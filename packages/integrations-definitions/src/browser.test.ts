@@ -18,6 +18,7 @@ import {
   MiniMaxBrowserDefinition,
   NotionBrowserDefinition,
   OpenComputerSandboxRuntimeBrowserDefinition,
+  OpenRouterBrowserDefinition,
   PostHogBrowserDefinition,
   ResendBrowserDefinition,
   SentryBrowserDefinition,
@@ -171,6 +172,24 @@ describe("browser definitions", () => {
     expect(InceptionBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
     expect(InceptionBrowserDefinition.webhookHandler).toBeUndefined();
     expect(InceptionBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("registers OpenRouter in the browser-safe definitions bundle", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: OpenRouterBrowserDefinition.familyId,
+      variantId: OpenRouterBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "openrouter",
+      variantId: "openrouter-default",
+      kind: "agent",
+      displayName: "OpenRouter",
+      logoKey: "openrouter",
+    });
+    expect(OpenRouterBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(OpenRouterBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(OpenRouterBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("registers Z.ai in the browser-safe definitions bundle", () => {

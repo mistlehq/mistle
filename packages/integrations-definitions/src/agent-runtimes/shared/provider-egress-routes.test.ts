@@ -12,6 +12,7 @@ import {
   isMiniMaxOpenCodeApiRoute,
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
+  isOpenRouterApiRoute,
   isOpenCodeGoRoute,
   isZaiApiRoute,
   routeHasHost,
@@ -210,6 +211,19 @@ describe("provider egress route helpers", () => {
           host: "api.inceptionlabs.ai",
           baseUrl: "https://api.inceptionlabs.ai/v1",
           pathPrefixes: ["/v1"],
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches OpenRouter API provider routes", () => {
+    expect(
+      isOpenRouterApiRoute(
+        createRoute({
+          familyId: "openrouter",
+          host: "openrouter.ai",
+          baseUrl: "https://openrouter.ai/api/v1",
+          pathPrefixes: ["/api/v1"],
         }),
       ),
     ).toBe(true);

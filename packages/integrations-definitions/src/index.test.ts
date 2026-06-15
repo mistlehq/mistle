@@ -57,6 +57,10 @@ describe("integrations-definitions index", () => {
       familyId: "openai",
       variantId: "openai-default",
     });
+    const openRouterDefinition = registry.getDefinition({
+      familyId: "openrouter",
+      variantId: "openrouter-default",
+    });
     const miniMaxDefinition = registry.getDefinition({
       familyId: "minimax",
       variantId: "minimax-default",
@@ -314,6 +318,13 @@ describe("integrations-definitions index", () => {
     });
     expect(openAiDefinition?.displayName).toBe("OpenAI");
     expect(openAiDefinition?.kind).toBe("agent");
+    expect(openRouterDefinition).toMatchObject({
+      familyId: "openrouter",
+      variantId: "openrouter-default",
+      kind: "agent",
+      displayName: "OpenRouter",
+      allowedRuntimeIds: ["opencode", "pi"],
+    });
     expect(deepSeekDefinition).toMatchObject({
       familyId: "deepseek",
       variantId: "deepseek-default",
@@ -1030,7 +1041,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(29);
+    expect(definitions).toHaveLength(31);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -1053,6 +1064,7 @@ describe("integrations-definitions index", () => {
       "notion::notion-mcp",
       "openai::openai-default",
       "opencode::opencode-go",
+      "openrouter::openrouter-default",
       "planetscale::planetscale-mcp",
       "posthog::posthog-mcp",
       "resend::resend-mcp",

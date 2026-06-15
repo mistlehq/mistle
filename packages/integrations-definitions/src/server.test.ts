@@ -92,6 +92,10 @@ describe("integrations-definitions server", () => {
       familyId: "opencode",
       variantId: "opencode-go",
     });
+    const openRouterDefinition = registry.getDefinition({
+      familyId: "openrouter",
+      variantId: "openrouter-default",
+    });
     const planetscaleDefinition = registry.getDefinition({
       familyId: "planetscale",
       variantId: "planetscale-mcp",
@@ -203,6 +207,13 @@ describe("integrations-definitions server", () => {
     });
     expect(anthropicDefinition?.kind).toBe("agent");
     expect(openCodeGoDefinition?.kind).toBe("agent");
+    expect(openRouterDefinition).toMatchObject({
+      familyId: "openrouter",
+      variantId: "openrouter-default",
+      kind: "agent",
+      displayName: "OpenRouter",
+      allowedRuntimeIds: ["opencode", "pi"],
+    });
     expect(
       githubEnterpriseServerDefinition?.credentialResolvers?.custom?.github_app_installation_token,
     ).toBeDefined();
@@ -367,7 +378,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(29);
+    expect(definitions).toHaveLength(31);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
@@ -380,6 +391,7 @@ describe("integrations-definitions server", () => {
         "kimi::kimi-default",
         "minimax::minimax-default",
         "notion::notion-mcp",
+        "openrouter::openrouter-default",
         "posthog::posthog-mcp",
         "resend::resend-mcp",
         "zai::zai-coding-plan",

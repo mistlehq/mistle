@@ -24,6 +24,7 @@ import { MiniMaxDefinition } from "./minimax/index.js";
 import { NotionMcpBaseDefinition } from "./notion/variants/notion-mcp/base-definition.js";
 import { OpenAiApiKeyDefinition } from "./openai/variants/openai-default/definition.js";
 import { OpenCodeGoDefinition } from "./opencode/index.js";
+import { OpenRouterDefinition } from "./openrouter/index.js";
 import { PlanetScaleMcpBaseDefinition } from "./planetscale/variants/planetscale-mcp/base-definition.js";
 import { PostHogMcpBaseDefinition } from "./posthog/variants/posthog-mcp/base-definition.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
@@ -56,6 +57,7 @@ export const LinearBrowserDefinition = LinearBaseDefinition;
 export const MiniMaxBrowserDefinition = MiniMaxDefinition;
 export const NotionBrowserDefinition = NotionMcpBaseDefinition;
 export const OpenCodeGoBrowserDefinition = OpenCodeGoDefinition;
+export const OpenRouterBrowserDefinition = OpenRouterDefinition;
 export const PlanetScaleBrowserDefinition = PlanetScaleMcpBaseDefinition;
 export const PostHogBrowserDefinition = PostHogMcpBaseDefinition;
 export const ResendBrowserDefinition = ResendMcpBaseDefinition;
@@ -88,6 +90,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   NotionBrowserDefinition,
   OpenAiApiKeyDefinition,
   OpenCodeGoBrowserDefinition,
+  OpenRouterBrowserDefinition,
   PlanetScaleBrowserDefinition,
   PostHogBrowserDefinition,
   ResendBrowserDefinition,
@@ -135,6 +138,7 @@ export * from "./linear/browser.js";
 export * from "./minimax/index.js";
 export * from "./notion/browser.js";
 export * from "./opencode/index.js";
+export * from "./openrouter/index.js";
 export * from "./posthog/browser.js";
 export * from "./resend/browser.js";
 export * from "./sandbox-runtimes/index.js";

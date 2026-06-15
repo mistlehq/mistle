@@ -20,6 +20,7 @@ import {
   isMiniMaxOpenCodeApiRoute,
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
+  isOpenRouterApiRoute,
   isOpenCodeGoRoute,
   isZaiApiRoute,
 } from "../shared/provider-egress-routes.js";
@@ -114,6 +115,10 @@ function resolveOpenCodeEnabledProviders(
 
     if (isInceptionApiRoute(route)) {
       providers.add("inception");
+    }
+
+    if (isOpenRouterApiRoute(route)) {
+      providers.add("openrouter");
     }
 
     if (isKimiApiRoute(route)) {
@@ -256,6 +261,17 @@ function renderOpenCodeAuthContent(
       insertOpenCodeAuth({
         auth,
         providerId: "inception",
+        value: {
+          type: "api",
+          key: MistleManagedApiKey,
+        },
+      });
+    }
+
+    if (isOpenRouterApiRoute(route)) {
+      insertOpenCodeAuth({
+        auth,
+        providerId: "openrouter",
         value: {
           type: "api",
           key: MistleManagedApiKey,

@@ -672,6 +672,16 @@ describe("compileOpenCodeRuntime", () => {
           secretType: "api_key",
         }),
         createCompiledRoute({
+          egressRuleId: "egress_rule_bind_openrouter",
+          bindingId: "bind_openrouter",
+          familyId: "openrouter",
+          variantId: "openrouter-default",
+          host: "openrouter.ai",
+          pathPrefixes: ["/api/v1"],
+          baseUrl: "https://openrouter.ai/api/v1",
+          secretType: "api_key",
+        }),
+        createCompiledRoute({
           egressRuleId: "egress_rule_bind_minimax",
           bindingId: "bind_minimax",
           familyId: "minimax",
@@ -715,6 +725,7 @@ describe("compileOpenCodeRuntime", () => {
         "moonshotai",
         "openai",
         "opencode-go",
+        "openrouter",
         "zai-coding-plan",
       ],
     });
@@ -884,6 +895,28 @@ describe("compileOpenCodeRuntime", () => {
       ]),
     ).toEqual({
       inception: {
+        type: "api",
+        key: "mistle-managed-credential",
+      },
+    });
+  });
+
+  it("renders OpenRouter API auth file from proxied egress routes", () => {
+    expect(
+      readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_openrouter",
+          bindingId: "bind_openrouter",
+          familyId: "openrouter",
+          variantId: "openrouter-default",
+          host: "openrouter.ai",
+          pathPrefixes: ["/api/v1"],
+          baseUrl: "https://openrouter.ai/api/v1",
+          secretType: "api_key",
+        }),
+      ]),
+    ).toEqual({
+      openrouter: {
         type: "api",
         key: "mistle-managed-credential",
       },

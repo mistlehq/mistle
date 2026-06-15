@@ -94,6 +94,17 @@ export function isInceptionApiRoute(route: EgressCredentialRoute): boolean {
   );
 }
 
+export function isOpenRouterApiRoute(route: EgressCredentialRoute): boolean {
+  return (
+    route.familyId === "openrouter" &&
+    routeHasHost({ route, host: "openrouter.ai" }) &&
+    routeHasPathPrefix({ route, pathPrefix: "/api/v1" }) &&
+    route.authInjection.type === "bearer" &&
+    isIntegrationConnectionCredentialRoute(route) &&
+    route.credentialResolver.secretType === "api_key"
+  );
+}
+
 export function isKimiApiRoute(route: EgressCredentialRoute): boolean {
   return (
     route.familyId === "kimi" &&
