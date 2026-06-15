@@ -151,6 +151,11 @@
       }
     },
     {
+      "targetKey": "stripe-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "github-cloud",
       "enabled": true,
       "config": {
