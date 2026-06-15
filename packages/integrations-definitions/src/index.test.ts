@@ -951,7 +951,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(23);
+    expect(definitions).toHaveLength(24);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -961,6 +961,7 @@ describe("integrations-definitions index", () => {
       "cloudflare::cloudflare-mcp",
       "datadog::datadog-default",
       "deepseek::deepseek-default",
+      "expo::expo-mcp",
       "gcp::gcp-mcp",
       "jira::jira-default",
       "github::github-cloud",

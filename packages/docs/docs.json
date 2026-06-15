@@ -39,6 +39,7 @@
               "guides/anthropic-integration-setup",
               "guides/bugsnag-integration-setup",
               "guides/datadog-integration-setup",
+              "guides/expo-integration-setup",
               "guides/gcp-integration-setup",
               "guides/github-integration-setup",
               "guides/jira-integration-setup",

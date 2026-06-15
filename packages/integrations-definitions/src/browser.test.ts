@@ -7,6 +7,7 @@ import {
   DatadogBrowserDefinition,
   DeepSeekBrowserDefinition,
   E2BSandboxRuntimeBrowserDefinition,
+  ExpoBrowserDefinition,
   GcpBrowserDefinition,
   GitHubCloudBrowserDefinition,
   JiraBrowserDefinition,
@@ -110,6 +111,10 @@ describe("browser definitions", () => {
     expect(PostHogBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
   });
 
+  it("keeps Expo browser definitions free of server-only OAuth handlers", () => {
+    expect(ExpoBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+  });
+
   it("keeps slack browser definitions free of server-only webhook hooks", () => {
     expect(SlackBrowserDefinition.webhookHandler).toBeUndefined();
     expect(SlackBrowserDefinition.webhookSource).toBeUndefined();
@@ -185,6 +190,20 @@ describe("browser definitions", () => {
       sandboxRuntime: {
         providerId: "e2b",
       },
+    });
+  });
+
+  it("registers Expo in the browser-safe definitions bundle", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: ExpoBrowserDefinition.familyId,
+      variantId: ExpoBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "expo",
+      variantId: "expo-mcp",
+      kind: "connector",
+      logoKey: "expo",
     });
   });
 
