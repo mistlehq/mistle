@@ -63,6 +63,13 @@
       "import": "./dist/agent-runtimes/opencode/index.js",
       "default": "./dist/agent-runtimes/opencode/index.js"
     },
+    "./agent-runtimes/claude-code": {
+      "types": "./src/agent-runtimes/claude-code/index.ts",
+      "workspace-src": "./src/agent-runtimes/claude-code/index.ts",
+      "node": "./dist/agent-runtimes/claude-code/index.js",
+      "import": "./dist/agent-runtimes/claude-code/index.js",
+      "default": "./dist/agent-runtimes/claude-code/index.js"
+    },
     "./agent-runtimes/opencode/client": {
       "types": "./src/agent-runtimes/opencode/client.ts",
       "workspace-src": "./src/agent-runtimes/opencode/client.ts",
@@ -173,6 +180,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-sts": "3.1047.0",
+    "@mistle/claude-code-runtime-server": "workspace:*",
     "@mistle/http": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/sandbox-session-client": "workspace:*",

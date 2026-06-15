@@ -16,6 +16,7 @@ pub enum RuntimeReadinessMode {
     NoAgentRuntime,
     CodexProxyOnly,
     Codex,
+    ClaudeCode,
     OpenCode,
     OpenCodeProxyOnly,
     Pi,
@@ -32,6 +33,10 @@ pub fn derive_runtime_ready(snapshot: &SandboxdHealthSnapshot, mode: RuntimeRead
         RuntimeReadinessMode::Codex => {
             codex_proxy_is_ready(snapshot)
                 && component_is_healthy(snapshot, SupervisedComponent::CodexAppServer)
+                && runtime_agent_endpoint_is_ready(snapshot)
+        }
+        RuntimeReadinessMode::ClaudeCode => {
+            component_is_healthy(snapshot, SupervisedComponent::ClaudeCodeServer)
                 && runtime_agent_endpoint_is_ready(snapshot)
         }
         RuntimeReadinessMode::OpenCodeProxyOnly => {
@@ -316,6 +321,47 @@ mod tests {
         assert!(!derive_runtime_ready(
             &snapshot,
             RuntimeReadinessMode::Codex
+        ));
+    }
+
+    #[test]
+    fn derives_claude_code_runtime_as_ready_only_when_server_and_endpoint_are_healthy() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![
+                component_snapshot(
+                    SupervisedComponent::ClaudeCodeServer,
+                    ComponentHealthState::Healthy,
+                ),
+                component_snapshot(
+                    SupervisedComponent::RuntimeAgentEndpoint,
+                    ComponentHealthState::Healthy,
+                ),
+            ],
+        };
+
+        assert!(derive_runtime_ready(
+            &snapshot,
+            RuntimeReadinessMode::ClaudeCode
+        ));
+
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![
+                component_snapshot(
+                    SupervisedComponent::ClaudeCodeServer,
+                    ComponentHealthState::Restarting,
+                ),
+                component_snapshot(
+                    SupervisedComponent::RuntimeAgentEndpoint,
+                    ComponentHealthState::Healthy,
+                ),
+            ],
+        };
+
+        assert!(!derive_runtime_ready(
+            &snapshot,
+            RuntimeReadinessMode::ClaudeCode
         ));
     }
 

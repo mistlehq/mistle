@@ -1616,6 +1616,7 @@ fn build_runtime_agent_probe_plan(
     };
 
     let runtime_probe = match adapter.runtime_id() {
+        "claude-code" => RuntimeSpecificProbe::ClaudeCode,
         "codex" => RuntimeSpecificProbe::Codex,
         "opencode" => build_opencode_runtime_specific_probe(runtime_plan, adapter.listen_url())?,
         "pi" => RuntimeSpecificProbe::Pi {

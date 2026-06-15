@@ -26,6 +26,7 @@ pub enum SupervisedComponent {
     EgressProxy,
     CodexProxy,
     CodexAppServer,
+    ClaudeCodeServer,
     OpenCodeProxy,
     OpenCodeServer,
     OpenCodeProxyConnectivity,
@@ -43,6 +44,7 @@ impl SupervisedComponent {
             Self::EgressProxy => "EgressProxy",
             Self::CodexProxy => "CodexProxy",
             Self::CodexAppServer => "CodexAppServer",
+            Self::ClaudeCodeServer => "ClaudeCodeServer",
             Self::OpenCodeProxy => "OpenCodeProxy",
             Self::OpenCodeServer => "OpenCodeServer",
             Self::OpenCodeProxyConnectivity => "OpenCodeProxyConnectivity",
@@ -814,6 +816,19 @@ fn snapshot_detail_field_names_for_event(
             | LifecycleEventName::ComponentHealthcheckFailed,
         ) => &["processKey", "readinessUrl", "pid"],
         (SupervisedComponent::OpenCodeServer, LifecycleEventName::ComponentExited) => {
+            &["processKey", "pid"]
+        }
+        (
+            SupervisedComponent::ClaudeCodeServer,
+            LifecycleEventName::ComponentStarting | LifecycleEventName::ComponentRestartScheduled,
+        ) => &["processKey", "readinessUrl"],
+        (
+            SupervisedComponent::ClaudeCodeServer,
+            LifecycleEventName::ComponentStarted
+            | LifecycleEventName::ComponentRestartSucceeded
+            | LifecycleEventName::ComponentHealthcheckFailed,
+        ) => &["processKey", "readinessUrl", "pid"],
+        (SupervisedComponent::ClaudeCodeServer, LifecycleEventName::ComponentExited) => {
             &["processKey", "pid"]
         }
         (

@@ -23,6 +23,18 @@ export const SessionRuntimeWorkbenchCapabilities = {
     supportsSteering: true,
     preservesCliLaunchContext: false,
   },
+  CLAUDE_CODE: {
+    runtimeId: "claude-code",
+    displayName: "Claude Code",
+    cliTerminalContentInset: "none",
+    composerModelSelection: {
+      required: false,
+      showControls: false,
+    },
+    supportsSteering: true,
+    preservesCliLaunchContext: false,
+    hasContextUsage: false,
+  },
   OPENCODE: {
     runtimeId: "opencode",
     displayName: "OpenCode",

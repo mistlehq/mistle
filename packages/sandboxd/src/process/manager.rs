@@ -183,6 +183,15 @@ fn start_runtime_client_process_manager_with_supervisor_observer_and_platform_sc
             );
             supervisor_handle.mark_component_starting(SupervisedComponent::OpenCodeServer);
         }
+        if process_spec.process_key == "claude-code-runtime-server"
+            && supervisor_handle.tracks_component(SupervisedComponent::ClaudeCodeServer)
+        {
+            supervisor_handle.replace_component_details(
+                SupervisedComponent::ClaudeCodeServer,
+                claude_code_server_details_with_status(process_spec, None, "Starting", "Starting"),
+            );
+            supervisor_handle.mark_component_starting(SupervisedComponent::ClaudeCodeServer);
+        }
         if let Some(observer) = observer {
             observer.record_process_started(process_spec);
         }
@@ -325,6 +334,20 @@ fn start_runtime_client_process_manager_with_supervisor_observer_and_platform_sc
             ));
             opencode_server_control_handle = Some(control_handle);
         }
+        if process_spec.process_key == "claude-code-runtime-server"
+            && supervisor_handle.tracks_component(SupervisedComponent::ClaudeCodeServer)
+        {
+            supervisor_handle.replace_component_details(
+                SupervisedComponent::ClaudeCodeServer,
+                claude_code_server_details_with_status(
+                    process_spec,
+                    Some(process.pid()),
+                    "Alive",
+                    "Ready",
+                ),
+            );
+            supervisor_handle.mark_component_healthy(SupervisedComponent::ClaudeCodeServer);
+        }
 
         if let Some(observer) = observer {
             observer.record_process_completed(process_spec);
@@ -348,6 +371,24 @@ fn start_runtime_client_process_manager_with_supervisor_observer_and_platform_sc
         monitor_threads,
         supervisor_handle,
     })
+}
+
+fn claude_code_server_details_with_status(
+    process_spec: &RuntimeClientProcessSpec,
+    pid: Option<u32>,
+    process_state: &str,
+    readiness_state: &str,
+) -> BTreeMap<String, String> {
+    let mut details = BTreeMap::from([
+        ("processKey".to_string(), process_spec.process_key.clone()),
+        ("readinessUrl".to_string(), readiness_target(process_spec)),
+        ("processState".to_string(), process_state.to_string()),
+        ("readinessState".to_string(), readiness_state.to_string()),
+    ]);
+    if let Some(pid) = pid {
+        details.insert("pid".to_string(), pid.to_string());
+    }
+    details
 }
 
 fn create_runtime_client_process_platform_scope(
@@ -419,6 +460,13 @@ impl RuntimeClientProcessManager {
         {
             self.supervisor_handle
                 .mark_component_stopped(SupervisedComponent::OpenCodeServer);
+        }
+        if self
+            .supervisor_handle
+            .tracks_component(SupervisedComponent::ClaudeCodeServer)
+        {
+            self.supervisor_handle
+                .mark_component_stopped(SupervisedComponent::ClaudeCodeServer);
         }
         Ok(())
     }

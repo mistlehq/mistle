@@ -175,6 +175,10 @@ pub enum RuntimeAdapter {
         runtime_id: String,
         proxy: OpenCodeProxy,
     },
+    ClaudeCode {
+        listen_url: String,
+        runtime_id: String,
+    },
     Pi {
         runtime_id: String,
         proxy: PiProxy,
@@ -187,6 +191,7 @@ impl RuntimeAdapter {
         match self {
             Self::Codex { runtime_id, .. } => runtime_id,
             Self::OpenCode { runtime_id, .. } => runtime_id,
+            Self::ClaudeCode { runtime_id, .. } => runtime_id,
             Self::Pi { runtime_id, .. } => runtime_id,
         }
     }
@@ -196,6 +201,7 @@ impl RuntimeAdapter {
         match self {
             Self::Codex { proxy, .. } => proxy.listen_url(),
             Self::OpenCode { proxy, .. } => proxy.listen_url(),
+            Self::ClaudeCode { listen_url, .. } => listen_url,
             Self::Pi { proxy, .. } => proxy.listen_url(),
         }
     }
@@ -205,6 +211,7 @@ impl RuntimeAdapter {
         match self {
             Self::Codex { proxy, .. } => proxy.close().map_err(Self::map_codex_close_error),
             Self::OpenCode { proxy, .. } => proxy.close().map_err(Self::map_opencode_close_error),
+            Self::ClaudeCode { .. } => Ok(()),
             Self::Pi { proxy, .. } => proxy.close().map_err(Self::map_pi_close_error),
         }
     }
@@ -354,6 +361,10 @@ impl RuntimeAdapterRegistry {
                     started_adapters.push(adapter);
                     codex_proxy_control_handle = Some(control_handle);
                 }
+                "claude-code" => {
+                    let adapter = start_claude_code_runtime_adapter(agent_runtime, &runtime_plan)?;
+                    started_adapters.push(adapter);
+                }
                 "opencode" => {
                     let adapter = start_opencode_runtime_adapter(
                         agent_runtime,
@@ -401,6 +412,7 @@ fn collect_runtime_adapter_components(
             "codex" => {
                 components.insert(SupervisedComponent::CodexProxy);
             }
+            "claude-code" => {}
             "opencode" => {
                 components.insert(SupervisedComponent::OpenCodeProxy);
             }
@@ -412,6 +424,52 @@ fn collect_runtime_adapter_components(
         }
     }
     components
+}
+
+fn start_claude_code_runtime_adapter(
+    agent_runtime: &CompiledAgentRuntime,
+    runtime_plan: &CompiledRuntimePlan,
+) -> Result<RuntimeAdapter, RuntimeAdapterRegistryError> {
+    let runtime_client = runtime_plan
+        .runtime_clients
+        .iter()
+        .find(|runtime_client| runtime_client.client_id == agent_runtime.client_id)
+        .ok_or_else(|| RuntimeAdapterRegistryError::MissingRuntimeClient {
+            runtime_id: agent_runtime.runtime_id.clone(),
+            client_id: agent_runtime.client_id.clone(),
+        })?;
+
+    let endpoint = runtime_client
+        .endpoints
+        .iter()
+        .find(|endpoint| endpoint.endpoint_key == agent_runtime.endpoint_key)
+        .ok_or_else(|| RuntimeAdapterRegistryError::MissingRuntimeEndpoint {
+            runtime_id: agent_runtime.runtime_id.clone(),
+            client_id: agent_runtime.client_id.clone(),
+            endpoint_key: agent_runtime.endpoint_key.clone(),
+        })?;
+    if endpoint.connection_mode != RuntimeClientConnectionMode::Dedicated {
+        return Err(RuntimeAdapterRegistryError::UnsupportedConnectionMode {
+            runtime_id: agent_runtime.runtime_id.clone(),
+            connection_mode: endpoint.connection_mode,
+        });
+    }
+
+    runtime_client
+        .processes
+        .iter()
+        .find(|process| process.process_key == agent_runtime.runtime_key)
+        .ok_or_else(|| RuntimeAdapterRegistryError::MissingRuntimeProcess {
+            runtime_id: agent_runtime.runtime_id.clone(),
+            client_id: agent_runtime.client_id.clone(),
+            process_key: agent_runtime.runtime_key.clone(),
+        })?;
+
+    let RuntimeClientEndpointTransport::Ws { url: listen_url } = &endpoint.transport;
+    Ok(RuntimeAdapter::ClaudeCode {
+        listen_url: listen_url.clone(),
+        runtime_id: agent_runtime.runtime_id.clone(),
+    })
 }
 
 fn start_pi_runtime_adapter(
@@ -783,6 +841,79 @@ mod tests {
         assert_eq!(
             collect_runtime_adapter_components(&runtime_plan),
             BTreeSet::from([SupervisedComponent::OpenCodeProxy])
+        );
+    }
+
+    #[test]
+    fn adapter_owned_claude_code_components_do_not_include_server_process() {
+        let runtime_plan: CompiledRuntimePlan = serde_json::from_value(serde_json::json!({
+            "sandboxProfileId": "sbp_123",
+            "version": 1,
+            "image": {
+                "source": "base",
+                "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
+            },
+            "egressRoutes": [],
+            "artifacts": [],
+            "runtimeClients": [
+                {
+                    "clientId": "claude-code-runtime-server",
+                    "setup": {
+                        "env": {},
+                        "files": []
+                    },
+                    "processes": [
+                        {
+                            "processKey": "claude-code-runtime-server",
+                            "command": {
+                                "args": ["node", "/opt/mistle/claude-code-runtime-server/server.mjs"]
+                            },
+                            "readiness": {
+                                "type": "http",
+                                "url": "http://127.0.0.1:4521/health",
+                                "expectedStatus": 200,
+                                "timeoutMs": 5000
+                            },
+                            "stop": {
+                                "signal": "sigterm",
+                                "timeoutMs": 10000,
+                                "gracePeriodMs": 2000
+                            }
+                        }
+                    ],
+                    "endpoints": [
+                        {
+                            "endpointKey": "server",
+                            "processKey": "claude-code-runtime-server",
+                            "transport": {
+                                "type": "ws",
+                                "url": "ws://127.0.0.1:4521/agent"
+                            },
+                            "connectionMode": "dedicated"
+                        }
+                    ]
+                }
+            ],
+            "workspaceSources": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            },
+            "agentRuntimes": [
+                {
+                    "runtimeId": "claude-code",
+                    "runtimeKey": "claude-code-runtime-server",
+                    "clientId": "claude-code-runtime-server",
+                    "endpointKey": "server",
+                    "ptyLaunch": {}
+                }
+            ]
+        }))
+        .expect("runtime plan should decode");
+
+        assert_eq!(
+            collect_runtime_adapter_components(&runtime_plan),
+            BTreeSet::new()
         );
     }
 }

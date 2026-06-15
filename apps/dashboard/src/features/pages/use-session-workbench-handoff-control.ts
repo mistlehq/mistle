@@ -25,6 +25,7 @@ import type { SessionLifecycleForWorkbench } from "./use-session-workbench-lifec
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
 
 const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
+const ClaudeCodeWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE;
 const OpenCodeWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.OPENCODE;
 const PiWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.PI;
 
@@ -184,6 +185,10 @@ export function useSessionWorkbenchHandoffControl(input: {
   );
   const handoffRuntimes = useMemo(
     () => ({
+      [ClaudeCodeWorkbenchCapabilities.runtimeId]: {
+        ...codexHandoffRuntime,
+        displayName: ClaudeCodeWorkbenchCapabilities.displayName,
+      },
       [CodexWorkbenchCapabilities.runtimeId]: codexHandoffRuntime,
       [OpenCodeWorkbenchCapabilities.runtimeId]: openCodeHandoffRuntime,
       [PiWorkbenchCapabilities.runtimeId]: piHandoffRuntime,

@@ -312,6 +312,7 @@ fn component_name(component: SupervisedComponent) -> &'static str {
         SupervisedComponent::EgressProxy => "egress_proxy",
         SupervisedComponent::CodexProxy => "codex_proxy",
         SupervisedComponent::CodexAppServer => "codex_app_server",
+        SupervisedComponent::ClaudeCodeServer => "claude_code_server",
         SupervisedComponent::OpenCodeProxy => "opencode_proxy",
         SupervisedComponent::OpenCodeServer => "opencode_server",
         SupervisedComponent::OpenCodeProxyConnectivity => "opencode_proxy_connectivity",
