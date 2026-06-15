@@ -7,6 +7,7 @@ import {
 
 import { AnthropicDefinition } from "./anthropic/index.js";
 import { AwsDefinition } from "./aws/browser.js";
+import { BugSnagDefinition } from "./bugsnag/browser.js";
 import { CloudflareDefinition } from "./cloudflare/browser.js";
 import { DatadogDefinition } from "./datadog/index.js";
 import { GcpDefinition } from "./gcp/browser.js";
@@ -29,6 +30,7 @@ import { SlackDefinition } from "./slack/browser.js";
 
 export * from "./anthropic/index.js";
 export * from "./aws/browser.js";
+export * from "./bugsnag/browser.js";
 export * from "./cloudflare/browser.js";
 export * from "./datadog/index.js";
 export * from "./gcp/browser.js";
@@ -51,6 +53,7 @@ export * from "./shared/remote-mcp-server-catalog/index.js";
 const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   AnthropicDefinition,
   AwsDefinition,
+  BugSnagDefinition,
   CloudflareDefinition,
   DatadogDefinition,
   GcpDefinition,

@@ -19,6 +19,11 @@
       "config": {}
     },
     {
+      "targetKey": "bugsnag-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "cloudflare-mcp",
       "enabled": true,
       "config": {}

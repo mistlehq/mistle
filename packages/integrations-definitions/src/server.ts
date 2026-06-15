@@ -9,6 +9,7 @@ import {
 
 import { AnthropicDefinition } from "./anthropic/index.js";
 import { AwsDefinition } from "./aws/server.js";
+import { BugSnagDefinition } from "./bugsnag/server.js";
 import { CloudflareDefinition } from "./cloudflare/server.js";
 import { DatadogDefinition } from "./datadog/index.js";
 import { resolveDefinitionEgressCredentialResolver } from "./egress-credential-resolver.server.js";
@@ -33,6 +34,7 @@ import { SlackDefinition } from "./slack/index.js";
 
 export * from "./anthropic/index.js";
 export * from "./aws/server.js";
+export * from "./bugsnag/server.js";
 export * from "./cloudflare/server.js";
 export * from "./datadog/index.js";
 export * from "./egress-credential-resolver.server.js";
@@ -60,6 +62,7 @@ export * from "./shared/webhook-callback-url.server.js";
 const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   AnthropicDefinition,
   AwsDefinition,
+  BugSnagDefinition,
   CloudflareDefinition,
   DatadogDefinition,
   GcpDefinition,

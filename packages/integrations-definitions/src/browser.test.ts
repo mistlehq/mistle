@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   AwsBrowserDefinition,
+  BugSnagBrowserDefinition,
   createBrowserDefinitionsBundle,
   DatadogBrowserDefinition,
   E2BSandboxRuntimeBrowserDefinition,
@@ -70,6 +71,14 @@ describe("browser definitions", () => {
     expect(DatadogBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
     expect(DatadogBrowserDefinition.webhookHandler).toBeUndefined();
     expect(DatadogBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("keeps BugSnag browser definitions free of server-only hooks and resources", () => {
+    expect(BugSnagBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(BugSnagBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(BugSnagBrowserDefinition.webhookSource).toBeUndefined();
+    expect(BugSnagBrowserDefinition.resourceDefinitions).toBeUndefined();
+    expect(BugSnagBrowserDefinition.resourceSyncTriggers).toBeUndefined();
   });
 
   it("keeps GCP browser definitions free of server-only OAuth handlers", () => {

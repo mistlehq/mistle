@@ -32,6 +32,10 @@ describe("integrations-definitions server", () => {
       familyId: "aws",
       variantId: "aws-cli-default",
     });
+    const bugSnagDefinition = registry.getDefinition({
+      familyId: "bugsnag",
+      variantId: "bugsnag-mcp",
+    });
     const datadogDefinition = registry.getDefinition({
       familyId: "datadog",
       variantId: "datadog-default",
@@ -235,6 +239,11 @@ describe("integrations-definitions server", () => {
     });
     expect(awsDefinition?.webhookHandler).toBeUndefined();
     expect(awsDefinition?.webhookSource).toBeUndefined();
+    expect(bugSnagDefinition?.oauth2AuthorizationCode).toBeDefined();
+    expect(bugSnagDefinition?.webhookHandler).toBeUndefined();
+    expect(bugSnagDefinition?.webhookSource).toBeUndefined();
+    expect(bugSnagDefinition?.resourceDefinitions).toBeUndefined();
+    expect(bugSnagDefinition?.resourceSyncTriggers).toBeUndefined();
     expect(githubEnterpriseServerDefinition?.resourceDefinitions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -315,7 +324,10 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(19);
+    expect(definitions).toHaveLength(20);
+    expect(
+      definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
+    ).toContain("bugsnag::bugsnag-mcp");
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {

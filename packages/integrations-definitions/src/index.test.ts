@@ -17,6 +17,10 @@ describe("integrations-definitions index", () => {
       familyId: "aws",
       variantId: "aws-cli-default",
     });
+    const bugSnagDefinition = registry.getDefinition({
+      familyId: "bugsnag",
+      variantId: "bugsnag-mcp",
+    });
     const datadogDefinition = registry.getDefinition({
       familyId: "datadog",
       variantId: "datadog-default",
@@ -110,6 +114,26 @@ describe("integrations-definitions index", () => {
     expect(awsDefinition?.credentialResolvers).toBeUndefined();
     expect(awsDefinition?.webhookHandler).toBeUndefined();
     expect(awsDefinition?.webhookSource).toBeUndefined();
+    expect(bugSnagDefinition).toMatchObject({
+      familyId: "bugsnag",
+      variantId: "bugsnag-mcp",
+      kind: "connector",
+      displayName: "BugSnag",
+      connectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "BugSnag OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect BugSnag",
+              helperText: "Authorize SmartBear hosted BugSnag MCP access.",
+            },
+          },
+        },
+      ],
+    });
+    expect(bugSnagDefinition?.oauth2AuthorizationCode).toBeUndefined();
     expect(datadogDefinition).toMatchObject({
       familyId: "datadog",
       variantId: "datadog-default",
@@ -865,12 +889,13 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(19);
+    expect(definitions).toHaveLength(20);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
       "anthropic::anthropic-default",
       "aws::aws-cli-default",
+      "bugsnag::bugsnag-mcp",
       "cloudflare::cloudflare-mcp",
       "datadog::datadog-default",
       "gcp::gcp-mcp",
