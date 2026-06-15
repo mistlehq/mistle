@@ -21,7 +21,7 @@ use crate::control::state::{
 use crate::control::{ActivationPhase, ControlError};
 use crate::protocol::activation::ActivationInput;
 use crate::protocol::session::SessionRuntimeInput;
-use crate::protocol::startup::ActivationOperationKind;
+use crate::protocol::startup::{ActivationOperationKind, GitIdentity, GitSigningConfig};
 use crate::sandboxd_state::{SandboxdState, SandboxdStateError};
 use crate::security;
 use crate::startup_diagnostics::{
@@ -349,6 +349,12 @@ fn reject_unsupported_activated_activation_input(
             "initialized activation cannot change runtime plan".to_string(),
         ));
     }
+    if candidate_activation_input.operation_kind == ActivationOperationKind::Resume {
+        let _ = resume_git_identity_after_refresh(
+            accepted_activation_input.git_identity.as_ref(),
+            candidate_activation_input.git_identity.as_ref(),
+        )?;
+    }
     Ok(())
 }
 
@@ -396,10 +402,86 @@ fn refresh_activated_activation(
 
     let mut state_guard = lock_control_state(state)?;
     if activate_result.is_ok() {
-        state_guard.activation_input = Some(activation_input);
+        state_guard.activation_input = Some(activation_input_after_refresh(
+            &accepted_session_input,
+            activation_input,
+        ));
     }
     state_guard.sandboxd_state = Some(sandboxd_state);
     activate_result
+}
+
+fn activation_input_after_refresh(
+    accepted_session_input: &SessionRuntimeInput,
+    mut activation_input: ActivationInput,
+) -> ActivationInput {
+    if activation_input.operation_kind != ActivationOperationKind::Resume {
+        return activation_input;
+    }
+
+    activation_input.git_identity = resume_git_identity_after_refresh(
+        accepted_session_input.git_identity.as_ref(),
+        activation_input.git_identity.as_ref(),
+    )
+    .expect("resume Git identity changes should be prevalidated before refresh activation");
+
+    activation_input
+}
+
+fn resume_git_identity_after_refresh(
+    accepted_git_identity: Option<&GitIdentity>,
+    candidate_git_identity: Option<&GitIdentity>,
+) -> Result<Option<GitIdentity>, ControlError> {
+    match (accepted_git_identity, candidate_git_identity) {
+        (None, None) => Ok(None),
+        (None, Some(_)) => Err(ControlError::ResumeSandboxdState(
+            "initialized resume cannot add Git identity".to_string(),
+        )),
+        (Some(accepted), None) => Ok(Some(accepted.clone())),
+        (Some(accepted), Some(candidate)) => {
+            if accepted.name != candidate.name || accepted.email != candidate.email {
+                return Err(ControlError::ResumeSandboxdState(
+                    "initialized resume cannot change Git identity".to_string(),
+                ));
+            }
+
+            match (&accepted.signing, &candidate.signing) {
+                (None, None) => Ok(Some(accepted.clone())),
+                (None, Some(_)) => Err(ControlError::ResumeSandboxdState(
+                    "initialized resume cannot add Git signing identity".to_string(),
+                )),
+                (Some(_), None) => Ok(Some(accepted.clone())),
+                (Some(accepted_signing), Some(candidate_signing)) => {
+                    if !git_signing_durable_fields_match(accepted_signing, candidate_signing) {
+                        return Err(ControlError::ResumeSandboxdState(
+                            "initialized resume cannot change Git signing identity".to_string(),
+                        ));
+                    }
+
+                    let mut refreshed = accepted.clone();
+                    refreshed
+                        .signing
+                        .as_mut()
+                        .expect("accepted signing should exist")
+                        .grant = candidate_signing.grant.clone();
+                    Ok(Some(refreshed))
+                }
+            }
+        }
+    }
+}
+
+fn git_signing_durable_fields_match(
+    accepted_signing: &GitSigningConfig,
+    candidate_signing: &GitSigningConfig,
+) -> bool {
+    accepted_signing.format == candidate_signing.format
+        && accepted_signing.program == candidate_signing.program
+        && accepted_signing.key_ref == candidate_signing.key_ref
+        && accepted_signing.organization_id == candidate_signing.organization_id
+        && accepted_signing.provider_family == candidate_signing.provider_family
+        && accepted_signing.integration_connection_id == candidate_signing.integration_connection_id
+        && accepted_signing.acting_user_id == candidate_signing.acting_user_id
 }
 
 fn start_activation_init_worker(

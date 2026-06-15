@@ -899,59 +899,6 @@ impl SandboxdState {
                 timeline_attributes("tunnel", "Connecting tunnel"),
             );
         }
-        record_operation_phase_started_with_attributes(
-            &diagnostics_logger,
-            "apply_git_identity",
-            timeline_attributes("git-identity", "Configuring Git"),
-        );
-        if let Err(error) =
-            runtime::git_identity::apply_git_identity(&session_input, global_git_config_path)
-        {
-            let mut attributes = timeline_attributes("git-identity", "Configuring Git");
-            attributes.insert(
-                "error".to_string(),
-                activation_diagnostics_string(error.clone()),
-            );
-            record_operation_phase_failure(&diagnostics_logger, "apply_git_identity", attributes);
-            close_tunnel_session(
-                tunnel_session,
-                &diagnostics_logger,
-                "stop_tunnel_session_after_git_identity_failure",
-            );
-            let git_restore_result = restore_accepted_git_identity_after_activation_failure(
-                accepted_session_input,
-                global_git_config_path,
-                "apply candidate Git identity",
-            );
-            self.restore_previous_tunnel_session_after_activation_failure(
-                previous_tunnel_session,
-                previous_tunnel_health_snapshot,
-            );
-            let gateway_restore_result =
-                restore_accepted_gateway_egress_actor_after_activation_failure(
-                    &self.gateway_egress_token_provider,
-                    accepted_session_input,
-                    false,
-                    gateway_egress_provider_detached,
-                    self.tunnel_session.as_ref(),
-                );
-            if let Err(gateway_restore_error) = gateway_restore_result {
-                return Err(SandboxdStateError::ApplyGitIdentity(format!(
-                    "{error}; {gateway_restore_error}"
-                )));
-            }
-            if let Err(restore_error) = git_restore_result {
-                return Err(SandboxdStateError::ApplyGitIdentity(format!(
-                    "{error}; {restore_error}"
-                )));
-            }
-            return Err(SandboxdStateError::ApplyGitIdentity(error));
-        }
-        record_operation_phase_completed_with_attributes(
-            &diagnostics_logger,
-            "apply_git_identity",
-            timeline_attributes("git-identity", "Configuring Git"),
-        );
         if let Err(error) = attach_runtime_environment_to_tunnel(
             &tunnel_session,
             self.runtime_env.clone(),

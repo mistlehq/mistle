@@ -548,6 +548,123 @@ mod tests {
     }
 
     #[test]
+    fn resume_refreshes_signing_grant_without_rewriting_git_config() {
+        let test_dir = create_temp_test_dir("control_resume_git_identity");
+        let socket_path = test_dir.join("control.sock");
+        let start_gateway = start_bootstrap_gateway();
+        let key_ref = format!("key::{TEST_PUBLIC_KEY}");
+        let activation_input = valid_signing_activation_input(&start_gateway.ws_url, key_ref);
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_activate(&socket_path, &activation_input).expect("activation should succeed");
+        wait_for_activation_phase(&server, ActivationPhase::Activated);
+        let git_config_path = test_global_git_config_path(&socket_path);
+        let started_git_config =
+            std::fs::read_to_string(&git_config_path).expect("Git config should be written");
+
+        let refresh_gateway = start_bootstrap_gateway();
+        let mut refresh_input = activation_input.clone();
+        refresh_input.operation_kind = ActivationOperationKind::Resume;
+        refresh_input.tunnel_gateway_ws_url = refresh_gateway.ws_url.clone();
+        refresh_input.bootstrap_token = "refreshed-bootstrap-token".to_string();
+        refresh_input.tunnel_exchange_token = "refreshed-exchange-token".to_string();
+        refresh_input
+            .git_identity
+            .as_mut()
+            .and_then(|git_identity| git_identity.signing.as_mut())
+            .expect("test input should include signing")
+            .grant = "refreshed-grant-token".to_string();
+
+        submit_activate(&socket_path, &refresh_input).expect("resume activation should succeed");
+        assert_eq!(
+            std::fs::read_to_string(&git_config_path).expect("Git config should still exist"),
+            started_git_config
+        );
+        assert_eq!(server.activation_input(), Some(refresh_input));
+
+        server.close().expect("control server should stop cleanly");
+        start_gateway.close().expect("gateway should stop cleanly");
+        refresh_gateway
+            .close()
+            .expect("gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn resume_without_signing_preserves_accepted_signing_identity() {
+        let test_dir = create_temp_test_dir("control_resume_preserve_signing");
+        let socket_path = test_dir.join("control.sock");
+        let start_gateway = start_bootstrap_gateway();
+        let key_ref = format!("key::{TEST_PUBLIC_KEY}");
+        let activation_input = valid_signing_activation_input(&start_gateway.ws_url, key_ref);
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_activate(&socket_path, &activation_input).expect("activation should succeed");
+        wait_for_activation_phase(&server, ActivationPhase::Activated);
+        let git_config_path = test_global_git_config_path(&socket_path);
+        let started_git_config =
+            std::fs::read_to_string(&git_config_path).expect("Git config should be written");
+
+        let resume_gateway = start_bootstrap_gateway();
+        let mut resume_input = valid_activation_input(&resume_gateway.ws_url);
+        resume_input.operation_kind = ActivationOperationKind::Resume;
+        resume_input.git_identity = Some(GitIdentity {
+            name: "Mistle User".to_string(),
+            email: "mistle@example.test".to_string(),
+            signing: None,
+        });
+
+        submit_activate(&socket_path, &resume_input).expect("resume activation should succeed");
+        assert_eq!(
+            std::fs::read_to_string(&git_config_path).expect("Git config should still exist"),
+            started_git_config
+        );
+        let mut expected_activation_input = resume_input;
+        expected_activation_input.git_identity = activation_input.git_identity;
+        assert_eq!(server.activation_input(), Some(expected_activation_input));
+
+        server.close().expect("control server should stop cleanly");
+        start_gateway.close().expect("gateway should stop cleanly");
+        resume_gateway.close().expect("gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn resume_rejects_durable_signing_identity_changes() {
+        let test_dir = create_temp_test_dir("control_resume_reject_signing_change");
+        let socket_path = test_dir.join("control.sock");
+        let start_gateway = start_bootstrap_gateway();
+        let key_ref = format!("key::{TEST_PUBLIC_KEY}");
+        let activation_input = valid_signing_activation_input(&start_gateway.ws_url, key_ref);
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_activate(&socket_path, &activation_input).expect("activation should succeed");
+        wait_for_activation_phase(&server, ActivationPhase::Activated);
+
+        let resume_gateway = start_bootstrap_gateway();
+        let mut resume_input = valid_signing_activation_input(
+            &resume_gateway.ws_url,
+            "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDifferentKey".to_string(),
+        );
+        resume_input.operation_kind = ActivationOperationKind::Resume;
+
+        let error = submit_activate(&socket_path, &resume_input)
+            .expect_err("resume should reject durable signing identity changes");
+
+        assert!(
+            error
+                .to_string()
+                .contains("initialized resume cannot change Git signing identity")
+        );
+        assert_eq!(server.activation_input(), Some(activation_input));
+
+        server.close().expect("control server should stop cleanly");
+        start_gateway.close().expect("gateway should stop cleanly");
+        resume_gateway.close().expect("gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
     fn failed_activation_reports_failure_to_later_activation_attempts() {
         let test_dir = create_temp_test_dir("control_activate_failure");
         let socket_path = test_dir.join("control.sock");
