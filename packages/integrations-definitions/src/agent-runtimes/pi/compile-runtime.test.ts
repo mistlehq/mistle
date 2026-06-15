@@ -447,6 +447,35 @@ describe("compilePiRuntime", () => {
     });
   });
 
+  it("renders DeepSeek custom provider config when DeepSeek egress is available", () => {
+    const runtimeClients = renderRuntimeClients({
+      compiled: compileDefaultPiRuntime(),
+      egressRoutes: [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_deepseek",
+          bindingId: "bind_deepseek",
+          familyId: "deepseek",
+          variantId: "deepseek-default",
+          host: "api.deepseek.com",
+          baseUrl: "https://api.deepseek.com",
+          secretType: "api_key",
+        }),
+      ],
+    });
+
+    expect(JSON.parse(readSetupFile({ runtimeClients, fileId: "pi_models" }))).toEqual({
+      providers: {
+        deepseek: {
+          api: "openai-completions",
+          apiKey: "mistle-managed-credential",
+          baseUrl: "https://api.deepseek.com",
+          headers: {},
+          models: [{ id: "deepseek-v4-flash" }, { id: "deepseek-v4-pro" }],
+        },
+      },
+    });
+  });
+
   it("uses Pi's OpenAI Codex provider for ChatGPT subscription egress", () => {
     const runtimeClients = renderRuntimeClients({
       compiled: compileDefaultPiRuntime(),

@@ -12,6 +12,7 @@ import { AwsDefinition } from "./aws/server.js";
 import { BugSnagDefinition } from "./bugsnag/server.js";
 import { CloudflareDefinition } from "./cloudflare/server.js";
 import { DatadogDefinition } from "./datadog/index.js";
+import { DeepSeekDefinition } from "./deepseek/index.js";
 import { resolveDefinitionEgressCredentialResolver } from "./egress-credential-resolver.server.js";
 import { resolveDefinitionEgressRequestMiddleware } from "./egress-request-middleware.server.js";
 import { GcpDefinition } from "./gcp/server.js";
@@ -39,6 +40,7 @@ export * from "./aws/server.js";
 export * from "./bugsnag/server.js";
 export * from "./cloudflare/server.js";
 export * from "./datadog/index.js";
+export * from "./deepseek/index.js";
 export * from "./egress-credential-resolver.server.js";
 export * from "./egress-request-middleware.server.js";
 export * from "./egress-telemetry.server.js";
@@ -69,6 +71,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   BugSnagDefinition,
   CloudflareDefinition,
   DatadogDefinition,
+  DeepSeekDefinition,
   GcpDefinition,
   JiraDefinition,
   GitHubCloudDefinition,

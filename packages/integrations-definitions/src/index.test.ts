@@ -25,6 +25,10 @@ describe("integrations-definitions index", () => {
       familyId: "datadog",
       variantId: "datadog-default",
     });
+    const deepSeekDefinition = registry.getDefinition({
+      familyId: "deepseek",
+      variantId: "deepseek-default",
+    });
     const cloudflareDefinition = registry.getDefinition({
       familyId: "cloudflare",
       variantId: "cloudflare-mcp",
@@ -286,6 +290,13 @@ describe("integrations-definitions index", () => {
     });
     expect(openAiDefinition?.displayName).toBe("OpenAI");
     expect(openAiDefinition?.kind).toBe("agent");
+    expect(deepSeekDefinition).toMatchObject({
+      familyId: "deepseek",
+      variantId: "deepseek-default",
+      kind: "agent",
+      displayName: "DeepSeek",
+      allowedRuntimeIds: ["pi"],
+    });
     expect(openCodeGoDefinition).toMatchObject({
       familyId: "opencode",
       variantId: "opencode-go",
@@ -940,7 +951,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(22);
+    expect(definitions).toHaveLength(23);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -949,6 +960,7 @@ describe("integrations-definitions index", () => {
       "bugsnag::bugsnag-mcp",
       "cloudflare::cloudflare-mcp",
       "datadog::datadog-default",
+      "deepseek::deepseek-default",
       "gcp::gcp-mcp",
       "jira::jira-default",
       "github::github-cloud",

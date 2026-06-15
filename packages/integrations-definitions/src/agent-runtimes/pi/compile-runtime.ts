@@ -13,6 +13,7 @@ import {
 } from "../shared/managed-instructions.js";
 import {
   isAnthropicApiRoute,
+  isDeepSeekApiRoute,
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
 } from "../shared/provider-egress-routes.js";
@@ -66,15 +67,25 @@ type PiModelsJson = Record<
   Record<
     string,
     {
+      api?: "openai-completions";
       apiKey: string;
+      baseUrl?: string;
       headers: Record<string, never>;
+      models?: readonly PiModelConfig[];
     }
   >
 >;
 
 type PiProviderConfig = {
   provider: string;
+  api?: "openai-completions";
   apiKey: string;
+  baseUrl?: string;
+  models?: readonly PiModelConfig[];
+};
+
+type PiModelConfig = {
+  id: string;
 };
 
 type PiMcpConfigServer = {
@@ -128,20 +139,16 @@ function readChatGptAccountId(route: EgressCredentialRoute): string {
 
 function insertPiProviderConfig(input: {
   configsByProvider: Map<string, PiProviderConfig>;
-  provider: string;
-  apiKey: string;
+  config: PiProviderConfig;
 }): void {
-  const existing = input.configsByProvider.get(input.provider);
+  const existing = input.configsByProvider.get(input.config.provider);
   if (existing !== undefined) {
     throw new Error(
-      `Pi provider '${input.provider}' cannot be represented unambiguously because 2 supported egress routes matched the same built-in provider id.`,
+      `Pi provider '${input.config.provider}' cannot be represented unambiguously because 2 supported egress routes matched the same built-in provider id.`,
     );
   }
 
-  input.configsByProvider.set(input.provider, {
-    provider: input.provider,
-    apiKey: input.apiKey,
-  });
+  input.configsByProvider.set(input.config.provider, input.config);
 }
 
 function resolvePiProviderConfigs(
@@ -153,24 +160,43 @@ function resolvePiProviderConfigs(
     if (isOpenAiApiRoute(route)) {
       insertPiProviderConfig({
         configsByProvider,
-        provider: "openai",
-        apiKey: MistleManagedApiKey,
+        config: {
+          provider: "openai",
+          apiKey: MistleManagedApiKey,
+        },
       });
     }
 
     if (isOpenAiChatGptSubscriptionRoute(route)) {
       insertPiProviderConfig({
         configsByProvider,
-        provider: "openai-codex",
-        apiKey: renderManagedChatGptAccessToken(readChatGptAccountId(route)),
+        config: {
+          provider: "openai-codex",
+          apiKey: renderManagedChatGptAccessToken(readChatGptAccountId(route)),
+        },
       });
     }
 
     if (isAnthropicApiRoute(route)) {
       insertPiProviderConfig({
         configsByProvider,
-        provider: "anthropic",
-        apiKey: MistleManagedApiKey,
+        config: {
+          provider: "anthropic",
+          apiKey: MistleManagedApiKey,
+        },
+      });
+    }
+
+    if (isDeepSeekApiRoute(route)) {
+      insertPiProviderConfig({
+        configsByProvider,
+        config: {
+          provider: "deepseek",
+          api: "openai-completions",
+          apiKey: MistleManagedApiKey,
+          baseUrl: route.upstream.baseUrl,
+          models: [{ id: "deepseek-v4-flash" }, { id: "deepseek-v4-pro" }],
+        },
       });
     }
   }
@@ -182,10 +208,13 @@ function resolvePiProviderConfigs(
 
 function renderPiModelsJson(egressRoutes: ReadonlyArray<EgressCredentialRoute>): string {
   const providers: PiModelsJson["providers"] = {};
-  for (const { provider, apiKey } of resolvePiProviderConfigs(egressRoutes)) {
+  for (const { provider, api, apiKey, baseUrl, models } of resolvePiProviderConfigs(egressRoutes)) {
     providers[provider] = {
+      ...(api === undefined ? {} : { api }),
       apiKey,
+      ...(baseUrl === undefined ? {} : { baseUrl }),
       headers: {},
+      ...(models === undefined ? {} : { models }),
     };
   }
 

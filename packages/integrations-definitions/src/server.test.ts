@@ -353,12 +353,13 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(22);
+    expect(definitions).toHaveLength(23);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
       expect.arrayContaining([
         "bugsnag::bugsnag-mcp",
+        "deepseek::deepseek-default",
         "posthog::posthog-mcp",
         "resend::resend-mcp",
       ]),

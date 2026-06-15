@@ -5,6 +5,7 @@ import {
   BugSnagBrowserDefinition,
   createBrowserDefinitionsBundle,
   DatadogBrowserDefinition,
+  DeepSeekBrowserDefinition,
   E2BSandboxRuntimeBrowserDefinition,
   GcpBrowserDefinition,
   GitHubCloudBrowserDefinition,
@@ -73,6 +74,24 @@ describe("browser definitions", () => {
     expect(DatadogBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
     expect(DatadogBrowserDefinition.webhookHandler).toBeUndefined();
     expect(DatadogBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("registers DeepSeek in the browser-safe definitions bundle", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: DeepSeekBrowserDefinition.familyId,
+      variantId: DeepSeekBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "deepseek",
+      variantId: "deepseek-default",
+      kind: "agent",
+      displayName: "DeepSeek",
+      logoKey: "deepseek",
+    });
+    expect(DeepSeekBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(DeepSeekBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(DeepSeekBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("keeps BugSnag browser definitions free of server-only hooks and resources", () => {
