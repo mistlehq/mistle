@@ -74,7 +74,6 @@ export const PostHogMcpOAuthScopes = [
   "hog_function:write",
   "insight:read",
   "insight:write",
-  "insight_variable:read",
   "insight_variable:write",
   "integration:read",
   "integration:write",

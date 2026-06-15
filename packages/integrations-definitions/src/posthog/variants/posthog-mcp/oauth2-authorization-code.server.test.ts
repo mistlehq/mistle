@@ -64,6 +64,7 @@ describe("PostHog OAuth 2.0 authorization code", () => {
         "dashboard:write",
       ]),
     );
+    expect(requestedScopes).not.toContain("insight_variable:read");
   });
 
   it("builds the expected authorization code exchange body", () => {
