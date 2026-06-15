@@ -39,7 +39,6 @@ const ClaudeCodeMcpConfigPath = "/root/.claude/mcp.json";
 
 type ClaudeCodeRuntimeEnvironment = {
   ANTHROPIC_API_KEY: string;
-  MISTLE_CLAUDE_CODE_EXECUTABLE_PATH: string;
   MISTLE_CLAUDE_CODE_RUNTIME_HEALTH_PATH: string;
   MISTLE_CLAUDE_CODE_RUNTIME_HOST: string;
   MISTLE_CLAUDE_CODE_RUNTIME_PORT: string;
@@ -152,7 +151,6 @@ function resolveAnthropicRoute(egressRoutes: ReadonlyArray<EgressCredentialRoute
 function buildClaudeCodeRuntimeEnvironment(): ClaudeCodeRuntimeEnvironment {
   return {
     ANTHROPIC_API_KEY: MistleManagedApiKey,
-    MISTLE_CLAUDE_CODE_EXECUTABLE_PATH: ClaudeCodeExecutablePath,
     MISTLE_CLAUDE_CODE_RUNTIME_HEALTH_PATH: ClaudeCodeRuntimeServerHealthPath,
     MISTLE_CLAUDE_CODE_RUNTIME_HOST: ClaudeCodeRuntimeServerHost,
     MISTLE_CLAUDE_CODE_RUNTIME_PORT: String(ClaudeCodeRuntimeServerPort),
@@ -168,7 +166,20 @@ function buildClaudeCodeExecutableInstallScript(): string {
   return [
     `cat > "$1" <<'EOF'`,
     "#!/bin/sh",
-    `exec mise exec ${ClaudeCodeNodeTool} -- ${ClaudeCodeRuntimeServerPackageDir}/node_modules/.bin/claude "$@"`,
+    `sdk_bin_dir=${ClaudeCodeRuntimeServerPackageDir}/node_modules/@anthropic-ai`,
+    'case "$(uname -m)" in',
+    '  x86_64|amd64) package_candidates="claude-agent-sdk-linux-x64 claude-agent-sdk-linux-x64-musl" ;;',
+    '  aarch64|arm64) package_candidates="claude-agent-sdk-linux-arm64 claude-agent-sdk-linux-arm64-musl" ;;',
+    '  *) package_candidates="" ;;',
+    "esac",
+    "for package_name in $package_candidates claude-agent-sdk-linux-x64 claude-agent-sdk-linux-arm64 claude-agent-sdk-linux-x64-musl claude-agent-sdk-linux-arm64-musl; do",
+    '  executable="$sdk_bin_dir/$package_name/claude"',
+    '  if [ -x "$executable" ]; then',
+    '    exec "$executable" "$@"',
+    "  fi",
+    "done",
+    'echo "Claude Code SDK bundled binary was not found." >&2',
+    "exit 127",
     "EOF",
     `chmod 755 "$1"`,
   ].join("\n");

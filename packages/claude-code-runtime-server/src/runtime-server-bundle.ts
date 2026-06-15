@@ -8,7 +8,6 @@ const listenHost = process.env.MISTLE_CLAUDE_CODE_RUNTIME_HOST ?? "127.0.0.1";
 const listenPort = Number.parseInt(process.env.MISTLE_CLAUDE_CODE_RUNTIME_PORT ?? "4521", 10);
 const healthPath = process.env.MISTLE_CLAUDE_CODE_RUNTIME_HEALTH_PATH ?? "/health";
 const websocketPath = process.env.MISTLE_CLAUDE_CODE_RUNTIME_WS_PATH ?? "/agent";
-const claudeExecutablePath = process.env.MISTLE_CLAUDE_CODE_EXECUTABLE_PATH;
 
 if (!Number.isInteger(listenPort) || listenPort <= 0 || listenPort > 65535) {
   throw new Error("MISTLE_CLAUDE_CODE_RUNTIME_PORT must be a valid TCP port.");
@@ -103,12 +102,7 @@ function createClaudeQueryOptions(input) {
   return {
     ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
     systemPrompt: { type: "preset", preset: "claude_code" },
-    permissionMode: "bypassPermissions",
-    allowDangerouslySkipPermissions: true,
     includePartialMessages: true,
-    ...(claudeExecutablePath === undefined
-      ? {}
-      : { pathToClaudeCodeExecutable: claudeExecutablePath }),
     ...sessionOptions,
   };
 }

@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
+import type { UseClaudeCodeSessionStateResult } from "../session-agents/claude-code/session-state/index.js";
 import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
 import type { UseCodexSessionStateResult } from "../session-agents/codex/session-state/index.js";
 import {
@@ -15,10 +16,12 @@ import type {
 } from "../session-agents/runtime-conversations/runtime-conversation-navigator-model.js";
 import {
   useCodexWorkbenchComposerState,
+  useClaudeCodeWorkbenchComposerState,
   useOpenCodeWorkbenchComposerState,
   usePiWorkbenchComposerState,
 } from "../session-agents/session-workbench-composer-bootstrap.js";
 import {
+  buildClaudeCodeConversationRuntime,
   buildCodexConversationRuntime,
   buildOpenCodeConversationRuntime,
   buildPiConversationRuntime,
@@ -26,6 +29,8 @@ import {
 } from "../session-agents/session-workbench-conversation-runtimes.js";
 import {
   buildCodexTurnStarter,
+  buildClaudeCodeTurnStarter,
+  buildClaudeCodeTurnSteerer,
   buildOpenCodeTurnStarter,
   buildOpenCodeTurnSteerer,
   buildPiTurnQueuer,
@@ -269,7 +274,9 @@ function buildPiRuntimeConversationNavigatorState(input: {
 }
 
 export function useSessionWorkbenchConversationRuntime(input: {
+  claudeCodeSessionState: UseClaudeCodeSessionStateResult;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
+  isClaudeCodeRuntime: boolean;
   isOpenCodeRuntime: boolean;
   isPiRuntime: boolean;
   openCodeSessionState: UseOpenCodeSessionStateResult;
@@ -300,8 +307,12 @@ export function useSessionWorkbenchConversationRuntime(input: {
   const { configControl } = useCodexWorkbenchComposerState({
     sessionState,
   });
+  const { bootstrap: claudeCodeComposerBootstrap, configControl: claudeCodeConfigControl } =
+    useClaudeCodeWorkbenchComposerState({
+      sessionState: input.claudeCodeSessionState,
+    });
   const activeRuntimeConversationId =
-    input.isOpenCodeRuntime || input.isPiRuntime
+    input.isClaudeCodeRuntime || input.isOpenCodeRuntime || input.isPiRuntime
       ? null
       : (input.sessionSnapshot?.activeRuntimeConversationId ?? null);
   const contextUsage =
@@ -353,6 +364,20 @@ export function useSessionWorkbenchConversationRuntime(input: {
       openCodeSessionState.chat,
       openCodeSessionState.chat.chatState.messageOrder.length,
     ],
+  );
+  const startClaudeCodeTurn = useMemo<SessionTurnControl["startTurn"]>(
+    () =>
+      buildClaudeCodeTurnStarter({
+        chat: input.claudeCodeSessionState.chat,
+      }),
+    [input.claudeCodeSessionState.chat],
+  );
+  const steerClaudeCodeTurn = useMemo<SessionTurnControl["steerTurn"]>(
+    () =>
+      buildClaudeCodeTurnSteerer({
+        chat: input.claudeCodeSessionState.chat,
+      }),
+    [input.claudeCodeSessionState.chat],
   );
   const executeOpenCodePromptCommand = useMemo(
     () =>
@@ -529,6 +554,37 @@ export function useSessionWorkbenchConversationRuntime(input: {
       steerOpenCodeTurn,
     ],
   );
+  const claudeCodeRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
+    () =>
+      buildClaudeCodeConversationRuntime({
+        bootstrap: claudeCodeComposerBootstrap,
+        chat: input.claudeCodeSessionState.chat,
+        configControl: claudeCodeConfigControl,
+        sessionMessage: input.claudeCodeSessionState.sessionMessage,
+        sessionSnapshot: input.claudeCodeSessionState.lifecycle.sessionSnapshot,
+        startTurn: startClaudeCodeTurn,
+        steerTurn: steerClaudeCodeTurn,
+      }),
+    [
+      claudeCodeComposerBootstrap,
+      claudeCodeConfigControl,
+      input.claudeCodeSessionState.chat.abortThread,
+      input.claudeCodeSessionState.chat.canInterruptTurn,
+      input.claudeCodeSessionState.chat.canSteerTurn,
+      input.claudeCodeSessionState.chat.chatState,
+      input.claudeCodeSessionState.chat.isInterruptingTurn,
+      input.claudeCodeSessionState.chat.isStartingTurn,
+      input.claudeCodeSessionState.chat.isSteeringTurn,
+      input.claudeCodeSessionState.chat.sendPrompt,
+      input.claudeCodeSessionState.chat.steerTurn,
+      input.claudeCodeSessionState.lifecycle.sessionSnapshot,
+      input.claudeCodeSessionState.sessionMessage.clearSessionErrorMessage,
+      input.claudeCodeSessionState.sessionMessage.reportSessionErrorMessage,
+      input.claudeCodeSessionState.sessionMessage.sessionErrorMessage,
+      startClaudeCodeTurn,
+      steerClaudeCodeTurn,
+    ],
+  );
   const piRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
     () =>
       buildPiConversationRuntime({
@@ -564,22 +620,26 @@ export function useSessionWorkbenchConversationRuntime(input: {
       steerPiTurn,
     ],
   );
-  const activeRuntime = input.isPiRuntime
-    ? piRuntime
-    : input.isOpenCodeRuntime
-      ? openCodeRuntime
-      : codexRuntime;
-  const runtimeConversationNavigator = input.isPiRuntime
-    ? buildPiRuntimeConversationNavigatorState({
-        piSessionState: input.piSessionState,
-      })
-    : input.isOpenCodeRuntime
-      ? buildOpenCodeRuntimeConversationNavigatorState({
-          openCodeSessionState,
+  const activeRuntime = input.isClaudeCodeRuntime
+    ? claudeCodeRuntime
+    : input.isPiRuntime
+      ? piRuntime
+      : input.isOpenCodeRuntime
+        ? openCodeRuntime
+        : codexRuntime;
+  const runtimeConversationNavigator = input.isClaudeCodeRuntime
+    ? null
+    : input.isPiRuntime
+      ? buildPiRuntimeConversationNavigatorState({
+          piSessionState: input.piSessionState,
         })
-      : buildCodexRuntimeConversationNavigatorState({
-          sessionState,
-        });
+      : input.isOpenCodeRuntime
+        ? buildOpenCodeRuntimeConversationNavigatorState({
+            openCodeSessionState,
+          })
+        : buildCodexRuntimeConversationNavigatorState({
+            sessionState,
+          });
   const attachmentTargetId = activeRuntime.conversation.attachmentTargetId;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:
@@ -594,7 +654,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
     ensureTransportConnected: input.ensureTransportConnected,
   });
   const activeContextMentionCwd =
-    runtimeConversationNavigator.activeConversationCwd ??
+    runtimeConversationNavigator?.activeConversationCwd ??
     resolvePrimaryRepositoryTurnStartCwd(input.selectedRepositoryPath);
   const contextMentionControl = useSessionComposerContextMentionControl({
     cwd: activeContextMentionCwd,

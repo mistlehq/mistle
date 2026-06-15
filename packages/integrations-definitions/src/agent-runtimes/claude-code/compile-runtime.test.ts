@@ -185,7 +185,6 @@ describe("compileClaudeCodeRuntime", () => {
       setup: {
         env: {
           ANTHROPIC_API_KEY: "mistle-managed-credential",
-          MISTLE_CLAUDE_CODE_EXECUTABLE_PATH: ClaudeCodeExecutablePath,
         },
       },
       processes: [
@@ -323,7 +322,20 @@ describe("compileClaudeCodeRuntime", () => {
           [
             `cat > "$1" <<'EOF'`,
             "#!/bin/sh",
-            `exec mise exec node@25.0.0 -- ${ClaudeCodeRuntimeServerPackageDir}/node_modules/.bin/claude "$@"`,
+            `sdk_bin_dir=${ClaudeCodeRuntimeServerPackageDir}/node_modules/@anthropic-ai`,
+            'case "$(uname -m)" in',
+            '  x86_64|amd64) package_candidates="claude-agent-sdk-linux-x64 claude-agent-sdk-linux-x64-musl" ;;',
+            '  aarch64|arm64) package_candidates="claude-agent-sdk-linux-arm64 claude-agent-sdk-linux-arm64-musl" ;;',
+            '  *) package_candidates="" ;;',
+            "esac",
+            "for package_name in $package_candidates claude-agent-sdk-linux-x64 claude-agent-sdk-linux-arm64 claude-agent-sdk-linux-x64-musl claude-agent-sdk-linux-arm64-musl; do",
+            '  executable="$sdk_bin_dir/$package_name/claude"',
+            '  if [ -x "$executable" ]; then',
+            '    exec "$executable" "$@"',
+            "  fi",
+            "done",
+            'echo "Claude Code SDK bundled binary was not found." >&2',
+            "exit 127",
             "EOF",
             `chmod 755 "$1"`,
           ].join("\n"),

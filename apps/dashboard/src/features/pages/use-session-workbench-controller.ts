@@ -6,6 +6,7 @@ import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
 
+import { useClaudeCodeSessionState } from "../session-agents/claude-code/session-state/index.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useOpenCodeSessionState } from "../session-agents/opencode/session-state/index.js";
 import { usePiSessionState } from "../session-agents/pi/session-state/index.js";
@@ -132,11 +133,15 @@ export function useSessionWorkbenchController(input: {
   const openCodeSessionState = useOpenCodeSessionState({
     ensureTransportConnected: transportManager.ensureTransportConnected,
   });
+  const claudeCodeSessionState = useClaudeCodeSessionState({
+    ensureTransportConnected: transportManager.ensureTransportConnected,
+  });
   const piSessionState = usePiSessionState({
     ensureTransportConnected: transportManager.ensureTransportConnected,
   });
   const { cliPtyState, handoff, resolveLifecycleForWorkbench } = useSessionWorkbenchHandoffControl({
     activeHandoffRuntimeIdRef,
+    claudeCodeSessionState,
     ensureTransportConnected: transportManager.ensureTransportConnected,
     openCodeSessionState,
     piSessionState,
@@ -165,6 +170,7 @@ export function useSessionWorkbenchController(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     selectedRepositoryPathRef,
   });
+  const isClaudeCodeRuntime = repositoryControl.isClaudeCodeRuntime;
   const isOpenCodeRuntime = repositoryControl.isOpenCodeRuntime;
   const isPiRuntime = repositoryControl.isPiRuntime;
   const selectedRepositoryPath = repositoryControl.selectedRepositoryPath;
@@ -179,7 +185,9 @@ export function useSessionWorkbenchController(input: {
   });
   const sessionSnapshot = workbenchLifecycleState.sessionSnapshot;
   const conversationRuntime = useSessionWorkbenchConversationRuntime({
+    claudeCodeSessionState,
     ensureTransportConnected: transportManager.ensureTransportConnected,
+    isClaudeCodeRuntime,
     isOpenCodeRuntime,
     isPiRuntime,
     openCodeSessionState,

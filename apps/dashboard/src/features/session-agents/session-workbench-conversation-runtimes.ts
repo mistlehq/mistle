@@ -13,6 +13,7 @@ import type {
 } from "../pages/session-composer/index.js";
 import { hasComposerCommand } from "../pages/session-composer/session-composer-trigger-detection.js";
 import type { SessionTerminalContentInset } from "../pages/session-terminal-surface.js";
+import type { UseClaudeCodeSessionStateResult } from "./claude-code/session-state/index.js";
 import type { UseCodexSessionStateResult } from "./codex/session-state/index.js";
 import {
   mapOpenCodeChatStateForConversation,
@@ -70,6 +71,17 @@ function mapPiChatStateForConversation(
 ): SessionConversationChatState {
   return {
     activeTurnId: resolvePiActiveTurnIdForConversation(chatState),
+    entries: chatState.entries,
+    pendingTurnId: chatState.pendingTurnId,
+    status: chatState.status === "busy" ? "inProgress" : chatState.status,
+  };
+}
+
+function mapClaudeCodeChatStateForConversation(
+  chatState: UseClaudeCodeSessionStateResult["chat"]["chatState"],
+): SessionConversationChatState {
+  return {
+    activeTurnId: chatState.pendingTurnId,
     entries: chatState.entries,
     pendingTurnId: chatState.pendingTurnId,
     status: chatState.status === "busy" ? "inProgress" : chatState.status,
@@ -348,6 +360,60 @@ export function buildOpenCodeConversationRuntime(input: {
   };
 }
 
+export function buildClaudeCodeConversationRuntime(input: {
+  bootstrap: SessionComposerRuntimeInput["bootstrap"];
+  chat: UseClaudeCodeSessionStateResult["chat"];
+  configControl: SessionComposerRuntimeInput["configControl"];
+  sessionMessage: UseClaudeCodeSessionStateResult["sessionMessage"];
+  sessionSnapshot: UseClaudeCodeSessionStateResult["lifecycle"]["sessionSnapshot"];
+  startTurn: SessionTurnControl["startTurn"];
+  steerTurn: SessionTurnControl["steerTurn"];
+}): SessionWorkbenchRuntimeAdapter {
+  const capabilities = SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE;
+  const isTurnRunning = input.chat.chatState.status === "busy";
+
+  return {
+    displayName: capabilities.displayName,
+    cliTerminalContentInset: capabilities.cliTerminalContentInset,
+    conversation: {
+      activeConversationId: input.sessionSnapshot?.activeThreadId ?? null,
+      attachmentTargetId: input.sessionSnapshot?.activeThreadId ?? null,
+      chatState: mapClaudeCodeChatStateForConversation(input.chat.chatState),
+    },
+    composerRuntimeInput: {
+      bootstrap: input.bootstrap,
+      configControl: input.configControl,
+      turnControl: {
+        activeTurnState: isTurnRunning ? "running" : "idle",
+        canInterrupt: input.chat.canInterruptTurn,
+        canSteer: capabilities.supportsSteering && isTurnRunning && input.chat.canSteerTurn,
+        completedTurnErrorMessage: input.chat.chatState.completedErrorMessage,
+        interruptTurn: (): void => {
+          void input.chat.abortThread();
+        },
+        isInterrupting: input.chat.isInterruptingTurn,
+        isStarting: input.chat.isStartingTurn,
+        isSteering: input.chat.isSteeringTurn,
+        startTurn: input.startTurn,
+        steerTurn: input.steerTurn,
+      },
+      sessionErrorMessage: input.sessionMessage.sessionErrorMessage,
+      clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
+      contextUsage: null,
+      modelSelection: capabilities.composerModelSelection,
+    },
+    serverRequestsState: {
+      isRespondingToServerRequest: false,
+      pendingServerRequests: [],
+      respondToServerRequest: () => {
+        input.sessionMessage.reportSessionErrorMessage(
+          "Claude Code has no pending server request.",
+        );
+      },
+    },
+  };
+}
+
 export function buildPiConversationRuntime(input: {
   bootstrap: SessionComposerRuntimeInput["bootstrap"];
   chat: UsePiSessionStateResult["chat"];
@@ -379,7 +445,7 @@ export function buildPiConversationRuntime(input: {
       turnControl: {
         activeTurnState: isTurnRunning ? "running" : "idle",
         canInterrupt: input.chat.canInterruptTurn,
-        canSteer: capabilities.supportsSteering && input.chat.canSteerTurn,
+        canSteer: capabilities.supportsSteering && isTurnRunning && input.chat.canSteerTurn,
         completedTurnErrorMessage: input.chat.chatState.completedErrorMessage,
         interruptTurn: (): void => {
           void input.chat.abortConversation();

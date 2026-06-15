@@ -146,6 +146,44 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.primaryPanelState.cliRuntimeDisplayName).toBe("OpenCode");
   });
 
+  it("uses the Claude Code workbench boundary for Claude Code runtime sessions", () => {
+    const queryClient = createControllerQueryClient();
+    const sandboxStatus: SandboxInstanceStatusResult = {
+      id: "sbi_claude",
+      sandboxProfileId: "sbp_claude",
+      sandboxProfileVersion: 1,
+      title: null,
+      status: "starting",
+      connectable: false,
+      failureCode: null,
+      failureMessage: null,
+      runtimeContext: {
+        agentRuntimeId: "claude-code",
+        launchCwd: "/workspace/repo",
+        primaryRepositoryRoot: "/workspace/repo",
+      },
+      triggerConversation: null,
+      startupOperation: null,
+    };
+    queryClient.setQueryData(sandboxInstanceStatusQueryKey("sbi_claude"), sandboxStatus);
+
+    const { result } = renderSessionWorkbenchController({
+      queryClient,
+      sandboxInstanceId: "sbi_claude",
+    });
+
+    expect(result.current.conversationPane.composerStateInput.modelSelection).toEqual({
+      required: false,
+      showControls: false,
+    });
+    expect(result.current.conversationPane.composerStateInput.contextUsage).toBeNull();
+    expect(result.current.conversationPane.runtimeConversationNavigator).toBeNull();
+    expect(result.current.conversationPane.serverRequestsState.pendingServerRequests).toEqual([]);
+    expect(result.current.workbench.primaryPanelState.cliTerminalContentInset).toBe("none");
+    expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("system");
+    expect(result.current.workbench.primaryPanelState.cliRuntimeDisplayName).toBe("Claude Code");
+  });
+
   it("starts session recovery from a recoverable disconnect and preserves attempts for the same event", () => {
     const startedRecovery = reduceSessionWorkbenchRecoveryState(
       { kind: "idle" },
