@@ -17,6 +17,7 @@ import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./githu
 import { JiraDefinition } from "./jira/browser.js";
 import { KimiDefinition } from "./kimi/index.js";
 import { LinearBaseDefinition } from "./linear/variants/linear-default/base-definition.js";
+import { MiniMaxDefinition } from "./minimax/index.js";
 import { OpenAiApiKeyDefinition } from "./openai/index.js";
 import { OpenCodeGoDefinition } from "./opencode/index.js";
 import { PlanetScaleDefinition } from "./planetscale/browser.js";
@@ -46,6 +47,7 @@ export * from "./jira-shared.js";
 export * from "./github/browser.js";
 export * from "./kimi/index.js";
 export * from "./linear/browser.js";
+export * from "./minimax/index.js";
 export * from "./openai/index.js";
 export * from "./opencode/index.js";
 export * from "./planetscale/browser.js";
@@ -74,6 +76,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   GitHubCloudDefinition,
   GitHubEnterpriseServerDefinition,
   LinearBaseDefinition,
+  MiniMaxDefinition,
   OpenAiApiKeyDefinition,
   OpenCodeGoDefinition,
   PlanetScaleDefinition,

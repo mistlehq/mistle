@@ -6,6 +6,8 @@ import {
   isDeepSeekApiRoute,
   isIntegrationConnectionCredentialRoute,
   isKimiApiRoute,
+  isMiniMaxApiRoute,
+  isMiniMaxOpenCodeApiRoute,
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
   isOpenCodeGoRoute,
@@ -192,6 +194,32 @@ describe("provider egress route helpers", () => {
           host: "api.moonshot.ai",
           baseUrl: "https://api.moonshot.ai/v1",
           pathPrefixes: ["/v1"],
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches MiniMax API provider routes", () => {
+    expect(
+      isMiniMaxApiRoute(
+        createRoute({
+          familyId: "minimax",
+          host: "api.minimaxi.com",
+          baseUrl: "https://api.minimaxi.com/v1",
+          pathPrefixes: ["/v1"],
+        }),
+      ),
+    ).toBe(true);
+
+    expect(
+      isMiniMaxOpenCodeApiRoute(
+        createRoute({
+          familyId: "minimax",
+          host: "api.minimaxi.com",
+          baseUrl: "https://api.minimaxi.com/anthropic/v1",
+          pathPrefixes: ["/anthropic/v1"],
+          authInjectionType: "header",
+          authInjectionTarget: "x-api-key",
         }),
       ),
     ).toBe(true);

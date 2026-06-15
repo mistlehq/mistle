@@ -108,6 +108,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "minimax-default",
+        familyId: "minimax",
+        variantId: "minimax-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "modal-default",
         familyId: "modal",
         variantId: "modal-default",

@@ -13,6 +13,7 @@ import {
   JiraBrowserDefinition,
   KimiBrowserDefinition,
   LinearBrowserDefinition,
+  MiniMaxBrowserDefinition,
   OpenComputerSandboxRuntimeBrowserDefinition,
   PostHogBrowserDefinition,
   ResendBrowserDefinition,
@@ -112,6 +113,24 @@ describe("browser definitions", () => {
     expect(KimiBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
     expect(KimiBrowserDefinition.webhookHandler).toBeUndefined();
     expect(KimiBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("registers MiniMax in the browser-safe definitions bundle", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: MiniMaxBrowserDefinition.familyId,
+      variantId: MiniMaxBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "minimax",
+      variantId: "minimax-default",
+      kind: "agent",
+      displayName: "MiniMax",
+      logoKey: "minimax",
+    });
+    expect(MiniMaxBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(MiniMaxBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(MiniMaxBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("keeps BugSnag browser definitions free of server-only hooks and resources", () => {
