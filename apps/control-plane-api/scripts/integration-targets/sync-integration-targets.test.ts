@@ -66,6 +66,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "fireworks-default",
+        familyId: "fireworks",
+        variantId: "fireworks-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "gcp-mcp",
         familyId: "gcp",
         variantId: "gcp-mcp",

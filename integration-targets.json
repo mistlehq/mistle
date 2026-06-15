@@ -44,6 +44,11 @@
       "config": {}
     },
     {
+      "targetKey": "fireworks-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "e2b-default",
       "enabled": true,
       "config": {}

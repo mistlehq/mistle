@@ -29,6 +29,10 @@ describe("integrations-definitions index", () => {
       familyId: "deepseek",
       variantId: "deepseek-default",
     });
+    const fireworksDefinition = registry.getDefinition({
+      familyId: "fireworks",
+      variantId: "fireworks-default",
+    });
     const cloudflareDefinition = registry.getDefinition({
       familyId: "cloudflare",
       variantId: "cloudflare-mcp",
@@ -303,6 +307,13 @@ describe("integrations-definitions index", () => {
       variantId: "deepseek-default",
       kind: "agent",
       displayName: "DeepSeek",
+      allowedRuntimeIds: ["opencode", "pi"],
+    });
+    expect(fireworksDefinition).toMatchObject({
+      familyId: "fireworks",
+      variantId: "fireworks-default",
+      kind: "agent",
+      displayName: "Fireworks AI",
       allowedRuntimeIds: ["opencode", "pi"],
     });
     expect(kimiDefinition).toMatchObject({
@@ -973,7 +984,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(26);
+    expect(definitions).toHaveLength(27);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -984,6 +995,7 @@ describe("integrations-definitions index", () => {
       "datadog::datadog-default",
       "deepseek::deepseek-default",
       "expo::expo-mcp",
+      "fireworks::fireworks-default",
       "gcp::gcp-mcp",
       "jira::jira-default",
       "kimi::kimi-default",

@@ -8,6 +8,7 @@ import {
   DeepSeekBrowserDefinition,
   E2BSandboxRuntimeBrowserDefinition,
   ExpoBrowserDefinition,
+  FireworksBrowserDefinition,
   GcpBrowserDefinition,
   GitHubCloudBrowserDefinition,
   JiraBrowserDefinition,
@@ -131,6 +132,24 @@ describe("browser definitions", () => {
     expect(MiniMaxBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
     expect(MiniMaxBrowserDefinition.webhookHandler).toBeUndefined();
     expect(MiniMaxBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("registers Fireworks AI in the browser-safe definitions bundle", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: FireworksBrowserDefinition.familyId,
+      variantId: FireworksBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "fireworks",
+      variantId: "fireworks-default",
+      kind: "agent",
+      displayName: "Fireworks AI",
+      logoKey: "fireworks",
+    });
+    expect(FireworksBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(FireworksBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(FireworksBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("keeps BugSnag browser definitions free of server-only hooks and resources", () => {

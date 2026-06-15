@@ -72,6 +72,17 @@ export function isDeepSeekApiRoute(route: EgressCredentialRoute): boolean {
   );
 }
 
+export function isFireworksApiRoute(route: EgressCredentialRoute): boolean {
+  return (
+    route.familyId === "fireworks" &&
+    routeHasHost({ route, host: "api.fireworks.ai" }) &&
+    routeHasPathPrefix({ route, pathPrefix: "/inference/v1" }) &&
+    route.authInjection.type === "bearer" &&
+    isIntegrationConnectionCredentialRoute(route) &&
+    route.credentialResolver.secretType === "api_key"
+  );
+}
+
 export function isKimiApiRoute(route: EgressCredentialRoute): boolean {
   return (
     route.familyId === "kimi" &&

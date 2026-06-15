@@ -12,6 +12,7 @@ import { CloudflareDefinition } from "./cloudflare/browser.js";
 import { DatadogDefinition } from "./datadog/index.js";
 import { DeepSeekDefinition } from "./deepseek/index.js";
 import { ExpoDefinition } from "./expo/browser.js";
+import { FireworksDefinition } from "./fireworks/index.js";
 import { GcpDefinition } from "./gcp/browser.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/browser.js";
 import { JiraDefinition } from "./jira/browser.js";
@@ -41,6 +42,7 @@ export * from "./cloudflare/browser.js";
 export * from "./datadog/index.js";
 export * from "./deepseek/index.js";
 export * from "./expo/browser.js";
+export * from "./fireworks/index.js";
 export * from "./gcp/browser.js";
 export * from "./jira/browser.js";
 export * from "./jira-shared.js";
@@ -70,6 +72,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   DatadogDefinition,
   DeepSeekDefinition,
   ExpoDefinition,
+  FireworksDefinition,
   GcpDefinition,
   JiraDefinition,
   KimiDefinition,
