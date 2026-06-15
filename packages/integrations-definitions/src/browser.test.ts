@@ -11,6 +11,7 @@ import {
   JiraBrowserDefinition,
   LinearBrowserDefinition,
   OpenComputerSandboxRuntimeBrowserDefinition,
+  ResendBrowserDefinition,
   SentryBrowserDefinition,
   SignozBrowserDefinition,
   SlackBrowserDefinition,
@@ -111,6 +112,24 @@ describe("browser definitions", () => {
 
   it("keeps sentry browser definitions free of server-only OAuth handlers", () => {
     expect(SentryBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+  });
+
+  it("registers resend in the browser-safe definitions bundle", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: ResendBrowserDefinition.familyId,
+      variantId: ResendBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "resend",
+      variantId: "resend-mcp",
+      kind: "connector",
+      displayName: "Resend",
+      logoKey: "resend",
+    });
+    expect(ResendBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(ResendBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(ResendBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("registers Tensorlake sandbox runtime in the browser-safe definitions bundle", () => {

@@ -8,6 +8,7 @@ const IntegrationLogoDarkVariantKeys = {
   opencomputer: true,
   opencode: true,
   planetscale: true,
+  resend: true,
 } satisfies Record<string, true>;
 
 type IntegrationLogoColorScheme = "light" | "dark";

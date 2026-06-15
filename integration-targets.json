@@ -79,6 +79,11 @@
       "config": {}
     },
     {
+      "targetKey": "resend-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "sentry-mcp",
       "enabled": true,
       "config": {}
