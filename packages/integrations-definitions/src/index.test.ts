@@ -295,7 +295,7 @@ describe("integrations-definitions index", () => {
       variantId: "deepseek-default",
       kind: "agent",
       displayName: "DeepSeek",
-      allowedRuntimeIds: ["pi"],
+      allowedRuntimeIds: ["opencode", "pi"],
     });
     expect(openCodeGoDefinition).toMatchObject({
       familyId: "opencode",

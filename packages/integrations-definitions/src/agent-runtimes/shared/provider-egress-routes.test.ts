@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   isAnthropicApiRoute,
+  isDeepSeekApiRoute,
   isIntegrationConnectionCredentialRoute,
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
@@ -166,6 +167,17 @@ describe("provider egress route helpers", () => {
           familyId: "opencode",
           host: "opencode.ai",
           baseUrl: "https://opencode.ai/zen/go",
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches DeepSeek API provider routes", () => {
+    expect(
+      isDeepSeekApiRoute(
+        createRoute({
+          familyId: "deepseek",
+          host: "api.deepseek.com",
         }),
       ),
     ).toBe(true);

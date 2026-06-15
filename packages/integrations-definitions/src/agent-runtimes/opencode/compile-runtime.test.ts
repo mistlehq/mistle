@@ -633,6 +633,15 @@ describe("compileOpenCodeRuntime", () => {
           },
         }),
         createCompiledRoute({
+          egressRuleId: "egress_rule_bind_deepseek",
+          bindingId: "bind_deepseek",
+          familyId: "deepseek",
+          variantId: "deepseek-default",
+          host: "api.deepseek.com",
+          baseUrl: "https://api.deepseek.com",
+          secretType: "api_key",
+        }),
+        createCompiledRoute({
           egressRuleId: "egress_rule_bind_opencode_go",
           bindingId: "bind_opencode_go",
           familyId: "opencode",
@@ -642,7 +651,7 @@ describe("compileOpenCodeRuntime", () => {
           secretType: "api_key",
         }),
       ]),
-    ).toEqual({ enabled_providers: ["anthropic", "openai", "opencode-go"] });
+    ).toEqual({ enabled_providers: ["anthropic", "deepseek", "openai", "opencode-go"] });
   });
 
   it("renders OpenAI API auth file from proxied egress routes", () => {
@@ -722,6 +731,27 @@ describe("compileOpenCodeRuntime", () => {
       ]),
     ).toEqual({
       anthropic: {
+        type: "api",
+        key: "mistle-managed-credential",
+      },
+    });
+  });
+
+  it("renders DeepSeek API auth file from proxied egress routes", () => {
+    expect(
+      readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_deepseek",
+          bindingId: "bind_deepseek",
+          familyId: "deepseek",
+          variantId: "deepseek-default",
+          host: "api.deepseek.com",
+          baseUrl: "https://api.deepseek.com",
+          secretType: "api_key",
+        }),
+      ]),
+    ).toEqual({
+      deepseek: {
         type: "api",
         key: "mistle-managed-credential",
       },
