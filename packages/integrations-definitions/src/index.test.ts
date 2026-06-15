@@ -49,6 +49,10 @@ describe("integrations-definitions index", () => {
       familyId: "openai",
       variantId: "openai-default",
     });
+    const miniMaxDefinition = registry.getDefinition({
+      familyId: "minimax",
+      variantId: "minimax-default",
+    });
     const openCodeGoDefinition = registry.getDefinition({
       familyId: "opencode",
       variantId: "opencode-go",
@@ -306,6 +310,13 @@ describe("integrations-definitions index", () => {
       variantId: "kimi-default",
       kind: "agent",
       displayName: "Kimi",
+      allowedRuntimeIds: ["opencode", "pi"],
+    });
+    expect(miniMaxDefinition).toMatchObject({
+      familyId: "minimax",
+      variantId: "minimax-default",
+      kind: "agent",
+      displayName: "MiniMax",
       allowedRuntimeIds: ["opencode", "pi"],
     });
     expect(openCodeGoDefinition).toMatchObject({
@@ -962,7 +973,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(25);
+    expect(definitions).toHaveLength(26);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -979,6 +990,7 @@ describe("integrations-definitions index", () => {
       "github::github-cloud",
       "github::github-enterprise-server",
       "linear::linear-default",
+      "minimax::minimax-default",
       "openai::openai-default",
       "opencode::opencode-go",
       "planetscale::planetscale-mcp",

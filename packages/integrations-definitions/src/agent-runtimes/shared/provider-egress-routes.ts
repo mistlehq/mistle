@@ -82,6 +82,29 @@ export function isKimiApiRoute(route: EgressCredentialRoute): boolean {
   );
 }
 
+export function isMiniMaxApiRoute(route: EgressCredentialRoute): boolean {
+  return (
+    route.familyId === "minimax" &&
+    routeHasHost({ route, host: "api.minimaxi.com" }) &&
+    routeHasPathPrefix({ route, pathPrefix: "/v1" }) &&
+    route.authInjection.type === "bearer" &&
+    isIntegrationConnectionCredentialRoute(route) &&
+    route.credentialResolver.secretType === "api_key"
+  );
+}
+
+export function isMiniMaxOpenCodeApiRoute(route: EgressCredentialRoute): boolean {
+  return (
+    route.familyId === "minimax" &&
+    routeHasHost({ route, host: "api.minimaxi.com" }) &&
+    routeHasPathPrefix({ route, pathPrefix: "/anthropic/v1" }) &&
+    route.authInjection.type === "header" &&
+    route.authInjection.target.toLowerCase() === "x-api-key" &&
+    isIntegrationConnectionCredentialRoute(route) &&
+    route.credentialResolver.secretType === "api_key"
+  );
+}
+
 export function isOpenCodeGoRoute(route: EgressCredentialRoute): boolean {
   return (
     route.familyId === "opencode" &&

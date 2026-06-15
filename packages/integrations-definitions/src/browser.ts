@@ -18,6 +18,7 @@ import { GitHubEnterpriseServerBaseDefinition } from "./github/variants/github-e
 import { JiraBaseDefinition } from "./jira/variants/jira-default/base-definition.js";
 import { KimiDefinition } from "./kimi/index.js";
 import { LinearBaseDefinition } from "./linear/variants/linear-default/base-definition.js";
+import { MiniMaxDefinition } from "./minimax/index.js";
 import { OpenAiApiKeyDefinition } from "./openai/variants/openai-default/definition.js";
 import { OpenCodeGoDefinition } from "./opencode/index.js";
 import { PlanetScaleMcpBaseDefinition } from "./planetscale/variants/planetscale-mcp/base-definition.js";
@@ -46,6 +47,7 @@ export const GitHubEnterpriseServerBrowserDefinition = GitHubEnterpriseServerBas
 export const JiraBrowserDefinition = JiraBaseDefinition;
 export const KimiBrowserDefinition = KimiDefinition;
 export const LinearBrowserDefinition = LinearBaseDefinition;
+export const MiniMaxBrowserDefinition = MiniMaxDefinition;
 export const OpenCodeGoBrowserDefinition = OpenCodeGoDefinition;
 export const PlanetScaleBrowserDefinition = PlanetScaleMcpBaseDefinition;
 export const PostHogBrowserDefinition = PostHogMcpBaseDefinition;
@@ -72,6 +74,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   GitHubCloudBrowserDefinition,
   GitHubEnterpriseServerBrowserDefinition,
   LinearBrowserDefinition,
+  MiniMaxBrowserDefinition,
   OpenAiApiKeyDefinition,
   OpenCodeGoBrowserDefinition,
   PlanetScaleBrowserDefinition,
@@ -115,6 +118,7 @@ export * from "./github/browser.js";
 export * from "./jira/browser.js";
 export * from "./kimi/index.js";
 export * from "./linear/browser.js";
+export * from "./minimax/index.js";
 export * from "./opencode/index.js";
 export * from "./posthog/browser.js";
 export * from "./resend/browser.js";

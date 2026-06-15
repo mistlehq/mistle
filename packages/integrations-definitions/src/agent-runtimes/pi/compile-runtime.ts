@@ -15,6 +15,7 @@ import {
   isAnthropicApiRoute,
   isDeepSeekApiRoute,
   isKimiApiRoute,
+  isMiniMaxApiRoute,
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
 } from "../shared/provider-egress-routes.js";
@@ -210,6 +211,19 @@ function resolvePiProviderConfigs(
           apiKey: MistleManagedApiKey,
           baseUrl: route.upstream.baseUrl,
           models: [{ id: "kimi-k2.7-code" }, { id: "kimi-k2.6" }],
+        },
+      });
+    }
+
+    if (isMiniMaxApiRoute(route)) {
+      insertPiProviderConfig({
+        configsByProvider,
+        config: {
+          provider: "minimax",
+          api: "openai-completions",
+          apiKey: MistleManagedApiKey,
+          baseUrl: route.upstream.baseUrl,
+          models: [{ id: "MiniMax-M3" }],
         },
       });
     }

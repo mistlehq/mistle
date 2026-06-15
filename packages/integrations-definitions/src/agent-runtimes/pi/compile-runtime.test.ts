@@ -505,6 +505,35 @@ describe("compilePiRuntime", () => {
     });
   });
 
+  it("renders MiniMax custom provider config when MiniMax egress is available", () => {
+    const runtimeClients = renderRuntimeClients({
+      compiled: compileDefaultPiRuntime(),
+      egressRoutes: [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_minimax",
+          bindingId: "bind_minimax",
+          familyId: "minimax",
+          variantId: "minimax-default",
+          host: "api.minimaxi.com",
+          baseUrl: "https://api.minimaxi.com/v1",
+          secretType: "api_key",
+        }),
+      ],
+    });
+
+    expect(JSON.parse(readSetupFile({ runtimeClients, fileId: "pi_models" }))).toEqual({
+      providers: {
+        minimax: {
+          api: "openai-completions",
+          apiKey: "mistle-managed-credential",
+          baseUrl: "https://api.minimaxi.com/v1",
+          headers: {},
+          models: [{ id: "MiniMax-M3" }],
+        },
+      },
+    });
+  });
+
   it("uses Pi's OpenAI Codex provider for ChatGPT subscription egress", () => {
     const runtimeClients = renderRuntimeClients({
       compiled: compileDefaultPiRuntime(),

@@ -15,6 +15,7 @@ import {
   isAnthropicApiRoute,
   isDeepSeekApiRoute,
   isKimiApiRoute,
+  isMiniMaxOpenCodeApiRoute,
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
   isOpenCodeGoRoute,
@@ -106,6 +107,10 @@ function resolveOpenCodeEnabledProviders(
 
     if (isKimiApiRoute(route)) {
       providers.add("moonshotai");
+    }
+
+    if (isMiniMaxOpenCodeApiRoute(route)) {
+      providers.add("minimax-cn");
     }
 
     if (isOpenCodeGoRoute(route)) {
@@ -225,6 +230,17 @@ function renderOpenCodeAuthContent(
       insertOpenCodeAuth({
         auth,
         providerId: "moonshotai",
+        value: {
+          type: "api",
+          key: MistleManagedApiKey,
+        },
+      });
+    }
+
+    if (isMiniMaxOpenCodeApiRoute(route)) {
+      insertOpenCodeAuth({
+        auth,
+        providerId: "minimax-cn",
         value: {
           type: "api",
           key: MistleManagedApiKey,

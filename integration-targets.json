@@ -84,6 +84,11 @@
       "config": {}
     },
     {
+      "targetKey": "minimax-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "opencode-go",
       "enabled": true,
       "config": {}

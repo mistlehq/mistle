@@ -652,6 +652,20 @@ describe("compileOpenCodeRuntime", () => {
           secretType: "api_key",
         }),
         createCompiledRoute({
+          egressRuleId: "egress_rule_bind_minimax",
+          bindingId: "bind_minimax",
+          familyId: "minimax",
+          variantId: "minimax-default",
+          host: "api.minimaxi.com",
+          pathPrefixes: ["/anthropic/v1"],
+          baseUrl: "https://api.minimaxi.com/anthropic/v1",
+          secretType: "api_key",
+          authInjection: {
+            type: "header",
+            target: "x-api-key",
+          },
+        }),
+        createCompiledRoute({
           egressRuleId: "egress_rule_bind_opencode_go",
           bindingId: "bind_opencode_go",
           familyId: "opencode",
@@ -662,7 +676,14 @@ describe("compileOpenCodeRuntime", () => {
         }),
       ]),
     ).toEqual({
-      enabled_providers: ["anthropic", "deepseek", "moonshotai", "openai", "opencode-go"],
+      enabled_providers: [
+        "anthropic",
+        "deepseek",
+        "minimax-cn",
+        "moonshotai",
+        "openai",
+        "opencode-go",
+      ],
     });
   });
 
@@ -786,6 +807,32 @@ describe("compileOpenCodeRuntime", () => {
       ]),
     ).toEqual({
       moonshotai: {
+        type: "api",
+        key: "mistle-managed-credential",
+      },
+    });
+  });
+
+  it("renders MiniMax OpenCode API auth file from proxied egress routes", () => {
+    expect(
+      readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_minimax",
+          bindingId: "bind_minimax",
+          familyId: "minimax",
+          variantId: "minimax-default",
+          host: "api.minimaxi.com",
+          pathPrefixes: ["/anthropic/v1"],
+          baseUrl: "https://api.minimaxi.com/anthropic/v1",
+          secretType: "api_key",
+          authInjection: {
+            type: "header",
+            target: "x-api-key",
+          },
+        }),
+      ]),
+    ).toEqual({
+      "minimax-cn": {
         type: "api",
         key: "mistle-managed-credential",
       },
