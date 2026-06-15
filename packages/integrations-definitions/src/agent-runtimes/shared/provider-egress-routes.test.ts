@@ -5,6 +5,7 @@ import {
   isAnthropicApiRoute,
   isDeepSeekApiRoute,
   isFireworksApiRoute,
+  isInceptionApiRoute,
   isIntegrationConnectionCredentialRoute,
   isKimiApiRoute,
   isMiniMaxApiRoute,
@@ -196,6 +197,19 @@ describe("provider egress route helpers", () => {
           host: "api.fireworks.ai",
           baseUrl: "https://api.fireworks.ai/inference/v1",
           pathPrefixes: ["/inference/v1"],
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches Inception Labs API provider routes", () => {
+    expect(
+      isInceptionApiRoute(
+        createRoute({
+          familyId: "inception",
+          host: "api.inceptionlabs.ai",
+          baseUrl: "https://api.inceptionlabs.ai/v1",
+          pathPrefixes: ["/v1"],
         }),
       ),
     ).toBe(true);

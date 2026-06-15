@@ -662,6 +662,16 @@ describe("compileOpenCodeRuntime", () => {
           secretType: "api_key",
         }),
         createCompiledRoute({
+          egressRuleId: "egress_rule_bind_inception",
+          bindingId: "bind_inception",
+          familyId: "inception",
+          variantId: "inception-default",
+          host: "api.inceptionlabs.ai",
+          pathPrefixes: ["/v1"],
+          baseUrl: "https://api.inceptionlabs.ai/v1",
+          secretType: "api_key",
+        }),
+        createCompiledRoute({
           egressRuleId: "egress_rule_bind_minimax",
           bindingId: "bind_minimax",
           familyId: "minimax",
@@ -700,6 +710,7 @@ describe("compileOpenCodeRuntime", () => {
         "anthropic",
         "deepseek",
         "fireworks-ai",
+        "inception",
         "minimax-cn",
         "moonshotai",
         "openai",
@@ -851,6 +862,28 @@ describe("compileOpenCodeRuntime", () => {
       ]),
     ).toEqual({
       moonshotai: {
+        type: "api",
+        key: "mistle-managed-credential",
+      },
+    });
+  });
+
+  it("renders Inception API auth file from proxied egress routes", () => {
+    expect(
+      readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_inception",
+          bindingId: "bind_inception",
+          familyId: "inception",
+          variantId: "inception-default",
+          host: "api.inceptionlabs.ai",
+          pathPrefixes: ["/v1"],
+          baseUrl: "https://api.inceptionlabs.ai/v1",
+          secretType: "api_key",
+        }),
+      ]),
+    ).toEqual({
+      inception: {
         type: "api",
         key: "mistle-managed-credential",
       },

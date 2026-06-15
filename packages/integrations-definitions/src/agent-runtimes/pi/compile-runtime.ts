@@ -15,6 +15,7 @@ import {
   isAnthropicApiRoute,
   isDeepSeekApiRoute,
   isFireworksApiRoute,
+  isInceptionApiRoute,
   isKimiApiRoute,
   isMiniMaxApiRoute,
   isOpenAiApiRoute,
@@ -216,6 +217,19 @@ function resolvePiProviderConfigs(
             { id: "accounts/fireworks/routers/kimi-k2p7-code-fast" },
             { id: "accounts/fireworks/models/deepseek-v4-pro" },
           ],
+        },
+      });
+    }
+
+    if (isInceptionApiRoute(route)) {
+      insertPiProviderConfig({
+        configsByProvider,
+        config: {
+          provider: "inception",
+          api: "openai-completions",
+          apiKey: MistleManagedApiKey,
+          baseUrl: route.upstream.baseUrl,
+          models: [{ id: "mercury-2" }],
         },
       });
     }

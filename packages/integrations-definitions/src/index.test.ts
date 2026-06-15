@@ -33,6 +33,10 @@ describe("integrations-definitions index", () => {
       familyId: "fireworks",
       variantId: "fireworks-default",
     });
+    const inceptionDefinition = registry.getDefinition({
+      familyId: "inception",
+      variantId: "inception-default",
+    });
     const cloudflareDefinition = registry.getDefinition({
       familyId: "cloudflare",
       variantId: "cloudflare-mcp",
@@ -318,6 +322,13 @@ describe("integrations-definitions index", () => {
       variantId: "fireworks-default",
       kind: "agent",
       displayName: "Fireworks AI",
+      allowedRuntimeIds: ["opencode", "pi"],
+    });
+    expect(inceptionDefinition).toMatchObject({
+      familyId: "inception",
+      variantId: "inception-default",
+      kind: "agent",
+      displayName: "Inception Labs",
       allowedRuntimeIds: ["opencode", "pi"],
     });
     expect(kimiDefinition).toMatchObject({
@@ -995,7 +1006,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(28);
+    expect(definitions).toHaveLength(29);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -1008,6 +1019,7 @@ describe("integrations-definitions index", () => {
       "expo::expo-mcp",
       "fireworks::fireworks-default",
       "gcp::gcp-mcp",
+      "inception::inception-default",
       "jira::jira-default",
       "kimi::kimi-default",
       "github::github-cloud",

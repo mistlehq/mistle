@@ -94,6 +94,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "inception-default",
+        familyId: "inception",
+        variantId: "inception-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "jira-default",
         familyId: "jira",
         variantId: "jira-default",

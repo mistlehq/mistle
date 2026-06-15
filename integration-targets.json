@@ -69,6 +69,11 @@
       "config": {}
     },
     {
+      "targetKey": "inception-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "tensorlake-default",
       "enabled": true,
       "config": {}

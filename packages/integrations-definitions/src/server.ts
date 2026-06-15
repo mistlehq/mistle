@@ -19,6 +19,7 @@ import { ExpoDefinition } from "./expo/server.js";
 import { FireworksDefinition } from "./fireworks/index.js";
 import { GcpDefinition } from "./gcp/server.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/index.js";
+import { InceptionDefinition } from "./inception/index.js";
 import { JiraDefinition } from "./jira/index.js";
 import { KimiDefinition } from "./kimi/index.js";
 import { LinearDefinition } from "./linear/index.js";
@@ -55,6 +56,7 @@ export * from "./gcp/server.js";
 export * from "./jira/index.js";
 export * from "./github/index.js";
 export * from "./github/shared/identity-linking.server.js";
+export * from "./inception/index.js";
 export * from "./kimi/index.js";
 export * from "./linear/index.js";
 export * from "./minimax/index.js";
@@ -85,6 +87,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   ExpoDefinition,
   FireworksDefinition,
   GcpDefinition,
+  InceptionDefinition,
   JiraDefinition,
   KimiDefinition,
   GitHubCloudDefinition,

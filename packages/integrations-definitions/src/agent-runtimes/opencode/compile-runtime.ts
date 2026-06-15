@@ -15,6 +15,7 @@ import {
   isAnthropicApiRoute,
   isDeepSeekApiRoute,
   isFireworksApiRoute,
+  isInceptionApiRoute,
   isKimiApiRoute,
   isMiniMaxOpenCodeApiRoute,
   isOpenAiApiRoute,
@@ -109,6 +110,10 @@ function resolveOpenCodeEnabledProviders(
 
     if (isFireworksApiRoute(route)) {
       providers.add("fireworks-ai");
+    }
+
+    if (isInceptionApiRoute(route)) {
+      providers.add("inception");
     }
 
     if (isKimiApiRoute(route)) {
@@ -240,6 +245,17 @@ function renderOpenCodeAuthContent(
       insertOpenCodeAuth({
         auth,
         providerId: "fireworks-ai",
+        value: {
+          type: "api",
+          key: MistleManagedApiKey,
+        },
+      });
+    }
+
+    if (isInceptionApiRoute(route)) {
+      insertOpenCodeAuth({
+        auth,
+        providerId: "inception",
         value: {
           type: "api",
           key: MistleManagedApiKey,
