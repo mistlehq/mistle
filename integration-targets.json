@@ -114,6 +114,11 @@
       "config": {}
     },
     {
+      "targetKey": "openrouter-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "planetscale-mcp",
       "enabled": true,
       "config": {}

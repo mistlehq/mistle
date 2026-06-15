@@ -164,6 +164,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "openrouter-default",
+        familyId: "openrouter",
+        variantId: "openrouter-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "planetscale-mcp",
         familyId: "planetscale",
         variantId: "planetscale-mcp",

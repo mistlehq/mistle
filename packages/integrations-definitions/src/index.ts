@@ -23,6 +23,7 @@ import { MiniMaxDefinition } from "./minimax/index.js";
 import { NotionDefinition } from "./notion/browser.js";
 import { OpenAiApiKeyDefinition } from "./openai/index.js";
 import { OpenCodeGoDefinition } from "./opencode/index.js";
+import { OpenRouterDefinition } from "./openrouter/index.js";
 import { PlanetScaleDefinition } from "./planetscale/browser.js";
 import { PostHogDefinition } from "./posthog/browser.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
@@ -57,6 +58,7 @@ export * from "./minimax/index.js";
 export * from "./notion/browser.js";
 export * from "./openai/index.js";
 export * from "./opencode/index.js";
+export * from "./openrouter/index.js";
 export * from "./planetscale/browser.js";
 export * from "./posthog/browser.js";
 export * from "./resend/browser.js";
@@ -90,6 +92,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   NotionDefinition,
   OpenAiApiKeyDefinition,
   OpenCodeGoDefinition,
+  OpenRouterDefinition,
   PlanetScaleDefinition,
   PostHogDefinition,
   ResendDefinition,

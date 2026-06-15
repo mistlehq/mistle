@@ -566,6 +566,39 @@ describe("compilePiRuntime", () => {
     });
   });
 
+  it("renders OpenRouter custom provider config when OpenRouter egress is available", () => {
+    const runtimeClients = renderRuntimeClients({
+      compiled: compileDefaultPiRuntime(),
+      egressRoutes: [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_openrouter",
+          bindingId: "bind_openrouter",
+          familyId: "openrouter",
+          variantId: "openrouter-default",
+          host: "openrouter.ai",
+          baseUrl: "https://openrouter.ai/api/v1",
+          secretType: "api_key",
+        }),
+      ],
+    });
+
+    expect(JSON.parse(readSetupFile({ runtimeClients, fileId: "pi_models" }))).toEqual({
+      providers: {
+        openrouter: {
+          api: "openai-completions",
+          apiKey: "mistle-managed-credential",
+          baseUrl: "https://openrouter.ai/api/v1",
+          headers: {},
+          models: [
+            { id: "~anthropic/claude-sonnet-latest" },
+            { id: "~openai/gpt-latest" },
+            { id: "qwen/qwen3-coder:free" },
+          ],
+        },
+      },
+    });
+  });
+
   it("renders MiniMax custom provider config when MiniMax egress is available", () => {
     const runtimeClients = renderRuntimeClients({
       compiled: compileDefaultPiRuntime(),

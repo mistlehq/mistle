@@ -20,6 +20,7 @@ import {
   isMiniMaxApiRoute,
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
+  isOpenRouterApiRoute,
   isZaiApiRoute,
 } from "../shared/provider-egress-routes.js";
 import { PiMcpAdapterExtensionBundle } from "./pi-mcp-adapter-extension.bundle.js";
@@ -230,6 +231,23 @@ function resolvePiProviderConfigs(
           apiKey: MistleManagedApiKey,
           baseUrl: route.upstream.baseUrl,
           models: [{ id: "mercury-2" }],
+        },
+      });
+    }
+
+    if (isOpenRouterApiRoute(route)) {
+      insertPiProviderConfig({
+        configsByProvider,
+        config: {
+          provider: "openrouter",
+          api: "openai-completions",
+          apiKey: MistleManagedApiKey,
+          baseUrl: route.upstream.baseUrl,
+          models: [
+            { id: "~anthropic/claude-sonnet-latest" },
+            { id: "~openai/gpt-latest" },
+            { id: "qwen/qwen3-coder:free" },
+          ],
         },
       });
     }
