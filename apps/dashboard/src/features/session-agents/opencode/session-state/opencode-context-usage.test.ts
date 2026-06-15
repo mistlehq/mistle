@@ -141,7 +141,7 @@ const OpenCodeProviders: readonly OpenCodeProviderSummary[] = [
 ];
 
 describe("formatOpenCodeContextUsage", () => {
-  it("formats context usage from the latest assistant message with tokens and total cost", () => {
+  it("formats context window remaining from the latest assistant message with tokens", () => {
     expect(
       formatOpenCodeContextUsage({
         chatState: createChatState([
@@ -162,12 +162,12 @@ describe("formatOpenCodeContextUsage", () => {
         providers: OpenCodeProviders,
       }),
     ).toEqual({
-      label: "Context 40% used",
-      title: "400 used of 1,000 window, $1.75 total cost",
+      label: "60% context left",
+      title: "400 tokens used of 1,000 token context window.",
     });
   });
 
-  it("falls back to token count when provider model context is unavailable", () => {
+  it("omits context window remaining when provider model context is unavailable", () => {
     expect(
       formatOpenCodeContextUsage({
         chatState: createChatState([
@@ -181,13 +181,10 @@ describe("formatOpenCodeContextUsage", () => {
         ]),
         providers: OpenCodeProviders,
       }),
-    ).toEqual({
-      label: "Context 50 tokens",
-      title: "50 tokens used, $0.10 total cost",
-    });
+    ).toBeNull();
   });
 
-  it("still exposes cost when no assistant message has token usage", () => {
+  it("omits context window remaining when no assistant message has token usage", () => {
     expect(
       formatOpenCodeContextUsage({
         chatState: createChatState([
@@ -200,9 +197,6 @@ describe("formatOpenCodeContextUsage", () => {
         ]),
         providers: OpenCodeProviders,
       }),
-    ).toEqual({
-      label: "Cost $0.50",
-      title: "$0.50 total cost",
-    });
+    ).toBeNull();
   });
 });

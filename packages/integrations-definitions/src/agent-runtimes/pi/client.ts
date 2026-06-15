@@ -13,6 +13,12 @@ const PiModelSchema = z.looseObject({
 
 const PiThinkingLevelSchema = z.enum(["off", "minimal", "low", "medium", "high", "xhigh"]);
 
+const PiContextUsageSchema = z.object({
+  tokens: z.number().nullable(),
+  contextWindow: z.number(),
+  percent: z.number().nullable(),
+});
+
 const PiSessionStateSchema = z.looseObject({
   isStreaming: z.boolean(),
   isCompacting: z.boolean(),
@@ -23,6 +29,7 @@ const PiSessionStateSchema = z.looseObject({
   sessionName: z.string().optional(),
   messageCount: z.number(),
   pendingMessageCount: z.number(),
+  contextUsage: PiContextUsageSchema.optional(),
 });
 
 const PiAgentMessageSchema = z.looseObject({
@@ -88,6 +95,7 @@ const PiCommandsResultSchema = z.object({
 });
 
 export type PiSessionState = z.output<typeof PiSessionStateSchema>;
+export type PiContextUsage = z.output<typeof PiContextUsageSchema>;
 export type PiModel = z.output<typeof PiModelSchema>;
 export type PiThinkingLevel = z.output<typeof PiThinkingLevelSchema>;
 export type PiAgentMessage = z.output<typeof PiAgentMessageSchema>;

@@ -9,7 +9,6 @@ type SessionRuntimeWorkbenchCapability = {
   composerModelSelection: SessionComposerModelSelectionInput;
   supportsSteering: boolean;
   preservesCliLaunchContext: boolean;
-  hasContextUsage: boolean;
 };
 
 export const SessionRuntimeWorkbenchCapabilities = {
@@ -23,7 +22,6 @@ export const SessionRuntimeWorkbenchCapabilities = {
     },
     supportsSteering: true,
     preservesCliLaunchContext: false,
-    hasContextUsage: true,
   },
   OPENCODE: {
     runtimeId: "opencode",
@@ -35,7 +33,6 @@ export const SessionRuntimeWorkbenchCapabilities = {
     },
     supportsSteering: true,
     preservesCliLaunchContext: true,
-    hasContextUsage: true,
   },
   PI: {
     runtimeId: "pi",
@@ -47,6 +44,5 @@ export const SessionRuntimeWorkbenchCapabilities = {
     },
     supportsSteering: true,
     preservesCliLaunchContext: false,
-    hasContextUsage: false,
   },
 } satisfies Record<string, SessionRuntimeWorkbenchCapability>;

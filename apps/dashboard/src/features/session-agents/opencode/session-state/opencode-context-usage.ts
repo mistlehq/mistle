@@ -1,17 +1,12 @@
 import type { OpenCodeProviderSummary } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
 
+import {
+  formatKnownContextWindowRemaining,
+  type ContextWindowRemainingViewModel,
+} from "../../context-window-remaining.js";
 import type { OpenCodeChatState } from "./opencode-chat-state.js";
 
-const TokenCountFormatter = new Intl.NumberFormat("en-US");
-const UsdFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
-export type OpenCodeContextUsageViewModel = {
-  label: string;
-  title: string;
-};
+export type OpenCodeContextUsageViewModel = ContextWindowRemainingViewModel;
 
 type OpenCodeAssistantMessage = Extract<
   OpenCodeChatState["messagesById"][string]["info"],
@@ -25,19 +20,10 @@ export function formatOpenCodeContextUsage(input: {
   const messages = input.chatState.messageOrder
     .map((messageId) => input.chatState.messagesById[messageId]?.info)
     .filter((message) => message !== undefined);
-  const totalCost = messages.reduce(
-    (sum, message) => sum + (message.role === "assistant" ? message.cost : 0),
-    0,
-  );
   const contextMessage = findLastAssistantMessageWithTokens(messages);
 
   if (contextMessage === null) {
-    return totalCost > 0
-      ? {
-          label: `Cost ${formatCost(totalCost)}`,
-          title: `${formatCost(totalCost)} total cost`,
-        }
-      : null;
+    return null;
   }
 
   const totalTokens = getAssistantMessageTokenTotal(contextMessage);
@@ -45,25 +31,22 @@ export function formatOpenCodeContextUsage(input: {
     message: contextMessage,
     providers: input.providers,
   });
-  const costTitle = `${formatCost(totalCost)} total cost`;
 
   if (contextWindow === null || contextWindow <= 0) {
-    return {
-      label: `Context ${formatTokenCount(totalTokens)} tokens`,
-      title: `${formatTokenCount(totalTokens)} tokens used, ${costTitle}`,
-    };
+    return null;
   }
 
   // Match upstream OpenCode: context usage is based on the assistant message's
   // total token count, including generated and cache tokens.
-  const usagePercent = Math.round(Math.max(totalTokens / contextWindow, 0) * 100);
+  const remainingPercent = Math.round(
+    Math.min(Math.max(1 - totalTokens / contextWindow, 0), 1) * 100,
+  );
 
-  return {
-    label: `Context ${String(usagePercent)}% used`,
-    title: `${formatTokenCount(totalTokens)} used of ${formatTokenCount(
-      contextWindow,
-    )} window, ${costTitle}`,
-  };
+  return formatKnownContextWindowRemaining({
+    contextWindow,
+    remainingPercent,
+    usedTokens: totalTokens,
+  });
 }
 
 function findLastAssistantMessageWithTokens(
@@ -95,12 +78,4 @@ function findOpenCodeContextWindow(input: {
 }): number | null {
   const provider = input.providers.find((candidate) => candidate.id === input.message.providerID);
   return provider?.models[input.message.modelID]?.limit.context ?? null;
-}
-
-function formatTokenCount(value: number): string {
-  return TokenCountFormatter.format(Math.max(Math.round(value), 0));
-}
-
-function formatCost(value: number): string {
-  return UsdFormatter.format(Math.max(value, 0));
 }

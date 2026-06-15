@@ -14,7 +14,6 @@ describe("SessionRuntimeWorkbenchCapabilities", () => {
       },
       supportsSteering: true,
       preservesCliLaunchContext: false,
-      hasContextUsage: true,
     });
   });
 
@@ -29,7 +28,6 @@ describe("SessionRuntimeWorkbenchCapabilities", () => {
       },
       supportsSteering: true,
       preservesCliLaunchContext: true,
-      hasContextUsage: true,
     });
   });
 
@@ -44,7 +42,6 @@ describe("SessionRuntimeWorkbenchCapabilities", () => {
       },
       supportsSteering: true,
       preservesCliLaunchContext: false,
-      hasContextUsage: false,
     });
   });
 });

@@ -176,8 +176,8 @@ export const OpenCodeContextUsage: Story = {
     composerViewModel: {
       ...SessionConversationPanePlaygroundBaseArgs.composerViewModel,
       contextUsage: {
-        label: "Context 40% used",
-        title: "400 used of 1,000 window, $1.75 total cost",
+        label: "60% context left",
+        title: "400 tokens used of 1,000 token context window.",
       },
       modelOptions: [
         {
