@@ -38,7 +38,7 @@ import type {
   UpdateSandboxProfileInput,
 } from "./sandbox-profiles-types.js";
 
-const AgentRuntimeIdSchema = z.enum(["codex", "opencode", "pi"]);
+const AgentRuntimeIdSchema = z.enum(["claude-code", "codex", "opencode", "pi"]);
 const AssociatedResourceEventRoutingResourceRuleSchema = z
   .object({
     resourceKind: z.string().min(1),

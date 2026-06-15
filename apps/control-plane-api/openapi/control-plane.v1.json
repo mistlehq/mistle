@@ -18999,7 +18999,7 @@
                       "properties": {
                         "agentRuntimeId": {
                           "type": ["string", "null"],
-                          "enum": ["codex", "opencode", "pi", null]
+                          "enum": ["claude-code", "codex", "opencode", "pi", null]
                         },
                         "launchCwd": {
                           "type": ["string", "null"],
@@ -19955,7 +19955,7 @@
                       "properties": {
                         "agentRuntimeId": {
                           "type": ["string", "null"],
-                          "enum": ["codex", "opencode", "pi", null]
+                          "enum": ["claude-code", "codex", "opencode", "pi", null]
                         },
                         "launchCwd": {
                           "type": ["string", "null"],
@@ -21945,7 +21945,7 @@
                     },
                     "agentRuntimeId": {
                       "type": "string",
-                      "enum": ["codex", "opencode", "pi"]
+                      "enum": ["claude-code", "codex", "opencode", "pi"]
                     },
                     "gitCommitSigningIntegrationConnectionId": {
                       "type": ["string", "null"],
@@ -22348,7 +22348,7 @@
                           },
                           "agentRuntimeId": {
                             "type": "string",
-                            "enum": ["codex", "opencode", "pi"]
+                            "enum": ["claude-code", "codex", "opencode", "pi"]
                           },
                           "gitCommitSigningIntegrationConnectionId": {
                             "type": ["string", "null"],
@@ -24685,7 +24685,7 @@
                   },
                   "agentRuntimeId": {
                     "type": "string",
-                    "enum": ["codex", "opencode", "pi"]
+                    "enum": ["claude-code", "codex", "opencode", "pi"]
                   },
                   "gitCommitSigningIntegrationConnectionId": {
                     "type": ["string", "null"],
@@ -24861,7 +24861,7 @@
                     },
                     "agentRuntimeId": {
                       "type": "string",
-                      "enum": ["codex", "opencode", "pi"]
+                      "enum": ["claude-code", "codex", "opencode", "pi"]
                     },
                     "gitCommitSigningIntegrationConnectionId": {
                       "type": ["string", "null"],
@@ -25848,7 +25848,7 @@
                         },
                         "agentRuntimeId": {
                           "type": "string",
-                          "enum": ["codex", "opencode", "pi"]
+                          "enum": ["claude-code", "codex", "opencode", "pi"]
                         },
                         "gitCommitSigningIntegrationConnectionId": {
                           "type": ["string", "null"],
@@ -26372,7 +26372,7 @@
                         },
                         "agentRuntimeId": {
                           "type": "string",
-                          "enum": ["codex", "opencode", "pi"]
+                          "enum": ["claude-code", "codex", "opencode", "pi"]
                         },
                         "gitCommitSigningIntegrationConnectionId": {
                           "type": ["string", "null"],
@@ -26856,7 +26856,7 @@
                         },
                         "agentRuntimeId": {
                           "type": "string",
-                          "enum": ["codex", "opencode", "pi"]
+                          "enum": ["claude-code", "codex", "opencode", "pi"]
                         },
                         "gitCommitSigningIntegrationConnectionId": {
                           "type": ["string", "null"],
@@ -27330,7 +27330,7 @@
                   },
                   "agentRuntimeId": {
                     "type": "string",
-                    "enum": ["codex", "opencode", "pi"]
+                    "enum": ["claude-code", "codex", "opencode", "pi"]
                   },
                   "sandboxProvider": {
                     "type": "string",
@@ -27588,7 +27588,7 @@
                   },
                   "agentRuntimeId": {
                     "type": "string",
-                    "enum": ["codex", "opencode", "pi"]
+                    "enum": ["claude-code", "codex", "opencode", "pi"]
                   },
                   "sandboxProvider": {
                     "type": "string",

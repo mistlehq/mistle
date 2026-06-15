@@ -822,6 +822,75 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     });
   });
 
+  it("updates Claude Code runtime and Mistle MCP access settings together", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-claude-code-mistle-mcp@example.com",
+    });
+    const mcpCredential = await createApiKeyCredential({
+      env,
+      cookie: session.cookie,
+      name: "Claude Code Mistle MCP profile key",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_claude_code_mistle_mcp",
+        organizationId: session.organizationId,
+        displayName: "Claude Code Mistle MCP Draft Put Profile",
+        createdAt: "2026-05-09T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_claude_code_mistle_mcp",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_claude_code_mistle_mcp/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE,
+          mistleMcpEnabled: true,
+          mistleMcpApiKeyId: mcpCredential.apiKey.id,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PutSandboxProfileVersionDraftResponseSchema.parse(await response.json());
+    expect(responseBody.agentRuntimeId).toBe(SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE);
+    expect(responseBody.mistleMcpEnabled).toBe(true);
+    expect(responseBody.mistleMcpApiKeyId).toBe(mcpCredential.apiKey.id);
+
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        agentRuntimeId: true,
+        mistleMcpEnabled: true,
+        mistleMcpApiKeyId: true,
+      },
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.sandboxProfileId, "sbp_draft_put_claude_code_mistle_mcp"),
+          eq(table.version, 1),
+        ),
+    });
+    expect(persistedVersion).toEqual({
+      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE,
+      mistleMcpEnabled: true,
+      mistleMcpApiKeyId: mcpCredential.apiKey.id,
+    });
+  });
+
   it("rejects enabling Mistle MCP without an API key", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-sandbox-profile-draft-put-mistle-mcp-missing-key@example.com",

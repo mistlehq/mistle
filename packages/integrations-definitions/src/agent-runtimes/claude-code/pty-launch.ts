@@ -17,6 +17,6 @@ export const ClaudeCodePtyLaunchSpec: AgentPtyLaunchSpec = {
     cols: 120,
     rows: 30,
     command: "claude",
-    args: [],
+    args: [{ kind: "literal", value: "--resume" }, { kind: "threadId" }],
   },
 };

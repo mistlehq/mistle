@@ -1109,7 +1109,7 @@ async function createStartableProfile(input: {
   versionState:
     | typeof SandboxProfileVersionStates.DRAFT
     | typeof SandboxProfileVersionStates.PUBLISHED;
-  agentRuntimeId?: "codex" | "opencode" | "pi";
+  agentRuntimeId?: "claude-code" | "codex" | "opencode" | "pi";
   snapshotImageId?: string;
   snapshotImageProvider?: "docker" | "e2b" | "tensorlake";
   runtimeColumns?: typeof DockerSandboxRuntimeColumns | typeof TensorlakeSandboxRuntimeColumns;
