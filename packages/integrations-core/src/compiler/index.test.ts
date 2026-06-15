@@ -127,6 +127,89 @@ function compileTestRuntimePlan(input: TestCompileRuntimePlanInput) {
   });
 }
 
+function createMissingMcpTargetAgentRuntimeRegistry(): AgentRuntimeRegistry {
+  const agentRuntimeRegistry = new AgentRuntimeRegistry();
+  agentRuntimeRegistry.register({
+    runtimeId: "codex",
+    displayName: "Codex",
+    logoKey: "openai",
+    configSchema: z.object({}).strict(),
+    createConversationProvider: () => NoopConversationProvider,
+    materializeMcpConfig: () => [
+      {
+        clientId: "missing-client",
+        fileId: "missing-file",
+        format: IntegrationMcpConfigFormats.TOML,
+        path: ["mcp_servers"],
+      },
+    ],
+    compileRuntime: () => ({
+      runtimeClients: [
+        {
+          clientId: "codex-cli",
+          setup: {
+            env: {},
+            files: [
+              {
+                fileId: "codex_config",
+                path: "/root/.codex/config.toml",
+                mode: 384,
+                content: "",
+              },
+            ],
+          },
+          processes: [],
+          endpoints: [
+            {
+              endpointKey: "app-server",
+              transport: {
+                type: "ws",
+                url: "ws://127.0.0.1:4747",
+              },
+              connectionMode: "dedicated",
+            },
+          ],
+        },
+      ],
+      agentRuntimes: [
+        {
+          runtimeId: "codex",
+          runtimeKey: "codex-app-server",
+          clientId: "codex-cli",
+          endpointKey: "app-server",
+          ptyLaunch: {
+            runtimeId: "codex",
+            displayName: "Codex",
+            newLaunch: {
+              ptySessionId: "cli",
+              cols: 120,
+              rows: 32,
+              command: "codex",
+              args: [],
+            },
+            resumeLaunch: {
+              ptySessionId: "cli",
+              cols: 120,
+              rows: 32,
+              command: "codex",
+              args: [
+                {
+                  kind: "literal",
+                  value: "resume",
+                },
+                {
+                  kind: "threadId",
+                },
+              ],
+            },
+          },
+        },
+      ],
+    }),
+  });
+  return agentRuntimeRegistry;
+}
+
 function createDefinitionsBundle(registry: IntegrationRegistry) {
   const agentRuntimeRegistry = new AgentRuntimeRegistry();
   agentRuntimeRegistry.register({
@@ -2906,89 +2989,67 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.runtimeClients[0]?.setup.env.OPENAI_BASE_URL).toBe("https://api.openai.com");
   });
 
-  it("fails when runtime-owned MCP materialization targets a missing client file", () => {
+  it("does not require MCP materialization targets when no MCP servers are resolved", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createOpenAiDefinition());
+    const agentRuntimeRegistry = createMissingMcpTargetAgentRuntimeRegistry();
+
+    const runtimePlan = compileTestRuntimePlan({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      definitions: {
+        integrationRegistry: registry,
+        agentRuntimeRegistry,
+      },
+      bindings: [
+        {
+          targetKey: "openai-default",
+          target: {
+            familyId: "openai",
+            variantId: "openai-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://api.openai.com",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "conn_openai_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_openai_agent",
+            kind: "agent",
+            connectionId: "conn_openai_org_123",
+            config: {
+              runtime: {
+                runtimeId: "codex",
+                config: {},
+              },
+              model: {
+                defaultModel: "gpt-5.3-codex",
+                options: {},
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    expect(runtimePlan.runtimeClients[0]?.clientId).toBe("codex-cli");
+  });
+
+  it("fails when MCP materialization targets a missing client file", () => {
     const registry = new IntegrationRegistry();
     registry.register(createOpenAiDefinition());
     registry.register(createLinearMcpDefinition());
-    const agentRuntimeRegistry = new AgentRuntimeRegistry();
-    agentRuntimeRegistry.register({
-      runtimeId: "codex",
-      displayName: "Codex",
-      logoKey: "openai",
-      configSchema: z.object({}).strict(),
-      createConversationProvider: () => NoopConversationProvider,
-      materializeMcpConfig: () => [
-        {
-          clientId: "missing-client",
-          fileId: "missing-file",
-          format: IntegrationMcpConfigFormats.TOML,
-          path: ["mcp_servers"],
-        },
-      ],
-      compileRuntime: () => ({
-        runtimeClients: [
-          {
-            clientId: "codex-cli",
-            setup: {
-              env: {},
-              files: [
-                {
-                  fileId: "codex_config",
-                  path: "/root/.codex/config.toml",
-                  mode: 384,
-                  content: "",
-                },
-              ],
-            },
-            processes: [],
-            endpoints: [
-              {
-                endpointKey: "app-server",
-                transport: {
-                  type: "ws",
-                  url: "ws://127.0.0.1:4747",
-                },
-                connectionMode: "dedicated",
-              },
-            ],
-          },
-        ],
-        agentRuntimes: [
-          {
-            runtimeId: "codex",
-            runtimeKey: "codex-app-server",
-            clientId: "codex-cli",
-            endpointKey: "app-server",
-            ptyLaunch: {
-              runtimeId: "codex",
-              displayName: "Codex",
-              newLaunch: {
-                ptySessionId: "cli",
-                cols: 120,
-                rows: 32,
-                command: "codex",
-                args: [],
-              },
-              resumeLaunch: {
-                ptySessionId: "cli",
-                cols: 120,
-                rows: 32,
-                command: "codex",
-                args: [
-                  {
-                    kind: "literal",
-                    value: "resume",
-                  },
-                  {
-                    kind: "threadId",
-                  },
-                ],
-              },
-            },
-          },
-        ],
-      }),
-    });
+    const agentRuntimeRegistry = createMissingMcpTargetAgentRuntimeRegistry();
 
     let caughtError: unknown;
     try {

@@ -1,0 +1,3 @@
+# Agent runtimes may own MCP wiring
+
+Agent runtimes may expose MCP servers either through the generic `materializeMcpConfig` runtime-plan materializer or by rendering the runtime-specific MCP configuration inside their own compiler. Setup Assistant depends on Mistle MCP tools, so every built-in server agent runtime must satisfy a cross-runtime MCP compatibility contract: empty MCP input compiles, resolved Mistle MCP input is wired into runtime setup, and resolved provider MCP input is wired into runtime setup. Missing generic materialization targets are built-in runtime definition bugs caught by contract tests, not ordinary sandbox profile errors.

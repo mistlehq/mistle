@@ -503,6 +503,10 @@ function applyAgentRuntimeMcpMappings(input: {
   >;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): ReadonlyArray<RuntimeClient> {
+  if (input.mcpServers.length === 0) {
+    return input.runtimeClients;
+  }
+
   let runtimeClients = input.runtimeClients;
 
   for (const mcpConfig of input.runtimeDefinition.materializeMcpConfig?.() ?? []) {

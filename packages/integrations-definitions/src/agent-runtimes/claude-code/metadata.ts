@@ -1,7 +1,7 @@
 import type { AgentRuntimeMetadata } from "@mistle/integrations-core";
 
 import { ClaudeCodeRuntimeConfigSchema } from "./runtime-config-schema.js";
-import { ClaudeCodeRuntimeClientId, ClaudeCodeRuntimeId } from "./server.js";
+import { ClaudeCodeRuntimeId } from "./server.js";
 
 export const ClaudeCodeRuntimeMetadata: AgentRuntimeMetadata<typeof ClaudeCodeRuntimeConfigSchema> =
   {
@@ -25,14 +25,6 @@ export const ClaudeCodeRuntimeMetadata: AgentRuntimeMetadata<typeof ClaudeCodeRu
         source: "workspacePath",
         insertAs: "relativePathText",
         submitAs: "inlineText",
-      },
-    ],
-    materializeMcpConfig: () => [
-      {
-        clientId: ClaudeCodeRuntimeClientId,
-        fileId: "claude_code_mcp_config",
-        format: "json",
-        path: ["mcpServers"],
       },
     ],
   };

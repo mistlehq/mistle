@@ -1,6 +1,7 @@
 import type {
   CompileAgentRuntimeResult,
   EgressCredentialRoute,
+  ResolvedIntegrationMcpServer,
   RuntimeArtifactLifecycleBuilder,
   RuntimeArtifactInstallStep,
   RuntimeArtifactRefs,
@@ -46,14 +47,16 @@ function createAnthropicRoute(): EgressCredentialRoute {
   };
 }
 
-function compileDefaultClaudeCodeRuntime(): CompileAgentRuntimeResult {
+function compileDefaultClaudeCodeRuntime(input?: {
+  mcpServers?: ReadonlyArray<ResolvedIntegrationMcpServer>;
+}): CompileAgentRuntimeResult {
   return compileClaudeCodeRuntime({
     organizationId: "org_123",
     sandboxProfileId: "sbp_123",
     version: 1,
     runtimeId: ClaudeCodeRuntimeId,
     runtimeConfig: {},
-    mcpServers: [],
+    mcpServers: input?.mcpServers ?? [],
     refs: {
       sandboxPaths: {
         userHomeDir: "/root",
@@ -65,6 +68,49 @@ function compileDefaultClaudeCodeRuntime(): CompileAgentRuntimeResult {
       artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
     },
   });
+}
+
+function createMistleMcpServer(): ResolvedIntegrationMcpServer {
+  return {
+    source: {
+      kind: "mistle",
+    },
+    server: {
+      serverId: "mistle",
+      serverName: "mistle",
+      transport: "streamable-http",
+      url: "https://mcp.example.test/mcp",
+    },
+  };
+}
+
+function createIntegrationMcpServer(): ResolvedIntegrationMcpServer {
+  return {
+    source: {
+      kind: "integration",
+      bindingId: "bind_remote",
+      connectionId: "conn_remote",
+      targetKey: "remote",
+      familyId: "remote",
+      variantId: "remote",
+    },
+    server: {
+      serverId: "remote",
+      serverName: "remote-http",
+      transport: "streamable-http",
+      url: "https://remote-mcp.example.test/mcp",
+      httpHeaders: {
+        Authorization: "Bearer mistle-managed-credential",
+      },
+    },
+  };
+}
+
+function findRuntimeSetupFile(compiled: CompileAgentRuntimeResult, fileId: string) {
+  const runtimeClients = renderRuntimeClients(compiled);
+  return runtimeClients
+    .flatMap((runtimeClient) => runtimeClient.setup.files)
+    .find((file) => file.fileId === fileId);
 }
 
 function renderRuntimeClients(compiled: CompileAgentRuntimeResult) {
@@ -185,6 +231,42 @@ describe("compileClaudeCodeRuntime", () => {
         }),
       },
     ]);
+  });
+
+  it("writes no MCP config when no MCP servers are resolved", () => {
+    const mcpConfig = findRuntimeSetupFile(
+      compileDefaultClaudeCodeRuntime(),
+      "claude_code_mcp_config",
+    );
+
+    expect(mcpConfig).toBeUndefined();
+  });
+
+  it("writes Claude Code MCP config when Mistle MCP is resolved", () => {
+    const mcpConfig = findRuntimeSetupFile(
+      compileDefaultClaudeCodeRuntime({ mcpServers: [createMistleMcpServer()] }),
+      "claude_code_mcp_config",
+    );
+
+    expect(mcpConfig).toMatchObject({
+      path: "/root/.claude/mcp.json",
+      content: expect.stringContaining('"mistle"'),
+    });
+    expect(mcpConfig?.content).toContain('"url": "https://mcp.example.test/mcp"');
+  });
+
+  it("writes Claude Code MCP config when provider MCP is resolved", () => {
+    const mcpConfig = findRuntimeSetupFile(
+      compileDefaultClaudeCodeRuntime({ mcpServers: [createIntegrationMcpServer()] }),
+      "claude_code_mcp_config",
+    );
+
+    expect(mcpConfig).toMatchObject({
+      path: "/root/.claude/mcp.json",
+      content: expect.stringContaining('"remote-http"'),
+    });
+    expect(mcpConfig?.content).toContain('"url": "https://remote-mcp.example.test/mcp"');
+    expect(mcpConfig?.content).toContain('"Authorization": "Bearer mistle-managed-credential"');
   });
 
   it("fails fast when the Anthropic API egress route is missing", () => {
