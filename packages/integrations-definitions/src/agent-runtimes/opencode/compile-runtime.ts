@@ -13,6 +13,7 @@ import {
 } from "../shared/managed-instructions.js";
 import {
   isAnthropicApiRoute,
+  isDeepSeekApiRoute,
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
   isOpenCodeGoRoute,
@@ -96,6 +97,10 @@ function resolveOpenCodeEnabledProviders(
 
     if (isAnthropicApiRoute(route)) {
       providers.add("anthropic");
+    }
+
+    if (isDeepSeekApiRoute(route)) {
+      providers.add("deepseek");
     }
 
     if (isOpenCodeGoRoute(route)) {
@@ -193,6 +198,17 @@ function renderOpenCodeAuthContent(
       insertOpenCodeAuth({
         auth,
         providerId: "anthropic",
+        value: {
+          type: "api",
+          key: MistleManagedApiKey,
+        },
+      });
+    }
+
+    if (isDeepSeekApiRoute(route)) {
+      insertOpenCodeAuth({
+        auth,
+        providerId: "deepseek",
         value: {
           type: "api",
           key: MistleManagedApiKey,

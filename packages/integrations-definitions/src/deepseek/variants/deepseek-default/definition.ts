@@ -26,7 +26,7 @@ type DeepSeekIntegrationDefinition = IntegrationDefinition<
 >;
 
 const DeepSeekTargetSecretSchema = z.object({}).strict();
-const DeepSeekAllowedRuntimeIds = ["pi"] as const;
+const DeepSeekAllowedRuntimeIds = ["opencode", "pi"] as const;
 
 export const DeepSeekDefinition: DeepSeekIntegrationDefinition = {
   familyId: "deepseek",
