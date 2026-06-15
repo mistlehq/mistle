@@ -15,6 +15,7 @@ import { ExpoDefinition } from "./expo/browser.js";
 import { FireworksDefinition } from "./fireworks/index.js";
 import { GcpDefinition } from "./gcp/browser.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/browser.js";
+import { InceptionDefinition } from "./inception/index.js";
 import { JiraDefinition } from "./jira/browser.js";
 import { KimiDefinition } from "./kimi/index.js";
 import { LinearBaseDefinition } from "./linear/variants/linear-default/base-definition.js";
@@ -48,6 +49,7 @@ export * from "./gcp/browser.js";
 export * from "./jira/browser.js";
 export * from "./jira-shared.js";
 export * from "./github/browser.js";
+export * from "./inception/index.js";
 export * from "./kimi/index.js";
 export * from "./linear/browser.js";
 export * from "./minimax/index.js";
@@ -76,6 +78,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   ExpoDefinition,
   FireworksDefinition,
   GcpDefinition,
+  InceptionDefinition,
   JiraDefinition,
   KimiDefinition,
   GitHubCloudDefinition,

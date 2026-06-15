@@ -83,6 +83,17 @@ export function isFireworksApiRoute(route: EgressCredentialRoute): boolean {
   );
 }
 
+export function isInceptionApiRoute(route: EgressCredentialRoute): boolean {
+  return (
+    route.familyId === "inception" &&
+    routeHasHost({ route, host: "api.inceptionlabs.ai" }) &&
+    routeHasPathPrefix({ route, pathPrefix: "/v1" }) &&
+    route.authInjection.type === "bearer" &&
+    isIntegrationConnectionCredentialRoute(route) &&
+    route.credentialResolver.secretType === "api_key"
+  );
+}
+
 export function isKimiApiRoute(route: EgressCredentialRoute): boolean {
   return (
     route.familyId === "kimi" &&

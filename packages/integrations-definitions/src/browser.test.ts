@@ -11,6 +11,7 @@ import {
   FireworksBrowserDefinition,
   GcpBrowserDefinition,
   GitHubCloudBrowserDefinition,
+  InceptionBrowserDefinition,
   JiraBrowserDefinition,
   KimiBrowserDefinition,
   LinearBrowserDefinition,
@@ -151,6 +152,24 @@ describe("browser definitions", () => {
     expect(FireworksBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
     expect(FireworksBrowserDefinition.webhookHandler).toBeUndefined();
     expect(FireworksBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("registers Inception Labs in the browser-safe definitions bundle", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: InceptionBrowserDefinition.familyId,
+      variantId: InceptionBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "inception",
+      variantId: "inception-default",
+      kind: "agent",
+      displayName: "Inception Labs",
+      logoKey: "inception",
+    });
+    expect(InceptionBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(InceptionBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(InceptionBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("registers Z.ai in the browser-safe definitions bundle", () => {

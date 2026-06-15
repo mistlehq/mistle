@@ -537,6 +537,35 @@ describe("compilePiRuntime", () => {
     });
   });
 
+  it("renders Inception custom provider config when Inception egress is available", () => {
+    const runtimeClients = renderRuntimeClients({
+      compiled: compileDefaultPiRuntime(),
+      egressRoutes: [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_inception",
+          bindingId: "bind_inception",
+          familyId: "inception",
+          variantId: "inception-default",
+          host: "api.inceptionlabs.ai",
+          baseUrl: "https://api.inceptionlabs.ai/v1",
+          secretType: "api_key",
+        }),
+      ],
+    });
+
+    expect(JSON.parse(readSetupFile({ runtimeClients, fileId: "pi_models" }))).toEqual({
+      providers: {
+        inception: {
+          api: "openai-completions",
+          apiKey: "mistle-managed-credential",
+          baseUrl: "https://api.inceptionlabs.ai/v1",
+          headers: {},
+          models: [{ id: "mercury-2" }],
+        },
+      },
+    });
+  });
+
   it("renders MiniMax custom provider config when MiniMax egress is available", () => {
     const runtimeClients = renderRuntimeClients({
       compiled: compileDefaultPiRuntime(),
