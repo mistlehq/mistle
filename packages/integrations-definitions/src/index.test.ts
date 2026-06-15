@@ -77,6 +77,10 @@ describe("integrations-definitions index", () => {
       familyId: "planetscale",
       variantId: "planetscale-mcp",
     });
+    const resendDefinition = registry.getDefinition({
+      familyId: "resend",
+      variantId: "resend-mcp",
+    });
     const sentryDefinition = registry.getDefinition({
       familyId: "sentry",
       variantId: "sentry-mcp",
@@ -461,6 +465,29 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(planetscaleDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(resendDefinition).toMatchObject({
+      familyId: "resend",
+      variantId: "resend-mcp",
+      kind: "connector",
+      displayName: "Resend",
+      logoKey: "resend",
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+              slotKey: "resend.resend-mcp.api-key.api-key",
+            },
+          ],
+        },
+      ],
+    });
+    expect(resendDefinition?.mcp).toBeDefined();
     expect(sentryDefinition).toMatchObject({
       familyId: "sentry",
       variantId: "sentry-mcp",
@@ -889,7 +916,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(20);
+    expect(definitions).toHaveLength(21);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -906,6 +933,7 @@ describe("integrations-definitions index", () => {
       "openai::openai-default",
       "opencode::opencode-go",
       "planetscale::planetscale-mcp",
+      "resend::resend-mcp",
       "e2b::e2b-default",
       "modal::modal-default",
       "opencomputer::opencomputer-default",

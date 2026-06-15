@@ -88,6 +88,10 @@ describe("integrations-definitions server", () => {
       familyId: "planetscale",
       variantId: "planetscale-mcp",
     });
+    const resendDefinition = registry.getDefinition({
+      familyId: "resend",
+      variantId: "resend-mcp",
+    });
     const sentryDefinition = registry.getDefinition({
       familyId: "sentry",
       variantId: "sentry-mcp",
@@ -272,6 +276,24 @@ describe("integrations-definitions server", () => {
     expect(planetscaleDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(planetscaleDefinition?.webhookHandler).toBeUndefined();
     expect(planetscaleDefinition?.webhookSource).toBeUndefined();
+    expect(resendDefinition).toMatchObject({
+      familyId: "resend",
+      variantId: "resend-mcp",
+      kind: "connector",
+      displayName: "Resend",
+      logoKey: "resend",
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+        },
+      ],
+    });
+    expect(resendDefinition?.mcp).toBeDefined();
+    expect(resendDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(resendDefinition?.webhookHandler).toBeUndefined();
+    expect(resendDefinition?.webhookSource).toBeUndefined();
     expect(sentryDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(sentryDefinition?.webhookHandler).toBeUndefined();
     expect(sentryDefinition?.webhookSource).toBeUndefined();
@@ -324,10 +346,10 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(20);
+    expect(definitions).toHaveLength(21);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
-    ).toContain("bugsnag::bugsnag-mcp");
+    ).toEqual(expect.arrayContaining(["bugsnag::bugsnag-mcp", "resend::resend-mcp"]));
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {

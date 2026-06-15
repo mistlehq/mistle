@@ -122,6 +122,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "resend-mcp",
+        familyId: "resend",
+        variantId: "resend-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "sentry-mcp",
         familyId: "sentry",
         variantId: "sentry-mcp",

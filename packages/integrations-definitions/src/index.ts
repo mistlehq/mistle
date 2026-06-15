@@ -18,6 +18,7 @@ import { OpenAiApiKeyDefinition } from "./openai/index.js";
 import { OpenCodeGoDefinition } from "./opencode/index.js";
 import { PlanetScaleDefinition } from "./planetscale/browser.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
+import { ResendDefinition } from "./resend/browser.js";
 import {
   E2BSandboxRuntimeDefinition,
   ModalSandboxRuntimeDefinition,
@@ -41,6 +42,7 @@ export * from "./linear/browser.js";
 export * from "./openai/index.js";
 export * from "./opencode/index.js";
 export * from "./planetscale/browser.js";
+export * from "./resend/browser.js";
 export * from "./sandbox-runtimes/index.js";
 export * from "./sentry/browser.js";
 export * from "./signoz/browser.js";
@@ -64,6 +66,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   OpenAiApiKeyDefinition,
   OpenCodeGoDefinition,
   PlanetScaleDefinition,
+  ResendDefinition,
   E2BSandboxRuntimeDefinition,
   ModalSandboxRuntimeDefinition,
   OpenComputerSandboxRuntimeDefinition,
