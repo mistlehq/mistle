@@ -11,9 +11,7 @@
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "queued"
-            ]
+            "enum": ["queued"]
           },
           "cutoffMinute": {
             "type": "string",
@@ -24,11 +22,7 @@
             "minLength": 1
           }
         },
-        "required": [
-          "status",
-          "cutoffMinute",
-          "idempotencyKey"
-        ],
+        "required": ["status", "cutoffMinute", "idempotencyKey"],
         "additionalProperties": false
       }
     },
@@ -37,9 +31,7 @@
   "paths": {
     "/internal/integration-connections/refresh-resource": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -60,11 +52,7 @@
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "organizationId",
-                  "connectionId",
-                  "kind"
-                ],
+                "required": ["organizationId", "connectionId", "kind"],
                 "additionalProperties": false
               }
             }
@@ -92,17 +80,10 @@
                     },
                     "syncState": {
                       "type": "string",
-                      "enum": [
-                        "syncing"
-                      ]
+                      "enum": ["syncing"]
                     }
                   },
-                  "required": [
-                    "connectionId",
-                    "familyId",
-                    "kind",
-                    "syncState"
-                  ],
+                  "required": ["connectionId", "familyId", "kind", "syncState"],
                   "additionalProperties": false
                 }
               }
@@ -119,19 +100,14 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": [
-                            "RESOURCE_KIND_NOT_SUPPORTED"
-                          ]
+                          "enum": ["RESOURCE_KIND_NOT_SUPPORTED"]
                         },
                         "message": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     },
                     {
@@ -139,19 +115,14 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": [
-                            "VALIDATION_ERROR"
-                          ]
+                          "enum": ["VALIDATION_ERROR"]
                         },
                         "message": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -168,19 +139,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -195,19 +161,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "CONNECTION_NOT_FOUND"
-                      ]
+                      "enum": ["CONNECTION_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -229,9 +190,7 @@
     },
     "/internal/integration-credentials/resolve": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -260,10 +219,7 @@
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "connectionId",
-                  "secretType"
-                ],
+                "required": ["connectionId", "secretType"],
                 "additionalProperties": false
               }
             }
@@ -281,9 +237,7 @@
                       "properties": {
                         "kind": {
                           "type": "string",
-                          "enum": [
-                            "value"
-                          ]
+                          "enum": ["value"]
                         },
                         "value": {
                           "type": "string",
@@ -294,10 +248,7 @@
                           "format": "date-time"
                         }
                       },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
+                      "required": ["kind", "value"],
                       "additionalProperties": false
                     },
                     {
@@ -305,9 +256,7 @@
                       "properties": {
                         "kind": {
                           "type": "string",
-                          "enum": [
-                            "aws_session"
-                          ]
+                          "enum": ["aws_session"]
                         },
                         "accessKeyId": {
                           "type": "string",
@@ -356,10 +305,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -374,19 +320,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -408,10 +349,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -437,19 +375,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "CREDENTIAL_RESOLUTION_FAILED"
-                      ]
+                      "enum": ["CREDENTIAL_RESOLUTION_FAILED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -460,9 +393,7 @@
     },
     "/internal/integration-credentials/resolve-target-secrets": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -480,10 +411,7 @@
                           "minLength": 1
                         },
                         "encryptedSecrets": {
-                          "type": [
-                            "object",
-                            "null"
-                          ],
+                          "type": ["object", "null"],
                           "properties": {
                             "ciphertext": {
                               "type": "string",
@@ -498,26 +426,17 @@
                               "minimum": 1
                             }
                           },
-                          "required": [
-                            "ciphertext",
-                            "nonce",
-                            "masterKeyVersion"
-                          ],
+                          "required": ["ciphertext", "nonce", "masterKeyVersion"],
                           "additionalProperties": false
                         }
                       },
-                      "required": [
-                        "targetKey",
-                        "encryptedSecrets"
-                      ],
+                      "required": ["targetKey", "encryptedSecrets"],
                       "additionalProperties": false
                     },
                     "minItems": 1
                   }
                 },
-                "required": [
-                  "targets"
-                ],
+                "required": ["targets"],
                 "additionalProperties": false
               }
             }
@@ -547,17 +466,12 @@
                             }
                           }
                         },
-                        "required": [
-                          "targetKey",
-                          "secrets"
-                        ],
+                        "required": ["targetKey", "secrets"],
                         "additionalProperties": false
                       }
                     }
                   },
-                  "required": [
-                    "targets"
-                  ],
+                  "required": ["targets"],
                   "additionalProperties": false
                 }
               }
@@ -579,10 +493,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -597,19 +508,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -631,9 +537,7 @@
     },
     "/internal/identity-linking/resolve-principal-credential": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -685,9 +589,7 @@
                       "properties": {
                         "kind": {
                           "type": "string",
-                          "enum": [
-                            "value"
-                          ]
+                          "enum": ["value"]
                         },
                         "value": {
                           "type": "string",
@@ -698,10 +600,7 @@
                           "format": "date-time"
                         }
                       },
-                      "required": [
-                        "kind",
-                        "value"
-                      ],
+                      "required": ["kind", "value"],
                       "additionalProperties": false
                     },
                     {
@@ -709,9 +608,7 @@
                       "properties": {
                         "kind": {
                           "type": "string",
-                          "enum": [
-                            "aws_session"
-                          ]
+                          "enum": ["aws_session"]
                         },
                         "accessKeyId": {
                           "type": "string",
@@ -760,10 +657,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -778,19 +672,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -812,10 +701,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -837,9 +723,7 @@
     },
     "/internal/identity-linking/sign-commit-payload": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -869,9 +753,7 @@
                   },
                   "format": {
                     "type": "string",
-                    "enum": [
-                      "ssh"
-                    ]
+                    "enum": ["ssh"]
                   },
                   "keyRef": {
                     "type": "string",
@@ -887,9 +769,7 @@
                   },
                   "encoding": {
                     "type": "string",
-                    "enum": [
-                      "base64"
-                    ]
+                    "enum": ["base64"]
                   }
                 },
                 "required": [
@@ -919,9 +799,7 @@
                   "properties": {
                     "format": {
                       "type": "string",
-                      "enum": [
-                        "ssh"
-                      ]
+                      "enum": ["ssh"]
                     },
                     "signature": {
                       "type": "string",
@@ -929,16 +807,10 @@
                     },
                     "signatureEncoding": {
                       "type": "string",
-                      "enum": [
-                        "pem"
-                      ]
+                      "enum": ["pem"]
                     }
                   },
-                  "required": [
-                    "format",
-                    "signature",
-                    "signatureEncoding"
-                  ],
+                  "required": ["format", "signature", "signatureEncoding"],
                   "additionalProperties": false
                 }
               }
@@ -960,10 +832,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -978,19 +847,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1012,10 +876,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1037,9 +898,7 @@
     },
     "/internal/provider-resource-associations/register": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -1087,19 +946,14 @@
                       "properties": {
                         "status": {
                           "type": "string",
-                          "enum": [
-                            "created"
-                          ]
+                          "enum": ["created"]
                         },
                         "associationId": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "status",
-                        "associationId"
-                      ],
+                      "required": ["status", "associationId"],
                       "additionalProperties": false
                     },
                     {
@@ -1107,19 +961,14 @@
                       "properties": {
                         "status": {
                           "type": "string",
-                          "enum": [
-                            "already_exists"
-                          ]
+                          "enum": ["already_exists"]
                         },
                         "associationId": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "status",
-                        "associationId"
-                      ],
+                      "required": ["status", "associationId"],
                       "additionalProperties": false
                     },
                     {
@@ -1127,9 +976,7 @@
                       "properties": {
                         "status": {
                           "type": "string",
-                          "enum": [
-                            "not_applicable"
-                          ]
+                          "enum": ["not_applicable"]
                         },
                         "reason": {
                           "type": "string",
@@ -1139,10 +986,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "status",
-                        "reason"
-                      ],
+                      "required": ["status", "reason"],
                       "additionalProperties": false
                     }
                   ]
@@ -1159,19 +1003,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR"
-                      ]
+                      "enum": ["VALIDATION_ERROR"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1186,19 +1025,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1220,10 +1054,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1245,9 +1076,7 @@
     },
     "/internal/schedules/dispatch": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "responses": {
           "202": {
             "description": "Enqueue scheduled workflow dispatch for internal callers.",
@@ -1268,19 +1097,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1302,9 +1126,7 @@
     },
     "/internal/snapshot-jobs/{jobId}/claim": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "parameters": [
           {
             "schema": {
@@ -1328,9 +1150,7 @@
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "workflowRunId"
-                ],
+                "required": ["workflowRunId"],
                 "additionalProperties": false
               }
             }
@@ -1346,14 +1166,10 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "ok"
-                      ]
+                      "enum": ["ok"]
                     }
                   },
-                  "required": [
-                    "status"
-                  ],
+                  "required": ["status"],
                   "additionalProperties": false
                 }
               }
@@ -1368,19 +1184,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR"
-                      ]
+                      "enum": ["VALIDATION_ERROR"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1395,19 +1206,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1422,19 +1228,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "SNAPSHOT_JOB_NOT_FOUND"
-                      ]
+                      "enum": ["SNAPSHOT_JOB_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1449,20 +1250,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "SNAPSHOT_JOB_STATE_CONFLICT",
-                        "SNAPSHOT_JOB_OWNERSHIP_MISMATCH"
-                      ]
+                      "enum": ["SNAPSHOT_JOB_STATE_CONFLICT", "SNAPSHOT_JOB_OWNERSHIP_MISMATCH"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1484,9 +1279,7 @@
     },
     "/internal/snapshot-jobs/{jobId}/succeed": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "parameters": [
           {
             "schema": {
@@ -1521,17 +1314,11 @@
                         "minLength": 1
                       }
                     },
-                    "required": [
-                      "provider",
-                      "imageId"
-                    ],
+                    "required": ["provider", "imageId"],
                     "additionalProperties": false
                   }
                 },
-                "required": [
-                  "workflowRunId",
-                  "image"
-                ],
+                "required": ["workflowRunId", "image"],
                 "additionalProperties": false
               }
             }
@@ -1547,14 +1334,10 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "ok"
-                      ]
+                      "enum": ["ok"]
                     }
                   },
-                  "required": [
-                    "status"
-                  ],
+                  "required": ["status"],
                   "additionalProperties": false
                 }
               }
@@ -1569,19 +1352,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR"
-                      ]
+                      "enum": ["VALIDATION_ERROR"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1596,19 +1374,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1623,19 +1396,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "SNAPSHOT_JOB_NOT_FOUND"
-                      ]
+                      "enum": ["SNAPSHOT_JOB_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1650,20 +1418,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "SNAPSHOT_JOB_STATE_CONFLICT",
-                        "SNAPSHOT_JOB_OWNERSHIP_MISMATCH"
-                      ]
+                      "enum": ["SNAPSHOT_JOB_STATE_CONFLICT", "SNAPSHOT_JOB_OWNERSHIP_MISMATCH"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1685,9 +1447,7 @@
     },
     "/internal/snapshot-jobs/{jobId}/fail": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "parameters": [
           {
             "schema": {
@@ -1719,11 +1479,7 @@
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "workflowRunId",
-                  "errorCode",
-                  "errorMessage"
-                ],
+                "required": ["workflowRunId", "errorCode", "errorMessage"],
                 "additionalProperties": false
               }
             }
@@ -1739,14 +1495,10 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "ok"
-                      ]
+                      "enum": ["ok"]
                     }
                   },
-                  "required": [
-                    "status"
-                  ],
+                  "required": ["status"],
                   "additionalProperties": false
                 }
               }
@@ -1761,19 +1513,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "VALIDATION_ERROR"
-                      ]
+                      "enum": ["VALIDATION_ERROR"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1788,19 +1535,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1815,19 +1557,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "SNAPSHOT_JOB_NOT_FOUND"
-                      ]
+                      "enum": ["SNAPSHOT_JOB_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1842,20 +1579,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "SNAPSHOT_JOB_STATE_CONFLICT",
-                        "SNAPSHOT_JOB_OWNERSHIP_MISMATCH"
-                      ]
+                      "enum": ["SNAPSHOT_JOB_STATE_CONFLICT", "SNAPSHOT_JOB_OWNERSHIP_MISMATCH"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -1877,9 +1608,7 @@
     },
     "/internal/sandbox-runtime/compile-plan": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -1901,10 +1630,7 @@
                   },
                   "snapshotPreparationScriptKind": {
                     "type": "string",
-                    "enum": [
-                      "setup",
-                      "maintenance"
-                    ]
+                    "enum": ["setup", "maintenance"]
                   },
                   "image": {
                     "type": "object",
@@ -1915,25 +1641,14 @@
                       },
                       "kind": {
                         "type": "string",
-                        "enum": [
-                          "base",
-                          "snapshot"
-                        ]
+                        "enum": ["base", "snapshot"]
                       }
                     },
-                    "required": [
-                      "imageId",
-                      "kind"
-                    ],
+                    "required": ["imageId", "kind"],
                     "additionalProperties": false
                   }
                 },
-                "required": [
-                  "organizationId",
-                  "profileId",
-                  "profileVersion",
-                  "image"
-                ],
+                "required": ["organizationId", "profileId", "profileVersion", "image"],
                 "additionalProperties": false
               }
             }
@@ -1965,19 +1680,14 @@
                               "properties": {
                                 "source": {
                                   "type": "string",
-                                  "enum": [
-                                    "base"
-                                  ]
+                                  "enum": ["base"]
                                 },
                                 "imageRef": {
                                   "type": "string",
                                   "minLength": 1
                                 }
                               },
-                              "required": [
-                                "source",
-                                "imageRef"
-                              ],
+                              "required": ["source", "imageRef"],
                               "additionalProperties": false
                             },
                             {
@@ -1985,19 +1695,14 @@
                               "properties": {
                                 "source": {
                                   "type": "string",
-                                  "enum": [
-                                    "snapshot"
-                                  ]
+                                  "enum": ["snapshot"]
                                 },
                                 "imageRef": {
                                   "type": "string",
                                   "minLength": 1
                                 }
                               },
-                              "required": [
-                                "source",
-                                "imageRef"
-                              ],
+                              "required": ["source", "imageRef"],
                               "additionalProperties": false
                             }
                           ]
@@ -2052,9 +1757,7 @@
                                     }
                                   }
                                 },
-                                "required": [
-                                  "hosts"
-                                ],
+                                "required": ["hosts"],
                                 "additionalProperties": false
                               },
                               "upstream": {
@@ -2065,9 +1768,7 @@
                                     "minLength": 1
                                   }
                                 },
-                                "required": [
-                                  "baseUrl"
-                                ],
+                                "required": ["baseUrl"],
                                 "additionalProperties": false
                               },
                               "authInjection": {
@@ -2077,19 +1778,14 @@
                                     "properties": {
                                       "type": {
                                         "type": "string",
-                                        "enum": [
-                                          "bearer"
-                                        ]
+                                        "enum": ["bearer"]
                                       },
                                       "target": {
                                         "type": "string",
                                         "minLength": 1
                                       }
                                     },
-                                    "required": [
-                                      "type",
-                                      "target"
-                                    ],
+                                    "required": ["type", "target"],
                                     "additionalProperties": false
                                   },
                                   {
@@ -2097,9 +1793,7 @@
                                     "properties": {
                                       "type": {
                                         "type": "string",
-                                        "enum": [
-                                          "basic"
-                                        ]
+                                        "enum": ["basic"]
                                       },
                                       "target": {
                                         "type": "string",
@@ -2110,10 +1804,7 @@
                                         "minLength": 1
                                       }
                                     },
-                                    "required": [
-                                      "type",
-                                      "target"
-                                    ],
+                                    "required": ["type", "target"],
                                     "additionalProperties": false
                                   },
                                   {
@@ -2121,19 +1812,14 @@
                                     "properties": {
                                       "type": {
                                         "type": "string",
-                                        "enum": [
-                                          "header"
-                                        ]
+                                        "enum": ["header"]
                                       },
                                       "target": {
                                         "type": "string",
                                         "minLength": 1
                                       }
                                     },
-                                    "required": [
-                                      "type",
-                                      "target"
-                                    ],
+                                    "required": ["type", "target"],
                                     "additionalProperties": false
                                   },
                                   {
@@ -2141,19 +1827,14 @@
                                     "properties": {
                                       "type": {
                                         "type": "string",
-                                        "enum": [
-                                          "query"
-                                        ]
+                                        "enum": ["query"]
                                       },
                                       "target": {
                                         "type": "string",
                                         "minLength": 1
                                       }
                                     },
-                                    "required": [
-                                      "type",
-                                      "target"
-                                    ],
+                                    "required": ["type", "target"],
                                     "additionalProperties": false
                                   },
                                   {
@@ -2161,9 +1842,7 @@
                                     "properties": {
                                       "type": {
                                         "type": "string",
-                                        "enum": [
-                                          "aws_sigv4"
-                                        ]
+                                        "enum": ["aws_sigv4"]
                                       },
                                       "service": {
                                         "type": "string",
@@ -2174,11 +1853,7 @@
                                         "minLength": 1
                                       }
                                     },
-                                    "required": [
-                                      "type",
-                                      "service",
-                                      "region"
-                                    ],
+                                    "required": ["type", "service", "region"],
                                     "additionalProperties": false
                                   }
                                 ]
@@ -2205,9 +1880,7 @@
                                           "properties": {
                                             "kind": {
                                               "type": "string",
-                                              "enum": [
-                                                "integration_connection"
-                                              ]
+                                              "enum": ["integration_connection"]
                                             },
                                             "connectionId": {
                                               "type": "string",
@@ -2226,11 +1899,7 @@
                                               "minLength": 1
                                             }
                                           },
-                                          "required": [
-                                            "kind",
-                                            "connectionId",
-                                            "secretType"
-                                          ],
+                                          "required": ["kind", "connectionId", "secretType"],
                                           "additionalProperties": false
                                         },
                                         {
@@ -2238,9 +1907,7 @@
                                           "properties": {
                                             "kind": {
                                               "type": "string",
-                                              "enum": [
-                                                "linked_principal"
-                                              ]
+                                              "enum": ["linked_principal"]
                                             },
                                             "providerFamily": {
                                               "type": "string",
@@ -2259,10 +1926,7 @@
                                             },
                                             "resolutionMode": {
                                               "type": "string",
-                                              "enum": [
-                                                "required",
-                                                "preferred"
-                                              ]
+                                              "enum": ["required", "preferred"]
                                             }
                                           },
                                           "required": [
@@ -2279,19 +1943,14 @@
                                           "properties": {
                                             "kind": {
                                               "type": "string",
-                                              "enum": [
-                                                "mistle_mcp_token"
-                                              ]
+                                              "enum": ["mistle_mcp_token"]
                                             },
                                             "apiKeyId": {
                                               "type": "string",
                                               "minLength": 1
                                             }
                                           },
-                                          "required": [
-                                            "kind",
-                                            "apiKeyId"
-                                          ],
+                                          "required": ["kind", "apiKeyId"],
                                           "additionalProperties": false
                                         },
                                         {
@@ -2299,9 +1958,7 @@
                                           "properties": {
                                             "kind": {
                                               "type": "string",
-                                              "enum": [
-                                                "mistle_mcp_setup_assistant_token"
-                                              ]
+                                              "enum": ["mistle_mcp_setup_assistant_token"]
                                             },
                                             "sandboxProfileId": {
                                               "type": "string",
@@ -2322,10 +1979,7 @@
                                       ]
                                     }
                                   },
-                                  "required": [
-                                    "header",
-                                    "credentialResolver"
-                                  ],
+                                  "required": ["header", "credentialResolver"],
                                   "additionalProperties": false
                                 }
                               },
@@ -2336,9 +1990,7 @@
                                     "properties": {
                                       "kind": {
                                         "type": "string",
-                                        "enum": [
-                                          "integration_connection"
-                                        ]
+                                        "enum": ["integration_connection"]
                                       },
                                       "connectionId": {
                                         "type": "string",
@@ -2357,11 +2009,7 @@
                                         "minLength": 1
                                       }
                                     },
-                                    "required": [
-                                      "kind",
-                                      "connectionId",
-                                      "secretType"
-                                    ],
+                                    "required": ["kind", "connectionId", "secretType"],
                                     "additionalProperties": false
                                   },
                                   {
@@ -2369,9 +2017,7 @@
                                     "properties": {
                                       "kind": {
                                         "type": "string",
-                                        "enum": [
-                                          "linked_principal"
-                                        ]
+                                        "enum": ["linked_principal"]
                                       },
                                       "providerFamily": {
                                         "type": "string",
@@ -2390,10 +2036,7 @@
                                       },
                                       "resolutionMode": {
                                         "type": "string",
-                                        "enum": [
-                                          "required",
-                                          "preferred"
-                                        ]
+                                        "enum": ["required", "preferred"]
                                       }
                                     },
                                     "required": [
@@ -2410,19 +2053,14 @@
                                     "properties": {
                                       "kind": {
                                         "type": "string",
-                                        "enum": [
-                                          "mistle_mcp_token"
-                                        ]
+                                        "enum": ["mistle_mcp_token"]
                                       },
                                       "apiKeyId": {
                                         "type": "string",
                                         "minLength": 1
                                       }
                                     },
-                                    "required": [
-                                      "kind",
-                                      "apiKeyId"
-                                    ],
+                                    "required": ["kind", "apiKeyId"],
                                     "additionalProperties": false
                                   },
                                   {
@@ -2430,9 +2068,7 @@
                                     "properties": {
                                       "kind": {
                                         "type": "string",
-                                        "enum": [
-                                          "mistle_mcp_setup_assistant_token"
-                                        ]
+                                        "enum": ["mistle_mcp_setup_assistant_token"]
                                       },
                                       "sandboxProfileId": {
                                         "type": "string",
@@ -2508,9 +2144,7 @@
                                           "properties": {
                                             "op": {
                                               "type": "string",
-                                              "enum": [
-                                                "github_release_install"
-                                              ]
+                                              "enum": ["github_release_install"]
                                             },
                                             "repository": {
                                               "type": "string",
@@ -2523,14 +2157,10 @@
                                                   "properties": {
                                                     "kind": {
                                                       "type": "string",
-                                                      "enum": [
-                                                        "latest"
-                                                      ]
+                                                      "enum": ["latest"]
                                                     }
                                                   },
-                                                  "required": [
-                                                    "kind"
-                                                  ],
+                                                  "required": ["kind"],
                                                   "additionalProperties": false
                                                 },
                                                 {
@@ -2538,26 +2168,18 @@
                                                   "properties": {
                                                     "kind": {
                                                       "type": "string",
-                                                      "enum": [
-                                                        "tag"
-                                                      ]
+                                                      "enum": ["tag"]
                                                     },
                                                     "match": {
                                                       "type": "string",
-                                                      "enum": [
-                                                        "exact"
-                                                      ]
+                                                      "enum": ["exact"]
                                                     },
                                                     "tag": {
                                                       "type": "string",
                                                       "minLength": 1
                                                     }
                                                   },
-                                                  "required": [
-                                                    "kind",
-                                                    "match",
-                                                    "tag"
-                                                  ],
+                                                  "required": ["kind", "match", "tag"],
                                                   "additionalProperties": false
                                                 },
                                                 {
@@ -2565,26 +2187,18 @@
                                                   "properties": {
                                                     "kind": {
                                                       "type": "string",
-                                                      "enum": [
-                                                        "tag"
-                                                      ]
+                                                      "enum": ["tag"]
                                                     },
                                                     "match": {
                                                       "type": "string",
-                                                      "enum": [
-                                                        "latest_matching_prefix"
-                                                      ]
+                                                      "enum": ["latest_matching_prefix"]
                                                     },
                                                     "prefix": {
                                                       "type": "string",
                                                       "minLength": 1
                                                     }
                                                   },
-                                                  "required": [
-                                                    "kind",
-                                                    "match",
-                                                    "prefix"
-                                                  ],
+                                                  "required": ["kind", "match", "prefix"],
                                                   "additionalProperties": false
                                                 }
                                               ]
@@ -2596,9 +2210,7 @@
                                                   "properties": {
                                                     "kind": {
                                                       "type": "string",
-                                                      "enum": [
-                                                        "exact"
-                                                      ]
+                                                      "enum": ["exact"]
                                                     },
                                                     "fileName": {
                                                       "type": "string",
@@ -2606,20 +2218,14 @@
                                                     },
                                                     "format": {
                                                       "type": "string",
-                                                      "enum": [
-                                                        "binary"
-                                                      ]
+                                                      "enum": ["binary"]
                                                     },
                                                     "sha256": {
                                                       "type": "string",
                                                       "pattern": "^[a-f0-9]{64}$/u"
                                                     }
                                                   },
-                                                  "required": [
-                                                    "kind",
-                                                    "fileName",
-                                                    "format"
-                                                  ],
+                                                  "required": ["kind", "fileName", "format"],
                                                   "additionalProperties": false
                                                 },
                                                 {
@@ -2627,9 +2233,7 @@
                                                   "properties": {
                                                     "kind": {
                                                       "type": "string",
-                                                      "enum": [
-                                                        "exact"
-                                                      ]
+                                                      "enum": ["exact"]
                                                     },
                                                     "fileName": {
                                                       "type": "string",
@@ -2637,9 +2241,7 @@
                                                     },
                                                     "format": {
                                                       "type": "string",
-                                                      "enum": [
-                                                        "tar.gz"
-                                                      ]
+                                                      "enum": ["tar.gz"]
                                                     },
                                                     "extractedPath": {
                                                       "type": "string",
@@ -2663,9 +2265,7 @@
                                                   "properties": {
                                                     "kind": {
                                                       "type": "string",
-                                                      "enum": [
-                                                        "by_arch"
-                                                      ]
+                                                      "enum": ["by_arch"]
                                                     },
                                                     "x86_64": {
                                                       "anyOf": [
@@ -2678,19 +2278,14 @@
                                                             },
                                                             "format": {
                                                               "type": "string",
-                                                              "enum": [
-                                                                "binary"
-                                                              ]
+                                                              "enum": ["binary"]
                                                             },
                                                             "sha256": {
                                                               "type": "string",
                                                               "pattern": "^[a-f0-9]{64}$/u"
                                                             }
                                                           },
-                                                          "required": [
-                                                            "fileName",
-                                                            "format"
-                                                          ],
+                                                          "required": ["fileName", "format"],
                                                           "additionalProperties": false
                                                         },
                                                         {
@@ -2702,9 +2297,7 @@
                                                             },
                                                             "format": {
                                                               "type": "string",
-                                                              "enum": [
-                                                                "tar.gz"
-                                                              ]
+                                                              "enum": ["tar.gz"]
                                                             },
                                                             "extractedPath": {
                                                               "type": "string",
@@ -2735,19 +2328,14 @@
                                                             },
                                                             "format": {
                                                               "type": "string",
-                                                              "enum": [
-                                                                "binary"
-                                                              ]
+                                                              "enum": ["binary"]
                                                             },
                                                             "sha256": {
                                                               "type": "string",
                                                               "pattern": "^[a-f0-9]{64}$/u"
                                                             }
                                                           },
-                                                          "required": [
-                                                            "fileName",
-                                                            "format"
-                                                          ],
+                                                          "required": ["fileName", "format"],
                                                           "additionalProperties": false
                                                         },
                                                         {
@@ -2759,9 +2347,7 @@
                                                             },
                                                             "format": {
                                                               "type": "string",
-                                                              "enum": [
-                                                                "tar.gz"
-                                                              ]
+                                                              "enum": ["tar.gz"]
                                                             },
                                                             "extractedPath": {
                                                               "type": "string",
@@ -2782,11 +2368,7 @@
                                                       ]
                                                     }
                                                   },
-                                                  "required": [
-                                                    "kind",
-                                                    "x86_64",
-                                                    "aarch64"
-                                                  ],
+                                                  "required": ["kind", "x86_64", "aarch64"],
                                                   "additionalProperties": false
                                                 }
                                               ]
@@ -2814,9 +2396,7 @@
                                           "properties": {
                                             "op": {
                                               "type": "string",
-                                              "enum": [
-                                                "mise_install"
-                                              ]
+                                              "enum": ["mise_install"]
                                             },
                                             "tools": {
                                               "type": "array",
@@ -2834,10 +2414,7 @@
                                               "exclusiveMinimum": 0
                                             }
                                           },
-                                          "required": [
-                                            "op",
-                                            "tools"
-                                          ],
+                                          "required": ["op", "tools"],
                                           "additionalProperties": false
                                         },
                                         {
@@ -2845,9 +2422,7 @@
                                           "properties": {
                                             "op": {
                                               "type": "string",
-                                              "enum": [
-                                                "exec"
-                                              ]
+                                              "enum": ["exec"]
                                             },
                                             "command": {
                                               "type": "object",
@@ -2873,33 +2448,22 @@
                                                   "exclusiveMinimum": 0
                                                 }
                                               },
-                                              "required": [
-                                                "args"
-                                              ],
+                                              "required": ["args"],
                                               "additionalProperties": false
                                             }
                                           },
-                                          "required": [
-                                            "op",
-                                            "command"
-                                          ],
+                                          "required": ["op", "command"],
                                           "additionalProperties": false
                                         }
                                       ]
                                     }
                                   }
                                 },
-                                "required": [
-                                  "install"
-                                ],
+                                "required": ["install"],
                                 "additionalProperties": false
                               }
                             },
-                            "required": [
-                              "artifactKey",
-                              "name",
-                              "lifecycle"
-                            ],
+                            "required": ["artifactKey", "name", "lifecycle"],
                             "additionalProperties": false
                           }
                         },
@@ -2912,15 +2476,11 @@
                                 "properties": {
                                   "sourceKind": {
                                     "type": "string",
-                                    "enum": [
-                                      "git-clone"
-                                    ]
+                                    "enum": ["git-clone"]
                                   },
                                   "resourceKind": {
                                     "type": "string",
-                                    "enum": [
-                                      "repository"
-                                    ]
+                                    "enum": ["repository"]
                                   },
                                   "path": {
                                     "type": "string",
@@ -2931,12 +2491,7 @@
                                     "format": "uri"
                                   }
                                 },
-                                "required": [
-                                  "sourceKind",
-                                  "resourceKind",
-                                  "path",
-                                  "originUrl"
-                                ],
+                                "required": ["sourceKind", "resourceKind", "path", "originUrl"],
                                 "additionalProperties": false
                               }
                             ]
@@ -2963,18 +2518,12 @@
                                     "minLength": 1
                                   }
                                 },
-                                "required": [
-                                  "name",
-                                  "relativePath"
-                                ],
+                                "required": ["name", "relativePath"],
                                 "additionalProperties": false
                               }
                             }
                           },
-                          "required": [
-                            "originUrl",
-                            "selectedSkills"
-                          ],
+                          "required": ["originUrl", "selectedSkills"],
                           "additionalProperties": false
                         },
                         "runtimeClients": {
@@ -3017,19 +2566,10 @@
                                         },
                                         "writeMode": {
                                           "type": "string",
-                                          "enum": [
-                                            "overwrite",
-                                            "if-absent",
-                                            "merge"
-                                          ]
+                                          "enum": ["overwrite", "if-absent", "merge"]
                                         }
                                       },
-                                      "required": [
-                                        "fileId",
-                                        "path",
-                                        "mode",
-                                        "content"
-                                      ],
+                                      "required": ["fileId", "path", "mode", "content"],
                                       "additionalProperties": false
                                     }
                                   },
@@ -3040,10 +2580,7 @@
                                     }
                                   }
                                 },
-                                "required": [
-                                  "env",
-                                  "files"
-                                ],
+                                "required": ["env", "files"],
                                 "additionalProperties": false
                               },
                               "processes": {
@@ -3079,9 +2616,7 @@
                                           "exclusiveMinimum": 0
                                         }
                                       },
-                                      "required": [
-                                        "args"
-                                      ],
+                                      "required": ["args"],
                                       "additionalProperties": false
                                     },
                                     "readiness": {
@@ -3091,14 +2626,10 @@
                                           "properties": {
                                             "type": {
                                               "type": "string",
-                                              "enum": [
-                                                "none"
-                                              ]
+                                              "enum": ["none"]
                                             }
                                           },
-                                          "required": [
-                                            "type"
-                                          ],
+                                          "required": ["type"],
                                           "additionalProperties": false
                                         },
                                         {
@@ -3106,9 +2637,7 @@
                                           "properties": {
                                             "type": {
                                               "type": "string",
-                                              "enum": [
-                                                "tcp"
-                                              ]
+                                              "enum": ["tcp"]
                                             },
                                             "host": {
                                               "type": "string",
@@ -3124,12 +2653,7 @@
                                               "exclusiveMinimum": 0
                                             }
                                           },
-                                          "required": [
-                                            "type",
-                                            "host",
-                                            "port",
-                                            "timeoutMs"
-                                          ],
+                                          "required": ["type", "host", "port", "timeoutMs"],
                                           "additionalProperties": false
                                         },
                                         {
@@ -3137,9 +2661,7 @@
                                           "properties": {
                                             "type": {
                                               "type": "string",
-                                              "enum": [
-                                                "http"
-                                              ]
+                                              "enum": ["http"]
                                             },
                                             "url": {
                                               "type": "string",
@@ -3168,9 +2690,7 @@
                                           "properties": {
                                             "type": {
                                               "type": "string",
-                                              "enum": [
-                                                "ws"
-                                              ]
+                                              "enum": ["ws"]
                                             },
                                             "url": {
                                               "type": "string",
@@ -3181,11 +2701,7 @@
                                               "exclusiveMinimum": 0
                                             }
                                           },
-                                          "required": [
-                                            "type",
-                                            "url",
-                                            "timeoutMs"
-                                          ],
+                                          "required": ["type", "url", "timeoutMs"],
                                           "additionalProperties": false
                                         }
                                       ]
@@ -3195,10 +2711,7 @@
                                       "properties": {
                                         "signal": {
                                           "type": "string",
-                                          "enum": [
-                                            "sigterm",
-                                            "sigkill"
-                                          ]
+                                          "enum": ["sigterm", "sigkill"]
                                         },
                                         "timeoutMs": {
                                           "type": "integer",
@@ -3209,19 +2722,11 @@
                                           "minimum": 0
                                         }
                                       },
-                                      "required": [
-                                        "signal",
-                                        "timeoutMs"
-                                      ],
+                                      "required": ["signal", "timeoutMs"],
                                       "additionalProperties": false
                                     }
                                   },
-                                  "required": [
-                                    "processKey",
-                                    "command",
-                                    "readiness",
-                                    "stop"
-                                  ],
+                                  "required": ["processKey", "command", "readiness", "stop"],
                                   "additionalProperties": false
                                 }
                               },
@@ -3245,46 +2750,29 @@
                                           "properties": {
                                             "type": {
                                               "type": "string",
-                                              "enum": [
-                                                "ws"
-                                              ]
+                                              "enum": ["ws"]
                                             },
                                             "url": {
                                               "type": "string",
                                               "format": "uri"
                                             }
                                           },
-                                          "required": [
-                                            "type",
-                                            "url"
-                                          ],
+                                          "required": ["type", "url"],
                                           "additionalProperties": false
                                         }
                                       ]
                                     },
                                     "connectionMode": {
                                       "type": "string",
-                                      "enum": [
-                                        "dedicated",
-                                        "shared"
-                                      ]
+                                      "enum": ["dedicated", "shared"]
                                     }
                                   },
-                                  "required": [
-                                    "endpointKey",
-                                    "transport",
-                                    "connectionMode"
-                                  ],
+                                  "required": ["endpointKey", "transport", "connectionMode"],
                                   "additionalProperties": false
                                 }
                               }
                             },
-                            "required": [
-                              "clientId",
-                              "setup",
-                              "processes",
-                              "endpoints"
-                            ],
+                            "required": ["clientId", "setup", "processes", "endpoints"],
                             "additionalProperties": false
                           }
                         },
@@ -3352,19 +2840,14 @@
                                               "properties": {
                                                 "kind": {
                                                   "type": "string",
-                                                  "enum": [
-                                                    "literal"
-                                                  ]
+                                                  "enum": ["literal"]
                                                 },
                                                 "value": {
                                                   "type": "string",
                                                   "minLength": 1
                                                 }
                                               },
-                                              "required": [
-                                                "kind",
-                                                "value"
-                                              ],
+                                              "required": ["kind", "value"],
                                               "additionalProperties": false
                                             },
                                             {
@@ -3372,27 +2855,17 @@
                                               "properties": {
                                                 "kind": {
                                                   "type": "string",
-                                                  "enum": [
-                                                    "threadId"
-                                                  ]
+                                                  "enum": ["threadId"]
                                                 }
                                               },
-                                              "required": [
-                                                "kind"
-                                              ],
+                                              "required": ["kind"],
                                               "additionalProperties": false
                                             }
                                           ]
                                         }
                                       }
                                     },
-                                    "required": [
-                                      "ptySessionId",
-                                      "cols",
-                                      "rows",
-                                      "command",
-                                      "args"
-                                    ],
+                                    "required": ["ptySessionId", "cols", "rows", "command", "args"],
                                     "additionalProperties": false
                                   },
                                   "resumeLaunch": {
@@ -3427,19 +2900,14 @@
                                               "properties": {
                                                 "kind": {
                                                   "type": "string",
-                                                  "enum": [
-                                                    "literal"
-                                                  ]
+                                                  "enum": ["literal"]
                                                 },
                                                 "value": {
                                                   "type": "string",
                                                   "minLength": 1
                                                 }
                                               },
-                                              "required": [
-                                                "kind",
-                                                "value"
-                                              ],
+                                              "required": ["kind", "value"],
                                               "additionalProperties": false
                                             },
                                             {
@@ -3447,27 +2915,17 @@
                                               "properties": {
                                                 "kind": {
                                                   "type": "string",
-                                                  "enum": [
-                                                    "threadId"
-                                                  ]
+                                                  "enum": ["threadId"]
                                                 }
                                               },
-                                              "required": [
-                                                "kind"
-                                              ],
+                                              "required": ["kind"],
                                               "additionalProperties": false
                                             }
                                           ]
                                         }
                                       }
                                     },
-                                    "required": [
-                                      "ptySessionId",
-                                      "cols",
-                                      "rows",
-                                      "command",
-                                      "args"
-                                    ],
+                                    "required": ["ptySessionId", "cols", "rows", "command", "args"],
                                     "additionalProperties": false
                                   }
                                 },
@@ -3487,14 +2945,10 @@
                                     "properties": {
                                       "supported": {
                                         "type": "boolean",
-                                        "enum": [
-                                          true
-                                        ]
+                                        "enum": [true]
                                       }
                                     },
-                                    "required": [
-                                      "supported"
-                                    ],
+                                    "required": ["supported"],
                                     "additionalProperties": false
                                   },
                                   "conversationDelivery": {
@@ -3506,10 +2960,7 @@
                                       },
                                       "createConversationRetryPolicy": {
                                         "type": "string",
-                                        "enum": [
-                                          "idempotent",
-                                          "single_attempt"
-                                        ]
+                                        "enum": ["idempotent", "single_attempt"]
                                       }
                                     },
                                     "required": [
@@ -3557,10 +3008,7 @@
                                   },
                                   "messageMode": {
                                     "type": "string",
-                                    "enum": [
-                                      "all",
-                                      "app_mentions_only"
-                                    ]
+                                    "enum": ["all", "app_mentions_only"]
                                   },
                                   "payloadFilter": {
                                     "type": "object",
@@ -3571,18 +3019,12 @@
                                     "additionalProperties": {}
                                   }
                                 },
-                                "required": [
-                                  "resourceKind",
-                                  "eventTypes"
-                                ],
+                                "required": ["resourceKind", "eventTypes"],
                                 "additionalProperties": false
                               }
                             }
                           },
-                          "required": [
-                            "enabled",
-                            "resources"
-                          ],
+                          "required": ["enabled", "resources"],
                           "additionalProperties": false
                         }
                       },
@@ -3600,9 +3042,7 @@
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "runtimePlan"
-                  ],
+                  "required": ["runtimePlan"],
                   "additionalProperties": false
                 }
               }
@@ -3626,10 +3066,7 @@
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     },
                     {
@@ -3637,19 +3074,14 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": [
-                            "VALIDATION_ERROR"
-                          ]
+                          "enum": ["VALIDATION_ERROR"]
                         },
                         "message": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -3666,19 +3098,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -3700,10 +3127,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -3725,9 +3149,7 @@
     },
     "/internal/sandbox-runtime/start-profile-instance": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -3748,10 +3170,7 @@
                     "minimum": 1
                   },
                   "primaryRepositoryId": {
-                    "type": [
-                      "string",
-                      "null"
-                    ],
+                    "type": ["string", "null"],
                     "minLength": 1
                   },
                   "startedBy": {
@@ -3761,15 +3180,11 @@
                         "anyOf": [
                           {
                             "type": "string",
-                            "enum": [
-                              "user"
-                            ]
+                            "enum": ["user"]
                           },
                           {
                             "type": "string",
-                            "enum": [
-                              "system"
-                            ]
+                            "enum": ["system"]
                           }
                         ]
                       },
@@ -3778,10 +3193,7 @@
                         "minLength": 1
                       }
                     },
-                    "required": [
-                      "kind",
-                      "id"
-                    ],
+                    "required": ["kind", "id"],
                     "additionalProperties": false
                   },
                   "actingUser": {
@@ -3792,30 +3204,22 @@
                         "minLength": 1
                       }
                     },
-                    "required": [
-                      "userId"
-                    ],
+                    "required": ["userId"],
                     "additionalProperties": false
                   },
                   "source": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "enum": [
-                          "dashboard"
-                        ]
+                        "enum": ["dashboard"]
                       },
                       {
                         "type": "string",
-                        "enum": [
-                          "webhook"
-                        ]
+                        "enum": ["webhook"]
                       },
                       {
                         "type": "string",
-                        "enum": [
-                          "schedule"
-                        ]
+                        "enum": ["schedule"]
                       }
                     ]
                   }
@@ -3842,9 +3246,7 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "accepted"
-                      ]
+                      "enum": ["accepted"]
                     },
                     "workflowRunId": {
                       "type": "string",
@@ -3855,11 +3257,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "status",
-                    "workflowRunId",
-                    "sandboxInstanceId"
-                  ],
+                  "required": ["status", "workflowRunId", "sandboxInstanceId"],
                   "additionalProperties": false
                 }
               }
@@ -3883,10 +3281,7 @@
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     },
                     {
@@ -3894,19 +3289,14 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": [
-                            "VALIDATION_ERROR"
-                          ]
+                          "enum": ["VALIDATION_ERROR"]
                         },
                         "message": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -3923,19 +3313,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -3957,10 +3342,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -3982,10 +3364,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -4007,9 +3386,7 @@
     },
     "/internal/sandbox-runtime/get-sandbox-instance": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -4026,10 +3403,7 @@
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "organizationId",
-                  "instanceId"
-                ],
+                "required": ["organizationId", "instanceId"],
                 "additionalProperties": false
               }
             }
@@ -4063,17 +3437,11 @@
                       ]
                     },
                     "failureCode": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
+                      "type": ["string", "null"],
                       "minLength": 1
                     },
                     "failureMessage": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
+                      "type": ["string", "null"],
                       "minLength": 1
                     },
                     "sandboxProfileId": {
@@ -4085,10 +3453,7 @@
                       "exclusiveMinimum": 0
                     },
                     "associatedResourceEventRouting": {
-                      "type": [
-                        "object",
-                        "null"
-                      ],
+                      "type": ["object", "null"],
                       "properties": {
                         "enabled": {
                           "type": "boolean"
@@ -4112,10 +3477,7 @@
                               },
                               "messageMode": {
                                 "type": "string",
-                                "enum": [
-                                  "all",
-                                  "app_mentions_only"
-                                ]
+                                "enum": ["all", "app_mentions_only"]
                               },
                               "payloadFilter": {
                                 "type": "object",
@@ -4126,18 +3488,12 @@
                                 "additionalProperties": {}
                               }
                             },
-                            "required": [
-                              "resourceKind",
-                              "eventTypes"
-                            ],
+                            "required": ["resourceKind", "eventTypes"],
                             "additionalProperties": false
                           }
                         }
                       },
-                      "required": [
-                        "enabled",
-                        "resources"
-                      ],
+                      "required": ["enabled", "resources"],
                       "additionalProperties": false
                     }
                   },
@@ -4173,10 +3529,7 @@
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     },
                     {
@@ -4184,19 +3537,14 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": [
-                            "VALIDATION_ERROR"
-                          ]
+                          "enum": ["VALIDATION_ERROR"]
                         },
                         "message": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -4213,19 +3561,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -4247,10 +3590,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -4272,9 +3612,7 @@
     },
     "/internal/sandbox-runtime/resume-sandbox-instance": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -4300,10 +3638,7 @@
                     "maxLength": 255
                   }
                 },
-                "required": [
-                  "organizationId",
-                  "instanceId"
-                ],
+                "required": ["organizationId", "instanceId"],
                 "additionalProperties": false
               }
             }
@@ -4319,9 +3654,7 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "accepted"
-                      ]
+                      "enum": ["accepted"]
                     },
                     "sandboxInstanceId": {
                       "type": "string",
@@ -4332,11 +3665,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "status",
-                    "sandboxInstanceId",
-                    "workflowRunId"
-                  ],
+                  "required": ["status", "sandboxInstanceId", "workflowRunId"],
                   "additionalProperties": false
                 }
               }
@@ -4360,10 +3689,7 @@
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     },
                     {
@@ -4371,19 +3697,14 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": [
-                            "VALIDATION_ERROR"
-                          ]
+                          "enum": ["VALIDATION_ERROR"]
                         },
                         "message": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -4400,19 +3721,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -4434,10 +3750,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -4459,10 +3772,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -4484,9 +3794,7 @@
     },
     "/internal/sandbox-runtime/mint-connection-token": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -4527,10 +3835,7 @@
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "organizationId",
-                  "instanceId"
-                ],
+                "required": ["organizationId", "instanceId"],
                 "additionalProperties": false
               }
             }
@@ -4565,13 +3870,7 @@
                       "format": "date-time"
                     }
                   },
-                  "required": [
-                    "instanceId",
-                    "tokenJti",
-                    "url",
-                    "token",
-                    "expiresAt"
-                  ],
+                  "required": ["instanceId", "tokenJti", "url", "token", "expiresAt"],
                   "additionalProperties": false
                 }
               }
@@ -4595,10 +3894,7 @@
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     },
                     {
@@ -4606,19 +3902,14 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": [
-                            "VALIDATION_ERROR"
-                          ]
+                          "enum": ["VALIDATION_ERROR"]
                         },
                         "message": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -4635,19 +3926,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -4669,10 +3955,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -4694,10 +3977,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -4719,9 +3999,7 @@
     },
     "/internal/sandbox-runtime/resolve-credentials": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -4735,24 +4013,14 @@
                   },
                   "provider": {
                     "type": "string",
-                    "enum": [
-                      "docker",
-                      "e2b",
-                      "freestyle",
-                      "modal",
-                      "opencomputer",
-                      "tensorlake"
-                    ]
+                    "enum": ["docker", "e2b", "freestyle", "modal", "opencomputer", "tensorlake"]
                   },
                   "connectionId": {
                     "type": "string",
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "organizationId",
-                  "provider"
-                ],
+                "required": ["organizationId", "provider"],
                 "additionalProperties": false
               }
             }
@@ -4770,21 +4038,14 @@
                       "properties": {
                         "provider": {
                           "type": "string",
-                          "enum": [
-                            "docker"
-                          ]
+                          "enum": ["docker"]
                         },
                         "source": {
                           "type": "string",
-                          "enum": [
-                            "managed"
-                          ]
+                          "enum": ["managed"]
                         }
                       },
-                      "required": [
-                        "provider",
-                        "source"
-                      ],
+                      "required": ["provider", "source"],
                       "additionalProperties": false
                     },
                     {
@@ -4792,16 +4053,11 @@
                       "properties": {
                         "provider": {
                           "type": "string",
-                          "enum": [
-                            "e2b"
-                          ]
+                          "enum": ["e2b"]
                         },
                         "source": {
                           "type": "string",
-                          "enum": [
-                            "managed",
-                            "connection"
-                          ]
+                          "enum": ["managed", "connection"]
                         },
                         "apiKey": {
                           "type": "string",
@@ -4812,11 +4068,7 @@
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "provider",
-                        "source",
-                        "apiKey"
-                      ],
+                      "required": ["provider", "source", "apiKey"],
                       "additionalProperties": false
                     },
                     {
@@ -4824,27 +4076,18 @@
                       "properties": {
                         "provider": {
                           "type": "string",
-                          "enum": [
-                            "tensorlake"
-                          ]
+                          "enum": ["tensorlake"]
                         },
                         "source": {
                           "type": "string",
-                          "enum": [
-                            "managed",
-                            "connection"
-                          ]
+                          "enum": ["managed", "connection"]
                         },
                         "apiKey": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "provider",
-                        "source",
-                        "apiKey"
-                      ],
+                      "required": ["provider", "source", "apiKey"],
                       "additionalProperties": false
                     },
                     {
@@ -4852,16 +4095,11 @@
                       "properties": {
                         "provider": {
                           "type": "string",
-                          "enum": [
-                            "opencomputer"
-                          ]
+                          "enum": ["opencomputer"]
                         },
                         "source": {
                           "type": "string",
-                          "enum": [
-                            "managed",
-                            "connection"
-                          ]
+                          "enum": ["managed", "connection"]
                         },
                         "apiKey": {
                           "type": "string",
@@ -4872,11 +4110,7 @@
                           "format": "uri"
                         }
                       },
-                      "required": [
-                        "provider",
-                        "source",
-                        "apiKey"
-                      ],
+                      "required": ["provider", "source", "apiKey"],
                       "additionalProperties": false
                     },
                     {
@@ -4884,16 +4118,11 @@
                       "properties": {
                         "provider": {
                           "type": "string",
-                          "enum": [
-                            "modal"
-                          ]
+                          "enum": ["modal"]
                         },
                         "source": {
                           "type": "string",
-                          "enum": [
-                            "managed",
-                            "connection"
-                          ]
+                          "enum": ["managed", "connection"]
                         },
                         "tokenId": {
                           "type": "string",
@@ -4917,13 +4146,7 @@
                           "maximum": 86400000
                         }
                       },
-                      "required": [
-                        "provider",
-                        "source",
-                        "tokenId",
-                        "tokenSecret",
-                        "appName"
-                      ],
+                      "required": ["provider", "source", "tokenId", "tokenSecret", "appName"],
                       "additionalProperties": false
                     }
                   ]
@@ -4949,10 +4172,7 @@
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     },
                     {
@@ -4960,19 +4180,14 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": [
-                            "VALIDATION_ERROR"
-                          ]
+                          "enum": ["VALIDATION_ERROR"]
                         },
                         "message": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -4989,19 +4204,14 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "UNAUTHORIZED"
-                      ]
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -5023,10 +4233,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
