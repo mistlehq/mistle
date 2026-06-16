@@ -21,6 +21,8 @@ import {
   OpenComputerSandboxRuntimeBrowserDefinition,
   OpenRouterBrowserDefinition,
   PostHogBrowserDefinition,
+  RailwayBrowserDefinition,
+  RenderBrowserDefinition,
   ResendBrowserDefinition,
   SentryBrowserDefinition,
   SignozBrowserDefinition,
@@ -243,6 +245,16 @@ describe("browser definitions", () => {
 
   it("keeps PostHog browser definitions free of server-only OAuth handlers", () => {
     expect(PostHogBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+  });
+
+  it("keeps Railway browser definitions free of server-only OAuth handlers", () => {
+    expect(RailwayBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+  });
+
+  it("keeps Render browser definitions free of server-only hooks", () => {
+    expect(RenderBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(RenderBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(RenderBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("keeps Expo browser definitions free of server-only OAuth handlers", () => {

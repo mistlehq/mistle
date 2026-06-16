@@ -1,0 +1,30 @@
+---
+title: Railway
+description: Connect Railway to Mistle
+icon: data:image/svg+xml;base64,PHN2ZyBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDI0IDEwMjQiPjxwYXRoIGQ9Ik00LjggNDM4LjJBNTIwLjcgNTIwLjcgMCAwMDAgNDg5LjdoNzc3LjhjLTIuNy01LjMtNi40LTEwLTEwLTE0LjctMTMzLTE3MS44LTIwNC41LTE1Ny0zMDYuOS0xNjEuMy0zNC0xLjQtNTcuMi0yLTE5My0yLTcyLjcgMC0xNTEuNy4yLTIyOC42LjRBNjIxIDYyMSAwIDAwMTUgMzg2LjNoMzk4LjZ2NTEuOUg0Ljh6bTc3OS4xIDEwMy41SC40Yy44IDEzLjggMi4xIDI3LjUgNCA0MWg3MjMuNGMzMi4yIDAgNTAuMy0xOC4zIDU2LjEtNDF6TTQ1IDcyNC4zczEyMCAyOTQuNSA0NjYuNSAyOTkuN2MyMDcgMCAzODUtMTIzIDQ2NS45LTI5OS43SDQ1eiIgZmlsbD0iIzAwMCIvPjxwYXRoIGQ9Ik01MTEuNSAwQTUxMi4yIDUxMi4yIDAgMDA2NS4zIDI2MC42bDIwMi43LS4yYzE1OC40IDAgMTY0LjIuNiAxOTUuMiAybDE5LjEuNmM2Ni43IDIuMyAxNDguNyA5LjQgMjEzLjIgNTguMiAzNSAyNi41IDg1LjYgODUgMTE1LjcgMTI2LjUgMjcuOSAzOC41IDM1LjkgODIuOCAxNyAxMjUuMi0xNy41IDM5LTU1IDYyLjItMTAwLjQgNjIuMkgxNi43czQuMiAxOCAxMC42IDM3LjhoOTcwLjZhNTEwLjQgNTEwLjQgMCAwMDI2LjEtMTYwLjdBNTEyLjQgNTEyLjQgMCAwMDUxMS41IDB6IiBmaWxsPSIjMDAwIi8+PC9zdmc+
+---
+
+## Overview
+
+Connect to Railway through Railway's hosted MCP server and Railway OAuth.
+
+The Railway MCP server lets agents inspect and operate on Railway workspaces, projects, services, deployments, logs, and variables through the official provider-hosted endpoint.
+
+## Connect In Mistle
+
+Open **Integrations** in the dashboard, choose **Railway**, then select **Railway OAuth**.
+
+The browser redirects to Railway, the user approves access, and the returned OAuth credentials are stored for the connection.
+
+## Access Scope
+
+This integration requests Railway's hosted MCP OAuth scopes: `openid`, `profile`, `email`, `offline_access`, and `workspace:member`.
+
+Review agent tool calls before approving changes that redeploy services, accept deployments, change variables, or otherwise modify Railway resources.
+
+## Official References
+
+- [Railway MCP server](https://docs.railway.com/ai/mcp-server)
+- [Railway remote MCP announcement](https://blog.railway.com/p/agent-rails-remote-mcp-cli)
+
+This integration uses the hosted MCP server at `https://mcp.railway.com`.
