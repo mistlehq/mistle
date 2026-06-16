@@ -2446,7 +2446,9 @@ describe("SandboxProfileEditorPage", () => {
       expect(event.defaultPrevented).toBe(true);
     });
 
-    void router.navigate("/outside");
+    act(() => {
+      void router.navigate("/outside");
+    });
 
     expect(await screen.findByText("Leave before draft changes are saved?")).toBeDefined();
     expect(router.state.location.pathname).toBe(
