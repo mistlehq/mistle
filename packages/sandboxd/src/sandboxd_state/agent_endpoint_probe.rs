@@ -28,6 +28,7 @@ pub(super) struct RuntimeAgentProbePlan {
 
 #[derive(Debug, Clone)]
 pub(super) enum RuntimeSpecificProbe {
+    ClaudeCode,
     Codex,
     OpenCode {
         proxy_url: String,
@@ -63,6 +64,7 @@ impl RuntimeAgentProbeHandle {
         }));
 
         match plan.runtime_probe {
+            RuntimeSpecificProbe::ClaudeCode => {}
             RuntimeSpecificProbe::Codex => {}
             RuntimeSpecificProbe::OpenCode {
                 proxy_url,

@@ -44,7 +44,7 @@ type SessionsStoryHarnessProps = {
     status: SandboxInstanceStatus;
     connectable: boolean;
     runtimeContext?: {
-      agentRuntimeId: "codex" | "opencode" | "pi" | null;
+      agentRuntimeId: "claude-code" | "codex" | "opencode" | "pi" | null;
       launchCwd: string | null;
       primaryRepositoryRoot: string | null;
     } | null;

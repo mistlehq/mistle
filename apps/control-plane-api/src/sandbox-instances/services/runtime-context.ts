@@ -1,6 +1,6 @@
 import type { CompiledRuntimePlan } from "@mistle/integrations-core";
 
-export type SandboxInstanceAgentRuntimeId = "codex" | "opencode" | "pi";
+export type SandboxInstanceAgentRuntimeId = "claude-code" | "codex" | "opencode" | "pi";
 
 function normalizePath(path: string): string {
   return path.replace(/\/+$/, "");
@@ -54,6 +54,7 @@ function resolveAgentRuntimeId(
     return null;
   }
   if (
+    agentRuntime.runtimeId !== "claude-code" &&
     agentRuntime.runtimeId !== "codex" &&
     agentRuntime.runtimeId !== "opencode" &&
     agentRuntime.runtimeId !== "pi"

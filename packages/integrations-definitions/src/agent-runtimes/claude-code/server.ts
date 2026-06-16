@@ -1,0 +1,14 @@
+export const ClaudeCodeRuntimeId = "claude-code";
+export const ClaudeCodeRuntimeClientId = "claude-code-runtime-server";
+export const ClaudeCodeRuntimeServerProcessKey = "claude-code-runtime-server";
+export const ClaudeCodeRuntimeServerEndpointKey = "server";
+export const ClaudeCodeRuntimeServerHost = "127.0.0.1";
+export const ClaudeCodeRuntimeServerPort = 4521;
+export const ClaudeCodeRuntimeServerHealthPath = "/health";
+export const ClaudeCodeRuntimeServerWsPath = "/agent";
+export const ClaudeCodeRuntimeServerListenUrl = `http://${ClaudeCodeRuntimeServerHost}:${ClaudeCodeRuntimeServerPort}`;
+export const ClaudeCodeRuntimeServerHealthUrl = `${ClaudeCodeRuntimeServerListenUrl}${ClaudeCodeRuntimeServerHealthPath}`;
+export const ClaudeCodeRuntimeServerWsUrl = `ws://${ClaudeCodeRuntimeServerHost}:${ClaudeCodeRuntimeServerPort}${ClaudeCodeRuntimeServerWsPath}`;
+export const ClaudeCodeRuntimeServerPath = "/opt/mistle/claude-code-runtime-server/server.mjs";
+export const ClaudeCodeRuntimeServerPackageDir = "/opt/mistle/claude-code-runtime-server";
+export const ClaudeCodeExecutablePath = "/usr/local/bin/claude";

@@ -15,6 +15,7 @@ import {
   patchSandboxInstanceTitle,
   type PatchSandboxInstanceTitleResult,
 } from "../sessions/sessions-service.js";
+import type { UseClaudeCodeSessionStateResult } from "./claude-code/session-state/index.js";
 import type { UseCodexSessionStateResult } from "./codex/session-state/index.js";
 import {
   buildOpenCodeAttachmentParts,
@@ -153,6 +154,26 @@ export function buildOpenCodeTurnStarter(input: {
         });
       },
       queryClient: input.queryClient,
+    });
+  };
+}
+
+export function buildClaudeCodeTurnStarter(input: {
+  chat: Pick<UseClaudeCodeSessionStateResult["chat"], "sendPrompt">;
+}): SessionTurnControl["startTurn"] {
+  return async (turnInput): Promise<void> => {
+    await input.chat.sendPrompt({
+      submittedPrompt: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
+    });
+  };
+}
+
+export function buildClaudeCodeTurnSteerer(input: {
+  chat: Pick<UseClaudeCodeSessionStateResult["chat"], "steerTurn">;
+}): SessionTurnControl["steerTurn"] {
+  return async (turnInput): Promise<void> => {
+    await input.chat.steerTurn({
+      submittedPrompt: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
     });
   };
 }

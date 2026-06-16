@@ -314,7 +314,7 @@ describe("integrations-definitions index", () => {
       variantId: "anthropic-default",
       kind: "agent",
       displayName: "Anthropic",
-      allowedRuntimeIds: ["opencode", "pi"],
+      allowedRuntimeIds: ["claude-code", "opencode", "pi"],
     });
     expect(openAiDefinition?.displayName).toBe("OpenAI");
     expect(openAiDefinition?.kind).toBe("agent");
@@ -1090,6 +1090,10 @@ describe("integrations-definitions index", () => {
       }),
     ).toBeDefined();
     expect(definitions.agentRuntimeRegistry.listRuntimes()).toMatchObject([
+      {
+        runtimeId: "claude-code",
+        displayName: "Claude Code",
+      },
       {
         runtimeId: "codex",
         displayName: "Codex",

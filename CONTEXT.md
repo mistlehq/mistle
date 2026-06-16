@@ -324,6 +324,10 @@ _Avoid_: Conversation name, provider title
 A Codex **Runtime conversation**.
 _Avoid_: Session, chat tab
 
+**Claude Code runtime**:
+An Anthropic Claude Code **Agent runtime**.
+_Avoid_: Claude runtime when referring specifically to Claude Code as a Mistle agent runtime
+
 **Codex subagent thread**:
 A **Codex thread** that is a **Child runtime conversation** spawned by another **Codex thread**.
 _Avoid_: Child thread, agent thread, nested conversation

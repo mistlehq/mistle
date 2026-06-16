@@ -161,6 +161,7 @@ fn minimal_initialized_state(execution_mode: SandboxdExecutionMode) -> SandboxdS
         runtime_adapters: RuntimeAdapters::default(),
         codex_app_server_observation_handle: None,
         codex_app_server_control_handle: None,
+        claude_code_server_control_handle: None,
         opencode_server_control_handle: None,
         codex_proxy_control_handle: None,
         runtime_coordination_shutdown_requested: Arc::new(AtomicBool::new(false)),

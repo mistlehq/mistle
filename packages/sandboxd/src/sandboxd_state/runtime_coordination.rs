@@ -9,7 +9,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 
 use crate::codex_proxy::CodexProxyControlHandle;
-use crate::process::{CodexAppServerControlHandle, OpenCodeServerControlHandle};
+use crate::process::{
+    ClaudeCodeServerControlHandle, CodexAppServerControlHandle, OpenCodeServerControlHandle,
+};
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 
 const RUNTIME_COORDINATION_POLL_INTERVAL: std::time::Duration =
@@ -20,12 +22,14 @@ const CODEX_PROXY_RECOVERY_TIMEOUT: std::time::Duration = std::time::Duration::f
 pub(super) struct RuntimeCoordinationHandles {
     pub(super) codex_app_server_control_handle: Option<CodexAppServerControlHandle>,
     pub(super) codex_proxy_control_handle: Option<CodexProxyControlHandle>,
+    pub(super) claude_code_server_control_handle: Option<ClaudeCodeServerControlHandle>,
     pub(super) opencode_server_control_handle: Option<OpenCodeServerControlHandle>,
 }
 
 impl RuntimeCoordinationHandles {
     pub(super) fn has_runtime_process_control(&self) -> bool {
-        self.opencode_server_control_handle.is_some()
+        self.claude_code_server_control_handle.is_some()
+            || self.opencode_server_control_handle.is_some()
             || (self.codex_app_server_control_handle.is_some()
                 && self.codex_proxy_control_handle.is_some())
     }
@@ -60,6 +64,10 @@ fn run_runtime_coordination_loop(
         }
         if let Some(opencode_server_control_handle) = &handles.opencode_server_control_handle {
             coordinate_opencode_runtime(opencode_server_control_handle, &supervisor_handle);
+        }
+        if let Some(claude_code_server_control_handle) = &handles.claude_code_server_control_handle
+        {
+            coordinate_claude_code_runtime(claude_code_server_control_handle, &supervisor_handle);
         }
         thread::sleep(RUNTIME_COORDINATION_POLL_INTERVAL);
     }
@@ -128,6 +136,31 @@ fn coordinate_opencode_runtime(
     );
 
     let _ = opencode_server_control_handle
+        .restart(&crate::time::SystemClock, &crate::time::ThreadSleeper);
+}
+
+fn coordinate_claude_code_runtime(
+    claude_code_server_control_handle: &ClaudeCodeServerControlHandle,
+    supervisor_handle: &SandboxdSupervisorHandle,
+) {
+    let Some(claude_code_server_snapshot) =
+        supervisor_handle.component_snapshot(SupervisedComponent::ClaudeCodeServer)
+    else {
+        return;
+    };
+    if claude_code_server_snapshot.state != crate::supervision::ComponentHealthState::Restarting {
+        return;
+    }
+
+    let restart_reason = component_restart_reason(&claude_code_server_snapshot);
+    supervisor_handle.emit_component_restart_scheduled(
+        SupervisedComponent::ClaudeCodeServer,
+        restart_reason,
+        0,
+        &[],
+    );
+
+    let _ = claude_code_server_control_handle
         .restart(&crate::time::SystemClock, &crate::time::ThreadSleeper);
 }
 

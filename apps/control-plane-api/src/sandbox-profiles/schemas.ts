@@ -40,6 +40,7 @@ const sandboxProfileVersionStateSchema = z.enum([
   SandboxProfileVersionStates.PUBLISHED,
 ]);
 const sandboxProfileVersionAgentRuntimeIdSchema = z.enum([
+  SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE,
   SandboxProfileVersionAgentRuntimeIds.CODEX,
   SandboxProfileVersionAgentRuntimeIds.OPENCODE,
   SandboxProfileVersionAgentRuntimeIds.PI,

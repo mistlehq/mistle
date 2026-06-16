@@ -26,6 +26,7 @@ export type SandboxProfileVersionState =
   (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
 
 export const SandboxProfileVersionAgentRuntimeIds = {
+  CLAUDE_CODE: "claude-code",
   CODEX: "codex",
   OPENCODE: "opencode",
   PI: "pi",

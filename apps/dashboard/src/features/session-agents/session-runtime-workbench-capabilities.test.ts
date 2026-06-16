@@ -17,6 +17,20 @@ describe("SessionRuntimeWorkbenchCapabilities", () => {
     });
   });
 
+  it("describes the Claude Code workbench contract", () => {
+    expect(SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE).toEqual({
+      runtimeId: "claude-code",
+      displayName: "Claude Code",
+      cliTerminalContentInset: "none",
+      composerModelSelection: {
+        required: false,
+        showControls: false,
+      },
+      supportsSteering: true,
+      preservesCliLaunchContext: false,
+    });
+  });
+
   it("describes the OpenCode workbench contract", () => {
     expect(SessionRuntimeWorkbenchCapabilities.OPENCODE).toEqual({
       runtimeId: "opencode",

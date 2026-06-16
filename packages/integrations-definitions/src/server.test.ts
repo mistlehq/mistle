@@ -411,6 +411,10 @@ describe("integrations-definitions server", () => {
     ).toBeDefined();
     expect(definitions.agentRuntimeRegistry.listRuntimes()).toMatchObject([
       {
+        runtimeId: "claude-code",
+        displayName: "Claude Code",
+      },
+      {
         runtimeId: "codex",
         displayName: "Codex",
       },

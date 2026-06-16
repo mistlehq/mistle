@@ -3,12 +3,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCodexConversationRuntime,
+  buildClaudeCodeConversationRuntime,
   buildOpenCodeConversationRuntime,
   buildPiConversationRuntime,
   resolvePiAttachmentTargetId,
 } from "./session-workbench-conversation-runtimes.js";
 
 type CodexRuntimeInput = Parameters<typeof buildCodexConversationRuntime>[0];
+type ClaudeCodeRuntimeInput = Parameters<typeof buildClaudeCodeConversationRuntime>[0];
 type OpenCodeRuntimeInput = Parameters<typeof buildOpenCodeConversationRuntime>[0];
 type PiRuntimeInput = Parameters<typeof buildPiConversationRuntime>[0];
 
@@ -226,6 +228,66 @@ function createOpenCodeRuntimeInput(reportedMessages: string[]): OpenCodeRuntime
     },
     steerTurn: async () => {
       return;
+    },
+  };
+}
+
+function createClaudeCodeRuntimeInput(input: {
+  isBusy?: boolean;
+  reportedMessages: string[];
+  steeredPrompts: string[];
+}): ClaudeCodeRuntimeInput {
+  return {
+    bootstrap: ReadyBootstrap,
+    chat: {
+      interruptQuery: async () => {
+        return;
+      },
+      canInterruptTurn: true,
+      canSteerTurn: true,
+      chatState: {
+        completedErrorMessage: null,
+        entries: [],
+        pendingQueryId: input.isBusy === false ? null : "query_123",
+        status: input.isBusy === false ? "idle" : "busy",
+        sessionId: "session_123",
+        queries: [],
+      },
+      hydrateChatFromSessionOrThrow: async () => {
+        return;
+      },
+      isInterruptingTurn: false,
+      isStartingTurn: false,
+      isSteeringTurn: false,
+      sendPrompt: async () => {
+        return;
+      },
+      steerTurn: async (turnInput) => {
+        input.steeredPrompts.push(turnInput.submittedPrompt);
+      },
+    },
+    configControl: ComposerConfigControl,
+    sessionMessage: {
+      clearSessionErrorMessage: () => {
+        return;
+      },
+      reportSessionErrorMessage: (message) => {
+        input.reportedMessages.push(message);
+      },
+      sessionErrorMessage: null,
+    },
+    sessionSnapshot: {
+      activeDirectory: null,
+      activeSessionId: "session_123",
+      connectedAtIso: "2026-05-19T00:00:00.000Z",
+      providerSessionId: null,
+      sandboxInstanceId: "sandbox_123",
+    },
+    startTurn: async () => {
+      return;
+    },
+    steerTurn: async (turnInput) => {
+      input.steeredPrompts.push(turnInput.transcriptPrompt ?? turnInput.submittedPrompt);
     },
   };
 }
@@ -594,6 +656,51 @@ describe("buildOpenCodeConversationRuntime", () => {
   });
 });
 
+describe("buildClaudeCodeConversationRuntime", () => {
+  it("exposes Claude Code active-turn steering when the thread is busy", () => {
+    const runtime = buildClaudeCodeConversationRuntime(
+      createClaudeCodeRuntimeInput({
+        reportedMessages: [],
+        steeredPrompts: [],
+      }),
+    );
+
+    expect(runtime.composerRuntimeInput.turnControl.activeTurnState).toBe("running");
+    expect(runtime.composerRuntimeInput.turnControl.canSteer).toBe(true);
+  });
+
+  it("does not expose Claude Code steering when the thread is idle", () => {
+    const runtime = buildClaudeCodeConversationRuntime(
+      createClaudeCodeRuntimeInput({
+        isBusy: false,
+        reportedMessages: [],
+        steeredPrompts: [],
+      }),
+    );
+
+    expect(runtime.composerRuntimeInput.turnControl.activeTurnState).toBe("idle");
+    expect(runtime.composerRuntimeInput.turnControl.canSteer).toBe(false);
+  });
+
+  it("routes Claude Code steering to the runtime-native steerer", async () => {
+    const steeredPrompts: string[] = [];
+    const runtime = buildClaudeCodeConversationRuntime(
+      createClaudeCodeRuntimeInput({
+        reportedMessages: [],
+        steeredPrompts,
+      }),
+    );
+
+    await runtime.composerRuntimeInput.turnControl.steerTurn({
+      submittedPrompt: "Keep going",
+      transcriptPrompt: "Keep going with context",
+      uploadedAttachments: [],
+    });
+
+    expect(steeredPrompts).toEqual(["Keep going with context"]);
+  });
+});
+
 describe("buildPiConversationRuntime", () => {
   it("maps the active Pi conversation into the shared workbench contract", () => {
     const runtime = buildPiConversationRuntime(
@@ -660,6 +767,19 @@ describe("buildPiConversationRuntime", () => {
     });
 
     expect(steeredPrompts).toEqual(["prompt with attachments"]);
+  });
+
+  it("does not expose Pi steering when the conversation is idle", () => {
+    const runtime = buildPiConversationRuntime(
+      createPiRuntimeInput({
+        isBusy: false,
+        reportedMessages: [],
+        steeredPrompts: [],
+      }),
+    );
+
+    expect(runtime.composerRuntimeInput.turnControl.activeTurnState).toBe("idle");
+    expect(runtime.composerRuntimeInput.turnControl.canSteer).toBe(false);
   });
 
   it("exposes Pi follow-up as a runtime-native queue turn", async () => {

@@ -366,6 +366,162 @@ fn opencode_server_control_handle_restarts_after_exit() {
 }
 
 #[test]
+fn records_claude_code_server_exit_after_readiness() {
+    let port = reserve_test_port();
+    let process_spec = claude_code_server_process_spec(port, "exit", 250);
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandbox-123",
+        std::sync::Arc::new(SystemClock),
+        BTreeSet::from([SupervisedComponent::ClaudeCodeServer]),
+    );
+
+    let process_manager = start_runtime_client_process_manager_with_supervisor(
+        std::slice::from_ref(&process_spec),
+        &SystemClock,
+        &ThreadSleeper,
+        supervisor_handle.clone(),
+    )
+    .expect("process manager should start");
+
+    wait_for_component_snapshot(
+        &supervisor_handle,
+        SupervisedComponent::ClaudeCodeServer,
+        ComponentHealthState::Restarting,
+        1,
+        Duration::from_secs(5),
+    );
+
+    let snapshot = supervisor_handle
+        .component_snapshot(SupervisedComponent::ClaudeCodeServer)
+        .expect("Claude Code server should be tracked");
+    assert_eq!(
+        snapshot.details.get("lastExitStatus"),
+        Some(&"process exited".to_string())
+    );
+    assert_eq!(
+        snapshot.details.get("livenessState"),
+        Some(&"Exited".to_string())
+    );
+    assert!(
+        wait_for_forwarded_lifecycle_event(
+            &supervisor_handle,
+            SupervisedComponent::ClaudeCodeServer,
+            "\"event\":\"component_exited\"",
+            Duration::from_secs(5),
+        ),
+        "expected a forwarded component_exited lifecycle event for the Claude Code server"
+    );
+
+    process_manager
+        .stop(&SystemClock, &ThreadSleeper)
+        .expect("process manager stop should succeed after exit observation");
+}
+
+#[test]
+fn claude_code_server_control_handle_restarts_after_exit() {
+    let port = reserve_test_port();
+    let control_dir = create_test_control_dir("claude-code-server-restart");
+    let exit_marker_path = control_dir.join("exit-now");
+    let process_spec = claude_code_server_restart_process_spec(port, &control_dir);
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandbox-123",
+        std::sync::Arc::new(SystemClock),
+        BTreeSet::from([SupervisedComponent::ClaudeCodeServer]),
+    );
+
+    let process_manager = start_runtime_client_process_manager_with_supervisor(
+        std::slice::from_ref(&process_spec),
+        &SystemClock,
+        &ThreadSleeper,
+        supervisor_handle.clone(),
+    )
+    .expect("process manager should start");
+    let control_handle = process_manager
+        .claude_code_server_control_handle()
+        .expect("Claude Code server control handle should exist")
+        .clone();
+
+    fs::write(&exit_marker_path, "exit-now").expect("exit marker should be writable");
+    wait_for_component_snapshot(
+        &supervisor_handle,
+        SupervisedComponent::ClaudeCodeServer,
+        ComponentHealthState::Restarting,
+        1,
+        Duration::from_secs(5),
+    );
+
+    control_handle
+        .restart(&SystemClock, &ThreadSleeper)
+        .expect("coordinated Claude Code restart should succeed");
+    wait_for_component_snapshot(
+        &supervisor_handle,
+        SupervisedComponent::ClaudeCodeServer,
+        ComponentHealthState::Healthy,
+        1,
+        Duration::from_secs(5),
+    );
+
+    process_manager
+        .stop(&SystemClock, &ThreadSleeper)
+        .expect("process manager stop should succeed after Claude Code restart");
+    let _ = fs::remove_dir_all(control_dir);
+}
+
+#[test]
+fn claude_code_server_control_handle_fails_restart_when_current_process_does_not_stop() {
+    let port = reserve_test_port();
+    let control_dir = create_test_control_dir("claude-code-server-stubborn-stop");
+    let allow_stop_path = control_dir.join("allow-stop");
+    let process_spec = claude_code_server_stubborn_stop_process_spec(port, &control_dir);
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandbox-123",
+        std::sync::Arc::new(SystemClock),
+        BTreeSet::from([SupervisedComponent::ClaudeCodeServer]),
+    );
+
+    let process_manager = start_runtime_client_process_manager_with_supervisor(
+        std::slice::from_ref(&process_spec),
+        &SystemClock,
+        &ThreadSleeper,
+        supervisor_handle.clone(),
+    )
+    .expect("process manager should start");
+    let control_handle = process_manager
+        .claude_code_server_control_handle()
+        .expect("Claude Code server control handle should exist")
+        .clone();
+
+    let error = control_handle
+        .restart(&SystemClock, &ThreadSleeper)
+        .expect_err("Claude Code restart should fail when the current process does not stop");
+    assert_eq!(error, "process did not exit before stop timeout");
+
+    let snapshot = supervisor_handle
+        .component_snapshot(SupervisedComponent::ClaudeCodeServer)
+        .expect("Claude Code server should be tracked");
+    assert_eq!(snapshot.state, ComponentHealthState::Restarting);
+    assert_eq!(
+        snapshot.last_error.as_deref(),
+        Some("process did not exit before stop timeout")
+    );
+    assert!(
+        wait_for_forwarded_lifecycle_event(
+            &supervisor_handle,
+            SupervisedComponent::ClaudeCodeServer,
+            "\"reason\":\"restart_stop_failed\"",
+            Duration::from_secs(5),
+        ),
+        "expected a forwarded restart_stop_failed lifecycle event for the Claude Code server"
+    );
+
+    fs::write(&allow_stop_path, "allow-stop").expect("allow stop marker should be writable");
+    process_manager
+        .stop(&SystemClock, &ThreadSleeper)
+        .expect("process manager stop should succeed after allowing the child to stop");
+    let _ = fs::remove_dir_all(control_dir);
+}
+
+#[test]
 fn platform_scoped_process_manager_attaches_started_processes_and_cleans_registry_on_stop() {
     let temp_root = create_test_control_dir("platform-process-scope");
     let registry = PlatformProcessRegistry::default();
@@ -967,6 +1123,76 @@ server.listen(port, '127.0.0.1', () => {
     }
 }
 
+fn claude_code_server_restart_process_spec(
+    port: u16,
+    control_dir: &Path,
+) -> RuntimeClientProcessSpec {
+    let mut process_spec = opencode_server_restart_process_spec(port, control_dir);
+    process_spec.process_key = "claude-code-runtime-server".to_string();
+    process_spec.readiness = RuntimeClientProcessReadiness::Http {
+        url: format!("http://127.0.0.1:{port}/health"),
+        expected_status: 200,
+        timeout_ms: 5_000,
+    };
+    process_spec
+}
+
+fn claude_code_server_stubborn_stop_process_spec(
+    port: u16,
+    control_dir: &Path,
+) -> RuntimeClientProcessSpec {
+    let script = r#"
+const fs = require('node:fs');
+const http = require('node:http');
+const path = require('node:path');
+const [portArg, controlDirArg] = process.argv.slice(1);
+const port = Number(portArg);
+const allowStopPath = path.join(controlDirArg, 'allow-stop');
+const keepAlive = setInterval(() => {}, 1000);
+
+process.on('SIGTERM', () => {
+  if (!fs.existsSync(allowStopPath)) {
+    return;
+  }
+
+  clearInterval(keepAlive);
+  server.close(() => process.exit(0));
+});
+
+const server = http.createServer((_request, response) => {
+  response.writeHead(200, { 'content-length': '0' });
+  response.end();
+});
+server.listen(port, '127.0.0.1');
+"#;
+
+    RuntimeClientProcessSpec {
+        process_key: "claude-code-runtime-server".to_string(),
+        command: RuntimeExecCommand {
+            args: vec![
+                "node".to_string(),
+                "-e".to_string(),
+                script.to_string(),
+                port.to_string(),
+                control_dir.display().to_string(),
+            ],
+            env: Some(BTreeMap::new()),
+            cwd: None,
+            timeout_ms: None,
+        },
+        readiness: RuntimeClientProcessReadiness::Http {
+            url: format!("http://127.0.0.1:{port}/health"),
+            expected_status: 200,
+            timeout_ms: 5_000,
+        },
+        stop: RuntimeClientProcessStopPolicy {
+            signal: RuntimeClientProcessStopSignal::Sigterm,
+            timeout_ms: 100,
+            grace_period_ms: None,
+        },
+    }
+}
+
 fn codex_app_server_readiness_failure_process_spec(port: u16) -> RuntimeClientProcessSpec {
     let script = r#"
 console.log('codex stdout before readiness failure');
@@ -1047,6 +1273,21 @@ server.listen(port, '127.0.0.1', () => {
             grace_period_ms: None,
         },
     }
+}
+
+fn claude_code_server_process_spec(
+    port: u16,
+    mode: &str,
+    delay_ms: u64,
+) -> RuntimeClientProcessSpec {
+    let mut process_spec = opencode_server_process_spec(port, mode, delay_ms);
+    process_spec.process_key = "claude-code-runtime-server".to_string();
+    process_spec.readiness = RuntimeClientProcessReadiness::Http {
+        url: format!("http://127.0.0.1:{port}/health"),
+        expected_status: 200,
+        timeout_ms: 5_000,
+    };
+    process_spec
 }
 
 fn reserve_test_port() -> u16 {

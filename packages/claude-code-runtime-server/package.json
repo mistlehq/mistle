@@ -1,0 +1,26 @@
+{
+  "name": "@mistle/claude-code-runtime-server",
+  "private": true,
+  "files": [
+    "dist/**",
+    "*.js"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "workspace-src": "./src/index.ts",
+      "node": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "lint": "oxlint --type-aware --deny-warnings .",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  }
+}

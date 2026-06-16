@@ -806,6 +806,8 @@ importers:
         specifier: workspace:*
         version: link:../test-harness
 
+  packages/claude-code-runtime-server: {}
+
   packages/commit-sign: {}
 
   packages/config:
@@ -989,6 +991,9 @@ importers:
       '@aws-sdk/client-sts':
         specifier: 3.1047.0
         version: 3.1047.0
+      '@mistle/claude-code-runtime-server':
+        specifier: workspace:*
+        version: link:../claude-code-runtime-server
       '@mistle/http':
         specifier: workspace:*
         version: link:../http

@@ -8388,7 +8388,7 @@ export interface paths {
               id: string;
               runtimeContext: {
                 /** @enum {string|null} */
-                agentRuntimeId: "codex" | "opencode" | "pi" | null;
+                agentRuntimeId: "claude-code" | "codex" | "opencode" | "pi" | null;
                 launchCwd: string | null;
                 primaryRepositoryRoot: string | null;
               } | null;
@@ -9112,7 +9112,7 @@ export interface paths {
               id: string;
               runtimeContext: {
                 /** @enum {string|null} */
-                agentRuntimeId: "codex" | "opencode" | "pi" | null;
+                agentRuntimeId: "claude-code" | "codex" | "opencode" | "pi" | null;
                 launchCwd: string | null;
                 primaryRepositoryRoot: string | null;
               } | null;
@@ -10373,7 +10373,7 @@ export interface paths {
             "application/json": {
               versions: {
                 /** @enum {string} */
-                agentRuntimeId: "codex" | "opencode" | "pi";
+                agentRuntimeId: "claude-code" | "codex" | "opencode" | "pi";
                 associatedResourceEventRoutingConfig: {
                   enabled?: boolean;
                   resources?: {
@@ -10523,7 +10523,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              agentRuntimeId: "codex" | "opencode" | "pi";
+              agentRuntimeId: "claude-code" | "codex" | "opencode" | "pi";
               associatedResourceEventRoutingConfig: {
                 enabled?: boolean;
                 resources?: {
@@ -10811,7 +10811,7 @@ export interface paths {
         content: {
           "application/json": {
             /** @enum {string} */
-            agentRuntimeId?: "codex" | "opencode" | "pi";
+            agentRuntimeId?: "claude-code" | "codex" | "opencode" | "pi";
             associatedResourceEventRoutingConfig?: {
               enabled?: boolean;
               resources?: {
@@ -10870,7 +10870,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              agentRuntimeId: "codex" | "opencode" | "pi";
+              agentRuntimeId: "claude-code" | "codex" | "opencode" | "pi";
               associatedResourceEventRoutingConfig: {
                 enabled?: boolean;
                 resources?: {
@@ -11444,7 +11444,7 @@ export interface paths {
         content: {
           "application/json": {
             /** @enum {string} */
-            agentRuntimeId?: "codex" | "opencode" | "pi";
+            agentRuntimeId?: "claude-code" | "codex" | "opencode" | "pi";
             idempotencyKey?: string;
             maintenanceScript: string;
             sandboxConnectionId?: string | null;
@@ -11636,7 +11636,7 @@ export interface paths {
                   };
               version: {
                 /** @enum {string} */
-                agentRuntimeId: "codex" | "opencode" | "pi";
+                agentRuntimeId: "claude-code" | "codex" | "opencode" | "pi";
                 associatedResourceEventRoutingConfig: {
                   enabled?: boolean;
                   resources?: {
@@ -11966,7 +11966,7 @@ export interface paths {
               };
               version: {
                 /** @enum {string} */
-                agentRuntimeId: "codex" | "opencode" | "pi";
+                agentRuntimeId: "claude-code" | "codex" | "opencode" | "pi";
                 associatedResourceEventRoutingConfig: {
                   enabled?: boolean;
                   resources?: {
@@ -12373,7 +12373,7 @@ export interface paths {
               };
               version: {
                 /** @enum {string} */
-                agentRuntimeId: "codex" | "opencode" | "pi";
+                agentRuntimeId: "claude-code" | "codex" | "opencode" | "pi";
                 associatedResourceEventRoutingConfig: {
                   enabled?: boolean;
                   resources?: {
@@ -12805,7 +12805,7 @@ export interface paths {
         content: {
           "application/json": {
             /** @enum {string} */
-            agentRuntimeId?: "codex" | "opencode" | "pi";
+            agentRuntimeId?: "claude-code" | "codex" | "opencode" | "pi";
             idempotencyKey?: string;
             sandboxConnectionId?: string | null;
             sandboxProvider?: string;

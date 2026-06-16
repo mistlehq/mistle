@@ -13,7 +13,7 @@ import {
   type MainPanelTransitionState,
 } from "./session-main-panel-handoff-state.js";
 
-type SessionMainPanelRuntimeId = "codex" | "opencode" | "pi";
+type SessionMainPanelRuntimeId = "claude-code" | "codex" | "opencode" | "pi";
 type ChatRestoreConnectionInput =
   | {
       initialCwd?: string | null;

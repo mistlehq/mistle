@@ -19,6 +19,7 @@ use crate::runtime::{
 };
 use crate::supervision::SandboxdSupervisorHandle;
 
+mod claude_code_server;
 mod codex_app_server;
 mod control;
 mod lifecycle;
@@ -27,6 +28,7 @@ mod opencode_server;
 mod output;
 mod readiness;
 
+use claude_code_server::*;
 use codex_app_server::*;
 use lifecycle::*;
 pub use manager::{
@@ -52,6 +54,8 @@ pub const CODEX_APP_SERVER_POST_START_READINESS_TIMEOUT: Duration = Duration::fr
 pub const CODEX_APP_SERVER_POST_START_FAILURE_THRESHOLD: u8 = 3;
 /// Number of consecutive post-start readiness failures before OpenCode is marked unhealthy.
 pub const OPENCODE_SERVER_POST_START_FAILURE_THRESHOLD: u8 = 3;
+/// Number of consecutive post-start readiness failures before Claude Code is marked unhealthy.
+pub const CLAUDE_CODE_SERVER_POST_START_FAILURE_THRESHOLD: u8 = 3;
 
 /// Captures one runtime client process after client-level environment merging.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,6 +78,7 @@ pub struct RuntimeClientProcessManager {
     processes: Vec<RunningRuntimeClientProcess>,
     codex_app_server_observation_handle: Option<CodexAppServerObservationHandle>,
     codex_app_server_control_handle: Option<CodexAppServerControlHandle>,
+    claude_code_server_control_handle: Option<ClaudeCodeServerControlHandle>,
     opencode_server_control_handle: Option<OpenCodeServerControlHandle>,
     monitor_shutdown_requested: Arc<AtomicBool>,
     monitor_threads: Vec<JoinHandle<()>>,
@@ -219,6 +224,11 @@ pub struct OpenCodeServerControlHandle {
     managed_process: Arc<ManagedOpenCodeServerProcess>,
 }
 
+#[derive(Clone, Debug)]
+pub struct ClaudeCodeServerControlHandle {
+    managed_process: Arc<ManagedClaudeCodeServerProcess>,
+}
+
 #[derive(Debug)]
 struct ManagedCodexAppServerProcess {
     spec: RuntimeClientProcessSpec,
@@ -233,6 +243,17 @@ struct ManagedCodexAppServerProcess {
 
 #[derive(Debug)]
 struct ManagedOpenCodeServerProcess {
+    spec: RuntimeClientProcessSpec,
+    child: Arc<Mutex<Child>>,
+    output_capture: ProcessOutputCapture,
+    platform_scope: Option<RuntimeClientProcessPlatformScope>,
+    supervisor_handle: SandboxdSupervisorHandle,
+    restart_lock: Mutex<()>,
+    restart_in_progress: AtomicBool,
+}
+
+#[derive(Debug)]
+struct ManagedClaudeCodeServerProcess {
     spec: RuntimeClientProcessSpec,
     child: Arc<Mutex<Child>>,
     output_capture: ProcessOutputCapture,

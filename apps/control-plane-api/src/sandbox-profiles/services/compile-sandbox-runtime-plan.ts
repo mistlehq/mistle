@@ -51,6 +51,7 @@ export const SandboxRuntimePlanCompilerErrorCodes = {
   INVALID_BINDING_CONFIG: "INVALID_BINDING_CONFIG",
   AGENT_RUNTIME_NOT_FOUND: "AGENT_RUNTIME_NOT_FOUND",
   INVALID_AGENT_RUNTIME_CONFIG: "INVALID_AGENT_RUNTIME_CONFIG",
+  AGENT_RUNTIME_CONFLICT: "AGENT_RUNTIME_CONFLICT",
   ROUTE_CONFLICT: "ROUTE_CONFLICT",
   ARTIFACT_CONFLICT: "ARTIFACT_CONFLICT",
   RUNTIME_CLIENT_SETUP_CONFLICT: "RUNTIME_CLIENT_SETUP_CONFLICT",
@@ -308,6 +309,8 @@ function mapCompilerErrorCodeToSandboxRuntimePlanCompilerErrorCode(
       return SandboxRuntimePlanCompilerErrorCodes.AGENT_RUNTIME_NOT_FOUND;
     case CompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG:
       return SandboxRuntimePlanCompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG;
+    case CompilerErrorCodes.AGENT_RUNTIME_CONFLICT:
+      return SandboxRuntimePlanCompilerErrorCodes.AGENT_RUNTIME_CONFLICT;
     case CompilerErrorCodes.ROUTE_CONFLICT:
       return SandboxRuntimePlanCompilerErrorCodes.ROUTE_CONFLICT;
     case CompilerErrorCodes.ARTIFACT_CONFLICT:

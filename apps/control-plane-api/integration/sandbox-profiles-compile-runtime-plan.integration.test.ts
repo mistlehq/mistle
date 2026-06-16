@@ -845,6 +845,52 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     });
   });
 
+  it("includes Mistle MCP config for Claude Code when enabled on the profile version", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-compile-mistle-mcp-claude-code@example.com",
+    });
+    const apiKeyId = "apk_compile_mistle_mcp_claude_code";
+
+    await seedMistleMcpApiKey(env, {
+      organizationId: session.organizationId,
+      apiKeyId,
+      secretPrefix: "compile_mistle_mcp_claude_code",
+    });
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_mistle_mcp_claude_code",
+      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE,
+      mistleMcpApiKeyId: apiKeyId,
+    });
+    await seedAgentBinding(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_mistle_mcp_claude_code",
+      targetKey: "anthropic-default-compile-mistle-mcp-claude-code",
+      connectionId: "icn_compile_mistle_mcp_claude_code_anthropic",
+      bindingId: "ibd_compile_mistle_mcp_claude_code_anthropic",
+      familyId: "anthropic",
+      variantId: "anthropic-default",
+      displayName: "Compile Mistle MCP Claude Code Anthropic Connection",
+      config: {},
+    });
+
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_mistle_mcp_claude_code",
+    });
+
+    expect(JSON.parse(readSetupFileContent(runtimePlan, "claude_code_mcp_config"))).toEqual({
+      mcpServers: {
+        mistle: {
+          type: "http",
+          url: "https://mcp.example.test/mcp",
+        },
+      },
+    });
+  });
+
   it("includes Mistle MCP config for Pi when enabled on the profile version", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-mistle-mcp-pi@example.com",
