@@ -41,19 +41,35 @@ These are the target-level fields operators own.
 
 These targets only need to be enabled:
 
+- `agentmail-mcp`
 - `aws-cli-default`
 - `anthropic-default`
+- `bugsnag-mcp`
+- `cloudflare-mcp`
 - `datadog-default`
+- `deepseek-default`
 - `e2b-default`
+- `expo-mcp`
+- `fireworks-default`
+- `gcp-mcp`
 - `inception-default`
 - `jira-default`
+- `kimi-default`
 - `linear-default`
+- `minimax-default`
+- `modal-default`
 - `notion-mcp`
 - `opencode-go`
+- `opencomputer-default`
 - `openrouter-default`
 - `planetscale-mcp`
+- `posthog-mcp`
+- `resend-mcp`
+- `sentry-mcp`
 - `signoz-mcp`
 - `stripe-mcp`
+- `tensorlake-default`
+- `zai-coding-plan`
 
 Example:
 
@@ -118,9 +134,9 @@ Use the `openai-default` block from `integration-targets.json` as your starting 
 
 ### Agent And Sandbox Runtime Targets
 
-`anthropic-default`, `inception-default`, `opencode-go`, and `openrouter-default` are model-provider targets for sandbox profiles that use agent runtimes.
+`anthropic-default`, `deepseek-default`, `fireworks-default`, `inception-default`, `kimi-default`, `minimax-default`, `opencode-go`, `openrouter-default`, and `zai-coding-plan` are model-provider targets for sandbox profiles that use OpenCode-compatible agent runtimes.
 
-`e2b-default` exposes E2B as a sandbox runtime connection target. Operators still configure deployment-level E2B runtime settings in [Self-Hosted Configuration](/guides/self-hosted-configuration), while workspace admins can use the integration connection when a profile should use workspace-owned E2B credentials.
+`e2b-default`, `modal-default`, `opencomputer-default`, and `tensorlake-default` expose sandbox runtime connection targets. Operators still configure deployment-level runtime settings in [Self-Hosted Configuration](/guides/self-hosted-configuration), while workspace admins can use integration connections when a profile should use workspace-owned runtime credentials.
 
 ## Scope Boundary
 

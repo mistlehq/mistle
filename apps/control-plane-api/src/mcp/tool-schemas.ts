@@ -129,3 +129,45 @@ export const mcpListTriggersInputSchema = z
     search: z.string().min(1).optional(),
   })
   .strict();
+
+export const mcpSetTriggerEnabledInputSchema = mcpTriggerIdParamsSchema
+  .extend({
+    enabled: z.boolean(),
+  })
+  .strict();
+
+export const mcpRenameTriggerInputSchema = mcpTriggerIdParamsSchema
+  .extend({
+    name: z.string().min(1),
+  })
+  .strict();
+
+export const mcpUpdateTriggerUserMessageInputSchema = mcpTriggerIdParamsSchema
+  .extend({
+    userMessage: z.string().min(1),
+  })
+  .strict();
+
+export const mcpSetTriggerScheduleInputSchema = mcpTriggerIdParamsSchema
+  .extend({
+    cronExpression: z.string().min(1),
+    timezone: z.string().min(1),
+  })
+  .strict();
+
+export const mcpListTriggerWebhookEventsInputSchema = z
+  .object({
+    sandboxProfileId: z
+      .string()
+      .min(1)
+      .regex(/^sbp_[a-zA-Z0-9_-]+$/, {
+        message: "`sandboxProfileId` must be a sandbox profile id.",
+      }),
+  })
+  .strict();
+
+export const mcpSetTriggerWebhookEventsInputSchema = mcpTriggerIdParamsSchema
+  .extend({
+    eventTypes: z.array(z.string().min(1)).min(1),
+  })
+  .strict();

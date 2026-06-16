@@ -11,9 +11,10 @@ For example, integrations can let an agent:
 
 - respond in Slack
 - work in GitHub and open pull requests
-- inspect logs and traces in Datadog or SigNoz
+- inspect logs and traces in Datadog, Sentry, or SigNoz
 - read or update issues in Jira or Linear
-- call model providers such as OpenAI, Anthropic, or OpenCode Go
+- call model providers such as OpenAI, Anthropic, OpenRouter, or OpenCode Go
+- run sandboxes through runtime providers such as E2B, Modal, OpenComputer, or Tensorlake
 
 ## Recommended Starting Integrations
 
@@ -24,7 +25,7 @@ Most useful Mistle workflows need at least:
 
 Other integrations are optional and should match the systems where your team wants agents to receive context, take action, or report results.
 
-Profiles that use the OpenCode agent runtime can use OpenCode-specific model provider connections such as [Anthropic](/guides/anthropic-integration-setup) and [OpenCode Go](/guides/opencode-go-integration-setup).
+Profiles that use OpenCode-compatible agent runtimes can use model provider connections such as [Anthropic](/guides/anthropic-integration-setup), [DeepSeek](/guides/deepseek-integration-setup), [Fireworks AI](/guides/fireworks-integration-setup), [Kimi](/guides/kimi-integration-setup), [OpenRouter](/guides/openrouter-integration-setup), and [OpenCode Go](/guides/opencode-go-integration-setup).
 
 ## After Connecting Integrations
 
@@ -53,23 +54,46 @@ When an official tool is unavailable or not well suited for agent workflows, Mis
 
 ## Supported Integrations
 
-Mistle currently ships setup guides for:
+Mistle currently ships setup guides for these external system connectors:
 
+- [AgentMail](/guides/agentmail-integration-setup)
 - [AWS](/guides/aws-integration-setup)
-- [Anthropic](/guides/anthropic-integration-setup)
 - [BugSnag](/guides/bugsnag-integration-setup)
+- [Cloudflare](/guides/cloudflare-integration-setup)
 - [Datadog](/guides/datadog-integration-setup)
 - [Expo](/guides/expo-integration-setup)
 - [Google Cloud](/guides/gcp-integration-setup)
 - [GitHub](/guides/github-integration-setup)
 - [Jira](/guides/jira-integration-setup)
 - [Linear](/guides/linear-integration-setup)
-- [OpenCode Go](/guides/opencode-go-integration-setup)
-- [OpenAI](/guides/openai-integration-setup)
+- [Notion](/guides/notion-integration-setup)
 - [PlanetScale](/guides/planetscale-integration-setup)
 - [PostHog](/guides/posthog-integration-setup)
+- [Resend](/guides/resend-integration-setup)
+- [Sentry](/guides/sentry-integration-setup)
 - [SigNoz](/guides/signoz-integration-setup)
 - [Slack](/guides/slack-integration-setup)
+- [Stripe](/guides/stripe-integration-setup)
+
+Mistle also ships setup guides for these model provider connections:
+
+- [Anthropic](/guides/anthropic-integration-setup)
+- [DeepSeek](/guides/deepseek-integration-setup)
+- [Fireworks AI](/guides/fireworks-integration-setup)
+- [Inception Labs](/guides/inception-integration-setup)
+- [Kimi](/guides/kimi-integration-setup)
+- [MiniMax](/guides/minimax-integration-setup)
+- [OpenAI](/guides/openai-integration-setup)
+- [OpenCode Go](/guides/opencode-go-integration-setup)
+- [OpenRouter](/guides/openrouter-integration-setup)
+- [Z.ai Coding Plan](/guides/zai-integration-setup)
+
+And these sandbox runtime connection guides:
+
+- [E2B](/guides/e2b-integration-setup)
+- [Modal](/guides/modal-integration-setup)
+- [OpenComputer](/guides/opencomputer-integration-setup)
+- [Tensorlake](/guides/tensorlake-integration-setup)
 
 ## Next Steps
 

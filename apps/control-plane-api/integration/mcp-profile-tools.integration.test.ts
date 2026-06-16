@@ -126,6 +126,7 @@ describe.concurrent("MCP profile tools integration", () => {
 
     expect(tools.map((tool) => tool.name).sort()).toEqual([
       "get_trigger",
+      "list_trigger_webhook_events",
       "list_triggers",
       "profile_draft_setup_script_put",
       "profile_get",
@@ -135,9 +136,14 @@ describe.concurrent("MCP profile tools integration", () => {
       "profile_maintenance_script_test_start",
       "profile_setup_script_get",
       "profile_setup_script_test_start",
+      "rename_trigger",
       "sandbox_instance_get",
       "sandbox_instance_port_access_create",
       "sandbox_operation_events_list",
+      "set_trigger_enabled",
+      "set_trigger_schedule",
+      "set_trigger_webhook_events",
+      "update_trigger_user_message",
     ]);
     expect(tools.every((tool) => tool.outputSchema === undefined)).toBe(true);
   });
