@@ -3,6 +3,7 @@ import { BadRequestError, ForbiddenError } from "@mistle/http/errors.js";
 import type { McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 
 import {
+  OrganizationPermissions,
   hasTriggerReadPermission,
   hasTriggerUpdatePermission,
 } from "../../auth/services/organization-policy.js";
@@ -22,7 +23,7 @@ import {
   mcpTriggerIdParamsSchema,
   mcpUpdateTriggerUserMessageInputSchema,
 } from "../tool-schemas.js";
-import { structuredResult } from "./shared.js";
+import { requireMcpToolPermission, structuredResult } from "./shared.js";
 
 const ReadOnlyToolAnnotations: ToolAnnotations = {
   readOnlyHint: true,
@@ -111,7 +112,7 @@ export function registerTriggerTools(server: McpServer, context: MistleMcpServer
       },
     },
     async ({ cronExpression, timezone, triggerId }) => {
-      requireMcpTriggerUpdatePermission(context);
+      requireMcpToolPermission(context.organizationActor, OrganizationPermissions.TRIGGER_UPDATE);
       const trigger = await getTrigger(
         {
           db: context.db,

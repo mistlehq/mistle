@@ -394,6 +394,55 @@ describe.concurrent("MCP trigger tools integration", () => {
     expect(persistedSchedule?.nextScheduledAt).not.toBe("2026-06-03T01:00:00.000Z");
   });
 
+  it("rejects legacy webhook update permission for scheduled trigger timing updates", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-trigger-schedule-legacy-webhook-forbidden@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP legacy webhook schedule updater",
+      permissions: [OrganizationPermissions.TRIGGER_WEBHOOK_UPDATE],
+    });
+
+    await seedScheduledTrigger(env, {
+      organizationId: session.organizationId,
+      triggerId: "atm_mcp_trigger_schedule_legacy_webhook_forbidden",
+      scheduleId: "sch_mcp_trigger_schedule_legacy_webhook_forbidden",
+      targetId: "atg_mcp_trigger_schedule_legacy_webhook_forbidden",
+      profileId: "sbp_mcp_trigger_schedule_legacy_webhook_forbidden",
+      name: "MCP schedule legacy webhook forbidden",
+      createdAt: "2026-06-02T00:00:00.000Z",
+    });
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "set_trigger_schedule",
+      arguments: {
+        triggerId: "atm_mcp_trigger_schedule_legacy_webhook_forbidden",
+        cronExpression: "30 10 * * *",
+        timezone: "UTC",
+      },
+    });
+
+    expect(result.isError).toBe(true);
+
+    const persistedSchedule = await env.controlPlaneDb.query.schedules.findFirst({
+      columns: {
+        cronExpression: true,
+        timezone: true,
+      },
+      where: (table, { eq }) => eq(table.id, "sch_mcp_trigger_schedule_legacy_webhook_forbidden"),
+    });
+    expect(persistedSchedule).toMatchObject({
+      cronExpression: "0 9 * * *",
+      timezone: "Asia/Singapore",
+    });
+  });
+
   it("accepts legacy webhook trigger update permission for shared trigger write tools", async ({
     env,
   }) => {
