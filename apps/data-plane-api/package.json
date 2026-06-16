@@ -52,7 +52,7 @@
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/workflow-registry": "workspace:*",
-    "@scalar/hono-api-reference": "^0.10.14",
+    "@scalar/hono-api-reference": "^0.11.0",
     "drizzle-orm": "^0.45.2",
     "hono": "4.12.23",
     "openworkflow": "^0.9.0",
