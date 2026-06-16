@@ -30,6 +30,10 @@ export const OrganizationPermissions = {
   INTEGRATION_WEBHOOK_SOURCE_DELETE: "integrationWebhookSource:delete",
   CREDENTIAL_KEY_READ: "credentialKey:read",
   CREDENTIAL_KEY_MANAGE: "credentialKey:manage",
+  TRIGGER_READ: "trigger:read",
+  TRIGGER_CREATE: "trigger:create",
+  TRIGGER_UPDATE: "trigger:update",
+  TRIGGER_DELETE: "trigger:delete",
   TRIGGER_WEBHOOK_READ: "triggerWebhook:read",
   TRIGGER_WEBHOOK_CREATE: "triggerWebhook:create",
   TRIGGER_WEBHOOK_UPDATE: "triggerWebhook:update",
@@ -69,6 +73,10 @@ const OWNER_PERMISSIONS: readonly OrganizationPermission[] = [
   OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_DELETE,
   OrganizationPermissions.CREDENTIAL_KEY_READ,
   OrganizationPermissions.CREDENTIAL_KEY_MANAGE,
+  OrganizationPermissions.TRIGGER_READ,
+  OrganizationPermissions.TRIGGER_CREATE,
+  OrganizationPermissions.TRIGGER_UPDATE,
+  OrganizationPermissions.TRIGGER_DELETE,
   OrganizationPermissions.TRIGGER_WEBHOOK_READ,
   OrganizationPermissions.TRIGGER_WEBHOOK_CREATE,
   OrganizationPermissions.TRIGGER_WEBHOOK_UPDATE,
@@ -101,6 +109,10 @@ const MEMBER_PERMISSIONS: readonly OrganizationPermission[] = [
   OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_UPDATE,
   OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_DELETE,
   OrganizationPermissions.CREDENTIAL_KEY_READ,
+  OrganizationPermissions.TRIGGER_READ,
+  OrganizationPermissions.TRIGGER_CREATE,
+  OrganizationPermissions.TRIGGER_UPDATE,
+  OrganizationPermissions.TRIGGER_DELETE,
   OrganizationPermissions.TRIGGER_WEBHOOK_READ,
   OrganizationPermissions.TRIGGER_WEBHOOK_CREATE,
   OrganizationPermissions.TRIGGER_WEBHOOK_UPDATE,
@@ -182,6 +194,47 @@ export function hasOrganizationPermission(
   permission: OrganizationPermission,
 ): boolean {
   return getOrganizationPermissions(actorRole).includes(permission);
+}
+
+export function hasTriggerReadPermission(permissions: readonly OrganizationPermission[]): boolean {
+  return hasPermission(permissions, [
+    OrganizationPermissions.TRIGGER_READ,
+    OrganizationPermissions.TRIGGER_WEBHOOK_READ,
+  ]);
+}
+
+export function hasTriggerCreatePermission(
+  permissions: readonly OrganizationPermission[],
+): boolean {
+  return hasPermission(permissions, [
+    OrganizationPermissions.TRIGGER_CREATE,
+    OrganizationPermissions.TRIGGER_WEBHOOK_CREATE,
+  ]);
+}
+
+export function hasTriggerUpdatePermission(
+  permissions: readonly OrganizationPermission[],
+): boolean {
+  return hasPermission(permissions, [
+    OrganizationPermissions.TRIGGER_UPDATE,
+    OrganizationPermissions.TRIGGER_WEBHOOK_UPDATE,
+  ]);
+}
+
+export function hasTriggerDeletePermission(
+  permissions: readonly OrganizationPermission[],
+): boolean {
+  return hasPermission(permissions, [
+    OrganizationPermissions.TRIGGER_DELETE,
+    OrganizationPermissions.TRIGGER_WEBHOOK_DELETE,
+  ]);
+}
+
+function hasPermission(
+  permissions: readonly OrganizationPermission[],
+  allowedPermissions: readonly OrganizationPermission[],
+): boolean {
+  return allowedPermissions.some((permission) => permissions.includes(permission));
 }
 
 export function canManageOrganization(actorRole: OrganizationRole): boolean {

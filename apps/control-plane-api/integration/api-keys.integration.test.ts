@@ -60,6 +60,31 @@ describe.concurrent("api keys integration", () => {
     expect(persistedApiKey?.secretHash).toHaveLength(43);
   });
 
+  it("creates API keys with generic trigger permissions", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-api-key-trigger-permissions@example.com",
+    });
+
+    const response = await createApiKey({
+      cookie: session.cookie,
+      env,
+      name: "Trigger key",
+      permissions: [OrganizationPermissions.TRIGGER_READ],
+    });
+
+    expect(response.status).toBe(201);
+    const body = CreateApiKeyResponseSchema.parse(await response.json());
+
+    expect(body.apiKey.permissions).toStrictEqual([OrganizationPermissions.TRIGGER_READ]);
+
+    const persistedPermissions = await env.controlPlaneDb.query.apiKeyPermissions.findMany({
+      where: (table, { eq }) => eq(table.apiKeyId, body.apiKey.id),
+    });
+    expect(persistedPermissions.map((permission) => permission.permission)).toStrictEqual([
+      OrganizationPermissions.TRIGGER_READ,
+    ]);
+  });
+
   it("lists active API keys using keyset pagination and omits revoked keys", async ({ env }) => {
     const firstSession = await env.auth.createSession({
       email: "integration-new-api-key-list-a@example.com",

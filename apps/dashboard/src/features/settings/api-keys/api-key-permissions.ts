@@ -56,24 +56,24 @@ export const ApiKeyPermissionOptions: readonly ApiKeyPermissionOption[] = [
     description: "Open session connections and terminals.",
   },
   {
-    value: "triggerWebhook:read",
+    value: "trigger:read",
     label: "Read triggers",
-    description: "View webhook triggers.",
+    description: "View triggers.",
   },
   {
-    value: "triggerWebhook:create",
+    value: "trigger:create",
     label: "Create triggers",
-    description: "Create webhook triggers.",
+    description: "Create triggers.",
   },
   {
-    value: "triggerWebhook:update",
+    value: "trigger:update",
     label: "Update triggers",
-    description: "Edit webhook triggers.",
+    description: "Edit triggers.",
   },
   {
-    value: "triggerWebhook:delete",
+    value: "trigger:delete",
     label: "Delete triggers",
-    description: "Delete webhook triggers.",
+    description: "Delete triggers.",
   },
 ];
 
@@ -106,6 +106,10 @@ const MistleResourcePermissionGroups = [
   {
     label: "Triggers",
     permissions: [
+      "trigger:read",
+      "trigger:create",
+      "trigger:update",
+      "trigger:delete",
       "triggerWebhook:read",
       "triggerWebhook:create",
       "triggerWebhook:update",
@@ -115,7 +119,29 @@ const MistleResourcePermissionGroups = [
 ] as const;
 
 const ApiKeyPermissionOptionByValue = new Map(
-  ApiKeyPermissionOptions.map((option) => [option.value, option]),
+  [
+    ...ApiKeyPermissionOptions,
+    {
+      value: "triggerWebhook:read",
+      label: "Read triggers",
+      description: "View triggers.",
+    },
+    {
+      value: "triggerWebhook:create",
+      label: "Create triggers",
+      description: "Create triggers.",
+    },
+    {
+      value: "triggerWebhook:update",
+      label: "Update triggers",
+      description: "Edit triggers.",
+    },
+    {
+      value: "triggerWebhook:delete",
+      label: "Delete triggers",
+      description: "Delete triggers.",
+    },
+  ].map((option) => [option.value, option]),
 );
 
 export function createAllowedMistleResourceAccessSummary(
@@ -124,18 +150,22 @@ export function createAllowedMistleResourceAccessSummary(
   const selectedPermissionValues = new Set(permissions);
   const groupedPermissionValues = new Set<string>();
 
-  const resourceGroups = MistleResourcePermissionGroups.map((group) => ({
-    label: group.label,
-    actions: group.permissions.flatMap((permission) => {
+  const resourceGroups = MistleResourcePermissionGroups.map((group) => {
+    const actions = new Set<string>();
+
+    for (const permission of group.permissions) {
       groupedPermissionValues.add(permission);
 
-      if (!selectedPermissionValues.has(permission)) {
-        return [];
+      if (selectedPermissionValues.has(permission)) {
+        actions.add(formatApiKeyPermission(permission));
       }
+    }
 
-      return [formatApiKeyPermission(permission)];
-    }),
-  })).filter((group) => group.actions.length > 0);
+    return {
+      label: group.label,
+      actions: [...actions],
+    };
+  }).filter((group) => group.actions.length > 0);
 
   const ungroupedPermissions = [...selectedPermissionValues]
     .filter((permission) => !groupedPermissionValues.has(permission))
