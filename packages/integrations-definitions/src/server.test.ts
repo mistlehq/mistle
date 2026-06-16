@@ -108,6 +108,14 @@ describe("integrations-definitions server", () => {
       familyId: "posthog",
       variantId: "posthog-mcp",
     });
+    const railwayDefinition = registry.getDefinition({
+      familyId: "railway",
+      variantId: "railway-mcp",
+    });
+    const renderDefinition = registry.getDefinition({
+      familyId: "render",
+      variantId: "render-mcp",
+    });
     const resendDefinition = registry.getDefinition({
       familyId: "resend",
       variantId: "resend-mcp",
@@ -312,6 +320,27 @@ describe("integrations-definitions server", () => {
     expect(postHogDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(postHogDefinition?.webhookHandler).toBeUndefined();
     expect(postHogDefinition?.webhookSource).toBeUndefined();
+    expect(railwayDefinition?.oauth2AuthorizationCode).toBeDefined();
+    expect(railwayDefinition?.webhookHandler).toBeUndefined();
+    expect(railwayDefinition?.webhookSource).toBeUndefined();
+    expect(renderDefinition).toMatchObject({
+      familyId: "render",
+      variantId: "render-mcp",
+      kind: "connector",
+      displayName: "Render",
+      logoKey: "render",
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+        },
+      ],
+    });
+    expect(renderDefinition?.mcp).toBeDefined();
+    expect(renderDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(renderDefinition?.webhookHandler).toBeUndefined();
+    expect(renderDefinition?.webhookSource).toBeUndefined();
     expect(resendDefinition).toMatchObject({
       familyId: "resend",
       variantId: "resend-mcp",
@@ -385,7 +414,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(33);
+    expect(definitions).toHaveLength(35);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
@@ -401,6 +430,8 @@ describe("integrations-definitions server", () => {
         "notion::notion-mcp",
         "openrouter::openrouter-default",
         "posthog::posthog-mcp",
+        "railway::railway-mcp",
+        "render::render-mcp",
         "resend::resend-mcp",
         "stripe::stripe-mcp",
         "zai::zai-coding-plan",

@@ -60,6 +60,8 @@
               "guides/openrouter-integration-setup",
               "guides/planetscale-integration-setup",
               "guides/posthog-integration-setup",
+              "guides/railway-integration-setup",
+              "guides/render-integration-setup",
               "guides/resend-integration-setup",
               "guides/sentry-integration-setup",
               "guides/signoz-integration-setup",

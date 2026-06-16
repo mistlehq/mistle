@@ -31,7 +31,9 @@ import { OpenCodeGoDefinition } from "./opencode/index.js";
 import { OpenRouterDefinition } from "./openrouter/index.js";
 import { PlanetScaleDefinition } from "./planetscale/server.js";
 import { PostHogDefinition } from "./posthog/server.js";
+import { RailwayDefinition } from "./railway/server.js";
 import { createAgentRuntimeServerRegistry } from "./registry/agent-runtimes.server.js";
+import { RenderDefinition } from "./render/index.js";
 import { ResendDefinition } from "./resend/server.js";
 import {
   E2BSandboxRuntimeDefinition,
@@ -71,6 +73,8 @@ export * from "./opencode/index.js";
 export * from "./openrouter/index.js";
 export * from "./planetscale/server.js";
 export * from "./posthog/server.js";
+export * from "./railway/server.js";
+export * from "./render/index.js";
 export * from "./resend/server.js";
 export * from "./sandbox-runtimes/index.js";
 export * from "./sentry/server.js";
@@ -109,6 +113,8 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   OpenRouterDefinition,
   PlanetScaleDefinition,
   PostHogDefinition,
+  RailwayDefinition,
+  RenderDefinition,
   ResendDefinition,
   E2BSandboxRuntimeDefinition,
   ModalSandboxRuntimeDefinition,

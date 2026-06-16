@@ -134,6 +134,16 @@
       "config": {}
     },
     {
+      "targetKey": "railway-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
+      "targetKey": "render-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "resend-mcp",
       "enabled": true,
       "config": {}

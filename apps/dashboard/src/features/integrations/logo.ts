@@ -8,6 +8,8 @@ const IntegrationLogoDarkVariantKeys = {
   opencomputer: true,
   opencode: true,
   planetscale: true,
+  railway: true,
+  render: true,
   resend: true,
 } satisfies Record<string, true>;
 
