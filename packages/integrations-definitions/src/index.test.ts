@@ -1041,7 +1041,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(31);
+    expect(definitions).toHaveLength(32);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -1075,6 +1075,7 @@ describe("integrations-definitions index", () => {
       "sentry::sentry-mcp",
       "signoz::signoz-mcp",
       "slack::slack-default",
+      "stripe::stripe-mcp",
       "zai::zai-coding-plan",
     ]);
   });

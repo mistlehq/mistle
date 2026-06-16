@@ -213,6 +213,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "stripe-mcp",
+        familyId: "stripe",
+        variantId: "stripe-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "tensorlake-default",
         familyId: "tensorlake",
         variantId: "tensorlake-default",

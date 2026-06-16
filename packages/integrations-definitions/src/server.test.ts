@@ -378,7 +378,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(31);
+    expect(definitions).toHaveLength(32);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
@@ -394,6 +394,7 @@ describe("integrations-definitions server", () => {
         "openrouter::openrouter-default",
         "posthog::posthog-mcp",
         "resend::resend-mcp",
+        "stripe::stripe-mcp",
         "zai::zai-coding-plan",
       ]),
     );

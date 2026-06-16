@@ -41,6 +41,7 @@ import {
 import { SentryDefinition } from "./sentry/server.js";
 import { SignozDefinition } from "./signoz/server.js";
 import { SlackDefinition } from "./slack/index.js";
+import { StripeDefinition } from "./stripe/server.js";
 import { ZaiDefinition } from "./zai/index.js";
 
 export * from "./anthropic/index.js";
@@ -73,6 +74,7 @@ export * from "./sandbox-runtimes/index.js";
 export * from "./sentry/server.js";
 export * from "./signoz/server.js";
 export * from "./slack/index.js";
+export * from "./stripe/server.js";
 export * from "./zai/index.js";
 export * from "./forms/index.js";
 export * from "./agent-runtimes/provider-selection.js";
@@ -112,6 +114,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   SentryDefinition,
   SignozDefinition,
   SlackDefinition,
+  StripeDefinition,
   ZaiDefinition,
 ];
 

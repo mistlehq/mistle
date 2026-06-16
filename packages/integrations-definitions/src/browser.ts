@@ -38,6 +38,7 @@ import {
 import { SentryMcpBaseDefinition } from "./sentry/variants/sentry-mcp/base-definition.js";
 import { SignozMcpBaseDefinition } from "./signoz/variants/signoz-mcp/base-definition.js";
 import { SlackBaseDefinition } from "./slack/variants/slack-default/base-definition.js";
+import { StripeMcpBaseDefinition } from "./stripe/variants/stripe-mcp/base-definition.js";
 import { ZaiDefinition } from "./zai/index.js";
 export const AnthropicBrowserDefinition = AnthropicDefinition;
 export const AwsBrowserDefinition = AwsBaseDefinition;
@@ -68,6 +69,7 @@ export const TensorlakeSandboxRuntimeBrowserDefinition = TensorlakeSandboxRuntim
 export const SentryBrowserDefinition = SentryMcpBaseDefinition;
 export const SignozBrowserDefinition = SignozMcpBaseDefinition;
 export const SlackBrowserDefinition = SlackBaseDefinition;
+export const StripeBrowserDefinition = StripeMcpBaseDefinition;
 export const ZaiBrowserDefinition = ZaiDefinition;
 
 const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
@@ -101,6 +103,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   SentryBrowserDefinition,
   SignozBrowserDefinition,
   SlackBrowserDefinition,
+  StripeBrowserDefinition,
   ZaiBrowserDefinition,
 ];
 
@@ -145,4 +148,5 @@ export * from "./sandbox-runtimes/index.js";
 export * from "./sentry/browser.js";
 export * from "./shared/remote-mcp-server-catalog/index.js";
 export * from "./slack/browser.js";
+export * from "./stripe/browser.js";
 export * from "./zai/index.js";
