@@ -22,9 +22,5 @@
     "test": "vitest run --passWithNoTests",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
-  },
-  "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "0.3.175",
-    "ws": "^8.21.0"
   }
 }
