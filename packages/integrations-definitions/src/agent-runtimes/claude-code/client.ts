@@ -23,6 +23,14 @@ export type ClaudeCodeSessionReadResult = {
   };
 };
 
+export type ClaudeCodeSessionSummary = {
+  createdAt: number | null;
+  cwd: string | null;
+  id: string;
+  title: string;
+  updatedAt: number;
+};
+
 export type ClaudeCodeSessionClient = {
   close(): void;
   connect(): Promise<void>;
@@ -31,8 +39,13 @@ export type ClaudeCodeSessionClient = {
     idempotency?: AgentConversationIdempotencyMetadata;
   }): Promise<{ sessionId: string }>;
   interruptQuery(input: { sessionId: string }): Promise<void>;
+  listSessions(input?: {
+    cwd?: string | null;
+    limit?: number;
+    offset?: number;
+  }): Promise<readonly ClaudeCodeSessionSummary[]>;
   readSession(input: { sessionId: string }): Promise<ClaudeCodeSessionReadResult>;
-  resumeSession(input: { sessionId: string }): Promise<void>;
+  resumeSession(input: { cwd?: string | null; sessionId: string }): Promise<void>;
   startQuery(input: {
     idempotency?: AgentConversationIdempotencyMetadata;
     inputText: string;
@@ -75,6 +88,28 @@ function readNestedString(value: unknown, path: readonly string[]): string | nul
   return typeof currentValue === "string" && currentValue.length > 0 ? currentValue : null;
 }
 
+function readNestedStringValue(value: unknown, path: readonly string[]): string | null {
+  let currentValue: unknown = value;
+  for (const segment of path) {
+    if (!isRecord(currentValue)) {
+      return null;
+    }
+    currentValue = currentValue[segment];
+  }
+  return typeof currentValue === "string" ? currentValue : null;
+}
+
+function readNestedNumber(value: unknown, path: readonly string[]): number | null {
+  let currentValue: unknown = value;
+  for (const segment of path) {
+    if (!isRecord(currentValue)) {
+      return null;
+    }
+    currentValue = currentValue[segment];
+  }
+  return typeof currentValue === "number" && Number.isFinite(currentValue) ? currentValue : null;
+}
+
 function extractSessionId(result: unknown, method: string): string {
   const sessionId = readNestedString(result, ["session", "id"]);
   if (sessionId === null) {
@@ -102,6 +137,41 @@ function normalizeClaudeCodeSessionStatus(value: string | null): ClaudeCodeSessi
     default:
       throw new Error("Claude Code session/read response did not include supported status.");
   }
+}
+
+function parseClaudeCodeSessionSummary(value: unknown): ClaudeCodeSessionSummary {
+  if (!isRecord(value)) {
+    throw new Error("Claude Code session/list response included an invalid session.");
+  }
+  const sessionId = readNestedString(value, ["id"]);
+  if (sessionId === null) {
+    throw new Error("Claude Code session/list response included a session without id.");
+  }
+  const title = readNestedStringValue(value, ["title"]);
+  const updatedAt = readNestedNumber(value, ["updatedAt"]);
+  if (title === null || updatedAt === null) {
+    throw new Error("Claude Code session/list response included a session without metadata.");
+  }
+  return {
+    id: sessionId,
+    title,
+    cwd: readNestedString(value, ["cwd"]),
+    createdAt: readNestedNumber(value, ["createdAt"]),
+    updatedAt,
+  };
+}
+
+export function parseClaudeCodeSessionListResult(
+  result: unknown,
+): readonly ClaudeCodeSessionSummary[] {
+  if (!isRecord(result)) {
+    throw new Error("Claude Code session/list response did not include sessions.");
+  }
+  const rawSessions = result["sessions"];
+  if (!Array.isArray(rawSessions)) {
+    throw new Error("Claude Code session/list response did not include sessions.");
+  }
+  return rawSessions.map(parseClaudeCodeSessionSummary);
 }
 
 function parseClaudeCodeSessionReadResult(result: unknown): ClaudeCodeSessionReadResult {
@@ -176,6 +246,14 @@ export function createClaudeCodeSessionClient(
         sessionId: interruptInput.sessionId,
       });
     },
+    async listSessions(listInput = {}) {
+      const result = await rpcClient.call("session/list", {
+        ...(listInput.cwd === undefined || listInput.cwd === null ? {} : { cwd: listInput.cwd }),
+        ...(listInput.limit === undefined ? {} : { limit: listInput.limit }),
+        ...(listInput.offset === undefined ? {} : { offset: listInput.offset }),
+      });
+      return parseClaudeCodeSessionListResult(result);
+    },
     async readSession(readInput) {
       const result = await rpcClient.call("session/read", {
         sessionId: readInput.sessionId,
@@ -185,6 +263,9 @@ export function createClaudeCodeSessionClient(
     async resumeSession(resumeInput) {
       await rpcClient.call("session/resume", {
         sessionId: resumeInput.sessionId,
+        ...(resumeInput.cwd === undefined || resumeInput.cwd === null
+          ? {}
+          : { cwd: resumeInput.cwd }),
       });
     },
     async startQuery(startInput) {

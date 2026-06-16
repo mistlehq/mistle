@@ -177,7 +177,7 @@ describe("useSessionWorkbenchController", () => {
       showControls: false,
     });
     expect(result.current.conversationPane.composerStateInput.contextUsage).toBeNull();
-    expect(result.current.conversationPane.runtimeConversationNavigator).toBeNull();
+    expect(result.current.conversationPane.runtimeConversationNavigator).not.toBeNull();
     expect(result.current.conversationPane.serverRequestsState.pendingServerRequests).toEqual([]);
     expect(result.current.workbench.primaryPanelState.cliTerminalContentInset).toBe("none");
     expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("system");

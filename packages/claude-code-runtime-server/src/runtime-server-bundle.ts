@@ -2,7 +2,7 @@ export const ClaudeCodeRuntimeServerBundle = String.raw`#!/usr/bin/env node
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
-import { query } from "@anthropic-ai/claude-agent-sdk";
+import { getSessionMessages, listSessions, query } from "@anthropic-ai/claude-agent-sdk";
 
 const listenHost = process.env.MISTLE_CLAUDE_CODE_RUNTIME_HOST ?? "127.0.0.1";
 const listenPort = Number.parseInt(process.env.MISTLE_CLAUDE_CODE_RUNTIME_PORT ?? "4521", 10);
@@ -53,6 +53,13 @@ function resolveClaudeCodeCwd(cwd) {
   return cwd;
 }
 
+function resolveClaudeCodeLookupCwd(cwd) {
+  if (cwd === undefined || cwd === null || cwd === "") {
+    return null;
+  }
+  return resolveClaudeCodeCwd(cwd);
+}
+
 function createSession(input) {
   const sessionId = input.sessionId ?? randomUUID();
   const cwd = resolveClaudeCodeCwd(input.cwd);
@@ -62,8 +69,27 @@ function createSession(input) {
     activeQueryId: null,
     queries: [],
     sdkSessionId: null,
+    sdkLookupCwd: cwd,
   });
   return sessionId;
+}
+
+async function listSessionPage(input) {
+  const cwd = input.cwd === undefined || input.cwd === null
+    ? undefined
+    : resolveClaudeCodeCwd(input.cwd);
+  const sessions = await listSessions({
+    ...(cwd === undefined ? {} : { dir: cwd }),
+    ...(input.limit === undefined ? {} : { limit: input.limit }),
+    ...(input.offset === undefined ? {} : { offset: input.offset }),
+  });
+  return sessions.map((session) => ({
+    id: session.sessionId,
+    title: session.summary,
+    cwd: session.cwd ?? cwd ?? null,
+    createdAt: session.createdAt ?? null,
+    updatedAt: session.lastModified,
+  }));
 }
 
 async function runClaudeQuery(conversation, queryId, inputText) {
@@ -111,7 +137,9 @@ function createClaudeQueryOptions(input) {
       ? { sessionId: input.session.sessionId }
       : { resume: input.session.sessionId };
   return {
-    cwd: resolveClaudeCodeCwd(input.cwd),
+    ...(input.cwd === undefined || input.cwd === null
+      ? {}
+      : { cwd: resolveClaudeCodeCwd(input.cwd) }),
     systemPrompt: { type: "preset", preset: "claude_code" },
     includePartialMessages: true,
     ...sessionOptions,
@@ -147,6 +175,78 @@ function collectAssistantText(message) {
     }
   }
   return textParts.join(" ");
+}
+
+function collectUserText(message) {
+  if (typeof message === "string") {
+    return message;
+  }
+  if (
+    message === null ||
+    typeof message !== "object" ||
+    !("content" in message)
+  ) {
+    return "";
+  }
+
+  if (typeof message.content === "string") {
+    return message.content;
+  }
+  if (!Array.isArray(message.content)) {
+    return "";
+  }
+
+  const textParts = [];
+  for (const content of message.content) {
+    if (
+      content !== null &&
+      typeof content === "object" &&
+      "type" in content &&
+      content.type === "text" &&
+      "text" in content &&
+      typeof content.text === "string"
+    ) {
+      textParts.push(content.text);
+    }
+  }
+  return textParts.join("\n\n");
+}
+
+async function readConversationQueries(conversation) {
+  if (conversation.queries.length > 0 || conversation.sdkSessionId === null) {
+    return conversation.queries;
+  }
+
+  const messages = await getSessionMessages(conversation.sdkSessionId, {
+    ...(conversation.sdkLookupCwd === null ? {} : { dir: conversation.sdkLookupCwd }),
+  });
+  const queries = messages.flatMap((message) => {
+    if (message.type === "user") {
+      return [
+        {
+          queryId: message.uuid,
+          message: {
+            type: "user",
+            text: collectUserText(message.message),
+          },
+        },
+      ];
+    }
+    if (message.type === "assistant") {
+      return [
+        {
+          queryId: message.uuid,
+          message: {
+            type: "assistant",
+            message: message.message,
+          },
+        },
+      ];
+    }
+    return [];
+  });
+  conversation.queries = queries;
+  return queries;
 }
 
 function normalizeGeneratedTitle(text) {
@@ -216,18 +316,30 @@ async function handleRequest(request) {
         },
       };
     }
+    case "session/list": {
+      const params = request.params ?? {};
+      return {
+        sessions: await listSessionPage({
+          cwd: params.cwd,
+          limit: params.limit,
+          offset: params.offset,
+        }),
+      };
+    }
     case "session/resume": {
       const params = request.params ?? {};
       if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
         throw new Error("session/resume requires params.sessionId.");
       }
       if (!conversations.has(params.sessionId)) {
+        const lookupCwd = resolveClaudeCodeLookupCwd(params.cwd);
         conversations.set(params.sessionId, {
           providerConversationId: params.sessionId,
-          cwd: resolveClaudeCodeCwd(params.cwd),
+          cwd: lookupCwd,
           activeQueryId: null,
           queries: [],
           sdkSessionId: params.sessionId,
+          sdkLookupCwd: lookupCwd,
         });
       }
       return {};
@@ -247,6 +359,7 @@ async function handleRequest(request) {
         throw new Error("session/read requires params.sessionId.");
       }
       const conversation = requireSession(params.sessionId);
+      const queries = await readConversationQueries(conversation);
       return {
         session: {
           id: conversation.providerConversationId,
@@ -255,7 +368,7 @@ async function handleRequest(request) {
             type: conversation.activeQueryId === null ? "idle" : "active",
           },
           activeQueryId: conversation.activeQueryId,
-          queries: conversation.queries,
+          queries,
           lastError: conversation.lastError ?? null,
         },
       };

@@ -141,6 +141,23 @@ function mapOpenCodeSessionToRuntimeConversationSummary(
   };
 }
 
+export function mapClaudeCodeSessionToRuntimeConversationSummary(input: {
+  cwd: string | null;
+  id: string;
+  startedAt: number | null;
+  title: string;
+  updatedAt: number | null;
+}): RuntimeConversationSummary {
+  return {
+    id: input.id,
+    title: input.title,
+    cwd: input.cwd ?? "",
+    createdAt: input.startedAt,
+    updatedAt: input.updatedAt,
+    lineage: null,
+  };
+}
+
 function parseOptionalIsoDateTimeMs(value: string | null): number | null {
   if (value === null) {
     return null;
@@ -163,6 +180,18 @@ function mapPiConversationToRuntimeConversationSummary(
   };
 }
 
+export function mapClaudeCodeRuntimeConversationCwdInput(input?: { cwd?: string | null }): {
+  directory?: string;
+} {
+  if (input?.cwd === undefined || input.cwd === null || input.cwd.length === 0) {
+    return {};
+  }
+
+  return {
+    directory: input.cwd,
+  };
+}
+
 function mapRuntimeConversationCwdInput(input?: { cwd?: string | null }): {
   directory?: string | null;
 } {
@@ -173,6 +202,68 @@ function mapRuntimeConversationStartOrResumeInput(input?: { cwd?: string }): {
   directory?: string;
 } {
   return input?.cwd === undefined ? {} : { directory: input.cwd };
+}
+
+function buildClaudeCodeRuntimeConversationNavigatorState(input: {
+  claudeCodeSessionState: UseClaudeCodeSessionStateResult;
+}): RuntimeConversationNavigatorState {
+  const activeSessionId = input.claudeCodeSessionState.sessions.activeSessionId;
+  const availableConversations = input.claudeCodeSessionState.sessions.availableSessions.map(
+    (session) =>
+      mapClaudeCodeSessionToRuntimeConversationSummary({
+        id: session.id,
+        title: session.title,
+        cwd: session.cwd,
+        startedAt: session.createdAt,
+        updatedAt: session.updatedAt,
+      }),
+  );
+  const hasListedActiveSession =
+    activeSessionId === null
+      ? true
+      : availableConversations.some((conversation) => conversation.id === activeSessionId);
+  const activeConversation =
+    activeSessionId === null || hasListedActiveSession
+      ? []
+      : [
+          mapClaudeCodeSessionToRuntimeConversationSummary({
+            id: activeSessionId,
+            title: "Claude Code session",
+            cwd: input.claudeCodeSessionState.sessions.activeSessionDirectory,
+            startedAt: input.claudeCodeSessionState.sessions.activeSessionStartedAt,
+            updatedAt: input.claudeCodeSessionState.sessions.activeSessionStartedAt,
+          }),
+        ];
+
+  return {
+    activeConversationCwd: input.claudeCodeSessionState.sessions.activeSessionDirectory,
+    activeConversationId: activeSessionId,
+    providerConversationId:
+      input.claudeCodeSessionState.lifecycle.sessionSnapshot?.providerSessionId ?? null,
+    availableConversations: [...activeConversation, ...availableConversations],
+    hasMoreAvailableConversations: input.claudeCodeSessionState.sessions.hasMoreAvailableSessions,
+    originalConversationId: input.claudeCodeSessionState.sessions.originalSessionId,
+    pendingConversationId: input.claudeCodeSessionState.sessions.pendingSessionId,
+    clearContextImplementationConversationId: null,
+    acknowledgeClearContextImplementationConversation: () => {
+      return;
+    },
+    isStartingNewConversation: input.claudeCodeSessionState.sessions.isStartingNewSession,
+    refreshConversationList: async (refreshInput) => {
+      await input.claudeCodeSessionState.sessions.refreshSessionList(
+        mapClaudeCodeRuntimeConversationCwdInput(refreshInput),
+      );
+    },
+    resumeConversation: async (conversationId, resumeInput) =>
+      await input.claudeCodeSessionState.sessions.resumeSession(
+        conversationId,
+        mapClaudeCodeRuntimeConversationCwdInput(resumeInput),
+      ),
+    startNewConversation: async (startInput) =>
+      await input.claudeCodeSessionState.sessions.startNewSession(
+        mapClaudeCodeRuntimeConversationCwdInput(startInput),
+      ),
+  };
 }
 
 function buildCodexRuntimeConversationNavigatorState(input: {
@@ -628,7 +719,9 @@ export function useSessionWorkbenchConversationRuntime(input: {
         ? openCodeRuntime
         : codexRuntime;
   const runtimeConversationNavigator = input.isClaudeCodeRuntime
-    ? null
+    ? buildClaudeCodeRuntimeConversationNavigatorState({
+        claudeCodeSessionState: input.claudeCodeSessionState,
+      })
     : input.isPiRuntime
       ? buildPiRuntimeConversationNavigatorState({
           piSessionState: input.piSessionState,

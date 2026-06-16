@@ -7,7 +7,11 @@ import { describe, expect, it } from "vitest";
 import type { RuntimeConversationSummary } from "../session-agents/runtime-conversations/runtime-conversation-navigator-model.js";
 import type { MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import type { SessionConversationPaneState } from "./use-session-workbench-conversation-runtime.js";
-import { mapCodexThreadToRuntimeConversationSummary } from "./use-session-workbench-conversation-runtime.js";
+import {
+  mapClaudeCodeRuntimeConversationCwdInput,
+  mapClaudeCodeSessionToRuntimeConversationSummary,
+  mapCodexThreadToRuntimeConversationSummary,
+} from "./use-session-workbench-conversation-runtime.js";
 import { useSessionWorkbenchRuntimeConversationNavigation } from "./use-session-workbench-runtime-conversation-navigation.js";
 
 function createConversation(input: { id: string; cwd?: string }): RuntimeConversationSummary {
@@ -95,6 +99,25 @@ function renderConversationNavigation(input: {
 }
 
 describe("useSessionWorkbenchRuntimeConversationNavigation", () => {
+  it("omits Claude Code cwd when navigator rows use the current-conversation sentinel", () => {
+    expect(mapClaudeCodeRuntimeConversationCwdInput({ cwd: "" })).toEqual({});
+  });
+
+  it("maps Claude Code last activity separately from creation time", () => {
+    expect(
+      mapClaudeCodeSessionToRuntimeConversationSummary({
+        id: "ses_recent_activity",
+        title: "Recent activity",
+        cwd: "/workspace/repo",
+        startedAt: 100,
+        updatedAt: 300,
+      }),
+    ).toMatchObject({
+      createdAt: 100,
+      updatedAt: 300,
+    });
+  });
+
   it("maps parentless Codex subagent threads to navigator lineage", () => {
     const thread = {
       id: "thread_memory_consolidation",

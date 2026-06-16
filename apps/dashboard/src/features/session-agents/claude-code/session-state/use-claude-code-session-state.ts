@@ -1,6 +1,7 @@
 import {
   createClaudeCodeSessionClient,
   type ClaudeCodeSessionClient,
+  type ClaudeCodeSessionSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/claude-code/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { systemSleeper } from "@mistle/time";
@@ -40,6 +41,30 @@ export type ClaudeCodeSessionLifecycleState = {
   step: "connected" | "connecting" | "idle" | "securing";
 };
 
+export type ClaudeCodeSessionNavigatorState = {
+  activeSessionDirectory: string | null;
+  activeSessionId: string | null;
+  activeSessionStartedAt: number | null;
+  availableSessions: readonly ClaudeCodeSessionNavigatorSummary[];
+  hasMoreAvailableSessions: boolean;
+  isStartingNewSession: boolean;
+  originalSessionId: string | null;
+  pendingSessionId: string | null;
+  refreshSessionList: (input?: {
+    directory?: string | null;
+  }) => Promise<readonly ClaudeCodeSessionNavigatorSummary[]>;
+  resumeSession: (sessionId: string, input?: { directory?: string | null }) => Promise<string>;
+  startNewSession: (input?: { directory?: string }) => Promise<string>;
+};
+
+export type ClaudeCodeSessionNavigatorSummary = {
+  createdAt: number | null;
+  cwd: string;
+  id: string;
+  title: string;
+  updatedAt: number | null;
+};
+
 export type UseClaudeCodeSessionStateResult = {
   bootstrap: SessionComposerBootstrapResult;
   chat: {
@@ -55,6 +80,7 @@ export type UseClaudeCodeSessionStateResult = {
     steerTurn: (input: { submittedPrompt: string }) => Promise<void>;
   };
   lifecycle: ClaudeCodeSessionLifecycleState;
+  sessions: ClaudeCodeSessionNavigatorState;
   sessionMessage: {
     clearSessionErrorMessage: () => void;
     reportSessionErrorMessage: (message: string) => void;
@@ -63,7 +89,7 @@ export type UseClaudeCodeSessionStateResult = {
 };
 
 const ClaudeCodeTurnPollIntervalMs = 1_000;
-
+const ClaudeCodeNavigatorSessionLimit = 20;
 const ReadyClaudeCodeBootstrap: SessionComposerBootstrapResult = {
   phase: { status: "ready" },
   composerCapabilities: [
@@ -93,6 +119,141 @@ function buildUnavailableClaudeCodeBootstrap(
   };
 }
 
+type ClaudeCodeSessionSelection =
+  | {
+      kind: "create";
+    }
+  | {
+      kind: "resume";
+      sessionId: string;
+    };
+
+type ClaudeCodeSessionPage = {
+  hasMore: boolean;
+  sessions: readonly ClaudeCodeSessionNavigatorSummary[];
+};
+
+async function listClaudeCodeSessionPage(input: {
+  client: ClaudeCodeSessionClient;
+  directory?: string | null;
+}): Promise<ClaudeCodeSessionPage> {
+  const sessions = await input.client.listSessions({
+    ...(input.directory === undefined || input.directory === null ? {} : { cwd: input.directory }),
+    limit: ClaudeCodeNavigatorSessionLimit + 1,
+  });
+
+  return {
+    hasMore: sessions.length > ClaudeCodeNavigatorSessionLimit,
+    sessions: sessions.slice(0, ClaudeCodeNavigatorSessionLimit).map(mapClaudeCodeSessionSummary),
+  };
+}
+
+export function resolveClaudeCodeSessionSelection(input: {
+  listedSessions: readonly ClaudeCodeSessionNavigatorSummary[];
+  targetSessionId: string | null;
+}): ClaudeCodeSessionSelection {
+  if (input.targetSessionId !== null) {
+    return {
+      kind: "resume",
+      sessionId: input.targetSessionId,
+    };
+  }
+
+  const [mostRecentSession] = input.listedSessions;
+  if (mostRecentSession !== undefined) {
+    return {
+      kind: "resume",
+      sessionId: mostRecentSession.id,
+    };
+  }
+
+  return { kind: "create" };
+}
+
+export function resolveOriginalClaudeCodeSessionId(input: {
+  explicitProviderSessionId: string | null;
+  hasMoreSandboxSessions: boolean;
+  sandboxSessions: readonly ClaudeCodeSessionNavigatorSummary[];
+}): string | null {
+  if (input.explicitProviderSessionId !== null) {
+    return input.explicitProviderSessionId;
+  }
+
+  if (input.hasMoreSandboxSessions) {
+    return null;
+  }
+
+  let originalSessionId: string | null = null;
+  let originalCreatedAt: number | null = null;
+  for (const session of input.sandboxSessions) {
+    const createdAt = session.createdAt;
+    if (createdAt === null) {
+      continue;
+    }
+
+    if (
+      originalCreatedAt === null ||
+      createdAt < originalCreatedAt ||
+      (createdAt === originalCreatedAt &&
+        (originalSessionId === null || session.id < originalSessionId))
+    ) {
+      originalSessionId = session.id;
+      originalCreatedAt = createdAt;
+    }
+  }
+
+  return originalSessionId;
+}
+
+export function resolveClaudeCodeResumeDirectory(input: {
+  activeDirectory: string | null;
+  resumeInput?: { directory?: string | null };
+}): string | null {
+  if (input.resumeInput === undefined) {
+    return input.activeDirectory;
+  }
+
+  if (
+    input.resumeInput.directory === undefined ||
+    input.resumeInput.directory === null ||
+    input.resumeInput.directory.length === 0
+  ) {
+    return null;
+  }
+
+  return input.resumeInput.directory;
+}
+
+function mapClaudeCodeSessionSummary(
+  session: ClaudeCodeSessionSummary,
+): ClaudeCodeSessionNavigatorSummary {
+  return {
+    id: session.id,
+    title: session.title,
+    cwd: session.cwd ?? "",
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+  };
+}
+
+function createActiveClaudeCodeSessionSummary(
+  session: ConnectedClaudeCodeSession | null,
+): ClaudeCodeSessionNavigatorSummary | null {
+  if (session === null) {
+    return null;
+  }
+
+  const startedAt = Date.parse(session.connectedAtIso);
+  const timestamp = Number.isNaN(startedAt) ? null : startedAt;
+  return {
+    id: session.activeSessionId,
+    title: "Claude Code session",
+    cwd: session.activeDirectory ?? "",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
 export function useClaudeCodeSessionState(input: {
   ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
     sandboxInstanceId: string;
@@ -117,6 +278,14 @@ export function useClaudeCodeSessionState(input: {
   const [isStartingTurn, setIsStartingTurn] = useState(false);
   const [isSteeringTurn, setIsSteeringTurn] = useState(false);
   const [isInterruptingTurn, setIsInterruptingTurn] = useState(false);
+  const [availableSessions, setAvailableSessions] = useState<
+    readonly ClaudeCodeSessionNavigatorSummary[]
+  >([]);
+  const [hasMoreAvailableSessions, setHasMoreAvailableSessions] = useState(false);
+  const [originalSessionId, setOriginalSessionId] = useState<string | null>(null);
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
+  const [isStartingNewSession, setIsStartingNewSession] = useState(false);
+  const sessionNavigationRequestSequenceRef = useRef(0);
   const [bootstrap, setBootstrap] = useState<SessionComposerBootstrapResult>(
     buildUnavailableClaudeCodeBootstrap({ status: "unavailable" }),
   );
@@ -139,10 +308,16 @@ export function useClaudeCodeSessionState(input: {
 
   const disconnectSession = useCallback((): void => {
     generationRef.current += 1;
+    sessionNavigationRequestSequenceRef.current += 1;
     clientRef.current?.close();
     clientRef.current = null;
     setBootstrap(buildUnavailableClaudeCodeBootstrap({ status: "unavailable" }));
     setSessionSnapshot(null);
+    setAvailableSessions([]);
+    setHasMoreAvailableSessions(false);
+    setOriginalSessionId(null);
+    setPendingSessionId(null);
+    setIsStartingNewSession(false);
     setSessionConnectionState("detached");
     setStep("idle");
   }, []);
@@ -190,6 +365,25 @@ export function useClaudeCodeSessionState(input: {
     [],
   );
 
+  const refreshSessionList = useCallback(
+    async (refreshInput?: {
+      directory?: string | null;
+    }): Promise<readonly ClaudeCodeSessionNavigatorSummary[]> => {
+      const client = clientRef.current;
+      if (client === null) {
+        return [];
+      }
+      const sessionPage = await listClaudeCodeSessionPage({
+        client,
+        directory: refreshInput?.directory ?? sessionSnapshotRef.current?.activeDirectory ?? null,
+      });
+      setAvailableSessions(sessionPage.sessions);
+      setHasMoreAvailableSessions(sessionPage.hasMore);
+      return sessionPage.sessions;
+    },
+    [],
+  );
+
   const connectSession = useCallback(
     (connectInput: {
       initialCwd?: string | null;
@@ -199,12 +393,15 @@ export function useClaudeCodeSessionState(input: {
     }): void => {
       const generation = generationRef.current + 1;
       generationRef.current = generation;
+      sessionNavigationRequestSequenceRef.current += 1;
       clientRef.current?.close();
       clientRef.current = null;
       setBootstrap(buildUnavailableClaudeCodeBootstrap({ status: "bootstrapping" }));
       setStep("securing");
       setSessionConnectionState("connecting");
       setLifecycleErrorMessage(null);
+      setPendingSessionId(null);
+      setIsStartingNewSession(false);
 
       void (async (): Promise<void> => {
         try {
@@ -220,19 +417,44 @@ export function useClaudeCodeSessionState(input: {
           });
           clientRef.current = client;
           await client.connect();
+          const directory = connectInput.initialCwd ?? null;
           const targetSessionId =
             connectInput.targetSessionId ?? connectInput.providerSessionId ?? null;
+          const sessionPage = await listClaudeCodeSessionPage({
+            client,
+            directory,
+          });
+          const sandboxSessionPage =
+            directory === null
+              ? sessionPage
+              : await listClaudeCodeSessionPage({
+                  client,
+                });
+          const sessionSelection = resolveClaudeCodeSessionSelection({
+            listedSessions: targetSessionId === null ? sessionPage.sessions : [],
+            targetSessionId,
+          });
           let activeSessionId: string;
-          if (targetSessionId === null) {
+          if (sessionSelection.kind === "create") {
             const createdSession = await client.createSession({
               ...(connectInput.initialCwd === undefined ? {} : { cwd: connectInput.initialCwd }),
             });
             activeSessionId = createdSession.sessionId;
           } else {
+            const listedSession = sessionPage.sessions.find(
+              (candidateSession) => candidateSession.id === sessionSelection.sessionId,
+            );
             await client.resumeSession({
-              sessionId: targetSessionId,
+              cwd:
+                listedSession === undefined
+                  ? directory
+                  : resolveClaudeCodeResumeDirectory({
+                      activeDirectory: directory,
+                      resumeInput: { directory: listedSession.cwd },
+                    }),
+              sessionId: sessionSelection.sessionId,
             });
-            activeSessionId = targetSessionId;
+            activeSessionId = sessionSelection.sessionId;
           }
           const session = await client.readSession({
             sessionId: activeSessionId,
@@ -246,6 +468,15 @@ export function useClaudeCodeSessionState(input: {
             session: session.session,
           });
           setBootstrap(ReadyClaudeCodeBootstrap);
+          setAvailableSessions(sessionPage.sessions);
+          setHasMoreAvailableSessions(sessionPage.hasMore);
+          setOriginalSessionId(
+            resolveOriginalClaudeCodeSessionId({
+              explicitProviderSessionId: connectInput.providerSessionId ?? null,
+              hasMoreSandboxSessions: sandboxSessionPage.hasMore,
+              sandboxSessions: sandboxSessionPage.sessions,
+            }),
+          );
           setSessionSnapshot({
             activeDirectory: session.session.cwd ?? connectInput.initialCwd ?? null,
             activeSessionId,
@@ -265,6 +496,8 @@ export function useClaudeCodeSessionState(input: {
             error instanceof Error ? error.message : "Could not connect Claude Code session.";
           setBootstrap(buildUnavailableClaudeCodeBootstrap({ status: "failed", message }));
           setSessionSnapshot(null);
+          setPendingSessionId(null);
+          setIsStartingNewSession(false);
           setLifecycleErrorMessage(message);
           setSessionConnectionState("detached");
           setStep("idle");
@@ -372,11 +605,127 @@ export function useClaudeCodeSessionState(input: {
     }
   }, [sessionSnapshot?.activeSessionId]);
 
+  const resumeSession = useCallback(
+    async (sessionId: string, resumeInput?: { directory?: string | null }): Promise<string> => {
+      const client = clientRef.current;
+      const connectedSession = sessionSnapshot;
+      if (client === null || connectedSession === null) {
+        throw new Error("Connect Claude Code before selecting a session.");
+      }
+
+      const navigationRequestId = sessionNavigationRequestSequenceRef.current + 1;
+      sessionNavigationRequestSequenceRef.current = navigationRequestId;
+      setPendingSessionId(sessionId);
+      try {
+        const directory = resolveClaudeCodeResumeDirectory({
+          activeDirectory: connectedSession.activeDirectory,
+          ...(resumeInput === undefined ? {} : { resumeInput }),
+        });
+        await client.resumeSession({
+          cwd: directory,
+          sessionId,
+        });
+        const session = await client.readSession({
+          sessionId,
+        });
+        const sessionPage = await listClaudeCodeSessionPage({
+          client,
+          directory,
+        });
+        if (sessionNavigationRequestSequenceRef.current !== navigationRequestId) {
+          return sessionId;
+        }
+        dispatchChatAction({
+          type: "hydrate_session",
+          session: session.session,
+        });
+        setAvailableSessions(sessionPage.sessions);
+        setHasMoreAvailableSessions(sessionPage.hasMore);
+        setSessionSnapshot({
+          activeDirectory: session.session.cwd,
+          activeSessionId: sessionId,
+          connectedAtIso: new Date().toISOString(),
+          providerSessionId: connectedSession.providerSessionId,
+          sandboxInstanceId: connectedSession.sandboxInstanceId,
+        });
+        setSessionErrorMessage(null);
+        return sessionId;
+      } catch (error) {
+        setSessionErrorMessage(
+          error instanceof Error ? error.message : "Could not select Claude Code session.",
+        );
+        throw error;
+      } finally {
+        if (sessionNavigationRequestSequenceRef.current === navigationRequestId) {
+          setPendingSessionId(null);
+        }
+      }
+    },
+    [sessionSnapshot],
+  );
+
+  const startNewSession = useCallback(
+    async (startInput?: { directory?: string }): Promise<string> => {
+      const client = clientRef.current;
+      const connectedSession = sessionSnapshot;
+      if (client === null || connectedSession === null) {
+        throw new Error("Connect Claude Code before starting a session.");
+      }
+
+      const navigationRequestId = sessionNavigationRequestSequenceRef.current + 1;
+      sessionNavigationRequestSequenceRef.current = navigationRequestId;
+      setIsStartingNewSession(true);
+      try {
+        const session = await client.createSession({
+          cwd: startInput?.directory ?? connectedSession.activeDirectory,
+        });
+        const hydratedSession = await client.readSession({
+          sessionId: session.sessionId,
+        });
+        const sessionPage = await listClaudeCodeSessionPage({
+          client,
+          directory: startInput?.directory ?? connectedSession.activeDirectory,
+        });
+        if (sessionNavigationRequestSequenceRef.current !== navigationRequestId) {
+          return session.sessionId;
+        }
+        dispatchChatAction({
+          type: "hydrate_session",
+          session: hydratedSession.session,
+        });
+        setAvailableSessions(sessionPage.sessions);
+        setHasMoreAvailableSessions(sessionPage.hasMore);
+        setSessionSnapshot({
+          activeDirectory: hydratedSession.session.cwd,
+          activeSessionId: session.sessionId,
+          connectedAtIso: new Date().toISOString(),
+          providerSessionId: connectedSession.providerSessionId,
+          sandboxInstanceId: connectedSession.sandboxInstanceId,
+        });
+        setSessionErrorMessage(null);
+        return session.sessionId;
+      } catch (error) {
+        setSessionErrorMessage(
+          error instanceof Error ? error.message : "Could not start Claude Code session.",
+        );
+        throw error;
+      } finally {
+        if (sessionNavigationRequestSequenceRef.current === navigationRequestId) {
+          setIsStartingNewSession(false);
+        }
+      }
+    },
+    [sessionSnapshot],
+  );
+
   const recoverSession = useCallback(
     (recoverInput: { sandboxInstanceId: string; targetSessionId: string | null }): void => {
-      connectSession(recoverInput);
+      connectSession({
+        ...recoverInput,
+        providerSessionId: sessionSnapshot?.providerSessionId ?? null,
+      });
     },
-    [connectSession],
+    [connectSession, sessionSnapshot?.providerSessionId],
   );
 
   return {
@@ -393,6 +742,20 @@ export function useClaudeCodeSessionState(input: {
       sessionConnectionState,
       sessionSnapshot,
       step,
+    },
+    sessions: {
+      activeSessionDirectory: sessionSnapshot?.activeDirectory ?? null,
+      activeSessionId: sessionSnapshot?.activeSessionId ?? null,
+      activeSessionStartedAt:
+        createActiveClaudeCodeSessionSummary(sessionSnapshot)?.createdAt ?? null,
+      availableSessions,
+      hasMoreAvailableSessions,
+      isStartingNewSession,
+      originalSessionId,
+      pendingSessionId,
+      refreshSessionList,
+      resumeSession,
+      startNewSession,
     },
     chat: {
       canInterruptTurn: chatState.status === "busy",
