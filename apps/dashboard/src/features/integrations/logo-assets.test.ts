@@ -95,4 +95,11 @@ describe("dashboard integration logo assets", () => {
     expect(width).toBe(40);
     expect(height).toBe(40);
   });
+
+  it("keeps the DeepSeek logo square so it does not regress to the wide wordmark", () => {
+    const { height, width } = readSvgViewBoxDimensions("deepseek.svg");
+
+    expect(width).toBe(24);
+    expect(height).toBe(24);
+  });
 });
