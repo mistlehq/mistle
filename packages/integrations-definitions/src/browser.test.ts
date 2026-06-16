@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AgentMailBrowserDefinition,
   AwsBrowserDefinition,
   BugSnagBrowserDefinition,
   createBrowserDefinitionsBundle,
@@ -29,6 +30,24 @@ import {
 } from "./browser.js";
 
 describe("browser definitions", () => {
+  it("registers AgentMail in the browser-safe definitions bundle without server-only handlers", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: AgentMailBrowserDefinition.familyId,
+      variantId: AgentMailBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "agentmail",
+      variantId: "agentmail-mcp",
+      kind: "connector",
+      displayName: "AgentMail",
+      logoKey: "agentmail",
+    });
+    expect(AgentMailBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(AgentMailBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(AgentMailBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
   it("keeps jira browser definitions free of server-only webhook handlers", () => {
     expect(JiraBrowserDefinition.webhookHandler).toBeUndefined();
     expect(JiraBrowserDefinition.webhookSource).toBeUndefined();

@@ -2,6 +2,11 @@
   "version": 1,
   "targets": [
     {
+      "targetKey": "agentmail-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "openai-default",
       "enabled": true,
       "config": {
