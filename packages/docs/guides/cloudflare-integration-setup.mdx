@@ -1,0 +1,30 @@
+---
+title: Cloudflare
+description: Connect Cloudflare to Mistle
+icon: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjU0IDMgNTAgMjMiPjxzdHlsZT4uc3Qwe2ZpbGw6I2ZmZn0uc3Qxe2ZpbGw6I2Y0ODEyMH0uc3Qye2ZpbGw6I2ZhYWQzZn08L3N0eWxlPjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik05OC42IDE0LjJMOTMgMTIuOWwtMS0uNC0yNS43LjJ2MTIuNGwzMi4zLjF6Ii8+PHBhdGggY2xhc3M9InN0MSIgZD0iTTg4LjEgMjRjLjMtMSAuMi0yLS4zLTIuNi0uNS0uNi0xLjItMS0yLjEtMS4xbC0xNy40LS4yYy0uMSAwLS4yLS4xLS4zLS4xLS4xLS4xLS4xLS4yIDAtLjMuMS0uMi4yLS4zLjQtLjNsMTcuNS0uMmMyLjEtLjEgNC4zLTEuOCA1LjEtMy44bDEtMi42YzAtLjEuMS0uMiAwLS4zLTEuMS01LjEtNS43LTguOS0xMS4xLTguOS01IDAtOS4zIDMuMi0xMC44IDcuNy0xLS43LTIuMi0xLjEtMy42LTEtMi40LjItNC4zIDIuMi00LjYgNC42LS4xLjYgMCAxLjIuMSAxLjgtMy45LjEtNy4xIDMuMy03LjEgNy4zIDAgLjQgMCAuNy4xIDEuMSAwIC4yLjIuMy4zLjNoMzIuMWMuMiAwIC40LS4xLjQtLjNsLjMtMS4xeiIvPjxwYXRoIGNsYXNzPSJzdDIiIGQ9Ik05My42IDEyLjhoLS41Yy0uMSAwLS4yLjEtLjMuMmwtLjcgMi40Yy0uMyAxLS4yIDIgLjMgMi42LjUuNiAxLjIgMSAyLjEgMS4xbDMuNy4yYy4xIDAgLjIuMS4zLjEuMS4xLjEuMiAwIC4zLS4xLjItLjIuMy0uNC4zbC0zLjguMmMtMi4xLjEtNC4zIDEuOC01LjEgMy44bC0uMi45Yy0uMS4xIDAgLjMuMi4zaDEzLjJjLjIgMCAuMy0uMS4zLS4zLjItLjguNC0xLjcuNC0yLjYgMC01LjItNC4zLTkuNS05LjUtOS41Ii8+PC9zdmc+
+---
+
+## Overview
+
+Connect to Cloudflare with a Cloudflare API token.
+
+This integration exposes Cloudflare API MCP Code Mode access to agent runtimes through the Cloudflare MCP server catalog selected on the sandbox profile.
+
+## Connect In Mistle
+
+Open **Integrations** in the dashboard, choose **Cloudflare**, then select **API token**.
+
+Enter:
+
+| Field                | Value                                                                   |
+| -------------------- | ----------------------------------------------------------------------- |
+| Cloudflare API token | Cloudflare API token scoped to the account operations agents should use |
+
+## Use With A Sandbox Profile
+
+After the connection exists:
+
+1. Open the sandbox profile that should use Cloudflare.
+2. Add Cloudflare to the profile's integration configuration.
+3. Select the Cloudflare MCP servers the profile should expose.
+4. Save and publish the profile version.
