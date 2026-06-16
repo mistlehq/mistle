@@ -19,6 +19,7 @@ use crate::runtime::{
 };
 use crate::supervision::SandboxdSupervisorHandle;
 
+mod claude_code_server;
 mod codex_app_server;
 mod control;
 mod lifecycle;
@@ -27,6 +28,7 @@ mod opencode_server;
 mod output;
 mod readiness;
 
+use claude_code_server::*;
 use codex_app_server::*;
 use lifecycle::*;
 pub use manager::{

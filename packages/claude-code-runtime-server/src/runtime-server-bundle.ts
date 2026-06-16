@@ -61,7 +61,7 @@ function resolveClaudeCodeLookupCwd(cwd) {
 }
 
 function createSession(input) {
-  const sessionId = input.sessionId ?? randomUUID();
+  const sessionId = randomUUID();
   const cwd = resolveClaudeCodeCwd(input.cwd);
   conversations.set(sessionId, {
     providerConversationId: sessionId,
@@ -292,9 +292,6 @@ function startQuery(conversation, inputText) {
   appendSubmittedUserQuery(conversation, queryId, inputText);
   void runClaudeQuery(conversation, queryId, inputText).catch((error) => {
     conversation.lastError = error instanceof Error ? error.message : String(error);
-    if (conversation.activeQueryId === queryId) {
-      conversation.activeQueryId = null;
-    }
   });
   return queryId;
 }

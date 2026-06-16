@@ -9,13 +9,7 @@ import { createNodeSandboxSessionRuntime } from "@mistle/sandbox-session-client/
 
 import { ClaudeCodeJsonRpcClient } from "./json-rpc-client.js";
 
-type ClaudeCodeConnection = {
-  rpcClient: ClaudeCodeJsonRpcClient;
-  sessionClient: AgentStreamClient;
-  transport: SandboxSessionTransport;
-};
-
-const ClaudeCodeConnections = new WeakMap<AgentConversationConnection, ClaudeCodeConnection>();
+const ClaudeCodeConnections = new WeakMap<AgentConversationConnection, ClaudeCodeJsonRpcClient>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -32,12 +26,12 @@ function readNestedString(value: unknown, path: readonly string[]): string | nul
   return typeof currentValue === "string" && currentValue.length > 0 ? currentValue : null;
 }
 
-function getClaudeCodeConnection(connection: AgentConversationConnection): ClaudeCodeConnection {
-  const claudeCodeConnection = ClaudeCodeConnections.get(connection);
-  if (claudeCodeConnection === undefined) {
+function getClaudeCodeClient(connection: AgentConversationConnection): ClaudeCodeJsonRpcClient {
+  const claudeCodeClient = ClaudeCodeConnections.get(connection);
+  if (claudeCodeClient === undefined) {
     throw new Error("Claude Code conversation provider received an unknown connection.");
   }
-  return claudeCodeConnection;
+  return claudeCodeClient;
 }
 
 function extractSessionId(result: unknown, method: string): string {
@@ -124,11 +118,7 @@ async function connectClaudeCodeConversationProvider(input: {
     },
   };
 
-  ClaudeCodeConnections.set(connection, {
-    rpcClient,
-    sessionClient,
-    transport,
-  });
+  ClaudeCodeConnections.set(connection, rpcClient);
   return connection;
 }
 
@@ -136,8 +126,8 @@ export function createClaudeCodeConversationProvider(): AgentConversationProvide
   return {
     connect: connectClaudeCodeConversationProvider,
     createConversation: async (input) => {
-      const claudeCodeConnection = getClaudeCodeConnection(input.connection);
-      const result = await claudeCodeConnection.rpcClient.call(
+      const claudeCodeClient = getClaudeCodeClient(input.connection);
+      const result = await claudeCodeClient.call(
         "session/create",
         {
           ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
@@ -152,14 +142,14 @@ export function createClaudeCodeConversationProvider(): AgentConversationProvide
       };
     },
     resumeConversation: async (input) => {
-      const claudeCodeConnection = getClaudeCodeConnection(input.connection);
-      await claudeCodeConnection.rpcClient.call("session/resume", {
+      const claudeCodeClient = getClaudeCodeClient(input.connection);
+      await claudeCodeClient.call("session/resume", {
         sessionId: input.providerConversationId,
       });
     },
     inspectConversation: async (input) => {
-      const claudeCodeConnection = getClaudeCodeConnection(input.connection);
-      const result = await claudeCodeConnection.rpcClient.call("session/read", {
+      const claudeCodeClient = getClaudeCodeClient(input.connection);
+      const result = await claudeCodeClient.call("session/read", {
         sessionId: input.providerConversationId,
       });
       return {
@@ -173,8 +163,8 @@ export function createClaudeCodeConversationProvider(): AgentConversationProvide
         connectionUrl: input.connectionUrl,
       });
       try {
-        const claudeCodeConnection = getClaudeCodeConnection(connection);
-        const result = await claudeCodeConnection.rpcClient.call("title/generate", {
+        const claudeCodeClient = getClaudeCodeClient(connection);
+        const result = await claudeCodeClient.call("title/generate", {
           inputText: input.inputText,
           sessionId: input.providerConversationId,
         });
@@ -186,8 +176,8 @@ export function createClaudeCodeConversationProvider(): AgentConversationProvide
       }
     },
     startExecution: async (input) => {
-      const claudeCodeConnection = getClaudeCodeConnection(input.connection);
-      const result = await claudeCodeConnection.rpcClient.call(
+      const claudeCodeClient = getClaudeCodeClient(input.connection);
+      const result = await claudeCodeClient.call(
         "query/start",
         {
           sessionId: input.providerConversationId,
@@ -205,8 +195,8 @@ export function createClaudeCodeConversationProvider(): AgentConversationProvide
       };
     },
     steerExecution: async (input) => {
-      const claudeCodeConnection = getClaudeCodeConnection(input.connection);
-      const result = await claudeCodeConnection.rpcClient.call(
+      const claudeCodeClient = getClaudeCodeClient(input.connection);
+      const result = await claudeCodeClient.call(
         "query/steer",
         {
           sessionId: input.providerConversationId,
@@ -222,8 +212,8 @@ export function createClaudeCodeConversationProvider(): AgentConversationProvide
       };
     },
     submitAssociatedResourceDelivery: async (input) => {
-      const claudeCodeConnection = getClaudeCodeConnection(input.connection);
-      const result = await claudeCodeConnection.rpcClient.call(
+      const claudeCodeClient = getClaudeCodeClient(input.connection);
+      const result = await claudeCodeClient.call(
         "query/start",
         {
           sessionId: input.providerConversationId,
@@ -238,8 +228,8 @@ export function createClaudeCodeConversationProvider(): AgentConversationProvide
       };
     },
     interruptExecution: async (input) => {
-      const claudeCodeConnection = getClaudeCodeConnection(input.connection);
-      await claudeCodeConnection.rpcClient.call("query/interrupt", {
+      const claudeCodeClient = getClaudeCodeClient(input.connection);
+      await claudeCodeClient.call("query/interrupt", {
         sessionId: input.providerConversationId,
         queryId: input.providerExecutionId,
       });

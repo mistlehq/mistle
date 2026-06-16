@@ -33,6 +33,7 @@ type PiConnectSessionInput = Parameters<UsePiSessionStateResult["lifecycle"]["co
 type ClaudeCodeConnectSessionInput = Parameters<
   UseClaudeCodeSessionStateResult["lifecycle"]["connectSession"]
 >[0];
+type SessionIdConnectSessionInput = OpenCodeConnectSessionInput | ClaudeCodeConnectSessionInput;
 
 function toCodexConnectSessionInput(
   connectInput: RuntimeConversationConnectInput,
@@ -63,9 +64,9 @@ function toCodexConnectSessionInput(
   };
 }
 
-function toOpenCodeConnectSessionInput(
+function toSessionIdConnectSessionInput(
   connectInput: RuntimeConversationConnectInput,
-): OpenCodeConnectSessionInput {
+): SessionIdConnectSessionInput {
   return {
     ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
     ...(connectInput.providerConversationId === undefined ||
@@ -95,22 +96,6 @@ function toPiConnectSessionInput(
   };
 }
 
-function toClaudeCodeConnectSessionInput(
-  connectInput: RuntimeConversationConnectInput,
-): ClaudeCodeConnectSessionInput {
-  return {
-    ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
-    ...(connectInput.providerConversationId === undefined ||
-    connectInput.providerConversationId === null
-      ? {}
-      : { providerSessionId: connectInput.providerConversationId }),
-    sandboxInstanceId: connectInput.sandboxInstanceId,
-    ...(connectInput.targetRuntimeConversationId === null
-      ? {}
-      : { targetSessionId: connectInput.targetRuntimeConversationId }),
-  };
-}
-
 export function buildCodexLifecycleForHandoff(
   lifecycle: UseCodexSessionStateResult["lifecycle"],
 ): SessionMainPanelHandoffLifecycle {
@@ -137,7 +122,7 @@ export function buildOpenCodeLifecycleForHandoff(
   return {
     clearLifecycleErrorMessage: lifecycle.clearLifecycleErrorMessage,
     connectSession: (connectInput): void => {
-      lifecycle.connectSession(toOpenCodeConnectSessionInput(connectInput));
+      lifecycle.connectSession(toSessionIdConnectSessionInput(connectInput));
     },
     detachSessionConnection: lifecycle.detachSessionConnection,
     lifecycleErrorMessage: lifecycle.lifecycleErrorMessage,
@@ -157,7 +142,7 @@ export function buildOpenCodeLifecycleForWorkbench(
   return {
     clearLifecycleErrorMessage: lifecycle.clearLifecycleErrorMessage,
     connectSession: (connectInput: InitialSessionConnectInput): void => {
-      lifecycle.connectSession(toOpenCodeConnectSessionInput(connectInput));
+      lifecycle.connectSession(toSessionIdConnectSessionInput(connectInput));
     },
     detachSessionConnection: lifecycle.detachSessionConnection,
     disconnectSession: lifecycle.disconnectSession,
@@ -189,7 +174,7 @@ export function buildClaudeCodeLifecycleForHandoff(
   return {
     clearLifecycleErrorMessage: lifecycle.clearLifecycleErrorMessage,
     connectSession: (connectInput): void => {
-      lifecycle.connectSession(toClaudeCodeConnectSessionInput(connectInput));
+      lifecycle.connectSession(toSessionIdConnectSessionInput(connectInput));
     },
     detachSessionConnection: lifecycle.detachSessionConnection,
     lifecycleErrorMessage: lifecycle.lifecycleErrorMessage,
@@ -209,7 +194,7 @@ export function buildClaudeCodeLifecycleForWorkbench(
   return {
     clearLifecycleErrorMessage: lifecycle.clearLifecycleErrorMessage,
     connectSession: (connectInput: InitialSessionConnectInput): void => {
-      lifecycle.connectSession(toClaudeCodeConnectSessionInput(connectInput));
+      lifecycle.connectSession(toSessionIdConnectSessionInput(connectInput));
     },
     detachSessionConnection: lifecycle.detachSessionConnection,
     disconnectSession: lifecycle.disconnectSession,

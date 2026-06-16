@@ -159,7 +159,7 @@ export function buildOpenCodeTurnStarter(input: {
 }
 
 export function buildClaudeCodeTurnStarter(input: {
-  chat: Pick<UseClaudeCodeSessionStateResult["chat"], "chatState" | "sendPrompt">;
+  chat: Pick<UseClaudeCodeSessionStateResult["chat"], "sendPrompt">;
 }): SessionTurnControl["startTurn"] {
   return async (turnInput): Promise<void> => {
     await input.chat.sendPrompt({
