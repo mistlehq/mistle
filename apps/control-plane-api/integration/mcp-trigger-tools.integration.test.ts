@@ -336,6 +336,64 @@ describe.concurrent("MCP trigger tools integration", () => {
     expect(persistedScheduleTrigger?.inputTemplate).toBe("Handle this schedule from MCP");
   });
 
+  it("sets recurring scheduled trigger timing with generic trigger update permission", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-trigger-schedule-set-timing@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP schedule trigger timing updater",
+      permissions: [OrganizationPermissions.TRIGGER_UPDATE],
+    });
+
+    await seedScheduledTrigger(env, {
+      organizationId: session.organizationId,
+      triggerId: "atm_mcp_trigger_schedule_set_timing",
+      scheduleId: "sch_mcp_trigger_schedule_set_timing",
+      targetId: "atg_mcp_trigger_schedule_set_timing",
+      profileId: "sbp_mcp_trigger_schedule_set_timing",
+      name: "MCP schedule before timing update",
+      createdAt: "2026-06-02T00:00:00.000Z",
+    });
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "set_trigger_schedule",
+      arguments: {
+        triggerId: "atm_mcp_trigger_schedule_set_timing",
+        cronExpression: "30 10 * * *",
+        timezone: "UTC",
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const trigger = GetTriggerResponseSchema.parse(result.structuredContent);
+    expect(trigger.source).toMatchObject({
+      kind: "schedule",
+      cronExpression: "30 10 * * *",
+      timezone: "UTC",
+    });
+
+    const persistedSchedule = await env.controlPlaneDb.query.schedules.findFirst({
+      columns: {
+        cronExpression: true,
+        timezone: true,
+        nextScheduledAt: true,
+      },
+      where: (table, { eq }) => eq(table.id, "sch_mcp_trigger_schedule_set_timing"),
+    });
+    expect(persistedSchedule).toMatchObject({
+      cronExpression: "30 10 * * *",
+      timezone: "UTC",
+    });
+    expect(persistedSchedule?.nextScheduledAt).not.toBeNull();
+    expect(persistedSchedule?.nextScheduledAt).not.toBe("2026-06-03T01:00:00.000Z");
+  });
+
   it("accepts legacy webhook trigger update permission for shared trigger write tools", async ({
     env,
   }) => {

@@ -1,5 +1,5 @@
 import { TriggerKinds } from "@mistle/db/control-plane";
-import { ForbiddenError } from "@mistle/http/errors.js";
+import { BadRequestError, ForbiddenError } from "@mistle/http/errors.js";
 import type { McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 
 import {
@@ -18,6 +18,7 @@ import {
   mcpListTriggersInputSchema,
   mcpRenameTriggerInputSchema,
   mcpSetTriggerEnabledInputSchema,
+  mcpSetTriggerScheduleInputSchema,
   mcpTriggerIdParamsSchema,
   mcpUpdateTriggerUserMessageInputSchema,
 } from "../tool-schemas.js";
@@ -94,6 +95,68 @@ export function registerTriggerTools(server: McpServer, context: MistleMcpServer
       );
 
       return structuredResult(trigger);
+    },
+  );
+
+  server.registerTool(
+    "set_trigger_schedule",
+    {
+      title: "Set trigger schedule",
+      description:
+        "Replace the cron expression and timezone for a recurring scheduled Mistle trigger. Use this only for schedule-based triggers that run repeatedly; it recalculates the next scheduled run time from the current server time.",
+      inputSchema: mcpSetTriggerScheduleInputSchema,
+      annotations: {
+        ...MutatingToolAnnotations,
+        title: "Set trigger schedule",
+      },
+    },
+    async ({ cronExpression, timezone, triggerId }) => {
+      requireMcpTriggerUpdatePermission(context);
+      const trigger = await getTrigger(
+        {
+          db: context.db,
+        },
+        {
+          organizationId: context.organizationActor.organizationId,
+          triggerId,
+        },
+      );
+
+      if (trigger.kind !== TriggerKinds.SCHEDULE) {
+        throw new BadRequestError(
+          "INVALID_TRIGGER_KIND",
+          "set_trigger_schedule can only update schedule-based triggers.",
+        );
+      }
+
+      await updateTriggerSchedule(
+        {
+          db: context.db,
+          openWorkflow: context.openWorkflow,
+        },
+        {
+          organizationId: context.organizationActor.organizationId,
+          triggerId,
+          now: context.clock.nowDate(),
+          schedule: {
+            kind: "recurring",
+            cronExpression,
+            timezone,
+          },
+        },
+      );
+
+      return structuredResult(
+        await getTrigger(
+          {
+            db: context.db,
+          },
+          {
+            organizationId: context.organizationActor.organizationId,
+            triggerId,
+          },
+        ),
+      );
     },
   );
 
