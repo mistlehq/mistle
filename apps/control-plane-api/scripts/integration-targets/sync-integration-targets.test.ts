@@ -10,6 +10,13 @@ describe("sync-integration-targets", () => {
 
     expect(targets).toEqual([
       {
+        targetKey: "agentmail-mcp",
+        familyId: "agentmail",
+        variantId: "agentmail-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "anthropic-default",
         familyId: "anthropic",
         variantId: "anthropic-default",

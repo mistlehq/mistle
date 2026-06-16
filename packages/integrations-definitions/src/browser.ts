@@ -5,6 +5,7 @@ import {
   type IntegrationDefinitionsBundle,
 } from "@mistle/integrations-core";
 
+import { AgentMailMcpBaseDefinition } from "./agentmail/variants/agentmail-mcp/base-definition.js";
 import { AnthropicDefinition } from "./anthropic/index.js";
 import { AwsBaseDefinition } from "./aws/variants/aws-cli-default/base-definition.js";
 import { BugSnagMcpBaseDefinition } from "./bugsnag/variants/bugsnag-mcp/base-definition.js";
@@ -40,6 +41,7 @@ import { SignozMcpBaseDefinition } from "./signoz/variants/signoz-mcp/base-defin
 import { SlackBaseDefinition } from "./slack/variants/slack-default/base-definition.js";
 import { StripeMcpBaseDefinition } from "./stripe/variants/stripe-mcp/base-definition.js";
 import { ZaiDefinition } from "./zai/index.js";
+export const AgentMailBrowserDefinition = AgentMailMcpBaseDefinition;
 export const AnthropicBrowserDefinition = AnthropicDefinition;
 export const AwsBrowserDefinition = AwsBaseDefinition;
 export const BugSnagBrowserDefinition = BugSnagMcpBaseDefinition;
@@ -73,6 +75,7 @@ export const StripeBrowserDefinition = StripeMcpBaseDefinition;
 export const ZaiBrowserDefinition = ZaiDefinition;
 
 const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
+  AgentMailBrowserDefinition,
   AnthropicBrowserDefinition,
   AwsBrowserDefinition,
   BugSnagBrowserDefinition,
@@ -124,6 +127,7 @@ export function createBrowserDefinitionsBundle(): IntegrationDefinitionsBundle<A
   };
 }
 
+export * from "./agentmail/browser.js";
 export * from "./anthropic/index.js";
 export * from "./agent-runtimes/provider-selection.js";
 export * from "./bugsnag/browser.js";
