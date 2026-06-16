@@ -6,6 +6,10 @@ import {
   getOrganizationPermissions,
   getInviteAssignableRoles,
   getRoleTransitionMatrix,
+  hasTriggerCreatePermission,
+  hasTriggerDeletePermission,
+  hasTriggerReadPermission,
+  hasTriggerUpdatePermission,
   OrganizationPermissions,
   hasOrganizationPermission,
   parseOrganizationRole,
@@ -87,6 +91,55 @@ describe("organization policy", () => {
       expect(
         hasOrganizationPermission("member", OrganizationPermissions.ORGANIZATION_MEMBERSHIP_UPDATE),
       ).toBe(false);
+    });
+
+    it("grants generic trigger permissions to organization roles", () => {
+      expect(getOrganizationPermissions("owner")).toEqual(
+        expect.arrayContaining([
+          OrganizationPermissions.TRIGGER_READ,
+          OrganizationPermissions.TRIGGER_CREATE,
+          OrganizationPermissions.TRIGGER_UPDATE,
+          OrganizationPermissions.TRIGGER_DELETE,
+        ]),
+      );
+      expect(getOrganizationPermissions("member")).toEqual(
+        expect.arrayContaining([
+          OrganizationPermissions.TRIGGER_READ,
+          OrganizationPermissions.TRIGGER_CREATE,
+          OrganizationPermissions.TRIGGER_UPDATE,
+          OrganizationPermissions.TRIGGER_DELETE,
+        ]),
+      );
+    });
+
+    it("matches trigger access with generic and legacy webhook trigger permissions", () => {
+      expect(hasTriggerReadPermission([OrganizationPermissions.TRIGGER_READ])).toBe(true);
+      expect(hasTriggerReadPermission([OrganizationPermissions.TRIGGER_WEBHOOK_READ])).toBe(true);
+      expect(hasTriggerReadPermission([OrganizationPermissions.SANDBOX_PROFILE_READ])).toBe(false);
+
+      expect(hasTriggerCreatePermission([OrganizationPermissions.TRIGGER_CREATE])).toBe(true);
+      expect(hasTriggerCreatePermission([OrganizationPermissions.TRIGGER_WEBHOOK_CREATE])).toBe(
+        true,
+      );
+      expect(hasTriggerCreatePermission([OrganizationPermissions.SANDBOX_PROFILE_CREATE])).toBe(
+        false,
+      );
+
+      expect(hasTriggerUpdatePermission([OrganizationPermissions.TRIGGER_UPDATE])).toBe(true);
+      expect(hasTriggerUpdatePermission([OrganizationPermissions.TRIGGER_WEBHOOK_UPDATE])).toBe(
+        true,
+      );
+      expect(hasTriggerUpdatePermission([OrganizationPermissions.SANDBOX_PROFILE_UPDATE])).toBe(
+        false,
+      );
+
+      expect(hasTriggerDeletePermission([OrganizationPermissions.TRIGGER_DELETE])).toBe(true);
+      expect(hasTriggerDeletePermission([OrganizationPermissions.TRIGGER_WEBHOOK_DELETE])).toBe(
+        true,
+      );
+      expect(hasTriggerDeletePermission([OrganizationPermissions.SANDBOX_PROFILE_DELETE])).toBe(
+        false,
+      );
     });
   });
 

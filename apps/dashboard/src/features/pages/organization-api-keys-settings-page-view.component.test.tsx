@@ -170,6 +170,34 @@ describe("OrganizationApiKeyCreatePageView", () => {
       },
     ]);
   });
+
+  it("submits generic trigger permissions for new API keys", () => {
+    const submissions: { name: string; permissions: readonly string[] }[] = [];
+    renderCreatePage({
+      onCreateApiKey: (input) => {
+        submissions.push(input);
+      },
+    });
+
+    fireEvent.change(screen.getByLabelText("Name"), {
+      target: { value: "Trigger automation" },
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Read triggers/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Create API key" }));
+
+    expect(submissions).toEqual([
+      {
+        name: "Trigger automation",
+        permissions: [
+          "sandboxProfile:read",
+          "sandboxSession:create",
+          "sandboxSession:read",
+          "sandboxSession:connect",
+          "trigger:read",
+        ],
+      },
+    ]);
+  });
 });
 
 function renderPage(
