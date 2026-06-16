@@ -135,9 +135,12 @@ describe.concurrent("MCP profile tools integration", () => {
       "profile_maintenance_script_test_start",
       "profile_setup_script_get",
       "profile_setup_script_test_start",
+      "rename_trigger",
       "sandbox_instance_get",
       "sandbox_instance_port_access_create",
       "sandbox_operation_events_list",
+      "set_trigger_enabled",
+      "update_trigger_user_message",
     ]);
     expect(tools.every((tool) => tool.outputSchema === undefined)).toBe(true);
   });

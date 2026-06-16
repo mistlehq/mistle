@@ -31,6 +31,7 @@ export function createMcpRoutes(): AppRoutes<typeof MCP_ROUTE_BASE_PATH> {
       integrationRegistry: ctx.get("integrationRegistry"),
       integrationsConfig,
       mcpConfig,
+      openWorkflow: ctx.get("openWorkflow"),
       organizationActor,
       portAccessConfig: ctx.get("portAccessConfig"),
       sandboxConfig: ctx.get("sandboxConfig"),
