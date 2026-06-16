@@ -50,16 +50,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
         with:
-          run_install: false
-
-      - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
-        with:
-          node-version: 25
-          package-manager-cache: false
+          runtime: node@25
+          install: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -123,16 +118,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
+      - name: Setup pnpm and Node
+        uses: pnpm/setup@5d160c5bc68a09337ad0d5654e237e03253b5879 # v1
         with:
-          run_install: false
-
-      - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
-        with:
-          node-version: 25
-          package-manager-cache: false
+          runtime: node@25
+          install: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
