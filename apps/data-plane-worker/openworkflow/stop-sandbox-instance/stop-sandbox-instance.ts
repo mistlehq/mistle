@@ -1,4 +1,3 @@
-import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   SandboxInstancePurposes,
   SandboxInstanceStatuses,
@@ -18,13 +17,13 @@ import type {
   SandboxRuntimeStateReader,
   SandboxRuntimeStateSnapshot,
 } from "../../runtime-state/sandbox-runtime-state-reader.js";
-import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import {
   createResolveSandboxRuntimeInput,
   type SandboxRuntimeProviderResolver,
 } from "../core/sandbox-runtime-resolver.js";
 import { markSandboxInstanceFailed } from "../reconcile-sandbox-instance/mark-sandbox-instance-failed.js";
 import { applySandboxLifecycleEvent } from "../shared/apply-sandbox-lifecycle-event.js";
+import type { WorkerSandboxLifecycleEventRecorder } from "../shared/sandbox-operation-events.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 import {
@@ -79,6 +78,10 @@ export type StopSandboxInstanceResult = {
 };
 
 type StopSandboxInstanceUsageEventState = NonNullable<StopSandboxInstanceResult["usageEventState"]>;
+type SandboxStopPermission = {
+  permitted: boolean;
+  snapshot: SandboxRuntimeStateSnapshot;
+};
 
 function createStopSandboxUsageEventState(
   state: StoppableSandboxInstanceStopState,
@@ -216,6 +219,7 @@ async function markStopProviderFailureOrThrow(
     tables: DataPlaneTables;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
+    operationEvents?: WorkerSandboxLifecycleEventRecorder | undefined;
   },
   input: {
     sandboxInstanceId: string;
@@ -226,6 +230,7 @@ async function markStopProviderFailureOrThrow(
     usageEventState: StopSandboxInstanceUsageEventState;
   },
 ): Promise<StopSandboxInstanceResult> {
+  let finalMarkPermission: SandboxStopPermission | undefined;
   const markOutcome = await markSandboxInstanceFailed({
     db: ctx.db,
     tables: ctx.tables,
@@ -233,14 +238,23 @@ async function markStopProviderFailureOrThrow(
     currentStatus: input.currentStatus,
     failureCode: input.action.failureCode,
     failureMessage: input.action.failureMessage,
-    stillPermitted: async () =>
-      isSandboxStopStillPermitted({
+    stillPermitted: async () => {
+      finalMarkPermission = await readSandboxStopPermission({
         runtimeStateReader: ctx.runtimeStateReader,
         clock: ctx.clock,
         sandboxInstanceId: input.sandboxInstanceId,
         stopReason: input.stopReason,
         ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
-      }),
+      });
+      return finalMarkPermission.permitted;
+    },
+  });
+  await recordSandboxStopPermissionDecision({
+    permission: finalMarkPermission,
+    operationEvents: ctx.operationEvents,
+    checkpoint: "final_mark_failed",
+    stopReason: input.stopReason,
+    ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
   });
 
   if (markOutcome === "fence_mismatch") {
@@ -259,25 +273,6 @@ async function markStopProviderFailureOrThrow(
     },
     ...(markOutcome === "failed" ? { usageEventState: input.usageEventState } : {}),
   };
-}
-
-async function isSandboxStopStillPermitted(ctx: {
-  runtimeStateReader: SandboxRuntimeStateReader;
-  clock: Clock;
-  sandboxInstanceId: string;
-  stopReason: SandboxStopReason;
-  expectedOwnerLeaseId?: string;
-}): Promise<boolean> {
-  const snapshot = await ctx.runtimeStateReader.readSnapshot({
-    sandboxInstanceId: ctx.sandboxInstanceId,
-    nowMs: ctx.clock.nowMs(),
-  });
-
-  return shouldExecuteSandboxStop({
-    stopReason: ctx.stopReason,
-    snapshot,
-    ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: ctx.expectedOwnerLeaseId }),
-  });
 }
 
 function resolveBootstrapAttachmentTerminationTarget(
@@ -299,22 +294,87 @@ async function readSandboxStopPermission(ctx: {
   sandboxInstanceId: string;
   stopReason: SandboxStopReason;
   expectedOwnerLeaseId?: string;
-}): Promise<{
-  permitted: boolean;
-  snapshot: SandboxRuntimeStateSnapshot;
-}> {
+  operationEvents?: WorkerSandboxLifecycleEventRecorder | undefined;
+  checkpoint?: string | undefined;
+}): Promise<SandboxStopPermission> {
   const snapshot = await ctx.runtimeStateReader.readSnapshot({
     sandboxInstanceId: ctx.sandboxInstanceId,
     nowMs: ctx.clock.nowMs(),
   });
 
-  return {
-    permitted: shouldExecuteSandboxStop({
-      stopReason: ctx.stopReason,
-      snapshot,
-      ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: ctx.expectedOwnerLeaseId }),
-    }),
+  const permitted = shouldExecuteSandboxStop({
+    stopReason: ctx.stopReason,
     snapshot,
+    ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: ctx.expectedOwnerLeaseId }),
+  });
+
+  await recordSandboxStopPermissionDecision({
+    permission: {
+      permitted,
+      snapshot,
+    },
+    operationEvents: ctx.operationEvents,
+    checkpoint: ctx.checkpoint,
+    stopReason: ctx.stopReason,
+    ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: ctx.expectedOwnerLeaseId }),
+  });
+
+  return {
+    permitted,
+    snapshot,
+  };
+}
+
+async function recordSandboxStopPermissionDecision(ctx: {
+  permission: SandboxStopPermission | undefined;
+  operationEvents?: WorkerSandboxLifecycleEventRecorder | undefined;
+  checkpoint?: string | undefined;
+  stopReason: SandboxStopReason;
+  expectedOwnerLeaseId?: string;
+}): Promise<void> {
+  if (
+    ctx.permission === undefined ||
+    ctx.operationEvents === undefined ||
+    ctx.checkpoint === undefined
+  ) {
+    return;
+  }
+
+  await ctx.operationEvents.record({
+    attributes: {
+      checkpoint: ctx.checkpoint,
+      expectedOwnerLeaseId: ctx.expectedOwnerLeaseId ?? null,
+      permitted: ctx.permission.permitted,
+      snapshot: createRuntimeStateDecisionSnapshot(ctx.permission.snapshot),
+      stopReason: ctx.stopReason,
+      timelineKey: "stop-decision",
+      timelineLabel: "Stop decision",
+    },
+    message: ctx.permission.permitted
+      ? `Sandbox stop fence permitted at ${ctx.checkpoint}.`
+      : `Sandbox stop fence rejected at ${ctx.checkpoint}.`,
+    phase: ctx.stopReason === "idle" ? "deadline" : "stop",
+    status: ctx.permission.permitted ? "completed" : "warning",
+  });
+}
+
+function createRuntimeStateDecisionSnapshot(
+  snapshot: SandboxRuntimeStateSnapshot,
+): Record<string, unknown> {
+  return {
+    ownerLeaseId: snapshot.ownerLeaseId,
+    attachment:
+      snapshot.attachment === null
+        ? null
+        : {
+            ownerLeaseId: snapshot.attachment.ownerLeaseId,
+            nodeId: snapshot.attachment.nodeId,
+            sessionId: snapshot.attachment.sessionId,
+            attachedAtMs: snapshot.attachment.attachedAtMs,
+          },
+    presenceActiveCount: snapshot.presence.activeCount,
+    keepaliveActive: snapshot.keepalive.active,
+    runtimeReady: snapshot.runtime.ready,
   };
 }
 
@@ -345,14 +405,13 @@ function assertWorkflowUserStopReasonIsScopedToSupportedPurpose(input: {
 
 export async function stopSandboxInstance(
   ctx: {
-    config: DataPlaneWorkerRuntimeConfig;
     db: DataPlaneDatabase;
     tables: DataPlaneTables;
-    controlPlaneInternalClient: ControlPlaneInternalClient;
     sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
     logger?: MistleLogger | undefined;
+    operationEvents?: WorkerSandboxLifecycleEventRecorder | undefined;
   },
   input: {
     sandboxInstanceId: string;
@@ -366,6 +425,8 @@ export async function stopSandboxInstance(
     sandboxInstanceId: input.sandboxInstanceId,
     stopReason: input.stopReason,
     ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
+    operationEvents: ctx.operationEvents,
+    checkpoint: "before_load",
   });
   if (!initialPermission.permitted) {
     return {
@@ -404,6 +465,8 @@ export async function stopSandboxInstance(
     sandboxInstanceId: input.sandboxInstanceId,
     stopReason: input.stopReason,
     ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
+    operationEvents: ctx.operationEvents,
+    checkpoint: "before_provider_stop",
   });
   if (!beforeStopPermission.permitted) {
     return {
@@ -448,6 +511,8 @@ export async function stopSandboxInstance(
     sandboxInstanceId: input.sandboxInstanceId,
     stopReason: input.stopReason,
     ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
+    operationEvents: ctx.operationEvents,
+    checkpoint: "before_mark_stopped",
   });
   if (!beforeMarkPermission.permitted) {
     return {
@@ -525,19 +590,29 @@ export async function stopSandboxInstance(
     }
   }
 
+  let finalMarkPermission: SandboxStopPermission | undefined;
   const markOutcome = await markSandboxInstanceStopped({
     db: ctx.db,
     tables: ctx.tables,
     sandboxInstanceId: input.sandboxInstanceId,
     stopReason: input.stopReason,
-    stillPermitted: async () =>
-      isSandboxStopStillPermitted({
+    stillPermitted: async () => {
+      finalMarkPermission = await readSandboxStopPermission({
         runtimeStateReader: ctx.runtimeStateReader,
         clock: ctx.clock,
         sandboxInstanceId: input.sandboxInstanceId,
         stopReason: input.stopReason,
         ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
-      }),
+      });
+      return finalMarkPermission.permitted;
+    },
+  });
+  await recordSandboxStopPermissionDecision({
+    permission: finalMarkPermission,
+    operationEvents: ctx.operationEvents,
+    checkpoint: "final_mark_stopped",
+    stopReason: input.stopReason,
+    ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
   });
 
   if (markOutcome === "fence_mismatch") {

@@ -152,14 +152,13 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       result = await step.run({ name: "stop-sandbox-instance" }, async () => {
         return stopSandboxInstance(
           {
-            config: ctx.config,
             db: ctx.db,
             tables: ctx.tables,
-            controlPlaneInternalClient: ctx.controlPlaneInternalClient,
             sandboxRuntimeProviderResolver: ctx.sandboxRuntimeProviderResolver,
             runtimeStateReader: ctx.runtimeStateReader,
             clock: ctx.clock,
             logger,
+            operationEvents,
           },
           {
             sandboxInstanceId: input.sandboxInstanceId,

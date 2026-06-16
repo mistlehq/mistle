@@ -1637,10 +1637,17 @@ export interface paths {
                 observedAt: string;
                 operationId: string;
                 /** @enum {string} */
-                operationKind: "start" | "resume" | "setup_check" | "snapshot" | "stop";
+                operationKind:
+                  | "deadline"
+                  | "start"
+                  | "resume"
+                  | "setup_check"
+                  | "snapshot"
+                  | "stop";
                 payloadBase64: string | null;
                 /** @enum {string|null} */
                 phase:
+                  | "deadline"
                   | "provider"
                   | "storage_provision"
                   | "storage_attach"

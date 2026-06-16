@@ -9,19 +9,35 @@ import {
   SandboxInstanceStatuses,
   SandboxStopReasons,
 } from "@mistle/db/data-plane";
+import {
+  SandboxInspectDispositions,
+  SandboxInspectStates,
+  SandboxProvider,
+  createTransparentProxyConfiguration,
+  type SandboxAdapter,
+  type SandboxRuntimeControl,
+} from "@mistle/sandbox";
 import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
+import type { Clock } from "@mistle/time";
 import { HandleSandboxInstanceDeadlineWorkflowSpec } from "@mistle/workflow-registry/data-plane";
 import { describe, expect } from "vitest";
 
+import { logger as dataPlaneWorkerLogger } from "../logger.js";
 import { markSandboxInstanceFailed as markSandboxInstanceFailedDuringReconcile } from "../openworkflow/reconcile-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceStopped as markSandboxInstanceStoppedDuringReconcile } from "../openworkflow/reconcile-sandbox-instance/mark-sandbox-instance-stopped.js";
 import { applySandboxLifecycleEvent } from "../openworkflow/shared/apply-sandbox-lifecycle-event.js";
+import { createWorkerSandboxLifecycleEventRecorder } from "../openworkflow/shared/sandbox-operation-events.js";
 import { markSandboxInstanceFailed as markSandboxInstanceFailedDuringStart } from "../openworkflow/start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceStopped as markSandboxInstanceStoppedDuringStop } from "../openworkflow/stop-sandbox-instance/mark-sandbox-instance-stopped.js";
+import { stopSandboxInstance } from "../openworkflow/stop-sandbox-instance/stop-sandbox-instance.js";
+import type {
+  SandboxRuntimeStateReader,
+  SandboxRuntimeStateSnapshot,
+} from "../runtime-state/sandbox-runtime-state-reader.js";
 
 const it = createIntegrationTest({
   services: ["data-plane-worker"],
@@ -86,6 +102,54 @@ describe.concurrent("data-plane worker sandbox instance deadlines", () => {
       executed: false,
       outcome: "deadline_generation_mismatch",
     });
+
+    const operationEvents = await env.dataPlaneDb.query.sandboxOperationEvents.findMany({
+      columns: {
+        operationKind: true,
+        operationId: true,
+        sequence: true,
+        source: true,
+        phase: true,
+        status: true,
+        message: true,
+        attributes: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxInstanceId, sandboxInstanceId), eq(table.operationKind, "deadline")),
+      orderBy: (table, { asc }) => [asc(table.sequence)],
+    });
+    expect(operationEvents).toMatchObject([
+      {
+        operationKind: "deadline",
+        sequence: 1,
+        source: "worker",
+        phase: "deadline",
+        status: "started",
+        message: "Sandbox deadline evaluation started.",
+        attributes: {
+          deadlineDueAt: dueAt,
+          deadlineGeneration: 1,
+          deadlineKind: SandboxInstanceDeadlineKinds.IDLE,
+          ownerLeaseId,
+        },
+      },
+      {
+        operationKind: "deadline",
+        sequence: 2,
+        source: "worker",
+        phase: "deadline",
+        status: "warning",
+        message: "Sandbox deadline evaluation completed.",
+        attributes: {
+          deadlineDueAt: dueAt,
+          deadlineGeneration: 1,
+          deadlineKind: SandboxInstanceDeadlineKinds.IDLE,
+          executed: false,
+          outcome: "deadline_generation_mismatch",
+          ownerLeaseId,
+        },
+      },
+    ]);
 
     const persistedInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({
       columns: {
@@ -232,6 +296,122 @@ describe.concurrent("data-plane worker sandbox instance deadlines", () => {
 
     await expectDeadlinesCleared(env, sandboxInstanceId);
     await expectSandboxStatus(env, sandboxInstanceId, SandboxInstanceStatuses.STOPPED);
+  });
+
+  it("records the final mark-time fence decision when runtime state changes after the pre-mark check", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = "sbi_integration_deadline_final_mark_fence";
+    const ownerLeaseId = "owner-integration-deadline-final-mark-fence";
+    await insertSandboxInstance(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.RUNNING,
+      providerSandboxId: "provider-integration-deadline-final-mark-fence",
+    });
+    await insertDeadline(env, {
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.IDLE,
+      ownerLeaseId,
+      dueAt: MatchingDeadlineDueAt,
+    });
+
+    const operationEvents = createWorkerSandboxLifecycleEventRecorder({
+      clock: DeterministicIntegrationClock,
+      db: env.dataPlaneDb,
+      logger: dataPlaneWorkerLogger,
+      operationId: "deadline-final-mark-fence-operation",
+      operationKind: "deadline",
+      sandboxInstanceId,
+    });
+    const result = await stopSandboxInstance(
+      {
+        db: env.dataPlaneDb,
+        tables: env.dataPlaneTables,
+        sandboxRuntimeProviderResolver: ResumableStoppedRuntimeProviderResolver,
+        runtimeStateReader: createChangingRuntimeStateReader({
+          sandboxInstanceId,
+          permittedOwnerLeaseId: ownerLeaseId,
+          rejectedOwnerLeaseId: "owner-integration-deadline-final-mark-fence-new",
+        }),
+        clock: DeterministicIntegrationClock,
+        operationEvents,
+      },
+      {
+        sandboxInstanceId,
+        stopReason: SandboxStopReasons.IDLE,
+        expectedOwnerLeaseId: ownerLeaseId,
+      },
+    );
+
+    expect(result).toEqual({
+      executed: false,
+      outcome: "runtime_state_fence_before_mark",
+    });
+    await expectSandboxStatus(env, sandboxInstanceId, SandboxInstanceStatuses.STOPPING);
+
+    const persistedOperationEvents = await env.dataPlaneDb.query.sandboxOperationEvents.findMany({
+      columns: {
+        phase: true,
+        status: true,
+        message: true,
+        attributes: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxInstanceId, sandboxInstanceId), eq(table.operationKind, "deadline")),
+      orderBy: (table, { asc }) => [asc(table.sequence)],
+    });
+
+    expect(persistedOperationEvents).toMatchObject([
+      {
+        phase: "deadline",
+        status: "completed",
+        message: "Sandbox stop fence permitted at before_load.",
+        attributes: {
+          checkpoint: "before_load",
+          permitted: true,
+          snapshot: {
+            ownerLeaseId,
+          },
+        },
+      },
+      {
+        phase: "deadline",
+        status: "completed",
+        message: "Sandbox stop fence permitted at before_provider_stop.",
+        attributes: {
+          checkpoint: "before_provider_stop",
+          permitted: true,
+          snapshot: {
+            ownerLeaseId,
+          },
+        },
+      },
+      {
+        phase: "deadline",
+        status: "completed",
+        message: "Sandbox stop fence permitted at before_mark_stopped.",
+        attributes: {
+          checkpoint: "before_mark_stopped",
+          permitted: true,
+          snapshot: {
+            ownerLeaseId,
+          },
+        },
+      },
+      {
+        phase: "deadline",
+        status: "warning",
+        message: "Sandbox stop fence rejected at final_mark_stopped.",
+        attributes: {
+          checkpoint: "final_mark_stopped",
+          expectedOwnerLeaseId: ownerLeaseId,
+          permitted: false,
+          snapshot: {
+            ownerLeaseId: "owner-integration-deadline-final-mark-fence-new",
+          },
+        },
+      },
+    ]);
   });
 
   it("clears both deadline kinds when start failure marks a sandbox instance failed", async ({
@@ -543,4 +723,116 @@ async function expectDeadlinesCleared(
       clearedAt: expect.any(String),
     },
   ]);
+}
+
+const DeterministicIntegrationClock: Clock = {
+  nowMs: () => Date.parse("2026-05-16T00:00:00.000Z"),
+  nowDate: () => new Date("2026-05-16T00:00:00.000Z"),
+};
+
+const ResumableStoppedSandboxAdapter: SandboxAdapter = {
+  getTransparentProxyConfiguration: () =>
+    createTransparentProxyConfiguration({
+      provider: SandboxProvider.DOCKER,
+      exclusions: [],
+      smokeRequirements: [],
+    }),
+  prepareImage: async (request) => request.image,
+  start: async () => {
+    throw new Error("This test does not start provider sandboxes.");
+  },
+  inspect: async (request) => ({
+    provider: SandboxProvider.DOCKER,
+    id: request.id,
+    state: SandboxInspectStates.STOPPED,
+    disposition: SandboxInspectDispositions.RESUMABLE_STOPPED,
+    createdAt: "2026-05-16T00:00:00.000Z",
+    startedAt: "2026-05-16T00:00:00.000Z",
+    endedAt: "2026-05-16T00:00:00.000Z",
+    raw: {},
+  }),
+  resume: async () => {
+    throw new Error("This test does not resume provider sandboxes.");
+  },
+  captureSnapshot: async () => {
+    throw new Error("This test does not capture provider snapshots.");
+  },
+  stop: async () => {
+    throw new Error("This test does not stop provider sandboxes.");
+  },
+  destroy: async () => {
+    throw new Error("This test does not destroy provider sandboxes.");
+  },
+};
+
+const UnusedSandboxRuntimeControl: SandboxRuntimeControl = {
+  readSandboxdVersion: async () => {
+    throw new Error("This test does not read sandboxd versions.");
+  },
+  ensureSandboxd: async () => {
+    throw new Error("This test does not ensure sandboxd.");
+  },
+  activate: async () => {
+    throw new Error("This test does not activate sandboxes.");
+  },
+  shutdown: async () => {
+    throw new Error("This test does not shut down sandboxes.");
+  },
+  readOperationLog: async () => {
+    throw new Error("This test does not read operation logs.");
+  },
+  close: async () => {},
+};
+
+const ResumableStoppedRuntimeProviderResolver = {
+  resolve: async () => ({
+    provider: SandboxProvider.DOCKER,
+    sandboxAdapter: ResumableStoppedSandboxAdapter,
+    sandboxRuntimeControl: UnusedSandboxRuntimeControl,
+  }),
+  resolveForImagePreparation: async () => {
+    throw new Error("This test does not prepare images.");
+  },
+};
+
+function createChangingRuntimeStateReader(input: {
+  sandboxInstanceId: string;
+  permittedOwnerLeaseId: string;
+  rejectedOwnerLeaseId: string;
+}): SandboxRuntimeStateReader {
+  let readCount = 0;
+  return {
+    readSnapshot: async () => {
+      readCount += 1;
+      return createRuntimeStateSnapshot({
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: readCount < 4 ? input.permittedOwnerLeaseId : input.rejectedOwnerLeaseId,
+      });
+    },
+  };
+}
+
+function createRuntimeStateSnapshot(input: {
+  sandboxInstanceId: string;
+  ownerLeaseId: string;
+}): SandboxRuntimeStateSnapshot {
+  return {
+    ownerLeaseId: input.ownerLeaseId,
+    attachment: {
+      sandboxInstanceId: input.sandboxInstanceId,
+      ownerLeaseId: input.ownerLeaseId,
+      nodeId: `node_${input.sandboxInstanceId}`,
+      sessionId: `session_${input.sandboxInstanceId}`,
+      attachedAtMs: DeterministicIntegrationClock.nowMs(),
+    },
+    presence: {
+      activeCount: 0,
+    },
+    keepalive: {
+      active: false,
+    },
+    runtime: {
+      ready: true,
+    },
+  };
 }

@@ -126,7 +126,7 @@ export const sandboxOperationEventSchema = z
   .object({
     id: z.string().min(1),
     sandboxInstanceId: z.string().min(1),
-    operationKind: z.enum(["start", "resume", "setup_check", "snapshot", "stop"]),
+    operationKind: z.enum(["deadline", "start", "resume", "setup_check", "snapshot", "stop"]),
     operationId: z.string().min(1),
     sequence: z.number().int().min(0),
     recordKind: z.enum(["lifecycle", "transcript"]),
@@ -134,6 +134,7 @@ export const sandboxOperationEventSchema = z
     source: z.enum(["worker", "gateway", "sandboxd"]),
     phase: z
       .enum([
+        "deadline",
         "provider",
         "storage_provision",
         "storage_attach",
