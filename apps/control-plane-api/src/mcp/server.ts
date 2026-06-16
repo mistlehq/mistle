@@ -7,6 +7,7 @@ import type { CreateSandboxProfilesServiceInput } from "../sandbox-profiles/serv
 import type { AppOrganizationActor, ControlPlaneApiPortAccessConfig } from "../types.js";
 import { registerProfileTools } from "./tools/profile.js";
 import { registerSandboxTools } from "./tools/sandbox.js";
+import { registerTriggerTools } from "./tools/trigger.js";
 
 const MistleMcpServerVersion = readRepositoryVersion(import.meta.url);
 
@@ -30,6 +31,7 @@ export function createMistleMcpServer(context: MistleMcpServerContext): McpServe
 
   registerProfileTools(server, context);
   registerSandboxTools(server, context);
+  registerTriggerTools(server, context);
 
   return server;
 }
