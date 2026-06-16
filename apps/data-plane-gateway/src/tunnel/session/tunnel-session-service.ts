@@ -177,8 +177,14 @@ export class TunnelSessionService {
           consecutiveMissedPongs,
           lastPongAgeMs,
           maxConsecutiveMissedPongs,
+          pingScheduleDelayMs,
           pingSentAtMs,
           pingSeq,
+          pingWriteCallbackAtMs,
+          pingWriteDurationMs,
+          pongTimeoutDriftMs,
+          pongTimeoutFiredAtMs,
+          socket,
         }) => {
           logger.warn(
             {
@@ -187,8 +193,14 @@ export class TunnelSessionService {
               consecutiveMissedPongs,
               lastPongAgeMs,
               maxConsecutiveMissedPongs,
+              pingScheduleDelayMs,
               pingSentAtMs,
               pingSeq,
+              pingWriteCallbackAtMs,
+              pingWriteDurationMs,
+              pongTimeoutDriftMs,
+              pongTimeoutFiredAtMs,
+              socket,
             },
             "Bootstrap websocket missed pong health check",
           );
@@ -219,6 +231,52 @@ export class TunnelSessionService {
                 "Failed to mark bootstrap websocket as degraded after missed pong",
               );
             });
+        },
+        onPingWriteCompleted: ({
+          pingScheduleDelayMs,
+          pingSentAtMs,
+          pingSeq,
+          pingWriteCallbackAtMs,
+          pingWriteDurationMs,
+          socket,
+        }) => {
+          logger.debug(
+            {
+              sandboxInstanceId: input.sandboxInstanceId,
+              leaseId: input.leaseId,
+              pingScheduleDelayMs,
+              pingSentAtMs,
+              pingSeq,
+              pingWriteCallbackAtMs,
+              pingWriteDurationMs,
+              socket,
+            },
+            "Bootstrap websocket health ping write completed",
+          );
+        },
+        onPingWriteFailed: ({
+          error,
+          pingScheduleDelayMs,
+          pingSentAtMs,
+          pingSeq,
+          pingWriteCallbackAtMs,
+          pingWriteDurationMs,
+          socket,
+        }) => {
+          logger.warn(
+            {
+              err: error,
+              sandboxInstanceId: input.sandboxInstanceId,
+              leaseId: input.leaseId,
+              pingScheduleDelayMs,
+              pingSentAtMs,
+              pingSeq,
+              pingWriteCallbackAtMs,
+              pingWriteDurationMs,
+              socket,
+            },
+            "Bootstrap websocket health ping write failed",
+          );
         },
         onRecovered: ({ consecutiveMissedPongs, lastPongAgeMs, pingSeq }) => {
           logger.info(
