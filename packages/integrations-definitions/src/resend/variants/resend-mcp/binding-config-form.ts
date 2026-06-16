@@ -1,12 +1,11 @@
-import type { IntegrationFormContext, ResolvedIntegrationForm } from "@mistle/integrations-core";
+import {
+  IntegrationConnectionMethodIds,
+  type ResolvedIntegrationForm,
+} from "@mistle/integrations-core";
 
 import { ResendToolIds } from "./tool-ids.js";
 
-type ResendBindingFormContext = IntegrationFormContext;
-
-export function resolveResendBindingConfigForm(
-  _input: ResendBindingFormContext,
-): ResolvedIntegrationForm {
+export function resolveResendBindingConfigForm(): ResolvedIntegrationForm {
   return {
     schema: {
       properties: {
@@ -51,8 +50,24 @@ export function resolveResendBindingConfigForm(
         "ui:placeholder": "onboarding@example.com",
       },
       replyToEmailAddresses: {
-        "ui:placeholder": "support@example.com",
+        "ui:placeholder": "support@example.com, sales@example.com",
+        "ui:widget": "comma-separated-string-array",
       },
     },
   };
 }
+
+export const ResendConnectionConfigForm: ResolvedIntegrationForm = {
+  schema: {
+    properties: {
+      connection_method: {
+        default: IntegrationConnectionMethodIds.API_KEY,
+      },
+    },
+  },
+  uiSchema: {
+    connection_method: {
+      "ui:widget": "hidden",
+    },
+  },
+};

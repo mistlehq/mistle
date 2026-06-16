@@ -2,6 +2,7 @@ import { IntegrationKinds, IntegrationMcpTransports } from "@mistle/integrations
 import { describe, expect, it } from "vitest";
 
 import { ResendMcpBaseDefinition } from "./base-definition.js";
+import { ResendConnectionConfigForm } from "./binding-config-form.js";
 import { type ResendCompileBindingInput, ResendMcpWrapperPath } from "./compile-binding.js";
 import { ResendToolIds } from "./tool-ids.js";
 
@@ -94,5 +95,6 @@ describe("ResendMcpBaseDefinition", () => {
         },
       ],
     });
+    expect(apiKeyMethod?.configForm).toBe(ResendConnectionConfigForm);
   });
 });

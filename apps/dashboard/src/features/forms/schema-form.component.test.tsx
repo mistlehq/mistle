@@ -60,6 +60,27 @@ const JiraSiteUrlUiSchema: UiSchema<JsonObject, RJSFSchema, SchemaFormContext> =
   },
 };
 
+const CommaSeparatedStringArraySchema: RJSFSchema = {
+  type: "object",
+  properties: {
+    replyToEmailAddresses: {
+      title: "Default reply-to emails",
+      type: "array",
+      items: {
+        type: "string",
+        format: "email",
+      },
+    },
+  },
+};
+
+const CommaSeparatedStringArrayUiSchema: UiSchema<JsonObject, RJSFSchema, SchemaFormContext> = {
+  replyToEmailAddresses: {
+    "ui:placeholder": "support@example.com, sales@example.com",
+    "ui:widget": "comma-separated-string-array",
+  },
+};
+
 function SingleSelectHarness(input: { formData: JsonObject }): React.JSX.Element {
   return (
     <SchemaFormWithoutSubmit
@@ -286,6 +307,86 @@ describe("SchemaFormWithoutSubmit", () => {
 
     expect(changedFormData).toEqual({
       site_url: "https://example.atlassian.net",
+    });
+  });
+
+  it("renders comma-separated string array values with a schema placeholder", () => {
+    let changedFormData: JsonObject | null = null;
+
+    render(
+      <SchemaFormWithoutSubmit
+        formContext={{}}
+        formData={{
+          replyToEmailAddresses: ["support@example.com"],
+        }}
+        noHtml5Validate
+        onChange={(event: IChangeEvent<JsonObject, RJSFSchema>) => {
+          changedFormData = event.formData ?? null;
+        }}
+        schema={CommaSeparatedStringArraySchema}
+        showErrorList={false}
+        uiSchema={CommaSeparatedStringArrayUiSchema}
+        validator={validator}
+      />,
+    );
+
+    const input = screen.getByLabelText("Default reply-to emails");
+    expect(input).toHaveProperty("placeholder", "support@example.com, sales@example.com");
+    expect(input).toHaveProperty("value", "support@example.com");
+
+    fireEvent.change(input, {
+      target: {
+        value: "support@example.com, sales@example.com",
+      },
+    });
+    fireEvent.blur(input);
+
+    expect(changedFormData).toEqual({
+      replyToEmailAddresses: ["support@example.com", "sales@example.com"],
+    });
+  });
+
+  it("supports comma-separated string array option placeholders and custom delimiters", () => {
+    let changedFormData: JsonObject | null = null;
+
+    render(
+      <SchemaFormWithoutSubmit
+        formContext={{}}
+        formData={{
+          replyToEmailAddresses: ["support@example.com"],
+        }}
+        noHtml5Validate
+        onChange={(event: IChangeEvent<JsonObject, RJSFSchema>) => {
+          changedFormData = event.formData ?? null;
+        }}
+        schema={CommaSeparatedStringArraySchema}
+        showErrorList={false}
+        uiSchema={{
+          replyToEmailAddresses: {
+            "ui:widget": "comma-separated-string-array",
+            "ui:options": {
+              delimiter: ";",
+              placeholder: "support@example.com; sales@example.com",
+            },
+          },
+        }}
+        validator={validator}
+      />,
+    );
+
+    const input = screen.getByLabelText("Default reply-to emails");
+    expect(input).toHaveProperty("placeholder", "support@example.com; sales@example.com");
+    expect(input).toHaveProperty("value", "support@example.com");
+
+    fireEvent.change(input, {
+      target: {
+        value: "support@example.com; sales@example.com",
+      },
+    });
+    fireEvent.blur(input);
+
+    expect(changedFormData).toEqual({
+      replyToEmailAddresses: ["support@example.com", "sales@example.com"],
     });
   });
 
