@@ -20,6 +20,8 @@ When an official tool is unavailable or not well-suited for agent workflows, Mis
 
 ## Further reading
 
+Refer to [packages/docs/guides/agentmail-integration-setup.mdx](../packages/docs/guides/agentmail-integration-setup.mdx) for AgentMail hosted MCP setup guidance.
+
 Refer to [docs/integrations/aws.md](./integrations/aws.md) for AWS, AWS CLI, and CloudWatch MCP setup guidance.
 
 Refer to [packages/docs/guides/posthog-integration-setup.mdx](../packages/docs/guides/posthog-integration-setup.mdx) for PostHog hosted MCP setup guidance.

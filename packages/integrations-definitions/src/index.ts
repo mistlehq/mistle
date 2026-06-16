@@ -5,6 +5,7 @@ import {
   type IntegrationDefinitionsBundle,
 } from "@mistle/integrations-core";
 
+import { AgentMailDefinition } from "./agentmail/browser.js";
 import { AnthropicDefinition } from "./anthropic/index.js";
 import { AwsDefinition } from "./aws/browser.js";
 import { BugSnagDefinition } from "./bugsnag/browser.js";
@@ -40,6 +41,7 @@ import { SlackDefinition } from "./slack/browser.js";
 import { StripeDefinition } from "./stripe/browser.js";
 import { ZaiDefinition } from "./zai/index.js";
 
+export * from "./agentmail/browser.js";
 export * from "./anthropic/index.js";
 export * from "./aws/browser.js";
 export * from "./bugsnag/browser.js";
@@ -75,6 +77,7 @@ export * from "./registry/agent-runtimes.js";
 export * from "./shared/remote-mcp-server-catalog/index.js";
 
 const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
+  AgentMailDefinition,
   AnthropicDefinition,
   AwsDefinition,
   BugSnagDefinition,

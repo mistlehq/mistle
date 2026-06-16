@@ -24,6 +24,10 @@ describe("integrations-definitions server", () => {
 
   it("registers built-in server integration definitions in a registry", () => {
     const registry = createIntegrationRegistry();
+    const agentMailDefinition = registry.getDefinition({
+      familyId: "agentmail",
+      variantId: "agentmail-mcp",
+    });
     const anthropicDefinition = registry.getDefinition({
       familyId: "anthropic",
       variantId: "anthropic-default",
@@ -121,6 +125,9 @@ describe("integrations-definitions server", () => {
       variantId: "slack-default",
     });
 
+    expect(agentMailDefinition?.oauth2AuthorizationCode).toBeDefined();
+    expect(agentMailDefinition?.webhookHandler).toBeUndefined();
+    expect(agentMailDefinition?.webhookSource).toBeUndefined();
     expect(jiraDefinition?.webhookSource).toMatchObject({
       lifecycle: "managed",
     });
@@ -378,11 +385,12 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(32);
+    expect(definitions).toHaveLength(33);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
       expect.arrayContaining([
+        "agentmail::agentmail-mcp",
         "bugsnag::bugsnag-mcp",
         "deepseek::deepseek-default",
         "expo::expo-mcp",

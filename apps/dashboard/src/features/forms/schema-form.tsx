@@ -111,16 +111,22 @@ export const SchemaFormSelectContentClassName =
 
 function resolveCommaSeparatedOptions(
   options: WidgetProps<JsonObject, RJSFSchema, SchemaFormContext>["options"],
+  placeholder: WidgetProps<JsonObject, RJSFSchema, SchemaFormContext>["placeholder"],
 ): {
   delimiter: string;
   placeholder: string | undefined;
 } {
   const delimiter = typeof options.delimiter === "string" ? options.delimiter : ",";
-  const placeholder = typeof options.placeholder === "string" ? options.placeholder : undefined;
+  const resolvedPlaceholder =
+    typeof placeholder === "string"
+      ? placeholder
+      : typeof options.placeholder === "string"
+        ? options.placeholder
+        : undefined;
 
   return {
     delimiter,
-    placeholder,
+    placeholder: resolvedPlaceholder,
   };
 }
 
@@ -236,7 +242,7 @@ function forwardWidgetFocus<TValue>(
 function CommaSeparatedStringArrayWidget(
   props: WidgetProps<JsonObject, RJSFSchema, SchemaFormContext>,
 ): React.JSX.Element {
-  const { delimiter, placeholder } = resolveCommaSeparatedOptions(props.options);
+  const { delimiter, placeholder } = resolveCommaSeparatedOptions(props.options, props.placeholder);
   const value = Array.isArray(props.value)
     ? props.value.filter((entry): entry is string => typeof entry === "string")
     : [];

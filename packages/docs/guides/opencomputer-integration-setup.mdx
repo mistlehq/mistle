@@ -1,0 +1,32 @@
+---
+title: OpenComputer
+description: Connect OpenComputer sandbox runtime access to Mistle
+icon: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPCEtLSBTb3VyY2U6IE9wZW5Db21wdXRlciB3ZWJzaXRlIGZhdmljb24sIGh0dHBzOi8vb3BlbmNvbXB1dGVyLmRldi9mYXZpY29uLmljbyAtLT4KICA8dGV4dCB4PSIxNiIgeT0iMjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJHZW9yZ2lhLCAnVGltZXMgTmV3IFJvbWFuJywgc2VyaWYiIGZvbnQtc2l6ZT0iMjgiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiMwRjE3MkEiPk88L3RleHQ+Cjwvc3ZnPgo=
+---
+
+## Overview
+
+OpenComputer provides a sandbox runtime for running Mistle sandboxes with an organization-owned OpenComputer API key.
+
+Use this connection when a sandbox profile should use workspace-owned OpenComputer credentials.
+
+## Connect In Mistle
+
+Open **Integrations** in the dashboard, choose **OpenComputer**, then select **API key**.
+
+Enter:
+
+| Field   | Value                |
+| ------- | -------------------- |
+| API key | OpenComputer API key |
+
+## Use With A Sandbox Profile
+
+After the connection exists:
+
+1. Open the sandbox profile that should run on OpenComputer.
+2. Choose **OpenComputer** as the sandbox runtime.
+3. Select the OpenComputer credentials connection.
+4. Save and publish the profile version.
+
+For self-hosted deployments, the OpenComputer runtime must also be enabled in deployment configuration before profiles can use it.

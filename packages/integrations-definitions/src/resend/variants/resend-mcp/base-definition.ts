@@ -11,7 +11,10 @@ import {
   ResendCredentialSecretTypes,
   ResendCredentialSlotKeys,
 } from "./auth.js";
-import { resolveResendBindingConfigForm } from "./binding-config-form.js";
+import {
+  ResendConnectionConfigForm,
+  resolveResendBindingConfigForm,
+} from "./binding-config-form.js";
 import { ResendBindingConfigSchema } from "./binding-config-schema.js";
 import { compileResendBinding, ResendMcpWrapperPath } from "./compile-binding.js";
 import { ResendTargetConfigSchema } from "./target-config-schema.js";
@@ -54,6 +57,7 @@ export const ResendMcpBaseDefinition: ResendMcpBaseIntegrationDefinition = {
         },
       ],
       configSchema: ResendConnectionConfigSchema,
+      configForm: ResendConnectionConfigForm,
     },
   ],
   mcp: (input) =>

@@ -20,7 +20,12 @@ export type MistleMcpServerContext = {
   portAccessConfig: ControlPlaneApiPortAccessConfig;
 } & Pick<
   CreateSandboxProfilesServiceInput,
-  "db" | "integrationRegistry" | "integrationsConfig" | "mcpConfig" | "sandboxConfig"
+  | "db"
+  | "integrationRegistry"
+  | "integrationsConfig"
+  | "mcpConfig"
+  | "openWorkflow"
+  | "sandboxConfig"
 >;
 
 export function createMistleMcpServer(context: MistleMcpServerContext): McpServer {
