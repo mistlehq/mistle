@@ -35,10 +35,10 @@ function sendError(socket, id, code, message, data) {
   });
 }
 
-function requireConversation(providerConversationId) {
-  const conversation = conversations.get(providerConversationId);
+function requireSession(sessionId) {
+  const conversation = conversations.get(sessionId);
   if (conversation === undefined) {
-    throw new Error("Claude Code conversation not found: " + providerConversationId);
+    throw new Error("Claude Code session not found: " + sessionId);
   }
   return conversation;
 }
@@ -53,20 +53,20 @@ function resolveClaudeCodeCwd(cwd) {
   return cwd;
 }
 
-function createConversation(input) {
-  const providerConversationId = input.sessionId ?? randomUUID();
+function createSession(input) {
+  const sessionId = input.sessionId ?? randomUUID();
   const cwd = resolveClaudeCodeCwd(input.cwd);
-  conversations.set(providerConversationId, {
-    providerConversationId,
+  conversations.set(sessionId, {
+    providerConversationId: sessionId,
     cwd,
-    activeExecutionId: null,
-    turns: [],
+    activeQueryId: null,
+    queries: [],
     sdkSessionId: null,
   });
-  return providerConversationId;
+  return sessionId;
 }
 
-async function runClaudeTurn(conversation, executionId, inputText) {
+async function runClaudeQuery(conversation, queryId, inputText) {
   const options = createClaudeQueryOptions({
     cwd: conversation.cwd,
     session: conversation.sdkSessionId === null
@@ -74,7 +74,7 @@ async function runClaudeTurn(conversation, executionId, inputText) {
       : { kind: "resume", sessionId: conversation.sdkSessionId },
   });
 
-  conversation.activeExecutionId = executionId;
+  conversation.activeQueryId = queryId;
   try {
     const sdkQuery = query({
       prompt: inputText,
@@ -90,14 +90,14 @@ async function runClaudeTurn(conversation, executionId, inputText) {
       ) {
         conversation.sdkSessionId = message.session_id;
       }
-      conversation.turns.push({
-        executionId,
+      conversation.queries.push({
+        queryId,
         message,
       });
     }
   } finally {
-    if (conversation.activeExecutionId === executionId) {
-      conversation.activeExecutionId = null;
+    if (conversation.activeQueryId === queryId) {
+      conversation.activeQueryId = null;
     }
     if (conversation.activeQuery !== undefined) {
       conversation.activeQuery = undefined;
@@ -177,15 +177,26 @@ async function generateTitle(inputText) {
   return normalizeGeneratedTitle(titleText);
 }
 
-function startTurn(conversation, inputText) {
-  const executionId = randomUUID();
-  void runClaudeTurn(conversation, executionId, inputText).catch((error) => {
+function appendSubmittedUserQuery(conversation, queryId, inputText) {
+  conversation.queries.push({
+    queryId,
+    message: {
+      type: "user",
+      text: inputText,
+    },
+  });
+}
+
+function startQuery(conversation, inputText) {
+  const queryId = randomUUID();
+  appendSubmittedUserQuery(conversation, queryId, inputText);
+  void runClaudeQuery(conversation, queryId, inputText).catch((error) => {
     conversation.lastError = error instanceof Error ? error.message : String(error);
-    if (conversation.activeExecutionId === executionId) {
-      conversation.activeExecutionId = null;
+    if (conversation.activeQueryId === queryId) {
+      conversation.activeQueryId = null;
     }
   });
-  return executionId;
+  return queryId;
 }
 
 async function handleRequest(request) {
@@ -194,29 +205,29 @@ async function handleRequest(request) {
       return {
         userAgent: "mistle-claude-code-runtime-server",
       };
-    case "thread/start": {
+    case "session/create": {
       const params = request.params ?? {};
-      const providerConversationId = createConversation({
+      const sessionId = createSession({
         cwd: params.cwd,
       });
       return {
-        thread: {
-          id: providerConversationId,
+        session: {
+          id: sessionId,
         },
       };
     }
-    case "thread/resume": {
+    case "session/resume": {
       const params = request.params ?? {};
-      if (typeof params.threadId !== "string" || params.threadId.length === 0) {
-        throw new Error("thread/resume requires params.threadId.");
+      if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
+        throw new Error("session/resume requires params.sessionId.");
       }
-      if (!conversations.has(params.threadId)) {
-        conversations.set(params.threadId, {
-          providerConversationId: params.threadId,
+      if (!conversations.has(params.sessionId)) {
+        conversations.set(params.sessionId, {
+          providerConversationId: params.sessionId,
           cwd: resolveClaudeCodeCwd(params.cwd),
-          activeExecutionId: null,
-          turns: [],
-          sdkSessionId: params.threadId,
+          activeQueryId: null,
+          queries: [],
+          sdkSessionId: params.sessionId,
         });
       }
       return {};
@@ -230,57 +241,57 @@ async function handleRequest(request) {
         title: await generateTitle(params.inputText),
       };
     }
-    case "thread/read": {
+    case "session/read": {
       const params = request.params ?? {};
-      if (typeof params.threadId !== "string" || params.threadId.length === 0) {
-        throw new Error("thread/read requires params.threadId.");
+      if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
+        throw new Error("session/read requires params.sessionId.");
       }
-      const conversation = requireConversation(params.threadId);
+      const conversation = requireSession(params.sessionId);
       return {
-        thread: {
+        session: {
           id: conversation.providerConversationId,
           cwd: conversation.cwd,
           status: {
-            type: conversation.activeExecutionId === null ? "idle" : "active",
+            type: conversation.activeQueryId === null ? "idle" : "active",
           },
-          activeTurnId: conversation.activeExecutionId,
-          turns: conversation.turns,
+          activeQueryId: conversation.activeQueryId,
+          queries: conversation.queries,
           lastError: conversation.lastError ?? null,
         },
       };
     }
-    case "turn/start":
-    case "turn/steer": {
+    case "query/start":
+    case "query/steer": {
       const params = request.params ?? {};
-      if (typeof params.threadId !== "string" || params.threadId.length === 0) {
-        throw new Error(request.method + " requires params.threadId.");
+      if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
+        throw new Error(request.method + " requires params.sessionId.");
       }
       if (typeof params.inputText !== "string") {
         throw new Error(request.method + " requires params.inputText.");
       }
-      const conversation = requireConversation(params.threadId);
-      const executionId = startTurn(conversation, params.inputText);
+      const conversation = requireSession(params.sessionId);
+      const queryId = startQuery(conversation, params.inputText);
       return {
-        turn: {
-          id: executionId,
+        query: {
+          id: queryId,
           status: "running",
         },
-        turnId: executionId,
+        queryId,
       };
     }
-    case "turn/interrupt": {
+    case "query/interrupt": {
       const params = request.params ?? {};
-      if (typeof params.threadId !== "string" || params.threadId.length === 0) {
-        throw new Error("turn/interrupt requires params.threadId.");
+      if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
+        throw new Error("query/interrupt requires params.sessionId.");
       }
-      const conversation = requireConversation(params.threadId);
+      const conversation = requireSession(params.sessionId);
       if (
         conversation.activeQuery !== undefined &&
         typeof conversation.activeQuery.interrupt === "function"
       ) {
         await conversation.activeQuery.interrupt();
       }
-      conversation.activeExecutionId = null;
+      conversation.activeQueryId = null;
       return {};
     }
     default:

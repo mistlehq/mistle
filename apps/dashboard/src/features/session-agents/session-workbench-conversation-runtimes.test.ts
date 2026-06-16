@@ -240,7 +240,7 @@ function createClaudeCodeRuntimeInput(input: {
   return {
     bootstrap: ReadyBootstrap,
     chat: {
-      abortThread: async () => {
+      interruptQuery: async () => {
         return;
       },
       canInterruptTurn: true,
@@ -248,12 +248,12 @@ function createClaudeCodeRuntimeInput(input: {
       chatState: {
         completedErrorMessage: null,
         entries: [],
-        pendingTurnId: input.isBusy === false ? null : "turn_123",
+        pendingQueryId: input.isBusy === false ? null : "query_123",
         status: input.isBusy === false ? "idle" : "busy",
-        threadId: "thread_123",
-        turns: [],
+        sessionId: "session_123",
+        queries: [],
       },
-      hydrateChatFromThreadOrThrow: async () => {
+      hydrateChatFromSessionOrThrow: async () => {
         return;
       },
       isInterruptingTurn: false,
@@ -278,9 +278,9 @@ function createClaudeCodeRuntimeInput(input: {
     },
     sessionSnapshot: {
       activeDirectory: null,
-      activeThreadId: "thread_123",
+      activeSessionId: "session_123",
       connectedAtIso: "2026-05-19T00:00:00.000Z",
-      providerThreadId: null,
+      providerSessionId: null,
       sandboxInstanceId: "sandbox_123",
     },
     startTurn: async () => {

@@ -215,7 +215,7 @@ export function useSessionWorkbenchHandoffControl(input: {
       }),
     [
       claudeCodeLifecycleForHandoff,
-      input.claudeCodeSessionState.chat.hydrateChatFromThreadOrThrow,
+      input.claudeCodeSessionState.chat.hydrateChatFromSessionOrThrow,
       input.claudeCodeSessionState.lifecycle.sessionSnapshot,
     ],
   );

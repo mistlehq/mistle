@@ -14,4 +14,22 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain("cwd: resolveClaudeCodeCwd(input.cwd),");
     expect(ClaudeCodeRuntimeServerBundle).toContain("cwd: conversation.cwd,");
   });
+
+  it("records submitted user prompts in the session transcript", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain("function appendSubmittedUserQuery");
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "appendSubmittedUserQuery(conversation, queryId, inputText);",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain('type: "user"');
+    expect(ClaudeCodeRuntimeServerBundle).toContain("text: inputText");
+  });
+
+  it("exposes Claude Code sessions and queries instead of Codex thread and turn RPCs", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain('case "session/create"');
+    expect(ClaudeCodeRuntimeServerBundle).toContain('case "session/read"');
+    expect(ClaudeCodeRuntimeServerBundle).toContain('case "query/start"');
+    expect(ClaudeCodeRuntimeServerBundle).toContain('case "query/interrupt"');
+    expect(ClaudeCodeRuntimeServerBundle).not.toContain('case "thread/read"');
+    expect(ClaudeCodeRuntimeServerBundle).not.toContain('case "turn/start"');
+  });
 });

@@ -103,11 +103,11 @@ function toClaudeCodeConnectSessionInput(
     ...(connectInput.providerConversationId === undefined ||
     connectInput.providerConversationId === null
       ? {}
-      : { providerThreadId: connectInput.providerConversationId }),
+      : { providerSessionId: connectInput.providerConversationId }),
     sandboxInstanceId: connectInput.sandboxInstanceId,
     ...(connectInput.targetRuntimeConversationId === null
       ? {}
-      : { targetThreadId: connectInput.targetRuntimeConversationId }),
+      : { targetSessionId: connectInput.targetRuntimeConversationId }),
   };
 }
 
@@ -198,7 +198,7 @@ export function buildClaudeCodeLifecycleForHandoff(
       lifecycle.sessionSnapshot === null
         ? null
         : {
-            activeConversationId: lifecycle.sessionSnapshot.activeThreadId,
+            activeConversationId: lifecycle.sessionSnapshot.activeSessionId,
           },
   };
 }
@@ -218,7 +218,7 @@ export function buildClaudeCodeLifecycleForWorkbench(
     recoverSession: (recoverInput): void => {
       lifecycle.recoverSession({
         sandboxInstanceId: recoverInput.sandboxInstanceId,
-        targetThreadId: recoverInput.targetRuntimeConversationId,
+        targetSessionId: recoverInput.targetRuntimeConversationId,
       });
     },
     recoverableDisconnect: null,
@@ -228,9 +228,9 @@ export function buildClaudeCodeLifecycleForWorkbench(
         ? null
         : {
             activeRuntimeConversationCwd: lifecycle.sessionSnapshot.activeDirectory,
-            activeRuntimeConversationId: lifecycle.sessionSnapshot.activeThreadId,
+            activeRuntimeConversationId: lifecycle.sessionSnapshot.activeSessionId,
             connectedAtIso: lifecycle.sessionSnapshot.connectedAtIso,
-            providerConversationId: lifecycle.sessionSnapshot.providerThreadId,
+            providerConversationId: lifecycle.sessionSnapshot.providerSessionId,
             sandboxInstanceId: lifecycle.sessionSnapshot.sandboxInstanceId,
           },
   };
@@ -413,17 +413,17 @@ export function buildClaudeCodeHandoffRuntime(input: {
     buildCliPtyOpenInput: buildClaudeCodeCliPtyOpenInput,
     clearActiveThreadIdAfterCliLaunch: () => {},
     displayName: SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE.displayName,
-    hydrateChatFromConversation: input.chat.hydrateChatFromThreadOrThrow,
+    hydrateChatFromConversation: input.chat.hydrateChatFromSessionOrThrow,
     lifecycle: input.lifecycle,
     preserveCliLaunchForRestore:
       SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE.preservesCliLaunchContext,
     resetServerRequests: () => {},
-    restoreConversationId: input.sessionSnapshot?.activeThreadId ?? null,
-    restoreProviderConversationId: input.sessionSnapshot?.providerThreadId ?? null,
+    restoreConversationId: input.sessionSnapshot?.activeSessionId ?? null,
+    restoreProviderConversationId: input.sessionSnapshot?.providerSessionId ?? null,
     resolveCliLaunchTarget: async () => {
-      const activeThreadId = input.sessionSnapshot?.activeThreadId ?? null;
+      const activeSessionId = input.sessionSnapshot?.activeSessionId ?? null;
 
-      if (activeThreadId === null) {
+      if (activeSessionId === null) {
         return {
           type: "start_new",
           shouldClearActiveThreadId: false,
@@ -432,7 +432,7 @@ export function buildClaudeCodeHandoffRuntime(input: {
 
       return {
         type: "resume",
-        threadId: activeThreadId,
+        threadId: activeSessionId,
       };
     },
   };

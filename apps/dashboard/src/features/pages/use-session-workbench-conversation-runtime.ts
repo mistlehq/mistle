@@ -568,10 +568,10 @@ export function useSessionWorkbenchConversationRuntime(input: {
     [
       claudeCodeComposerBootstrap,
       claudeCodeConfigControl,
-      input.claudeCodeSessionState.chat.abortThread,
       input.claudeCodeSessionState.chat.canInterruptTurn,
       input.claudeCodeSessionState.chat.canSteerTurn,
       input.claudeCodeSessionState.chat.chatState,
+      input.claudeCodeSessionState.chat.interruptQuery,
       input.claudeCodeSessionState.chat.isInterruptingTurn,
       input.claudeCodeSessionState.chat.isStartingTurn,
       input.claudeCodeSessionState.chat.isSteeringTurn,

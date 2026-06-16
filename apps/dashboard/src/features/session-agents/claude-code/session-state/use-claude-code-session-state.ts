@@ -13,11 +13,11 @@ import {
   type ClaudeCodeChatState,
 } from "./claude-code-chat-state.js";
 
-export type ConnectedClaudeCodeThread = {
+export type ConnectedClaudeCodeSession = {
   activeDirectory: string | null;
-  activeThreadId: string;
+  activeSessionId: string;
   connectedAtIso: string;
-  providerThreadId: string | null;
+  providerSessionId: string | null;
   sandboxInstanceId: string;
 };
 
@@ -25,29 +25,29 @@ export type ClaudeCodeSessionLifecycleState = {
   clearLifecycleErrorMessage: () => void;
   connectSession: (input: {
     initialCwd?: string | null;
-    providerThreadId?: string | null;
+    providerSessionId?: string | null;
     sandboxInstanceId: string;
-    targetThreadId?: string | null;
+    targetSessionId?: string | null;
   }) => void;
   detachSessionConnection: () => void;
   disconnectSession: () => void;
   isStartingSession: boolean;
   lifecycleErrorMessage: string | null;
-  recoverSession: (input: { sandboxInstanceId: string; targetThreadId: string | null }) => void;
+  recoverSession: (input: { sandboxInstanceId: string; targetSessionId: string | null }) => void;
   recoverableDisconnect: null;
   sessionConnectionState: "connected" | "connecting" | "detached";
-  sessionSnapshot: ConnectedClaudeCodeThread | null;
+  sessionSnapshot: ConnectedClaudeCodeSession | null;
   step: "connected" | "connecting" | "idle" | "securing";
 };
 
 export type UseClaudeCodeSessionStateResult = {
   bootstrap: SessionComposerBootstrapResult;
   chat: {
-    abortThread: () => Promise<void>;
     canInterruptTurn: boolean;
     canSteerTurn: boolean;
     chatState: ClaudeCodeChatState;
-    hydrateChatFromThreadOrThrow: () => Promise<void>;
+    hydrateChatFromSessionOrThrow: () => Promise<void>;
+    interruptQuery: () => Promise<void>;
     isInterruptingTurn: boolean;
     isStartingTurn: boolean;
     isSteeringTurn: boolean;
@@ -102,9 +102,9 @@ export function useClaudeCodeSessionState(input: {
   const ensureTransportConnected = input.ensureTransportConnected;
   const clientRef = useRef<ClaudeCodeSessionClient | null>(null);
   const generationRef = useRef(0);
-  const sessionSnapshotRef = useRef<ConnectedClaudeCodeThread | null>(null);
+  const sessionSnapshotRef = useRef<ConnectedClaudeCodeSession | null>(null);
   const [step, setStep] = useState<ClaudeCodeSessionLifecycleState["step"]>("idle");
-  const [sessionSnapshot, setSessionSnapshot] = useState<ConnectedClaudeCodeThread | null>(null);
+  const [sessionSnapshot, setSessionSnapshot] = useState<ConnectedClaudeCodeSession | null>(null);
   const [sessionConnectionState, setSessionConnectionState] =
     useState<ClaudeCodeSessionLifecycleState["sessionConnectionState"]>("detached");
   const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
@@ -153,35 +153,35 @@ export function useClaudeCodeSessionState(input: {
     };
   }, [disconnectSession]);
 
-  const hydrateChatFromThreadOrThrow = useCallback(async (): Promise<void> => {
+  const hydrateChatFromSessionOrThrow = useCallback(async (): Promise<void> => {
     const client = clientRef.current;
-    const threadId = sessionSnapshot?.activeThreadId ?? null;
-    if (client === null || threadId === null) {
+    const sessionId = sessionSnapshot?.activeSessionId ?? null;
+    if (client === null || sessionId === null) {
       throw new Error("Connect Claude Code before hydrating messages.");
     }
 
-    const thread = await client.readThread({ threadId });
+    const session = await client.readSession({ sessionId });
     dispatchChatAction({
-      type: "hydrate_thread",
-      thread: thread.thread,
+      type: "hydrate_session",
+      session: session.session,
     });
     setSessionErrorMessage(null);
-  }, [sessionSnapshot?.activeThreadId]);
+  }, [sessionSnapshot?.activeSessionId]);
 
-  const pollThreadUntilIdle = useCallback(
-    async (input: { client: ClaudeCodeSessionClient; generation: number; threadId: string }) => {
+  const pollSessionUntilIdle = useCallback(
+    async (input: { client: ClaudeCodeSessionClient; generation: number; sessionId: string }) => {
       while (generationRef.current === input.generation) {
-        const thread = await input.client.readThread({
-          threadId: input.threadId,
+        const session = await input.client.readSession({
+          sessionId: input.sessionId,
         });
         if (generationRef.current !== input.generation) {
           return;
         }
         dispatchChatAction({
-          type: "hydrate_thread",
-          thread: thread.thread,
+          type: "hydrate_session",
+          session: session.session,
         });
-        if (thread.thread.status.type !== "active") {
+        if (session.session.status.type !== "active") {
           return;
         }
         await systemSleeper.sleep(ClaudeCodeTurnPollIntervalMs);
@@ -193,9 +193,9 @@ export function useClaudeCodeSessionState(input: {
   const connectSession = useCallback(
     (connectInput: {
       initialCwd?: string | null;
-      providerThreadId?: string | null;
+      providerSessionId?: string | null;
       sandboxInstanceId: string;
-      targetThreadId?: string | null;
+      targetSessionId?: string | null;
     }): void => {
       const generation = generationRef.current + 1;
       generationRef.current = generation;
@@ -220,37 +220,37 @@ export function useClaudeCodeSessionState(input: {
           });
           clientRef.current = client;
           await client.connect();
-          const targetThreadId =
-            connectInput.targetThreadId ?? connectInput.providerThreadId ?? null;
-          let activeThreadId: string;
-          if (targetThreadId === null) {
-            const createdThread = await client.createThread({
+          const targetSessionId =
+            connectInput.targetSessionId ?? connectInput.providerSessionId ?? null;
+          let activeSessionId: string;
+          if (targetSessionId === null) {
+            const createdSession = await client.createSession({
               ...(connectInput.initialCwd === undefined ? {} : { cwd: connectInput.initialCwd }),
             });
-            activeThreadId = createdThread.threadId;
+            activeSessionId = createdSession.sessionId;
           } else {
-            await client.resumeThread({
-              threadId: targetThreadId,
+            await client.resumeSession({
+              sessionId: targetSessionId,
             });
-            activeThreadId = targetThreadId;
+            activeSessionId = targetSessionId;
           }
-          const thread = await client.readThread({
-            threadId: activeThreadId,
+          const session = await client.readSession({
+            sessionId: activeSessionId,
           });
           if (generationRef.current !== generation) {
             client.close();
             return;
           }
           dispatchChatAction({
-            type: "hydrate_thread",
-            thread: thread.thread,
+            type: "hydrate_session",
+            session: session.session,
           });
           setBootstrap(ReadyClaudeCodeBootstrap);
           setSessionSnapshot({
-            activeDirectory: thread.thread.cwd ?? connectInput.initialCwd ?? null,
-            activeThreadId,
+            activeDirectory: session.session.cwd ?? connectInput.initialCwd ?? null,
+            activeSessionId,
             connectedAtIso: new Date().toISOString(),
-            providerThreadId: connectInput.providerThreadId ?? null,
+            providerSessionId: connectInput.providerSessionId ?? null,
             sandboxInstanceId: connectInput.sandboxInstanceId,
           });
           setStep("connected");
@@ -277,8 +277,8 @@ export function useClaudeCodeSessionState(input: {
   const sendPrompt = useCallback(
     async (promptInput: { submittedPrompt: string }): Promise<void> => {
       const client = clientRef.current;
-      const threadId = sessionSnapshot?.activeThreadId ?? null;
-      if (client === null || threadId === null) {
+      const sessionId = sessionSnapshot?.activeSessionId ?? null;
+      if (client === null || sessionId === null) {
         throw new Error("Connect Claude Code before sending a prompt.");
       }
       const prompt = promptInput.submittedPrompt.trim();
@@ -288,27 +288,27 @@ export function useClaudeCodeSessionState(input: {
       const generation = generationRef.current;
       setIsStartingTurn(true);
       try {
-        const turn = await client.startTurn({
-          threadId,
+        const query = await client.startQuery({
+          sessionId,
           inputText: prompt,
         });
         dispatchChatAction({
           type: "prompt_submitted",
-          threadId,
+          queryId: query.queryId,
+          sessionId,
           submittedPrompt: prompt,
-          turnId: turn.turnId,
         });
         setSessionErrorMessage(null);
-        await pollThreadUntilIdle({
+        await pollSessionUntilIdle({
           client,
           generation,
-          threadId,
+          sessionId,
         });
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Could not send Claude Code prompt.";
         dispatchChatAction({
-          type: "turn_failed",
+          type: "query_failed",
           errorMessage: message,
         });
         setSessionErrorMessage(message);
@@ -317,14 +317,14 @@ export function useClaudeCodeSessionState(input: {
         setIsStartingTurn(false);
       }
     },
-    [pollThreadUntilIdle, sessionSnapshot?.activeThreadId],
+    [pollSessionUntilIdle, sessionSnapshot?.activeSessionId],
   );
 
   const steerTurn = useCallback(
     async (steerInput: { submittedPrompt: string }): Promise<void> => {
       const client = clientRef.current;
-      const threadId = sessionSnapshot?.activeThreadId ?? null;
-      if (client === null || threadId === null) {
+      const sessionId = sessionSnapshot?.activeSessionId ?? null;
+      if (client === null || sessionId === null) {
         throw new Error("Connect Claude Code before steering.");
       }
       const prompt = steerInput.submittedPrompt.trim();
@@ -334,15 +334,15 @@ export function useClaudeCodeSessionState(input: {
       const generation = generationRef.current;
       setIsSteeringTurn(true);
       try {
-        await client.steerTurn({
-          threadId,
+        await client.steerQuery({
+          sessionId,
           inputText: prompt,
         });
         setSessionErrorMessage(null);
-        await pollThreadUntilIdle({
+        await pollSessionUntilIdle({
           client,
           generation,
-          threadId,
+          sessionId,
         });
       } catch (error) {
         setSessionErrorMessage(
@@ -353,27 +353,27 @@ export function useClaudeCodeSessionState(input: {
         setIsSteeringTurn(false);
       }
     },
-    [pollThreadUntilIdle, sessionSnapshot?.activeThreadId],
+    [pollSessionUntilIdle, sessionSnapshot?.activeSessionId],
   );
 
-  const abortThread = useCallback(async (): Promise<void> => {
+  const interruptQuery = useCallback(async (): Promise<void> => {
     const client = clientRef.current;
-    const threadId = sessionSnapshot?.activeThreadId ?? null;
-    if (client === null || threadId === null) {
+    const sessionId = sessionSnapshot?.activeSessionId ?? null;
+    if (client === null || sessionId === null) {
       return;
     }
     setIsInterruptingTurn(true);
     try {
-      await client.interruptTurn({
-        threadId,
+      await client.interruptQuery({
+        sessionId,
       });
     } finally {
       setIsInterruptingTurn(false);
     }
-  }, [sessionSnapshot?.activeThreadId]);
+  }, [sessionSnapshot?.activeSessionId]);
 
   const recoverSession = useCallback(
-    (recoverInput: { sandboxInstanceId: string; targetThreadId: string | null }): void => {
+    (recoverInput: { sandboxInstanceId: string; targetSessionId: string | null }): void => {
       connectSession(recoverInput);
     },
     [connectSession],
@@ -395,11 +395,11 @@ export function useClaudeCodeSessionState(input: {
       step,
     },
     chat: {
-      abortThread,
       canInterruptTurn: chatState.status === "busy",
       canSteerTurn: chatState.status === "busy",
       chatState,
-      hydrateChatFromThreadOrThrow,
+      hydrateChatFromSessionOrThrow,
+      interruptQuery,
       isInterruptingTurn,
       isStartingTurn,
       isSteeringTurn,

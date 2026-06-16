@@ -1,6 +1,6 @@
 import type {
-  ClaudeCodeThreadReadResult,
-  ClaudeCodeThreadTurn,
+  ClaudeCodeSessionQuery,
+  ClaudeCodeSessionReadResult,
 } from "@mistle/integrations-definitions/agent-runtimes/claude-code/client";
 
 import type { ChatEntry } from "../../../chat/chat-types.js";
@@ -8,36 +8,36 @@ import type { ChatEntry } from "../../../chat/chat-types.js";
 export type ClaudeCodeChatState = {
   completedErrorMessage: string | null;
   entries: readonly ChatEntry[];
-  pendingTurnId: string | null;
+  pendingQueryId: string | null;
+  queries: readonly ClaudeCodeSessionQuery[];
+  sessionId: string | null;
   status: "busy" | "failed" | "idle" | null;
-  threadId: string | null;
-  turns: readonly ClaudeCodeThreadTurn[];
 };
 
 export type ClaudeCodeChatAction =
   | {
-      thread: ClaudeCodeThreadReadResult["thread"];
-      type: "hydrate_thread";
+      session: ClaudeCodeSessionReadResult["session"];
+      type: "hydrate_session";
     }
   | {
+      queryId: string;
+      sessionId: string;
       submittedPrompt: string;
-      threadId: string;
-      turnId: string;
       type: "prompt_submitted";
     }
   | {
       errorMessage: string;
-      type: "turn_failed";
+      type: "query_failed";
     };
 
 export function createInitialClaudeCodeChatState(): ClaudeCodeChatState {
   return {
     completedErrorMessage: null,
     entries: [],
-    pendingTurnId: null,
+    pendingQueryId: null,
+    queries: [],
+    sessionId: null,
     status: null,
-    threadId: null,
-    turns: [],
   };
 }
 
@@ -74,45 +74,63 @@ function readAssistantText(message: unknown): string {
     .join("\n\n");
 }
 
-function buildEntriesFromThread(input: {
-  activeTurnId: string | null;
-  threadId: string;
-  turns: readonly ClaudeCodeThreadTurn[];
+function readUserText(message: unknown): string {
+  if (!isRecord(message) || readStringProperty(message, "type") !== "user") {
+    return "";
+  }
+  return readStringProperty(message, "text") ?? "";
+}
+
+function buildEntriesFromSession(input: {
+  activeQueryId: string | null;
+  queries: readonly ClaudeCodeSessionQuery[];
+  sessionId: string;
 }): readonly ChatEntry[] {
-  return input.turns.flatMap((turn, index) => {
-    const text = readAssistantText(turn.message);
-    if (text.length === 0) {
-      return [];
+  const entries: ChatEntry[] = [];
+  input.queries.forEach((query, index) => {
+    const userText = readUserText(query.message);
+    if (userText.length > 0) {
+      entries.push({
+        id: `${input.sessionId}:user:${query.queryId}:${String(index)}`,
+        kind: "user-message",
+        status: "completed",
+        text: userText,
+        turnId: query.queryId,
+      });
+      return;
     }
 
-    return [
-      {
-        id: `${input.threadId}:assistant:${String(index)}`,
-        kind: "assistant-message" as const,
-        phase: null,
-        status:
-          input.activeTurnId === turn.executionId ? ("streaming" as const) : ("completed" as const),
-        text,
-        turnId: turn.executionId,
-      },
-    ];
+    const text = readAssistantText(query.message);
+    if (text.length === 0) {
+      return;
+    }
+
+    entries.push({
+      id: `${input.sessionId}:assistant:${String(index)}`,
+      kind: "assistant-message",
+      phase: null,
+      status: input.activeQueryId === query.queryId ? "streaming" : "completed",
+      text,
+      turnId: query.queryId,
+    });
   });
+  return entries;
 }
 
 function appendSubmittedPromptEntry(input: {
   currentEntries: readonly ChatEntry[];
+  queryId: string;
+  sessionId: string;
   submittedPrompt: string;
-  threadId: string;
-  turnId: string;
 }): readonly ChatEntry[] {
   return [
     ...input.currentEntries,
     {
-      id: `${input.threadId}:user:${input.turnId}`,
+      id: `${input.sessionId}:user:${input.queryId}`,
       kind: "user-message",
       status: "completed",
       text: input.submittedPrompt,
-      turnId: input.turnId,
+      turnId: input.queryId,
     },
   ];
 }
@@ -122,23 +140,23 @@ export function reduceClaudeCodeChatState(
   action: ClaudeCodeChatAction,
 ): ClaudeCodeChatState {
   switch (action.type) {
-    case "hydrate_thread":
+    case "hydrate_session":
       return {
-        completedErrorMessage: action.thread.lastError,
-        entries: buildEntriesFromThread({
-          activeTurnId: action.thread.activeTurnId,
-          threadId: action.thread.id,
-          turns: action.thread.turns,
+        completedErrorMessage: action.session.lastError,
+        entries: buildEntriesFromSession({
+          activeQueryId: action.session.activeQueryId,
+          queries: action.session.queries,
+          sessionId: action.session.id,
         }),
-        pendingTurnId: action.thread.activeTurnId,
+        pendingQueryId: action.session.activeQueryId,
+        queries: action.session.queries,
+        sessionId: action.session.id,
         status:
-          action.thread.status.type === "active"
+          action.session.status.type === "active"
             ? "busy"
-            : action.thread.lastError === null
+            : action.session.lastError === null
               ? "idle"
               : "failed",
-        threadId: action.thread.id,
-        turns: action.thread.turns,
       };
     case "prompt_submitted":
       return {
@@ -146,15 +164,15 @@ export function reduceClaudeCodeChatState(
         completedErrorMessage: null,
         entries: appendSubmittedPromptEntry({
           currentEntries: state.entries,
+          queryId: action.queryId,
+          sessionId: action.sessionId,
           submittedPrompt: action.submittedPrompt,
-          threadId: action.threadId,
-          turnId: action.turnId,
         }),
-        pendingTurnId: action.turnId,
+        pendingQueryId: action.queryId,
+        sessionId: action.sessionId,
         status: "busy",
-        threadId: action.threadId,
       };
-    case "turn_failed":
+    case "query_failed":
       return {
         ...state,
         completedErrorMessage: action.errorMessage,

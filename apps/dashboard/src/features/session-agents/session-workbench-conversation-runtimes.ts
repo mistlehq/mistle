@@ -81,9 +81,9 @@ function mapClaudeCodeChatStateForConversation(
   chatState: UseClaudeCodeSessionStateResult["chat"]["chatState"],
 ): SessionConversationChatState {
   return {
-    activeTurnId: chatState.pendingTurnId,
+    activeTurnId: chatState.pendingQueryId,
     entries: chatState.entries,
-    pendingTurnId: chatState.pendingTurnId,
+    pendingTurnId: chatState.pendingQueryId,
     status: chatState.status === "busy" ? "inProgress" : chatState.status,
   };
 }
@@ -376,8 +376,8 @@ export function buildClaudeCodeConversationRuntime(input: {
     displayName: capabilities.displayName,
     cliTerminalContentInset: capabilities.cliTerminalContentInset,
     conversation: {
-      activeConversationId: input.sessionSnapshot?.activeThreadId ?? null,
-      attachmentTargetId: input.sessionSnapshot?.activeThreadId ?? null,
+      activeConversationId: input.sessionSnapshot?.activeSessionId ?? null,
+      attachmentTargetId: input.sessionSnapshot?.activeSessionId ?? null,
       chatState: mapClaudeCodeChatStateForConversation(input.chat.chatState),
     },
     composerRuntimeInput: {
@@ -389,7 +389,7 @@ export function buildClaudeCodeConversationRuntime(input: {
         canSteer: capabilities.supportsSteering && isTurnRunning && input.chat.canSteerTurn,
         completedTurnErrorMessage: input.chat.chatState.completedErrorMessage,
         interruptTurn: (): void => {
-          void input.chat.abortThread();
+          void input.chat.interruptQuery();
         },
         isInterrupting: input.chat.isInterruptingTurn,
         isStarting: input.chat.isStartingTurn,

@@ -3,46 +3,46 @@ import { AgentStreamClient, type SandboxSessionTransport } from "@mistle/sandbox
 
 import { ClaudeCodeJsonRpcClient } from "./json-rpc-client.js";
 
-export type ClaudeCodeThreadStatus = "active" | "error" | "idle" | "notLoaded";
+export type ClaudeCodeSessionStatus = "active" | "error" | "idle" | "notLoaded";
 
-export type ClaudeCodeThreadTurn = {
-  executionId: string;
+export type ClaudeCodeSessionQuery = {
+  queryId: string;
   message: unknown;
 };
 
-export type ClaudeCodeThreadReadResult = {
-  thread: {
-    activeTurnId: string | null;
+export type ClaudeCodeSessionReadResult = {
+  session: {
+    activeQueryId: string | null;
     cwd: string | null;
     id: string;
     lastError: string | null;
+    queries: readonly ClaudeCodeSessionQuery[];
     status: {
-      type: ClaudeCodeThreadStatus;
+      type: ClaudeCodeSessionStatus;
     };
-    turns: readonly ClaudeCodeThreadTurn[];
   };
 };
 
 export type ClaudeCodeSessionClient = {
   close(): void;
   connect(): Promise<void>;
-  createThread(input?: {
+  createSession(input?: {
     cwd?: string | null;
     idempotency?: AgentConversationIdempotencyMetadata;
-  }): Promise<{ threadId: string }>;
-  interruptTurn(input: { threadId: string }): Promise<void>;
-  readThread(input: { threadId: string }): Promise<ClaudeCodeThreadReadResult>;
-  resumeThread(input: { threadId: string }): Promise<void>;
-  startTurn(input: {
+  }): Promise<{ sessionId: string }>;
+  interruptQuery(input: { sessionId: string }): Promise<void>;
+  readSession(input: { sessionId: string }): Promise<ClaudeCodeSessionReadResult>;
+  resumeSession(input: { sessionId: string }): Promise<void>;
+  startQuery(input: {
     idempotency?: AgentConversationIdempotencyMetadata;
     inputText: string;
-    threadId: string;
-  }): Promise<{ turnId: string }>;
-  steerTurn(input: {
+    sessionId: string;
+  }): Promise<{ queryId: string }>;
+  steerQuery(input: {
     idempotency?: AgentConversationIdempotencyMetadata;
     inputText: string;
-    threadId: string;
-  }): Promise<{ turnId: string }>;
+    sessionId: string;
+  }): Promise<{ queryId: string }>;
 };
 
 export type ClaudeCodeSessionClientInput = {
@@ -75,23 +75,24 @@ function readNestedString(value: unknown, path: readonly string[]): string | nul
   return typeof currentValue === "string" && currentValue.length > 0 ? currentValue : null;
 }
 
-function extractThreadId(result: unknown, method: string): string {
-  const threadId = readNestedString(result, ["thread", "id"]);
-  if (threadId === null) {
-    throw new Error(`Claude Code ${method} response did not include thread.id.`);
+function extractSessionId(result: unknown, method: string): string {
+  const sessionId = readNestedString(result, ["session", "id"]);
+  if (sessionId === null) {
+    throw new Error(`Claude Code ${method} response did not include session.id.`);
   }
-  return threadId;
+  return sessionId;
 }
 
-function extractTurnId(result: unknown, method: string): string {
-  const turnId = readNestedString(result, ["turn", "id"]) ?? readNestedString(result, ["turnId"]);
-  if (turnId === null) {
-    throw new Error(`Claude Code ${method} response did not include turn id.`);
+function extractQueryId(result: unknown, method: string): string {
+  const queryId =
+    readNestedString(result, ["query", "id"]) ?? readNestedString(result, ["queryId"]);
+  if (queryId === null) {
+    throw new Error(`Claude Code ${method} response did not include query id.`);
   }
-  return turnId;
+  return queryId;
 }
 
-function normalizeClaudeCodeThreadStatus(value: string | null): ClaudeCodeThreadStatus {
+function normalizeClaudeCodeSessionStatus(value: string | null): ClaudeCodeSessionStatus {
   switch (value) {
     case "active":
     case "error":
@@ -99,43 +100,43 @@ function normalizeClaudeCodeThreadStatus(value: string | null): ClaudeCodeThread
     case "notLoaded":
       return value;
     default:
-      throw new Error("Claude Code thread/read response did not include supported status.");
+      throw new Error("Claude Code session/read response did not include supported status.");
   }
 }
 
-function parseClaudeCodeThreadReadResult(result: unknown): ClaudeCodeThreadReadResult {
-  const thread = readNestedRecord(result, ["thread"]);
-  if (thread === null) {
-    throw new Error("Claude Code thread/read response did not include thread.");
+function parseClaudeCodeSessionReadResult(result: unknown): ClaudeCodeSessionReadResult {
+  const session = readNestedRecord(result, ["session"]);
+  if (session === null) {
+    throw new Error("Claude Code session/read response did not include session.");
   }
-  const threadId = readNestedString(result, ["thread", "id"]);
-  if (threadId === null) {
-    throw new Error("Claude Code thread/read response did not include thread.id.");
+  const sessionId = readNestedString(result, ["session", "id"]);
+  if (sessionId === null) {
+    throw new Error("Claude Code session/read response did not include session.id.");
   }
-  const rawTurns = thread["turns"];
-  if (!Array.isArray(rawTurns)) {
-    throw new Error("Claude Code thread/read response did not include thread.turns.");
+  const rawQueries = session["queries"];
+  if (!Array.isArray(rawQueries)) {
+    throw new Error("Claude Code session/read response did not include session.queries.");
   }
 
   return {
-    thread: {
-      id: threadId,
+    session: {
+      id: sessionId,
       status: {
-        type: normalizeClaudeCodeThreadStatus(
-          readNestedString(result, ["thread", "status", "type"]),
+        type: normalizeClaudeCodeSessionStatus(
+          readNestedString(result, ["session", "status", "type"]),
         ),
       },
-      activeTurnId: readNestedString(result, ["thread", "activeTurnId"]),
-      cwd: readNestedString(result, ["thread", "cwd"]),
-      turns: rawTurns.map((turn, index) => ({
-        executionId: isRecord(turn)
-          ? (readNestedString(turn, ["executionId"]) ?? `turn_${String(index)}`)
-          : `turn_${String(index)}`,
-        message: isRecord(turn) ? turn["message"] : turn,
+      activeQueryId: readNestedString(result, ["session", "activeQueryId"]),
+      cwd: readNestedString(result, ["session", "cwd"]),
+      queries: rawQueries.map((query, index) => ({
+        queryId: isRecord(query)
+          ? (readNestedString(query, ["queryId"]) ?? `query_${String(index)}`)
+          : `query_${String(index)}`,
+        message: isRecord(query) ? query["message"] : query,
       })),
       lastError:
-        typeof thread["lastError"] === "string" && thread["lastError"].length > 0
-          ? thread["lastError"]
+        typeof session["lastError"] === "string" && session["lastError"].length > 0
+          ? session["lastError"]
           : null,
     },
   };
@@ -158,39 +159,39 @@ export function createClaudeCodeSessionClient(
       await agentStream.connect();
       await rpcClient.initialize();
     },
-    async createThread(createInput = {}) {
+    async createSession(createInput = {}) {
       const result = await rpcClient.call(
-        "thread/start",
+        "session/create",
         createInput.cwd === undefined || createInput.cwd === null ? {} : { cwd: createInput.cwd },
         {
           idempotency: createInput.idempotency,
         },
       );
       return {
-        threadId: extractThreadId(result, "thread/start"),
+        sessionId: extractSessionId(result, "session/create"),
       };
     },
-    async interruptTurn(interruptInput) {
-      await rpcClient.call("turn/interrupt", {
-        threadId: interruptInput.threadId,
+    async interruptQuery(interruptInput) {
+      await rpcClient.call("query/interrupt", {
+        sessionId: interruptInput.sessionId,
       });
     },
-    async readThread(readInput) {
-      const result = await rpcClient.call("thread/read", {
-        threadId: readInput.threadId,
+    async readSession(readInput) {
+      const result = await rpcClient.call("session/read", {
+        sessionId: readInput.sessionId,
       });
-      return parseClaudeCodeThreadReadResult(result);
+      return parseClaudeCodeSessionReadResult(result);
     },
-    async resumeThread(resumeInput) {
-      await rpcClient.call("thread/resume", {
-        threadId: resumeInput.threadId,
+    async resumeSession(resumeInput) {
+      await rpcClient.call("session/resume", {
+        sessionId: resumeInput.sessionId,
       });
     },
-    async startTurn(startInput) {
+    async startQuery(startInput) {
       const result = await rpcClient.call(
-        "turn/start",
+        "query/start",
         {
-          threadId: startInput.threadId,
+          sessionId: startInput.sessionId,
           inputText: startInput.inputText,
         },
         {
@@ -198,14 +199,14 @@ export function createClaudeCodeSessionClient(
         },
       );
       return {
-        turnId: extractTurnId(result, "turn/start"),
+        queryId: extractQueryId(result, "query/start"),
       };
     },
-    async steerTurn(steerInput) {
+    async steerQuery(steerInput) {
       const result = await rpcClient.call(
-        "turn/steer",
+        "query/steer",
         {
-          threadId: steerInput.threadId,
+          sessionId: steerInput.sessionId,
           inputText: steerInput.inputText,
         },
         {
@@ -213,7 +214,7 @@ export function createClaudeCodeSessionClient(
         },
       );
       return {
-        turnId: extractTurnId(result, "turn/steer"),
+        queryId: extractQueryId(result, "query/steer"),
       };
     },
   };

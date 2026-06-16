@@ -148,7 +148,7 @@ export function useClaudeCodeWorkbenchComposerState(input: {
   const configControl = useLocalSessionComposerConfigControl({
     bootstrap,
     clearSessionErrorMessage: input.sessionState.sessionMessage.clearSessionErrorMessage,
-    resetKey: input.sessionState.lifecycle.sessionSnapshot?.activeThreadId ?? null,
+    resetKey: input.sessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null,
   });
 
   return {
