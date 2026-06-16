@@ -147,3 +147,10 @@ export const mcpUpdateTriggerUserMessageInputSchema = mcpTriggerIdParamsSchema
     userMessage: z.string().min(1),
   })
   .strict();
+
+export const mcpSetTriggerScheduleInputSchema = mcpTriggerIdParamsSchema
+  .extend({
+    cronExpression: z.string().min(1),
+    timezone: z.string().min(1),
+  })
+  .strict();

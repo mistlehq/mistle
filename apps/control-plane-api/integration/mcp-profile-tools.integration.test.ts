@@ -140,6 +140,7 @@ describe.concurrent("MCP profile tools integration", () => {
       "sandbox_instance_port_access_create",
       "sandbox_operation_events_list",
       "set_trigger_enabled",
+      "set_trigger_schedule",
       "update_trigger_user_message",
     ]);
     expect(tools.every((tool) => tool.outputSchema === undefined)).toBe(true);
