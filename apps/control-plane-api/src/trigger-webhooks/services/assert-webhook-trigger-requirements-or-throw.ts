@@ -13,6 +13,18 @@ export function assertWebhookTriggerRequirementsOrThrow(input: {
   supportedWebhookEvents: readonly IntegrationWebhookEventDefinition[];
 }): void {
   const capabilities = parseWebhookTriggerCapabilitiesProviderMetadata(input.providerMetadata);
+  const supportedEventTypes = new Set(
+    input.supportedWebhookEvents.map((eventDefinition) => eventDefinition.eventType),
+  );
+  const unsupportedEventType = input.eventTypes?.find(
+    (eventType) => !supportedEventTypes.has(eventType),
+  );
+  if (unsupportedEventType !== undefined) {
+    throw new BadRequestError(
+      TriggerWebhooksBadRequestCodes.INVALID_WEBHOOK_TRIGGER_REQUIREMENTS,
+      `Webhook source does not support trigger event '${unsupportedEventType}'.`,
+    );
+  }
 
   const selectedEvents =
     input.eventTypes === null

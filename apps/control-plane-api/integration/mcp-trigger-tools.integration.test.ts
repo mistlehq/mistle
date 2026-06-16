@@ -9,10 +9,12 @@ import {
   type ControlPlaneTables,
   type ScheduleKind,
 } from "@mistle/db/control-plane";
+import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "@mistle/integrations-core";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
+import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
@@ -22,6 +24,8 @@ import { ListTriggersResponseSchema } from "../src/triggers/list-triggers/schema
 import { createApiKeyToken } from "./helpers/api-keys.js";
 import { sandboxProfileRow, sandboxProfileVersionRow } from "./helpers/sandbox-profiles.js";
 import {
+  GitHubIssueCommentCreatedEventType,
+  GitHubTriggerTargetKey,
   seedPersistedWebhookTrigger,
   seedTriggerWebhookTargets,
   seedWebhookTriggerFixture,
@@ -41,6 +45,30 @@ const JsonRpcToolResponseSchema = z
         isError: z.boolean().optional(),
       })
       .loose(),
+  })
+  .strict();
+
+const ListTriggerWebhookEventsResultSchema = z
+  .object({
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileName: z.string().min(1),
+    sandboxProfileVersion: z.number().int().min(1),
+    events: z.array(
+      z
+        .object({
+          eventType: z.string().min(1),
+          displayName: z.string().min(1),
+          webhookSourceId: z.string().min(1),
+          webhookSourceName: z.string().min(1).nullable(),
+          integrationConnectionId: z.string().min(1),
+          integrationConnectionName: z.string().min(1),
+          integrationTargetKey: z.string().min(1),
+          integrationName: z.string().min(1),
+          logoKey: z.string().min(1).optional(),
+          category: z.string().min(1).optional(),
+        })
+        .strict(),
+    ),
   })
   .strict();
 
@@ -259,6 +287,192 @@ describe.concurrent("MCP trigger tools integration", () => {
       where: (table, { eq }) => eq(table.triggerId, "atm_mcp_trigger_webhook_shared_update"),
     });
     expect(persistedWebhook?.inputTemplate).toBe("Handle this webhook from MCP");
+  });
+
+  it("lists webhook trigger events available to a sandbox profile", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-trigger-webhook-events-list@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP trigger event reader",
+      permissions: [OrganizationPermissions.TRIGGER_READ],
+    });
+
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_mcp_trigger_webhook_events_list",
+      webhookSourceId: "iws_mcp_trigger_webhook_events_list",
+      profileId: "sbp_mcp_trigger_webhook_events_list",
+      profileVersion: 1,
+      profileActiveVersion: 1,
+    });
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "list_trigger_webhook_events",
+      arguments: {
+        sandboxProfileId: "sbp_mcp_trigger_webhook_events_list",
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const eventOptions = ListTriggerWebhookEventsResultSchema.parse(result.structuredContent);
+    expect(eventOptions).toMatchObject({
+      sandboxProfileId: "sbp_mcp_trigger_webhook_events_list",
+      sandboxProfileName: "sbp_mcp_trigger_webhook_events_list display",
+      sandboxProfileVersion: 1,
+    });
+    expect(eventOptions.events.map((event) => event.eventType)).toContain(
+      GitHubIssueCommentCreatedEventType,
+    );
+    expect(eventOptions.events).toContainEqual(
+      expect.objectContaining({
+        eventType: GitHubIssueCommentCreatedEventType,
+        displayName: "Issue comment created",
+        webhookSourceId: "iws_mcp_trigger_webhook_events_list",
+        integrationConnectionId: "icn_mcp_trigger_webhook_events_list",
+        integrationTargetKey: GitHubTriggerTargetKey,
+        integrationName: "GitHub",
+        category: "Issues",
+      }),
+    );
+  });
+
+  it("sets webhook trigger events and clears stale payload filters", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-trigger-webhook-events-set@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP trigger event updater",
+      permissions: [OrganizationPermissions.TRIGGER_UPDATE],
+    });
+
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_mcp_trigger_webhook_events_set",
+      webhookSourceId: "iws_mcp_trigger_webhook_events_set",
+      profileId: "sbp_mcp_trigger_webhook_events_set",
+      profileVersion: 1,
+      profileActiveVersion: 1,
+    });
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.integrationWebhookSources)
+      .set({
+        providerMetadata: {
+          [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+            events: ["issue_comment", "pull_request"],
+            permissions: [
+              { permission: "issues", access: "read" },
+              { permission: "pull_requests", access: "read" },
+            ],
+          },
+        },
+      })
+      .where(
+        eq(
+          env.controlPlaneTables.integrationWebhookSources.id,
+          "iws_mcp_trigger_webhook_events_set",
+        ),
+      );
+    await seedPersistedWebhookTrigger(env, {
+      triggerId: "atm_mcp_trigger_webhook_events_set",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_mcp_trigger_webhook_events_set",
+      profileId: "sbp_mcp_trigger_webhook_events_set",
+      profileVersion: 1,
+      targetId: "atg_mcp_trigger_webhook_events_set",
+      name: "MCP webhook event update",
+    });
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "set_trigger_webhook_events",
+      arguments: {
+        triggerId: "atm_mcp_trigger_webhook_events_set",
+        eventTypes: ["github.pull_request.opened"],
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const trigger = GetTriggerResponseSchema.parse(result.structuredContent);
+    expect(trigger.source).toMatchObject({
+      kind: "webhook",
+      events: [
+        {
+          label: "Pull request opened",
+        },
+      ],
+    });
+
+    const persistedWebhook = await env.controlPlaneDb.query.webhookTriggers.findFirst({
+      columns: {
+        eventTypes: true,
+        payloadFilter: true,
+      },
+      where: (table, { eq }) => eq(table.triggerId, "atm_mcp_trigger_webhook_events_set"),
+    });
+    expect(persistedWebhook?.eventTypes).toEqual(["github.pull_request.opened"]);
+    expect(persistedWebhook?.payloadFilter).toBeNull();
+  });
+
+  it("rejects webhook trigger events that the current webhook source does not support", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-trigger-webhook-events-invalid@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP trigger invalid event updater",
+      permissions: [OrganizationPermissions.TRIGGER_UPDATE],
+    });
+
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_mcp_trigger_webhook_events_invalid",
+      webhookSourceId: "iws_mcp_trigger_webhook_events_invalid",
+      profileId: "sbp_mcp_trigger_webhook_events_invalid",
+      profileVersion: 1,
+      profileActiveVersion: 1,
+    });
+    await seedPersistedWebhookTrigger(env, {
+      triggerId: "atm_mcp_trigger_webhook_events_invalid",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_mcp_trigger_webhook_events_invalid",
+      profileId: "sbp_mcp_trigger_webhook_events_invalid",
+      profileVersion: 1,
+      targetId: "atg_mcp_trigger_webhook_events_invalid",
+      name: "MCP webhook invalid event update",
+    });
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "set_trigger_webhook_events",
+      arguments: {
+        triggerId: "atm_mcp_trigger_webhook_events_invalid",
+        eventTypes: ["github.not_a_real_event"],
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    const persistedWebhook = await env.controlPlaneDb.query.webhookTriggers.findFirst({
+      columns: {
+        eventTypes: true,
+      },
+      where: (table, { eq }) => eq(table.triggerId, "atm_mcp_trigger_webhook_events_invalid"),
+    });
+    expect(persistedWebhook?.eventTypes).toEqual([GitHubIssueCommentCreatedEventType]);
   });
 
   it("updates shared scheduled trigger fields with generic trigger update permission", async ({
