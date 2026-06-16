@@ -1,12 +1,15 @@
 import { createServer } from "node:http";
 
 import { createManualScheduler, createMutableClock } from "@mistle/time/testing";
-import { WSContext } from "hono/ws";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 
 import type { RelayPeerSocket } from "../types.js";
-import { startWebSocketHealthMonitor } from "./websocket-health-monitor.js";
+import {
+  startWebSocketHealthMonitor,
+  type WebSocketHealthMissedPong,
+  type WebSocketHealthPingWriteCompleted,
+} from "./websocket-health-monitor.js";
 
 type WebSocketPair = {
   clientSocket: WebSocket;
@@ -119,10 +122,10 @@ function toWsReadyState(input: number): 0 | 1 | 2 | 3 {
 }
 
 function toPeerSocket(socket: WebSocket): RelayPeerSocket {
-  return new WSContext<WebSocket>({
-    send: (data, options) => {
+  return {
+    send: (data) => {
       socket.send(data, {
-        compress: options.compress,
+        compress: false,
       });
     },
     close: (code, reason) => {
@@ -132,7 +135,7 @@ function toPeerSocket(socket: WebSocket): RelayPeerSocket {
       return toWsReadyState(socket.readyState);
     },
     raw: socket,
-  });
+  };
 }
 
 async function createWebSocketPair(options?: WebSocketPairOptions): Promise<WebSocketPair> {
@@ -255,6 +258,112 @@ describe("startWebSocketHealthMonitor", () => {
       sentAtMs: 1_010,
     });
     expect(unhealthyCount).toBe(0);
+    handle.stop();
+  });
+
+  it("reports health ping write completion diagnostics", async () => {
+    const pair = await createWebSocketPair();
+    openPairs.add(pair);
+    const clock = createMutableClock(1_500);
+    const scheduler = createManualScheduler(clock);
+    let unhealthyCount = 0;
+    const pingWriteCompletedEvents: WebSocketHealthPingWriteCompleted[] = [];
+
+    const handle = startWebSocketHealthMonitor({
+      clock,
+      socketKind: "bootstrap",
+      tokenKind: "bootstrap",
+      socket: pair.peerSocket,
+      scheduler,
+      pingIntervalMs: 10,
+      pongTimeoutMs: 10,
+      onPingWriteCompleted: (event) => {
+        pingWriteCompletedEvents.push(event);
+      },
+      onUnhealthy: () => {
+        unhealthyCount += 1;
+      },
+    });
+
+    clock.advanceMs(15);
+    const pongPromise = waitForPong(pair.serverSocket);
+    scheduler.runDue();
+    await pongPromise;
+
+    expect(pingWriteCompletedEvents).toHaveLength(1);
+    expect(pingWriteCompletedEvents[0]).toMatchObject({
+      pingScheduleDelayMs: 5,
+      pingSentAtMs: 1_515,
+      pingSeq: 1,
+      pingWriteCallbackAtMs: 1_515,
+      pingWriteDurationMs: 0,
+      socket: {
+        bufferedAmount: 0,
+        readyState: WebSocket.OPEN,
+      },
+    });
+    expect(unhealthyCount).toBe(0);
+    handle.stop();
+  });
+
+  it("reports missed pong diagnostics with timer drift and ping write state", async () => {
+    const pair = await createWebSocketPair({ clientAutoPong: false });
+    openPairs.add(pair);
+    const clock = createMutableClock(1_700);
+    const scheduler = createManualScheduler(clock);
+    const missedPongs: WebSocketHealthMissedPong[] = [];
+    let resolvePingWriteCompleted = (): void => {
+      throw new Error("Ping write completion resolver was used before initialization.");
+    };
+    const pingWriteCompletedPromise = new Promise<void>((resolve) => {
+      resolvePingWriteCompleted = resolve;
+    });
+    const handle = startWebSocketHealthMonitor({
+      clock,
+      socketKind: "bootstrap",
+      tokenKind: "bootstrap",
+      socket: pair.peerSocket,
+      scheduler,
+      pingIntervalMs: 10,
+      pongTimeoutMs: 10,
+      maxConsecutiveMissedPongs: 2,
+      onMissedPong: (event) => {
+        missedPongs.push(event);
+      },
+      onPingWriteCompleted: () => {
+        resolvePingWriteCompleted();
+      },
+      onUnhealthy: () => {
+        throw new Error("Socket should remain healthy after one missed pong.");
+      },
+    });
+
+    await sendScheduledPing({
+      clock,
+      clientSocket: pair.clientSocket,
+      scheduler,
+    });
+    await pingWriteCompletedPromise;
+    clock.advanceMs(13);
+    scheduler.runDue();
+
+    expect(missedPongs).toHaveLength(1);
+    expect(missedPongs[0]).toMatchObject({
+      consecutiveMissedPongs: 1,
+      lastPongAgeMs: 23,
+      maxConsecutiveMissedPongs: 2,
+      pingScheduleDelayMs: 0,
+      pingSentAtMs: 1_710,
+      pingSeq: 1,
+      pingWriteCallbackAtMs: 1_710,
+      pingWriteDurationMs: 0,
+      pongTimeoutDriftMs: 3,
+      pongTimeoutFiredAtMs: 1_723,
+      socket: {
+        bufferedAmount: 0,
+        readyState: WebSocket.OPEN,
+      },
+    });
     handle.stop();
   });
 
