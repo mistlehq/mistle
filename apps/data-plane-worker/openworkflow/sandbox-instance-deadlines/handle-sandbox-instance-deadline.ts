@@ -15,6 +15,7 @@ import {
   reconcileSandboxInstance,
   type ReconcileSandboxInstanceResult,
 } from "../reconcile-sandbox-instance/reconcile-sandbox-instance.js";
+import type { WorkerSandboxLifecycleEventRecorder } from "../shared/sandbox-operation-events.js";
 import {
   stopSandboxInstance,
   type StopSandboxInstanceResult,
@@ -45,6 +46,7 @@ export async function handleSandboxInstanceDeadline(
     sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
+    operationEvents?: WorkerSandboxLifecycleEventRecorder | undefined;
   },
   input: {
     sandboxInstanceId: string;
@@ -144,6 +146,7 @@ async function executeDeadlineAction(
     sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
+    operationEvents?: WorkerSandboxLifecycleEventRecorder | undefined;
   },
   input: {
     sandboxInstanceId: string;
@@ -155,13 +158,12 @@ async function executeDeadlineAction(
     case "idle":
       return stopSandboxInstance(
         {
-          config: ctx.config,
           db: ctx.db,
           tables: ctx.tables,
-          controlPlaneInternalClient: ctx.controlPlaneInternalClient,
           sandboxRuntimeProviderResolver: ctx.sandboxRuntimeProviderResolver,
           runtimeStateReader: ctx.runtimeStateReader,
           clock: ctx.clock,
+          operationEvents: ctx.operationEvents,
         },
         {
           sandboxInstanceId: input.sandboxInstanceId,

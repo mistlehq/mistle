@@ -615,6 +615,8 @@ function formatLifecyclePhase(phase: SandboxOperationEvent["phase"]): string {
   switch (phase) {
     case "agent_endpoint":
       return "Agent endpoint";
+    case "deadline":
+      return "Deadline";
     case "egress":
       return "Egress";
     case "git_identity":

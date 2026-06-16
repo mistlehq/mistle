@@ -23,6 +23,7 @@ const bytea = customType<{
 });
 
 export const SandboxOperationKinds = {
+  DEADLINE: "deadline",
   START: "start",
   RESUME: "resume",
   SETUP_CHECK: "setup_check",
@@ -51,6 +52,7 @@ export type SandboxOperationEventSource =
   (typeof SandboxOperationEventSources)[keyof typeof SandboxOperationEventSources];
 
 export const SandboxLifecyclePhases = {
+  DEADLINE: "deadline",
   PROVIDER: "provider",
   STORAGE_PROVISION: "storage_provision",
   STORAGE_ATTACH: "storage_attach",

@@ -19375,7 +19375,14 @@
                           },
                           "operationKind": {
                             "type": "string",
-                            "enum": ["start", "resume", "setup_check", "snapshot", "stop"]
+                            "enum": [
+                              "deadline",
+                              "start",
+                              "resume",
+                              "setup_check",
+                              "snapshot",
+                              "stop"
+                            ]
                           },
                           "operationId": {
                             "type": "string",
@@ -19400,6 +19407,7 @@
                           "phase": {
                             "type": ["string", "null"],
                             "enum": [
+                              "deadline",
                               "provider",
                               "storage_provision",
                               "storage_attach",
