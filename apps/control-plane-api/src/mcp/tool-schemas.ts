@@ -129,3 +129,21 @@ export const mcpListTriggersInputSchema = z
     search: z.string().min(1).optional(),
   })
   .strict();
+
+export const mcpSetTriggerEnabledInputSchema = mcpTriggerIdParamsSchema
+  .extend({
+    enabled: z.boolean(),
+  })
+  .strict();
+
+export const mcpRenameTriggerInputSchema = mcpTriggerIdParamsSchema
+  .extend({
+    name: z.string().min(1),
+  })
+  .strict();
+
+export const mcpUpdateTriggerUserMessageInputSchema = mcpTriggerIdParamsSchema
+  .extend({
+    userMessage: z.string().min(1),
+  })
+  .strict();
