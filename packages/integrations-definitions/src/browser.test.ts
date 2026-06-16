@@ -202,7 +202,7 @@ describe("browser definitions", () => {
       familyId: "zai",
       variantId: "zai-coding-plan",
       kind: "agent",
-      displayName: "Z.ai Coding Plan",
+      displayName: "Z.ai",
       logoKey: "zai",
     });
     expect(ZaiBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();

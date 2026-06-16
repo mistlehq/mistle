@@ -364,7 +364,7 @@ describe("integrations-definitions index", () => {
       familyId: "zai",
       variantId: "zai-coding-plan",
       kind: "agent",
-      displayName: "Z.ai Coding Plan",
+      displayName: "Z.ai",
       allowedRuntimeIds: ["opencode", "pi"],
     });
     expect(openCodeGoDefinition).toMatchObject({
