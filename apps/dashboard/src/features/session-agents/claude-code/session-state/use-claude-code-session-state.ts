@@ -597,18 +597,20 @@ export function useClaudeCodeSessionState(input: {
   const interruptQuery = useCallback(async (): Promise<void> => {
     const client = clientRef.current;
     const sessionId = sessionSnapshot?.activeSessionId ?? null;
-    if (client === null || sessionId === null) {
+    const queryId = chatState.pendingQueryId;
+    if (client === null || sessionId === null || queryId === null) {
       return;
     }
     setIsInterruptingTurn(true);
     try {
       await client.interruptQuery({
+        queryId,
         sessionId,
       });
     } finally {
       setIsInterruptingTurn(false);
     }
-  }, [sessionSnapshot?.activeSessionId]);
+  }, [chatState.pendingQueryId, sessionSnapshot?.activeSessionId]);
 
   const resumeSession = useCallback(
     async (sessionId: string, resumeInput?: { directory?: string | null }): Promise<string> => {

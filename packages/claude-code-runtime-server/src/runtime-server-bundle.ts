@@ -441,7 +441,16 @@ async function handleRequest(request) {
       if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
         throw new Error("query/interrupt requires params.sessionId.");
       }
+      if (typeof params.queryId !== "string" || params.queryId.length === 0) {
+        throw new Error("query/interrupt requires params.queryId.");
+      }
       const conversation = requireSession(params.sessionId);
+      if (conversation.activeQueryId !== params.queryId) {
+        return {
+          interrupted: false,
+          reason: "stale_query",
+        };
+      }
       if (conversation.activeQueryAbortController !== undefined) {
         conversation.activeQueryAbortController.abort();
       }
@@ -451,7 +460,9 @@ async function handleRequest(request) {
       ) {
         await conversation.activeQuery.close();
       }
-      return {};
+      return {
+        interrupted: true,
+      };
     }
     default:
       throw new Error("Unsupported Claude Code runtime method: " + request.method);

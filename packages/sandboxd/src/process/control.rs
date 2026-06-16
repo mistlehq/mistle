@@ -349,7 +349,24 @@ impl ClaudeCodeServerControlHandle {
             output_capture: self.managed_process.output_capture.clone(),
             platform_scope: self.managed_process.platform_scope.clone(),
         };
-        let _ = stop_runtime_client_process(&mut current_process, clock, sleeper);
+        if let Err(error) = stop_runtime_client_process(&mut current_process, clock, sleeper) {
+            self.managed_process
+                .supervisor_handle
+                .mark_component_restarting(SupervisedComponent::ClaudeCodeServer, error.clone());
+            self.managed_process
+                .supervisor_handle
+                .emit_component_healthcheck_failed(
+                    SupervisedComponent::ClaudeCodeServer,
+                    "restart_stop_failed",
+                    &error,
+                    "process_liveness",
+                    &[],
+                );
+            self.managed_process
+                .restart_in_progress
+                .store(false, Ordering::Relaxed);
+            return Err(error);
+        }
 
         let (mut replacement_child, replacement_output_capture) =
             match spawn_runtime_client_child(&self.managed_process.spec) {

@@ -41,14 +41,47 @@ pub(super) fn run_claude_code_server_monitor(
             continue;
         }
 
-        let current_pid = pid_from_child_handle(&control_handle.managed_process.child);
-        let exit_status = {
-            let mut child = control_handle
-                .managed_process
-                .child
-                .lock()
-                .expect("runtime client child lock should not be poisoned");
-            child.try_wait().ok().flatten()
+        let (current_pid, exit_status) = {
+            let mut child = match control_handle.managed_process.child.lock() {
+                Ok(child) => child,
+                Err(error) => {
+                    let error = format!("Claude Code runtime child lock was poisoned: {error}");
+                    control_handle
+                        .managed_process
+                        .supervisor_handle
+                        .replace_component_details(
+                            SupervisedComponent::ClaudeCodeServer,
+                            claude_code_server_details_with_status(
+                                &control_handle.managed_process.spec,
+                                None,
+                                None,
+                                "Unknown",
+                                "Unreachable",
+                            ),
+                        );
+                    control_handle
+                        .managed_process
+                        .supervisor_handle
+                        .mark_component_restarting(
+                            SupervisedComponent::ClaudeCodeServer,
+                            error.clone(),
+                        );
+                    control_handle
+                        .managed_process
+                        .supervisor_handle
+                        .emit_component_healthcheck_failed(
+                            SupervisedComponent::ClaudeCodeServer,
+                            "monitor_child_lock_poisoned",
+                            error,
+                            "process_liveness",
+                            &[],
+                        );
+                    last_readiness_ok = false;
+                    thread::sleep(DEFAULT_PROCESS_MONITOR_POLL_INTERVAL);
+                    continue;
+                }
+            };
+            (child.id(), child.try_wait().ok().flatten())
         };
 
         if let Some(exit_status) = exit_status {

@@ -58,6 +58,16 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
     expect(ClaudeCodeRuntimeServerBundle).not.toContain("conversation.activeQuery.interrupt");
   });
 
+  it("only interrupts the requested active Claude Code query", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      'throw new Error("query/interrupt requires params.queryId.");',
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "if (conversation.activeQueryId !== params.queryId)",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain('reason: "stale_query"');
+  });
+
   it("hydrates resumed Claude Code sessions from persisted SDK transcripts", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain("getSessionMessages");
     expect(ClaudeCodeRuntimeServerBundle).toContain("function readConversationQueries");

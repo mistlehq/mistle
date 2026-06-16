@@ -38,7 +38,7 @@ export type ClaudeCodeSessionClient = {
     cwd?: string | null;
     idempotency?: AgentConversationIdempotencyMetadata;
   }): Promise<{ sessionId: string }>;
-  interruptQuery(input: { sessionId: string }): Promise<void>;
+  interruptQuery(input: { queryId: string; sessionId: string }): Promise<void>;
   listSessions(input?: {
     cwd?: string | null;
     limit?: number;
@@ -243,6 +243,7 @@ export function createClaudeCodeSessionClient(
     },
     async interruptQuery(interruptInput) {
       await rpcClient.call("query/interrupt", {
+        queryId: interruptInput.queryId,
         sessionId: interruptInput.sessionId,
       });
     },
