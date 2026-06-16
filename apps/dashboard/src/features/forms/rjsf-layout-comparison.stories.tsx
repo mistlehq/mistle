@@ -203,6 +203,25 @@ function ManualCheckboxGroup(): React.JSX.Element {
   );
 }
 
+function ManualCommaSeparatedStringArray(): React.JSX.Element {
+  return (
+    <Field>
+      <FieldHeader>
+        <FieldLabel htmlFor="comparison-reply-to-emails">Default reply-to emails</FieldLabel>
+        <FieldDescription>
+          Comma-separated email list stored as a string array in form data.
+        </FieldDescription>
+      </FieldHeader>
+      <FieldContent>
+        <Input
+          defaultValue="support@example.com, sales@example.com"
+          id="comparison-reply-to-emails"
+        />
+      </FieldContent>
+    </Field>
+  );
+}
+
 function ManualResourcePicker(): React.JSX.Element {
   return (
     <IntegrationResourcePickerView
@@ -489,6 +508,39 @@ function RjsfCheckboxGroup(): React.JSX.Element {
   );
 }
 
+function RjsfCommaSeparatedStringArray(): React.JSX.Element {
+  return (
+    <RjsfExampleForm
+      formContext={{
+        layout: "vertical",
+      }}
+      formData={{
+        replyToEmailAddresses: ["support@example.com", "sales@example.com"],
+      }}
+      schema={{
+        type: "object",
+        properties: {
+          replyToEmailAddresses: {
+            type: "array",
+            title: "Default reply-to emails",
+            description: "Comma-separated email list stored as a string array in form data.",
+            items: {
+              type: "string",
+              format: "email",
+            },
+          },
+        },
+      }}
+      uiSchema={{
+        replyToEmailAddresses: {
+          "ui:placeholder": "support@example.com, sales@example.com",
+          "ui:widget": "comma-separated-string-array",
+        },
+      }}
+    />
+  );
+}
+
 function RjsfResourcePicker(): React.JSX.Element {
   return (
     <RjsfExampleForm
@@ -574,6 +626,13 @@ function RjsfLayoutComparisonStory(input: { caseItem?: ComparisonCase }): React.
             manual: <ManualCheckboxGroup />,
             rjsf: <RjsfCheckboxGroup />,
             caseTitle: "Checkbox Group",
+          },
+          {
+            description:
+              "Comma-separated array input should render as one compact text field while preserving array form data.",
+            manual: <ManualCommaSeparatedStringArray />,
+            rjsf: <RjsfCommaSeparatedStringArray />,
+            caseTitle: "Comma-Separated String Array",
           },
           {
             description:
@@ -691,6 +750,22 @@ export const CheckboxGroup: Story = {
           manual: <ManualCheckboxGroup />,
           rjsf: <RjsfCheckboxGroup />,
           caseTitle: "Checkbox Group",
+        }}
+      />
+    );
+  },
+};
+
+export const CommaSeparatedStringArray: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    return (
+      <RjsfLayoutComparisonStory
+        caseItem={{
+          description:
+            "Comma-separated array input should render as one compact text field while preserving array form data.",
+          manual: <ManualCommaSeparatedStringArray />,
+          rjsf: <RjsfCommaSeparatedStringArray />,
+          caseTitle: "Comma-Separated String Array",
         }}
       />
     );
