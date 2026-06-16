@@ -121,6 +121,7 @@ export function buildRailwayAuthorizationUrl(input: {
   url.searchParams.set("redirect_uri", input.redirectUrl);
   url.searchParams.set("state", input.state);
   url.searchParams.set("scope", RailwayMcpOAuthScopes.join(" "));
+  url.searchParams.set("prompt", "consent");
   url.searchParams.set("resource", RailwayMcpUrl);
   url.searchParams.set("code_challenge", input.pkceChallenge);
   url.searchParams.set("code_challenge_method", "S256");

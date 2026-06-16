@@ -48,6 +48,7 @@ describe("Railway OAuth 2.0 authorization code", () => {
       "https://mistle.example.com/callback",
     );
     expect(authorizationUrl.searchParams.get("state")).toBe("state_123");
+    expect(authorizationUrl.searchParams.get("prompt")).toBe("consent");
     expect(authorizationUrl.searchParams.get("resource")).toBe("https://mcp.railway.com");
     expect(authorizationUrl.searchParams.get("code_challenge")).toBe("challenge_123");
     expect(authorizationUrl.searchParams.get("code_challenge_method")).toBe("S256");
