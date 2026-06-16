@@ -139,6 +139,7 @@ fn start_runtime_client_process_manager_with_supervisor_observer_and_platform_sc
     let mut started_processes = Vec::new();
     let mut codex_app_server_observation_handle = None;
     let mut codex_app_server_control_handle = None;
+    let mut claude_code_server_control_handle = None;
     let mut opencode_server_control_handle = None;
     let monitor_shutdown_requested = Arc::new(AtomicBool::new(false));
     let mut monitor_threads = Vec::new();
@@ -188,7 +189,13 @@ fn start_runtime_client_process_manager_with_supervisor_observer_and_platform_sc
         {
             supervisor_handle.replace_component_details(
                 SupervisedComponent::ClaudeCodeServer,
-                claude_code_server_details_with_status(process_spec, None, "Starting", "Starting"),
+                claude_code_server_details_with_status(
+                    process_spec,
+                    None,
+                    None,
+                    "Starting",
+                    "Starting",
+                ),
             );
             supervisor_handle.mark_component_starting(SupervisedComponent::ClaudeCodeServer);
         }
@@ -337,16 +344,33 @@ fn start_runtime_client_process_manager_with_supervisor_observer_and_platform_sc
         if is_claude_code_server_process(process_spec)
             && supervisor_handle.tracks_component(SupervisedComponent::ClaudeCodeServer)
         {
+            let control_handle = ClaudeCodeServerControlHandle {
+                managed_process: Arc::new(ManagedClaudeCodeServerProcess {
+                    spec: process_spec.clone(),
+                    child: process.child.clone(),
+                    output_capture: process.output_capture.clone(),
+                    platform_scope: process.platform_scope.clone(),
+                    supervisor_handle: supervisor_handle.clone(),
+                    restart_lock: Mutex::new(()),
+                    restart_in_progress: AtomicBool::new(false),
+                }),
+            };
             supervisor_handle.replace_component_details(
                 SupervisedComponent::ClaudeCodeServer,
                 claude_code_server_details_with_status(
                     process_spec,
                     Some(process.pid()),
+                    None,
                     "Alive",
                     "Ready",
                 ),
             );
             supervisor_handle.mark_component_healthy(SupervisedComponent::ClaudeCodeServer);
+            monitor_threads.push(spawn_claude_code_server_monitor(
+                control_handle.clone(),
+                monitor_shutdown_requested.clone(),
+            ));
+            claude_code_server_control_handle = Some(control_handle);
         }
 
         if let Some(observer) = observer {
@@ -366,6 +390,7 @@ fn start_runtime_client_process_manager_with_supervisor_observer_and_platform_sc
         processes: started_processes,
         codex_app_server_observation_handle,
         codex_app_server_control_handle,
+        claude_code_server_control_handle,
         opencode_server_control_handle,
         monitor_shutdown_requested,
         monitor_threads,
@@ -403,6 +428,10 @@ impl RuntimeClientProcessManager {
 
     pub fn opencode_server_control_handle(&self) -> Option<&OpenCodeServerControlHandle> {
         self.opencode_server_control_handle.as_ref()
+    }
+
+    pub fn claude_code_server_control_handle(&self) -> Option<&ClaudeCodeServerControlHandle> {
+        self.claude_code_server_control_handle.as_ref()
     }
 
     /// Stops all managed processes in reverse start order using their stop policies.

@@ -45,13 +45,17 @@ type ClaudeCodeRuntimeEnvironment = {
   MISTLE_CLAUDE_CODE_RUNTIME_WS_PATH: string;
 };
 
-type ClaudeCodeMcpConfigServer = {
-  command?: string;
-  args?: readonly string[];
-  env?: Readonly<Record<string, string>>;
-  url?: string;
-  headers?: Readonly<Record<string, string>>;
-};
+type ClaudeCodeMcpConfigServer =
+  | {
+      args?: readonly string[];
+      command: string;
+      env?: Readonly<Record<string, string>>;
+    }
+  | {
+      headers?: Readonly<Record<string, string>>;
+      type: "http";
+      url: string;
+    };
 
 type ClaudeCodeMcpConfig = {
   mcpServers: Record<string, ClaudeCodeMcpConfigServer>;
@@ -91,10 +95,17 @@ function renderClaudeCodeMcpConfig(
       continue;
     }
 
+    const transport: string = server.transport;
+    if (transport !== "streamable-http") {
+      throw new Error(
+        `Claude Code MCP server '${server.serverName}' uses unsupported transport '${transport}'.`,
+      );
+    }
     if (server.url === undefined) {
       throw new Error(`Claude Code MCP server '${server.serverName}' is missing a remote URL.`);
     }
     renderedServers[server.serverName] = {
+      type: "http",
       url: server.url,
       ...(server.httpHeaders === undefined ? {} : { headers: server.httpHeaders }),
     };

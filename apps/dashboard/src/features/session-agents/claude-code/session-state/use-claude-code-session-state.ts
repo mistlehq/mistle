@@ -290,9 +290,10 @@ export function useClaudeCodeSessionState(input: {
     buildUnavailableClaudeCodeBootstrap({ status: "unavailable" }),
   );
 
-  useEffect(() => {
-    sessionSnapshotRef.current = sessionSnapshot;
-  }, [sessionSnapshot]);
+  const updateSessionSnapshot = useCallback((snapshot: ConnectedClaudeCodeSession | null): void => {
+    sessionSnapshotRef.current = snapshot;
+    setSessionSnapshot(snapshot);
+  }, []);
 
   const clearLifecycleErrorMessage = useCallback((): void => {
     setLifecycleErrorMessage(null);
@@ -312,7 +313,7 @@ export function useClaudeCodeSessionState(input: {
     clientRef.current?.close();
     clientRef.current = null;
     setBootstrap(buildUnavailableClaudeCodeBootstrap({ status: "unavailable" }));
-    setSessionSnapshot(null);
+    updateSessionSnapshot(null);
     setAvailableSessions([]);
     setHasMoreAvailableSessions(false);
     setOriginalSessionId(null);
@@ -320,8 +321,9 @@ export function useClaudeCodeSessionState(input: {
     setIsStartingNewSession(false);
     setSessionConnectionState("detached");
     setStep("idle");
-  }, []);
+  }, [updateSessionSnapshot]);
 
+  // Synchronizes the external Claude Code sandbox transport lifecycle with React unmount cleanup.
   useEffect(() => {
     return () => {
       disconnectSession();
@@ -349,7 +351,10 @@ export function useClaudeCodeSessionState(input: {
         const session = await input.client.readSession({
           sessionId: input.sessionId,
         });
-        if (generationRef.current !== input.generation) {
+        if (
+          generationRef.current !== input.generation ||
+          sessionSnapshotRef.current?.activeSessionId !== input.sessionId
+        ) {
           return;
         }
         dispatchChatAction({
@@ -477,7 +482,7 @@ export function useClaudeCodeSessionState(input: {
               sandboxSessions: sandboxSessionPage.sessions,
             }),
           );
-          setSessionSnapshot({
+          updateSessionSnapshot({
             activeDirectory: session.session.cwd ?? connectInput.initialCwd ?? null,
             activeSessionId,
             connectedAtIso: new Date().toISOString(),
@@ -495,7 +500,7 @@ export function useClaudeCodeSessionState(input: {
           const message =
             error instanceof Error ? error.message : "Could not connect Claude Code session.";
           setBootstrap(buildUnavailableClaudeCodeBootstrap({ status: "failed", message }));
-          setSessionSnapshot(null);
+          updateSessionSnapshot(null);
           setPendingSessionId(null);
           setIsStartingNewSession(false);
           setLifecycleErrorMessage(message);
@@ -504,7 +509,7 @@ export function useClaudeCodeSessionState(input: {
         }
       })();
     },
-    [ensureTransportConnected],
+    [ensureTransportConnected, updateSessionSnapshot],
   );
 
   const sendPrompt = useCallback(
@@ -615,6 +620,7 @@ export function useClaudeCodeSessionState(input: {
 
       const navigationRequestId = sessionNavigationRequestSequenceRef.current + 1;
       sessionNavigationRequestSequenceRef.current = navigationRequestId;
+      generationRef.current += 1;
       setPendingSessionId(sessionId);
       try {
         const directory = resolveClaudeCodeResumeDirectory({
@@ -641,7 +647,7 @@ export function useClaudeCodeSessionState(input: {
         });
         setAvailableSessions(sessionPage.sessions);
         setHasMoreAvailableSessions(sessionPage.hasMore);
-        setSessionSnapshot({
+        updateSessionSnapshot({
           activeDirectory: session.session.cwd,
           activeSessionId: sessionId,
           connectedAtIso: new Date().toISOString(),
@@ -661,7 +667,7 @@ export function useClaudeCodeSessionState(input: {
         }
       }
     },
-    [sessionSnapshot],
+    [sessionSnapshot, updateSessionSnapshot],
   );
 
   const startNewSession = useCallback(
@@ -674,6 +680,7 @@ export function useClaudeCodeSessionState(input: {
 
       const navigationRequestId = sessionNavigationRequestSequenceRef.current + 1;
       sessionNavigationRequestSequenceRef.current = navigationRequestId;
+      generationRef.current += 1;
       setIsStartingNewSession(true);
       try {
         const session = await client.createSession({
@@ -695,7 +702,7 @@ export function useClaudeCodeSessionState(input: {
         });
         setAvailableSessions(sessionPage.sessions);
         setHasMoreAvailableSessions(sessionPage.hasMore);
-        setSessionSnapshot({
+        updateSessionSnapshot({
           activeDirectory: hydratedSession.session.cwd,
           activeSessionId: session.sessionId,
           connectedAtIso: new Date().toISOString(),
@@ -715,7 +722,7 @@ export function useClaudeCodeSessionState(input: {
         }
       }
     },
-    [sessionSnapshot],
+    [sessionSnapshot, updateSessionSnapshot],
   );
 
   const recoverSession = useCallback(

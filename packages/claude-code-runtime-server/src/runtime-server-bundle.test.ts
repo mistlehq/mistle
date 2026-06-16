@@ -35,6 +35,29 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain("text: inputText");
   });
 
+  it("replays idempotent Claude Code session and query results", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain("const idempotentResults = new Map();");
+    expect(ClaudeCodeRuntimeServerBundle).toContain("function idempotencyKeyForRequest");
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      'request.method + ":" + key + ":" + fingerprint',
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "return handleIdempotentRequest(request, () => {",
+    );
+  });
+
+  it("terminates string-prompt Claude Code queries through the SDK close path", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "const abortController = new AbortController();",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain("abortController: input.abortController");
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "conversation.activeQueryAbortController.abort();",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain("typeof conversation.activeQuery.close");
+    expect(ClaudeCodeRuntimeServerBundle).not.toContain("conversation.activeQuery.interrupt");
+  });
+
   it("hydrates resumed Claude Code sessions from persisted SDK transcripts", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain("getSessionMessages");
     expect(ClaudeCodeRuntimeServerBundle).toContain("function readConversationQueries");

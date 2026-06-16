@@ -15,6 +15,7 @@ if (!Number.isInteger(listenPort) || listenPort <= 0 || listenPort > 65535) {
 }
 
 const conversations = new Map();
+const idempotentResults = new Map();
 
 function sendJson(socket, payload) {
   socket.send(JSON.stringify(payload));
@@ -70,8 +71,42 @@ function createSession(input) {
     queries: [],
     sdkSessionId: null,
     sdkLookupCwd: cwd,
+    activeQueryAbortController: undefined,
   });
   return sessionId;
+}
+
+function idempotencyKeyForRequest(request) {
+  const idempotency = request.idempotency;
+  if (idempotency === undefined || idempotency === null) {
+    return null;
+  }
+  const key =
+    typeof idempotency === "string"
+      ? idempotency
+      : typeof idempotency === "object" && typeof idempotency.key === "string"
+        ? idempotency.key
+        : null;
+  if (key === null || key.length === 0) {
+    throw new Error("Claude Code idempotency key must be a non-empty string.");
+  }
+  const fingerprint =
+    typeof idempotency === "object" && typeof idempotency.requestFingerprint === "string"
+      ? idempotency.requestFingerprint
+      : JSON.stringify(request.params ?? null);
+  return request.method + ":" + key + ":" + fingerprint;
+}
+
+async function handleIdempotentRequest(request, operation) {
+  const key = idempotencyKeyForRequest(request);
+  if (key !== null && idempotentResults.has(key)) {
+    return idempotentResults.get(key);
+  }
+  const result = await operation();
+  if (key !== null) {
+    idempotentResults.set(key, result);
+  }
+  return result;
 }
 
 async function listSessionPage(input) {
@@ -93,14 +128,17 @@ async function listSessionPage(input) {
 }
 
 async function runClaudeQuery(conversation, queryId, inputText) {
+  const abortController = new AbortController();
   const options = createClaudeQueryOptions({
     cwd: conversation.cwd,
     session: conversation.sdkSessionId === null
       ? { kind: "new", sessionId: conversation.providerConversationId }
       : { kind: "resume", sessionId: conversation.sdkSessionId },
+    abortController,
   });
 
   conversation.activeQueryId = queryId;
+  conversation.activeQueryAbortController = abortController;
   try {
     const sdkQuery = query({
       prompt: inputText,
@@ -128,6 +166,9 @@ async function runClaudeQuery(conversation, queryId, inputText) {
     if (conversation.activeQuery !== undefined) {
       conversation.activeQuery = undefined;
     }
+    if (conversation.activeQueryAbortController === abortController) {
+      conversation.activeQueryAbortController = undefined;
+    }
   }
 }
 
@@ -142,6 +183,7 @@ function createClaudeQueryOptions(input) {
       : { cwd: resolveClaudeCodeCwd(input.cwd) }),
     systemPrompt: { type: "preset", preset: "claude_code" },
     includePartialMessages: true,
+    ...(input.abortController === undefined ? {} : { abortController: input.abortController }),
     ...sessionOptions,
   };
 }
@@ -303,15 +345,17 @@ async function handleRequest(request) {
         userAgent: "mistle-claude-code-runtime-server",
       };
     case "session/create": {
-      const params = request.params ?? {};
-      const sessionId = createSession({
-        cwd: params.cwd,
+      return handleIdempotentRequest(request, () => {
+        const params = request.params ?? {};
+        const sessionId = createSession({
+          cwd: params.cwd,
+        });
+        return {
+          session: {
+            id: sessionId,
+          },
+        };
       });
-      return {
-        session: {
-          id: sessionId,
-        },
-      };
     }
     case "session/list": {
       const params = request.params ?? {};
@@ -337,6 +381,7 @@ async function handleRequest(request) {
           queries: [],
           sdkSessionId: params.sessionId,
           sdkLookupCwd: lookupCwd,
+          activeQueryAbortController: undefined,
         });
       }
       return {};
@@ -372,22 +417,24 @@ async function handleRequest(request) {
     }
     case "query/start":
     case "query/steer": {
-      const params = request.params ?? {};
-      if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
-        throw new Error(request.method + " requires params.sessionId.");
-      }
-      if (typeof params.inputText !== "string") {
-        throw new Error(request.method + " requires params.inputText.");
-      }
-      const conversation = requireSession(params.sessionId);
-      const queryId = startQuery(conversation, params.inputText);
-      return {
-        query: {
-          id: queryId,
-          status: "running",
-        },
-        queryId,
-      };
+      return handleIdempotentRequest(request, () => {
+        const params = request.params ?? {};
+        if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
+          throw new Error(request.method + " requires params.sessionId.");
+        }
+        if (typeof params.inputText !== "string") {
+          throw new Error(request.method + " requires params.inputText.");
+        }
+        const conversation = requireSession(params.sessionId);
+        const queryId = startQuery(conversation, params.inputText);
+        return {
+          query: {
+            id: queryId,
+            status: "running",
+          },
+          queryId,
+        };
+      });
     }
     case "query/interrupt": {
       const params = request.params ?? {};
@@ -395,13 +442,15 @@ async function handleRequest(request) {
         throw new Error("query/interrupt requires params.sessionId.");
       }
       const conversation = requireSession(params.sessionId);
+      if (conversation.activeQueryAbortController !== undefined) {
+        conversation.activeQueryAbortController.abort();
+      }
       if (
         conversation.activeQuery !== undefined &&
-        typeof conversation.activeQuery.interrupt === "function"
+        typeof conversation.activeQuery.close === "function"
       ) {
-        await conversation.activeQuery.interrupt();
+        await conversation.activeQuery.close();
       }
-      conversation.activeQueryId = null;
       return {};
     }
     default:

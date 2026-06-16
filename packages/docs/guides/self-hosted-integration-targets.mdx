@@ -45,10 +45,12 @@ These targets only need to be enabled:
 - `anthropic-default`
 - `datadog-default`
 - `e2b-default`
+- `inception-default`
 - `jira-default`
 - `linear-default`
 - `notion-mcp`
 - `opencode-go`
+- `openrouter-default`
 - `planetscale-mcp`
 - `signoz-mcp`
 
@@ -115,7 +117,7 @@ Use the `openai-default` block from `integration-targets.json` as your starting 
 
 ### Agent And Sandbox Runtime Targets
 
-`anthropic-default` and `opencode-go` are model-provider targets for sandbox profiles that use the OpenCode agent runtime.
+`anthropic-default`, `inception-default`, `opencode-go`, and `openrouter-default` are model-provider targets for sandbox profiles that use agent runtimes.
 
 `e2b-default` exposes E2B as a sandbox runtime connection target. Operators still configure deployment-level E2B runtime settings in [Self-Hosted Configuration](/guides/self-hosted-configuration), while workspace admins can use the integration connection when a profile should use workspace-owned E2B credentials.
 

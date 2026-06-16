@@ -19,8 +19,8 @@ use crate::egress_proxy::EgressProxy;
 use crate::keepalive::KeepaliveManager;
 use crate::process;
 use crate::process::{
-    CodexAppServerControlHandle, CodexAppServerObservationHandle, OpenCodeServerControlHandle,
-    PlatformProcessRegistry,
+    ClaudeCodeServerControlHandle, CodexAppServerControlHandle, CodexAppServerObservationHandle,
+    OpenCodeServerControlHandle, PlatformProcessRegistry,
 };
 use crate::protocol::activation::ActivationInput;
 use crate::protocol::session::SessionRuntimeInput;
@@ -155,6 +155,7 @@ pub struct SandboxdState {
     runtime_adapters: RuntimeAdapters,
     codex_app_server_observation_handle: Option<CodexAppServerObservationHandle>,
     codex_app_server_control_handle: Option<CodexAppServerControlHandle>,
+    claude_code_server_control_handle: Option<ClaudeCodeServerControlHandle>,
     opencode_server_control_handle: Option<OpenCodeServerControlHandle>,
     codex_proxy_control_handle: Option<CodexProxyControlHandle>,
     runtime_coordination_shutdown_requested: Arc<AtomicBool>,
@@ -567,6 +568,7 @@ impl SandboxdState {
                 runtime_adapters: RuntimeAdapters::default(),
                 codex_app_server_observation_handle: None,
                 codex_app_server_control_handle: None,
+                claude_code_server_control_handle: None,
                 opencode_server_control_handle: None,
                 codex_proxy_control_handle: None,
                 runtime_coordination_shutdown_requested: Arc::new(AtomicBool::new(false)),
@@ -637,6 +639,10 @@ impl SandboxdState {
         let opencode_server_control_handle = process_manager
             .as_ref()
             .and_then(process::RuntimeClientProcessManager::opencode_server_control_handle)
+            .cloned();
+        let claude_code_server_control_handle = process_manager
+            .as_ref()
+            .and_then(process::RuntimeClientProcessManager::claude_code_server_control_handle)
             .cloned();
 
         let runtime_adapter_observer = RuntimeAdapterTimelineObserver {
@@ -784,6 +790,7 @@ impl SandboxdState {
         let runtime_coordination_handles = RuntimeCoordinationHandles {
             codex_app_server_control_handle: codex_app_server_control_handle.clone(),
             codex_proxy_control_handle: codex_proxy_control_handle.clone(),
+            claude_code_server_control_handle: claude_code_server_control_handle.clone(),
             opencode_server_control_handle: opencode_server_control_handle.clone(),
         };
         let runtime_coordination_thread = runtime_coordination_handles
@@ -808,6 +815,7 @@ impl SandboxdState {
             runtime_adapters,
             codex_app_server_observation_handle,
             codex_app_server_control_handle,
+            claude_code_server_control_handle,
             opencode_server_control_handle,
             codex_proxy_control_handle,
             runtime_coordination_shutdown_requested,
@@ -1268,6 +1276,10 @@ impl SandboxdState {
 
     pub fn codex_app_server_control_handle(&self) -> Option<&CodexAppServerControlHandle> {
         self.codex_app_server_control_handle.as_ref()
+    }
+
+    pub fn claude_code_server_control_handle(&self) -> Option<&ClaudeCodeServerControlHandle> {
+        self.claude_code_server_control_handle.as_ref()
     }
 
     pub fn opencode_server_control_handle(&self) -> Option<&OpenCodeServerControlHandle> {

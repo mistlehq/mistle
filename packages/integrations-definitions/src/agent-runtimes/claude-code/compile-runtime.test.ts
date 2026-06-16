@@ -252,6 +252,7 @@ describe("compileClaudeCodeRuntime", () => {
       content: expect.stringContaining('"mistle"'),
     });
     expect(mcpConfig?.content).toContain('"url": "https://mcp.example.test/mcp"');
+    expect(mcpConfig?.content).toContain('"type": "http"');
   });
 
   it("writes Claude Code MCP config when provider MCP is resolved", () => {
@@ -265,6 +266,7 @@ describe("compileClaudeCodeRuntime", () => {
       content: expect.stringContaining('"remote-http"'),
     });
     expect(mcpConfig?.content).toContain('"url": "https://remote-mcp.example.test/mcp"');
+    expect(mcpConfig?.content).toContain('"type": "http"');
     expect(mcpConfig?.content).toContain('"Authorization": "Bearer mistle-managed-credential"');
   });
 

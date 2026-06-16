@@ -884,6 +884,7 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     expect(JSON.parse(readSetupFileContent(runtimePlan, "claude_code_mcp_config"))).toEqual({
       mcpServers: {
         mistle: {
+          type: "http",
           url: "https://mcp.example.test/mcp",
         },
       },
