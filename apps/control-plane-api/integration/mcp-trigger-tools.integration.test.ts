@@ -423,6 +423,58 @@ describe.concurrent("MCP trigger tools integration", () => {
     expect(persistedWebhook?.payloadFilter).toBeNull();
   });
 
+  it("rejects webhook trigger events that the current webhook source does not support", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-trigger-webhook-events-invalid@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP trigger invalid event updater",
+      permissions: [OrganizationPermissions.TRIGGER_UPDATE],
+    });
+
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_mcp_trigger_webhook_events_invalid",
+      webhookSourceId: "iws_mcp_trigger_webhook_events_invalid",
+      profileId: "sbp_mcp_trigger_webhook_events_invalid",
+      profileVersion: 1,
+      profileActiveVersion: 1,
+    });
+    await seedPersistedWebhookTrigger(env, {
+      triggerId: "atm_mcp_trigger_webhook_events_invalid",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_mcp_trigger_webhook_events_invalid",
+      profileId: "sbp_mcp_trigger_webhook_events_invalid",
+      profileVersion: 1,
+      targetId: "atg_mcp_trigger_webhook_events_invalid",
+      name: "MCP webhook invalid event update",
+    });
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "set_trigger_webhook_events",
+      arguments: {
+        triggerId: "atm_mcp_trigger_webhook_events_invalid",
+        eventTypes: ["github.not_a_real_event"],
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    const persistedWebhook = await env.controlPlaneDb.query.webhookTriggers.findFirst({
+      columns: {
+        eventTypes: true,
+      },
+      where: (table, { eq }) => eq(table.triggerId, "atm_mcp_trigger_webhook_events_invalid"),
+    });
+    expect(persistedWebhook?.eventTypes).toEqual([GitHubIssueCommentCreatedEventType]);
+  });
+
   it("updates shared scheduled trigger fields with generic trigger update permission", async ({
     env,
   }) => {
