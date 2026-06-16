@@ -46,8 +46,44 @@ export type WebSocketHealthSnapshot = {
   healthy: boolean;
   consecutiveMissedPongs: number;
   lastPongAgeMs: number;
+  lastControlFrame: WebSocketHealthControlFrameKind | null;
+  lastControlFrameAtMs: number | null;
+  lastPeerPingAtMs: number | null;
+  lastPongAtMs: number | null;
+  lastPongPingSeq: number | null;
   pingInFlight: boolean;
   pingSeq: number | null;
+};
+
+export type WebSocketHealthControlFrameKind = "close" | "error" | "ping" | "pong";
+
+export type WebSocketHealthPeerPingReceived = {
+  payloadLen: number;
+  receivedAtMs: number;
+  socket: WebSocketHealthSocketSnapshot;
+};
+
+export type WebSocketHealthPongReceived = {
+  expectedPingSeq: number | null;
+  lastPongAgeMs: number;
+  matched: boolean;
+  pingSeq: number | null;
+  receivedAtMs: number;
+  sentAtMs: number | null;
+  socket: WebSocketHealthSocketSnapshot;
+};
+
+export type WebSocketHealthSocketClosed = {
+  closeCode: number;
+  closeReason: string;
+  observedAtMs: number;
+  socket: WebSocketHealthSocketSnapshot;
+};
+
+export type WebSocketHealthSocketError = {
+  error: Error;
+  observedAtMs: number;
+  socket: WebSocketHealthSocketSnapshot;
 };
 
 export type WebSocketHealthPingWriteCompleted = {
@@ -84,9 +120,13 @@ export function startWebSocketHealthMonitor(input: {
   pongTimeoutMs: number;
   maxConsecutiveMissedPongs?: number;
   onMissedPong?: (state: WebSocketHealthMissedPong) => void;
+  onPeerPingReceived?: (state: WebSocketHealthPeerPingReceived) => void;
   onPingWriteCompleted?: (state: WebSocketHealthPingWriteCompleted) => void;
   onPingWriteFailed?: (state: WebSocketHealthPingWriteFailed) => void;
+  onPongReceived?: (state: WebSocketHealthPongReceived) => void;
   onRecovered?: (state: WebSocketHealthRecovered) => void;
+  onSocketClosed?: (state: WebSocketHealthSocketClosed) => void;
+  onSocketError?: (state: WebSocketHealthSocketError) => void;
   onUnhealthy: () => void;
   onRoundTripTimeObserved?: (roundTripTimeMs: number) => void;
 }): WebSocketHealthHandle {
@@ -102,6 +142,11 @@ export function startWebSocketHealthMonitor(input: {
   let pongTimeoutHandle: TimerHandle | undefined;
   let consecutiveMissedPongs = 0;
   let lastPongAtMs = input.clock.nowMs();
+  let lastPongReceivedAtMs: number | undefined;
+  let lastControlFrame: WebSocketHealthControlFrameKind | undefined;
+  let lastControlFrameAtMs: number | undefined;
+  let lastPeerPingAtMs: number | undefined;
+  let lastPongPingSeq: number | undefined;
   let nextPingSeq = 1;
   let pingSeq: number | undefined;
   let pingScheduleDelayMs: number | undefined;
@@ -118,11 +163,25 @@ export function startWebSocketHealthMonitor(input: {
       return;
     }
     const pongPayload = parseHealthPingPayload(data);
-    if (pongPayload !== null && pingSeq !== undefined && pongPayload.pingSeq !== pingSeq) {
+    const nowMs = input.clock.nowMs();
+    lastControlFrame = "pong";
+    lastControlFrameAtMs = nowMs;
+    const matched =
+      pongPayload === null || pingSeq === undefined || pongPayload.pingSeq === pingSeq;
+    input.onPongReceived?.({
+      expectedPingSeq: pingSeq ?? null,
+      lastPongAgeMs: nowMs - lastPongAtMs,
+      matched,
+      pingSeq: pongPayload?.pingSeq ?? null,
+      receivedAtMs: nowMs,
+      sentAtMs: pongPayload?.sentAtMs ?? null,
+      socket: snapshotWebSocketHealthSocket(input.socket),
+    });
+    if (!matched) {
       return;
     }
     if (pingSentAtMs !== undefined) {
-      const roundTripTimeMs = input.clock.nowMs() - pingSentAtMs;
+      const roundTripTimeMs = nowMs - pingSentAtMs;
       TunnelWebSocketRoundTripTimeMs.record(
         roundTripTimeMs,
         buildRoundTripAttributes({
@@ -133,7 +192,6 @@ export function startWebSocketHealthMonitor(input: {
       input.onRoundTripTimeObserved?.(roundTripTimeMs);
       pingSentAtMs = undefined;
     }
-    const nowMs = input.clock.nowMs();
     if (consecutiveMissedPongs > 0) {
       input.onRecovered?.({
         consecutiveMissedPongs,
@@ -143,6 +201,8 @@ export function startWebSocketHealthMonitor(input: {
     }
     consecutiveMissedPongs = 0;
     lastPongAtMs = nowMs;
+    lastPongReceivedAtMs = nowMs;
+    lastPongPingSeq = pongPayload?.pingSeq ?? pingSeq;
     pingSeq = undefined;
     if (pongTimeoutHandle !== undefined) {
       input.scheduler.cancel(pongTimeoutHandle);
@@ -179,7 +239,52 @@ export function startWebSocketHealthMonitor(input: {
 
     stopped = true;
     cleanupTimers();
+    rawSocket.off("close", onClose);
+    rawSocket.off("error", onError);
+    rawSocket.off("ping", onPing);
     rawSocket.off("pong", onPong);
+  };
+
+  const onPing = (data: RawData): void => {
+    if (stopped) {
+      return;
+    }
+    const nowMs = input.clock.nowMs();
+    lastControlFrame = "ping";
+    lastControlFrameAtMs = nowMs;
+    lastPeerPingAtMs = nowMs;
+    input.onPeerPingReceived?.({
+      payloadLen: rawDataToBuffer(data).length,
+      receivedAtMs: nowMs,
+      socket: snapshotWebSocketHealthSocket(input.socket),
+    });
+  };
+
+  const onClose = (code: number, reason: Buffer): void => {
+    const nowMs = input.clock.nowMs();
+    lastControlFrame = "close";
+    lastControlFrameAtMs = nowMs;
+    input.onSocketClosed?.({
+      closeCode: code,
+      closeReason: reason.toString("utf8"),
+      observedAtMs: nowMs,
+      socket: snapshotWebSocketHealthSocket(input.socket),
+    });
+    stopForClosedSocket();
+  };
+
+  const onError = (error: Error): void => {
+    if (stopped) {
+      return;
+    }
+    const nowMs = input.clock.nowMs();
+    lastControlFrame = "error";
+    lastControlFrameAtMs = nowMs;
+    input.onSocketError?.({
+      error,
+      observedAtMs: nowMs,
+      socket: snapshotWebSocketHealthSocket(input.socket),
+    });
   };
 
   const scheduleNextPing = (): void => {
@@ -293,6 +398,9 @@ export function startWebSocketHealthMonitor(input: {
     }, input.pingIntervalMs);
   };
 
+  rawSocket.on("close", onClose);
+  rawSocket.on("error", onError);
+  rawSocket.on("ping", onPing);
   rawSocket.on("pong", onPong);
   scheduleNextPing();
 
@@ -304,6 +412,9 @@ export function startWebSocketHealthMonitor(input: {
 
       stopped = true;
       cleanupTimers();
+      rawSocket.off("close", onClose);
+      rawSocket.off("error", onError);
+      rawSocket.off("ping", onPing);
       rawSocket.off("pong", onPong);
     },
     isHealthy: () => healthy,
@@ -311,6 +422,11 @@ export function startWebSocketHealthMonitor(input: {
       healthy,
       consecutiveMissedPongs,
       lastPongAgeMs: input.clock.nowMs() - lastPongAtMs,
+      lastControlFrame: lastControlFrame ?? null,
+      lastControlFrameAtMs: lastControlFrameAtMs ?? null,
+      lastPeerPingAtMs: lastPeerPingAtMs ?? null,
+      lastPongAtMs: lastPongReceivedAtMs ?? null,
+      lastPongPingSeq: lastPongPingSeq ?? null,
       pingInFlight: pingSentAtMs !== undefined,
       pingSeq: pingSeq ?? null,
     }),

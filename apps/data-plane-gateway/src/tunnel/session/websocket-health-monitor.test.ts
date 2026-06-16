@@ -8,7 +8,9 @@ import type { RelayPeerSocket } from "../types.js";
 import {
   startWebSocketHealthMonitor,
   type WebSocketHealthMissedPong,
+  type WebSocketHealthPeerPingReceived,
   type WebSocketHealthPingWriteCompleted,
+  type WebSocketHealthPongReceived,
 } from "./websocket-health-monitor.js";
 
 type WebSocketPair = {
@@ -306,6 +308,109 @@ describe("startWebSocketHealthMonitor", () => {
     handle.stop();
   });
 
+  it("reports matched pong receive diagnostics", async () => {
+    const pair = await createWebSocketPair({ clientAutoPong: false });
+    openPairs.add(pair);
+    const clock = createMutableClock(1_600);
+    const scheduler = createManualScheduler(clock);
+    const receivedPongs: WebSocketHealthPongReceived[] = [];
+
+    const handle = startWebSocketHealthMonitor({
+      clock,
+      socketKind: "bootstrap",
+      tokenKind: "bootstrap",
+      socket: pair.peerSocket,
+      scheduler,
+      pingIntervalMs: 10,
+      pongTimeoutMs: 10,
+      onPongReceived: (event) => {
+        receivedPongs.push(event);
+      },
+      onUnhealthy: () => {
+        throw new Error("Socket should stay healthy after matching pong.");
+      },
+    });
+
+    const pingPayload = await sendScheduledPing({
+      clock,
+      clientSocket: pair.clientSocket,
+      scheduler,
+    });
+    clock.advanceMs(4);
+    const pongPromise = waitForPong(pair.serverSocket);
+    await sendPong(pair.clientSocket, pingPayload);
+    await pongPromise;
+
+    expect(receivedPongs).toEqual([
+      {
+        expectedPingSeq: 1,
+        lastPongAgeMs: 14,
+        matched: true,
+        pingSeq: 1,
+        receivedAtMs: 1_614,
+        sentAtMs: 1_610,
+        socket: {
+          bufferedAmount: 0,
+          readyState: WebSocket.OPEN,
+        },
+      },
+    ]);
+    expect(handle.getSnapshot()).toMatchObject({
+      lastControlFrame: "pong",
+      lastControlFrameAtMs: 1_614,
+      lastPongAtMs: 1_614,
+      lastPongPingSeq: 1,
+      pingInFlight: false,
+      pingSeq: null,
+    });
+    handle.stop();
+  });
+
+  it("reports peer ping control-frame diagnostics", async () => {
+    const pair = await createWebSocketPair();
+    openPairs.add(pair);
+    const clock = createMutableClock(1_650);
+    const scheduler = createManualScheduler(clock);
+    const receivedPeerPings: WebSocketHealthPeerPingReceived[] = [];
+
+    const handle = startWebSocketHealthMonitor({
+      clock,
+      socketKind: "bootstrap",
+      tokenKind: "bootstrap",
+      socket: pair.peerSocket,
+      scheduler,
+      pingIntervalMs: 10,
+      pongTimeoutMs: 10,
+      onPeerPingReceived: (event) => {
+        receivedPeerPings.push(event);
+      },
+      onUnhealthy: () => {
+        throw new Error("Socket should stay healthy after peer ping.");
+      },
+    });
+
+    clock.advanceMs(3);
+    pair.clientSocket.ping("peer-health");
+    await waitForPong(pair.clientSocket);
+
+    expect(receivedPeerPings).toEqual([
+      {
+        payloadLen: "peer-health".length,
+        receivedAtMs: 1_653,
+        socket: {
+          bufferedAmount: 0,
+          readyState: WebSocket.OPEN,
+        },
+      },
+    ]);
+    expect(handle.getSnapshot()).toMatchObject({
+      lastControlFrame: "ping",
+      lastControlFrameAtMs: 1_653,
+      lastPeerPingAtMs: 1_653,
+    });
+    handle.stop();
+  });
+
   it("reports missed pong diagnostics with timer drift and ping write state", async () => {
     const pair = await createWebSocketPair({ clientAutoPong: false });
     openPairs.add(pair);
@@ -511,6 +616,7 @@ describe("startWebSocketHealthMonitor", () => {
     const scheduler = createManualScheduler(clock);
     const missedPongCounts: number[] = [];
     const recoveredMissedPongCounts: number[] = [];
+    const receivedPongs: WebSocketHealthPongReceived[] = [];
     let unhealthyCount = 0;
 
     const handle = startWebSocketHealthMonitor({
@@ -524,6 +630,9 @@ describe("startWebSocketHealthMonitor", () => {
       maxConsecutiveMissedPongs: 3,
       onMissedPong: ({ consecutiveMissedPongs }) => {
         missedPongCounts.push(consecutiveMissedPongs);
+      },
+      onPongReceived: (event) => {
+        receivedPongs.push(event);
       },
       onRecovered: ({ consecutiveMissedPongs }) => {
         recoveredMissedPongCounts.push(consecutiveMissedPongs);
@@ -552,6 +661,13 @@ describe("startWebSocketHealthMonitor", () => {
     await stalePongPromise;
 
     expect(handle.getSnapshot().pingSeq).toBe(2);
+    expect(receivedPongs).toMatchObject([
+      {
+        expectedPingSeq: 2,
+        matched: false,
+        pingSeq: 1,
+      },
+    ]);
     expect(handle.isHealthy()).toBe(true);
     expect(unhealthyCount).toBe(0);
     expect(missedPongCounts).toEqual([1]);

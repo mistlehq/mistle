@@ -706,6 +706,24 @@ pub(super) fn spawn_bootstrap_socket_task(
                         Some(Ok(Message::Close(frame))) => {
                             let close_code = frame.as_ref().map(|frame| frame.code.to_string());
                             let close_reason = frame.as_ref().map(|frame| frame.reason.to_string());
+                            record_bootstrap_tunnel_diagnostic_event(
+                                "bootstrap_tunnel.socket_read_advanced",
+                                bootstrap_control_frame_attributes(
+                                    "close",
+                                    0,
+                                    close_code.as_deref(),
+                                    close_reason.as_deref(),
+                                ),
+                            );
+                            record_bootstrap_tunnel_diagnostic_event(
+                                "bootstrap_tunnel.reader_frame_decoded",
+                                bootstrap_control_frame_attributes(
+                                    "close",
+                                    0,
+                                    close_code.as_deref(),
+                                    close_reason.as_deref(),
+                                ),
+                            );
                             let mut attributes = BTreeMap::new();
                             attributes.insert("closeSource".to_string(), Value::String("reader".to_string()));
                             attributes.insert("closeKind".to_string(), Value::String("close_frame".to_string()));
@@ -784,7 +802,20 @@ pub(super) fn spawn_bootstrap_socket_task(
                         Some(Ok(Message::Ping(payload))) => {
                             let payload_len = payload.len();
                             let ping_received_at = Instant::now();
-                            let ping_attributes = bootstrap_ping_payload_attributes(&payload);
+                            let ping_attributes =
+                                bootstrap_ping_control_frame_attributes(&payload);
+                            record_bootstrap_tunnel_diagnostic_event(
+                                "bootstrap_tunnel.socket_read_advanced",
+                                bootstrap_control_frame_attributes("ping", payload_len, None, None),
+                            );
+                            record_bootstrap_tunnel_diagnostic_event(
+                                "bootstrap_tunnel.reader_frame_decoded",
+                                ping_attributes.clone(),
+                            );
+                            record_bootstrap_tunnel_diagnostic_event(
+                                "bootstrap_tunnel.control_handler_entered",
+                                ping_attributes.clone(),
+                            );
                             record_bootstrap_tunnel_diagnostic_event(
                                 "bootstrap_tunnel.ping_received",
                                 ping_attributes.clone(),
@@ -820,6 +851,18 @@ pub(super) fn spawn_bootstrap_socket_task(
                             info!(
                                 event = "bootstrap_tunnel.pong_queued",
                                 payload_len,
+                            );
+                        }
+                        Some(Ok(Message::Pong(payload))) => {
+                            let payload_attributes =
+                                bootstrap_pong_control_frame_attributes(&payload);
+                            record_bootstrap_tunnel_diagnostic_event(
+                                "bootstrap_tunnel.socket_read_advanced",
+                                bootstrap_control_frame_attributes("pong", payload.len(), None, None),
+                            );
+                            record_bootstrap_tunnel_diagnostic_event(
+                                "bootstrap_tunnel.reader_frame_decoded",
+                                payload_attributes,
                             );
                         }
                         Some(Ok(message)) => {
@@ -902,6 +945,49 @@ fn bootstrap_ping_payload_attributes(payload: &[u8]) -> BTreeMap<String, Value> 
         if let Some(sent_at_ms) = parsed.get("sentAtMs").and_then(Value::as_u64) {
             attributes.insert("gatewaySentAtMs".to_string(), Value::from(sent_at_ms));
         }
+    }
+    attributes
+}
+
+fn bootstrap_ping_control_frame_attributes(payload: &[u8]) -> BTreeMap<String, Value> {
+    let mut attributes = bootstrap_ping_payload_attributes(payload);
+    attributes.insert("frameKind".to_string(), Value::String("ping".to_string()));
+    attributes
+}
+
+fn bootstrap_pong_control_frame_attributes(payload: &[u8]) -> BTreeMap<String, Value> {
+    let mut attributes = bootstrap_payload_diagnostic_attributes(
+        payload.len(),
+        serde_json::from_slice(payload).ok(),
+    );
+    attributes.insert("frameKind".to_string(), Value::String("pong".to_string()));
+    attributes
+}
+
+fn bootstrap_control_frame_attributes(
+    frame_kind: &str,
+    payload_len: usize,
+    close_code: Option<&str>,
+    close_reason: Option<&str>,
+) -> BTreeMap<String, Value> {
+    let mut attributes = BTreeMap::from([
+        (
+            "frameKind".to_string(),
+            Value::String(frame_kind.to_string()),
+        ),
+        ("payloadLen".to_string(), usize_value(payload_len)),
+    ]);
+    if let Some(close_code) = close_code {
+        attributes.insert(
+            "closeCode".to_string(),
+            Value::String(close_code.to_string()),
+        );
+    }
+    if let Some(close_reason) = close_reason {
+        attributes.insert(
+            "closeReason".to_string(),
+            Value::String(close_reason.to_string()),
+        );
     }
     attributes
 }
@@ -1380,8 +1466,10 @@ pub(in crate::tunnel::session) fn write_tunnel_close(
 mod tests {
     use std::time::{Duration, Instant};
 
-    use futures_util::StreamExt;
+    use futures_util::{SinkExt, StreamExt};
     use serde_json::json;
+    use tokio::sync::mpsc;
+    use tokio_tungstenite::MaybeTlsStream;
     use tokio_tungstenite::WebSocketStream;
     use tokio_tungstenite::tungstenite::{Message, protocol::Role};
 
@@ -1393,11 +1481,12 @@ mod tests {
     use crate::tunnel::session::bootstrap::{
         BootstrapPongControlMessage, BootstrapWriterControlMessage,
         GATEWAY_SERVICE_RESTART_CLOSE_CODE, GATEWAY_SERVICE_RESTART_CLOSE_REASON,
-        bootstrap_close_frame_disconnect_reason, bootstrap_ping_payload_attributes,
+        bootstrap_close_frame_disconnect_reason, bootstrap_ping_control_frame_attributes,
+        bootstrap_ping_payload_attributes, bootstrap_pong_control_frame_attributes,
         bootstrap_pong_diagnostic_attributes, is_gateway_service_restart_close_frame,
         prioritize_ipv4_socket_addresses, record_bootstrap_tunnel_diagnostic_event,
-        resolve_tunnel_exchange_url, startup_transparent_passthrough_socket_mark, usize_value,
-        write_bootstrap_control_message,
+        resolve_tunnel_exchange_url, spawn_bootstrap_socket_task,
+        startup_transparent_passthrough_socket_mark, usize_value, write_bootstrap_control_message,
     };
 
     #[test]
@@ -1449,6 +1538,24 @@ mod tests {
                 ("writeDurationMs".to_string(), json!(3_u64)),
             ])
         );
+        assert_eq!(
+            bootstrap_ping_control_frame_attributes(payload),
+            std::collections::BTreeMap::from([
+                ("frameKind".to_string(), json!("ping")),
+                ("gatewaySentAtMs".to_string(), json!(1780590000000_u64)),
+                ("payloadLen".to_string(), usize_value(payload.len())),
+                ("pingSeq".to_string(), json!(7_u64)),
+            ])
+        );
+        assert_eq!(
+            bootstrap_pong_control_frame_attributes(payload),
+            std::collections::BTreeMap::from([
+                ("frameKind".to_string(), json!("pong")),
+                ("gatewaySentAtMs".to_string(), json!(1780590000000_u64)),
+                ("payloadLen".to_string(), usize_value(payload.len())),
+                ("pingSeq".to_string(), json!(7_u64)),
+            ])
+        );
     }
 
     #[test]
@@ -1469,6 +1576,92 @@ mod tests {
                 ("queueDelayMs".to_string(), json!(5_u64)),
             ])
         );
+    }
+
+    #[tokio::test]
+    async fn records_bootstrap_control_frame_reader_diagnostics() {
+        let temp_dir = tempfile::tempdir().expect("tempdir should be created");
+        let _guard = crate::test_support::TestEnvVarsGuard::set([(
+            "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
+            temp_dir
+                .path()
+                .to_str()
+                .expect("temp dir path should be utf8 for environment variable")
+                .to_string(),
+        )]);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("test websocket listener should bind");
+        let address = listener
+            .local_addr()
+            .expect("test websocket listener address should resolve");
+        let accept_socket = async {
+            let (stream, _) = listener
+                .accept()
+                .await
+                .expect("test websocket connection should be accepted");
+            tokio_tungstenite::accept_async(MaybeTlsStream::Plain(stream))
+                .await
+                .expect("sandboxd websocket handshake should succeed")
+        };
+        let connect_socket = async {
+            let (socket, _) = tokio_tungstenite::connect_async(format!("ws://{address}"))
+                .await
+                .expect("gateway websocket should connect");
+            socket
+        };
+        let (mut gateway_socket, sandboxd_socket) = tokio::join!(connect_socket, accept_socket);
+        let (_writer_sender, writer_receiver) = mpsc::unbounded_channel();
+        let (event_sender, _event_receiver) = mpsc::unbounded_channel();
+        let socket_task =
+            spawn_bootstrap_socket_task(sandboxd_socket, writer_receiver, event_sender);
+        let payload =
+            br#"{"type":"mistle.tunnel.health_ping","pingSeq":11,"sentAtMs":1780590000011}"#
+                .to_vec();
+
+        gateway_socket
+            .send(Message::Ping(payload.clone().into()))
+            .await
+            .expect("gateway ping frame should send");
+        let Some(Ok(Message::Pong(written_payload))) = gateway_socket.next().await else {
+            panic!("gateway should receive pong frame");
+        };
+        assert_eq!(written_payload.as_ref(), payload.as_slice());
+        gateway_socket
+            .send(Message::Close(None))
+            .await
+            .expect("gateway close frame should send");
+        socket_task
+            .await
+            .expect("socket task should join")
+            .expect("socket task should complete cleanly");
+
+        let log_text = std::fs::read_to_string(temp_dir.path().join("bootstrap-tunnel.log"))
+            .expect("bootstrap tunnel diagnostic log should be readable");
+        let records: Vec<serde_json::Value> = log_text
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("diagnostic line should be json"))
+            .collect();
+        let events: Vec<&str> = records
+            .iter()
+            .filter_map(|record| record["event"].as_str())
+            .collect();
+
+        assert!(events.contains(&"bootstrap_tunnel.socket_read_advanced"));
+        assert!(events.contains(&"bootstrap_tunnel.reader_frame_decoded"));
+        assert!(events.contains(&"bootstrap_tunnel.control_handler_entered"));
+        assert!(events.contains(&"bootstrap_tunnel.ping_received"));
+        assert!(events.contains(&"bootstrap_tunnel.pong_queued"));
+        assert!(events.contains(&"bootstrap_tunnel.pong_write_started"));
+        assert!(events.contains(&"bootstrap_tunnel.pong_write_completed"));
+        let handler = records
+            .iter()
+            .find(|record| record["event"] == "bootstrap_tunnel.control_handler_entered")
+            .expect("control handler record should be present");
+        assert_eq!(handler["frameKind"], json!("ping"));
+        assert_eq!(handler["payloadLen"], json!(payload.len()));
+        assert_eq!(handler["pingSeq"], json!(11_u64));
+        assert_eq!(handler["gatewaySentAtMs"], json!(1780590000011_u64));
     }
 
     #[tokio::test]
