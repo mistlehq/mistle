@@ -192,6 +192,20 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "railway-mcp",
+        familyId: "railway",
+        variantId: "railway-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
+        targetKey: "render-mcp",
+        familyId: "render",
+        variantId: "render-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "resend-mcp",
         familyId: "resend",
         variantId: "resend-mcp",

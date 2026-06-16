@@ -28,7 +28,9 @@ import { OpenCodeGoDefinition } from "./opencode/index.js";
 import { OpenRouterDefinition } from "./openrouter/index.js";
 import { PlanetScaleMcpBaseDefinition } from "./planetscale/variants/planetscale-mcp/base-definition.js";
 import { PostHogMcpBaseDefinition } from "./posthog/variants/posthog-mcp/base-definition.js";
+import { RailwayMcpBaseDefinition } from "./railway/variants/railway-mcp/base-definition.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
+import { RenderDefinition } from "./render/variants/render-mcp/definition.js";
 import { ResendMcpBaseDefinition } from "./resend/variants/resend-mcp/base-definition.js";
 import {
   E2BSandboxRuntimeDefinition,
@@ -63,6 +65,8 @@ export const OpenCodeGoBrowserDefinition = OpenCodeGoDefinition;
 export const OpenRouterBrowserDefinition = OpenRouterDefinition;
 export const PlanetScaleBrowserDefinition = PlanetScaleMcpBaseDefinition;
 export const PostHogBrowserDefinition = PostHogMcpBaseDefinition;
+export const RailwayBrowserDefinition = RailwayMcpBaseDefinition;
+export const RenderBrowserDefinition = RenderDefinition;
 export const ResendBrowserDefinition = ResendMcpBaseDefinition;
 export const E2BSandboxRuntimeBrowserDefinition = E2BSandboxRuntimeDefinition;
 export const ModalSandboxRuntimeBrowserDefinition = ModalSandboxRuntimeDefinition;
@@ -98,6 +102,8 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   OpenRouterBrowserDefinition,
   PlanetScaleBrowserDefinition,
   PostHogBrowserDefinition,
+  RailwayBrowserDefinition,
+  RenderBrowserDefinition,
   ResendBrowserDefinition,
   E2BSandboxRuntimeBrowserDefinition,
   ModalSandboxRuntimeBrowserDefinition,
@@ -147,6 +153,8 @@ export * from "./notion/browser.js";
 export * from "./opencode/index.js";
 export * from "./openrouter/index.js";
 export * from "./posthog/browser.js";
+export * from "./railway/browser.js";
+export * from "./render/index.js";
 export * from "./resend/browser.js";
 export * from "./sandbox-runtimes/index.js";
 export * from "./sentry/browser.js";

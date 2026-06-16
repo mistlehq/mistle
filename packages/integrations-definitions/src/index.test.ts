@@ -117,6 +117,14 @@ describe("integrations-definitions index", () => {
       familyId: "posthog",
       variantId: "posthog-mcp",
     });
+    const railwayDefinition = registry.getDefinition({
+      familyId: "railway",
+      variantId: "railway-mcp",
+    });
+    const renderDefinition = registry.getDefinition({
+      familyId: "render",
+      variantId: "render-mcp",
+    });
     const resendDefinition = registry.getDefinition({
       familyId: "resend",
       variantId: "resend-mcp",
@@ -595,6 +603,45 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(postHogDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(railwayDefinition).toMatchObject({
+      familyId: "railway",
+      variantId: "railway-mcp",
+      kind: "connector",
+      displayName: "Railway",
+      logoKey: "railway",
+      connectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "Railway OAuth",
+          kind: "redirect",
+        },
+      ],
+    });
+    expect(railwayDefinition?.mcp).toBeDefined();
+    expect(railwayDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(renderDefinition).toMatchObject({
+      familyId: "render",
+      variantId: "render-mcp",
+      kind: "connector",
+      displayName: "Render",
+      logoKey: "render",
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+              slotKey: "render.render-mcp.api-key.api-key",
+            },
+          ],
+        },
+      ],
+    });
+    expect(renderDefinition?.mcp).toBeDefined();
     expect(notionDefinition).toMatchObject({
       familyId: "notion",
       variantId: "notion-mcp",
@@ -1066,7 +1113,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(33);
+    expect(definitions).toHaveLength(35);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -1093,6 +1140,8 @@ describe("integrations-definitions index", () => {
       "openrouter::openrouter-default",
       "planetscale::planetscale-mcp",
       "posthog::posthog-mcp",
+      "railway::railway-mcp",
+      "render::render-mcp",
       "resend::resend-mcp",
       "e2b::e2b-default",
       "modal::modal-default",
