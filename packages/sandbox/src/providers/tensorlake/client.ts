@@ -2,6 +2,7 @@ import { systemClock, systemSleeper } from "@mistle/time";
 import {
   Sandbox,
   SandboxClient,
+  SandboxNotFoundError,
   SandboxStatus,
   StdinMode,
   type CommandResult,
@@ -75,6 +76,8 @@ export const DaemonReadinessPollTimeoutMs =
   DaemonReadinessPollIntervalMs * DaemonReadinessPollAttempts;
 const ClaimedSandboxReadinessPollIntervalMs = 500;
 const ClaimedSandboxReadinessPollAttempts = 120;
+const DeletedSandboxReadinessPollIntervalMs = 500;
+const DeletedSandboxReadinessPollAttempts = 120;
 const StartupCommandPollIntervalMs = 250;
 export const StartupCommandPollTimeoutMs = 60 * 60 * 1000;
 const StartupCommandPollAttempts = StartupCommandPollTimeoutMs / StartupCommandPollIntervalMs;
@@ -511,6 +514,7 @@ export class TensorlakeApiClient implements TensorlakeClient {
 
     try {
       await this.#client.delete(parsedRequest.sandboxId);
+      await this.#waitForSandboxDeletion(parsedRequest.sandboxId);
       await this.#deleteSuspendSnapshots(parsedRequest.sandboxId);
     } catch (error) {
       throw mapTensorlakeClientError(TensorlakeClientOperationIds.TERMINATE_SANDBOX, error);
@@ -578,6 +582,31 @@ export class TensorlakeApiClient implements TensorlakeClient {
         await this.#client.deleteSnapshot(snapshot.snapshotId);
       }
     }
+  }
+
+  async #waitForSandboxDeletion(sandboxId: string): Promise<void> {
+    for (let attempt = 1; attempt <= DeletedSandboxReadinessPollAttempts; attempt += 1) {
+      try {
+        const sandbox = await this.#client.get(sandboxId);
+        if (
+          sandbox.status === SandboxStatus.TERMINATED ||
+          sandbox.status === SandboxStatus.TIMEOUT
+        ) {
+          return;
+        }
+      } catch (error) {
+        if (error instanceof SandboxNotFoundError || isTensorlakeRemoteApiStatusCode(error, 404)) {
+          return;
+        }
+        throw error;
+      }
+
+      await systemSleeper.sleep(DeletedSandboxReadinessPollIntervalMs);
+    }
+
+    throw new Error(
+      `Tensorlake sandbox ${sandboxId} did not become terminal after delete before suspend snapshot cleanup.`,
+    );
   }
 
   async #readProcessOutput(
