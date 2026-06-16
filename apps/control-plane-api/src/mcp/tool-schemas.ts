@@ -1,4 +1,4 @@
-import { SandboxProfileVersionAgentRuntimeIds } from "@mistle/db/control-plane";
+import { SandboxProfileVersionAgentRuntimeIds, TriggerKinds } from "@mistle/db/control-plane";
 import { z } from "zod";
 
 // MCP tool schemas are discovery metadata first: `tools/list` must serialize
@@ -104,5 +104,28 @@ export const mcpSandboxOperationEventsListInputSchema = z
     operationId: z.string().min(1),
     afterSequence: z.number().int().min(0).optional(),
     limit: z.number().int().min(1).max(500).optional(),
+  })
+  .strict();
+
+export const mcpTriggerIdParamsSchema = z
+  .object({
+    triggerId: z
+      .string()
+      .min(1)
+      .regex(/^(?:atm|trg)_[a-zA-Z0-9_-]+$/, {
+        message: "`triggerId` must be a trigger id.",
+      }),
+  })
+  .strict();
+
+export const mcpListTriggersInputSchema = z
+  .object({
+    limit: z.number().int().min(1).max(100).optional(),
+    after: z.string().min(1).optional(),
+    before: z.string().min(1).optional(),
+    sandboxProfileId: z.string().min(1).optional(),
+    kind: z.enum([TriggerKinds.WEBHOOK, TriggerKinds.SCHEDULE]).optional(),
+    enabled: z.boolean().optional(),
+    search: z.string().min(1).optional(),
   })
   .strict();
