@@ -33,7 +33,6 @@ export const SessionRuntimeWorkbenchCapabilities = {
     },
     supportsSteering: true,
     preservesCliLaunchContext: false,
-    hasContextUsage: false,
   },
   OPENCODE: {
     runtimeId: "opencode",

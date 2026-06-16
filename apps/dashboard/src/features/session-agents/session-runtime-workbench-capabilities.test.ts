@@ -28,7 +28,6 @@ describe("SessionRuntimeWorkbenchCapabilities", () => {
       },
       supportsSteering: true,
       preservesCliLaunchContext: false,
-      hasContextUsage: false,
     });
   });
 
