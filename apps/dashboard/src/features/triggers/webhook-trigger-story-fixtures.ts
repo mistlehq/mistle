@@ -12,6 +12,8 @@ export const StorySlackConnectionId = "conn_slack_prod";
 export const StorySlackWebhookSourceId = "iws_slack_prod";
 export const StoryWasenderApiConnectionId = "conn_wasenderapi_prod";
 export const StoryWasenderApiWebhookSourceId = "iws_wasenderapi_prod";
+export const StoryWhapiConnectionId = "conn_whapi_prod";
+export const StoryWhapiWebhookSourceId = "iws_whapi_prod";
 
 export function isRule(value: string) {
   return {
@@ -69,6 +71,30 @@ export const StoryWasenderApiMessagesUpsertTriggerId = createWebhookTriggerEvent
 export const StoryWasenderApiMessagesReceivedTriggerId = createWebhookTriggerEventId({
   webhookSourceId: StoryWasenderApiWebhookSourceId,
   eventType: "wasenderapi.messages.received",
+});
+export const StoryWhapiMessagesPostTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: StoryWhapiWebhookSourceId,
+  eventType: "whapi.messages.post",
+});
+export const StoryWhapiMessagesPatchTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: StoryWhapiWebhookSourceId,
+  eventType: "whapi.messages.patch",
+});
+export const StoryWhapiStatusesPostTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: StoryWhapiWebhookSourceId,
+  eventType: "whapi.statuses.post",
+});
+export const StoryWhapiChannelPostTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: StoryWhapiWebhookSourceId,
+  eventType: "whapi.channel.post",
+});
+export const StoryWhapiUsersPostTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: StoryWhapiWebhookSourceId,
+  eventType: "whapi.users.post",
+});
+export const StoryWhapiUsersDeleteTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: StoryWhapiWebhookSourceId,
+  eventType: "whapi.users.delete",
 });
 
 const StoryGitHubRepositoryResources: IntegrationConnectionResources = {
@@ -364,6 +390,69 @@ export const StoryWasenderApiEventOptions: readonly WebhookTriggerEventOption[] 
     label: "Message received",
     category: "WasenderAPI Production / Messages",
     logoKey: "wasenderapi",
+  },
+];
+
+export const StoryWhapiEventOptions: readonly WebhookTriggerEventOption[] = [
+  {
+    id: StoryWhapiMessagesPostTriggerId,
+    eventType: "whapi.messages.post",
+    integrationWebhookSourceId: StoryWhapiWebhookSourceId,
+    connectionId: StoryWhapiConnectionId,
+    connectionLabel: "Whapi Support Channel",
+    label: "Message created",
+    category: "Whapi Support Channel / Messages",
+    logoKey: "whapi",
+  },
+  {
+    id: StoryWhapiMessagesPatchTriggerId,
+    eventType: "whapi.messages.patch",
+    integrationWebhookSourceId: StoryWhapiWebhookSourceId,
+    connectionId: StoryWhapiConnectionId,
+    connectionLabel: "Whapi Support Channel",
+    label: "Message patched",
+    category: "Whapi Support Channel / Messages",
+    logoKey: "whapi",
+  },
+  {
+    id: StoryWhapiStatusesPostTriggerId,
+    eventType: "whapi.statuses.post",
+    integrationWebhookSourceId: StoryWhapiWebhookSourceId,
+    connectionId: StoryWhapiConnectionId,
+    connectionLabel: "Whapi Support Channel",
+    label: "Status created",
+    category: "Whapi Support Channel / Statuses",
+    logoKey: "whapi",
+  },
+  {
+    id: StoryWhapiChannelPostTriggerId,
+    eventType: "whapi.channel.post",
+    integrationWebhookSourceId: StoryWhapiWebhookSourceId,
+    connectionId: StoryWhapiConnectionId,
+    connectionLabel: "Whapi Support Channel",
+    label: "Channel status changed",
+    category: "Whapi Support Channel / Channel",
+    logoKey: "whapi",
+  },
+  {
+    id: StoryWhapiUsersPostTriggerId,
+    eventType: "whapi.users.post",
+    integrationWebhookSourceId: StoryWhapiWebhookSourceId,
+    connectionId: StoryWhapiConnectionId,
+    connectionLabel: "Whapi Support Channel",
+    label: "User connected",
+    category: "Whapi Support Channel / Users",
+    logoKey: "whapi",
+  },
+  {
+    id: StoryWhapiUsersDeleteTriggerId,
+    eventType: "whapi.users.delete",
+    integrationWebhookSourceId: StoryWhapiWebhookSourceId,
+    connectionId: StoryWhapiConnectionId,
+    connectionLabel: "Whapi Support Channel",
+    label: "User disconnected",
+    category: "Whapi Support Channel / Users",
+    logoKey: "whapi",
   },
 ];
 

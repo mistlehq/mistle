@@ -29,6 +29,7 @@ import {
   SlackBrowserDefinition,
   TensorlakeSandboxRuntimeBrowserDefinition,
   WasenderApiBrowserDefinition,
+  WhapiBrowserDefinition,
   ZaiBrowserDefinition,
 } from "./browser.js";
 
@@ -331,6 +332,27 @@ describe("browser definitions", () => {
     expect(WasenderApiBrowserDefinition.mcp).toBeDefined();
     expect(WasenderApiBrowserDefinition.webhookHandler).toBeUndefined();
     expect(WasenderApiBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("registers Whapi in the browser-safe definitions bundle without server-only hooks", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: WhapiBrowserDefinition.familyId,
+      variantId: WhapiBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "whapi",
+      variantId: "whapi-mcp",
+      kind: "connector",
+      displayName: "Whapi",
+      logoKey: "whapi",
+    });
+    expect(definition?.mcp).toBeDefined();
+    expect(definition?.webhookHandler).toBeUndefined();
+    expect(definition?.webhookSource).toBeUndefined();
+    expect(WhapiBrowserDefinition.mcp).toBeDefined();
+    expect(WhapiBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(WhapiBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("registers Tensorlake sandbox runtime in the browser-safe definitions bundle", () => {

@@ -15,6 +15,7 @@ import {
   createSigNozDetailViewStoryProps,
   createSlackDetailViewStoryProps,
   createWasenderApiDetailViewStoryProps,
+  createWhapiDetailViewStoryProps,
 } from "./integration-story-harness.js";
 
 function mergeDetailViewStoryProps(
@@ -290,5 +291,11 @@ export const WasenderAPI: Story = {
   name: "WasenderAPI",
   args: {
     ...withoutStoryHandlers(createWasenderApiDetailViewStoryProps()),
+  },
+};
+
+export const Whapi: Story = {
+  args: {
+    ...withoutStoryHandlers(createWhapiDetailViewStoryProps()),
   },
 };

@@ -23,6 +23,7 @@ const DashboardLogoKeys = [
   "slack",
   "tensorlake",
   "wasenderapi",
+  "whapi",
 ] as const;
 
 const meta = {

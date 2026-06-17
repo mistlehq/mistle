@@ -7,6 +7,7 @@ import {
   PlanetScaleToolIds,
   SlackAssociatedResourceEventsCapability,
   WasenderApiToolIds,
+  WhapiToolIds,
 } from "@mistle/integrations-definitions";
 import { QueryClient } from "@tanstack/react-query";
 
@@ -364,6 +365,28 @@ export const StoryWasenderApiConnection: IntegrationConnectionSummary = {
   },
 };
 
+export const StoryWhapiTarget: IntegrationTargetSummary = {
+  targetKey: "target-whapi",
+  displayName: "Whapi",
+  logoKey: "whapi",
+  familyId: "whapi",
+  variantId: "whapi-mcp",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+export const StoryWhapiConnection: IntegrationConnectionSummary = {
+  id: "connection-whapi",
+  displayName: "Whapi Support Channel",
+  targetKey: StoryWhapiTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "api-key",
+  },
+};
+
 export const StorySlackTarget: IntegrationTargetSummary = {
   targetKey: "target-slack",
   displayName: "Slack",
@@ -403,6 +426,7 @@ export const StoryIntegrationTargets = [
   StoryPlanetScaleTarget,
   StorySignozTarget,
   StoryWasenderApiTarget,
+  StoryWhapiTarget,
   StorySlackTarget,
 ] as const;
 export const StoryIntegrationConnections = [
@@ -418,6 +442,7 @@ export const StoryIntegrationConnections = [
   StoryPlanetScaleConnection,
   StorySignozConnection,
   StoryWasenderApiConnection,
+  StoryWhapiConnection,
   StorySlackConnection,
 ] as const;
 
@@ -561,3 +586,5 @@ export const StoryPlanetScaleTools = [
 ] as const;
 
 export const StoryWasenderApiTools = [WasenderApiToolIds.WASENDERAPI_MCP] as const;
+
+export const StoryWhapiTools: readonly string[] = [WhapiToolIds.WHAPI_MCP];

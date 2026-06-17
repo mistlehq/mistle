@@ -19,6 +19,7 @@ describe("webhook trigger requirements", () => {
       "linear::linear-default",
       "slack::slack-default",
       "wasenderapi::wasenderapi-mcp",
+      "whapi::whapi-mcp",
     ]);
 
     for (const definition of triggerCapableDefinitions) {

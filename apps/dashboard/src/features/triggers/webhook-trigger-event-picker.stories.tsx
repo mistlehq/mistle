@@ -30,6 +30,13 @@ import {
   StoryWasenderApiEventOptions,
   StoryWasenderApiMessagesReceivedTriggerId,
   StoryWasenderApiMessagesUpsertTriggerId,
+  StoryWhapiChannelPostTriggerId,
+  StoryWhapiConnectionId,
+  StoryWhapiEventOptions,
+  StoryWhapiMessagesPatchTriggerId,
+  StoryWhapiMessagesPostTriggerId,
+  StoryWhapiStatusesPostTriggerId,
+  StoryWhapiUsersPostTriggerId,
 } from "./webhook-trigger-story-fixtures.js";
 
 function StoryHarness(input: {
@@ -270,6 +277,22 @@ export const WasenderAPIMessageEvents: Story = {
       StoryWasenderApiMessagesReceivedTriggerId,
     ],
     eventOptions: StoryWasenderApiEventOptions,
+  },
+};
+
+export const WhapiWhatsAppEvents: Story = {
+  name: "Whapi callback events",
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: StoryWhapiConnectionId,
+    selectedEventIds: [
+      StoryWhapiMessagesPostTriggerId,
+      StoryWhapiMessagesPatchTriggerId,
+      StoryWhapiStatusesPostTriggerId,
+      StoryWhapiChannelPostTriggerId,
+      StoryWhapiUsersPostTriggerId,
+    ],
+    eventOptions: StoryWhapiEventOptions,
   },
 };
 

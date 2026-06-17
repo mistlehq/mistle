@@ -28,6 +28,8 @@ Refer to [packages/docs/guides/posthog-integration-setup.mdx](../packages/docs/g
 
 Refer to [docs/integrations/resend.md](./integrations/resend.md) for Resend MCP setup guidance.
 
+Refer to [packages/docs/guides/whapi-integration-setup.mdx](../packages/docs/guides/whapi-integration-setup.mdx) for Whapi MCP and webhook setup guidance.
+
 Refer to [docs/architecture.md](./architecture.md) for more details about credentialless sandboxes and caveats.
 
 Refer to [packages/integrations-core/README.md](../packages/integrations-core/README.md) for technical and design details of the integrations API.

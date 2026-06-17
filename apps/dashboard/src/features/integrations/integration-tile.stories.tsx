@@ -55,6 +55,15 @@ export const WasenderAPI: Story = {
     displayName: "WasenderAPI",
     logoKey: "wasenderapi",
     actionHref: "/integrations/wasenderapi-mcp/add",
-    statusBadge: "Available",
+  },
+};
+
+export const Whapi: Story = {
+  args: {
+    actionLabel: "Add",
+    description: "Connect Whapi for local MCP tools and WhatsApp channel webhooks.",
+    displayName: "Whapi",
+    logoKey: "whapi",
+    actionHref: "/integrations/whapi-mcp/add",
   },
 };

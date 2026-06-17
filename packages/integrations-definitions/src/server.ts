@@ -46,6 +46,7 @@ import { SignozDefinition } from "./signoz/server.js";
 import { SlackDefinition } from "./slack/index.js";
 import { StripeDefinition } from "./stripe/server.js";
 import { WasenderApiDefinition } from "./wasenderapi/server.js";
+import { WhapiDefinition } from "./whapi/server.js";
 import { ZaiDefinition } from "./zai/index.js";
 
 export * from "./agentmail/server.js";
@@ -83,6 +84,7 @@ export * from "./signoz/server.js";
 export * from "./slack/index.js";
 export * from "./stripe/server.js";
 export * from "./wasenderapi/server.js";
+export * from "./whapi/server.js";
 export * from "./zai/index.js";
 export * from "./forms/index.js";
 export * from "./agent-runtimes/provider-selection.js";
@@ -127,6 +129,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   SlackDefinition,
   StripeDefinition,
   WasenderApiDefinition,
+  WhapiDefinition,
   ZaiDefinition,
 ];
 

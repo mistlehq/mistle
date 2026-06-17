@@ -7,6 +7,8 @@ import {
   StoryAwsConnection,
   StoryWasenderApiConnection,
   StoryWasenderApiTools,
+  StoryWhapiConnection,
+  StoryWhapiTools,
 } from "./integrations-editor-section-story-support.js";
 import {
   DefaultSandboxProfileEditorStoryArgs,
@@ -104,6 +106,23 @@ export const WasenderApiMcpBinding: Story = {
         kind: "connector",
         config: {
           tools: [...StoryWasenderApiTools],
+        },
+      },
+    ],
+  },
+};
+
+export const WhapiMcpBinding: Story = {
+  name: "Whapi MCP binding",
+  args: {
+    initialBindings: [
+      ...StoryBindings,
+      {
+        id: "binding-whapi-connector",
+        connectionId: StoryWhapiConnection.id,
+        kind: "connector",
+        config: {
+          tools: [...StoryWhapiTools],
         },
       },
     ],
