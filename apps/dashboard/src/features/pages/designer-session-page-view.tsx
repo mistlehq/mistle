@@ -6,6 +6,7 @@ import { ChatComposer } from "../chat/components/chat-composer.js";
 import { ChatThread } from "../chat/components/chat-thread.js";
 import type {
   DesignerActionProposal,
+  DesignerActionProposalResponse,
   DesignerRuntimeConversationBootstrap,
   DesignerRuntimeConversationTranscript,
   DesignerSession,
@@ -14,6 +15,9 @@ import { hydrateCodexChatEntriesFromThreadReadTurns } from "../session-agents/co
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 
 export type DesignerSessionPageViewProps = {
+  actionProposalResponseErrorMessage: string | null;
+  actionProposalResponsePendingId: string | null;
+  actionProposalResponseSuccessMessage: string | null;
   bootstrapErrorMessage: string | null;
   bootstrapIsPending: boolean;
   errorMessage: string | null;
@@ -21,6 +25,10 @@ export type DesignerSessionPageViewProps = {
   followUpErrorMessage: string | null;
   followUpIsPending: boolean;
   followUpSuccessMessage: string | null;
+  onActionProposalResponseSubmit: (
+    proposalId: string,
+    response: DesignerActionProposalResponse,
+  ) => void;
   onFollowUpDraftChange: (draft: string) => void;
   onFollowUpSubmit: () => void;
   runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
@@ -172,6 +180,13 @@ function RuntimeConversationPreview(input: {
   followUpErrorMessage: string | null;
   followUpIsPending: boolean;
   followUpSuccessMessage: string | null;
+  actionProposalResponseErrorMessage: string | null;
+  actionProposalResponsePendingId: string | null;
+  actionProposalResponseSuccessMessage: string | null;
+  onActionProposalResponseSubmit: (
+    proposalId: string,
+    response: DesignerActionProposalResponse,
+  ) => void;
   onFollowUpDraftChange: (draft: string) => void;
   onFollowUpSubmit: () => void;
   runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
@@ -234,7 +249,11 @@ function RuntimeConversationPreview(input: {
           <p className="mt-2 text-xs text-destructive">{input.transcriptErrorMessage}</p>
         )}
         <DesignerActionProposals
+          errorMessage={input.actionProposalResponseErrorMessage}
+          onSubmitResponse={input.onActionProposalResponseSubmit}
+          pendingProposalId={input.actionProposalResponsePendingId}
           proposals={input.runtimeConversationTranscript?.actionProposals ?? []}
+          successMessage={input.actionProposalResponseSuccessMessage}
         />
         <div className="mt-3">
           <ChatComposer
@@ -290,7 +309,11 @@ function ignoreDesignerComposerAction(): void {}
 function ignoreDesignerServerRequest(): void {}
 
 function DesignerActionProposals(input: {
+  errorMessage: string | null;
+  onSubmitResponse: (proposalId: string, response: DesignerActionProposalResponse) => void;
+  pendingProposalId: string | null;
   proposals: readonly DesignerActionProposal[];
+  successMessage: string | null;
 }): React.JSX.Element | null {
   if (input.proposals.length === 0) {
     return null;
@@ -332,12 +355,35 @@ function DesignerActionProposals(input: {
             ))}
           </dl>
           {proposal.status === "pending" ? (
-            <p className="mt-3 text-xs text-muted-foreground">
-              Approval responses are not enabled for Designer action proposals yet.
-            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={input.pendingProposalId !== null}
+                onClick={() => {
+                  input.onSubmitResponse(proposal.id, "approved");
+                }}
+                type="button"
+              >
+                {input.pendingProposalId === proposal.id ? "Submitting" : "Approve"}
+              </button>
+              <button
+                className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={input.pendingProposalId !== null}
+                onClick={() => {
+                  input.onSubmitResponse(proposal.id, "declined");
+                }}
+                type="button"
+              >
+                {input.pendingProposalId === proposal.id ? "Submitting" : "Decline"}
+              </button>
+            </div>
           ) : null}
         </article>
       ))}
+      <ErrorNotice message={input.errorMessage} />
+      {input.successMessage === null ? null : (
+        <p className="text-xs text-muted-foreground">{input.successMessage}</p>
+      )}
     </div>
   );
 }
@@ -434,12 +480,16 @@ export function DesignerSessionPageView(input: DesignerSessionPageViewProps): Re
               session={input.session}
             />
             <RuntimeConversationPreview
+              actionProposalResponseErrorMessage={input.actionProposalResponseErrorMessage}
+              actionProposalResponsePendingId={input.actionProposalResponsePendingId}
+              actionProposalResponseSuccessMessage={input.actionProposalResponseSuccessMessage}
               bootstrapErrorMessage={input.bootstrapErrorMessage}
               bootstrapIsPending={input.bootstrapIsPending}
               followUpDraft={input.followUpDraft}
               followUpErrorMessage={input.followUpErrorMessage}
               followUpIsPending={input.followUpIsPending}
               followUpSuccessMessage={input.followUpSuccessMessage}
+              onActionProposalResponseSubmit={input.onActionProposalResponseSubmit}
               onFollowUpDraftChange={input.onFollowUpDraftChange}
               onFollowUpSubmit={input.onFollowUpSubmit}
               runtimeConversationBootstrap={input.runtimeConversationBootstrap}

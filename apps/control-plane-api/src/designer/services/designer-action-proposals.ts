@@ -1,4 +1,4 @@
-import type { DesignerActionProposal } from "../schemas.js";
+import type { DesignerActionProposal, DesignerActionProposalResponse } from "../schemas.js";
 import { designerActionProposalSchema } from "../schemas.js";
 
 export type DesignerActionProposalTranscriptTurn = {
@@ -54,4 +54,22 @@ export function splitDesignerActionProposalsFromTranscriptTurns(
       .map((entry) => entry.proposal),
     turns: filteredTurns,
   };
+}
+
+export function createDesignerActionProposalResponsePrompt(input: {
+  proposalId: string;
+  response: DesignerActionProposalResponse;
+}): string {
+  const responsePayload = JSON.stringify({
+    proposalId: input.proposalId,
+    response: input.response,
+  });
+
+  return [
+    "Designer action proposal response",
+    "",
+    responsePayload,
+    "",
+    "Record this response in the Designer conversation. Do not perform provider writes, publish, launch, or mutate target profile configuration from this response. Continue only within the current Designer planning boundary.",
+  ].join("\n");
 }

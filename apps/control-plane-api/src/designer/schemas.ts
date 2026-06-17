@@ -33,6 +33,12 @@ export const designerSessionIdParamsSchema = z
   })
   .strict();
 
+export const designerActionProposalIdParamsSchema = designerSessionIdParamsSchema
+  .extend({
+    proposalId: z.string().min(1).max(255),
+  })
+  .strict();
+
 export const createDesignerSessionBodySchema = z
   .object({
     prompt: z.string().trim().min(1).max(20_000),
@@ -55,6 +61,15 @@ export const putDesignerSessionCanvasTabsBodySchema = z
 export const submitDesignerRuntimeFollowUpBodySchema = z
   .object({
     prompt: z.string().trim().min(1).max(20_000),
+    idempotencyKey: z.string().min(1).max(255),
+  })
+  .strict();
+
+export const designerActionProposalResponseSchema = z.enum(["approved", "declined"]);
+
+export const submitDesignerActionProposalResponseBodySchema = z
+  .object({
+    response: designerActionProposalResponseSchema,
     idempotencyKey: z.string().min(1).max(255),
   })
   .strict();
@@ -86,6 +101,16 @@ const designerRuntimeConversationSchema = z
 
 const designerRuntimeFollowUpSubmissionSchema = z
   .object({
+    providerConversationId: z.string().min(1),
+    providerExecutionId: z.string().min(1).nullable(),
+    submittedAt: z.string().min(1),
+  })
+  .strict();
+
+const designerActionProposalResponseSubmissionSchema = z
+  .object({
+    proposalId: z.string().min(1).max(255),
+    response: designerActionProposalResponseSchema,
     providerConversationId: z.string().min(1),
     providerExecutionId: z.string().min(1).nullable(),
     submittedAt: z.string().min(1),
@@ -157,6 +182,11 @@ export const submitDesignerRuntimeFollowUpResponseSchema = z
     runtimeFollowUp: designerRuntimeFollowUpSubmissionSchema,
   })
   .strict();
+export const submitDesignerActionProposalResponseResponseSchema = z
+  .object({
+    actionProposalResponse: designerActionProposalResponseSubmissionSchema,
+  })
+  .strict();
 export const getDesignerRuntimeConversationTranscriptResponseSchema = z
   .object({
     runtimeConversationTranscript: designerRuntimeConversationTranscriptSchema,
@@ -165,6 +195,7 @@ export const getDesignerRuntimeConversationTranscriptResponseSchema = z
 
 export type DesignerSessionResponse = z.infer<typeof designerSessionSchema>;
 export type DesignerActionProposal = z.infer<typeof designerActionProposalSchema>;
+export type DesignerActionProposalResponse = z.infer<typeof designerActionProposalResponseSchema>;
 export type CreateDesignerSessionBody = z.infer<typeof createDesignerSessionBodySchema>;
 export type PutDesignerSessionCanvasTabsBody = z.infer<
   typeof putDesignerSessionCanvasTabsBodySchema
@@ -172,11 +203,17 @@ export type PutDesignerSessionCanvasTabsBody = z.infer<
 export type SubmitDesignerRuntimeFollowUpBody = z.infer<
   typeof submitDesignerRuntimeFollowUpBodySchema
 >;
+export type SubmitDesignerActionProposalResponseBody = z.infer<
+  typeof submitDesignerActionProposalResponseBodySchema
+>;
 export type BootstrapDesignerRuntimeConversationResponse = z.infer<
   typeof bootstrapDesignerRuntimeConversationResponseSchema
 >;
 export type SubmitDesignerRuntimeFollowUpResponse = z.infer<
   typeof submitDesignerRuntimeFollowUpResponseSchema
+>;
+export type SubmitDesignerActionProposalResponseResponse = z.infer<
+  typeof submitDesignerActionProposalResponseResponseSchema
 >;
 export type GetDesignerRuntimeConversationTranscriptResponse = z.infer<
   typeof getDesignerRuntimeConversationTranscriptResponseSchema

@@ -14,7 +14,9 @@ import { SandboxInstancePurposes, type SandboxInstanceStarterKind } from "@mistl
 import {
   AgentConversationStatuses,
   CompiledRuntimePlanSchema,
+  type AgentConversationConnection,
   type AgentConversationIdempotencyMetadata,
+  type AgentConversationProvider,
   type EgressCredentialRoute,
   SandboxImageSources,
   createDisabledAssociatedResourceEventRouting,
@@ -54,10 +56,15 @@ import type {
   DesignerSessionResponse,
   GetDesignerRuntimeConversationTranscriptResponse,
   PutDesignerSessionCanvasTabsBody,
+  SubmitDesignerActionProposalResponseBody,
+  SubmitDesignerActionProposalResponseResponse,
   SubmitDesignerRuntimeFollowUpBody,
   SubmitDesignerRuntimeFollowUpResponse,
 } from "../schemas.js";
-import { splitDesignerActionProposalsFromTranscriptTurns } from "./designer-action-proposals.js";
+import {
+  createDesignerActionProposalResponsePrompt,
+  splitDesignerActionProposalsFromTranscriptTurns,
+} from "./designer-action-proposals.js";
 
 type DesignerSessionActor = {
   kind: SandboxInstanceStarterKind;
@@ -95,7 +102,7 @@ type LockedDesignerRuntimeConversationContext = Omit<DesignerRuntimeConversation
   db: ControlPlaneTransaction;
 };
 
-const DesignerRuntimeFollowUpAdvisoryLockNamespace = 20_260_618;
+const DesignerRuntimeSubmissionAdvisoryLockNamespace = 20_260_618;
 
 type RuntimeConversationBootstrapResult = {
   providerConversationId: string;
@@ -160,7 +167,11 @@ function createRuntimeRequestFingerprint(input: {
 function createDesignerConversationIdempotency(input: {
   designerSessionId: string;
   operation: AgentConversationIdempotencyMetadata["operation"];
-  keySuffix: "create-conversation" | "submit-initial-prompt" | `submit-follow-up:${string}`;
+  keySuffix:
+    | "create-conversation"
+    | "submit-initial-prompt"
+    | `submit-follow-up:${string}`
+    | `submit-action-proposal-response:${string}:${string}`;
   fields: Record<string, string>;
 }): AgentConversationIdempotencyMetadata {
   return {
@@ -189,6 +200,29 @@ function createDesignerRuntimeFollowUpIdempotency(input: {
       idempotency_key: input.idempotencyKey,
       input_text: input.prompt,
       provider_conversation_id: input.providerConversationId,
+      sandbox_instance_id: input.sandboxInstanceId,
+    },
+  });
+}
+
+function createDesignerActionProposalResponseIdempotency(input: {
+  designerSessionId: string;
+  idempotencyKey: string;
+  response: SubmitDesignerActionProposalResponseBody["response"];
+  proposalId: string;
+  providerConversationId: string;
+  sandboxInstanceId: string;
+}): AgentConversationIdempotencyMetadata {
+  return createDesignerConversationIdempotency({
+    designerSessionId: input.designerSessionId,
+    operation: "submitPayload",
+    keySuffix: `submit-action-proposal-response:${input.proposalId}:${input.idempotencyKey}`,
+    fields: {
+      designer_session_id: input.designerSessionId,
+      idempotency_key: input.idempotencyKey,
+      provider_conversation_id: input.providerConversationId,
+      proposal_id: input.proposalId,
+      response: input.response,
       sandbox_instance_id: input.sandboxInstanceId,
     },
   });
@@ -619,7 +653,7 @@ async function persistInitialPromptSubmission(
   return completed;
 }
 
-async function markRuntimeFollowUpSubmitted(
+async function markRuntimeSubmissionSubmitted(
   ctx: { db: DesignerSessionDatabase },
   input: {
     organizationId: string;
@@ -653,22 +687,22 @@ async function markRuntimeFollowUpSubmitted(
   return updatedAt;
 }
 
-async function acquireDesignerRuntimeFollowUpLock(
+async function acquireDesignerRuntimeSubmissionLock(
   db: DesignerSessionDatabase,
   input: { sessionId: string },
 ): Promise<boolean> {
   const result = await db.execute(
     sql<{
       acquired: boolean;
-    }>`select pg_try_advisory_xact_lock(${DesignerRuntimeFollowUpAdvisoryLockNamespace}, hashtext(${input.sessionId})) as "acquired"`,
+    }>`select pg_try_advisory_xact_lock(${DesignerRuntimeSubmissionAdvisoryLockNamespace}, hashtext(${input.sessionId})) as "acquired"`,
   );
   const row = result.rows[0];
   if (row === undefined) {
-    throw new Error("Expected Designer runtime follow-up advisory lock query to return a row.");
+    throw new Error("Expected Designer runtime submission advisory lock query to return a row.");
   }
 
   if (typeof row.acquired !== "boolean") {
-    throw new Error("Expected Designer runtime follow-up advisory lock result to be boolean.");
+    throw new Error("Expected Designer runtime submission advisory lock result to be boolean.");
   }
 
   return row.acquired;
@@ -826,7 +860,7 @@ export async function submitDesignerRuntimeFollowUp(
   });
 
   return ctx.db.transaction(async (tx) => {
-    const lockAcquired = await acquireDesignerRuntimeFollowUpLock(tx, {
+    const lockAcquired = await acquireDesignerRuntimeSubmissionLock(tx, {
       sessionId: input.sessionId,
     });
     if (!lockAcquired) {
@@ -844,6 +878,51 @@ export async function submitDesignerRuntimeFollowUp(
       {
         organizationId: input.organizationId,
         sessionId: input.sessionId,
+        body: input.body,
+        connectionUrl: connectionToken.url,
+      },
+    );
+  });
+}
+
+export async function submitDesignerActionProposalResponse(
+  ctx: Omit<DesignerRuntimeConversationContext, "db"> & { db: ControlPlaneDatabase },
+  input: {
+    organizationId: string;
+    sessionId: string;
+    actingUserId: string;
+    proposalId: string;
+    body: SubmitDesignerActionProposalResponseBody;
+  },
+): Promise<SubmitDesignerActionProposalResponseResponse> {
+  const designerSession = await readReadyRuntimeConversationDesignerSession(ctx, input);
+
+  const connectionToken = await mintDesignerRuntimeConnectionToken(ctx, {
+    organizationId: input.organizationId,
+    sandboxInstanceId: designerSession.sandboxInstanceId,
+    actingUserId: input.actingUserId,
+  });
+
+  return ctx.db.transaction(async (tx) => {
+    const lockAcquired = await acquireDesignerRuntimeSubmissionLock(tx, {
+      sessionId: input.sessionId,
+    });
+    if (!lockAcquired) {
+      throw new DesignerConflictError(
+        DesignerConflictCodes.DESIGNER_RUNTIME_CONVERSATION_BUSY,
+        `Designer session '${input.sessionId}' runtime conversation is still processing a previous turn.`,
+      );
+    }
+
+    return submitDesignerActionProposalResponseWithLock(
+      {
+        ...ctx,
+        db: tx,
+      },
+      {
+        organizationId: input.organizationId,
+        sessionId: input.sessionId,
+        proposalId: input.proposalId,
         body: input.body,
         connectionUrl: connectionToken.url,
       },
@@ -911,6 +990,95 @@ async function submitDesignerRuntimeFollowUpWithLock(
     connectionUrl: string;
   },
 ): Promise<SubmitDesignerRuntimeFollowUpResponse> {
+  const submission = await submitDesignerRuntimeConversationInputWithLock(ctx, {
+    organizationId: input.organizationId,
+    sessionId: input.sessionId,
+    connectionUrl: input.connectionUrl,
+    inputText: input.body.prompt,
+    createIdempotency: (designerSession, providerConversationId) =>
+      createDesignerRuntimeFollowUpIdempotency({
+        designerSessionId: designerSession.id,
+        idempotencyKey: input.body.idempotencyKey,
+        prompt: input.body.prompt,
+        providerConversationId,
+        sandboxInstanceId: designerSession.sandboxInstanceId,
+      }),
+  });
+
+  return {
+    runtimeFollowUp: submission,
+  };
+}
+
+async function submitDesignerActionProposalResponseWithLock(
+  ctx: LockedDesignerRuntimeConversationContext,
+  input: {
+    organizationId: string;
+    sessionId: string;
+    proposalId: string;
+    body: SubmitDesignerActionProposalResponseBody;
+    connectionUrl: string;
+  },
+): Promise<SubmitDesignerActionProposalResponseResponse> {
+  const responsePrompt = createDesignerActionProposalResponsePrompt({
+    proposalId: input.proposalId,
+    response: input.body.response,
+  });
+  const submission = await submitDesignerRuntimeConversationInputWithLock(ctx, {
+    organizationId: input.organizationId,
+    sessionId: input.sessionId,
+    connectionUrl: input.connectionUrl,
+    inputText: responsePrompt,
+    createIdempotency: (designerSession, providerConversationId) =>
+      createDesignerActionProposalResponseIdempotency({
+        designerSessionId: designerSession.id,
+        idempotencyKey: input.body.idempotencyKey,
+        response: input.body.response,
+        proposalId: input.proposalId,
+        providerConversationId,
+        sandboxInstanceId: designerSession.sandboxInstanceId,
+      }),
+    validateBeforeStartExecution: async ({ provider, connection, providerConversationId }) => {
+      await assertPendingDesignerActionProposal({
+        provider,
+        connection,
+        providerConversationId,
+        proposalId: input.proposalId,
+      });
+    },
+  });
+
+  return {
+    actionProposalResponse: {
+      proposalId: input.proposalId,
+      response: input.body.response,
+      ...submission,
+    },
+  };
+}
+
+async function submitDesignerRuntimeConversationInputWithLock(
+  ctx: LockedDesignerRuntimeConversationContext,
+  input: {
+    organizationId: string;
+    sessionId: string;
+    connectionUrl: string;
+    inputText: string;
+    createIdempotency: (
+      designerSession: DesignerSession,
+      providerConversationId: string,
+    ) => AgentConversationIdempotencyMetadata;
+    validateBeforeStartExecution?: (input: {
+      provider: AgentConversationProvider;
+      connection: AgentConversationConnection;
+      providerConversationId: string;
+    }) => Promise<void>;
+  },
+): Promise<{
+  providerConversationId: string;
+  providerExecutionId: string | null;
+  submittedAt: string;
+}> {
   const designerSession = await readReadyRuntimeConversationDesignerSession(ctx, input);
   const providerConversationId = designerSession.runtimeProviderConversationId;
   const provider = resolveAgentConversationProvider(DesignerRuntimeId);
@@ -935,31 +1103,67 @@ async function submitDesignerRuntimeFollowUpWithLock(
       );
     }
 
-    const submittedFollowUp = await provider.startExecution({
+    if (input.validateBeforeStartExecution !== undefined) {
+      await input.validateBeforeStartExecution({
+        provider,
+        connection,
+        providerConversationId,
+      });
+    }
+
+    const submittedTurn = await provider.startExecution({
       connection,
       providerConversationId,
-      inputText: input.body.prompt,
-      idempotency: createDesignerRuntimeFollowUpIdempotency({
-        designerSessionId: designerSession.id,
-        idempotencyKey: input.body.idempotencyKey,
-        prompt: input.body.prompt,
-        providerConversationId,
-        sandboxInstanceId: designerSession.sandboxInstanceId,
-      }),
+      inputText: input.inputText,
+      idempotency: input.createIdempotency(designerSession, providerConversationId),
     });
 
     return {
-      runtimeFollowUp: {
-        providerConversationId,
-        providerExecutionId: submittedFollowUp.providerExecutionId,
-        submittedAt: await markRuntimeFollowUpSubmitted(ctx, {
-          organizationId: input.organizationId,
-          sessionId: designerSession.id,
-        }),
-      },
+      providerConversationId,
+      providerExecutionId: submittedTurn.providerExecutionId,
+      submittedAt: await markRuntimeSubmissionSubmitted(ctx, {
+        organizationId: input.organizationId,
+        sessionId: designerSession.id,
+      }),
     };
   } finally {
     await connection.close();
+  }
+}
+
+async function assertPendingDesignerActionProposal(input: {
+  provider: AgentConversationProvider;
+  connection: AgentConversationConnection;
+  providerConversationId: string;
+  proposalId: string;
+}): Promise<void> {
+  if (input.provider.readConversationTranscript === undefined) {
+    throw new Error(
+      `Agent runtime '${DesignerRuntimeId}' does not support runtime conversation transcript reads.`,
+    );
+  }
+
+  const transcript = await input.provider.readConversationTranscript({
+    connection: input.connection,
+    providerConversationId: input.providerConversationId,
+  });
+  const splitTranscript = splitDesignerActionProposalsFromTranscriptTurns(transcript.turns);
+  const proposal = splitTranscript.actionProposals.find(
+    (candidate) => candidate.id === input.proposalId,
+  );
+
+  if (proposal === undefined) {
+    throw new DesignerNotFoundError(
+      DesignerNotFoundCodes.DESIGNER_ACTION_PROPOSAL_NOT_FOUND,
+      `Designer action proposal '${input.proposalId}' was not found.`,
+    );
+  }
+
+  if (proposal.status !== "pending") {
+    throw new DesignerConflictError(
+      DesignerConflictCodes.DESIGNER_ACTION_PROPOSAL_NOT_PENDING,
+      `Designer action proposal '${input.proposalId}' is not pending.`,
+    );
   }
 }
 

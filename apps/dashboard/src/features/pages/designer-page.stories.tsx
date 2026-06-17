@@ -155,6 +155,9 @@ export const Workspace: Story = {
     return (
       <MemoryRouter initialEntries={["/designer/dsn_triage_agent_story"]}>
         <DesignerSessionPageView
+          actionProposalResponseErrorMessage={null}
+          actionProposalResponsePendingId={null}
+          actionProposalResponseSuccessMessage={null}
           bootstrapErrorMessage={null}
           bootstrapIsPending={false}
           errorMessage={null}
@@ -162,6 +165,7 @@ export const Workspace: Story = {
           followUpErrorMessage={null}
           followUpIsPending={false}
           followUpSuccessMessage={null}
+          onActionProposalResponseSubmit={() => {}}
           onFollowUpDraftChange={() => {}}
           onFollowUpSubmit={() => {}}
           runtimeConversationBootstrap={{

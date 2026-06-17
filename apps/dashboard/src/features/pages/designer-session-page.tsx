@@ -15,7 +15,9 @@ import {
   designerSessionsQueryKey,
   getDesignerRuntimeConversationTranscript,
   getDesignerSession,
+  submitDesignerActionProposalResponse,
   submitDesignerRuntimeFollowUp,
+  type DesignerActionProposalResponse,
   type DesignerRuntimeConversationTranscript,
   type DesignerSession,
 } from "../designer/designer-service.js";
@@ -147,6 +149,10 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
   const [followUpSubmissionIdempotencyKey, setFollowUpSubmissionIdempotencyKey] = useState<
     string | null
   >(null);
+  const [
+    latestRuntimeSubmissionProviderExecutionId,
+    setLatestRuntimeSubmissionProviderExecutionId,
+  ] = useState<string | null>(null);
 
   const designerSessionQuery = useQuery({
     queryKey: [...designerSessionsQueryKey, sessionId],
@@ -190,11 +196,12 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
         prompt: input.prompt,
         idempotencyKey: input.idempotencyKey,
       }),
-    onSuccess: (_submission, variables) => {
+    onSuccess: (submission, variables) => {
       if (variables.sessionId !== sessionId) {
         return;
       }
 
+      setLatestRuntimeSubmissionProviderExecutionId(submission.providerExecutionId);
       void invalidateDesignerSessionQuery({
         queryClient,
         sessionId: variables.sessionId,
@@ -204,6 +211,34 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
       });
       setFollowUpDraft("");
       setFollowUpSubmissionIdempotencyKey(null);
+    },
+  });
+  const submitActionProposalResponseMutation = useMutation({
+    mutationFn: async (input: {
+      sessionId: string;
+      proposalId: string;
+      response: DesignerActionProposalResponse;
+      idempotencyKey: string;
+    }) =>
+      submitDesignerActionProposalResponse({
+        sessionId: input.sessionId,
+        proposalId: input.proposalId,
+        response: input.response,
+        idempotencyKey: input.idempotencyKey,
+      }),
+    onSuccess: (submission, variables) => {
+      if (variables.sessionId !== sessionId) {
+        return;
+      }
+
+      setLatestRuntimeSubmissionProviderExecutionId(submission.providerExecutionId);
+      void invalidateDesignerSessionQuery({
+        queryClient,
+        sessionId: variables.sessionId,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [...designerRuntimeConversationTranscriptQueryKey, variables.sessionId],
+      });
     },
   });
   const runtimeConversationTranscriptQuery = useQuery({
@@ -217,12 +252,17 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
     refetchInterval: (query) =>
       shouldPollDesignerRuntimeTranscript(
         query.state.data ?? null,
-        submitFollowUpMutation.data?.providerExecutionId ?? null,
+        latestRuntimeSubmissionProviderExecutionId,
       )
         ? DesignerSessionRuntimeTranscriptPollIntervalMs
         : false,
   });
   const trimmedFollowUpDraft = followUpDraft.trim();
+  const pendingActionProposalResponseId =
+    submitActionProposalResponseMutation.isPending &&
+    submitActionProposalResponseMutation.variables !== undefined
+      ? submitActionProposalResponseMutation.variables.proposalId
+      : null;
 
   return (
     <DesignerSessionPageView
@@ -248,6 +288,15 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
           ? null
           : `Follow-up submitted at ${submitFollowUpMutation.data.submittedAt}.`
       }
+      actionProposalResponseErrorMessage={
+        submitActionProposalResponseMutation.error?.message ?? null
+      }
+      actionProposalResponsePendingId={pendingActionProposalResponseId}
+      actionProposalResponseSuccessMessage={
+        submitActionProposalResponseMutation.data === undefined
+          ? null
+          : `Action proposal response submitted at ${submitActionProposalResponseMutation.data.submittedAt}.`
+      }
       errorMessage={designerSessionQuery.error?.message ?? null}
       onFollowUpDraftChange={(draft) => {
         setFollowUpDraft(draft);
@@ -269,10 +318,31 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
 
         const idempotencyKey = followUpSubmissionIdempotencyKey ?? crypto.randomUUID();
         setFollowUpSubmissionIdempotencyKey(idempotencyKey);
+        if (!submitActionProposalResponseMutation.isPending) {
+          submitActionProposalResponseMutation.reset();
+        }
         submitFollowUpMutation.mutate({
           sessionId,
           prompt: trimmedFollowUpDraft,
           idempotencyKey,
+        });
+      }}
+      onActionProposalResponseSubmit={(proposalId, response) => {
+        if (
+          runtimeConversationBootstrapQuery.data === undefined ||
+          submitActionProposalResponseMutation.isPending
+        ) {
+          return;
+        }
+
+        if (!submitFollowUpMutation.isPending) {
+          submitFollowUpMutation.reset();
+        }
+        submitActionProposalResponseMutation.mutate({
+          sessionId,
+          proposalId,
+          response,
+          idempotencyKey: crypto.randomUUID(),
         });
       }}
       session={session}

@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import type {
+  DesignerActionProposalResponse,
   DesignerRuntimeConversationBootstrap,
   DesignerRuntimeConversationTranscript,
   DesignerSession,
@@ -91,6 +93,9 @@ const RuntimeConversationTranscriptWithActionProposal = {
 function renderDesignerSessionPageView(input?: {
   bootstrapErrorMessage?: string | null;
   bootstrapIsPending?: boolean;
+  actionProposalResponseErrorMessage?: string | null;
+  actionProposalResponsePendingId?: string | null;
+  actionProposalResponseSuccessMessage?: string | null;
   followUpDraft?: string;
   followUpErrorMessage?: string | null;
   followUpIsPending?: boolean;
@@ -105,11 +110,15 @@ function renderDesignerSessionPageView(input?: {
     <DesignerSessionPageView
       bootstrapErrorMessage={input?.bootstrapErrorMessage ?? null}
       bootstrapIsPending={input?.bootstrapIsPending ?? false}
+      actionProposalResponseErrorMessage={input?.actionProposalResponseErrorMessage ?? null}
+      actionProposalResponsePendingId={input?.actionProposalResponsePendingId ?? null}
+      actionProposalResponseSuccessMessage={input?.actionProposalResponseSuccessMessage ?? null}
       errorMessage={null}
       followUpDraft={input?.followUpDraft ?? ""}
       followUpErrorMessage={input?.followUpErrorMessage ?? null}
       followUpIsPending={input?.followUpIsPending ?? false}
       followUpSuccessMessage={input?.followUpSuccessMessage ?? null}
+      onActionProposalResponseSubmit={() => {}}
       onFollowUpDraftChange={() => {}}
       onFollowUpSubmit={() => {}}
       runtimeConversationBootstrap={input?.runtimeConversationBootstrap ?? null}
@@ -119,6 +128,42 @@ function renderDesignerSessionPageView(input?: {
       transcriptErrorMessage={input?.transcriptErrorMessage ?? null}
       transcriptIsPending={input?.transcriptIsPending ?? false}
     />,
+  );
+}
+
+function DesignerSessionPageViewActionResponseHarness(): React.JSX.Element {
+  const [submitted, setSubmitted] = useState("none");
+
+  return (
+    <>
+      <DesignerSessionPageView
+        actionProposalResponseErrorMessage={null}
+        actionProposalResponsePendingId={null}
+        actionProposalResponseSuccessMessage={null}
+        bootstrapErrorMessage={null}
+        bootstrapIsPending={false}
+        errorMessage={null}
+        followUpDraft=""
+        followUpErrorMessage={null}
+        followUpIsPending={false}
+        followUpSuccessMessage={null}
+        onActionProposalResponseSubmit={(
+          proposalId: string,
+          response: DesignerActionProposalResponse,
+        ) => {
+          setSubmitted(`${proposalId}:${response}`);
+        }}
+        onFollowUpDraftChange={() => {}}
+        onFollowUpSubmit={() => {}}
+        runtimeConversationBootstrap={RuntimeConversationBootstrap}
+        runtimeConversationTranscript={RuntimeConversationTranscriptWithActionProposal}
+        session={BaseDesignerSession}
+        sessionId="dsn_test"
+        transcriptErrorMessage={null}
+        transcriptIsPending={false}
+      />
+      <output aria-label="Submitted action proposal response">{submitted}</output>
+    </>
   );
 }
 
@@ -167,7 +212,7 @@ describe("DesignerSessionPageView", () => {
     expect(screen.queryByText("Initial prompt submitted")).toBeNull();
   });
 
-  it("renders Designer action proposals without approval controls", () => {
+  it("renders Designer action proposals with response controls", () => {
     renderDesignerSessionPageView({
       runtimeConversationBootstrap: RuntimeConversationBootstrap,
       runtimeConversationTranscript: RuntimeConversationTranscriptWithActionProposal,
@@ -181,11 +226,47 @@ describe("DesignerSessionPageView", () => {
     expect(screen.getByText("GitHub create webhook")).toBeDefined();
     expect(screen.getByText("repository webhook: mistle/agent-runtime")).toBeDefined();
     expect(screen.getByText("pull_request, pull_request_review")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Decline" })).toBeDefined();
+  });
+
+  it("submits Designer action proposal responses with the selected proposal decision", () => {
+    render(<DesignerSessionPageViewActionResponseHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+
+    expect(screen.getByLabelText("Submitted action proposal response").textContent).toBe(
+      "dap_github_webhook_setup:approved",
+    );
+  });
+
+  it("disables Designer action proposal response controls while a response is pending", () => {
+    renderDesignerSessionPageView({
+      actionProposalResponsePendingId: "dap_github_webhook_setup",
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      runtimeConversationTranscript: RuntimeConversationTranscriptWithActionProposal,
+    });
+
+    expect(screen.getAllByRole("button", { name: "Submitting" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Submitting" })[0]).toHaveProperty(
+      "disabled",
+      true,
+    );
+  });
+
+  it("shows Designer action proposal response submission status", () => {
+    renderDesignerSessionPageView({
+      actionProposalResponseErrorMessage: "Designer action proposal is not pending.",
+      actionProposalResponseSuccessMessage:
+        "Action proposal response submitted at 2026-04-01T09:03:00.000Z.",
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      runtimeConversationTranscript: RuntimeConversationTranscriptWithActionProposal,
+    });
+
+    expect(screen.getByText("Designer action proposal is not pending.")).toBeDefined();
     expect(
-      screen.getByText("Approval responses are not enabled for Designer action proposals yet."),
+      screen.getByText("Action proposal response submitted at 2026-04-01T09:03:00.000Z."),
     ).toBeDefined();
-    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /decline/i })).toBeNull();
   });
 
   it("shows transcript load errors while retaining the saved prompt preview", () => {

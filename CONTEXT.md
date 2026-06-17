@@ -73,6 +73,10 @@ _Avoid_: Chat suggestion when the recommendation has selectable product state
 An itemized **Mistle Designer** proposal for a user-reviewed change or operation that requires explicit user approval before it can take effect.
 _Avoid_: Provider configuration change when the change has not been approved or applied
 
+**Designer action proposal response**:
+A user's approve or decline decision for a pending **Designer action proposal**.
+_Avoid_: Provider configuration change when the response has not caused an external provider mutation
+
 **User input request**:
 A runtime request that asks the user to answer one or more structured questions before the agent continues.
 _Avoid_: Approval request when the user is choosing configuration rather than granting permission
@@ -608,6 +612,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Mistle Designer** may read and refresh scoped **Provider configuration resources** needed for the current setup path.
 - **Mistle Designer** may make **Provider configuration changes** only after explicit user approval.
 - **Mistle Designer** may request approval for an itemized batch of **Provider configuration changes**.
+- A **Designer action proposal response** records user intent for one pending **Designer action proposal**; provider writes still require an explicit supported operation path.
 - First-pass **Mistle Designer sessions** do not require detailed durable activity history for **Provider configuration changes**.
 - Publishing the first **Sandbox profile version** is publish-worthy when no **Source sandbox profile version** exists.
 - Publishing the first **Sandbox profile version** does not require a **Source sandbox profile version**.
