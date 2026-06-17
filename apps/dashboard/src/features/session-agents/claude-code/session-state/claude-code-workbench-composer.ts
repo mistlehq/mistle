@@ -2,6 +2,7 @@ import type {
   ClaudeCodeModelSummary,
   ClaudeCodeSessionConfig,
 } from "@mistle/integrations-definitions/agent-runtimes/claude-code/client";
+import { mapClaudeCodeSlashCommandsToComposerCapabilities } from "@mistle/integrations-definitions/agent-runtimes/claude-code/composer-capabilities";
 import { useCallback, useMemo, useState } from "react";
 
 import { buildSessionComposerModelOptions } from "../../../pages/session-composer/session-composer-model-options.js";
@@ -37,6 +38,7 @@ export function buildReadyClaudeCodeComposerBootstrap(
   return {
     phase: { status: "ready" },
     composerCapabilities: [
+      ...mapClaudeCodeSlashCommandsToComposerCapabilities(config.availableCommands),
       {
         kind: "contextMention",
         trigger: "@",

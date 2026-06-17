@@ -6,6 +6,7 @@ import {
 } from "./claude-code-chat-state.js";
 
 const ClaudeCodeTestSessionConfig = {
+  availableCommands: [],
   availableModels: [],
   model: null,
   modelReasoningEffort: null,

@@ -104,7 +104,7 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain('case "session/model-catalog"');
     expect(ClaudeCodeRuntimeServerBundle).toContain("function createIdlePromptStream");
     expect(ClaudeCodeRuntimeServerBundle).toContain("await sdkQuery.supportedModels()");
-    expect(ClaudeCodeRuntimeServerBundle).toContain("conversation.modelCatalog = modelCatalog");
+    expect(ClaudeCodeRuntimeServerBundle).toContain("conversation.modelCatalog = catalog");
     expect(ClaudeCodeRuntimeServerBundle).toContain('isDefault: modelInfo.value === "default"');
     expect(ClaudeCodeRuntimeServerBundle).toContain(
       'displayName: modelInfo.value === "default" ? "Default" : modelInfo.displayName',
@@ -113,6 +113,31 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
     expect(ClaudeCodeRuntimeServerBundle).not.toContain("isDefault: index === 0");
     expect(ClaudeCodeRuntimeServerBundle).toContain(
       "availableModels: conversation.modelCatalog ?? []",
+    );
+  });
+
+  it("loads Claude Code slash command catalog lazily through the SDK", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain("commandCatalog: null");
+    expect(ClaudeCodeRuntimeServerBundle).toContain("commandCatalogLoadPromise: null");
+    expect(ClaudeCodeRuntimeServerBundle).toContain('case "session/command-catalog"');
+    expect(ClaudeCodeRuntimeServerBundle).toContain("await sdkQuery.supportedCommands()");
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "function mapClaudeCodeCommandInfo(commandInfo)",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      'throw new Error("Claude Code returned an invalid slash command catalog entry.");',
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "availableCommands: conversation.commandCatalog ?? []",
+    );
+  });
+
+  it("updates the cached Claude Code slash command catalog from SDK change events", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain('message.type === "system"');
+    expect(ClaudeCodeRuntimeServerBundle).toContain('message.subtype === "commands_changed"');
+    expect(ClaudeCodeRuntimeServerBundle).toContain("Array.isArray(message.commands)");
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "conversation.commandCatalog = message.commands.map(mapClaudeCodeCommandInfo);",
     );
   });
 

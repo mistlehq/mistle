@@ -93,6 +93,8 @@ function createConversationState(input) {
     selectedReasoningEffort: null,
     modelCatalog: null,
     modelCatalogLoadPromise: null,
+    commandCatalog: null,
+    commandCatalogLoadPromise: null,
     contextUsage: null,
   };
 }
@@ -157,6 +159,7 @@ async function configureSession(conversation, input) {
 
 function buildConversationConfig(conversation) {
   return {
+    availableCommands: conversation.commandCatalog ?? [],
     availableModels: conversation.modelCatalog ?? [],
     model: conversation.selectedModel,
     modelReasoningEffort: conversation.selectedReasoningEffort,
@@ -224,24 +227,90 @@ async function fetchClaudeCodeModelCatalog(conversation) {
   }
 }
 
-async function loadConversationModelCatalog(conversation, refresh) {
-  if (!refresh && conversation.modelCatalog !== null) {
-    return conversation.modelCatalog;
+async function loadConversationCatalog(input) {
+  const cachedCatalog = input.readCatalog();
+  if (!input.refresh && cachedCatalog !== null) {
+    return cachedCatalog;
   }
-  if (!refresh && conversation.modelCatalogLoadPromise !== null) {
-    return conversation.modelCatalogLoadPromise;
+  const activeLoadPromise = input.readLoadPromise();
+  if (!input.refresh && activeLoadPromise !== null) {
+    return activeLoadPromise;
   }
-  const loadPromise = fetchClaudeCodeModelCatalog(conversation);
-  conversation.modelCatalogLoadPromise = loadPromise;
+  const loadPromise = input.fetchCatalog();
+  input.writeLoadPromise(loadPromise);
   try {
-    const modelCatalog = await loadPromise;
-    conversation.modelCatalog = modelCatalog;
-    return modelCatalog;
+    const catalog = await loadPromise;
+    input.writeCatalog(catalog);
+    return catalog;
   } finally {
-    if (conversation.modelCatalogLoadPromise === loadPromise) {
-      conversation.modelCatalogLoadPromise = null;
+    if (input.readLoadPromise() === loadPromise) {
+      input.writeLoadPromise(null);
     }
   }
+}
+
+async function loadConversationModelCatalog(conversation, refresh) {
+  return loadConversationCatalog({
+    refresh,
+    readCatalog: () => conversation.modelCatalog,
+    writeCatalog: (catalog) => {
+      conversation.modelCatalog = catalog;
+    },
+    readLoadPromise: () => conversation.modelCatalogLoadPromise,
+    writeLoadPromise: (loadPromise) => {
+      conversation.modelCatalogLoadPromise = loadPromise;
+    },
+    fetchCatalog: () => fetchClaudeCodeModelCatalog(conversation),
+  });
+}
+
+function mapClaudeCodeCommandInfo(commandInfo) {
+  if (
+    commandInfo === null ||
+    typeof commandInfo !== "object" ||
+    typeof commandInfo.name !== "string" ||
+    commandInfo.name.length === 0
+  ) {
+    throw new Error("Claude Code returned an invalid slash command catalog entry.");
+  }
+  return {
+    name: commandInfo.name,
+    description:
+      typeof commandInfo.description === "string" && commandInfo.description.length > 0
+        ? commandInfo.description
+        : null,
+  };
+}
+
+async function fetchClaudeCodeCommandCatalog(conversation) {
+  const sdkQuery = query({
+    prompt: createIdlePromptStream(),
+    options: createClaudeQueryOptions({
+      cwd: conversation.cwd,
+      session: { kind: "new", sessionId: randomUUID() },
+    }),
+  });
+  try {
+    const commands = await sdkQuery.supportedCommands();
+    return commands.map(mapClaudeCodeCommandInfo);
+  } finally {
+    await sdkQuery.close();
+  }
+}
+
+async function loadConversationCommandCatalog(conversation, refresh) {
+  return loadConversationCatalog({
+    refresh,
+    readCatalog: () => conversation.commandCatalog,
+    writeCatalog: (catalog) => {
+      conversation.commandCatalog = catalog;
+    },
+    readLoadPromise: () => conversation.commandCatalogLoadPromise,
+    writeLoadPromise: (loadPromise) => {
+      conversation.commandCatalogLoadPromise = loadPromise;
+    },
+    fetchCatalog: () => fetchClaudeCodeCommandCatalog(conversation),
+  });
 }
 
 function idempotencyKeyForRequest(request) {
@@ -328,6 +397,18 @@ async function runClaudeQuery(conversation, queryId, inputText) {
         queryId,
         message,
       });
+      if (
+        message !== null &&
+        typeof message === "object" &&
+        "type" in message &&
+        message.type === "system" &&
+        "subtype" in message &&
+        message.subtype === "commands_changed" &&
+        "commands" in message &&
+        Array.isArray(message.commands)
+      ) {
+        conversation.commandCatalog = message.commands.map(mapClaudeCodeCommandInfo);
+      }
       if (
         message !== null &&
         typeof message === "object" &&
@@ -625,6 +706,17 @@ async function handleRequest(request) {
       }
       const conversation = requireSession(params.sessionId);
       await loadConversationModelCatalog(conversation, params.refresh === true);
+      return {
+        config: buildConversationConfig(conversation),
+      };
+    }
+    case "session/command-catalog": {
+      const params = request.params ?? {};
+      if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
+        throw new Error("session/command-catalog requires params.sessionId.");
+      }
+      const conversation = requireSession(params.sessionId);
+      await loadConversationCommandCatalog(conversation, params.refresh === true);
       return {
         config: buildConversationConfig(conversation),
       };

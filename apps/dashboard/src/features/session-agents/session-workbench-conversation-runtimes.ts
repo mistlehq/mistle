@@ -1,3 +1,4 @@
+import { isClaudeCodeSlashCommandId } from "@mistle/integrations-definitions/agent-runtimes/claude-code/composer-capabilities";
 import {
   CodexComposerCommandIds,
   CodexRuntimeCommandIds,
@@ -401,6 +402,34 @@ export function buildClaudeCodeConversationRuntime(input: {
       sessionErrorMessage: input.sessionMessage.sessionErrorMessage,
       clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
       contextUsage: input.contextUsage,
+      executeTypedRuntimeCommand: (commandInput) => {
+        if (!isClaudeCodeSlashCommandId(commandInput.commandId)) {
+          input.sessionMessage.reportSessionErrorMessage(
+            `Unsupported Claude Code runtime command '${commandInput.commandId}'.`,
+          );
+          return false;
+        }
+
+        if (isTurnRunning) {
+          input.sessionMessage.reportSessionErrorMessage(
+            "Claude Code slash commands are disabled while Claude Code is working.",
+          );
+          return false;
+        }
+
+        void input
+          .startTurn({
+            submittedPrompt: commandInput.text,
+            transcriptPrompt: commandInput.text,
+            uploadedAttachments: [],
+          })
+          .catch((error: unknown) => {
+            input.sessionMessage.reportSessionErrorMessage(
+              error instanceof Error ? error.message : "Could not send Claude Code slash command.",
+            );
+          });
+        return true;
+      },
       modelSelection: capabilities.composerModelSelection,
     },
     serverRequestsState: {
