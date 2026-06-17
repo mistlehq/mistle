@@ -1102,6 +1102,36 @@ describe.concurrent("MCP profile tools integration", () => {
     ]);
   });
 
+  it("prevents designer MCP tokens from starting profile test sandboxes", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-designer-session-create-forbidden@example.com",
+    });
+    const token = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "designer",
+        sub: "sbi_mcp_designer_session_create_forbidden",
+        organizationId: session.organizationId,
+        designerSessionId: "dsn_mcp_designer_session_create_forbidden",
+      },
+      ttlSeconds: 300,
+    });
+
+    const result = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_setup_script_test_start",
+      arguments: {
+        profileId: "sbp_mcp_designer_session_create_forbidden",
+        version: 1,
+        setupScript: "echo should not start",
+        idempotencyKey: "mcp-designer-session-create-forbidden-001",
+      },
+    });
+
+    expect(result.isError).toBe(true);
+  });
+
   it("authorizes profile tools with a gateway-injected MCP token referencing an API key", async ({
     env,
   }) => {

@@ -49,9 +49,7 @@ export async function authenticateMcpToken(input: {
       permissions: [
         OrganizationPermissions.SANDBOX_PROFILE_READ,
         OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
-        OrganizationPermissions.SANDBOX_SESSION_CREATE,
         OrganizationPermissions.SANDBOX_SESSION_READ,
-        OrganizationPermissions.SANDBOX_SESSION_CONNECT,
         OrganizationPermissions.INTEGRATION_CONNECTION_READ,
         OrganizationPermissions.INTEGRATION_CONNECTION_CREATE,
         OrganizationPermissions.INTEGRATION_CONNECTION_UPDATE,
