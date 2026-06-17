@@ -267,6 +267,7 @@ fn start_pi_proxy_inner(
     let state = Arc::new(PiProxyState {
         config,
         child: Mutex::new(None),
+        output_receiver: Mutex::new(None),
         command_lock: Mutex::new(()),
         event_subscribers: Mutex::new(Vec::new()),
         keepalive_manager,
@@ -306,9 +307,10 @@ fn start_pi_proxy_inner(
 mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
+    use std::net::TcpListener;
     use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
     use std::thread;
     use std::time::Duration;
@@ -379,6 +381,84 @@ mod tests {
                 "expected Pi RPC process to restart before timeout, got {snapshot:?}"
             );
             thread::sleep(Duration::from_millis(25));
+        }
+    }
+
+    fn wait_for_json_line(path: &str, timeout: Duration) -> Value {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            if let Ok(contents) = fs::read_to_string(path)
+                && let Some(line) = contents.lines().find(|line| !line.trim().is_empty())
+            {
+                return serde_json::from_str(line).expect("file line should be JSON");
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "expected {path} to contain a JSON line before timeout"
+            );
+            thread::sleep(Duration::from_millis(25));
+        }
+    }
+
+    fn test_pi_proxy_state(pi_cli_path: String) -> Arc<PiProxyState> {
+        Arc::new(PiProxyState {
+            config: PiProxyConfig {
+                pi_cli_path,
+                env: BTreeMap::new(),
+            },
+            child: Mutex::new(None),
+            output_receiver: Mutex::new(None),
+            command_lock: Mutex::new(()),
+            event_subscribers: Mutex::new(Vec::new()),
+            keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
+            active: std::sync::atomic::AtomicBool::new(false),
+            activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
+            next_id: AtomicU64::new(1),
+            idempotency_store: None,
+            supervisor_handle: test_supervisor_handle(),
+            platform_scope: None,
+        })
+    }
+
+    fn read_websocket_json_until(
+        websocket: &mut tungstenite::WebSocket<std::net::TcpStream>,
+        timeout: Duration,
+        matches: impl Fn(&Value) -> bool,
+    ) -> Value {
+        try_read_websocket_json_until(websocket, timeout, matches)
+            .expect("expected websocket JSON-RPC message before timeout")
+    }
+
+    fn try_read_websocket_json_until(
+        websocket: &mut tungstenite::WebSocket<std::net::TcpStream>,
+        timeout: Duration,
+        matches: impl Fn(&Value) -> bool,
+    ) -> Option<Value> {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            if std::time::Instant::now() >= deadline {
+                return None;
+            }
+            match websocket.read() {
+                Ok(tungstenite::Message::Text(payload)) => {
+                    let message =
+                        serde_json::from_str::<Value>(&payload).expect("message should be JSON");
+                    if matches(&message) {
+                        return Some(message);
+                    }
+                }
+                Ok(tungstenite::Message::Ping(payload)) => websocket
+                    .send(tungstenite::Message::Pong(payload))
+                    .expect("websocket pong should be sent"),
+                Ok(_) => {}
+                Err(tungstenite::Error::Io(error))
+                    if error.kind() == std::io::ErrorKind::WouldBlock
+                        || error.kind() == std::io::ErrorKind::TimedOut =>
+                {
+                    thread::sleep(Duration::from_millis(25));
+                }
+                Err(error) => panic!("websocket read failed: {error}"),
+            }
         }
     }
 
@@ -646,6 +726,7 @@ mod tests {
                 env: BTreeMap::new(),
             },
             child: Mutex::new(None),
+            output_receiver: Mutex::new(None),
             command_lock: Mutex::new(()),
             event_subscribers: Mutex::new(Vec::new()),
             keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
@@ -690,6 +771,7 @@ mod tests {
                 env: BTreeMap::new(),
             },
             child: Mutex::new(None),
+            output_receiver: Mutex::new(None),
             command_lock: Mutex::new(()),
             event_subscribers: Mutex::new(Vec::new()),
             keepalive_manager: keepalive_manager.clone(),
@@ -749,9 +831,9 @@ mod tests {
         );
 
         let pi_event = parse_json_rpc_message(
-            prompt_responses
-                .first()
-                .expect("prompt should fan out Pi events before its response"),
+            &event_receiver
+                .recv_timeout(Duration::from_secs(1))
+                .expect("prompt should broadcast Pi events before its response"),
         );
         assert_eq!(pi_event["method"], json!("pi/event"));
         assert_eq!(pi_event["params"]["type"], json!("agent_start"));
@@ -786,6 +868,326 @@ mod tests {
     }
 
     #[test]
+    fn websocket_accepts_extension_ui_response_while_prompt_request_is_pending() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let state = test_pi_proxy_state(simulated_pi.path());
+        let listener = TcpListener::bind("127.0.0.1:0").expect("listener should bind");
+        let address = listener
+            .local_addr()
+            .expect("listener address should be set");
+        listener
+            .set_nonblocking(true)
+            .expect("listener should be nonblocking");
+        let shutdown_requested = Arc::new(AtomicBool::new(false));
+        let server_state = state.clone();
+        let server_shutdown_requested = shutdown_requested.clone();
+        let server_thread = thread::spawn(move || {
+            super::server::run_pi_proxy_listener(listener, server_state, server_shutdown_requested)
+                .expect("Pi proxy listener should run")
+        });
+        let stream = std::net::TcpStream::connect(address).expect("websocket should connect");
+        let (mut websocket, _response) = tungstenite::client(format!("ws://{address}"), stream)
+            .expect("websocket handshake should complete");
+        websocket
+            .get_mut()
+            .set_read_timeout(Some(Duration::from_millis(100)))
+            .expect("websocket read timeout should be set");
+
+        websocket
+            .send(tungstenite::Message::Text(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": "prompt",
+                    "method": "pi/prompt",
+                    "params": {
+                        "sessionFile": "session.jsonl",
+                        "message": "wait-for-ui"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("prompt request should be sent");
+        let ui_request =
+            read_websocket_json_until(&mut websocket, Duration::from_secs(5), |value| {
+                value["method"] == json!("pi/event")
+                    && value["params"]["type"] == json!("extension_ui_request")
+            });
+        assert_eq!(ui_request["params"]["id"], json!("ui_confirm_1"));
+
+        websocket
+            .send(tungstenite::Message::Text(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": "get-state",
+                    "method": "pi/getState",
+                    "params": {
+                        "sessionFile": "session.jsonl"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("getState request should be sent");
+        assert!(
+            try_read_websocket_json_until(&mut websocket, Duration::from_millis(150), |value| {
+                value["id"] == json!("get-state")
+            })
+            .is_none(),
+            "regular Pi requests should wait behind the pending prompt request"
+        );
+
+        websocket
+            .send(tungstenite::Message::Text(
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": "extension-response",
+                    "method": "pi/respondToExtensionUI",
+                    "params": {
+                        "requestId": "ui_confirm_1",
+                        "confirmed": true
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("extension UI response request should be sent");
+        let extension_response =
+            read_websocket_json_until(&mut websocket, Duration::from_secs(5), |value| {
+                value["id"] == json!("extension-response")
+            });
+        assert_eq!(extension_response["result"], json!({ "accepted": true }));
+        let prompt_response =
+            read_websocket_json_until(&mut websocket, Duration::from_secs(5), |value| {
+                value["id"] == json!("prompt")
+            });
+        assert_eq!(prompt_response["result"], json!({ "accepted": true }));
+        let get_state_response =
+            read_websocket_json_until(&mut websocket, Duration::from_secs(5), |value| {
+                value["id"] == json!("get-state")
+            });
+        assert_eq!(
+            get_state_response["result"]["sessionFile"],
+            json!(simulated_pi.session_file())
+        );
+        let pi_response =
+            wait_for_json_line(simulated_pi.ui_response_file(), Duration::from_secs(2));
+        assert_eq!(
+            pi_response,
+            json!({
+                "type": "extension_ui_response",
+                "id": "ui_confirm_1",
+                "confirmed": true,
+            }),
+        );
+
+        websocket
+            .close(None)
+            .expect("websocket should close cleanly");
+        shutdown_requested.store(true, Ordering::Relaxed);
+        server_thread
+            .join()
+            .expect("Pi proxy listener thread should not panic");
+        state
+            .shutdown_child()
+            .expect("Pi RPC process should shut down cleanly");
+    }
+
+    #[test]
+    fn forwards_extension_ui_responses_to_pi_rpc_stdin_without_waiting_for_pi_response() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let state = test_pi_proxy_state(simulated_pi.path());
+        state
+            .ensure_child(None)
+            .expect("Pi RPC process should start");
+
+        let response = parse_json_rpc_message(
+            handle_json_rpc_request(
+                &state,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": "extension-response",
+                    "method": "pi/respondToExtensionUI",
+                    "params": {
+                        "requestId": "ui_confirm_1",
+                        "confirmed": true
+                    }
+                })
+                .to_string(),
+            )
+            .last()
+            .expect("extension UI response should produce a JSON-RPC response"),
+        );
+
+        assert_eq!(response["id"], json!("extension-response"));
+        assert_eq!(response["result"], json!({ "accepted": true }));
+        let pi_response =
+            wait_for_json_line(simulated_pi.ui_response_file(), Duration::from_secs(2));
+        assert_eq!(
+            pi_response,
+            json!({
+                "type": "extension_ui_response",
+                "id": "ui_confirm_1",
+                "confirmed": true,
+            }),
+        );
+
+        state
+            .shutdown_child()
+            .expect("Pi RPC process should shut down cleanly");
+    }
+
+    #[test]
+    fn rejects_malformed_extension_ui_response_params_before_forwarding_to_pi() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let state = test_pi_proxy_state(simulated_pi.path());
+
+        let wrong_type_response = parse_json_rpc_message(
+            handle_json_rpc_request(
+                &state,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": "wrong-type",
+                    "method": "pi/respondToExtensionUI",
+                    "params": {
+                        "requestId": "ui_confirm_1",
+                        "confirmed": true,
+                        "value": 123
+                    }
+                })
+                .to_string(),
+            )
+            .last()
+            .expect("malformed extension UI response should produce a JSON-RPC response"),
+        );
+        assert_eq!(wrong_type_response["id"], json!("wrong-type"));
+        assert!(
+            wrong_type_response["error"]["message"]
+                .as_str()
+                .expect("error message should be a string")
+                .contains("value response must be a string")
+        );
+
+        let extra_key_response = parse_json_rpc_message(
+            handle_json_rpc_request(
+                &state,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": "extra-key",
+                    "method": "pi/respondToExtensionUI",
+                    "params": {
+                        "requestId": "ui_confirm_1",
+                        "confirmed": true,
+                        "unexpected": true
+                    }
+                })
+                .to_string(),
+            )
+            .last()
+            .expect("malformed extension UI response should produce a JSON-RPC response"),
+        );
+        assert_eq!(extra_key_response["id"], json!("extra-key"));
+        assert!(
+            extra_key_response["error"]["message"]
+                .as_str()
+                .expect("error message should be a string")
+                .contains("unsupported parameter 'unexpected'")
+        );
+    }
+
+    #[test]
+    fn forwards_extension_ui_response_while_command_waits_for_pi_output() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let state = test_pi_proxy_state(simulated_pi.path());
+        state
+            .ensure_child(None)
+            .expect("Pi RPC process should start");
+        let (prompt_sender, prompt_receiver) = std::sync::mpsc::channel();
+        let prompt_state = state.clone();
+        let prompt_thread = thread::spawn(move || {
+            let responses = handle_json_rpc_request(
+                &prompt_state,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": "prompt",
+                    "method": "pi/prompt",
+                    "params": {
+                        "sessionFile": "session.jsonl",
+                        "message": "wait-for-ui"
+                    }
+                })
+                .to_string(),
+            );
+            prompt_sender
+                .send(responses)
+                .expect("prompt responses should be sent to test thread");
+        });
+
+        let ui_request = wait_for_json_line(simulated_pi.ui_request_file(), Duration::from_secs(2));
+        assert_eq!(ui_request["type"], json!("extension_ui_request"));
+        assert_eq!(ui_request["id"], json!("ui_confirm_1"));
+        assert!(
+            prompt_receiver
+                .recv_timeout(Duration::from_millis(100))
+                .is_err(),
+            "prompt should still be waiting for the extension UI response",
+        );
+
+        let response = parse_json_rpc_message(
+            handle_json_rpc_request(
+                &state,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": "extension-response",
+                    "method": "pi/respondToExtensionUI",
+                    "params": {
+                        "requestId": "ui_confirm_1",
+                        "confirmed": true
+                    }
+                })
+                .to_string(),
+            )
+            .last()
+            .expect("extension UI response should produce a JSON-RPC response"),
+        );
+        assert_eq!(response["result"], json!({ "accepted": true }));
+        assert!(
+            prompt_receiver
+                .recv_timeout(Duration::from_millis(100))
+                .is_err(),
+            "extension UI response should return before the prompt command finishes waiting",
+        );
+
+        let prompt_responses = prompt_receiver
+            .recv_timeout(Duration::from_secs(2))
+            .expect("prompt should complete after extension UI response is forwarded");
+        prompt_thread
+            .join()
+            .expect("prompt thread should finish without panicking");
+        let prompt_response = parse_json_rpc_message(
+            prompt_responses
+                .last()
+                .expect("prompt should produce a JSON-RPC response"),
+        );
+        assert_eq!(prompt_response["id"], json!("prompt"));
+        assert_eq!(prompt_response["result"], json!({ "accepted": true }));
+        let pi_response =
+            wait_for_json_line(simulated_pi.ui_response_file(), Duration::from_secs(2));
+        assert_eq!(
+            pi_response,
+            json!({
+                "type": "extension_ui_response",
+                "id": "ui_confirm_1",
+                "confirmed": true,
+            }),
+        );
+
+        state
+            .shutdown_child()
+            .expect("Pi RPC process should shut down cleanly");
+    }
+
+    #[test]
     fn replays_completed_idempotent_pi_create_without_requiring_live_child() {
         let simulated_pi = SimulatedPiRpcProcess::start();
         let temp_dir = tempdir().expect("temp dir should be created");
@@ -795,6 +1197,7 @@ mod tests {
                 env: BTreeMap::new(),
             },
             child: Mutex::new(None),
+            output_receiver: Mutex::new(None),
             command_lock: Mutex::new(()),
             event_subscribers: Mutex::new(Vec::new()),
             keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
@@ -873,6 +1276,7 @@ mod tests {
                 env: BTreeMap::new(),
             },
             child: Mutex::new(None),
+            output_receiver: Mutex::new(None),
             command_lock: Mutex::new(()),
             event_subscribers: Mutex::new(Vec::new()),
             keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
@@ -945,6 +1349,7 @@ mod tests {
                 env: BTreeMap::new(),
             },
             child: Mutex::new(None),
+            output_receiver: Mutex::new(None),
             command_lock: Mutex::new(()),
             event_subscribers: Mutex::new(Vec::new()),
             keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
@@ -997,6 +1402,7 @@ mod tests {
                 env: BTreeMap::new(),
             },
             child: Mutex::new(None),
+            output_receiver: Mutex::new(None),
             command_lock: Mutex::new(()),
             event_subscribers: Mutex::new(Vec::new()),
             keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
@@ -1078,6 +1484,7 @@ mod tests {
                 env: simulated_pi.session_env(),
             },
             child: Mutex::new(None),
+            output_receiver: Mutex::new(None),
             command_lock: Mutex::new(()),
             event_subscribers: Mutex::new(Vec::new()),
             keepalive_manager: keepalive_manager.clone(),
@@ -1151,6 +1558,7 @@ mod tests {
                 env: BTreeMap::new(),
             },
             child: Mutex::new(None),
+            output_receiver: Mutex::new(None),
             command_lock: Mutex::new(()),
             event_subscribers: Mutex::new(Vec::new()),
             keepalive_manager,
@@ -1185,6 +1593,7 @@ mod tests {
                 env: simulated_pi.session_env(),
             },
             child: Mutex::new(None),
+            output_receiver: Mutex::new(None),
             command_lock: Mutex::new(()),
             event_subscribers: Mutex::new(Vec::new()),
             keepalive_manager,
@@ -1235,6 +1644,7 @@ mod tests {
                 env: BTreeMap::new(),
             },
             child: Mutex::new(None),
+            output_receiver: Mutex::new(None),
             command_lock: Mutex::new(()),
             event_subscribers: Mutex::new(Vec::new()),
             keepalive_manager,
@@ -1380,6 +1790,7 @@ mod tests {
                 )]),
             },
             child: Mutex::new(None),
+            output_receiver: Mutex::new(None),
             command_lock: Mutex::new(()),
             event_subscribers: Mutex::new(Vec::new()),
             keepalive_manager,
@@ -1457,6 +1868,7 @@ mod tests {
                 )]),
             },
             child: Mutex::new(None),
+            output_receiver: Mutex::new(None),
             command_lock: Mutex::new(()),
             event_subscribers: Mutex::new(Vec::new()),
             keepalive_manager,
@@ -1555,6 +1967,8 @@ mod tests {
         session_dir: String,
         session_file: String,
         session_id: String,
+        ui_request_file: String,
+        ui_response_file: String,
     }
 
     impl SimulatedPiRpcProcess {
@@ -1578,6 +1992,8 @@ mod tests {
             let session_dir = directory.path().join("sessions");
             fs::create_dir(&session_dir).expect("session directory should be created");
             let cwd_report_file = directory.path().join("cwd-report");
+            let ui_request_file = directory.path().join("ui-request-report");
+            let ui_response_file = directory.path().join("ui-response-report");
             let session_file = session_dir.join("session.jsonl");
             let session_id = "simulated-session";
             write_session_file(
@@ -1599,9 +2015,14 @@ mod tests {
 active_marker="{}"
 no_initial_session_marker="{}"
 cwd_report_file="{}"
+ui_request_file="{}"
+ui_response_file="{}"
 while IFS= read -r line; do
   id="$(printf '%s' "$line" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
   case "$line" in
+    *'"type":"extension_ui_response"'*)
+      printf '%s\n' "$line" >> "$ui_response_file"
+      ;;
     *'"type":"new_session"'*)
       pwd > "$cwd_report_file"
       printf '{{"type":"response","command":"new_session","id":"%s","success":true,"data":{{}}}}\n' "$id"
@@ -1657,6 +2078,14 @@ while IFS= read -r line; do
       ;;
     *'"type":"prompt"'*)
       printf '{{"type":"agent_start"}}\n'
+      case "$line" in
+        *'"message":"wait-for-ui"'*)
+          ui_request='{{"type":"extension_ui_request","id":"ui_confirm_1","method":"confirm","title":"Run command?","message":"Allow command?"}}'
+          printf '%s\n' "$ui_request"
+          printf '%s\n' "$ui_request" >> "$ui_request_file"
+          sleep 0.5
+          ;;
+      esac
       printf '{{"type":"response","command":"prompt","id":"%s","success":true,"data":{{"accepted":true}}}}\n' "$id"
       sleep 0.1
       printf '{{"type":"agent_end"}}\n'
@@ -1670,6 +2099,8 @@ done
                 active_marker.display(),
                 no_initial_session_marker.display(),
                 cwd_report_file.display(),
+                ui_request_file.display(),
+                ui_response_file.display(),
                 session_file.display(),
                 session_id,
                 session_file.display(),
@@ -1703,6 +2134,14 @@ done
                     .expect("session path should be UTF-8")
                     .to_string(),
                 session_id: session_id.to_string(),
+                ui_request_file: ui_request_file
+                    .to_str()
+                    .expect("UI request report path should be UTF-8")
+                    .to_string(),
+                ui_response_file: ui_response_file
+                    .to_str()
+                    .expect("UI response report path should be UTF-8")
+                    .to_string(),
             }
         }
 
@@ -1716,6 +2155,14 @@ done
 
         fn cwd_report_file(&self) -> &str {
             &self.cwd_report_file
+        }
+
+        fn ui_response_file(&self) -> &str {
+            &self.ui_response_file
+        }
+
+        fn ui_request_file(&self) -> &str {
+            &self.ui_request_file
         }
 
         fn session_file(&self) -> &str {

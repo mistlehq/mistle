@@ -50,6 +50,95 @@ const PiEventSchema = z.looseObject({
   type: z.string(),
 });
 
+const PiExtensionUIRequestSchema = z.discriminatedUnion("method", [
+  z.object({
+    type: z.literal("extension_ui_request"),
+    id: z.string(),
+    method: z.literal("select"),
+    title: z.string(),
+    options: z.array(z.string()).min(1),
+    timeout: z.number().optional(),
+  }),
+  z.object({
+    type: z.literal("extension_ui_request"),
+    id: z.string(),
+    method: z.literal("confirm"),
+    title: z.string(),
+    message: z.string(),
+    timeout: z.number().optional(),
+  }),
+  z.object({
+    type: z.literal("extension_ui_request"),
+    id: z.string(),
+    method: z.literal("input"),
+    title: z.string(),
+    placeholder: z.string().optional(),
+    timeout: z.number().optional(),
+  }),
+  z.object({
+    type: z.literal("extension_ui_request"),
+    id: z.string(),
+    method: z.literal("editor"),
+    title: z.string(),
+    prefill: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("extension_ui_request"),
+    id: z.string(),
+    method: z.literal("notify"),
+    message: z.string(),
+    notifyType: z.enum(["info", "warning", "error"]).optional(),
+  }),
+  z.object({
+    type: z.literal("extension_ui_request"),
+    id: z.string(),
+    method: z.literal("setStatus"),
+    statusKey: z.string(),
+    statusText: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("extension_ui_request"),
+    id: z.string(),
+    method: z.literal("setWidget"),
+    widgetKey: z.string(),
+    widgetLines: z.array(z.string()).optional(),
+    widgetPlacement: z.enum(["aboveEditor", "belowEditor"]).optional(),
+  }),
+  z.object({
+    type: z.literal("extension_ui_request"),
+    id: z.string(),
+    method: z.literal("setTitle"),
+    title: z.string(),
+  }),
+  z.object({
+    type: z.literal("extension_ui_request"),
+    id: z.string(),
+    method: z.literal("set_editor_text"),
+    text: z.string(),
+  }),
+]);
+
+const PiExtensionUIResponseInputSchema = z.union([
+  z
+    .object({
+      requestId: z.string().min(1),
+      value: z.string(),
+    })
+    .strict(),
+  z
+    .object({
+      requestId: z.string().min(1),
+      confirmed: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      requestId: z.string().min(1),
+      cancelled: z.literal(true),
+    })
+    .strict(),
+]);
+
 const PiProviderConversationResultSchema = z.object({
   providerConversationId: z.string(),
   sessionFile: z.string(),
@@ -100,6 +189,8 @@ export type PiModel = z.output<typeof PiModelSchema>;
 export type PiThinkingLevel = z.output<typeof PiThinkingLevelSchema>;
 export type PiAgentMessage = z.output<typeof PiAgentMessageSchema>;
 export type PiEvent = z.output<typeof PiEventSchema>;
+export type PiExtensionUIRequest = z.output<typeof PiExtensionUIRequestSchema>;
+export type PiExtensionUIResponseInput = z.input<typeof PiExtensionUIResponseInputSchema>;
 export type PiConversationSummary = z.output<typeof PiConversationSummarySchema>;
 export type PiListConversationsResult = z.output<typeof PiListConversationsResultSchema>;
 export type PiCommandSource = z.output<typeof PiCommandSourceSchema>;
@@ -107,6 +198,20 @@ export type PiCommandSummary = z.output<typeof PiCommandSummarySchema>;
 
 export function parsePiSessionState(input: unknown): PiSessionState {
   return PiSessionStateSchema.parse(input);
+}
+
+export function parsePiExtensionUIRequest(input: unknown): PiExtensionUIRequest | null {
+  if (typeof input !== "object" || input === null || !("type" in input)) {
+    return null;
+  }
+  if (input.type !== "extension_ui_request") {
+    return null;
+  }
+  return PiExtensionUIRequestSchema.parse(input);
+}
+
+export function parsePiExtensionUIResponseInput(input: unknown): PiExtensionUIResponseInput {
+  return PiExtensionUIResponseInputSchema.parse(input);
 }
 
 export type PiEventSubscription = {
@@ -142,6 +247,7 @@ export type PiSessionClient = {
   setModel(input: { modelId: string; provider: string; sessionFile: string }): Promise<void>;
   setThinkingLevel(input: { level: PiThinkingLevel; sessionFile: string }): Promise<void>;
   setSessionName(input: { name: string; sessionFile: string }): Promise<void>;
+  respondToExtensionUI(input: PiExtensionUIResponseInput): Promise<void>;
   prompt(input: {
     message: string;
     sessionFile: string;
@@ -364,6 +470,12 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
       await request({
         method: "pi/setSessionName",
         params: setSessionNameInput,
+      });
+    },
+    async respondToExtensionUI(extensionUIInput) {
+      await request({
+        method: "pi/respondToExtensionUI",
+        params: parsePiExtensionUIResponseInput(extensionUIInput),
       });
     },
     async prompt(promptInput) {

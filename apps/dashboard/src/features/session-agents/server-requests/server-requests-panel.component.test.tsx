@@ -105,6 +105,59 @@ describe("ServerRequestsPanel", () => {
     ]);
   });
 
+  it("submits a prefilled multiline user input answer unchanged", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: "editor-request-1",
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [
+              {
+                header: "Pi",
+                id: "editor",
+                question: "Edit instructions",
+                options: [
+                  {
+                    label: "Response",
+                    description: null,
+                    defaultValue: "Keep this text",
+                    inputKind: "textarea",
+                    isOther: true,
+                  },
+                ],
+              },
+            ],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+      />,
+    );
+
+    expect(screen.getByDisplayValue("Keep this text")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit responses" }));
+
+    expect(submittedResults).toEqual([
+      {
+        answers: [
+          {
+            id: "editor",
+            value: "Keep this text",
+          },
+        ],
+      },
+    ]);
+  });
+
   it("renders OpenCode permission requests in the standalone panel", () => {
     const submittedResults: unknown[] = [];
 
@@ -176,6 +229,44 @@ describe("ServerRequestsPanel", () => {
     expect(submittedResults).toEqual([
       {
         decision: "reject",
+      },
+    ]);
+  });
+
+  it("renders Pi confirmation requests in the standalone panel", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: "pi-confirm-1",
+            method: "pi/extensionUi/confirm",
+            kind: "pi-extension-ui-confirm",
+            title: "Run command?",
+            message: "Allow Pi to run pnpm test?",
+            availableDecisions: ["confirm", "cancel"],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Pi confirmation").textContent).toBe("Pi confirmation");
+    expect(screen.getByText("Allow Pi to run pnpm test?").textContent).toBe(
+      "Allow Pi to run pnpm test?",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "confirm" }));
+
+    expect(submittedResults).toEqual([
+      {
+        decision: "confirm",
       },
     ]);
   });

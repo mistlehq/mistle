@@ -227,6 +227,85 @@ fn require_param_string(params: &Option<Value>, key: &str) -> Result<String, PiP
         .ok_or_else(|| PiProxyError::InvalidRequest(format!("missing required parameter '{key}'")))
 }
 
+fn resolve_pi_extension_ui_response_command(params: &Option<Value>) -> Result<Value, PiProxyError> {
+    let params_object = params.as_ref().and_then(Value::as_object).ok_or_else(|| {
+        PiProxyError::InvalidRequest(
+            "Pi extension UI response params must be an object.".to_string(),
+        )
+    })?;
+    for key in params_object.keys() {
+        if key != "requestId" && key != "value" && key != "confirmed" && key != "cancelled" {
+            return Err(PiProxyError::InvalidRequest(format!(
+                "Pi extension UI response included unsupported parameter '{key}'."
+            )));
+        }
+    }
+
+    let request_id = params_object
+        .get("requestId")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            PiProxyError::InvalidRequest(
+                "Pi extension UI response requires a non-empty requestId.".to_string(),
+            )
+        })?
+        .to_string();
+    let value = match params_object.get("value") {
+        Some(value) => Some(value.as_str().ok_or_else(|| {
+            PiProxyError::InvalidRequest(
+                "Pi extension UI value response must be a string.".to_string(),
+            )
+        })?),
+        None => None,
+    };
+    let confirmed = match params_object.get("confirmed") {
+        Some(value) => Some(value.as_bool().ok_or_else(|| {
+            PiProxyError::InvalidRequest(
+                "Pi extension UI confirmed response must be a boolean.".to_string(),
+            )
+        })?),
+        None => None,
+    };
+    let cancelled = match params_object.get("cancelled") {
+        Some(value) => Some(value.as_bool().ok_or_else(|| {
+            PiProxyError::InvalidRequest(
+                "Pi extension UI cancelled response must be a boolean.".to_string(),
+            )
+        })?),
+        None => None,
+    };
+    let response_count = usize::from(value.is_some())
+        + usize::from(confirmed.is_some())
+        + usize::from(cancelled.is_some());
+    if response_count != 1 {
+        return Err(PiProxyError::InvalidRequest(
+            "Pi extension UI response must include exactly one of value, confirmed, or cancelled."
+                .to_string(),
+        ));
+    }
+
+    let mut command = json!({
+        "type": "extension_ui_response",
+        "id": request_id,
+    });
+    if let Some(value) = value {
+        command["value"] = json!(value);
+    }
+    if let Some(confirmed) = confirmed {
+        command["confirmed"] = json!(confirmed);
+    }
+    if let Some(cancelled) = cancelled {
+        if !cancelled {
+            return Err(PiProxyError::InvalidRequest(
+                "Pi extension UI cancelled response must be true.".to_string(),
+            ));
+        }
+        command["cancelled"] = json!(true);
+    }
+    Ok(command)
+}
+
 fn handle_pi_method(
     state: &Arc<PiProxyState>,
     request: &JsonRpcRequest,
@@ -378,10 +457,7 @@ fn handle_pi_method(
             state.ensure_child(None)?;
             state.switch_session(&session_file, captured_events)?;
             PiProxyState::mark_active_and_start_activity_monitor(state);
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "prompt", "message": message }),
-                captured_events,
-            )
+            state.send_pi_command(json!({ "type": "prompt", "message": message }))
         }
         "pi/steer" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
@@ -389,10 +465,7 @@ fn handle_pi_method(
             state.ensure_child(None)?;
             state.switch_session(&session_file, captured_events)?;
             PiProxyState::mark_active_and_start_activity_monitor(state);
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "steer", "message": message }),
-                captured_events,
-            )
+            state.send_pi_command(json!({ "type": "steer", "message": message }))
         }
         "pi/followUp" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
@@ -400,16 +473,18 @@ fn handle_pi_method(
             state.ensure_child(None)?;
             state.switch_session(&session_file, captured_events)?;
             PiProxyState::mark_active_and_start_activity_monitor(state);
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "follow_up", "message": message }),
-                captured_events,
-            )
+            state.send_pi_command(json!({ "type": "follow_up", "message": message }))
         }
         "pi/abort" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             state.ensure_child(None)?;
             state.switch_session(&session_file, captured_events)?;
             state.send_pi_command_with_captured_events(json!({ "type": "abort" }), captured_events)
+        }
+        "pi/respondToExtensionUI" => {
+            let command = resolve_pi_extension_ui_response_command(&request.params)?;
+            state.send_pi_input(command)?;
+            Ok(json!({ "accepted": true }))
         }
         other => Err(PiProxyError::InvalidRequest(format!(
             "unsupported Pi proxy method '{other}'"

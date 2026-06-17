@@ -1,10 +1,12 @@
 import {
   createPiSessionClient,
+  parsePiExtensionUIRequest,
   type PiAgentMessage,
   type PiCommandSummary,
   type PiConversationSummary,
   type PiEvent,
   type PiEventSubscription,
+  type PiExtensionUIResponseInput,
   type PiModel,
   type PiSessionClient,
   type PiSessionState,
@@ -31,6 +33,10 @@ import {
   resolveStablePiCliLaunchTarget,
 } from "./pi-cli-launch-authority.js";
 import { formatPiContextUsage, type PiContextUsageViewModel } from "./pi-context-usage.js";
+import {
+  shouldExposePiExtensionUIRequest,
+  type ExposedPiExtensionUIRequest,
+} from "./pi-extension-ui-requests.js";
 import {
   buildReadyPiComposerBootstrap,
   buildUnavailablePiComposerBootstrap,
@@ -103,9 +109,12 @@ export type UsePiSessionStateResult = {
     chatState: PiChatState;
     confirmChatRestoredAfterReconnect: () => Promise<void>;
     isInterruptingTurn: boolean;
+    isRespondingToExtensionUIRequest: boolean;
     isStartingTurn: boolean;
     isSteeringTurn: boolean;
     followUpTurn: (input: { submittedPrompt: string }) => Promise<void>;
+    pendingExtensionUIRequests: readonly ExposedPiExtensionUIRequest[];
+    respondToExtensionUIRequest: (input: PiExtensionUIResponseInput) => Promise<void>;
     sendPrompt: (input: { submittedPrompt: string }) => Promise<void>;
     steerTurn: (input: { submittedPrompt: string }) => Promise<void>;
   };
@@ -299,6 +308,22 @@ function resolvePiChatStatusFromSessionState(sessionState: PiSessionState): "bus
   return isPiSessionActivelyWorking(sessionState) ? "busy" : "idle";
 }
 
+function upsertPendingPiExtensionUIRequest(
+  pendingRequests: readonly ExposedPiExtensionUIRequest[],
+  request: ExposedPiExtensionUIRequest,
+): readonly ExposedPiExtensionUIRequest[] {
+  const existingIndex = pendingRequests.findIndex(
+    (pendingRequest) => pendingRequest.id === request.id,
+  );
+  if (existingIndex === -1) {
+    return [...pendingRequests, request];
+  }
+
+  return pendingRequests.map((pendingRequest, index) =>
+    index === existingIndex ? request : pendingRequest,
+  );
+}
+
 export function usePiSessionState(input: {
   ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
     sandboxInstanceId: string;
@@ -333,6 +358,10 @@ export function usePiSessionState(input: {
   const [isStartingTurn, setIsStartingTurn] = useState(false);
   const [isSteeringTurn, setIsSteeringTurn] = useState(false);
   const [isInterruptingTurn, setIsInterruptingTurn] = useState(false);
+  const [isRespondingToExtensionUIRequest, setIsRespondingToExtensionUIRequest] = useState(false);
+  const [pendingExtensionUIRequests, setPendingExtensionUIRequests] = useState<
+    readonly ExposedPiExtensionUIRequest[]
+  >([]);
   const [availableConversations, setAvailableConversations] = useState<
     readonly PiConversationSummary[]
   >([]);
@@ -383,6 +412,8 @@ export function usePiSessionState(input: {
     setOriginalConversationId(null);
     setIsStartingNewConversation(false);
     setPendingConversationId(null);
+    setPendingExtensionUIRequests([]);
+    setIsRespondingToExtensionUIRequest(false);
     setSessionConnectionState("detached");
     setStep("idle");
   }, [clearEventSubscription]);
@@ -534,6 +565,8 @@ export function usePiSessionState(input: {
       setOriginalConversationId(null);
       setPendingConversationId(null);
       setIsStartingNewConversation(false);
+      setPendingExtensionUIRequests([]);
+      setIsRespondingToExtensionUIRequest(false);
 
       void (async (): Promise<void> => {
         try {
@@ -585,6 +618,16 @@ export function usePiSessionState(input: {
           let hydrationHasCompleted = false;
           eventSubscriptionRef.current = client.subscribeEvents({
             onEvent: (event) => {
+              const extensionUIRequest = parsePiExtensionUIRequest(event);
+              if (
+                extensionUIRequest !== null &&
+                shouldExposePiExtensionUIRequest(extensionUIRequest)
+              ) {
+                setPendingExtensionUIRequests((currentRequests) =>
+                  upsertPendingPiExtensionUIRequest(currentRequests, extensionUIRequest),
+                );
+              }
+
               if (!hydrationHasCompleted) {
                 bufferedEvents.push(event);
                 return;
@@ -687,6 +730,8 @@ export function usePiSessionState(input: {
           setOriginalConversationId(null);
           setPendingConversationId(null);
           setIsStartingNewConversation(false);
+          setPendingExtensionUIRequests([]);
+          setIsRespondingToExtensionUIRequest(false);
           setLifecycleErrorMessage(message);
           setSessionConnectionState("detached");
           setStep("idle");
@@ -804,6 +849,32 @@ export function usePiSessionState(input: {
       setIsInterruptingTurn(false);
     }
   }, [sessionSnapshot?.activeSessionFile]);
+
+  const respondToExtensionUIRequest = useCallback(
+    async (responseInput: PiExtensionUIResponseInput): Promise<void> => {
+      const client = clientRef.current;
+      if (client === null) {
+        throw new Error("Connect Pi before responding to an extension UI request.");
+      }
+
+      setIsRespondingToExtensionUIRequest(true);
+      try {
+        await client.respondToExtensionUI(responseInput);
+        setPendingExtensionUIRequests((currentRequests) =>
+          currentRequests.filter((request) => request.id !== responseInput.requestId),
+        );
+        setSessionErrorMessage(null);
+      } catch (error) {
+        setSessionErrorMessage(
+          error instanceof Error ? error.message : "Could not respond to Pi extension UI request.",
+        );
+        throw error;
+      } finally {
+        setIsRespondingToExtensionUIRequest(false);
+      }
+    },
+    [],
+  );
 
   const isCurrentPiSession = useCallback(
     (check: { client: PiSessionClient; generation: number; sessionFile: string }): boolean =>
@@ -971,6 +1042,7 @@ export function usePiSessionState(input: {
         sessionFile: input.sessionFile,
         status: resolvePiChatStatusFromSessionState(activeSessionState),
       });
+      setPendingExtensionUIRequests([]);
       setBootstrap(composerBootstrap.bootstrap);
       setSessionSnapshot((currentSnapshot) =>
         currentSnapshot === null
@@ -1113,9 +1185,12 @@ export function usePiSessionState(input: {
       chatState,
       confirmChatRestoredAfterReconnect,
       isInterruptingTurn,
+      isRespondingToExtensionUIRequest,
       isStartingTurn,
       isSteeringTurn,
       followUpTurn,
+      pendingExtensionUIRequests,
+      respondToExtensionUIRequest,
       sendPrompt,
       steerTurn,
     },

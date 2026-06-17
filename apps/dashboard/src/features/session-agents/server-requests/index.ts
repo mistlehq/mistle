@@ -5,6 +5,7 @@ export type {
   ClaudeCodePermissionApprovalRequestEntry,
   FileChangeApprovalRequestEntry,
   OpenCodePermissionApprovalRequestEntry,
+  PiExtensionUIConfirmRequestEntry,
   ServerRequestEntry,
   ToolRequestUserInputEntry,
 } from "./server-request-entries.js";

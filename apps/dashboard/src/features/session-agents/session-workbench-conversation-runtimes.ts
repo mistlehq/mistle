@@ -26,7 +26,11 @@ import {
   resolveOpenCodePermissionResponse,
   type UseOpenCodeSessionStateResult,
 } from "./opencode/session-state/index.js";
-import type { UsePiSessionStateResult } from "./pi/session-state/index.js";
+import {
+  mapPiExtensionUIRequestsToServerRequests,
+  resolvePiExtensionUIResponse,
+  type UsePiSessionStateResult,
+} from "./pi/session-state/index.js";
 import type { ServerRequestEntry } from "./server-requests/index.js";
 import { SessionRuntimeWorkbenchCapabilities } from "./session-runtime-workbench-capabilities.js";
 
@@ -485,6 +489,33 @@ export function buildPiConversationRuntime(input: {
 }): SessionWorkbenchRuntimeAdapter {
   const capabilities = SessionRuntimeWorkbenchCapabilities.PI;
   const isTurnRunning = input.chat.chatState.status === "busy";
+  const respondToServerRequest = (requestId: string | number, result: unknown): void => {
+    const request = input.chat.pendingExtensionUIRequests.find(
+      (pendingRequest) => pendingRequest.id === String(requestId),
+    );
+    if (request === undefined) {
+      input.sessionMessage.reportSessionErrorMessage("Pi server request was not found.");
+      return;
+    }
+
+    try {
+      const response = resolvePiExtensionUIResponse({
+        request,
+        result,
+      });
+
+      void input.chat.respondToExtensionUIRequest(response).catch((error: unknown) => {
+        input.sessionMessage.reportSessionErrorMessage(
+          error instanceof Error ? error.message : "Could not respond to Pi server request.",
+        );
+      });
+    } catch (error) {
+      input.sessionMessage.reportSessionErrorMessage(
+        error instanceof Error ? error.message : "Could not resolve Pi server request response.",
+      );
+      return;
+    }
+  };
 
   return {
     displayName: capabilities.displayName,
@@ -563,11 +594,11 @@ export function buildPiConversationRuntime(input: {
       modelSelection: capabilities.composerModelSelection,
     },
     serverRequestsState: {
-      isRespondingToServerRequest: false,
-      pendingServerRequests: [],
-      respondToServerRequest: () => {
-        input.sessionMessage.reportSessionErrorMessage("Pi has no pending server request.");
-      },
+      isRespondingToServerRequest: input.chat.isRespondingToExtensionUIRequest,
+      pendingServerRequests: mapPiExtensionUIRequestsToServerRequests(
+        input.chat.pendingExtensionUIRequests,
+      ),
+      respondToServerRequest,
     },
   };
 }

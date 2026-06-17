@@ -1,4 +1,4 @@
-import { Button, Input } from "@mistle/ui";
+import { Button, Input, Textarea } from "@mistle/ui";
 import { useState } from "react";
 
 import { ApprovalDecisionButtons } from "./approval-decision-buttons.js";
@@ -16,6 +16,19 @@ function createRequestKey(requestId: string | number): string {
 
 function assertUnsupportedServerRequestEntry(_entry: never): never {
   throw new Error("Unsupported server request entry.");
+}
+
+function readUserInputAnswer(input: {
+  answerKey: string;
+  otherOption:
+    | Extract<
+        ServerRequestEntry,
+        { kind: "tool-user-input" }
+      >["questions"][number]["options"][number]
+    | undefined;
+  userInputAnswers: Readonly<Record<string, string>>;
+}): string {
+  return input.userInputAnswers[input.answerKey] ?? input.otherOption?.defaultValue ?? "";
 }
 
 export function ServerRequestsPanel({
@@ -106,8 +119,12 @@ export function ServerRequestsPanel({
               </div>
               {entry.questions.map((question) => {
                 const answerKey = `${requestKey}:${question.id}`;
-                const selectedAnswer = userInputAnswers[answerKey] ?? "";
                 const otherOption = question.options.find((option) => option.isOther);
+                const selectedAnswer = readUserInputAnswer({
+                  answerKey,
+                  otherOption,
+                  userInputAnswers,
+                });
 
                 return (
                   <div className="space-y-2" key={question.id}>
@@ -139,7 +156,20 @@ export function ServerRequestsPanel({
                           ))}
                       </div>
                     )}
-                    {otherOption === undefined ? null : (
+                    {otherOption === undefined ? null : otherOption.inputKind === "textarea" ? (
+                      <Textarea
+                        className="min-h-32"
+                        disabled={isRespondingToServerRequest}
+                        onChange={(event) => {
+                          setUserInputAnswers((current) => ({
+                            ...current,
+                            [answerKey]: event.target.value,
+                          }));
+                        }}
+                        placeholder={otherOption.label}
+                        value={selectedAnswer}
+                      />
+                    ) : (
                       <Input
                         disabled={isRespondingToServerRequest}
                         onChange={(event) => {
@@ -161,16 +191,28 @@ export function ServerRequestsPanel({
                     isRespondingToServerRequest ||
                     entry.questions.some((question) => {
                       const answerKey = `${requestKey}:${question.id}`;
-                      return (userInputAnswers[answerKey] ?? "").trim().length === 0;
+                      const otherOption = question.options.find((option) => option.isOther);
+                      return (
+                        readUserInputAnswer({
+                          answerKey,
+                          otherOption,
+                          userInputAnswers,
+                        }).trim().length === 0
+                      );
                     })
                   }
                   onClick={() => {
                     onRespondToServerRequest(entry.requestId, {
                       answers: entry.questions.map((question) => {
                         const answerKey = `${requestKey}:${question.id}`;
+                        const otherOption = question.options.find((option) => option.isOther);
                         return {
                           id: question.id,
-                          value: userInputAnswers[answerKey] ?? "",
+                          value: readUserInputAnswer({
+                            answerKey,
+                            otherOption,
+                            userInputAnswers,
+                          }),
                         };
                       }),
                     });
@@ -222,6 +264,31 @@ export function ServerRequestsPanel({
               <pre className="bg-muted max-h-80 overflow-auto rounded-md p-3 text-xs leading-5 whitespace-pre-wrap">
                 {entry.toolInputJson}
               </pre>
+              <ApprovalDecisionButtons
+                appearance="panel"
+                availableDecisions={entry.availableDecisions}
+                disabled={isRespondingToServerRequest}
+                onRespondToServerRequest={onRespondToServerRequest}
+                requestId={entry.requestId}
+              />
+              {entry.responseErrorMessage === null ? null : (
+                <p className="text-destructive text-sm">{entry.responseErrorMessage}</p>
+              )}
+            </div>
+          );
+        }
+
+        if (entry.kind === "pi-extension-ui-confirm") {
+          return (
+            <div className="space-y-3 rounded-xl border p-4" key={requestKey}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-medium text-sm">Pi confirmation</p>
+                <p className="text-muted-foreground text-xs">{entry.method}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium text-sm">{entry.title}</p>
+                <p className="text-sm leading-6 whitespace-pre-wrap">{entry.message}</p>
+              </div>
               <ApprovalDecisionButtons
                 appearance="panel"
                 availableDecisions={entry.availableDecisions}
