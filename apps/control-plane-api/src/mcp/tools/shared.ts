@@ -83,3 +83,21 @@ export function requireMcpSandboxInstanceScope(
     throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
   }
 }
+
+export function requireMcpDesignerSandboxInstanceScope(
+  organizationActor: AppOrganizationActor,
+  input: {
+    sandboxInstanceId: string;
+  },
+): void {
+  if (
+    organizationActor.kind !== "mcp_capability" ||
+    organizationActor.capability.kind !== "designer"
+  ) {
+    return;
+  }
+
+  if (input.sandboxInstanceId !== organizationActor.capability.sandboxInstanceId) {
+    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
+  }
+}

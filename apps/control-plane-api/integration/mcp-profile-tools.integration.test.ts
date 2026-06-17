@@ -1007,6 +1007,101 @@ describe.concurrent("MCP profile tools integration", () => {
     ]);
   });
 
+  it("keeps designer MCP sandbox feedback reads scoped to the token sandbox instance", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-designer-feedback-scope@example.com",
+    });
+    const token = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "designer",
+        sub: "sbi_mcp_designer_feedback_scoped",
+        organizationId: session.organizationId,
+        designerSessionId: "dsn_mcp_designer_feedback_scope",
+      },
+      ttlSeconds: 300,
+    });
+
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_designer_feedback_scoped",
+      status: SandboxInstanceStatuses.FAILED,
+    });
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_designer_feedback_other",
+      status: SandboxInstanceStatuses.FAILED,
+    });
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxOperationEvents).values([
+      operationEventRow({
+        id: "soe_mcp_designer_feedback_scoped_001",
+        sandboxInstanceId: "sbi_mcp_designer_feedback_scoped",
+        operationId: "op_mcp_designer_feedback_scoped",
+        sequence: 1,
+        phase: "setup_script",
+        status: "failed",
+        message: "designer scoped setup failed",
+      }),
+      operationEventRow({
+        id: "soe_mcp_designer_feedback_other_001",
+        sandboxInstanceId: "sbi_mcp_designer_feedback_other",
+        operationId: "op_mcp_designer_feedback_other",
+        sequence: 1,
+        phase: "setup_script",
+        status: "failed",
+        message: "designer other setup failed",
+      }),
+    ]);
+
+    const scopedInstanceResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "sandbox_instance_get",
+      arguments: {
+        instanceId: "sbi_mcp_designer_feedback_scoped",
+      },
+    });
+    const scopedEventsResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "sandbox_operation_events_list",
+      arguments: {
+        instanceId: "sbi_mcp_designer_feedback_scoped",
+        operationId: "op_mcp_designer_feedback_scoped",
+      },
+    });
+    const otherInstanceResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "sandbox_instance_get",
+      arguments: {
+        instanceId: "sbi_mcp_designer_feedback_other",
+      },
+    });
+    const otherEventsResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "sandbox_operation_events_list",
+      arguments: {
+        instanceId: "sbi_mcp_designer_feedback_other",
+        operationId: "op_mcp_designer_feedback_other",
+      },
+    });
+
+    expect(scopedInstanceResult.isError).toBeUndefined();
+    expect(scopedEventsResult.isError).toBeUndefined();
+    expect(otherInstanceResult.isError).toBe(true);
+    expect(otherEventsResult.isError).toBe(true);
+    const operationEvents = SandboxOperationEventsResponseSchema.parse(
+      scopedEventsResult.structuredContent,
+    );
+    expect(operationEvents.events.map((event) => event.id)).toEqual([
+      "soe_mcp_designer_feedback_scoped_001",
+    ]);
+  });
+
   it("authorizes profile tools with a gateway-injected MCP token referencing an API key", async ({
     env,
   }) => {
