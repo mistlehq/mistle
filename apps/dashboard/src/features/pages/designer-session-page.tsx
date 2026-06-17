@@ -3,7 +3,8 @@ import {
   SandboxDeliveryDispositions,
   SandboxInstanceStatuses,
 } from "@mistle/sandbox-lifecycle";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useParams } from "react-router";
 
 import { readHttpErrorStatus } from "../api/http-api-error.js";
@@ -12,6 +13,7 @@ import {
   designerRuntimeConversationBootstrapQueryKey,
   designerSessionsQueryKey,
   getDesignerSession,
+  submitDesignerRuntimeFollowUp,
   type DesignerSession,
 } from "../designer/designer-service.js";
 import { DesignerSessionPageView } from "./designer-session-page-view.js";
@@ -101,7 +103,18 @@ async function bootstrapDesignerRuntimeConversationAndRefreshSession(input: {
 
 export function DesignerSessionPage(): React.JSX.Element {
   const sessionId = useDesignerSessionId();
+
+  return <DesignerSessionPageContent key={sessionId} sessionId={sessionId} />;
+}
+
+function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Element {
+  const sessionId = input.sessionId;
   const queryClient = useQueryClient();
+  const [followUpDraft, setFollowUpDraft] = useState("");
+  const [followUpSubmissionIdempotencyKey, setFollowUpSubmissionIdempotencyKey] = useState<
+    string | null
+  >(null);
+
   const designerSessionQuery = useQuery({
     queryKey: [...designerSessionsQueryKey, sessionId],
     queryFn: async ({ signal }) => getDesignerSession({ sessionId, signal }),
@@ -137,6 +150,27 @@ export function DesignerSessionPage(): React.JSX.Element {
     retryDelay: DesignerSessionRuntimeBootstrapPollIntervalMs,
     staleTime: Number.POSITIVE_INFINITY,
   });
+  const submitFollowUpMutation = useMutation({
+    mutationFn: async (input: { sessionId: string; prompt: string; idempotencyKey: string }) =>
+      submitDesignerRuntimeFollowUp({
+        sessionId: input.sessionId,
+        prompt: input.prompt,
+        idempotencyKey: input.idempotencyKey,
+      }),
+    onSuccess: (_submission, variables) => {
+      if (variables.sessionId !== sessionId) {
+        return;
+      }
+
+      void invalidateDesignerSessionQuery({
+        queryClient,
+        sessionId: variables.sessionId,
+      });
+      setFollowUpDraft("");
+      setFollowUpSubmissionIdempotencyKey(null);
+    },
+  });
+  const trimmedFollowUpDraft = followUpDraft.trim();
 
   return (
     <DesignerSessionPageView
@@ -147,7 +181,41 @@ export function DesignerSessionPage(): React.JSX.Element {
           runtimeConversationBootstrapQuery.isFetching)
       }
       runtimeConversationBootstrap={runtimeConversationBootstrapQuery.data ?? null}
+      followUpDraft={followUpDraft}
+      followUpErrorMessage={submitFollowUpMutation.error?.message ?? null}
+      followUpIsPending={submitFollowUpMutation.isPending}
+      followUpSuccessMessage={
+        submitFollowUpMutation.data === undefined
+          ? null
+          : `Follow-up submitted at ${submitFollowUpMutation.data.submittedAt}.`
+      }
       errorMessage={designerSessionQuery.error?.message ?? null}
+      onFollowUpDraftChange={(draft) => {
+        setFollowUpDraft(draft);
+        setFollowUpSubmissionIdempotencyKey(null);
+        if (
+          !submitFollowUpMutation.isPending &&
+          (submitFollowUpMutation.data !== undefined || submitFollowUpMutation.error !== null)
+        ) {
+          submitFollowUpMutation.reset();
+        }
+      }}
+      onFollowUpSubmit={() => {
+        if (
+          runtimeConversationBootstrapQuery.data === undefined ||
+          trimmedFollowUpDraft.length === 0
+        ) {
+          return;
+        }
+
+        const idempotencyKey = followUpSubmissionIdempotencyKey ?? crypto.randomUUID();
+        setFollowUpSubmissionIdempotencyKey(idempotencyKey);
+        submitFollowUpMutation.mutate({
+          sessionId,
+          prompt: trimmedFollowUpDraft,
+          idempotencyKey,
+        });
+      }}
       session={session}
       sessionId={sessionId}
     />

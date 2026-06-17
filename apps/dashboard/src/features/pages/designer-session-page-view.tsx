@@ -2,15 +2,23 @@ import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import { Badge } from "@mistle/ui";
 
 import { ErrorNotice } from "../auth/error-notice.js";
+import { ChatComposer } from "../chat/components/chat-composer.js";
 import type {
   DesignerRuntimeConversationBootstrap,
   DesignerSession,
 } from "../designer/designer-service.js";
+import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 
 export type DesignerSessionPageViewProps = {
   bootstrapErrorMessage: string | null;
   bootstrapIsPending: boolean;
   errorMessage: string | null;
+  followUpDraft: string;
+  followUpErrorMessage: string | null;
+  followUpIsPending: boolean;
+  followUpSuccessMessage: string | null;
+  onFollowUpDraftChange: (draft: string) => void;
+  onFollowUpSubmit: () => void;
   runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
   session: DesignerSession | null;
   sessionId: string;
@@ -153,6 +161,12 @@ function RuntimeBootstrapState(input: RuntimeBootstrapStateProps): React.JSX.Ele
 function RuntimeConversationPreview(input: {
   bootstrapErrorMessage: string | null;
   bootstrapIsPending: boolean;
+  followUpDraft: string;
+  followUpErrorMessage: string | null;
+  followUpIsPending: boolean;
+  followUpSuccessMessage: string | null;
+  onFollowUpDraftChange: (draft: string) => void;
+  onFollowUpSubmit: () => void;
   runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
   session: DesignerSession | null;
 }): React.JSX.Element | null {
@@ -162,6 +176,10 @@ function RuntimeConversationPreview(input: {
   }
 
   const promptState = resolveRuntimeConversationPromptState(input);
+  const canSubmitFollowUp =
+    input.runtimeConversationBootstrap !== null &&
+    input.followUpDraft.trim().length > 0 &&
+    !input.followUpIsPending;
 
   return (
     <section className="rounded-lg border bg-background">
@@ -183,10 +201,57 @@ function RuntimeConversationPreview(input: {
             </p>
           )}
         </div>
+        <div className="mt-3">
+          <ChatComposer
+            canUploadAttachments={false}
+            composerCapabilities={[]}
+            composerDraft={createComposerDraft(input.followUpDraft)}
+            configControlsDisabled
+            contextUsage={null}
+            gitBranchLabel={null}
+            isSubmitPending={input.followUpIsPending}
+            isUploadingAttachments={false}
+            modelOptions={[]}
+            onClearPendingDiffComments={ignoreDesignerComposerAction}
+            onComposerDraftChange={(draft) => {
+              input.onFollowUpDraftChange(draft.text);
+            }}
+            onModelChange={ignoreDesignerComposerAction}
+            onPendingFilesAdded={ignoreDesignerComposerAction}
+            onReasoningEffortChange={ignoreDesignerComposerAction}
+            onRemovePendingAttachment={ignoreDesignerComposerAction}
+            onRuntimeCommandSubmit={ignoreDesignerComposerAction}
+            onSubmit={input.onFollowUpSubmit}
+            pendingAttachments={[]}
+            pendingDiffCommentSummary={null}
+            placeholderText="Ask Designer to continue refining this setup."
+            pullRequest={null}
+            reasoningEffortOptions={[]}
+            selectedModel={null}
+            selectedReasoningEffort={null}
+            showAttachmentControl={false}
+            showConfigControls={false}
+            showReasoningControl={false}
+            submitDisabled={!canSubmitFollowUp}
+            submitDisabledReason={
+              input.runtimeConversationBootstrap === null
+                ? "Runtime conversation must be ready before follow-up submission."
+                : "Write a follow-up first."
+            }
+            submitLabel={input.followUpIsPending ? "Submitting follow-up" : "Submit follow-up"}
+            submitMode="start"
+          />
+          <ErrorNotice message={input.followUpErrorMessage} />
+          {input.followUpSuccessMessage === null ? null : (
+            <p className="mt-2 text-xs text-muted-foreground">{input.followUpSuccessMessage}</p>
+          )}
+        </div>
       </div>
     </section>
   );
 }
+
+function ignoreDesignerComposerAction(): void {}
 
 function resolveRuntimeConversationPromptState(input: {
   bootstrapErrorMessage: string | null;
@@ -270,6 +335,12 @@ export function DesignerSessionPageView(input: DesignerSessionPageViewProps): Re
             <RuntimeConversationPreview
               bootstrapErrorMessage={input.bootstrapErrorMessage}
               bootstrapIsPending={input.bootstrapIsPending}
+              followUpDraft={input.followUpDraft}
+              followUpErrorMessage={input.followUpErrorMessage}
+              followUpIsPending={input.followUpIsPending}
+              followUpSuccessMessage={input.followUpSuccessMessage}
+              onFollowUpDraftChange={input.onFollowUpDraftChange}
+              onFollowUpSubmit={input.onFollowUpSubmit}
               runtimeConversationBootstrap={input.runtimeConversationBootstrap}
               session={input.session}
             />

@@ -33,6 +33,10 @@ const RuntimeConversationBootstrap = {
 function renderDesignerSessionPageView(input?: {
   bootstrapErrorMessage?: string | null;
   bootstrapIsPending?: boolean;
+  followUpDraft?: string;
+  followUpErrorMessage?: string | null;
+  followUpIsPending?: boolean;
+  followUpSuccessMessage?: string | null;
   runtimeConversationBootstrap?: DesignerRuntimeConversationBootstrap | null;
   session?: DesignerSession | null;
 }): void {
@@ -41,6 +45,12 @@ function renderDesignerSessionPageView(input?: {
       bootstrapErrorMessage={input?.bootstrapErrorMessage ?? null}
       bootstrapIsPending={input?.bootstrapIsPending ?? false}
       errorMessage={null}
+      followUpDraft={input?.followUpDraft ?? ""}
+      followUpErrorMessage={input?.followUpErrorMessage ?? null}
+      followUpIsPending={input?.followUpIsPending ?? false}
+      followUpSuccessMessage={input?.followUpSuccessMessage ?? null}
+      onFollowUpDraftChange={() => {}}
+      onFollowUpSubmit={() => {}}
       runtimeConversationBootstrap={input?.runtimeConversationBootstrap ?? null}
       session={input?.session ?? BaseDesignerSession}
       sessionId="dsn_test"
@@ -61,6 +71,37 @@ describe("DesignerSessionPageView", () => {
     expect(screen.getByText("Submitted at 2026-04-01T09:01:00.000Z.")).toBeDefined();
     expect(screen.getByText("thread_designer_test")).toBeDefined();
     expect(screen.getAllByText("turn_designer_initial_prompt")).toHaveLength(2);
+    expect(screen.getByLabelText("Submit follow-up")).toBeDefined();
+  });
+
+  it("enables follow-up submission only after runtime bootstrap is ready", () => {
+    renderDesignerSessionPageView({
+      followUpDraft: "Add Slack escalation.",
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+    });
+
+    expect(screen.getByLabelText("Submit follow-up")).toHaveProperty("disabled", false);
+  });
+
+  it("shows acknowledged runtime follow-up submission status", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      followUpSuccessMessage: "Follow-up submitted at 2026-04-01T09:02:00.000Z.",
+    });
+
+    expect(screen.getByText("Follow-up submitted at 2026-04-01T09:02:00.000Z.")).toBeDefined();
+  });
+
+  it("shows runtime follow-up submission errors without hiding the conversation", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      followUpErrorMessage: "Designer runtime conversation is not ready for follow-up submission.",
+    });
+
+    expect(screen.getByText("Build a triaging agent for Linear bugs.")).toBeDefined();
+    expect(
+      screen.getByText("Designer runtime conversation is not ready for follow-up submission."),
+    ).toBeDefined();
   });
 
   it("shows the initial prompt as waiting before runtime bootstrap completes", () => {
@@ -69,6 +110,7 @@ describe("DesignerSessionPageView", () => {
     expect(screen.getByText("Runtime conversation")).toBeDefined();
     expect(screen.getByText("Initial prompt")).toBeDefined();
     expect(screen.getByText("Waiting to submit to the Designer runtime.")).toBeDefined();
+    expect(screen.getByLabelText("Submit follow-up")).toHaveProperty("disabled", true);
   });
 
   it("shows runtime bootstrap progress before the conversation is ready", () => {

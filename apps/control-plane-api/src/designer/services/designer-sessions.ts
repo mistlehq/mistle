@@ -12,6 +12,7 @@ import {
 } from "@mistle/db/control-plane";
 import { SandboxInstancePurposes, type SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import {
+  AgentConversationStatuses,
   CompiledRuntimePlanSchema,
   type AgentConversationIdempotencyMetadata,
   type EgressCredentialRoute,
@@ -39,14 +40,21 @@ import {
   DESIGNER_RUNTIME_PROFILE_ID,
   DESIGNER_RUNTIME_PROFILE_VERSION,
   DesignerBadRequestCodes,
+  DesignerConflictCodes,
   DesignerNotFoundCodes,
 } from "../constants.js";
-import { DesignerBadRequestError, DesignerNotFoundError } from "../errors.js";
+import {
+  DesignerBadRequestError,
+  DesignerConflictError,
+  DesignerNotFoundError,
+} from "../errors.js";
 import type {
   BootstrapDesignerRuntimeConversationResponse,
   CreateDesignerSessionBody,
   DesignerSessionResponse,
   PutDesignerSessionCanvasTabsBody,
+  SubmitDesignerRuntimeFollowUpBody,
+  SubmitDesignerRuntimeFollowUpResponse,
 } from "../schemas.js";
 
 type DesignerSessionActor = {
@@ -54,6 +62,9 @@ type DesignerSessionActor = {
   id: string;
   actingUserId?: string;
 };
+
+type ControlPlaneTransaction = Parameters<Parameters<ControlPlaneDatabase["transaction"]>[0]>[0];
+type DesignerSessionDatabase = ControlPlaneDatabase | ControlPlaneTransaction;
 
 type DesignerSessionServiceContext = {
   db: ControlPlaneDatabase;
@@ -65,7 +76,7 @@ type DesignerSessionServiceContext = {
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
 };
 
-type BootstrapDesignerRuntimeConversationContext = Pick<DesignerSessionServiceContext, "db"> & {
+type DesignerRuntimeConversationContext = Pick<DesignerSessionServiceContext, "db"> & {
   cache: Cache;
   connectionTokenConfig: ControlPlaneApiConnectionTokenConfig;
   dataPlaneClient: Pick<
@@ -77,6 +88,12 @@ type BootstrapDesignerRuntimeConversationContext = Pick<DesignerSessionServiceCo
     masterEncryptionKeys: Record<string, string>;
   };
 };
+
+type LockedDesignerRuntimeConversationContext = Omit<DesignerRuntimeConversationContext, "db"> & {
+  db: ControlPlaneTransaction;
+};
+
+const DesignerRuntimeFollowUpAdvisoryLockNamespace = 20_260_618;
 
 type RuntimeConversationBootstrapResult = {
   providerConversationId: string;
@@ -141,7 +158,7 @@ function createRuntimeRequestFingerprint(input: {
 function createDesignerConversationIdempotency(input: {
   designerSessionId: string;
   operation: AgentConversationIdempotencyMetadata["operation"];
-  keySuffix: "create-conversation" | "submit-initial-prompt";
+  keySuffix: "create-conversation" | "submit-initial-prompt" | `submit-follow-up:${string}`;
   fields: Record<string, string>;
 }): AgentConversationIdempotencyMetadata {
   return {
@@ -152,6 +169,27 @@ function createDesignerConversationIdempotency(input: {
       fields: input.fields,
     }),
   };
+}
+
+function createDesignerRuntimeFollowUpIdempotency(input: {
+  designerSessionId: string;
+  idempotencyKey: string;
+  prompt: string;
+  providerConversationId: string;
+  sandboxInstanceId: string;
+}): AgentConversationIdempotencyMetadata {
+  return createDesignerConversationIdempotency({
+    designerSessionId: input.designerSessionId,
+    operation: "submitPayload",
+    keySuffix: `submit-follow-up:${input.idempotencyKey}`,
+    fields: {
+      designer_session_id: input.designerSessionId,
+      idempotency_key: input.idempotencyKey,
+      input_text: input.prompt,
+      provider_conversation_id: input.providerConversationId,
+      sandbox_instance_id: input.sandboxInstanceId,
+    },
+  });
 }
 
 function mapRuntimeConversationBootstrapResult(
@@ -579,8 +617,93 @@ async function persistInitialPromptSubmission(
   return completed;
 }
 
+async function markRuntimeFollowUpSubmitted(
+  ctx: { db: DesignerSessionDatabase },
+  input: {
+    organizationId: string;
+    sessionId: string;
+  },
+): Promise<string> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+  const updatedRows = await ctx.db
+    .update(tables.designerSessions)
+    .set({
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(tables.designerSessions.id, input.sessionId),
+        eq(tables.designerSessions.organizationId, input.organizationId),
+      ),
+    )
+    .returning({
+      updatedAt: tables.designerSessions.updatedAt,
+    });
+
+  const updatedAt = updatedRows[0]?.updatedAt;
+  if (updatedAt === undefined) {
+    throw new DesignerNotFoundError(
+      DesignerNotFoundCodes.DESIGNER_SESSION_NOT_FOUND,
+      `Designer session '${input.sessionId}' was not found.`,
+    );
+  }
+
+  return updatedAt;
+}
+
+async function acquireDesignerRuntimeFollowUpLock(
+  db: DesignerSessionDatabase,
+  input: { sessionId: string },
+): Promise<boolean> {
+  const result = await db.execute(
+    sql<{
+      acquired: boolean;
+    }>`select pg_try_advisory_xact_lock(${DesignerRuntimeFollowUpAdvisoryLockNamespace}, hashtext(${input.sessionId})) as "acquired"`,
+  );
+  const row = result.rows[0];
+  if (row === undefined) {
+    throw new Error("Expected Designer runtime follow-up advisory lock query to return a row.");
+  }
+
+  if (typeof row.acquired !== "boolean") {
+    throw new Error("Expected Designer runtime follow-up advisory lock result to be boolean.");
+  }
+
+  return row.acquired;
+}
+
+async function mintDesignerRuntimeConnectionToken(
+  ctx: DesignerRuntimeConversationContext,
+  input: {
+    organizationId: string;
+    sandboxInstanceId: string;
+    actingUserId: string;
+  },
+) {
+  return mintConnectionToken(
+    {
+      db: ctx.db,
+      cache: ctx.cache,
+      integrationsConfig: ctx.integrationsConfig,
+      dataPlaneClient: ctx.dataPlaneClient,
+      gatewayWebsocketUrl: ctx.gatewayWebsocketUrl,
+      tokenTtlSeconds: SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS,
+      tokenConfig: {
+        connectionTokenSecret: ctx.connectionTokenConfig.secret,
+        tokenIssuer: ctx.connectionTokenConfig.issuer,
+        tokenAudience: ctx.connectionTokenConfig.audience,
+      },
+    },
+    {
+      organizationId: input.organizationId,
+      instanceId: input.sandboxInstanceId,
+      actingUserId: input.actingUserId,
+    },
+  );
+}
+
 export async function bootstrapDesignerRuntimeConversation(
-  ctx: BootstrapDesignerRuntimeConversationContext,
+  ctx: DesignerRuntimeConversationContext,
   input: {
     organizationId: string;
     sessionId: string;
@@ -614,26 +737,11 @@ export async function bootstrapDesignerRuntimeConversation(
     );
   }
 
-  const connectionToken = await mintConnectionToken(
-    {
-      db: ctx.db,
-      cache: ctx.cache,
-      integrationsConfig: ctx.integrationsConfig,
-      dataPlaneClient: ctx.dataPlaneClient,
-      gatewayWebsocketUrl: ctx.gatewayWebsocketUrl,
-      tokenTtlSeconds: SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS,
-      tokenConfig: {
-        connectionTokenSecret: ctx.connectionTokenConfig.secret,
-        tokenIssuer: ctx.connectionTokenConfig.issuer,
-        tokenAudience: ctx.connectionTokenConfig.audience,
-      },
-    },
-    {
-      organizationId: input.organizationId,
-      instanceId: designerSession.sandboxInstanceId,
-      actingUserId: input.actingUserId,
-    },
-  );
+  const connectionToken = await mintDesignerRuntimeConnectionToken(ctx, {
+    organizationId: input.organizationId,
+    sandboxInstanceId: designerSession.sandboxInstanceId,
+    actingUserId: input.actingUserId,
+  });
 
   const provider = resolveAgentConversationProvider(DesignerRuntimeId);
   const connection = await provider.connect({
@@ -696,4 +804,151 @@ export async function bootstrapDesignerRuntimeConversation(
   } finally {
     await connection.close();
   }
+}
+
+export async function submitDesignerRuntimeFollowUp(
+  ctx: Omit<DesignerRuntimeConversationContext, "db"> & { db: ControlPlaneDatabase },
+  input: {
+    organizationId: string;
+    sessionId: string;
+    actingUserId: string;
+    body: SubmitDesignerRuntimeFollowUpBody;
+  },
+): Promise<SubmitDesignerRuntimeFollowUpResponse> {
+  const designerSession = await readReadyRuntimeConversationDesignerSession(ctx, input);
+
+  const connectionToken = await mintDesignerRuntimeConnectionToken(ctx, {
+    organizationId: input.organizationId,
+    sandboxInstanceId: designerSession.sandboxInstanceId,
+    actingUserId: input.actingUserId,
+  });
+
+  return ctx.db.transaction(async (tx) => {
+    const lockAcquired = await acquireDesignerRuntimeFollowUpLock(tx, {
+      sessionId: input.sessionId,
+    });
+    if (!lockAcquired) {
+      throw new DesignerConflictError(
+        DesignerConflictCodes.DESIGNER_RUNTIME_CONVERSATION_BUSY,
+        `Designer session '${input.sessionId}' runtime conversation is still processing a previous turn.`,
+      );
+    }
+
+    return submitDesignerRuntimeFollowUpWithLock(
+      {
+        ...ctx,
+        db: tx,
+      },
+      {
+        organizationId: input.organizationId,
+        sessionId: input.sessionId,
+        body: input.body,
+        connectionUrl: connectionToken.url,
+      },
+    );
+  });
+}
+
+async function submitDesignerRuntimeFollowUpWithLock(
+  ctx: LockedDesignerRuntimeConversationContext,
+  input: {
+    organizationId: string;
+    sessionId: string;
+    body: SubmitDesignerRuntimeFollowUpBody;
+    connectionUrl: string;
+  },
+): Promise<SubmitDesignerRuntimeFollowUpResponse> {
+  const designerSession = await readReadyRuntimeConversationDesignerSession(ctx, input);
+  const providerConversationId = designerSession.runtimeProviderConversationId;
+  const provider = resolveAgentConversationProvider(DesignerRuntimeId);
+  const connection = await provider.connect({
+    connectionUrl: input.connectionUrl,
+  });
+
+  try {
+    await provider.resumeConversation({
+      connection,
+      providerConversationId,
+    });
+
+    const runtimeConversation = await provider.inspectConversation({
+      connection,
+      providerConversationId,
+    });
+    if (runtimeConversation.status === AgentConversationStatuses.ACTIVE) {
+      throw new DesignerConflictError(
+        DesignerConflictCodes.DESIGNER_RUNTIME_CONVERSATION_BUSY,
+        `Designer session '${input.sessionId}' runtime conversation is still processing a previous turn.`,
+      );
+    }
+
+    const submittedFollowUp = await provider.startExecution({
+      connection,
+      providerConversationId,
+      inputText: input.body.prompt,
+      idempotency: createDesignerRuntimeFollowUpIdempotency({
+        designerSessionId: designerSession.id,
+        idempotencyKey: input.body.idempotencyKey,
+        prompt: input.body.prompt,
+        providerConversationId,
+        sandboxInstanceId: designerSession.sandboxInstanceId,
+      }),
+    });
+
+    return {
+      runtimeFollowUp: {
+        providerConversationId,
+        providerExecutionId: submittedFollowUp.providerExecutionId,
+        submittedAt: await markRuntimeFollowUpSubmitted(ctx, {
+          organizationId: input.organizationId,
+          sessionId: designerSession.id,
+        }),
+      },
+    };
+  } finally {
+    await connection.close();
+  }
+}
+
+async function readReadyRuntimeConversationDesignerSession(
+  ctx: { db: DesignerSessionDatabase },
+  input: {
+    organizationId: string;
+    sessionId: string;
+  },
+): Promise<
+  DesignerSession & {
+    runtimeProviderConversationId: string;
+    initialPromptSubmittedAt: string;
+  }
+> {
+  const designerSession = await ctx.db.query.designerSessions.findFirst({
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.id, input.sessionId),
+        whereEq(table.organizationId, input.organizationId),
+      ),
+  });
+
+  if (designerSession === undefined) {
+    throw new DesignerNotFoundError(
+      DesignerNotFoundCodes.DESIGNER_SESSION_NOT_FOUND,
+      `Designer session '${input.sessionId}' was not found.`,
+    );
+  }
+
+  const providerConversationId = designerSession.runtimeProviderConversationId;
+  const initialPromptSubmittedAt = designerSession.initialPromptSubmittedAt;
+  if (providerConversationId === null || initialPromptSubmittedAt === null) {
+    throw new DesignerConflictError(
+      DesignerConflictCodes.DESIGNER_RUNTIME_CONVERSATION_NOT_READY,
+      `Designer session '${input.sessionId}' runtime conversation is not ready for follow-up submission.`,
+    );
+  }
+
+  return {
+    ...designerSession,
+    runtimeProviderConversationId: providerConversationId,
+    initialPromptSubmittedAt,
+  };
 }

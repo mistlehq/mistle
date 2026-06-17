@@ -158,6 +158,12 @@ export const Workspace: Story = {
           bootstrapErrorMessage={null}
           bootstrapIsPending={false}
           errorMessage={null}
+          followUpDraft=""
+          followUpErrorMessage={null}
+          followUpIsPending={false}
+          followUpSuccessMessage={null}
+          onFollowUpDraftChange={() => {}}
+          onFollowUpSubmit={() => {}}
           runtimeConversationBootstrap={{
             providerConversationId: "thread_designer_triage",
             providerExecutionId: "turn_designer_triage_initial_prompt",

@@ -61,10 +61,25 @@ const BootstrapDesignerRuntimeConversationResponseSchema = z
   })
   .strict();
 
+const SubmitDesignerRuntimeFollowUpResponseSchema = z
+  .object({
+    runtimeFollowUp: z
+      .object({
+        providerConversationId: z.string().min(1),
+        providerExecutionId: z.string().min(1).nullable(),
+        submittedAt: z.string().min(1),
+      })
+      .strict(),
+  })
+  .strict();
+
 export type DesignerSession = z.output<typeof DesignerSessionSchema>;
 export type DesignerRuntimeConversationBootstrap = z.output<
   typeof BootstrapDesignerRuntimeConversationResponseSchema
 >["runtimeConversation"];
+export type DesignerRuntimeFollowUpSubmission = z.output<
+  typeof SubmitDesignerRuntimeFollowUpResponseSchema
+>["runtimeFollowUp"];
 
 export const designerSessionsQueryKey = ["designer", "sessions"] as const;
 export const designerRuntimeConversationBootstrapQueryKey = [
@@ -217,6 +232,48 @@ export async function bootstrapDesignerRuntimeConversation(input: {
         operation: "bootstrapDesignerRuntimeConversation",
         error,
         fallbackMessage: "Could not prepare Designer runtime conversation.",
+      }),
+    );
+  }
+}
+
+export async function submitDesignerRuntimeFollowUp(input: {
+  sessionId: string;
+  prompt: string;
+  idempotencyKey: string;
+  signal?: AbortSignal;
+}): Promise<DesignerRuntimeFollowUpSubmission> {
+  try {
+    const response = await requestControlPlane({
+      operation: "submitDesignerRuntimeFollowUp",
+      method: "POST",
+      pathname: `/v1/designer/sessions/${encodeURIComponent(input.sessionId)}/runtime-conversation/follow-ups`,
+      body: {
+        prompt: input.prompt,
+        idempotencyKey: input.idempotencyKey,
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not submit Designer follow-up.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SubmitDesignerRuntimeFollowUpResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new DesignerApiError({
+        operation: "submitDesignerRuntimeFollowUp",
+        status: 500,
+        body: responseBody,
+        message: "Designer runtime follow-up response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data.runtimeFollowUp;
+  } catch (error) {
+    throw new DesignerApiError(
+      normalizeHttpApiError({
+        operation: "submitDesignerRuntimeFollowUp",
+        error,
+        fallbackMessage: "Could not submit Designer follow-up.",
       }),
     );
   }
