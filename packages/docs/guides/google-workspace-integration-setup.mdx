@@ -96,24 +96,19 @@ Create a Web application OAuth client in Google Auth Platform.
 
 ## Connect With A Service Account
 
-For headless Workspace automation, you can connect with a Google Cloud service account that has Workspace domain-wide delegation enabled. This lets Mistle mint short-lived Google access tokens for a delegated Workspace user without an interactive OAuth consent flow.
+For headless Workspace automation, you can connect with a Google Cloud service account. This lets Mistle mint short-lived Google access tokens without an interactive OAuth consent flow.
 
 <Note>
-  Domain-wide delegation is powerful. Authorize only the scopes required for the Workspace MCP
-  servers you intend to use, store the service account JSON key carefully, and delegate to a
-  controlled Workspace user.
+  Authorize only the scopes required for the Workspace MCP servers you intend to use, and store the
+  service account JSON key carefully.
 </Note>
 
 To use a service account connection:
 
 1. Create a Google Cloud service account in the same project used for the Workspace MCP services.
-2. Enable **Domain-wide delegation** for the service account.
-3. In the Google Workspace Admin console, open **Security > API controls > Domain-wide delegation**.
-4. Add the service account's OAuth client ID.
-5. Authorize the same Google OAuth scopes listed in this guide.
-6. Create a JSON key for the service account.
-7. In Mistle, choose **Service account with domain-wide delegation** when adding a Google Workspace connection.
-8. Paste the service account JSON key and enter the Workspace user email Mistle should delegate to.
+2. Create a JSON key for the service account.
+3. In Mistle, choose **Service account** when adding a Google Workspace connection.
+4. Paste the service account JSON key and enter the Workspace user email Mistle should use.
 
 Mistle signs a Google OAuth JWT bearer assertion with the service account key, exchanges it for a short-lived Google access token, and injects that token into calls to the selected Google-hosted MCP servers.
 
@@ -143,4 +138,3 @@ Only selected MCP servers are exposed to sessions using that published profile.
 - [Configure Google Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers)
 - [Authenticate to Google and Google Cloud MCP servers](https://docs.cloud.google.com/mcp/authenticate-mcp)
 - [OAuth 2.0 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server)
-- [Control API access with domain-wide delegation](https://knowledge.workspace.google.com/admin/apps/control-api-access-with-domain-wide-delegation)

@@ -157,7 +157,7 @@ describe("GoogleWorkspaceServiceAccountCredentialResolver", () => {
     }
   });
 
-  it("builds a domain-wide delegation JWT bearer assertion", () => {
+  it("builds a service account JWT bearer assertion with a user subject", () => {
     const assertion = buildGoogleWorkspaceServiceAccountJwtAssertion({
       clientEmail: "workspace-mcp@example-project.iam.gserviceaccount.com",
       delegatedUserEmail: "delegated@example.com",

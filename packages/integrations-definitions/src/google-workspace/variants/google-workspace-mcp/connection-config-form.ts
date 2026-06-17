@@ -9,7 +9,7 @@ export const GoogleWorkspaceServiceAccountConnectionConfigForm: ResolvedIntegrat
         default: GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION,
       },
       delegated_user_email: {
-        title: "Delegated user email",
+        title: "User email",
       },
     },
   },

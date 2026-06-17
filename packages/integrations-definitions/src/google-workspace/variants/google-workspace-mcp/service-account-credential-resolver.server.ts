@@ -143,7 +143,7 @@ export function resolveGoogleWorkspaceServiceAccountContext(
     GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION
   ) {
     throw new Error(
-      "Google Workspace service account resolver requires a service-account domain-wide delegation connection config.",
+      "Google Workspace service account resolver requires a service-account connection config.",
     );
   }
   const connectionConfig =

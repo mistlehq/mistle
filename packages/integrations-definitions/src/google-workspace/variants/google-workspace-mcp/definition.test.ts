@@ -20,7 +20,7 @@ describe("GoogleWorkspaceDefinition", () => {
         },
         {
           id: "google-workspace-service-account-domain-wide-delegation",
-          label: "Service account with domain-wide delegation",
+          label: "Service account",
           kind: "form",
         },
       ],

@@ -86,15 +86,14 @@ export const GoogleWorkspaceMcpBaseDefinition: GoogleWorkspaceMcpBaseIntegration
     },
     {
       id: GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION,
-      label: "Service account with domain-wide delegation",
+      label: "Service account",
       kind: "form",
       secretFields: [
         {
           name: "serviceAccountKeyJson",
           label: "Service account JSON key",
           placeholder: '{"type":"service_account",...}',
-          description:
-            "JSON key for a Google Cloud service account with Workspace domain-wide delegation enabled.",
+          description: "JSON key for a Google Cloud service account.",
           inputType: "textarea",
           secretType: GoogleWorkspaceCredentialSecretTypes.SERVICE_ACCOUNT_KEY_JSON,
           slotKey: GoogleWorkspaceServiceAccountCredentialSlotKeys.SERVICE_ACCOUNT_KEY_JSON,
