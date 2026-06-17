@@ -1,8 +1,4 @@
-import {
-  IntegrationConnectionMethodIds,
-  IntegrationKinds,
-  type IntegrationDefinition,
-} from "@mistle/integrations-core";
+import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
 import { resolveRemoteMcpServers } from "../../../shared/remote-mcp-server-catalog/index.js";
 import {
@@ -11,6 +7,8 @@ import {
   GoogleWorkspaceConnectionConfigSchema,
   GoogleWorkspaceConnectionStartConfigSchema,
   GoogleWorkspaceCredentialSecretTypes,
+  GoogleWorkspaceFamilyId,
+  GoogleWorkspaceMcpVariantId,
   GoogleWorkspaceServiceAccountConnectionConfigSchema,
   GoogleWorkspaceServiceAccountCredentialSlotKeys,
 } from "./auth.js";
@@ -31,8 +29,8 @@ export type GoogleWorkspaceMcpBaseIntegrationDefinition = IntegrationDefinition<
 >;
 
 export const GoogleWorkspaceMcpBaseDefinition: GoogleWorkspaceMcpBaseIntegrationDefinition = {
-  familyId: "google-workspace",
-  variantId: "google-workspace-mcp",
+  familyId: GoogleWorkspaceFamilyId,
+  variantId: GoogleWorkspaceMcpVariantId,
   kind: IntegrationKinds.CONNECTOR,
   displayName: "Google Workspace",
   description:
@@ -45,7 +43,7 @@ export const GoogleWorkspaceMcpBaseDefinition: GoogleWorkspaceMcpBaseIntegration
   validateBindingWriteContext: validateGoogleWorkspaceBindingWriteContext,
   connectionMethods: [
     {
-      id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+      id: GoogleWorkspaceConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
       label: "Google OAuth",
       kind: "redirect",
       configSchema: GoogleWorkspaceConnectionConfigSchema,

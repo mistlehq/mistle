@@ -1,4 +1,7 @@
-import type { BindingWriteValidationResult } from "@mistle/integrations-core";
+import type {
+  BindingWriteValidationContext,
+  BindingWriteValidationResult,
+} from "@mistle/integrations-core";
 
 import {
   GoogleWorkspaceAnyConnectionConfigSchema,
@@ -7,23 +10,11 @@ import {
 import type { GoogleWorkspaceBindingConfig } from "./binding-config-schema.js";
 import type { GoogleWorkspaceTargetConfig } from "./target-config-schema.js";
 
-type GoogleWorkspaceBindingWriteValidationInput = {
-  targetKey: string;
-  bindingIdOrDraftIndex: string;
-  target: {
-    familyId: string;
-    variantId: string;
-    config: GoogleWorkspaceTargetConfig;
-  };
-  connection: {
-    id: string;
-    config: Record<string, unknown>;
-  };
-  binding: {
-    kind: string;
-    config: GoogleWorkspaceBindingConfig;
-  };
-};
+type GoogleWorkspaceBindingWriteValidationInput = BindingWriteValidationContext<
+  GoogleWorkspaceTargetConfig,
+  GoogleWorkspaceBindingConfig,
+  Record<string, unknown>
+>;
 
 export function validateGoogleWorkspaceBindingWriteContext(
   input: GoogleWorkspaceBindingWriteValidationInput,
