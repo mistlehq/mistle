@@ -121,6 +121,10 @@ _Avoid_: No-op publish, external dependency refresh
 A **Sandbox profile version** setting that lets an agent runtime use Mistle-owned resources through a selected organization API key.
 _Avoid_: Allow agent toggle, Mistle MCP toggle
 
+**Mistle Designer resource access**:
+A **Mistle Designer session** capability that lets Designer use Mistle-owned resources without selecting an organization API key on a target **Sandbox profile version**.
+_Avoid_: Mistle resource access when the access belongs to Designer rather than the target profile
+
 **Collection landing page**:
 A top-level page that lists existing product objects and offers the primary action for creating the first one.
 _Avoid_: Detail tab, filtered results view
@@ -562,7 +566,15 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - First-pass **Mistle Designer sessions** are one-to-one with their designer sandbox instance.
 - Resuming a **Mistle Designer session** reconnects to its existing designer sandbox instance rather than creating a replacement sandbox instance.
 - **Mistle Designer sessions** use a **Mistle Designer base image**.
+- The **Mistle Designer base image** is a distinct image contract from the ordinary sandbox **Base image**, even when both references temporarily resolve to the same underlying image.
+- The **Mistle Designer base image** is deployment configuration, not a user-editable product resource.
+- A **Mistle Designer base image** supplies built-in Designer runtime tooling; a **Runtime plan** activates and configures that tooling for a **Mistle Designer session**.
+- **Mistle Designer session** runtime provider selection is deployment configuration, not target **Sandbox profile version configuration**.
 - **Mistle Designer sessions** are intended to use Mistle-selected agent runtime and model access rather than the user's sandbox profile runtime selection.
+- **Mistle Designer** model access is not an **Agent runtime connection** selected on a target **Sandbox profile version**.
+- **Mistle Designer resource access** is distinct from **Mistle resource access** configured on a target **Sandbox profile version**.
+- **Mistle Designer resource access** defines technical access authority; approval behavior for mutating actions is a separate **Mistle Designer** interaction policy.
+- **Mistle Designer resource access** is scoped to a **Mistle Designer session** and organization rather than one target **Sandbox profile version**.
 - **Mistle Designer sessions** currently persist the user's initial prompt and workspace state before the full Designer chat runtime is wired in.
 - The target **Sandbox profile version**'s **Agent runtime** remains a user choice even when authored through **Mistle Designer**.
 - **Mistle Designer** may save incomplete draft **Sandbox profile version configuration**, but publishing still requires a publishable target **Agent runtime** configuration.
@@ -575,6 +587,9 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Mistle Designer session** access is controlled by Designer-specific user organization permissions in the first pass, not API-key scopes.
 - **Mistle Designer sessions** may update their own runtime setup as selected **Integration connections** become available.
 - **Mistle Designer sessions** may use preinstalled tools from the **Mistle Designer base image** and session-time integration access without rebuilding their sandbox image.
+- Preinstalled provider CLI tooling in a **Mistle Designer base image** does not imply access to the corresponding **Integration connection**.
+- Session-time tool installation in a **Mistle Designer session** is sandbox workspace state produced by the agent, not a change to the **Runtime plan**.
+- **Mistle Designer session** access to newly selected **Integration connections** may change without changing the **Runtime plan**.
 - **Mistle Designer session** setup changes do not automatically change the target **Sandbox profile version configuration**.
 - **Mistle Designer** may route a user to an existing integration setup flow rather than creating an **Integration connection** directly.
 - **Mistle Designer** may select an existing active **Integration connection** for a draft **Sandbox profile version**.
