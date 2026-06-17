@@ -33,6 +33,7 @@ type BuiltInIntegrationVariantId =
   | "linear-default"
   | "openai-default"
   | "signoz-mcp"
+  | "supabase-mcp"
   | "wasenderapi-mcp"
   | "whapi-mcp";
 type DeviceAuthorizationExpiryScenario = "active" | "expired" | "expiringSoon";
@@ -100,6 +101,13 @@ function getStoryDefinitionOrThrow(
   if (variantId === "signoz-mcp") {
     return getDefinitionOrThrow({
       familyId: "signoz",
+      variantId,
+    });
+  }
+
+  if (variantId === "supabase-mcp") {
+    return getDefinitionOrThrow({
+      familyId: "supabase",
       variantId,
     });
   }
@@ -459,6 +467,10 @@ export const AddFlowStorySpecs = {
   SigNoz: {
     initialConnectionDisplayNameValue: "SigNoz Cloud",
     variantId: "signoz-mcp",
+  },
+  Supabase: {
+    initialConnectionDisplayNameValue: "Supabase Production",
+    variantId: "supabase-mcp",
   },
   WasenderAPI: {
     initialConnectionDisplayNameValue: "WasenderAPI Production",

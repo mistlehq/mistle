@@ -67,6 +67,7 @@
               "guides/signoz-integration-setup",
               "guides/slack-integration-setup",
               "guides/stripe-integration-setup",
+              "guides/supabase-integration-setup",
               "guides/tensorlake-integration-setup",
               "guides/whapi-integration-setup",
               "guides/zai-integration-setup"

@@ -5,6 +5,8 @@ import { expect, userEvent, within } from "storybook/test";
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import {
   StoryAwsConnection,
+  StorySupabaseConnection,
+  StorySupabaseTarget,
   StoryWasenderApiConnection,
   StoryWasenderApiTools,
   StoryWhapiConnection,
@@ -154,6 +156,30 @@ export const AddConnectorsDialog: Story = {
     await expect(logoSources).toContain("/integration-logos/planetscale.svg");
     await expect(logoSources).toContain("/integration-logos/planetscale-dark.svg");
     await expect(logoSources).not.toContain("/integration-logos/aws-dark.svg");
+  },
+};
+
+export const SupabaseConnectorBinding: Story = {
+  args: {
+    availableConnections: [...StoryIntegrationConnections, StorySupabaseConnection],
+    availableTargets: [...StoryIntegrationTargets, StorySupabaseTarget],
+    initialBindings: [
+      ...StoryBindings,
+      {
+        id: "binding-supabase-connector",
+        connectionId: StorySupabaseConnection.id,
+        kind: "connector",
+        config: {
+          tools: ["supabase-mcp"],
+        },
+      },
+    ],
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByText("Supabase Production")).toBeVisible();
+    await expect(canvas.getByText("Supabase MCP")).toBeVisible();
   },
 };
 

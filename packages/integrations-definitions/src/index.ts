@@ -41,6 +41,7 @@ import { SentryDefinition } from "./sentry/browser.js";
 import { SignozDefinition } from "./signoz/browser.js";
 import { SlackDefinition } from "./slack/browser.js";
 import { StripeDefinition } from "./stripe/browser.js";
+import { SupabaseDefinition } from "./supabase/browser.js";
 import { WasenderApiDefinition } from "./wasenderapi/browser.js";
 import { WhapiDefinition } from "./whapi/browser.js";
 import { ZaiDefinition } from "./zai/index.js";
@@ -76,6 +77,7 @@ export * from "./sentry/browser.js";
 export * from "./signoz/browser.js";
 export * from "./slack/browser.js";
 export * from "./stripe/browser.js";
+export * from "./supabase/browser.js";
 export * from "./wasenderapi/browser.js";
 export * from "./whapi/browser.js";
 export * from "./zai/index.js";
@@ -119,6 +121,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   SignozDefinition,
   SlackDefinition,
   StripeDefinition,
+  SupabaseDefinition,
   WasenderApiDefinition,
   WhapiDefinition,
   ZaiDefinition,

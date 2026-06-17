@@ -1,0 +1,41 @@
+---
+title: Supabase
+description: Connect Supabase to Mistle
+icon: /icons/integrations/supabase.svg
+---
+
+## Overview
+
+Connect to Supabase through Supabase hosted MCP OAuth.
+
+The Supabase integration exposes hosted MCP access for projects, databases, Auth, Edge Functions, environment configuration, analytics, and secrets.
+
+## Connect In Mistle
+
+Open **Integrations** in the dashboard, choose **Supabase**, then select **Supabase MCP OAuth**.
+
+The browser redirects to Supabase, the user approves access, and the returned OAuth credentials are stored for the connection.
+
+There are no user-entered secret fields for this target.
+
+## Use With A Sandbox Profile
+
+After the connection exists:
+
+1. Open the sandbox profile that should use Supabase.
+2. Add Supabase to the profile's integration configuration.
+3. Select the Supabase MCP tool.
+4. Save and publish the profile version.
+
+## Access Scope
+
+This integration requests Supabase hosted MCP OAuth scopes for reading organizations, projects, databases, analytics, secrets, Edge Functions, and environment configuration, plus write access for projects, databases, Edge Functions, and environment configuration.
+
+Review agent tool calls before approving changes that modify Supabase projects, database schema, Edge Functions, or environment configuration.
+
+## Official References
+
+- [Supabase MCP Server](https://supabase.com/docs/guides/ai-tools/mcp)
+- [Announcing the Supabase Remote MCP Server](https://supabase.com/blog/remote-mcp-server)
+
+This integration uses the hosted MCP server at `https://mcp.supabase.com/mcp`.

@@ -1183,7 +1183,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(37);
+    expect(definitions).toHaveLength(38);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -1221,6 +1221,7 @@ describe("integrations-definitions index", () => {
       "signoz::signoz-mcp",
       "slack::slack-default",
       "stripe::stripe-mcp",
+      "supabase::supabase-mcp",
       "wasenderapi::wasenderapi-mcp",
       "whapi::whapi-mcp",
       "zai::zai-coding-plan",
