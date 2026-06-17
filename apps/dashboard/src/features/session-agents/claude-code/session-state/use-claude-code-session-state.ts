@@ -1,6 +1,8 @@
 import {
   createClaudeCodeSessionClient,
+  type ClaudeCodeSessionConfig,
   type ClaudeCodeSessionClient,
+  type ClaudeCodeSessionReadResult,
   type ClaudeCodeSessionSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/claude-code/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
@@ -13,6 +15,11 @@ import {
   reduceClaudeCodeChatState,
   type ClaudeCodeChatState,
 } from "./claude-code-chat-state.js";
+import {
+  formatClaudeCodeContextUsage,
+  type ClaudeCodeContextUsageViewModel,
+} from "./claude-code-context-usage.js";
+import { buildReadyClaudeCodeComposerBootstrap } from "./claude-code-workbench-composer.js";
 
 export type ConnectedClaudeCodeSession = {
   activeDirectory: string | null;
@@ -80,6 +87,14 @@ export type UseClaudeCodeSessionStateResult = {
     steerTurn: (input: { submittedPrompt: string }) => Promise<void>;
   };
   lifecycle: ClaudeCodeSessionLifecycleState;
+  contextUsage: ClaudeCodeContextUsageViewModel | null;
+  modelControl: {
+    refreshModelCatalog: () => Promise<void>;
+    setSessionConfig: (input: {
+      model: string;
+      modelReasoningEffort: string | null;
+    }) => Promise<void>;
+  };
   sessions: ClaudeCodeSessionNavigatorState;
   sessionMessage: {
     clearSessionErrorMessage: () => void;
@@ -90,31 +105,17 @@ export type UseClaudeCodeSessionStateResult = {
 
 const ClaudeCodeTurnPollIntervalMs = 1_000;
 const ClaudeCodeNavigatorSessionLimit = 20;
-const ReadyClaudeCodeBootstrap: SessionComposerBootstrapResult = {
-  phase: { status: "ready" },
-  composerCapabilities: [
-    {
-      kind: "contextMention",
-      trigger: "@",
-      source: "workspacePath",
-      insertAs: "relativePathText",
-      submitAs: "inlineText",
-    },
-  ],
-  establishedSnapshot: {
-    availableModels: [],
-    configSnapshot: {
-      model: null,
-      modelReasoningEffort: null,
-    },
-  },
+const EmptyClaudeCodeSessionConfig: ClaudeCodeSessionConfig = {
+  availableModels: [],
+  model: null,
+  modelReasoningEffort: null,
 };
 
 function buildUnavailableClaudeCodeBootstrap(
   phase: SessionComposerBootstrapResult["phase"],
 ): SessionComposerBootstrapResult {
   return {
-    ...ReadyClaudeCodeBootstrap,
+    ...buildReadyClaudeCodeComposerBootstrap(EmptyClaudeCodeSessionConfig),
     phase,
   };
 }
@@ -254,6 +255,24 @@ function createActiveClaudeCodeSessionSummary(
   };
 }
 
+async function readClaudeCodeSessionWithModelCatalog(input: {
+  client: ClaudeCodeSessionClient;
+  sessionId: string;
+}): Promise<Awaited<ReturnType<ClaudeCodeSessionClient["readSession"]>>> {
+  const session = await input.client.readSession({
+    sessionId: input.sessionId,
+  });
+  const config = await input.client.refreshModelCatalog({
+    sessionId: input.sessionId,
+  });
+  return {
+    session: {
+      ...session.session,
+      config,
+    },
+  };
+}
+
 export function useClaudeCodeSessionState(input: {
   ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
     sandboxInstanceId: string;
@@ -289,11 +308,20 @@ export function useClaudeCodeSessionState(input: {
   const [bootstrap, setBootstrap] = useState<SessionComposerBootstrapResult>(
     buildUnavailableClaudeCodeBootstrap({ status: "unavailable" }),
   );
+  const [activeContextUsage, setActiveContextUsage] =
+    useState<ClaudeCodeContextUsageViewModel | null>(null);
 
   const updateSessionSnapshot = useCallback((snapshot: ConnectedClaudeCodeSession | null): void => {
     sessionSnapshotRef.current = snapshot;
     setSessionSnapshot(snapshot);
   }, []);
+
+  const isCurrentSessionResponse = useCallback(
+    (response: { client: ClaudeCodeSessionClient; sessionId: string }): boolean =>
+      clientRef.current === response.client &&
+      sessionSnapshotRef.current?.activeSessionId === response.sessionId,
+    [],
+  );
 
   const clearLifecycleErrorMessage = useCallback((): void => {
     setLifecycleErrorMessage(null);
@@ -307,12 +335,25 @@ export function useClaudeCodeSessionState(input: {
     setSessionErrorMessage(message);
   }, []);
 
+  const applyHydratedSession = useCallback(
+    (session: ClaudeCodeSessionReadResult["session"]): void => {
+      dispatchChatAction({
+        type: "hydrate_session",
+        session,
+      });
+      setBootstrap(buildReadyClaudeCodeComposerBootstrap(session.config));
+      setActiveContextUsage(formatClaudeCodeContextUsage(session.contextUsage));
+    },
+    [],
+  );
+
   const disconnectSession = useCallback((): void => {
     generationRef.current += 1;
     sessionNavigationRequestSequenceRef.current += 1;
     clientRef.current?.close();
     clientRef.current = null;
     setBootstrap(buildUnavailableClaudeCodeBootstrap({ status: "unavailable" }));
+    setActiveContextUsage(null);
     updateSessionSnapshot(null);
     setAvailableSessions([]);
     setHasMoreAvailableSessions(false);
@@ -337,13 +378,10 @@ export function useClaudeCodeSessionState(input: {
       throw new Error("Connect Claude Code before hydrating messages.");
     }
 
-    const session = await client.readSession({ sessionId });
-    dispatchChatAction({
-      type: "hydrate_session",
-      session: session.session,
-    });
+    const session = await readClaudeCodeSessionWithModelCatalog({ client, sessionId });
+    applyHydratedSession(session.session);
     setSessionErrorMessage(null);
-  }, [sessionSnapshot?.activeSessionId]);
+  }, [applyHydratedSession, sessionSnapshot?.activeSessionId]);
 
   const pollSessionUntilIdle = useCallback(
     async (input: { client: ClaudeCodeSessionClient; generation: number; sessionId: string }) => {
@@ -357,17 +395,14 @@ export function useClaudeCodeSessionState(input: {
         ) {
           return;
         }
-        dispatchChatAction({
-          type: "hydrate_session",
-          session: session.session,
-        });
+        applyHydratedSession(session.session);
         if (session.session.status.type !== "active") {
           return;
         }
         await systemSleeper.sleep(ClaudeCodeTurnPollIntervalMs);
       }
     },
-    [],
+    [applyHydratedSession],
   );
 
   const refreshSessionList = useCallback(
@@ -402,6 +437,7 @@ export function useClaudeCodeSessionState(input: {
       clientRef.current?.close();
       clientRef.current = null;
       setBootstrap(buildUnavailableClaudeCodeBootstrap({ status: "bootstrapping" }));
+      setActiveContextUsage(null);
       setStep("securing");
       setSessionConnectionState("connecting");
       setLifecycleErrorMessage(null);
@@ -461,18 +497,15 @@ export function useClaudeCodeSessionState(input: {
             });
             activeSessionId = sessionSelection.sessionId;
           }
-          const session = await client.readSession({
+          const session = await readClaudeCodeSessionWithModelCatalog({
+            client,
             sessionId: activeSessionId,
           });
           if (generationRef.current !== generation) {
             client.close();
             return;
           }
-          dispatchChatAction({
-            type: "hydrate_session",
-            session: session.session,
-          });
-          setBootstrap(ReadyClaudeCodeBootstrap);
+          applyHydratedSession(session.session);
           setAvailableSessions(sessionPage.sessions);
           setHasMoreAvailableSessions(sessionPage.hasMore);
           setOriginalSessionId(
@@ -500,6 +533,7 @@ export function useClaudeCodeSessionState(input: {
           const message =
             error instanceof Error ? error.message : "Could not connect Claude Code session.";
           setBootstrap(buildUnavailableClaudeCodeBootstrap({ status: "failed", message }));
+          setActiveContextUsage(null);
           updateSessionSnapshot(null);
           setPendingSessionId(null);
           setIsStartingNewSession(false);
@@ -509,7 +543,7 @@ export function useClaudeCodeSessionState(input: {
         }
       })();
     },
-    [ensureTransportConnected, updateSessionSnapshot],
+    [applyHydratedSession, ensureTransportConnected, updateSessionSnapshot],
   );
 
   const sendPrompt = useCallback(
@@ -612,6 +646,47 @@ export function useClaudeCodeSessionState(input: {
     }
   }, [chatState.pendingQueryId, sessionSnapshot?.activeSessionId]);
 
+  const setSessionConfig = useCallback(
+    async (configInput: { model: string; modelReasoningEffort: string | null }): Promise<void> => {
+      const client = clientRef.current;
+      const sessionId = sessionSnapshot?.activeSessionId ?? null;
+      if (client === null || sessionId === null) {
+        throw new Error("Connect Claude Code before changing model settings.");
+      }
+
+      const config = await client.setSessionConfig({
+        sessionId,
+        model: configInput.model,
+        modelReasoningEffort: configInput.modelReasoningEffort,
+      });
+      if (!isCurrentSessionResponse({ client, sessionId })) {
+        return;
+      }
+      setBootstrap(buildReadyClaudeCodeComposerBootstrap(config));
+      setActiveContextUsage(null);
+      setSessionErrorMessage(null);
+    },
+    [isCurrentSessionResponse, sessionSnapshot?.activeSessionId],
+  );
+
+  const refreshModelCatalog = useCallback(async (): Promise<void> => {
+    const client = clientRef.current;
+    const sessionId = sessionSnapshot?.activeSessionId ?? null;
+    if (client === null || sessionId === null) {
+      throw new Error("Connect Claude Code before loading models.");
+    }
+
+    const config = await client.refreshModelCatalog({
+      refresh: true,
+      sessionId,
+    });
+    if (!isCurrentSessionResponse({ client, sessionId })) {
+      return;
+    }
+    setBootstrap(buildReadyClaudeCodeComposerBootstrap(config));
+    setSessionErrorMessage(null);
+  }, [isCurrentSessionResponse, sessionSnapshot?.activeSessionId]);
+
   const resumeSession = useCallback(
     async (sessionId: string, resumeInput?: { directory?: string | null }): Promise<string> => {
       const client = clientRef.current;
@@ -633,7 +708,8 @@ export function useClaudeCodeSessionState(input: {
           cwd: directory,
           sessionId,
         });
-        const session = await client.readSession({
+        const session = await readClaudeCodeSessionWithModelCatalog({
+          client,
           sessionId,
         });
         const sessionPage = await listClaudeCodeSessionPage({
@@ -643,10 +719,7 @@ export function useClaudeCodeSessionState(input: {
         if (sessionNavigationRequestSequenceRef.current !== navigationRequestId) {
           return sessionId;
         }
-        dispatchChatAction({
-          type: "hydrate_session",
-          session: session.session,
-        });
+        applyHydratedSession(session.session);
         setAvailableSessions(sessionPage.sessions);
         setHasMoreAvailableSessions(sessionPage.hasMore);
         updateSessionSnapshot({
@@ -669,7 +742,7 @@ export function useClaudeCodeSessionState(input: {
         }
       }
     },
-    [sessionSnapshot, updateSessionSnapshot],
+    [applyHydratedSession, sessionSnapshot, updateSessionSnapshot],
   );
 
   const startNewSession = useCallback(
@@ -688,7 +761,8 @@ export function useClaudeCodeSessionState(input: {
         const session = await client.createSession({
           cwd: startInput?.directory ?? connectedSession.activeDirectory,
         });
-        const hydratedSession = await client.readSession({
+        const hydratedSession = await readClaudeCodeSessionWithModelCatalog({
+          client,
           sessionId: session.sessionId,
         });
         const sessionPage = await listClaudeCodeSessionPage({
@@ -698,10 +772,7 @@ export function useClaudeCodeSessionState(input: {
         if (sessionNavigationRequestSequenceRef.current !== navigationRequestId) {
           return session.sessionId;
         }
-        dispatchChatAction({
-          type: "hydrate_session",
-          session: hydratedSession.session,
-        });
+        applyHydratedSession(hydratedSession.session);
         setAvailableSessions(sessionPage.sessions);
         setHasMoreAvailableSessions(sessionPage.hasMore);
         updateSessionSnapshot({
@@ -724,7 +795,7 @@ export function useClaudeCodeSessionState(input: {
         }
       }
     },
-    [sessionSnapshot, updateSessionSnapshot],
+    [applyHydratedSession, sessionSnapshot, updateSessionSnapshot],
   );
 
   const recoverSession = useCallback(
@@ -739,6 +810,7 @@ export function useClaudeCodeSessionState(input: {
 
   return {
     bootstrap,
+    contextUsage: activeContextUsage,
     lifecycle: {
       clearLifecycleErrorMessage,
       connectSession,
@@ -751,6 +823,10 @@ export function useClaudeCodeSessionState(input: {
       sessionConnectionState,
       sessionSnapshot,
       step,
+    },
+    modelControl: {
+      refreshModelCatalog,
+      setSessionConfig,
     },
     sessions: {
       activeSessionDirectory: sessionSnapshot?.activeDirectory ?? null,

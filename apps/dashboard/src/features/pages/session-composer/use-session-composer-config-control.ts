@@ -20,6 +20,7 @@ export type SessionComposerConfigControl = {
   canChangeReasoningEffort: boolean;
   controlsDisabled: boolean;
   isUpdating: boolean;
+  refreshModelOptions?: () => void;
   setModel: (value: string) => void;
   setReasoningEffort: (value: string) => void;
 };

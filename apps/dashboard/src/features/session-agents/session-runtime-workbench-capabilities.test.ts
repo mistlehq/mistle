@@ -24,7 +24,7 @@ describe("SessionRuntimeWorkbenchCapabilities", () => {
       cliTerminalContentInset: "none",
       composerModelSelection: {
         required: false,
-        showControls: false,
+        showControls: true,
       },
       supportsSteering: true,
       preservesCliLaunchContext: false,

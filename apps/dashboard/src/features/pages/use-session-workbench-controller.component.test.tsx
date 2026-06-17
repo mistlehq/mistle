@@ -174,7 +174,7 @@ describe("useSessionWorkbenchController", () => {
 
     expect(result.current.conversationPane.composerStateInput.modelSelection).toEqual({
       required: false,
-      showControls: false,
+      showControls: true,
     });
     expect(result.current.conversationPane.composerStateInput.contextUsage).toBeNull();
     expect(result.current.conversationPane.runtimeConversationNavigator).not.toBeNull();

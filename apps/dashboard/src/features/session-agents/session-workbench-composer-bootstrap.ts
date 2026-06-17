@@ -7,6 +7,7 @@ import {
   type SessionComposerConfigWriter,
 } from "../pages/session-composer/index.js";
 import type { UseClaudeCodeSessionStateResult } from "./claude-code/session-state/index.js";
+import { useClaudeCodeSessionComposerConfigControl } from "./claude-code/session-state/index.js";
 import type { UseCodexSessionStateResult } from "./codex/session-state/index.js";
 import {
   buildOpenCodeComposerConfigResetKey,
@@ -145,10 +146,12 @@ export function useClaudeCodeWorkbenchComposerState(input: {
   configControl: SessionComposerConfigControl;
 } {
   const bootstrap = input.sessionState.bootstrap;
-  const configControl = useLocalSessionComposerConfigControl({
+  const configControl = useClaudeCodeSessionComposerConfigControl({
     bootstrap,
     clearSessionErrorMessage: input.sessionState.sessionMessage.clearSessionErrorMessage,
-    resetKey: input.sessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null,
+    isTurnRunning: input.sessionState.chat.chatState.status === "busy",
+    reportSessionErrorMessage: input.sessionState.sessionMessage.reportSessionErrorMessage,
+    writer: input.sessionState.modelControl,
   });
 
   return {

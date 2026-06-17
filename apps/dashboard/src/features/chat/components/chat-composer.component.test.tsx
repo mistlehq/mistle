@@ -310,6 +310,22 @@ describe("ChatComposer", () => {
     );
   });
 
+  it("notifies the runtime when the model switcher opens", () => {
+    let openCount = 0;
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        onModelSelectorOpen={() => {
+          openCount += 1;
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Model switcher" }));
+
+    expect(openCount).toBe(1);
+  });
+
   it("hides model and reasoning controls when the composer does not own runtime config", () => {
     render(<ChatComposer {...createBaseComposerProps()} showConfigControls={false} />);
 
