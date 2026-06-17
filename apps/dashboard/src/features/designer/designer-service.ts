@@ -49,9 +49,28 @@ const ListDesignerSessionsResponseSchema = z
   })
   .strict();
 
+const BootstrapDesignerRuntimeConversationResponseSchema = z
+  .object({
+    runtimeConversation: z
+      .object({
+        providerConversationId: z.string().min(1),
+        providerExecutionId: z.string().min(1).nullable(),
+        initialPromptSubmittedAt: z.string().min(1),
+      })
+      .strict(),
+  })
+  .strict();
+
 export type DesignerSession = z.output<typeof DesignerSessionSchema>;
+export type DesignerRuntimeConversationBootstrap = z.output<
+  typeof BootstrapDesignerRuntimeConversationResponseSchema
+>["runtimeConversation"];
 
 export const designerSessionsQueryKey = ["designer", "sessions"] as const;
+export const designerRuntimeConversationBootstrapQueryKey = [
+  "designer",
+  "runtime-conversation-bootstrap",
+] as const;
 
 export async function listDesignerSessions(input?: {
   signal?: AbortSignal;
@@ -161,6 +180,43 @@ export async function getDesignerSession(input: {
         operation: "getDesignerSession",
         error,
         fallbackMessage: "Could not load Designer session.",
+      }),
+    );
+  }
+}
+
+export async function bootstrapDesignerRuntimeConversation(input: {
+  sessionId: string;
+  signal?: AbortSignal;
+}): Promise<DesignerRuntimeConversationBootstrap> {
+  try {
+    const response = await requestControlPlane({
+      operation: "bootstrapDesignerRuntimeConversation",
+      method: "POST",
+      pathname: `/v1/designer/sessions/${encodeURIComponent(input.sessionId)}/runtime-conversation`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not prepare Designer runtime conversation.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse =
+      BootstrapDesignerRuntimeConversationResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new DesignerApiError({
+        operation: "bootstrapDesignerRuntimeConversation",
+        status: 500,
+        body: responseBody,
+        message: "Designer runtime conversation bootstrap response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data.runtimeConversation;
+  } catch (error) {
+    throw new DesignerApiError(
+      normalizeHttpApiError({
+        operation: "bootstrapDesignerRuntimeConversation",
+        error,
+        fallbackMessage: "Could not prepare Designer runtime conversation.",
       }),
     );
   }

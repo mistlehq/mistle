@@ -155,7 +155,14 @@ export const Workspace: Story = {
     return (
       <MemoryRouter initialEntries={["/designer/dsn_triage_agent_story"]}>
         <DesignerSessionPageView
+          bootstrapErrorMessage={null}
+          bootstrapIsPending={false}
           errorMessage={null}
+          runtimeConversationBootstrap={{
+            providerConversationId: "thread_designer_triage",
+            providerExecutionId: "turn_designer_triage_initial_prompt",
+            initialPromptSubmittedAt: "2026-04-01T09:01:00.000Z",
+          }}
           session={StoryDesignerSessions[0] ?? null}
           sessionId="dsn_triage"
         />

@@ -1,0 +1,129 @@
+// @vitest-environment jsdom
+
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+
+import type {
+  DesignerRuntimeConversationBootstrap,
+  DesignerSession,
+} from "../designer/designer-service.js";
+import { DesignerSessionPageView } from "./designer-session-page-view.js";
+
+const BaseDesignerSession = {
+  id: "dsn_test",
+  organizationId: "org_test",
+  sandboxInstanceId: "sbi_designer_test",
+  initialPrompt: "Build a triaging agent for Linear bugs.",
+  title: "Design triage agent",
+  status: "running",
+  connectable: true,
+  failureCode: null,
+  failureMessage: null,
+  canvasTabs: [],
+  createdAt: "2026-04-01T09:00:00.000Z",
+  updatedAt: "2026-04-01T09:00:00.000Z",
+} satisfies DesignerSession;
+
+const RuntimeConversationBootstrap = {
+  providerConversationId: "thread_designer_test",
+  providerExecutionId: "turn_designer_initial_prompt",
+  initialPromptSubmittedAt: "2026-04-01T09:01:00.000Z",
+} satisfies DesignerRuntimeConversationBootstrap;
+
+function renderDesignerSessionPageView(input?: {
+  bootstrapErrorMessage?: string | null;
+  bootstrapIsPending?: boolean;
+  runtimeConversationBootstrap?: DesignerRuntimeConversationBootstrap | null;
+  session?: DesignerSession | null;
+}): void {
+  render(
+    <DesignerSessionPageView
+      bootstrapErrorMessage={input?.bootstrapErrorMessage ?? null}
+      bootstrapIsPending={input?.bootstrapIsPending ?? false}
+      errorMessage={null}
+      runtimeConversationBootstrap={input?.runtimeConversationBootstrap ?? null}
+      session={input?.session ?? BaseDesignerSession}
+      sessionId="dsn_test"
+    />,
+  );
+}
+
+describe("DesignerSessionPageView", () => {
+  it("shows the initial prompt and completed runtime bootstrap identity", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+    });
+
+    expect(screen.getByText("Build a triaging agent for Linear bugs.")).toBeDefined();
+    expect(screen.getByText("Runtime conversation ready")).toBeDefined();
+    expect(screen.getByText("thread_designer_test")).toBeDefined();
+    expect(screen.getByText("turn_designer_initial_prompt")).toBeDefined();
+  });
+
+  it("shows runtime bootstrap progress before the conversation is ready", () => {
+    renderDesignerSessionPageView({
+      bootstrapIsPending: true,
+    });
+
+    expect(screen.getByText("Preparing runtime conversation")).toBeDefined();
+    expect(
+      screen.getByText("Submitting the initial prompt to the Designer runtime."),
+    ).toBeDefined();
+  });
+
+  it("shows a waiting state while the Designer sandbox is not ready yet", () => {
+    renderDesignerSessionPageView({
+      session: {
+        ...BaseDesignerSession,
+        status: "stopping",
+        connectable: false,
+      },
+    });
+
+    expect(screen.getByText("Waiting for runtime")).toBeDefined();
+    expect(
+      screen.getByText("Runtime bootstrap will start when the Designer sandbox is ready."),
+    ).toBeDefined();
+  });
+
+  it("shows pending bootstrap copy for a stopped Designer sandbox", () => {
+    renderDesignerSessionPageView({
+      session: {
+        ...BaseDesignerSession,
+        status: "stopped",
+        connectable: false,
+      },
+    });
+
+    expect(screen.getByText("Runtime bootstrap pending")).toBeDefined();
+    expect(
+      screen.getByText("Runtime bootstrap will start when the session is ready."),
+    ).toBeDefined();
+  });
+
+  it("shows why bootstrap is unavailable for a failed Designer sandbox", () => {
+    renderDesignerSessionPageView({
+      session: {
+        ...BaseDesignerSession,
+        status: "failed",
+        connectable: false,
+        failureMessage: "Could not start the Designer sandbox runtime.",
+      },
+    });
+
+    expect(screen.getByText("Runtime unavailable")).toBeDefined();
+    expect(screen.getByText("Could not start the Designer sandbox runtime.")).toBeDefined();
+  });
+
+  it("shows bootstrap endpoint errors without hiding the saved prompt", () => {
+    renderDesignerSessionPageView({
+      bootstrapErrorMessage: "Designer sandbox is not ready for runtime conversation bootstrap.",
+    });
+
+    expect(screen.getByText("Build a triaging agent for Linear bugs.")).toBeDefined();
+    expect(screen.getByText("Runtime bootstrap failed")).toBeDefined();
+    expect(
+      screen.getByText("Designer sandbox is not ready for runtime conversation bootstrap."),
+    ).toBeDefined();
+  });
+});
