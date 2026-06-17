@@ -1,3 +1,4 @@
+import { isInternalServiceTokenValid } from "@mistle/http";
 import type { Clock } from "@mistle/time";
 import { z } from "zod";
 
@@ -40,8 +41,10 @@ export function registerSandboxBootstrapAttachmentTerminateRoute(
   input.app.post(SandboxBootstrapAttachmentTerminateRoutePath, async (ctx) => {
     const providedServiceToken = ctx.req.header(DataPlaneInternalAuthHeader);
     if (
-      providedServiceToken === undefined ||
-      providedServiceToken !== input.internalAuthServiceToken
+      !isInternalServiceTokenValid({
+        providedToken: providedServiceToken,
+        expectedToken: input.internalAuthServiceToken,
+      })
     ) {
       return ctx.json(
         {

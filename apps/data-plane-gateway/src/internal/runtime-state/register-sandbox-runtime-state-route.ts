@@ -1,3 +1,4 @@
+import { isInternalServiceTokenValid } from "@mistle/http";
 import type { Clock } from "@mistle/time";
 
 import type { ActiveBootstrapSessionStore } from "../../runtime-state/active-bootstrap-session-store.js";
@@ -35,8 +36,10 @@ export function registerSandboxRuntimeStateRoute(
   input.app.get(SandboxRuntimeStateRoutePath, async (ctx) => {
     const providedServiceToken = ctx.req.header(DataPlaneInternalAuthHeader);
     if (
-      providedServiceToken === undefined ||
-      providedServiceToken !== input.internalAuthServiceToken
+      !isInternalServiceTokenValid({
+        providedToken: providedServiceToken,
+        expectedToken: input.internalAuthServiceToken,
+      })
     ) {
       return ctx.json(
         {

@@ -54,7 +54,7 @@
     "@mistle/workflow-registry": "workspace:*",
     "@scalar/hono-api-reference": "^0.11.0",
     "drizzle-orm": "^0.45.2",
-    "hono": "4.12.23",
+    "hono": "4.12.25",
     "openworkflow": "^0.9.0",
     "pg": "^8.20.0",
     "postgres": "^3.4.9",

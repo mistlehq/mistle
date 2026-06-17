@@ -1,3 +1,4 @@
+import { isInternalServiceTokenValid } from "@mistle/http";
 import type { MiddlewareHandler } from "hono";
 
 import { DATA_PLANE_INTERNAL_AUTH_HEADER } from "../internal/constants.js";
@@ -15,8 +16,10 @@ export function createRequireInternalAuthMiddleware(
     const providedServiceToken = ctx.req.header(DATA_PLANE_INTERNAL_AUTH_HEADER);
 
     if (
-      providedServiceToken === undefined ||
-      providedServiceToken !== ctx.get("internalAuthServiceToken")
+      !isInternalServiceTokenValid({
+        providedToken: providedServiceToken,
+        expectedToken: ctx.get("internalAuthServiceToken"),
+      })
     ) {
       return ctx.json(
         {

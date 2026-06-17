@@ -1,3 +1,4 @@
+import { isInternalServiceTokenValid } from "@mistle/http";
 import { z } from "zod";
 
 import type { CredentialCache } from "../../egress/credential-cache.js";
@@ -24,8 +25,10 @@ export function registerCredentialCacheInvalidationRoute(
   input.app.post(CredentialCacheInvalidationRoutePath, async (ctx) => {
     const providedServiceToken = ctx.req.header(DataPlaneInternalAuthHeader);
     if (
-      providedServiceToken === undefined ||
-      providedServiceToken !== input.internalAuthServiceToken
+      !isInternalServiceTokenValid({
+        providedToken: providedServiceToken,
+        expectedToken: input.internalAuthServiceToken,
+      })
     ) {
       return ctx.json(
         {
