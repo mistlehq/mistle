@@ -101,6 +101,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "google-workspace-mcp",
+        familyId: "google-workspace",
+        variantId: "google-workspace-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "inception-default",
         familyId: "inception",
         variantId: "inception-default",

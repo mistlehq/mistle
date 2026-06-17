@@ -56,6 +56,10 @@ describe("integrations-definitions server", () => {
       familyId: "gcp",
       variantId: "gcp-mcp",
     });
+    const googleWorkspaceDefinition = registry.getDefinition({
+      familyId: "google-workspace",
+      variantId: "google-workspace-mcp",
+    });
     const jiraDefinition = registry.getDefinition({
       familyId: "jira",
       variantId: "jira-default",
@@ -322,6 +326,16 @@ describe("integrations-definitions server", () => {
     expect(gcpDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(gcpDefinition?.webhookHandler).toBeUndefined();
     expect(gcpDefinition?.webhookSource).toBeUndefined();
+    expect(googleWorkspaceDefinition).toMatchObject({
+      familyId: "google-workspace",
+      variantId: "google-workspace-mcp",
+      kind: "connector",
+      displayName: "Google Workspace",
+    });
+    expect(googleWorkspaceDefinition?.oauth2AuthorizationCode).toBeDefined();
+    expect(googleWorkspaceDefinition?.authorizationRevocation).toBeDefined();
+    expect(googleWorkspaceDefinition?.credentialResolvers?.default).toBeDefined();
+    expect(googleWorkspaceDefinition?.mcp).toBeDefined();
     expect(planetscaleDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(planetscaleDefinition?.webhookHandler).toBeUndefined();
     expect(planetscaleDefinition?.webhookSource).toBeUndefined();
@@ -456,7 +470,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(38);
+    expect(definitions).toHaveLength(39);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
@@ -466,6 +480,7 @@ describe("integrations-definitions server", () => {
         "deepseek::deepseek-default",
         "expo::expo-mcp",
         "fireworks::fireworks-default",
+        "google-workspace::google-workspace-mcp",
         "inception::inception-default",
         "kimi::kimi-default",
         "minimax::minimax-default",

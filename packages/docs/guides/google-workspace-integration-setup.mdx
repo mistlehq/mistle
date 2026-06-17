@@ -1,0 +1,146 @@
+---
+title: Google Workspace
+description: Connect Google Workspace MCP servers to Mistle
+---
+
+## Overview
+
+Connect to Google Workspace by authorizing Mistle with a Google OAuth client that you create in Google Cloud.
+
+Mistle uses the OAuth authorization code flow to obtain Google access tokens, then uses those tokens to call Google-hosted Workspace MCP servers selected in a sandbox profile. The connected Google user remains subject to Google Workspace permissions and data governance controls.
+
+<Note>
+  Google Workspace MCP servers are currently published by Google as a Developer Preview. Verify the
+  Google setup requirements before enabling this integration in production.
+</Note>
+
+## Enable Google Workspace MCP
+
+Use a Google Cloud project owned by the Workspace organization that should authorize the MCP servers.
+
+Enable the Workspace product APIs:
+
+```bash
+gcloud services enable \
+  gmail.googleapis.com \
+  drive.googleapis.com \
+  calendar-json.googleapis.com \
+  chat.googleapis.com \
+  people.googleapis.com \
+  --project=PROJECT_ID
+```
+
+Enable the Workspace MCP services:
+
+```bash
+gcloud services enable \
+  gmailmcp.googleapis.com \
+  drivemcp.googleapis.com \
+  calendarmcp.googleapis.com \
+  chatmcp.googleapis.com \
+  people.googleapis.com \
+  --project=PROJECT_ID
+```
+
+Replace `PROJECT_ID` with the Google Cloud project ID.
+
+## Configure Google Chat
+
+If you enable the Google Chat MCP server, configure a Chat app in the same Google Cloud project:
+
+1. Open **Google Chat API > Manage > Configuration**.
+2. Set **App name** to `Chat MCP`.
+3. Set **Avatar URL** to `https://developers.google.com/chat/images/quickstart-app-avatar.png`.
+4. Set **Description** to `Chat MCP server`.
+5. Turn off **Enable interactive features**.
+6. Select **Log errors to Logging**.
+7. Save the configuration.
+
+## Configure OAuth Consent
+
+In **Google Auth Platform**, configure branding, audience, and data access for the OAuth app.
+
+For an internal Workspace rollout, select **Internal** audience when available. For an external app in testing mode, add every authorizing Google account as a test user before connecting.
+
+Add the OAuth scopes for the Workspace MCP servers you intend to use. Mistle currently requests a fixed scope set for the supported hosted Workspace MCP servers:
+
+- `https://www.googleapis.com/auth/gmail.readonly`
+- `https://www.googleapis.com/auth/gmail.compose`
+- `https://www.googleapis.com/auth/drive.readonly`
+- `https://www.googleapis.com/auth/drive.file`
+- `https://www.googleapis.com/auth/calendar.calendarlist.readonly`
+- `https://www.googleapis.com/auth/calendar.events.freebusy`
+- `https://www.googleapis.com/auth/calendar.events.readonly`
+- `https://www.googleapis.com/auth/chat.spaces.readonly`
+- `https://www.googleapis.com/auth/chat.memberships.readonly`
+- `https://www.googleapis.com/auth/chat.messages.readonly`
+- `https://www.googleapis.com/auth/chat.messages.create`
+- `https://www.googleapis.com/auth/chat.users.readstate.readonly`
+- `https://www.googleapis.com/auth/directory.readonly`
+- `https://www.googleapis.com/auth/userinfo.profile`
+- `https://www.googleapis.com/auth/contacts.readonly`
+
+## Create A Google OAuth Client
+
+Create a Web application OAuth client in Google Auth Platform.
+
+1. In Mistle, open **Integrations** and choose **Google Workspace**.
+2. Copy the **callback URL** shown by Mistle.
+3. In Google Cloud, open **Google Auth Platform > Clients**.
+4. Create an OAuth client with **Application type** set to **Web application**.
+5. Add the Mistle callback URL to **Authorized redirect URIs**.
+6. Create the client and copy its **Client ID** and **Client secret**.
+7. Return to Mistle, enter the client ID and client secret, and click **Connect Google Workspace**.
+8. Complete the Google consent flow with the Google account that should back the connection.
+
+## Connect With A Service Account
+
+For headless Workspace automation, you can connect with a Google Cloud service account. This lets Mistle mint short-lived Google access tokens without an interactive OAuth consent flow.
+
+<Note>
+  Service account connections require Google Workspace domain-wide delegation. A Workspace super
+  administrator must authorize the service account client ID for the full fixed Mistle scope set
+  listed above, even when a sandbox profile exposes only selected MCP servers.
+</Note>
+
+To use a service account connection:
+
+1. Create a Google Cloud service account in the same project used for the Workspace MCP services.
+2. In the service account details, enable **Google Workspace domain-wide delegation** and copy the service account **Client ID**.
+3. In Google Workspace Admin Console, open **Security > Access and data control > API controls > Manage Domain Wide Delegation**.
+4. Click **Add new**, paste the service account Client ID, and authorize the full fixed Mistle OAuth scope set listed in **Configure OAuth Consent**.
+5. In Google Cloud, create a JSON key for the service account and store it carefully.
+6. In Mistle, choose **Service account** when adding a Google Workspace connection.
+7. Paste the service account JSON key.
+
+Mistle signs a Google OAuth JWT bearer assertion with the service account key, exchanges it for a short-lived Google access token, and injects that token into calls to the selected Google-hosted MCP servers.
+
+## Connect MCP Servers To A Sandbox Profile
+
+After the Google Workspace connection is active:
+
+1. Open the sandbox profile that should use Google Workspace.
+2. Add the Google Workspace integration connection to the profile.
+3. In **Resources & Tools**, select the Google Workspace MCP servers that agents may use.
+4. For service account connections, enter the **Workspace user email** Mistle should use as the Google Workspace user subject when minting access tokens.
+5. Publish the profile version.
+
+Only selected MCP servers are exposed to sessions using that published profile.
+
+## Supported MCP Servers
+
+| MCP server      | Server URL                                  |
+| --------------- | ------------------------------------------- |
+| Gmail           | `https://gmailmcp.googleapis.com/mcp/v1`    |
+| Google Drive    | `https://drivemcp.googleapis.com/mcp/v1`    |
+| Google Calendar | `https://calendarmcp.googleapis.com/mcp/v1` |
+| Google Chat     | `https://chatmcp.googleapis.com/mcp/v1`     |
+| People API      | `https://people.googleapis.com/mcp/v1`      |
+
+## Official References
+
+- [Configure Google Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers)
+- [Authenticate to Google and Google Cloud MCP servers](https://docs.cloud.google.com/mcp/authenticate-mcp)
+- [OAuth 2.0 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server)
+- [Using OAuth 2.0 for Server to Server Applications](https://developers.google.com/identity/protocols/oauth2/service-account)
+- [Control API access with domain-wide delegation](https://knowledge.workspace.google.com/admin/apps/control-api-access-with-domain-wide-delegation)

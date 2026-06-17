@@ -20,6 +20,7 @@ import { ExpoDefinition } from "./expo/server.js";
 import { FireworksDefinition } from "./fireworks/index.js";
 import { GcpDefinition } from "./gcp/server.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/index.js";
+import { GoogleWorkspaceDefinition } from "./google-workspace/server.js";
 import { InceptionDefinition } from "./inception/index.js";
 import { JiraDefinition } from "./jira/index.js";
 import { KimiDefinition } from "./kimi/index.js";
@@ -63,6 +64,7 @@ export * from "./egress-telemetry.server.js";
 export * from "./expo/server.js";
 export * from "./fireworks/index.js";
 export * from "./gcp/server.js";
+export * from "./google-workspace/server.js";
 export * from "./jira/index.js";
 export * from "./github/index.js";
 export * from "./github/shared/identity-linking.server.js";
@@ -106,6 +108,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   ExpoDefinition,
   FireworksDefinition,
   GcpDefinition,
+  GoogleWorkspaceDefinition,
   InceptionDefinition,
   JiraDefinition,
   KimiDefinition,

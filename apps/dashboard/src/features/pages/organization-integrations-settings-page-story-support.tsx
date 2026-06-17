@@ -29,6 +29,7 @@ const IntegrationRegistry = createBrowserIntegrationRegistry();
 type BuiltInIntegrationVariantId =
   | "github-cloud"
   | "github-enterprise-server"
+  | "google-workspace-mcp"
   | "jira-default"
   | "linear-default"
   | "openai-default"
@@ -80,6 +81,13 @@ function getStoryDefinitionOrThrow(
   if (variantId === "github-cloud" || variantId === "github-enterprise-server") {
     return getDefinitionOrThrow({
       familyId: "github",
+      variantId,
+    });
+  }
+
+  if (variantId === "google-workspace-mcp") {
+    return getDefinitionOrThrow({
+      familyId: "google-workspace",
       variantId,
     });
   }
@@ -460,6 +468,19 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
 export const AddFlowStorySpecs = {
   GitHubEnterpriseServer: {
     variantId: "github-enterprise-server",
+  },
+  GoogleWorkspace: {
+    initialConnectionDisplayNameValue: "Google Workspace Production",
+    variantId: "google-workspace-mcp",
+  },
+  GoogleWorkspaceServiceAccount: {
+    initialConnectionDisplayNameValue: "Google Workspace Service Account",
+    initialMethodId: "google-workspace-service-account-domain-wide-delegation",
+    initialSecrets: {
+      serviceAccountKeyJson:
+        '{"type":"service_account","client_email":"workspace-mcp@example-project.iam.gserviceaccount.com","private_key":"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"}',
+    },
+    variantId: "google-workspace-mcp",
   },
   Linear: {
     variantId: "linear-default",

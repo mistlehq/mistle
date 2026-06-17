@@ -49,6 +49,10 @@ describe("integrations-definitions index", () => {
       familyId: "gcp",
       variantId: "gcp-mcp",
     });
+    const googleWorkspaceDefinition = registry.getDefinition({
+      familyId: "google-workspace",
+      variantId: "google-workspace-mcp",
+    });
     const jiraDefinition = registry.getDefinition({
       familyId: "jira",
       variantId: "jira-default",
@@ -286,6 +290,42 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(gcpDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(googleWorkspaceDefinition).toMatchObject({
+      familyId: "google-workspace",
+      variantId: "google-workspace-mcp",
+      kind: "connector",
+      displayName: "Google Workspace",
+      connectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "Google OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect Google Workspace",
+              helperText: "Authorize Google Workspace access with your Google OAuth client.",
+              showCallbackUrl: true,
+            },
+          },
+        },
+        {
+          id: "google-workspace-service-account-domain-wide-delegation",
+          label: "Service account",
+          kind: "form",
+          secretFields: [
+            {
+              name: "serviceAccountKeyJson",
+              label: "Service account JSON key",
+              inputType: "textarea",
+              secretType: "api_key",
+              slotKey: "google-workspace.google-workspace-mcp.service-account-key-json",
+            },
+          ],
+        },
+      ],
+    });
+    expect(googleWorkspaceDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(googleWorkspaceDefinition?.credentialResolvers).toBeUndefined();
     expect(jiraDefinition).toMatchObject({
       familyId: "jira",
       variantId: "jira-default",
@@ -1183,7 +1223,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(38);
+    expect(definitions).toHaveLength(39);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -1197,6 +1237,7 @@ describe("integrations-definitions index", () => {
       "expo::expo-mcp",
       "fireworks::fireworks-default",
       "gcp::gcp-mcp",
+      "google-workspace::google-workspace-mcp",
       "inception::inception-default",
       "jira::jira-default",
       "kimi::kimi-default",

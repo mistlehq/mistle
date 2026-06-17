@@ -27,6 +27,20 @@ export const GitHubEnterpriseServer: Story = {
   },
 };
 
+export const GoogleWorkspace: Story = {
+  name: "Google Workspace",
+  render: function RenderStory() {
+    return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.GoogleWorkspace} />;
+  },
+};
+
+export const GoogleWorkspaceServiceAccount: Story = {
+  name: "Google Workspace Service Account",
+  render: function RenderStory() {
+    return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.GoogleWorkspaceServiceAccount} />;
+  },
+};
+
 export const Linear: Story = {
   render: function RenderStory() {
     return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.Linear} />;
