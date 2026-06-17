@@ -132,6 +132,24 @@ const ControlPlaneApiSandboxModalConfigSchema = z.discriminatedUnion("enabled", 
     .strict(),
 ]);
 
+const ControlPlaneApiDesignerSandboxConfigSchema = z
+  .object({
+    baseImage: z.string().trim().min(1),
+    codexCliPath: z.string().trim().min(1).default("codex"),
+    sandboxProvider: z.string().trim().min(1),
+    sandboxConnectionId: z.string().trim().min(1).nullable().default(null),
+    sandboxResources: z
+      .object({
+        vcpuCount: z.number().int().positive(),
+        memoryMb: z.number().int().positive(),
+        diskMb: z.number().int().positive().optional(),
+      })
+      .strict()
+      .nullable()
+      .default(null),
+  })
+  .strict();
+
 const ControlPlaneApiAuthGoogleConfigSchema = z
   .object({
     clientId: z.string().min(1),
@@ -279,6 +297,7 @@ export const ControlPlaneApiSandboxRuntimeConfigSchema = z
     modal: ControlPlaneApiSandboxModalConfigSchema.optional(),
     opencomputer: ControlPlaneApiSandboxOpenComputerConfigSchema.optional(),
     tensorlake: ControlPlaneApiSandboxTensorlakeConfigSchema.optional(),
+    designer: ControlPlaneApiDesignerSandboxConfigSchema.optional(),
   })
   .strict();
 

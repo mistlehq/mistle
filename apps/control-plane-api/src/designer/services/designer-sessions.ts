@@ -12,13 +12,20 @@ import {
 import { SandboxInstancePurposes, type SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import {
   CompiledRuntimePlanSchema,
+  type EgressCredentialRoute,
   SandboxImageSources,
   createDisabledAssociatedResourceEventRouting,
 } from "@mistle/integrations-core";
-import { SandboxProvider } from "@mistle/sandbox";
+import { compileInstalledCodexRuntime } from "@mistle/integrations-definitions/agent-runtimes/codex";
 import { and, desc, eq, sql } from "drizzle-orm";
+import { typeid } from "typeid-js";
 
-import type { ControlPlaneApiSandboxRuntimeConfig } from "../../types.js";
+import {
+  resolveMistleMcpEgressRoutes,
+  resolveMistleMcpServers,
+} from "../../sandbox-profiles/services/compile-sandbox-runtime-plan.js";
+import { createWorkflowSandboxRuntime } from "../../sandbox-profiles/services/profile-version-runtime-config.js";
+import type { ControlPlaneApiMcpConfig, ControlPlaneApiSandboxRuntimeConfig } from "../../types.js";
 import {
   DESIGNER_RUNTIME_PROFILE_ID,
   DESIGNER_RUNTIME_PROFILE_VERSION,
@@ -44,23 +51,72 @@ type DesignerSessionServiceContext = {
     DataPlaneSandboxInstancesClient,
     "getSandboxInstance" | "startSandboxInstance"
   >;
+  mcpConfig: ControlPlaneApiMcpConfig;
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
 };
 
-function resolveDesignerSandboxRuntime(sandboxConfig: ControlPlaneApiSandboxRuntimeConfig) {
-  if (sandboxConfig.docker?.enabled !== true) {
+function resolveDesignerSandboxConfig(sandboxConfig: ControlPlaneApiSandboxRuntimeConfig) {
+  if (sandboxConfig.designer === undefined) {
     throw new DesignerBadRequestError(
       DesignerBadRequestCodes.DESIGNER_SANDBOX_RUNTIME_UNAVAILABLE,
-      "Designer sessions require the Docker sandbox runtime in this first implementation.",
+      "Designer sessions require sandbox.designer runtime configuration.",
     );
   }
 
+  return sandboxConfig.designer;
+}
+
+function createPlatformOpenAiEgressRoute(): EgressCredentialRoute {
   return {
-    provider: SandboxProvider.DOCKER,
+    egressRuleId: "egress_rule_platform_openai",
+    bindingId: "platform-openai",
+    familyId: "openai",
+    variantId: "openai-default",
+    match: {
+      hosts: ["api.openai.com"],
+      pathPrefixes: ["/"],
+      methods: ["GET", "POST"],
+    },
+    upstream: {
+      baseUrl: "https://api.openai.com",
+    },
+    authInjection: {
+      type: "bearer",
+      target: "authorization",
+    },
+    credentialResolver: {
+      kind: "platform_openai_api_key",
+    },
   };
 }
 
-function createDesignerRuntimePlan(input: { imageRef: string }) {
+function createDesignerRuntimePlan(input: {
+  codexCliPath: string;
+  designerSessionId: string;
+  imageRef: string;
+  mcpUrl: string;
+}) {
+  const egressRoutes = [
+    createPlatformOpenAiEgressRoute(),
+    ...resolveMistleMcpEgressRoutes({
+      enabled: true,
+      credentialResolver: {
+        kind: "mistle_mcp_designer_token",
+        designerSessionId: input.designerSessionId,
+      },
+      url: input.mcpUrl,
+    }),
+  ];
+  const mcpServers = resolveMistleMcpServers({
+    enabled: true,
+    url: input.mcpUrl,
+  });
+  const codexRuntime = compileInstalledCodexRuntime({
+    codexCliPath: input.codexCliPath,
+    egressRoutes,
+    mcpServers,
+  });
+
   return CompiledRuntimePlanSchema.parse({
     sandboxProfileId: DESIGNER_RUNTIME_PROFILE_ID,
     version: DESIGNER_RUNTIME_PROFILE_VERSION,
@@ -69,11 +125,11 @@ function createDesignerRuntimePlan(input: { imageRef: string }) {
       imageRef: input.imageRef,
     },
     associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
-    egressRoutes: [],
-    artifacts: [],
+    egressRoutes,
+    artifacts: codexRuntime.artifacts,
     workspaceSources: [],
-    runtimeClients: [],
-    agentRuntimes: [],
+    runtimeClients: codexRuntime.runtimeClients,
+    agentRuntimes: codexRuntime.agentRuntimes,
   });
 }
 
@@ -119,9 +175,18 @@ export async function createDesignerSession(
     body: CreateDesignerSessionBody;
   },
 ): Promise<DesignerSessionResponse> {
-  const sandboxRuntime = resolveDesignerSandboxRuntime(ctx.sandboxConfig);
+  const designerSandboxConfig = resolveDesignerSandboxConfig(ctx.sandboxConfig);
+  const sandboxRuntime = createWorkflowSandboxRuntime({
+    sandboxProvider: designerSandboxConfig.sandboxProvider,
+    sandboxConnectionId: designerSandboxConfig.sandboxConnectionId,
+    sandboxResources: designerSandboxConfig.sandboxResources,
+  });
+  const designerSessionId = typeid("dsn").toString();
   const runtimePlan = createDesignerRuntimePlan({
-    imageRef: ctx.sandboxConfig.defaultBaseImage,
+    codexCliPath: designerSandboxConfig.codexCliPath,
+    designerSessionId,
+    imageRef: designerSandboxConfig.baseImage,
+    mcpUrl: ctx.mcpConfig.url,
   });
   const startedSandbox = await ctx.dataPlaneClient.startSandboxInstance({
     organizationId: input.organizationId,
@@ -137,10 +202,10 @@ export async function createDesignerSession(
     ...(input.actor.actingUserId === undefined ? {} : { actingUserId: input.actor.actingUserId }),
     source: "dashboard",
     image: {
-      imageId: ctx.sandboxConfig.defaultBaseImage,
+      imageId: designerSandboxConfig.baseImage,
       createdAt: new Date().toISOString(),
       kind: "base",
-      provider: SandboxProvider.DOCKER,
+      provider: sandboxRuntime.provider,
     },
     sandboxRuntime,
   });
@@ -149,6 +214,7 @@ export async function createDesignerSession(
   const createdDesignerSessionRows = await ctx.db
     .insert(tables.designerSessions)
     .values({
+      id: designerSessionId,
       organizationId: input.organizationId,
       sandboxInstanceId: startedSandbox.sandboxInstanceId,
       initialPrompt: input.body.prompt,

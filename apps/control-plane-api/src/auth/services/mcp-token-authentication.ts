@@ -37,6 +37,35 @@ export async function authenticateMcpToken(input: {
     });
   }
 
+  if (verifiedToken.kind === "designer") {
+    return {
+      kind: "mcp_capability",
+      organizationId: verifiedToken.organizationId,
+      capability: {
+        kind: "designer",
+        sandboxInstanceId: verifiedToken.sub,
+        designerSessionId: verifiedToken.designerSessionId,
+      },
+      permissions: [
+        OrganizationPermissions.SANDBOX_PROFILE_READ,
+        OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+        OrganizationPermissions.SANDBOX_SESSION_CREATE,
+        OrganizationPermissions.SANDBOX_SESSION_READ,
+        OrganizationPermissions.SANDBOX_SESSION_CONNECT,
+        OrganizationPermissions.INTEGRATION_CONNECTION_READ,
+        OrganizationPermissions.INTEGRATION_CONNECTION_CREATE,
+        OrganizationPermissions.INTEGRATION_CONNECTION_UPDATE,
+        OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_READ,
+        OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_CREATE,
+        OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_UPDATE,
+        OrganizationPermissions.CREDENTIAL_KEY_READ,
+        OrganizationPermissions.TRIGGER_READ,
+        OrganizationPermissions.TRIGGER_CREATE,
+        OrganizationPermissions.TRIGGER_UPDATE,
+      ],
+    };
+  }
+
   return {
     kind: "mcp_capability",
     organizationId: verifiedToken.organizationId,

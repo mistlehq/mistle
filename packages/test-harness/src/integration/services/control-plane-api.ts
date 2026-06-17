@@ -320,6 +320,13 @@ function config(input: {
       defaultBaseImage: input.sandboxBaseImageRef ?? getLocalDevDockerRegistrySandboxBaseImageRef(),
       gatewayWsUrl: input.gatewayWsUrl,
       ...createControlPlaneApiSandboxProviderConfig(input.sandbox),
+      designer: {
+        baseImage: input.sandboxBaseImageRef ?? getLocalDevDockerRegistrySandboxBaseImageRef(),
+        codexCliPath: "codex",
+        sandboxProvider: "docker",
+        sandboxConnectionId: null,
+        sandboxResources: null,
+      },
       bootstrap: {
         tokenSecret: "integration-new-bootstrap-token-secret",
         tokenIssuer: "integration-new-data-plane-worker",

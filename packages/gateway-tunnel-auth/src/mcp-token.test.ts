@@ -78,6 +78,32 @@ describe("MCP token", () => {
     });
   });
 
+  it("mints and verifies a short-lived Designer MCP token for a sandbox instance", async () => {
+    const minted = await mintMcpToken({
+      config: TokenConfig,
+      claims: {
+        kind: "designer",
+        sub: "sbi_123",
+        organizationId: "org_123",
+        designerSessionId: "dsn_123",
+      },
+      ttlSeconds: 300,
+    });
+
+    await expect(
+      verifyMcpToken({
+        config: TokenConfig,
+        token: minted.token,
+      }),
+    ).resolves.toEqual({
+      kind: "designer",
+      sub: "sbi_123",
+      organizationId: "org_123",
+      designerSessionId: "dsn_123",
+      expiresAt: minted.expiresAt,
+    });
+  });
+
   it("rejects tokens with the wrong audience", async () => {
     const minted = await mintMcpToken({
       config: TokenConfig,
@@ -179,4 +205,21 @@ describe("MCP token", () => {
       code: McpTokenErrorCode.INVALID_TTL_SECONDS,
     } satisfies Partial<McpTokenError>);
   });
+});
+
+it("rejects minting a Designer token without a Designer session id claim", async () => {
+  await expect(
+    mintMcpToken({
+      config: TokenConfig,
+      claims: {
+        kind: "designer",
+        sub: "sbi_123",
+        organizationId: "org_123",
+        designerSessionId: " ",
+      },
+      ttlSeconds: 300,
+    }),
+  ).rejects.toMatchObject({
+    code: McpTokenErrorCode.DESIGNER_SESSION_ID_REQUIRED,
+  } satisfies Partial<McpTokenError>);
 });

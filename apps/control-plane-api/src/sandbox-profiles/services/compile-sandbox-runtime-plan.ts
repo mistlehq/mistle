@@ -118,7 +118,7 @@ function normalizeSnapshotPreparationScript(script: string | null): string | und
   return script;
 }
 
-function resolveMistleMcpServers(input: {
+export function resolveMistleMcpServers(input: {
   enabled: boolean;
   url: string;
 }): ReadonlyArray<ResolvedIntegrationMcpServer> {
@@ -149,7 +149,7 @@ function normalizeMcpPathPrefix(pathname: string): string {
   return pathname.startsWith("/") ? pathname : `/${pathname}`;
 }
 
-function resolveMistleMcpEgressRoutes(input: {
+export function resolveMistleMcpEgressRoutes(input: {
   enabled: boolean;
   credentialResolver: EgressCredentialResolverRef | null;
   url: string;

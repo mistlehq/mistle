@@ -32,7 +32,10 @@ export function requireMcpSandboxProfileScope(
     version: number;
   },
 ): void {
-  if (organizationActor.kind !== "mcp_capability") {
+  if (
+    organizationActor.kind !== "mcp_capability" ||
+    organizationActor.capability.kind !== "setup_assistant"
+  ) {
     return;
   }
 
@@ -51,7 +54,10 @@ export function requireMcpSandboxInstanceProfileScope(
     sandboxProfileVersion: number | undefined;
   },
 ): void {
-  if (organizationActor.kind !== "mcp_capability") {
+  if (
+    organizationActor.kind !== "mcp_capability" ||
+    organizationActor.capability.kind !== "setup_assistant"
+  ) {
     return;
   }
 

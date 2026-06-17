@@ -225,6 +225,28 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON",
     valueFormat: "json",
   },
+  { path: ["sandbox", "designer", "baseImage"], envVar: "MISTLE_DESIGNER_SANDBOX_BASE_IMAGE" },
+  { path: ["sandbox", "designer", "codexCliPath"], envVar: "MISTLE_DESIGNER_CODEX_CLI_PATH" },
+  {
+    path: ["sandbox", "designer", "sandboxProvider"],
+    envVar: "MISTLE_DESIGNER_SANDBOX_PROVIDER",
+  },
+  {
+    path: ["sandbox", "designer", "sandboxConnectionId"],
+    envVar: "MISTLE_DESIGNER_SANDBOX_CONNECTION_ID",
+  },
+  {
+    path: ["sandbox", "designer", "sandboxResources", "vcpuCount"],
+    envVar: "MISTLE_DESIGNER_SANDBOX_VCPU_COUNT",
+  },
+  {
+    path: ["sandbox", "designer", "sandboxResources", "memoryMb"],
+    envVar: "MISTLE_DESIGNER_SANDBOX_MEMORY_MB",
+  },
+  {
+    path: ["sandbox", "designer", "sandboxResources", "diskMb"],
+    envVar: "MISTLE_DESIGNER_SANDBOX_DISK_MB",
+  },
   { path: ["sandbox", "docker", "enabled"], envVar: "MISTLE_SANDBOX_DOCKER_ENABLED" },
   { path: ["sandbox", "e2b", "enabled"], envVar: "MISTLE_SANDBOX_E2B_ENABLED" },
   { path: ["sandbox", "e2b", "apiKey"], envVar: "MISTLE_SANDBOX_E2B_API_KEY" },
@@ -375,6 +397,10 @@ const DataPlaneGatewayResourceRuntimeEnvExports: readonly RuntimeEnvExportDescri
   {
     path: ["controlPlaneApi", "mcp", "auth", "audience"],
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_AUDIENCE",
+  },
+  {
+    path: ["platformCredentials", "openai", "apiKey"],
+    envVar: "MISTLE_PLATFORM_OPENAI_API_KEY",
   },
 ];
 
