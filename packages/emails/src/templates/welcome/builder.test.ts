@@ -14,6 +14,12 @@ describe("welcome email", () => {
       subject: "Welcome to Mistle",
       templateName: "Welcome",
     });
+    expect(template.text).toContain(
+      "Thanks for signing up to Mistle. I'm Jonathan, one of the co-founders.",
+    );
+    expect(template.html).toContain(
+      "Thanks for signing up to Mistle. I'm Jonathan, one of the co-founders.",
+    );
     expect(template.text).toContain(callUrl);
     expect(template.html).toContain(callUrl);
   });
