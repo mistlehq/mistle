@@ -57,6 +57,7 @@ function decodeJwtPayload(token: string): z.output<typeof JwtPayloadSchema> {
 function createResolverInput(input: {
   tokenEndpoint?: string;
   privateKey: string;
+  workspaceUserEmail?: string;
 }): IntegrationCredentialResolverInput {
   const serviceAccountKey = {
     type: "service_account",
@@ -81,10 +82,17 @@ function createResolverInput(input: {
       status: "active",
       config: {
         connection_method: "google-workspace-service-account-domain-wide-delegation",
-        delegated_user_email: "delegated@example.com",
       },
       secrets: {
         serviceAccountKeyJson: JSON.stringify(serviceAccountKey),
+      },
+    },
+    binding: {
+      id: "ibd_google_workspace",
+      kind: "connector",
+      config: {
+        mcpServers: ["gmail"],
+        workspaceUserEmail: input.workspaceUserEmail ?? "workspace-user@example.com",
       },
     },
     secretType: GoogleWorkspaceCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
@@ -160,7 +168,7 @@ describe("GoogleWorkspaceServiceAccountCredentialResolver", () => {
   it("builds a service account JWT bearer assertion with a user subject", () => {
     const assertion = buildGoogleWorkspaceServiceAccountJwtAssertion({
       clientEmail: "workspace-mcp@example-project.iam.gserviceaccount.com",
-      delegatedUserEmail: "delegated@example.com",
+      workspaceUserEmail: "workspace-user@example.com",
       privateKey: createRsaPrivateKeyPem(),
       tokenEndpoint: "https://oauth2.googleapis.com/token",
       issuedAtEpochSeconds: 1_700_000_000,
@@ -172,7 +180,7 @@ describe("GoogleWorkspaceServiceAccountCredentialResolver", () => {
       aud: "https://oauth2.googleapis.com/token",
       iat: 1_700_000_000,
       exp: 1_700_003_600,
-      sub: "delegated@example.com",
+      sub: "workspace-user@example.com",
     });
     expect(payload.scope).toContain("https://www.googleapis.com/auth/gmail.readonly");
     expect(payload.scope).toContain("https://www.googleapis.com/auth/chat.messages");
@@ -194,10 +202,11 @@ describe("GoogleWorkspaceServiceAccountCredentialResolver", () => {
         createResolverInput({
           privateKey: createRsaPrivateKeyPem(),
           tokenEndpoint: "https://oauth2.example.test/token",
+          workspaceUserEmail: "workspace-user@example.com",
         }),
       ),
     ).toMatchObject({
-      delegatedUserEmail: "delegated@example.com",
+      workspaceUserEmail: "workspace-user@example.com",
       clientEmail: "workspace-mcp@example-project.iam.gserviceaccount.com",
       tokenEndpoint: "https://oauth2.example.test/token",
     });
@@ -267,7 +276,7 @@ describe("GoogleWorkspaceServiceAccountCredentialResolver", () => {
     expect(decodeJwtPayload(assertion)).toMatchObject({
       iss: "workspace-mcp@example-project.iam.gserviceaccount.com",
       aud: simulatedGoogleOAuthServer.url,
-      sub: "delegated@example.com",
+      sub: "workspace-user@example.com",
     });
   });
 });

@@ -72,7 +72,6 @@ export const GoogleWorkspaceServiceAccountConnectionConfigSchema = z
     connection_method: z.literal(
       GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION,
     ),
-    delegated_user_email: z.string().email(),
   })
   .strict();
 

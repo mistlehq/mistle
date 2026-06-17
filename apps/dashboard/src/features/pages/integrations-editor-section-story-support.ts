@@ -226,6 +226,16 @@ export const StoryGoogleWorkspaceConnection: IntegrationConnectionSummary = {
   },
 };
 
+export const StoryGoogleWorkspaceServiceAccountConnection: IntegrationConnectionSummary = {
+  id: "connection-google-workspace-service-account",
+  displayName: "Google Workspace Service Account",
+  targetKey: StoryGoogleWorkspaceTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "google-workspace-service-account-domain-wide-delegation",
+  },
+};
+
 export const StoryAwsTarget: IntegrationTargetSummary = {
   targetKey: "target-aws",
   displayName: "AWS",

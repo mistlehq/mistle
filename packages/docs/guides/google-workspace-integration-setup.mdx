@@ -108,7 +108,7 @@ To use a service account connection:
 1. Create a Google Cloud service account in the same project used for the Workspace MCP services.
 2. Create a JSON key for the service account.
 3. In Mistle, choose **Service account** when adding a Google Workspace connection.
-4. Paste the service account JSON key and enter the Workspace user email Mistle should use.
+4. Paste the service account JSON key.
 
 Mistle signs a Google OAuth JWT bearer assertion with the service account key, exchanges it for a short-lived Google access token, and injects that token into calls to the selected Google-hosted MCP servers.
 
@@ -119,7 +119,8 @@ After the Google Workspace connection is active:
 1. Open the sandbox profile that should use Google Workspace.
 2. Add the Google Workspace integration connection to the profile.
 3. In **Resources & Tools**, select the Google Workspace MCP servers that agents may use.
-4. Publish the profile version.
+4. For service account connections, enter the **Workspace user email** Mistle should use as the Google Workspace user subject when minting access tokens.
+5. Publish the profile version.
 
 Only selected MCP servers are exposed to sessions using that published profile.
 

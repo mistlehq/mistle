@@ -14,8 +14,8 @@ import {
   GoogleWorkspaceCredentialSecretTypes,
   GoogleWorkspaceCredentialSlotKeys,
   GoogleWorkspaceOAuthScopes,
-  GoogleWorkspaceServiceAccountConnectionConfigSchema,
 } from "./auth.js";
+import { GoogleWorkspaceBindingConfigSchema } from "./binding-config-schema.js";
 
 const GoogleWorkspaceDefaultTokenEndpoint = "https://oauth2.googleapis.com/token";
 const GoogleWorkspaceJwtBearerGrantType = "urn:ietf:params:oauth:grant-type:jwt-bearer";
@@ -51,7 +51,7 @@ type GoogleWorkspaceServiceAccountTokenResponse = z.output<
 >;
 
 type GoogleWorkspaceServiceAccountContext = {
-  delegatedUserEmail: string;
+  workspaceUserEmail: string;
   clientEmail: string;
   privateKey: string;
   tokenEndpoint: string;
@@ -67,7 +67,7 @@ function resolveGoogleWorkspaceTokenEndpoint(key: GoogleWorkspaceServiceAccountK
 
 export function buildGoogleWorkspaceServiceAccountJwtAssertion(input: {
   clientEmail: string;
-  delegatedUserEmail: string;
+  workspaceUserEmail: string;
   privateKey: string;
   tokenEndpoint?: string;
   issuedAtEpochSeconds: number;
@@ -86,7 +86,7 @@ export function buildGoogleWorkspaceServiceAccountJwtAssertion(input: {
       aud: tokenEndpoint,
       exp: input.issuedAtEpochSeconds + GoogleWorkspaceServiceAccountTokenTtlSeconds,
       iat: input.issuedAtEpochSeconds,
-      sub: input.delegatedUserEmail,
+      sub: input.workspaceUserEmail,
     }),
   );
   const signingInput = `${header}.${payload}`;
@@ -146,8 +146,12 @@ export function resolveGoogleWorkspaceServiceAccountContext(
       "Google Workspace service account resolver requires a service-account connection config.",
     );
   }
-  const connectionConfig =
-    GoogleWorkspaceServiceAccountConnectionConfigSchema.parse(parsedConnectionConfig);
+  const parsedBindingConfig = GoogleWorkspaceBindingConfigSchema.parse(input.binding?.config);
+  if (parsedBindingConfig.workspaceUserEmail === undefined) {
+    throw new Error(
+      "Google Workspace service account resolver requires binding config `workspaceUserEmail`.",
+    );
+  }
 
   const rawKeyJson = input.connection.secrets?.["serviceAccountKeyJson"];
   if (rawKeyJson === undefined || rawKeyJson.length === 0) {
@@ -159,7 +163,7 @@ export function resolveGoogleWorkspaceServiceAccountContext(
   const key = parseGoogleWorkspaceServiceAccountKey(rawKeyJson);
 
   return {
-    delegatedUserEmail: connectionConfig.delegated_user_email,
+    workspaceUserEmail: parsedBindingConfig.workspaceUserEmail,
     clientEmail: key.client_email,
     privateKey: key.private_key,
     tokenEndpoint: resolveGoogleWorkspaceTokenEndpoint(key),
@@ -241,7 +245,7 @@ export const GoogleWorkspaceServiceAccountCredentialResolver: IntegrationCredent
     const nowMs = Date.now();
     const assertion = buildGoogleWorkspaceServiceAccountJwtAssertion({
       clientEmail: context.clientEmail,
-      delegatedUserEmail: context.delegatedUserEmail,
+      workspaceUserEmail: context.workspaceUserEmail,
       privateKey: context.privateKey,
       tokenEndpoint: context.tokenEndpoint,
       issuedAtEpochSeconds: Math.floor(nowMs / 1000),
