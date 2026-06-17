@@ -232,6 +232,19 @@ export class TunnelSessionService {
               );
             });
         },
+        onPeerPingReceived: ({ payloadLen, receivedAtMs, socket }) => {
+          logger.info(
+            {
+              eventName: "gateway.bootstrap.health.peer_ping_received",
+              sandboxInstanceId: input.sandboxInstanceId,
+              leaseId: input.leaseId,
+              payloadLen,
+              receivedAtMs,
+              socket,
+            },
+            "Bootstrap websocket received peer ping control frame",
+          );
+        },
         onPingWriteCompleted: ({
           pingScheduleDelayMs,
           pingSentAtMs,
@@ -278,6 +291,33 @@ export class TunnelSessionService {
             "Bootstrap websocket health ping write failed",
           );
         },
+        onPongReceived: ({
+          expectedPingSeq,
+          lastPongAgeMs,
+          matched,
+          pingSeq,
+          receivedAtMs,
+          sentAtMs,
+          socket,
+        }) => {
+          const logFields = {
+            eventName: "gateway.bootstrap.health.pong_received",
+            sandboxInstanceId: input.sandboxInstanceId,
+            leaseId: input.leaseId,
+            expectedPingSeq,
+            lastPongAgeMs,
+            matched,
+            pingSeq,
+            receivedAtMs,
+            sentAtMs,
+            socket,
+          };
+          if (matched) {
+            logger.debug(logFields, "Bootstrap websocket received matching pong control frame");
+            return;
+          }
+          logger.warn(logFields, "Bootstrap websocket received stale pong control frame");
+        },
         onRecovered: ({ consecutiveMissedPongs, lastPongAgeMs, pingSeq }) => {
           logger.info(
             {
@@ -316,6 +356,33 @@ export class TunnelSessionService {
                 "Failed to mark bootstrap websocket as recovered after pong health check",
               );
             });
+        },
+        onSocketClosed: ({ closeCode, closeReason, observedAtMs, socket }) => {
+          logger.info(
+            {
+              eventName: "gateway.bootstrap.health.socket_closed",
+              sandboxInstanceId: input.sandboxInstanceId,
+              leaseId: input.leaseId,
+              closeCode,
+              closeReason,
+              observedAtMs,
+              socket,
+            },
+            "Bootstrap websocket health monitor observed socket close",
+          );
+        },
+        onSocketError: ({ error, observedAtMs, socket }) => {
+          logger.warn(
+            {
+              err: error,
+              eventName: "gateway.bootstrap.health.socket_error",
+              sandboxInstanceId: input.sandboxInstanceId,
+              leaseId: input.leaseId,
+              observedAtMs,
+              socket,
+            },
+            "Bootstrap websocket health monitor observed socket error",
+          );
         },
         onUnhealthy: () => {
           this.recordBootstrapCloseContext({
