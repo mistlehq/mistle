@@ -87,6 +87,12 @@ const JsonRpcToolsListResponseSchema = z
                   type: z.literal("object"),
                 })
                 .loose(),
+              annotations: z
+                .object({
+                  idempotentHint: z.boolean().optional(),
+                })
+                .loose()
+                .optional(),
               outputSchema: z.unknown().optional(),
             })
             .loose(),
@@ -125,6 +131,8 @@ describe.concurrent("MCP profile tools integration", () => {
     const tools = await listMcpTools({ env, token });
 
     expect(tools.map((tool) => tool.name).sort()).toEqual([
+      "create_scheduled_trigger",
+      "create_webhook_trigger",
       "get_trigger",
       "list_trigger_webhook_events",
       "list_triggers",
@@ -145,6 +153,16 @@ describe.concurrent("MCP profile tools integration", () => {
       "set_trigger_webhook_events",
       "update_trigger_user_message",
     ]);
+    expect(tools.find((tool) => tool.name === "create_scheduled_trigger")?.annotations).toEqual(
+      expect.objectContaining({
+        idempotentHint: false,
+      }),
+    );
+    expect(tools.find((tool) => tool.name === "create_webhook_trigger")?.annotations).toEqual(
+      expect.objectContaining({
+        idempotentHint: false,
+      }),
+    );
     expect(tools.every((tool) => tool.outputSchema === undefined)).toBe(true);
   });
 

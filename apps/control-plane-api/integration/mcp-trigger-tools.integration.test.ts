@@ -213,6 +213,209 @@ describe.concurrent("MCP trigger tools integration", () => {
     expect(result.isError).toBe(true);
   });
 
+  it("creates recurring scheduled triggers with generic trigger create permission", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-trigger-schedule-create@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP schedule trigger creator",
+      permissions: [OrganizationPermissions.TRIGGER_CREATE],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_mcp_trigger_schedule_create",
+        organizationId: session.organizationId,
+        displayName: "MCP schedule create profile",
+        activeVersion: 1,
+        createdAt: "2026-06-03T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_mcp_trigger_schedule_create",
+        version: 1,
+      }),
+    );
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "create_scheduled_trigger",
+      arguments: {
+        name: "MCP created recurring schedule",
+        enabled: true,
+        cronExpression: "15 8 * * *",
+        timezone: "UTC",
+        userMessage: "Run the scheduled maintenance check",
+        target: {
+          sandboxProfileId: "sbp_mcp_trigger_schedule_create",
+        },
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const trigger = GetTriggerResponseSchema.parse(result.structuredContent);
+    expect(trigger).toMatchObject({
+      kind: "schedule",
+      name: "MCP created recurring schedule",
+      enabled: true,
+      target: {
+        sandboxProfileId: "sbp_mcp_trigger_schedule_create",
+      },
+      source: {
+        kind: "schedule",
+        cronExpression: "15 8 * * *",
+        timezone: "UTC",
+      },
+    });
+
+    const persistedScheduleTrigger = await env.controlPlaneDb.query.scheduleTriggers.findFirst({
+      columns: {
+        scheduleId: true,
+        inputTemplate: true,
+        conversationKeyTemplate: true,
+        idempotencyKeyTemplate: true,
+      },
+      where: (table, { eq }) => eq(table.triggerId, trigger.id),
+    });
+    if (persistedScheduleTrigger === undefined) {
+      throw new Error("Expected created scheduled trigger to have a schedule trigger row.");
+    }
+    const persistedSchedule = await env.controlPlaneDb.query.schedules.findFirst({
+      columns: {
+        kind: true,
+        cronExpression: true,
+        timezone: true,
+        nextScheduledAt: true,
+      },
+      where: (table, { eq }) => eq(table.id, persistedScheduleTrigger.scheduleId),
+    });
+
+    expect(persistedScheduleTrigger).toMatchObject({
+      inputTemplate: "Run the scheduled maintenance check",
+      conversationKeyTemplate: "{{schedule.id}}",
+      idempotencyKeyTemplate: "{{schedule.scheduledActionId}}",
+    });
+    expect(persistedSchedule).toMatchObject({
+      kind: ScheduleKinds.RECURRING,
+      cronExpression: "15 8 * * *",
+      timezone: "UTC",
+    });
+    expect(persistedSchedule?.nextScheduledAt).not.toBeNull();
+  });
+
+  it("rejects legacy webhook create permission for scheduled trigger creation", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-trigger-schedule-create-legacy-webhook-forbidden@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP legacy webhook schedule creator",
+      permissions: [OrganizationPermissions.TRIGGER_WEBHOOK_CREATE],
+    });
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "create_scheduled_trigger",
+      arguments: {
+        name: "Forbidden scheduled trigger",
+        cronExpression: "15 8 * * *",
+        timezone: "UTC",
+        userMessage: "This should not be created",
+        target: {
+          sandboxProfileId: "sbp_mcp_trigger_schedule_create_forbidden",
+        },
+      },
+    });
+
+    expect(result.isError).toBe(true);
+  });
+
+  it("creates webhook triggers with legacy webhook create permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-trigger-webhook-create@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP webhook trigger creator",
+      permissions: [OrganizationPermissions.TRIGGER_WEBHOOK_CREATE],
+    });
+
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_mcp_trigger_webhook_create",
+      webhookSourceId: "iws_mcp_trigger_webhook_create",
+      profileId: "sbp_mcp_trigger_webhook_create",
+      profileVersion: 1,
+      profileActiveVersion: 1,
+    });
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "create_webhook_trigger",
+      arguments: {
+        name: "MCP created webhook trigger",
+        enabled: true,
+        integrationWebhookSourceId: "iws_mcp_trigger_webhook_create",
+        eventTypes: [GitHubIssueCommentCreatedEventType],
+        userMessage: "Triage {{payload.comment.body}}",
+        instructions: "Prefer concise triage summaries.",
+        conversationKeyTemplate: "{{payload.issue.node_id}}",
+        idempotencyKeyTemplate: "{{payload.comment.node_id}}",
+        target: {
+          sandboxProfileId: "sbp_mcp_trigger_webhook_create",
+        },
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const trigger = GetTriggerResponseSchema.parse(result.structuredContent);
+    expect(trigger).toMatchObject({
+      kind: "webhook",
+      name: "MCP created webhook trigger",
+      enabled: true,
+      target: {
+        sandboxProfileId: "sbp_mcp_trigger_webhook_create",
+      },
+      source: {
+        kind: "webhook",
+        events: [
+          {
+            label: "Issue comment created",
+          },
+        ],
+      },
+    });
+
+    const persistedWebhook = await env.controlPlaneDb.query.webhookTriggers.findFirst({
+      columns: {
+        eventTypes: true,
+        inputTemplate: true,
+        instructions: true,
+        conversationKeyTemplate: true,
+        idempotencyKeyTemplate: true,
+      },
+      where: (table, { eq }) => eq(table.triggerId, trigger.id),
+    });
+    expect(persistedWebhook).toMatchObject({
+      eventTypes: [GitHubIssueCommentCreatedEventType],
+      inputTemplate: "Triage {{payload.comment.body}}",
+      instructions: "Prefer concise triage summaries.",
+      conversationKeyTemplate: "{{payload.issue.node_id}}",
+      idempotencyKeyTemplate: "{{payload.comment.node_id}}",
+    });
+  });
+
   it("updates shared webhook trigger fields with generic trigger update permission", async ({
     env,
   }) => {
