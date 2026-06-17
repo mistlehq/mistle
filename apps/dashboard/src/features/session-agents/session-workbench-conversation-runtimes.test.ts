@@ -233,6 +233,8 @@ function createOpenCodeRuntimeInput(reportedMessages: string[]): OpenCodeRuntime
 }
 
 function createClaudeCodeRuntimeInput(input: {
+  activeSessionId?: string;
+  chatSessionId?: string;
   contextUsage?: ClaudeCodeRuntimeInput["contextUsage"];
   isBusy?: boolean;
   pendingPermissions?: ClaudeCodeRuntimeInput["chat"]["chatState"]["pendingPermissions"];
@@ -255,7 +257,7 @@ function createClaudeCodeRuntimeInput(input: {
         pendingPermissions: input.pendingPermissions ?? [],
         pendingQueryId: input.isBusy === false ? null : "query_123",
         status: input.isBusy === false ? "idle" : "busy",
-        sessionId: "session_123",
+        sessionId: input.chatSessionId ?? "session_123",
         queries: [],
       },
       hydrateChatFromSessionOrThrow: async () => {
@@ -288,7 +290,7 @@ function createClaudeCodeRuntimeInput(input: {
     },
     sessionSnapshot: {
       activeDirectory: null,
-      activeSessionId: "session_123",
+      activeSessionId: input.activeSessionId ?? "session_123",
       connectedAtIso: "2026-05-19T00:00:00.000Z",
       providerSessionId: null,
       sandboxInstanceId: "sandbox_123",
@@ -838,6 +840,29 @@ describe("buildClaudeCodeConversationRuntime", () => {
         decision: "once",
       },
     ]);
+  });
+
+  it("does not expose stale Claude Code permission requests from a previous session", () => {
+    const runtime = buildClaudeCodeConversationRuntime(
+      createClaudeCodeRuntimeInput({
+        activeSessionId: "session_current",
+        chatSessionId: "session_previous",
+        pendingPermissions: [
+          {
+            id: "permission-stale",
+            sessionId: "session_previous",
+            toolName: "Bash",
+            toolInput: {
+              command: "pnpm test",
+            },
+          },
+        ],
+        reportedMessages: [],
+        steeredPrompts: [],
+      }),
+    );
+
+    expect(runtime.serverRequestsState.pendingServerRequests).toEqual([]);
   });
 });
 

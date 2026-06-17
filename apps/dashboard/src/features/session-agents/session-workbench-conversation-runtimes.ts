@@ -377,6 +377,11 @@ export function buildClaudeCodeConversationRuntime(input: {
 }): SessionWorkbenchRuntimeAdapter {
   const capabilities = SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE;
   const isTurnRunning = input.chat.chatState.status === "busy";
+  const activeSessionId = input.sessionSnapshot?.activeSessionId ?? null;
+  const pendingPermissionRequests =
+    input.chat.chatState.sessionId === activeSessionId
+      ? mapClaudeCodePermissionsToServerRequests(input.chat.chatState.pendingPermissions)
+      : [];
   const respondToServerRequest = (requestId: string | number, result: unknown): void => {
     let response: ReturnType<typeof resolveClaudeCodePermissionResponse>;
     try {
@@ -405,8 +410,8 @@ export function buildClaudeCodeConversationRuntime(input: {
     displayName: capabilities.displayName,
     cliTerminalContentInset: capabilities.cliTerminalContentInset,
     conversation: {
-      activeConversationId: input.sessionSnapshot?.activeSessionId ?? null,
-      attachmentTargetId: input.sessionSnapshot?.activeSessionId ?? null,
+      activeConversationId: activeSessionId,
+      attachmentTargetId: activeSessionId,
       chatState: mapClaudeCodeChatStateForConversation(input.chat.chatState),
     },
     composerRuntimeInput: {
@@ -461,9 +466,7 @@ export function buildClaudeCodeConversationRuntime(input: {
     },
     serverRequestsState: {
       isRespondingToServerRequest: input.chat.isRespondingToPermission,
-      pendingServerRequests: mapClaudeCodePermissionsToServerRequests(
-        input.chat.chatState.pendingPermissions,
-      ),
+      pendingServerRequests: pendingPermissionRequests,
       respondToServerRequest,
     },
   };
