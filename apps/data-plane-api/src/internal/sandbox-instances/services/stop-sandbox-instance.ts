@@ -67,6 +67,7 @@ function createStopSandboxIdempotencyKey(input: StopSandboxInstanceInput): strin
 function supportsUserRequestedStop(purpose: SandboxInstancePurpose): boolean {
   return (
     purpose === SandboxInstancePurposes.SESSION ||
+    purpose === SandboxInstancePurposes.DESIGNER ||
     purpose === SandboxInstancePurposes.SETUP_ASSISTANT ||
     purpose === SandboxInstancePurposes.SETUP_CHECK ||
     purpose === SandboxInstancePurposes.SKILLS_DISCOVERY
@@ -150,7 +151,7 @@ async function claimSandboxInstanceStop(
     if (input.stopReason === "user" && !supportsUserRequestedStop(sandboxInstance.purpose)) {
       throw new ConflictError(
         SandboxInstanceUserStopNotSupportedErrorCode,
-        `User-requested stop is only supported for session, setup-check, setup-assistant, and skills-discovery sandbox instances; sandbox instance '${input.sandboxInstanceId}' has purpose '${sandboxInstance.purpose}'.`,
+        `User-requested stop is only supported for session, designer, setup-check, setup-assistant, and skills-discovery sandbox instances; sandbox instance '${input.sandboxInstanceId}' has purpose '${sandboxInstance.purpose}'.`,
       );
     }
 

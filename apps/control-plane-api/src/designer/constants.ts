@@ -1,0 +1,12 @@
+export const DESIGNER_ROUTE_BASE_PATH = "/v1/designer";
+
+export const DESIGNER_RUNTIME_PROFILE_ID = "designer";
+export const DESIGNER_RUNTIME_PROFILE_VERSION = 1;
+
+export const DesignerBadRequestCodes = {
+  DESIGNER_SANDBOX_RUNTIME_UNAVAILABLE: "DESIGNER_SANDBOX_RUNTIME_UNAVAILABLE",
+} as const;
+
+export const DesignerNotFoundCodes = {
+  DESIGNER_SESSION_NOT_FOUND: "DESIGNER_SESSION_NOT_FOUND",
+} as const;

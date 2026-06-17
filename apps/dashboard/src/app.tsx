@@ -16,6 +16,8 @@ import {
 } from "./features/auth/auth-switch-organization-page.js";
 import { OAuthConsentPage } from "./features/auth/oauth-consent/oauth-consent-page.js";
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
+import { DesignerPage } from "./features/pages/designer-page.js";
+import { DesignerSessionPage } from "./features/pages/designer-session-page.js";
 import { HomePage } from "./features/pages/home-page.js";
 import { IntegrationConnectionCreatePage } from "./features/pages/integration-connection-create-page.js";
 import { IntegrationConnectionEditPage } from "./features/pages/integration-connection-edit-page.js";
@@ -64,6 +66,14 @@ export const APP_ROUTES = createRoutesFromElements(
       <Route element={<PortAccessRedirectPage />} path="/p/ports/:slug" />
       <Route element={<AppShell />} errorElement={<RouteErrorBoundary />}>
         <Route element={<HomePage />} handle={ROUTE_HANDLES.dashboard} index />
+        <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.designer} path="designer">
+          <Route element={<DesignerPage />} index />
+          <Route
+            element={<DesignerSessionPage />}
+            handle={ROUTE_HANDLES.designerDetail}
+            path=":sessionId"
+          />
+        </Route>
         <Route
           element={<RouteOutlet />}
           handle={ROUTE_HANDLES.sandboxProfiles}

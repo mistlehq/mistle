@@ -132,6 +132,21 @@ export const ROUTE_HANDLES = {
     title: "Home",
     description: "",
   },
+  designer: {
+    appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
+    breadcrumb: "Designer",
+    title: "Designer",
+    description: "",
+  },
+  designerDetail: {
+    appShellInsetOwner: "app-shell",
+    appShellViewportMode: "workspace",
+    sidebarTriggerOwner: "workspace",
+    hideBreadcrumb: true,
+    title: "Designer",
+    description: "",
+  },
   integrations: {
     appShellInsetOwner: "child",
     sidebarTriggerOwner: "page-frame",
@@ -192,6 +207,7 @@ export const ROUTE_HANDLES = {
     description: "Start a sandbox-backed session from a sandbox profile.",
   },
   sessionsDetail: {
+    appShellViewportMode: "workspace",
     sidebarTriggerOwner: "workspace",
     hideBreadcrumb: true,
     title: "Session",

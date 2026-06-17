@@ -188,7 +188,7 @@ function hasActiveSessionListFilters(filters: SessionListFilters): boolean {
   );
 }
 
-function SessionTitleCell(input: { href?: string; title: string }): React.JSX.Element {
+export function SessionTitleCell(input: { href?: string; title: string }): React.JSX.Element {
   const titleText = (
     <OverflowTooltipText
       className={
@@ -326,7 +326,7 @@ function formatStartedByLabel(input: SandboxInstanceListItem["startedBy"]): stri
   return "User";
 }
 
-function resolveUpdatedLabel(input: {
+export function resolveSessionUpdatedLabel(input: {
   status: SandboxLifecycleStatus;
   updatedAt: string;
   failureMessage: string | null;
@@ -849,7 +849,7 @@ export function SessionsPage(): React.JSX.Element {
                       </TableCell>
                       <TableCell className="align-top text-right whitespace-nowrap">
                         <div className="flex justify-end">
-                          {resolveUpdatedLabel({
+                          {resolveSessionUpdatedLabel({
                             status: session.status,
                             updatedAt: session.updatedAt,
                             failureMessage: session.failureMessage,

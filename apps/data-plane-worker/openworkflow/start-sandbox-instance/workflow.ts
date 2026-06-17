@@ -1330,6 +1330,7 @@ function resolveStartSandboxOperationKind(
 ): SandboxdOperationKind {
   if (
     purpose === SandboxInstancePurposes.SESSION ||
+    purpose === SandboxInstancePurposes.DESIGNER ||
     purpose === SandboxInstancePurposes.SETUP_ASSISTANT ||
     purpose === SandboxInstancePurposes.SKILLS_DISCOVERY
   ) {

@@ -234,6 +234,7 @@
                     "type": "string",
                     "enum": [
                       "session",
+                      "designer",
                       "snapshot",
                       "setup_assistant",
                       "setup_check",
@@ -2578,6 +2579,7 @@
                       "type": "string",
                       "enum": [
                         "session",
+                        "designer",
                         "snapshot",
                         "setup_assistant",
                         "setup_check",
@@ -2673,6 +2675,15 @@
             },
             "required": true,
             "name": "organizationId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "allowedPurposes",
             "in": "query"
           }
         ],

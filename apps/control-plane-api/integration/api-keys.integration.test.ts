@@ -8,7 +8,10 @@ import type { IntegrationTestEnvironment } from "@mistle/test-harness/integratio
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
-import { CreateApiKeyResponseSchema } from "../src/api-keys/create-api-key/schema.js";
+import {
+  CreateApiKeyBadRequestResponseSchema,
+  CreateApiKeyResponseSchema,
+} from "../src/api-keys/create-api-key/schema.js";
 import { ListApiKeysResponseSchema } from "../src/api-keys/list-api-keys/schema.js";
 import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 
@@ -83,6 +86,25 @@ describe.concurrent("api keys integration", () => {
     expect(persistedPermissions.map((permission) => permission.permission)).toStrictEqual([
       OrganizationPermissions.TRIGGER_READ,
     ]);
+  });
+
+  it("rejects Designer session permissions for API keys", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-api-key-designer-permission@example.com",
+    });
+
+    const response = await createApiKey({
+      cookie: session.cookie,
+      env,
+      name: "Designer key",
+      permissions: [OrganizationPermissions.DESIGNER_SESSION_CREATE],
+    });
+
+    expect(response.status).toBe(400);
+    expect(CreateApiKeyBadRequestResponseSchema.parse(await response.json())).toEqual({
+      code: "INVALID_CREATE_API_KEY_INPUT",
+      message: "Permission 'designerSession:create' is not supported for API keys.",
+    });
   });
 
   it("lists active API keys using keyset pagination and omits revoked keys", async ({ env }) => {
