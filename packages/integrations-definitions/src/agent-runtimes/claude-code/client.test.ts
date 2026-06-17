@@ -42,6 +42,12 @@ describe("parseClaudeCodeSessionReadResult", () => {
           queries: [],
           lastError: null,
           config: {
+            availableCommands: [
+              {
+                name: "review",
+                description: "Review current changes",
+              },
+            ],
             availableModels: [
               {
                 model: "sonnet",
@@ -73,6 +79,12 @@ describe("parseClaudeCodeSessionReadResult", () => {
         queries: [],
         lastError: null,
         config: {
+          availableCommands: [
+            {
+              name: "review",
+              description: "Review current changes",
+            },
+          ],
           availableModels: [
             {
               model: "sonnet",
@@ -108,6 +120,7 @@ describe("parseClaudeCodeSessionReadResult", () => {
           queries: [],
           lastError: null,
           config: {
+            availableCommands: [],
             availableModels: [
               {
                 model: "sonnet",
@@ -139,6 +152,7 @@ describe("parseClaudeCodeSessionReadResult", () => {
           queries: [],
           lastError: null,
           config: {
+            availableCommands: [],
             availableModels: [
               {
                 model: "sonnet",
@@ -156,5 +170,28 @@ describe("parseClaudeCodeSessionReadResult", () => {
         },
       }),
     ).toThrow("Claude Code session config response included invalid inputModalities.");
+  });
+
+  it("rejects Claude Code config without command catalog metadata", () => {
+    expect(() =>
+      parseClaudeCodeSessionReadResult({
+        session: {
+          id: "session_123",
+          cwd: "/workspace",
+          status: {
+            type: "idle",
+          },
+          activeQueryId: null,
+          queries: [],
+          lastError: null,
+          config: {
+            availableModels: [],
+            model: null,
+            modelReasoningEffort: null,
+          },
+          contextUsage: null,
+        },
+      }),
+    ).toThrow("Claude Code session config did not include availableCommands.");
   });
 });

@@ -25,6 +25,7 @@ export type ClaudeCodeModelSummary = {
 };
 
 export type ClaudeCodeSessionConfig = {
+  availableCommands: readonly ClaudeCodeCommandSummary[];
   availableModels: readonly ClaudeCodeModelSummary[];
   model: string | null;
   modelReasoningEffort: string | null;
@@ -34,6 +35,11 @@ export type ClaudeCodeContextUsage = {
   contextWindow: number;
   percent: number | null;
   tokens: number | null;
+};
+
+export type ClaudeCodeCommandSummary = {
+  description: string | null;
+  name: string;
 };
 
 export type ClaudeCodeSessionReadResult = {
@@ -73,6 +79,10 @@ export type ClaudeCodeSessionClient = {
     offset?: number;
   }): Promise<readonly ClaudeCodeSessionSummary[]>;
   readSession(input: { sessionId: string }): Promise<ClaudeCodeSessionReadResult>;
+  refreshCommandCatalog(input: {
+    refresh?: boolean;
+    sessionId: string;
+  }): Promise<ClaudeCodeSessionConfig>;
   refreshModelCatalog(input: {
     refresh?: boolean;
     sessionId: string;
@@ -243,15 +253,34 @@ function parseClaudeCodeModelSummary(value: unknown): ClaudeCodeModelSummary {
   };
 }
 
+function parseClaudeCodeCommandSummary(value: unknown): ClaudeCodeCommandSummary {
+  if (!isRecord(value)) {
+    throw new Error("Claude Code session config response included an invalid command.");
+  }
+  const name = readNestedString(value, ["name"]);
+  if (name === null) {
+    throw new Error("Claude Code session config response included a command without name.");
+  }
+  return {
+    name,
+    description: readNestedStringValue(value, ["description"]),
+  };
+}
+
 function parseClaudeCodeSessionConfig(value: unknown): ClaudeCodeSessionConfig {
   if (!isRecord(value)) {
     throw new Error("Claude Code session/read response did not include session config.");
+  }
+  const rawAvailableCommands = value["availableCommands"];
+  if (!Array.isArray(rawAvailableCommands)) {
+    throw new Error("Claude Code session config did not include availableCommands.");
   }
   const rawAvailableModels = value["availableModels"];
   if (!Array.isArray(rawAvailableModels)) {
     throw new Error("Claude Code session config did not include availableModels.");
   }
   return {
+    availableCommands: rawAvailableCommands.map(parseClaudeCodeCommandSummary),
     availableModels: rawAvailableModels.map(parseClaudeCodeModelSummary),
     model: readNestedString(value, ["model"]),
     modelReasoningEffort: readNestedString(value, ["modelReasoningEffort"]),
@@ -388,6 +417,13 @@ export function createClaudeCodeSessionClient(
         sessionId: readInput.sessionId,
       });
       return parseClaudeCodeSessionReadResult(result);
+    },
+    async refreshCommandCatalog(refreshInput) {
+      const result = await rpcClient.call("session/command-catalog", {
+        sessionId: refreshInput.sessionId,
+        ...(refreshInput.refresh === undefined ? {} : { refresh: refreshInput.refresh }),
+      });
+      return parseClaudeCodeSessionConfigRpcResult(result, "session/command-catalog");
     },
     async refreshModelCatalog(refreshInput) {
       const result = await rpcClient.call("session/model-catalog", {

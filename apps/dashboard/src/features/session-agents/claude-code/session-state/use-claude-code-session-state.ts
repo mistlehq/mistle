@@ -106,6 +106,7 @@ export type UseClaudeCodeSessionStateResult = {
 const ClaudeCodeTurnPollIntervalMs = 1_000;
 const ClaudeCodeNavigatorSessionLimit = 20;
 const EmptyClaudeCodeSessionConfig: ClaudeCodeSessionConfig = {
+  availableCommands: [],
   availableModels: [],
   model: null,
   modelReasoningEffort: null,
@@ -255,20 +256,28 @@ function createActiveClaudeCodeSessionSummary(
   };
 }
 
-async function readClaudeCodeSessionWithModelCatalog(input: {
+async function readClaudeCodeSessionWithRuntimeCatalogs(input: {
   client: ClaudeCodeSessionClient;
   sessionId: string;
 }): Promise<Awaited<ReturnType<ClaudeCodeSessionClient["readSession"]>>> {
   const session = await input.client.readSession({
     sessionId: input.sessionId,
   });
-  const config = await input.client.refreshModelCatalog({
+  const modelConfig = await input.client.refreshModelCatalog({
+    sessionId: input.sessionId,
+  });
+  const commandConfig = await input.client.refreshCommandCatalog({
     sessionId: input.sessionId,
   });
   return {
     session: {
       ...session.session,
-      config,
+      config: {
+        availableCommands: commandConfig.availableCommands,
+        availableModels: modelConfig.availableModels,
+        model: modelConfig.model,
+        modelReasoningEffort: modelConfig.modelReasoningEffort,
+      },
     },
   };
 }
@@ -378,7 +387,7 @@ export function useClaudeCodeSessionState(input: {
       throw new Error("Connect Claude Code before hydrating messages.");
     }
 
-    const session = await readClaudeCodeSessionWithModelCatalog({ client, sessionId });
+    const session = await readClaudeCodeSessionWithRuntimeCatalogs({ client, sessionId });
     applyHydratedSession(session.session);
     setSessionErrorMessage(null);
   }, [applyHydratedSession, sessionSnapshot?.activeSessionId]);
@@ -497,7 +506,7 @@ export function useClaudeCodeSessionState(input: {
             });
             activeSessionId = sessionSelection.sessionId;
           }
-          const session = await readClaudeCodeSessionWithModelCatalog({
+          const session = await readClaudeCodeSessionWithRuntimeCatalogs({
             client,
             sessionId: activeSessionId,
           });
@@ -708,7 +717,7 @@ export function useClaudeCodeSessionState(input: {
           cwd: directory,
           sessionId,
         });
-        const session = await readClaudeCodeSessionWithModelCatalog({
+        const session = await readClaudeCodeSessionWithRuntimeCatalogs({
           client,
           sessionId,
         });
@@ -761,7 +770,7 @@ export function useClaudeCodeSessionState(input: {
         const session = await client.createSession({
           cwd: startInput?.directory ?? connectedSession.activeDirectory,
         });
-        const hydratedSession = await readClaudeCodeSessionWithModelCatalog({
+        const hydratedSession = await readClaudeCodeSessionWithRuntimeCatalogs({
           client,
           sessionId: session.sessionId,
         });

@@ -236,6 +236,7 @@ function createClaudeCodeRuntimeInput(input: {
   contextUsage?: ClaudeCodeRuntimeInput["contextUsage"];
   isBusy?: boolean;
   reportedMessages: string[];
+  startedPrompts?: string[];
   steeredPrompts: string[];
 }): ClaudeCodeRuntimeInput {
   return {
@@ -285,8 +286,8 @@ function createClaudeCodeRuntimeInput(input: {
       providerSessionId: null,
       sandboxInstanceId: "sandbox_123",
     },
-    startTurn: async () => {
-      return;
+    startTurn: async (turnInput) => {
+      input.startedPrompts?.push(turnInput.transcriptPrompt ?? turnInput.submittedPrompt);
     },
     steerTurn: async (turnInput) => {
       input.steeredPrompts.push(turnInput.transcriptPrompt ?? turnInput.submittedPrompt);
@@ -718,6 +719,70 @@ describe("buildClaudeCodeConversationRuntime", () => {
       label: "72% context left",
       title: "28,000 tokens used of 100,000 token context window.",
     });
+  });
+
+  it("routes Claude Code slash commands through normal turn start when idle", () => {
+    const startedPrompts: string[] = [];
+    const runtime = buildClaudeCodeConversationRuntime(
+      createClaudeCodeRuntimeInput({
+        isBusy: false,
+        reportedMessages: [],
+        startedPrompts,
+        steeredPrompts: [],
+      }),
+    );
+
+    const accepted = runtime.composerRuntimeInput.executeTypedRuntimeCommand?.({
+      commandId: "claude-code.slash.review",
+      text: "/review current changes",
+    });
+
+    expect(accepted).toBe(true);
+    expect(startedPrompts).toEqual(["/review current changes"]);
+  });
+
+  it("rejects Claude Code slash commands while the session is busy", () => {
+    const reportedMessages: string[] = [];
+    const startedPrompts: string[] = [];
+    const runtime = buildClaudeCodeConversationRuntime(
+      createClaudeCodeRuntimeInput({
+        reportedMessages,
+        startedPrompts,
+        steeredPrompts: [],
+      }),
+    );
+
+    const accepted = runtime.composerRuntimeInput.executeTypedRuntimeCommand?.({
+      commandId: "claude-code.slash.review",
+      text: "/review current changes",
+    });
+
+    expect(accepted).toBe(false);
+    expect(startedPrompts).toEqual([]);
+    expect(reportedMessages).toEqual([
+      "Claude Code slash commands are disabled while Claude Code is working.",
+    ]);
+  });
+
+  it("rejects typed commands outside the Claude Code slash command namespace", () => {
+    const reportedMessages: string[] = [];
+    const runtime = buildClaudeCodeConversationRuntime(
+      createClaudeCodeRuntimeInput({
+        isBusy: false,
+        reportedMessages,
+        steeredPrompts: [],
+      }),
+    );
+
+    const accepted = runtime.composerRuntimeInput.executeTypedRuntimeCommand?.({
+      commandId: "opencode.prompt.review",
+      text: "/review",
+    });
+
+    expect(accepted).toBe(false);
+    expect(reportedMessages).toEqual([
+      "Unsupported Claude Code runtime command 'opencode.prompt.review'.",
+    ]);
   });
 });
 

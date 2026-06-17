@@ -77,6 +77,13 @@
       "import": "./dist/agent-runtimes/claude-code/client.js",
       "default": "./dist/agent-runtimes/claude-code/client.js"
     },
+    "./agent-runtimes/claude-code/composer-capabilities": {
+      "types": "./src/agent-runtimes/claude-code/composer-capabilities.ts",
+      "workspace-src": "./src/agent-runtimes/claude-code/composer-capabilities.ts",
+      "node": "./dist/agent-runtimes/claude-code/composer-capabilities.js",
+      "import": "./dist/agent-runtimes/claude-code/composer-capabilities.js",
+      "default": "./dist/agent-runtimes/claude-code/composer-capabilities.js"
+    },
     "./agent-runtimes/claude-code/pty-launch": {
       "types": "./src/agent-runtimes/claude-code/pty-launch.ts",
       "workspace-src": "./src/agent-runtimes/claude-code/pty-launch.ts",

@@ -12,6 +12,12 @@ import {
 } from "./claude-code-workbench-composer.js";
 
 const ClaudeCodeConfigWithReasoningModels: ClaudeCodeSessionConfig = {
+  availableCommands: [
+    {
+      name: "review",
+      description: "Review current changes",
+    },
+  ],
   availableModels: [
     {
       model: "default",
@@ -96,6 +102,30 @@ describe("useClaudeCodeSessionComposerConfigControl", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("last-write").textContent).toBe("sonnet:");
+    });
+  });
+});
+
+describe("buildReadyClaudeCodeComposerBootstrap", () => {
+  it("includes runtime-provided Claude Code slash commands", () => {
+    expect(
+      buildReadyClaudeCodeComposerBootstrap(ClaudeCodeConfigWithReasoningModels)
+        .composerCapabilities,
+    ).toContainEqual({
+      kind: "composerCommand",
+      trigger: "/",
+      source: "runtimeCommand",
+      commands: [
+        {
+          id: "claude-code.slash.review",
+          name: "review",
+          description: "Review current changes",
+          availability: {
+            duringActiveTurn: "disabled",
+          },
+          submitAs: "typedRuntimeCommand",
+        },
+      ],
     });
   });
 });
