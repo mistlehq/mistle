@@ -150,6 +150,101 @@ function RuntimeBootstrapState(input: RuntimeBootstrapStateProps): React.JSX.Ele
   );
 }
 
+function RuntimeConversationPreview(input: {
+  bootstrapErrorMessage: string | null;
+  bootstrapIsPending: boolean;
+  runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
+  session: DesignerSession | null;
+}): React.JSX.Element | null {
+  const initialPrompt = input.session?.initialPrompt ?? null;
+  if (initialPrompt === null) {
+    return null;
+  }
+
+  const promptState = resolveRuntimeConversationPromptState(input);
+
+  return (
+    <section className="rounded-lg border bg-background">
+      <div className="border-b px-3 py-2">
+        <p className="text-xs font-medium text-muted-foreground">Runtime conversation</p>
+      </div>
+      <div className="p-3">
+        <div className="rounded-md bg-muted/40 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-medium text-muted-foreground">You</p>
+            <Badge variant="secondary">{promptState.label}</Badge>
+          </div>
+          <p className="mt-1 whitespace-pre-wrap text-sm">{initialPrompt}</p>
+          <p className="mt-2 text-xs text-muted-foreground">{promptState.detail}</p>
+          {input.runtimeConversationBootstrap?.providerExecutionId === undefined ||
+          input.runtimeConversationBootstrap.providerExecutionId === null ? null : (
+            <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+              {input.runtimeConversationBootstrap.providerExecutionId}
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function resolveRuntimeConversationPromptState(input: {
+  bootstrapErrorMessage: string | null;
+  bootstrapIsPending: boolean;
+  runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
+  session: DesignerSession | null;
+}): {
+  label: string;
+  detail: string;
+} {
+  if (input.runtimeConversationBootstrap !== null) {
+    return {
+      label: "Initial prompt submitted",
+      detail: `Submitted at ${input.runtimeConversationBootstrap.initialPromptSubmittedAt}.`,
+    };
+  }
+
+  if (input.bootstrapErrorMessage !== null) {
+    return {
+      label: "Initial prompt status unknown",
+      detail: "Runtime bootstrap failed while submitting the prompt.",
+    };
+  }
+
+  if (input.bootstrapIsPending) {
+    return {
+      label: "Initial prompt submitting",
+      detail: "Submitting to the Designer runtime.",
+    };
+  }
+
+  if (input.session === null) {
+    return {
+      label: "Initial prompt",
+      detail: "Waiting to submit to the Designer runtime.",
+    };
+  }
+
+  if (input.session.status === null || input.session.status === SandboxInstanceStatuses.FAILED) {
+    return {
+      label: "Initial prompt not submitted",
+      detail: input.session.failureMessage ?? "Designer runtime is unavailable.",
+    };
+  }
+
+  if (!input.session.connectable && !StartingDesignerSessionStatuses.has(input.session.status)) {
+    return {
+      label: "Initial prompt not submitted",
+      detail: "Designer runtime is not connectable.",
+    };
+  }
+
+  return {
+    label: "Initial prompt",
+    detail: "Waiting to submit to the Designer runtime.",
+  };
+}
+
 export function DesignerSessionPageView(input: DesignerSessionPageViewProps): React.JSX.Element {
   return (
     <div className="grid min-h-svh grid-cols-[minmax(20rem,28rem)_1fr] bg-background">
@@ -166,13 +261,13 @@ export function DesignerSessionPageView(input: DesignerSessionPageViewProps): Re
         <div className="min-h-0 flex-1 p-4">
           <ErrorNotice message={input.errorMessage} />
           <div className="grid content-start gap-3">
-            {input.session?.initialPrompt === null || input.session === null ? null : (
-              <div className="rounded-lg border bg-muted/20 p-3">
-                <p className="text-xs font-medium text-muted-foreground">Initial prompt</p>
-                <p className="mt-1 text-sm">{input.session.initialPrompt}</p>
-              </div>
-            )}
             <RuntimeBootstrapState
+              bootstrapErrorMessage={input.bootstrapErrorMessage}
+              bootstrapIsPending={input.bootstrapIsPending}
+              runtimeConversationBootstrap={input.runtimeConversationBootstrap}
+              session={input.session}
+            />
+            <RuntimeConversationPreview
               bootstrapErrorMessage={input.bootstrapErrorMessage}
               bootstrapIsPending={input.bootstrapIsPending}
               runtimeConversationBootstrap={input.runtimeConversationBootstrap}
