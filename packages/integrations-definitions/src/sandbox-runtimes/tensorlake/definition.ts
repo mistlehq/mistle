@@ -1,10 +1,11 @@
 import {
   IntegrationConnectionMethodIds,
   IntegrationKinds,
-  type CompileBindingResult,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 
+import { resolveTensorlakeBindingConfigForm } from "./binding-config-form.js";
+import { compileTensorlakeBinding } from "./compile-binding.js";
 import {
   TensorlakeSandboxRuntimeCredentialSecretTypes,
   TensorlakeSandboxRuntimeCredentialSlotKeys,
@@ -28,12 +29,6 @@ type TensorlakeSandboxRuntimeIntegrationDefinition = IntegrationDefinition<
   TensorlakeSandboxRuntimeConnectionConfig
 >;
 
-const EmptyCompileBindingResult: CompileBindingResult = {
-  egressRoutes: [],
-  artifacts: [],
-  runtimeClients: [],
-};
-
 export const TensorlakeSandboxRuntimeDefinition: TensorlakeSandboxRuntimeIntegrationDefinition = {
   familyId: TensorlakeSandboxRuntimeFamilyId,
   variantId: TensorlakeSandboxRuntimeVariantId,
@@ -49,6 +44,7 @@ export const TensorlakeSandboxRuntimeDefinition: TensorlakeSandboxRuntimeIntegra
   targetConfigSchema: TensorlakeSandboxRuntimeTargetConfigSchema,
   targetSecretSchema: TensorlakeSandboxRuntimeTargetSecretSchema,
   bindingConfigSchema: TensorlakeSandboxRuntimeBindingConfigSchema,
+  bindingConfigForm: resolveTensorlakeBindingConfigForm,
   connectionMethods: [
     {
       id: IntegrationConnectionMethodIds.API_KEY,
@@ -67,5 +63,5 @@ export const TensorlakeSandboxRuntimeDefinition: TensorlakeSandboxRuntimeIntegra
       configSchema: TensorlakeSandboxRuntimeConnectionConfigSchema,
     },
   ],
-  compileBinding: () => EmptyCompileBindingResult,
+  compileBinding: compileTensorlakeBinding,
 };

@@ -141,6 +141,46 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(runtime.getByText("Jira Production")).toBeDefined();
   });
 
+  it("lets users add Tensorlake as a sandbox tool integration", async () => {
+    const addedRows: Array<{
+      kind: SandboxIntegrationBindingKind;
+      connectionId: string;
+      config: Record<string, unknown>;
+    }> = [];
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryTensorlakeConnection],
+          availableTargets: [StoryTensorlakeTarget],
+          integrationRows: [],
+          onAddIntegrationBindingRow: async (row) => {
+            addedRows.push(row);
+            return true;
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add integration or tool" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Tensorlake")).toBeDefined();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      expect(addedRows).toEqual([
+        {
+          kind: "sandbox",
+          connectionId: StoryTensorlakeConnection.id,
+          config: {
+            tools: [],
+          },
+        },
+      ]);
+    });
+  });
+
   it("keeps saved pull request activity routing visible after the GitHub git connection is removed", () => {
     const draftStates: SandboxProfileAssociatedResourceRoutingDraftState[] = [];
 
@@ -961,7 +1001,7 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(screen.queryByText("Integrations & Tools")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Add integration or tool" }));
 
-    const dialog = screen.getByRole("dialog", { name: "Add connectors" });
+    const dialog = screen.getByRole("dialog", { name: "Add integration or tool" });
     expect(within(dialog).getByText("Datadog")).toBeDefined();
     const setupLink = within(dialog).getByRole("link", { name: "Setup integration" });
     expect(setupLink.getAttribute("href")).toBe("/integrations/target-datadog/add");
@@ -1207,6 +1247,26 @@ const StoryGcpConnection: IntegrationConnectionSummary = {
     connection_method: "oauth2-authorization-code",
     client_id: "google-client.apps.googleusercontent.com",
   },
+};
+
+const StoryTensorlakeTarget: IntegrationTargetSummary = {
+  targetKey: "target-tensorlake",
+  displayName: "Tensorlake",
+  logoKey: "tensorlake",
+  familyId: "tensorlake",
+  variantId: "tensorlake-default",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+const StoryTensorlakeConnection: IntegrationConnectionSummary = {
+  id: "connection-tensorlake",
+  displayName: "Tensorlake Production",
+  targetKey: StoryTensorlakeTarget.targetKey,
+  status: "active",
+  config: {},
 };
 
 function createTestSandboxProfileVersion(input?: {

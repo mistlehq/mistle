@@ -9,3 +9,7 @@ export const TensorlakeSandboxRuntimeCredentialSecretTypes = {
 export const TensorlakeSandboxRuntimeCredentialSlotKeys = {
   API_KEY: `${TensorlakeSandboxRuntimeFamilyId}.${TensorlakeSandboxRuntimeVariantId}.api-key.api-key`,
 } as const;
+
+export const TensorlakeToolIds = {
+  TENSORLAKE_CLI: "tensorlake-cli",
+} as const;
