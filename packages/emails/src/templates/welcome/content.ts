@@ -55,7 +55,7 @@ export function buildWelcomeEmailContent(input: WelcomeEmailContentInput): Welco
     subject: WelcomeEmailSubject,
     templateName: WelcomeEmailTemplateName,
     greeting: "Hey there,",
-    intro: "I'm Jonathan, one of the co-founders.",
+    intro: "Thanks for signing up to Mistle. I'm Jonathan, one of the co-founders.",
     helpHeading: "Ways I can help:",
     helpItems,
     useCaseRequest:
