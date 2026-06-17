@@ -425,6 +425,38 @@ describe("selectControlPlaneApiConfig", () => {
       apiBaseUrl: "https://opencomputer.example.com/api",
     });
   });
+
+  it("projects Designer sandbox runtime config", () => {
+    const config = selectControlPlaneApiConfig(
+      createRootConfig({
+        sandbox: {
+          designer: {
+            base_image: "registry.example.com/designer:latest",
+            codex_cli_path: "/usr/local/bin/codex",
+            sandbox_provider: "docker",
+            sandbox_connection_id: "sbc_designer",
+            sandbox_resources: {
+              vcpu_count: 2,
+              memory_mb: 4096,
+              disk_mb: 8192,
+            },
+          },
+        },
+      }),
+    );
+
+    expect(config.sandbox.designer).toEqual({
+      baseImage: "registry.example.com/designer:latest",
+      codexCliPath: "/usr/local/bin/codex",
+      sandboxProvider: "docker",
+      sandboxConnectionId: "sbc_designer",
+      sandboxResources: {
+        vcpuCount: 2,
+        memoryMb: 4096,
+        diskMb: 8192,
+      },
+    });
+  });
 });
 
 describe("selectControlPlaneWorkerConfig", () => {

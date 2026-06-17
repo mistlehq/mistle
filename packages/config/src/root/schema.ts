@@ -241,6 +241,24 @@ const SandboxModalProviderConfigSchema = z.discriminatedUnion("enabled", [
     .strict(),
 ]);
 
+const DesignerSandboxResourcesConfigSchema = z
+  .object({
+    vcpu_count: z.number().int().positive(),
+    memory_mb: z.number().int().positive(),
+    disk_mb: z.number().int().positive().optional(),
+  })
+  .strict();
+
+const DesignerSandboxConfigSchema = z
+  .object({
+    base_image: z.string().trim().min(1),
+    codex_cli_path: z.string().trim().min(1).default("codex"),
+    sandbox_provider: z.string().trim().min(1),
+    sandbox_connection_id: z.string().trim().min(1).nullable().default(null),
+    sandbox_resources: DesignerSandboxResourcesConfigSchema.nullable().default(null),
+  })
+  .strict();
+
 const ControlPlaneApiAuthSchema = z
   .object({
     secret: z.string().trim().min(1),
@@ -472,6 +490,7 @@ export const ConfigSchema = z
           })
           .strict(),
         docker: SandboxDockerProviderConfigSchema.optional(),
+        designer: DesignerSandboxConfigSchema.optional(),
         sandboxd_test_faults_enabled: z.boolean().optional(),
         e2b: SandboxE2BProviderConfigSchema.optional(),
         modal: SandboxModalProviderConfigSchema.optional(),

@@ -222,6 +222,24 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
       docker: {
         enabled: config.sandbox.docker?.enabled === true,
       },
+      ...(config.sandbox.designer === undefined
+        ? {}
+        : {
+            designer: {
+              baseImage: config.sandbox.designer.base_image,
+              codexCliPath: config.sandbox.designer.codex_cli_path,
+              sandboxProvider: config.sandbox.designer.sandbox_provider,
+              sandboxConnectionId: config.sandbox.designer.sandbox_connection_id,
+              sandboxResources:
+                config.sandbox.designer.sandbox_resources === null
+                  ? null
+                  : {
+                      vcpuCount: config.sandbox.designer.sandbox_resources.vcpu_count,
+                      memoryMb: config.sandbox.designer.sandbox_resources.memory_mb,
+                      diskMb: config.sandbox.designer.sandbox_resources.disk_mb,
+                    },
+            },
+          }),
       ...(config.sandbox.e2b?.enabled === true
         ? {
             e2b: {
