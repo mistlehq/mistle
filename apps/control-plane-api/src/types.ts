@@ -95,7 +95,6 @@ export type AppAuthContext =
         | {
             kind: "designer";
             sandboxInstanceId: string;
-            designerSessionId: string;
           };
       permissions: readonly OrganizationPermission[];
     };
@@ -135,7 +134,6 @@ export type AppOrganizationActor =
         | {
             kind: "designer";
             sandboxInstanceId: string;
-            designerSessionId: string;
           };
       permissions: readonly OrganizationPermission[];
     };

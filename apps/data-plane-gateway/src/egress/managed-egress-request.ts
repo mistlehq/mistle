@@ -634,61 +634,6 @@ function toCredentialResolverInputFromRef(input: {
   };
 }
 
-function normalizeSelectedCredentialResolver(
-  credentialResolver: RuntimePlanEgressCredentialResolver,
-): CredentialResolverRef {
-  if (credentialResolver.kind === "integration_connection") {
-    return {
-      kind: "integration_connection",
-      connectionId: credentialResolver.connectionId,
-      secretType: credentialResolver.secretType,
-      ...(credentialResolver.slotKey === undefined ? {} : { slotKey: credentialResolver.slotKey }),
-      ...(credentialResolver.resolverKey === undefined
-        ? {}
-        : { resolverKey: credentialResolver.resolverKey }),
-    };
-  }
-
-  if (credentialResolver.kind === "mistle_mcp_token") {
-    return {
-      kind: "mistle_mcp_token",
-      apiKeyId: credentialResolver.apiKeyId,
-    };
-  }
-
-  if (credentialResolver.kind === "mistle_mcp_setup_assistant_token") {
-    return {
-      kind: "mistle_mcp_setup_assistant_token",
-      sandboxProfileId: credentialResolver.sandboxProfileId,
-      sandboxProfileVersion: credentialResolver.sandboxProfileVersion,
-    };
-  }
-
-  if (credentialResolver.kind === "mistle_mcp_designer_token") {
-    return {
-      kind: "mistle_mcp_designer_token",
-      designerSessionId: credentialResolver.designerSessionId,
-    };
-  }
-
-  if (credentialResolver.kind === "platform_openai_api_key") {
-    return {
-      kind: "platform_openai_api_key",
-    };
-  }
-
-  return {
-    kind: "linked_principal",
-    providerFamily: credentialResolver.providerFamily,
-    integrationConnectionId: credentialResolver.integrationConnectionId,
-    actingUserRequired: credentialResolver.actingUserRequired,
-    resolutionMode: credentialResolver.resolutionMode,
-    ...(credentialResolver.credentialKind === undefined
-      ? {}
-      : { credentialKind: credentialResolver.credentialKind }),
-  };
-}
-
 async function selectCredentialResolverForRequest(input: {
   actingUserId?: string;
   organizationId: string;
@@ -712,7 +657,7 @@ async function selectCredentialResolverForRequest(input: {
       defaultCredentialResolver,
     },
   });
-  const selectedResolver = normalizeSelectedCredentialResolver(selectedCredentialResolver);
+  const selectedResolver = toCredentialResolverRef({ resolver: selectedCredentialResolver });
 
   const defaultIntegrationConnectionFallback =
     defaultCredentialResolver.kind !== "integration_connection"

@@ -93,11 +93,6 @@ describe("buildManagedEgressRequest", () => {
         tokenAudience: "mistle-mcp",
       },
       organizationId: "org_123",
-      platformCredentials: {
-        openai: {
-          apiKey: "sk-platform-openai",
-        },
-      },
       request: {
         actingUserId: "usr_123",
         authority: "api.github.test",
@@ -184,11 +179,6 @@ describe("buildManagedEgressRequest", () => {
         tokenAudience: "mistle-mcp",
       },
       organizationId: "org_123",
-      platformCredentials: {
-        openai: {
-          apiKey: "sk-platform-openai",
-        },
-      },
       request: {
         authority: "monitoring.us-east-1.amazonaws.com",
         headers: {
@@ -324,11 +314,6 @@ describe("buildManagedEgressRequest", () => {
         tokenAudience: "mistle-mcp",
       },
       organizationId: "org_123",
-      platformCredentials: {
-        openai: {
-          apiKey: "sk-platform-openai",
-        },
-      },
       request: {
         authority: "api.mistle.test",
         headers: {},

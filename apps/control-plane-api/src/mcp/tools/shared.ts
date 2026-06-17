@@ -47,6 +47,24 @@ export function requireMcpSandboxProfileScope(
   }
 }
 
+export function requireMcpSandboxProfileIdScope(
+  organizationActor: AppOrganizationActor,
+  input: {
+    profileId: string;
+  },
+): void {
+  if (
+    organizationActor.kind !== "mcp_capability" ||
+    organizationActor.capability.kind !== "setup_assistant"
+  ) {
+    return;
+  }
+
+  if (organizationActor.capability.sandboxProfileId !== input.profileId) {
+    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
+  }
+}
+
 export function requireMcpSandboxInstanceProfileScope(
   organizationActor: AppOrganizationActor,
   input: {
@@ -69,19 +87,20 @@ export function requireMcpSandboxInstanceProfileScope(
   }
 }
 
-export function requireMcpSandboxInstanceScope(
+export function requireMcpSetupAssistantSandboxInstanceScope(
   organizationActor: AppOrganizationActor,
   input: {
     sandboxInstanceId: string;
   },
 ): void {
-  if (organizationActor.kind !== "mcp_capability") {
+  if (
+    organizationActor.kind !== "mcp_capability" ||
+    organizationActor.capability.kind !== "setup_assistant"
+  ) {
     return;
   }
 
-  if (input.sandboxInstanceId !== organizationActor.capability.sandboxInstanceId) {
-    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
-  }
+  requireMatchingMcpSandboxInstanceScope(organizationActor, input);
 }
 
 export function requireMcpDesignerSandboxInstanceScope(
@@ -97,6 +116,15 @@ export function requireMcpDesignerSandboxInstanceScope(
     return;
   }
 
+  requireMatchingMcpSandboxInstanceScope(organizationActor, input);
+}
+
+function requireMatchingMcpSandboxInstanceScope(
+  organizationActor: Extract<AppOrganizationActor, { kind: "mcp_capability" }>,
+  input: {
+    sandboxInstanceId: string;
+  },
+): void {
   if (input.sandboxInstanceId !== organizationActor.capability.sandboxInstanceId) {
     throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
   }

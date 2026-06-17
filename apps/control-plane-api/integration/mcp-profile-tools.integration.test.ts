@@ -1106,6 +1106,7 @@ describe.concurrent("MCP profile tools integration", () => {
     const session = await env.auth.createSession({
       email: "integration-new-mcp-designer-session-create-forbidden@example.com",
     });
+    const profileId = "sbp_mcp_designer_session_create_forbidden";
     const token = await mintMcpToken({
       config: McpTokenConfig,
       claims: {
@@ -1117,12 +1118,61 @@ describe.concurrent("MCP profile tools integration", () => {
       ttlSeconds: 300,
     });
 
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: profileId,
+        organizationId: session.organizationId,
+        displayName: "MCP Designer Session Create Forbidden Profile",
+        createdAt: "2026-05-13T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: profileId,
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo persisted",
+        ...DockerSandboxRuntimeColumns,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-mcp-designer-session-create-forbidden",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_mcp_designer_session_create_forbidden_agent",
+        organizationId: session.organizationId,
+        targetKey: "openai-mcp-designer-session-create-forbidden",
+        displayName: "MCP Designer Session Create Forbidden Agent Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_mcp_designer_session_create_forbidden_agent",
+          sandboxProfileId: profileId,
+          sandboxProfileVersion: 1,
+          connectionId: "icn_mcp_designer_session_create_forbidden_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+      );
+
     const result = await callMcpTool({
       env,
       token: token.token,
       name: "profile_setup_script_test_start",
       arguments: {
-        profileId: "sbp_mcp_designer_session_create_forbidden",
+        profileId,
         version: 1,
         setupScript: "echo should not start",
         idempotencyKey: "mcp-designer-session-create-forbidden-001",
@@ -1130,6 +1180,14 @@ describe.concurrent("MCP profile tools integration", () => {
     });
 
     expect(result.isError).toBe(true);
+    const startedSandbox = await env.dataPlaneDb.query.sandboxInstances.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, session.organizationId),
+          eq(table.sandboxProfileId, profileId),
+        ),
+    });
+    expect(startedSandbox).toBeUndefined();
   });
 
   it("authorizes profile tools with a gateway-injected MCP token referencing an API key", async ({
