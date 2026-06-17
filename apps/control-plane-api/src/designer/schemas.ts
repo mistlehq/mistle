@@ -69,6 +69,14 @@ export const designerSessionSchema = z
   })
   .strict();
 
+const designerRuntimeConversationSchema = z
+  .object({
+    providerConversationId: z.string().min(1),
+    providerExecutionId: z.string().min(1).nullable(),
+    initialPromptSubmittedAt: z.string().min(1),
+  })
+  .strict();
+
 export const createDesignerSessionResponseSchema = designerSessionSchema;
 
 export const listDesignerSessionsResponseSchema = z
@@ -79,9 +87,17 @@ export const listDesignerSessionsResponseSchema = z
 
 export const getDesignerSessionResponseSchema = designerSessionSchema;
 export const putDesignerSessionCanvasTabsResponseSchema = designerSessionSchema;
+export const bootstrapDesignerRuntimeConversationResponseSchema = z
+  .object({
+    runtimeConversation: designerRuntimeConversationSchema,
+  })
+  .strict();
 
 export type DesignerSessionResponse = z.infer<typeof designerSessionSchema>;
 export type CreateDesignerSessionBody = z.infer<typeof createDesignerSessionBodySchema>;
 export type PutDesignerSessionCanvasTabsBody = z.infer<
   typeof putDesignerSessionCanvasTabsBodySchema
+>;
+export type BootstrapDesignerRuntimeConversationResponse = z.infer<
+  typeof bootstrapDesignerRuntimeConversationResponseSchema
 >;
