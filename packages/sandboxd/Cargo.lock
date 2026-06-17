@@ -564,9 +564,9 @@ checksum = "2a82489a2fff24c654dd94f635ab4f941e66e9e5e64cb25827e9d3330c412c0c"
 
 [[package]]
 name = "fff-search"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19d20f2192753e434a84a2c706f9c87a7a418250f56967b1f54d01816d8eb97a"
+checksum = "af4c26cca151e6cd49b2431fc716520feee40a41ae0ed7e1eab1ee49cb06455b"
 dependencies = [
  "ahash",
  "aho-corasick",
