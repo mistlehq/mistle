@@ -953,9 +953,13 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
         },
       ],
     });
-    expect(claudeRuntimeClient?.setup.env.MISTLE_CLAUDE_CODE_SKILLS).toBe(
-      JSON.stringify(["grill-with-docs", "write-a-skill"]),
-    );
+    expect(claudeRuntimeClient).toMatchObject({
+      setup: {
+        env: {
+          MISTLE_CLAUDE_CODE_SKILLS: JSON.stringify(["grill-with-docs", "write-a-skill"]),
+        },
+      },
+    });
   });
 
   it("includes Mistle MCP config for Pi when enabled on the profile version", async ({ env }) => {
