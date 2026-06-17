@@ -9,6 +9,7 @@ import { describe, expect } from "vitest";
 import { generateApiKeySecret } from "../src/api-keys/services/api-key-secret.js";
 import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
+  BootstrapDesignerRuntimeConversationResponseSchema,
   DesignerSessionSchema,
   ListDesignerSessionsResponseSchema,
 } from "../src/designer/index.js";
@@ -281,5 +282,72 @@ describe.concurrent("designer sessions integration", () => {
       },
     );
     expect(rejectedUpdateResponse.status).toBe(403);
+
+    const rejectedBootstrapResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/designer/sessions/${encodeURIComponent(created.id)}/runtime-conversation`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKeySecret.token}`,
+        },
+      },
+    );
+    expect(rejectedBootstrapResponse.status).toBe(403);
+  });
+
+  it("returns a persisted completed Designer runtime conversation bootstrap on repeated requests", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-designer-runtime-conversation-completed@example.com",
+    });
+    const designerSessionId = "dsn_runtime_conversation_completed";
+    const submittedAt = "2026-06-18 01:02:03+00";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: designerSessionId,
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_designer_runtime_conversation_completed",
+      initialPrompt: "Build a support triage agent.",
+      runtimeProviderConversationId: "thread_designer_runtime_conversation_completed",
+      initialPromptProviderExecutionId: "turn_designer_runtime_conversation_completed",
+      initialPromptSubmittedAt: submittedAt,
+      canvasTabs: [],
+    });
+
+    const bootstrapUrl = `/v1/designer/sessions/${encodeURIComponent(designerSessionId)}/runtime-conversation`;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const bootstrapResponse = await env.controlPlaneApi.http.fetch(bootstrapUrl, {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      });
+      expect(bootstrapResponse.status).toBe(200);
+      const bootstrap = BootstrapDesignerRuntimeConversationResponseSchema.parse(
+        await bootstrapResponse.json(),
+      );
+      expect(bootstrap).toEqual({
+        runtimeConversation: {
+          providerConversationId: "thread_designer_runtime_conversation_completed",
+          providerExecutionId: "turn_designer_runtime_conversation_completed",
+          initialPromptSubmittedAt: submittedAt,
+        },
+      });
+    }
+
+    const persisted = await env.controlPlaneDb.query.designerSessions.findFirst({
+      columns: {
+        runtimeProviderConversationId: true,
+        initialPromptProviderExecutionId: true,
+        initialPromptSubmittedAt: true,
+      },
+      where: (table, { eq }) => eq(table.id, designerSessionId),
+    });
+    expect(persisted).toEqual({
+      runtimeProviderConversationId: "thread_designer_runtime_conversation_completed",
+      initialPromptProviderExecutionId: "turn_designer_runtime_conversation_completed",
+      initialPromptSubmittedAt: submittedAt,
+    });
   });
 });
