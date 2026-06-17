@@ -25799,6 +25799,14 @@
                                   "default": {
                                     "type": "integer",
                                     "minimum": 0
+                                  },
+                                  "allowedValues": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    },
+                                    "minItems": 1
                                   }
                                 },
                                 "required": ["min", "max", "step", "default"],
@@ -25822,6 +25830,14 @@
                                   "default": {
                                     "type": "integer",
                                     "minimum": 0
+                                  },
+                                  "allowedValues": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    },
+                                    "minItems": 1
                                   },
                                   "minPerVcpu": {
                                     "type": "integer",
@@ -25853,6 +25869,14 @@
                                   "default": {
                                     "type": "integer",
                                     "minimum": 0
+                                  },
+                                  "allowedValues": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    },
+                                    "minItems": 1
                                   }
                                 },
                                 "required": ["min", "max", "step", "default"],
