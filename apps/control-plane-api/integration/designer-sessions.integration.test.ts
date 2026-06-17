@@ -293,6 +293,59 @@ describe.concurrent("designer sessions integration", () => {
       },
     );
     expect(rejectedBootstrapResponse.status).toBe(403);
+
+    const rejectedFollowUpResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/designer/sessions/${encodeURIComponent(created.id)}/runtime-conversation/follow-ups`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKeySecret.token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: "Continue Designer setup.",
+          idempotencyKey: "designer-session-api-key-rejection-follow-up",
+        }),
+      },
+    );
+    expect(rejectedFollowUpResponse.status).toBe(403);
+  });
+
+  it("rejects Designer runtime follow-ups before the runtime conversation is ready", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-designer-runtime-follow-up-not-ready@example.com",
+    });
+    const designerSessionId = "dsn_runtime_follow_up_not_ready";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: designerSessionId,
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_designer_runtime_follow_up_not_ready",
+      initialPrompt: "Build a support triage agent.",
+      canvasTabs: [],
+    });
+
+    const followUpResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/designer/sessions/${encodeURIComponent(designerSessionId)}/runtime-conversation/follow-ups`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          prompt: "Add Slack escalation for urgent support tickets.",
+          idempotencyKey: "designer-runtime-follow-up-not-ready",
+        }),
+      },
+    );
+    expect(followUpResponse.status).toBe(409);
+    expect(await followUpResponse.json()).toEqual({
+      code: "DESIGNER_RUNTIME_CONVERSATION_NOT_READY",
+      message: `Designer session '${designerSessionId}' runtime conversation is not ready for follow-up submission.`,
+    });
   });
 
   it("returns a persisted completed Designer runtime conversation bootstrap on repeated requests", async ({

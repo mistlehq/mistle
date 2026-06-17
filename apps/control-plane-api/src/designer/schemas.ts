@@ -52,6 +52,13 @@ export const putDesignerSessionCanvasTabsBodySchema = z
   })
   .strict();
 
+export const submitDesignerRuntimeFollowUpBodySchema = z
+  .object({
+    prompt: z.string().trim().min(1).max(20_000),
+    idempotencyKey: z.string().min(1).max(255),
+  })
+  .strict();
+
 export const designerSessionSchema = z
   .object({
     id: z.string().min(1),
@@ -77,6 +84,14 @@ const designerRuntimeConversationSchema = z
   })
   .strict();
 
+const designerRuntimeFollowUpSubmissionSchema = z
+  .object({
+    providerConversationId: z.string().min(1),
+    providerExecutionId: z.string().min(1).nullable(),
+    submittedAt: z.string().min(1),
+  })
+  .strict();
+
 export const createDesignerSessionResponseSchema = designerSessionSchema;
 
 export const listDesignerSessionsResponseSchema = z
@@ -92,12 +107,23 @@ export const bootstrapDesignerRuntimeConversationResponseSchema = z
     runtimeConversation: designerRuntimeConversationSchema,
   })
   .strict();
+export const submitDesignerRuntimeFollowUpResponseSchema = z
+  .object({
+    runtimeFollowUp: designerRuntimeFollowUpSubmissionSchema,
+  })
+  .strict();
 
 export type DesignerSessionResponse = z.infer<typeof designerSessionSchema>;
 export type CreateDesignerSessionBody = z.infer<typeof createDesignerSessionBodySchema>;
 export type PutDesignerSessionCanvasTabsBody = z.infer<
   typeof putDesignerSessionCanvasTabsBodySchema
 >;
+export type SubmitDesignerRuntimeFollowUpBody = z.infer<
+  typeof submitDesignerRuntimeFollowUpBodySchema
+>;
 export type BootstrapDesignerRuntimeConversationResponse = z.infer<
   typeof bootstrapDesignerRuntimeConversationResponseSchema
+>;
+export type SubmitDesignerRuntimeFollowUpResponse = z.infer<
+  typeof submitDesignerRuntimeFollowUpResponseSchema
 >;
