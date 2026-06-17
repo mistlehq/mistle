@@ -21,6 +21,7 @@ import { GoogleWorkspaceServiceAccountConnectionConfigForm } from "./connection-
 import { GoogleWorkspaceMcpServerCatalog } from "./mcp-catalog.js";
 import { GoogleWorkspaceTargetConfigSchema } from "./target-config-schema.js";
 import { GoogleWorkspaceTargetSecretSchema } from "./target-secret-schema.js";
+import { validateGoogleWorkspaceBindingWriteContext } from "./validate-binding-write-context.js";
 
 export type GoogleWorkspaceMcpBaseIntegrationDefinition = IntegrationDefinition<
   typeof GoogleWorkspaceTargetConfigSchema,
@@ -41,6 +42,7 @@ export const GoogleWorkspaceMcpBaseDefinition: GoogleWorkspaceMcpBaseIntegration
   targetSecretSchema: GoogleWorkspaceTargetSecretSchema,
   bindingConfigSchema: GoogleWorkspaceBindingConfigSchema,
   bindingConfigForm: resolveGoogleWorkspaceBindingConfigForm,
+  validateBindingWriteContext: validateGoogleWorkspaceBindingWriteContext,
   connectionMethods: [
     {
       id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
