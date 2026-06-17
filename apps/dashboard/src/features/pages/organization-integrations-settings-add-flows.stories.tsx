@@ -46,3 +46,9 @@ export const WasenderAPI: Story = {
     return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.WasenderAPI} />;
   },
 };
+
+export const Whapi: Story = {
+  render: function RenderStory() {
+    return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.Whapi} />;
+  },
+};

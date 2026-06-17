@@ -124,6 +124,10 @@ describe("integrations-definitions server", () => {
       familyId: "wasenderapi",
       variantId: "wasenderapi-mcp",
     });
+    const whapiDefinition = registry.getDefinition({
+      familyId: "whapi",
+      variantId: "whapi-mcp",
+    });
     const sentryDefinition = registry.getDefinition({
       familyId: "sentry",
       variantId: "sentry-mcp",
@@ -380,6 +384,23 @@ describe("integrations-definitions server", () => {
     expect(wasenderApiDefinition?.mcp).toBeDefined();
     expect(wasenderApiDefinition?.webhookHandler).toBeDefined();
     expect(wasenderApiDefinition?.webhookSource).toBeDefined();
+    expect(whapiDefinition).toMatchObject({
+      familyId: "whapi",
+      variantId: "whapi-mcp",
+      kind: "connector",
+      displayName: "Whapi",
+      logoKey: "whapi",
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API token",
+          kind: "form",
+        },
+      ],
+    });
+    expect(whapiDefinition?.mcp).toBeDefined();
+    expect(whapiDefinition?.webhookHandler).toBeDefined();
+    expect(whapiDefinition?.webhookSource).toBeDefined();
     expect(notionDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(notionDefinition?.webhookHandler).toBeUndefined();
     expect(notionDefinition?.webhookSource).toBeUndefined();
@@ -435,7 +456,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(36);
+    expect(definitions).toHaveLength(37);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
@@ -456,6 +477,7 @@ describe("integrations-definitions server", () => {
         "resend::resend-mcp",
         "stripe::stripe-mcp",
         "wasenderapi::wasenderapi-mcp",
+        "whapi::whapi-mcp",
         "zai::zai-coding-plan",
       ]),
     );

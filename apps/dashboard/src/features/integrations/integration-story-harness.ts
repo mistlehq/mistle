@@ -1562,3 +1562,49 @@ export function createWasenderApiDetailViewStoryProps(): IntegrationConnectionDe
     ],
   });
 }
+
+export function createWhapiDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  const connectionId = "icn_whapi_dense";
+  const definition = getDefinitionOrThrow({
+    familyId: "whapi",
+    variantId: "whapi-mcp",
+  });
+
+  return createScenarioDetailViewStoryProps({
+    authMethod: {
+      familyId: "whapi",
+      methodId: "api-key",
+      variantId: "whapi-mcp",
+    },
+    bindingCount: 1,
+    connectionId,
+    displayName: "Whapi Support Channel",
+    webhookLifecycle: "implicit",
+    webhookSources: [
+      {
+        callbackUrl:
+          "https://control-plane.example.com/p/integration/webhooks/whapi-mcp/ep_whapi_support",
+        createdAt: DenseStoryLastSyncedAt,
+        displayName: "Whapi webhook",
+        endpointKey: "whapi-mcp",
+        id: "iws_whapi_support",
+        integrationConnectionId: connectionId,
+        providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
+          definition,
+          events: [
+            "messages.post",
+            "messages.put",
+            "statuses.post",
+            "statuses.put",
+            "channel.post",
+            "users.post",
+            "users.delete",
+          ],
+        }),
+        status: "active",
+        targetKey: "whapi-mcp",
+        updatedAt: DenseStoryLastSyncedAt,
+      },
+    ],
+  });
+}

@@ -255,6 +255,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "whapi-mcp",
+        familyId: "whapi",
+        variantId: "whapi-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "zai-coding-plan",
         familyId: "zai",
         variantId: "zai-coding-plan",

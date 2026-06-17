@@ -154,6 +154,11 @@
       "config": {}
     },
     {
+      "targetKey": "whapi-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "sentry-mcp",
       "enabled": true,
       "config": {}

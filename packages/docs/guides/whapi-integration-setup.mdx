@@ -1,0 +1,50 @@
+---
+title: Whapi
+description: Connect Whapi to Mistle
+icon: /icons/integrations/whapi.svg
+---
+
+## Overview
+
+Connect to Whapi with a Whapi API token.
+
+The Whapi integration exposes MCP tools for Whapi's WhatsApp API and webhook triggers for Whapi channel callbacks.
+
+## Connect In Mistle
+
+Open **Integrations** in the dashboard, choose **Whapi**, then select **API token**.
+
+Enter:
+
+| Field          | Value                                                                                   |
+| -------------- | --------------------------------------------------------------------------------------- |
+| API token      | Whapi API token                                                                         |
+| Webhook secret | Shared secret to configure as the Whapi custom callback header `x-whapi-webhook-secret` |
+
+## Use With A Sandbox Profile
+
+After the connection exists:
+
+1. Open the sandbox profile that should use Whapi.
+2. Add Whapi to the profile's integration configuration.
+3. Select the Whapi MCP tool.
+4. Save and publish the profile version.
+
+## Webhook Setup
+
+Create a Whapi webhook in Body mode and point it at the callback URL shown in Mistle.
+
+Configure Whapi custom callback headers with:
+
+| Header                   | Value                                              |
+| ------------------------ | -------------------------------------------------- |
+| `x-whapi-webhook-secret` | The webhook secret stored on the Mistle connection |
+
+Whapi message callbacks use events such as `messages.post` and `messages.put`. Status callbacks use events such as `statuses.post` and `statuses.put`. Account and device status callbacks use `channel.post`, and user connection callbacks use `users.post` or `users.delete`.
+
+## Official References
+
+- [Whapi webhook events](https://support.whapi.cloud/help-desk/receiving/webhooks/our-webhooks-tracked-events)
+- [Whapi webhook format](https://support.whapi.cloud/help-desk/receiving/webhooks/incoming-webhooks-format)
+- [Whapi custom callback headers](https://support.whapi.cloud/help-desk/account/customizable-webhook-headers)
+- [Whapi MCP package](https://github.com/Whapi-Cloud/whapi-mcp)

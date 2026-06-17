@@ -68,6 +68,7 @@
               "guides/slack-integration-setup",
               "guides/stripe-integration-setup",
               "guides/tensorlake-integration-setup",
+              "guides/whapi-integration-setup",
               "guides/zai-integration-setup"
             ]
           }

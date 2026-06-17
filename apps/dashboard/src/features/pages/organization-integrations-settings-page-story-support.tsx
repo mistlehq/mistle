@@ -33,7 +33,8 @@ type BuiltInIntegrationVariantId =
   | "linear-default"
   | "openai-default"
   | "signoz-mcp"
-  | "wasenderapi-mcp";
+  | "wasenderapi-mcp"
+  | "whapi-mcp";
 type DeviceAuthorizationExpiryScenario = "active" | "expired" | "expiringSoon";
 
 type StoryIntegrationSpec = {
@@ -106,6 +107,13 @@ function getStoryDefinitionOrThrow(
   if (variantId === "wasenderapi-mcp") {
     return getDefinitionOrThrow({
       familyId: "wasenderapi",
+      variantId,
+    });
+  }
+
+  if (variantId === "whapi-mcp") {
+    return getDefinitionOrThrow({
+      familyId: "whapi",
       variantId,
     });
   }
@@ -459,6 +467,14 @@ export const AddFlowStorySpecs = {
       webhookSecret: "wasender-storybook-webhook-secret",
     },
     variantId: "wasenderapi-mcp",
+  },
+  Whapi: {
+    initialConnectionDisplayNameValue: "Whapi Support Channel",
+    initialSecrets: {
+      apiToken: "whapi_storybook_api_token",
+      webhookSecret: "whapi-storybook-webhook-secret",
+    },
+    variantId: "whapi-mcp",
   },
   OpenAI: {
     variantId: "openai-default",
