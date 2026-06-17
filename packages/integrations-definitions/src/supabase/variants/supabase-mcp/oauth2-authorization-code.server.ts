@@ -30,7 +30,6 @@ const SupabaseOAuthScopes: ReadonlyArray<string> = [
   "edge_functions:write",
   "environment:read",
   "environment:write",
-  "storage:read",
 ];
 
 const StringOrNumberSchema = z.union([z.string(), z.number()]);

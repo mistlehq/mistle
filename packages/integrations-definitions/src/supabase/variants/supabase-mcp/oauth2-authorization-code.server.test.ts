@@ -49,7 +49,7 @@ describe("Supabase OAuth 2.0 authorization code", () => {
     );
     expect(authorizationUrl.searchParams.get("state")).toBe("state_123");
     expect(authorizationUrl.searchParams.get("scope")).toBe(
-      "organizations:read projects:read projects:write database:write database:read analytics:read secrets:read edge_functions:read edge_functions:write environment:read environment:write storage:read",
+      "organizations:read projects:read projects:write database:write database:read analytics:read secrets:read edge_functions:read edge_functions:write environment:read environment:write",
     );
     expect(authorizationUrl.searchParams.get("resource")).toBe("https://mcp.supabase.com/mcp");
     expect(authorizationUrl.searchParams.get("code_challenge")).toBe("challenge_123");

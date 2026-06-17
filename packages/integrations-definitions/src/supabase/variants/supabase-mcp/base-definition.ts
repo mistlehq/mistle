@@ -29,7 +29,8 @@ export const SupabaseMcpBaseDefinition: SupabaseMcpBaseIntegrationDefinition = {
   variantId: "supabase-mcp",
   kind: IntegrationKinds.CONNECTOR,
   displayName: "Supabase",
-  description: "Enable Supabase hosted MCP access for projects, databases, Auth, and Storage.",
+  description:
+    "Enable Supabase hosted MCP access for projects, databases, Auth, and Edge Functions.",
   logoKey: "supabase",
   targetConfigSchema: SupabaseTargetConfigSchema,
   targetSecretSchema: SupabaseTargetSecretSchema,
