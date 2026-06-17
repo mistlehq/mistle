@@ -248,6 +248,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "wasenderapi-mcp",
+        familyId: "wasenderapi",
+        variantId: "wasenderapi-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "zai-coding-plan",
         familyId: "zai",
         variantId: "zai-coding-plan",

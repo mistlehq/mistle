@@ -46,3 +46,15 @@ export const InvalidConfig: Story = {
     statusBadge: "Invalid config",
   },
 };
+
+export const WasenderAPI: Story = {
+  name: "WasenderAPI",
+  args: {
+    actionLabel: "Add",
+    description: "Connect WasenderAPI for hosted MCP tools and signed WhatsApp message webhooks.",
+    displayName: "WasenderAPI",
+    logoKey: "wasenderapi",
+    actionHref: "/integrations/wasenderapi-mcp/add",
+    statusBadge: "Available",
+  },
+};

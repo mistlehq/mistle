@@ -6,6 +6,7 @@ import {
   GitHubAssociatedResourceEventsCapability,
   PlanetScaleToolIds,
   SlackAssociatedResourceEventsCapability,
+  WasenderApiToolIds,
 } from "@mistle/integrations-definitions";
 import { QueryClient } from "@tanstack/react-query";
 
@@ -341,6 +342,28 @@ export const StorySignozConnection: IntegrationConnectionSummary = {
   },
 };
 
+export const StoryWasenderApiTarget: IntegrationTargetSummary = {
+  targetKey: "target-wasenderapi",
+  displayName: "WasenderAPI",
+  logoKey: "wasenderapi",
+  familyId: "wasenderapi",
+  variantId: "wasenderapi-mcp",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+export const StoryWasenderApiConnection: IntegrationConnectionSummary = {
+  id: "connection-wasenderapi",
+  displayName: "WasenderAPI Production",
+  targetKey: StoryWasenderApiTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "api-key",
+  },
+};
+
 export const StorySlackTarget: IntegrationTargetSummary = {
   targetKey: "target-slack",
   displayName: "Slack",
@@ -379,6 +402,7 @@ export const StoryIntegrationTargets = [
   StoryLinearTarget,
   StoryPlanetScaleTarget,
   StorySignozTarget,
+  StoryWasenderApiTarget,
   StorySlackTarget,
 ] as const;
 export const StoryIntegrationConnections = [
@@ -393,6 +417,7 @@ export const StoryIntegrationConnections = [
   StoryLinearConnection,
   StoryPlanetScaleConnection,
   StorySignozConnection,
+  StoryWasenderApiConnection,
   StorySlackConnection,
 ] as const;
 
@@ -534,3 +559,5 @@ export const StoryPlanetScaleTools = [
   PlanetScaleToolIds.PLANETSCALE_MCP,
   PlanetScaleToolIds.PLANETSCALE_INSIGHTS_MCP,
 ] as const;
+
+export const StoryWasenderApiTools = [WasenderApiToolIds.WASENDERAPI_MCP] as const;

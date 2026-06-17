@@ -26,6 +26,10 @@ import {
   StorySlackAppMentionTriggerId,
   StorySlackConnectionId,
   StorySlackEventOptions,
+  StoryWasenderApiConnectionId,
+  StoryWasenderApiEventOptions,
+  StoryWasenderApiMessagesReceivedTriggerId,
+  StoryWasenderApiMessagesUpsertTriggerId,
 } from "./webhook-trigger-story-fixtures.js";
 
 function StoryHarness(input: {
@@ -253,6 +257,19 @@ export const SlackUnavailableArchivedChannelSelection: Story = {
       },
     },
     eventOptions: StorySlackEventOptions,
+  },
+};
+
+export const WasenderAPIMessageEvents: Story = {
+  name: "WasenderAPI message events",
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: StoryWasenderApiConnectionId,
+    selectedEventIds: [
+      StoryWasenderApiMessagesUpsertTriggerId,
+      StoryWasenderApiMessagesReceivedTriggerId,
+    ],
+    eventOptions: StoryWasenderApiEventOptions,
   },
 };
 

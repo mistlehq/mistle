@@ -41,6 +41,7 @@ import { SentryDefinition } from "./sentry/browser.js";
 import { SignozDefinition } from "./signoz/browser.js";
 import { SlackDefinition } from "./slack/browser.js";
 import { StripeDefinition } from "./stripe/browser.js";
+import { WasenderApiDefinition } from "./wasenderapi/browser.js";
 import { ZaiDefinition } from "./zai/index.js";
 
 export * from "./agentmail/browser.js";
@@ -74,6 +75,7 @@ export * from "./sentry/browser.js";
 export * from "./signoz/browser.js";
 export * from "./slack/browser.js";
 export * from "./stripe/browser.js";
+export * from "./wasenderapi/browser.js";
 export * from "./zai/index.js";
 export * from "./forms/index.js";
 export * from "./agent-runtimes/provider-selection.js";
@@ -115,6 +117,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   SignozDefinition,
   SlackDefinition,
   StripeDefinition,
+  WasenderApiDefinition,
   ZaiDefinition,
 ];
 

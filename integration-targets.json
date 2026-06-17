@@ -149,6 +149,11 @@
       "config": {}
     },
     {
+      "targetKey": "wasenderapi-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "sentry-mcp",
       "enabled": true,
       "config": {}

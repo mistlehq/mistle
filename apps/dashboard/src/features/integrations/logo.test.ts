@@ -11,6 +11,9 @@ describe("resolveIntegrationLogoPath", () => {
     expect(resolveIntegrationLogoPath({ logoKey: "openai" })).toBe("/integration-logos/openai.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "github" })).toBe("/integration-logos/github.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "aws" })).toBe("/integration-logos/aws.svg");
+    expect(resolveIntegrationLogoPath({ logoKey: "wasenderapi" })).toBe(
+      "/integration-logos/wasenderapi.png",
+    );
   });
 
   it("trims whitespace from the logo key", () => {
@@ -44,6 +47,9 @@ describe("resolveIntegrationLogoPath", () => {
     expect(resolveIntegrationLogoPath({ logoKey: "slack", colorScheme: "dark" })).toBe(
       "/integration-logos/slack.svg",
     );
+    expect(resolveIntegrationLogoPath({ logoKey: "wasenderapi", colorScheme: "dark" })).toBe(
+      "/integration-logos/wasenderapi.png",
+    );
   });
 
   it("returns paired logo paths for theme-specific marks", () => {
@@ -57,6 +63,10 @@ describe("resolveIntegrationLogoPath", () => {
     });
     expect(resolveIntegrationLogoPaths({ logoKey: "aws" })).toEqual({
       light: "/integration-logos/aws.svg",
+      dark: null,
+    });
+    expect(resolveIntegrationLogoPaths({ logoKey: "wasenderapi" })).toEqual({
+      light: "/integration-logos/wasenderapi.png",
       dark: null,
     });
     expect(hasIntegrationLogoDarkVariant({ logoKey: "planetscale" })).toBe(true);

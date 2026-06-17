@@ -28,7 +28,7 @@ export function resolveIntegrationLogoPath(input: {
   const usesDarkVariant =
     input.colorScheme === "dark" && hasIntegrationLogoDarkVariant({ logoKey });
   const suffix = usesDarkVariant ? "-dark" : "";
-  return `${PUBLIC_INTEGRATION_LOGOS_BASE_PATH}/${logoKey}${suffix}.svg`;
+  return `${PUBLIC_INTEGRATION_LOGOS_BASE_PATH}/${logoKey}${suffix}.${resolveIntegrationLogoFileExtension({ logoKey })}`;
 }
 
 export function resolveIntegrationLogoPaths(input: { logoKey: string }): IntegrationLogoPaths {
@@ -54,4 +54,14 @@ function normalizeIntegrationLogoKey(logoKeyInput: string): string {
   }
 
   return logoKey;
+}
+
+function resolveIntegrationLogoFileExtension(input: { logoKey: string }): "png" | "svg" {
+  const logoKey = normalizeIntegrationLogoKey(input.logoKey);
+
+  if (logoKey === "wasenderapi") {
+    return "png";
+  }
+
+  return "svg";
 }

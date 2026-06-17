@@ -55,6 +55,21 @@ function readSvgViewBoxDimensions(fileName: string): { height: number; width: nu
   return { height, width };
 }
 
+function readPngHeader(fileName: string): { colorType: number; height: number; width: number } {
+  const contents = readFileSync(join(DashboardIntegrationLogoDirectory, fileName));
+  const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+  if (!contents.subarray(0, pngSignature.length).equals(pngSignature)) {
+    throw new Error(`${fileName} should be a PNG file`);
+  }
+
+  return {
+    width: contents.readUInt32BE(16),
+    height: contents.readUInt32BE(20),
+    colorType: contents.readUInt8(25),
+  };
+}
+
 describe("dashboard integration logo assets", () => {
   it("has a light dashboard asset for every integration definition logo key", () => {
     for (const logoKey of listProductionDefinitionLogoKeys()) {
@@ -89,6 +104,20 @@ describe("dashboard integration logo assets", () => {
     }
   });
 
+  it("keeps dashboard SVG logo assets self-contained", () => {
+    for (const fileName of readdirSync(DashboardIntegrationLogoDirectory)) {
+      if (!fileName.endsWith(".svg")) {
+        continue;
+      }
+
+      const contents = readFileSync(join(DashboardIntegrationLogoDirectory, fileName), "utf8");
+      expect(
+        contents,
+        `${fileName} should not reference remote image or script assets`,
+      ).not.toMatch(/\b(?:href|src)\s*=\s*["']https?:\/\//);
+    }
+  });
+
   it("keeps the AWS logo square so it does not regress to the wide wordmark", () => {
     const { height, width } = readSvgViewBoxDimensions("aws.svg");
 
@@ -101,5 +130,13 @@ describe("dashboard integration logo assets", () => {
 
     expect(width).toBe(24);
     expect(height).toBe(24);
+  });
+
+  it("keeps the WasenderAPI logo square and opaque for light and dark surfaces", () => {
+    const { colorType, height, width } = readPngHeader("wasenderapi.png");
+
+    expect(width).toBe(512);
+    expect(height).toBe(512);
+    expect(colorType).toBe(2);
   });
 });
