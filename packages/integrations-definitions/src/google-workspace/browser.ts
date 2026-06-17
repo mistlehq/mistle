@@ -3,6 +3,7 @@ export * from "./variants/google-workspace-mcp/base-definition.js";
 export * from "./variants/google-workspace-mcp/binding-config-form.js";
 export * from "./variants/google-workspace-mcp/binding-config-schema.js";
 export * from "./variants/google-workspace-mcp/compile-binding.js";
+export * from "./variants/google-workspace-mcp/connection-config-form.js";
 export { GoogleWorkspaceMcpBaseDefinition as GoogleWorkspaceDefinition } from "./variants/google-workspace-mcp/base-definition.js";
 export * from "./variants/google-workspace-mcp/mcp-catalog.js";
 export * from "./variants/google-workspace-mcp/target-config-schema.js";

@@ -260,6 +260,7 @@ describe("browser definitions", () => {
       logoKey: "google",
     });
     expect(GoogleWorkspaceBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(GoogleWorkspaceBrowserDefinition.credentialResolvers).toBeUndefined();
   });
 
   it("keeps PostHog browser definitions free of server-only OAuth handlers", () => {

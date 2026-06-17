@@ -18,9 +18,15 @@ describe("GoogleWorkspaceDefinition", () => {
           label: "Google OAuth",
           kind: "redirect",
         },
+        {
+          id: "google-workspace-service-account-domain-wide-delegation",
+          label: "Service account with domain-wide delegation",
+          kind: "form",
+        },
       ],
     });
     expect(GoogleWorkspaceDefinition.oauth2AuthorizationCode).toBeDefined();
+    expect(GoogleWorkspaceDefinition.credentialResolvers?.default).toBeDefined();
   });
 
   it("keeps the browser-safe base definition free of server-only OAuth handlers", () => {

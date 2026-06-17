@@ -7,12 +7,17 @@ import {
 import { resolveRemoteMcpServers } from "../../../shared/remote-mcp-server-catalog/index.js";
 import {
   type GoogleWorkspaceConnectionConfig,
+  GoogleWorkspaceConnectionMethodIds,
   GoogleWorkspaceConnectionConfigSchema,
   GoogleWorkspaceConnectionStartConfigSchema,
+  GoogleWorkspaceCredentialSecretTypes,
+  GoogleWorkspaceServiceAccountConnectionConfigSchema,
+  GoogleWorkspaceServiceAccountCredentialSlotKeys,
 } from "./auth.js";
 import { resolveGoogleWorkspaceBindingConfigForm } from "./binding-config-form.js";
 import { GoogleWorkspaceBindingConfigSchema } from "./binding-config-schema.js";
 import { compileGoogleWorkspaceBinding } from "./compile-binding.js";
+import { GoogleWorkspaceServiceAccountConnectionConfigForm } from "./connection-config-form.js";
 import { GoogleWorkspaceMcpServerCatalog } from "./mcp-catalog.js";
 import { GoogleWorkspaceTargetConfigSchema } from "./target-config-schema.js";
 import { GoogleWorkspaceTargetSecretSchema } from "./target-secret-schema.js";
@@ -78,6 +83,25 @@ export const GoogleWorkspaceMcpBaseDefinition: GoogleWorkspaceMcpBaseIntegration
           pendingLabel: "Starting...",
         },
       },
+    },
+    {
+      id: GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION,
+      label: "Service account with domain-wide delegation",
+      kind: "form",
+      secretFields: [
+        {
+          name: "serviceAccountKeyJson",
+          label: "Service account JSON key",
+          placeholder: '{"type":"service_account",...}',
+          description:
+            "JSON key for a Google Cloud service account with Workspace domain-wide delegation enabled.",
+          inputType: "textarea",
+          secretType: GoogleWorkspaceCredentialSecretTypes.SERVICE_ACCOUNT_KEY_JSON,
+          slotKey: GoogleWorkspaceServiceAccountCredentialSlotKeys.SERVICE_ACCOUNT_KEY_JSON,
+        },
+      ],
+      configSchema: GoogleWorkspaceServiceAccountConnectionConfigSchema,
+      configForm: GoogleWorkspaceServiceAccountConnectionConfigForm,
     },
   ],
   mcp: (input) =>

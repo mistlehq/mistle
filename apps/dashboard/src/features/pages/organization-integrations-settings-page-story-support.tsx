@@ -473,6 +473,15 @@ export const AddFlowStorySpecs = {
     initialConnectionDisplayNameValue: "Google Workspace Production",
     variantId: "google-workspace-mcp",
   },
+  GoogleWorkspaceServiceAccount: {
+    initialConnectionDisplayNameValue: "Google Workspace Service Account",
+    initialMethodId: "google-workspace-service-account-domain-wide-delegation",
+    initialSecrets: {
+      serviceAccountKeyJson:
+        '{"type":"service_account","client_email":"workspace-mcp@example-project.iam.gserviceaccount.com","private_key":"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"}',
+    },
+    variantId: "google-workspace-mcp",
+  },
   Linear: {
     variantId: "linear-default",
   },

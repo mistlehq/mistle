@@ -9,14 +9,30 @@ export const GoogleWorkspaceMcpVariantId = "google-workspace-mcp";
 
 export const GoogleWorkspaceCredentialSecretTypes: {
   OAUTH2_ACCESS_TOKEN: "oauth2_access_token";
+  SERVICE_ACCOUNT_KEY_JSON: "google_service_account_key_json";
 } = {
   OAUTH2_ACCESS_TOKEN: "oauth2_access_token",
+  SERVICE_ACCOUNT_KEY_JSON: "google_service_account_key_json",
 };
 
 export const GoogleWorkspaceCredentialSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
   familyId: GoogleWorkspaceFamilyId,
   variantId: GoogleWorkspaceMcpVariantId,
 });
+
+export const GoogleWorkspaceServiceAccountCredentialSlotKeys: {
+  SERVICE_ACCOUNT_KEY_JSON: "google-workspace.google-workspace-mcp.service-account-key-json";
+} = {
+  SERVICE_ACCOUNT_KEY_JSON: "google-workspace.google-workspace-mcp.service-account-key-json",
+};
+
+export const GoogleWorkspaceConnectionMethodIds: {
+  OAUTH2_AUTHORIZATION_CODE: typeof IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE;
+  SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION: "google-workspace-service-account-domain-wide-delegation";
+} = {
+  OAUTH2_AUTHORIZATION_CODE: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+  SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION: "google-workspace-service-account-domain-wide-delegation",
+};
 
 export const GoogleWorkspaceOAuthScopes: ReadonlyArray<string> = [
   "https://www.googleapis.com/auth/gmail.readonly",
@@ -46,14 +62,31 @@ export const GoogleWorkspaceConnectionStartConfigSchema = z
 
 export const GoogleWorkspaceConnectionConfigSchema = z
   .object({
-    connection_method: z.literal(IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE),
+    connection_method: z.literal(GoogleWorkspaceConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE),
     client_id: z.string().min(1),
   })
   .strict();
+
+export const GoogleWorkspaceServiceAccountConnectionConfigSchema = z
+  .object({
+    connection_method: z.literal(
+      GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION,
+    ),
+    delegated_user_email: z.string().email(),
+  })
+  .strict();
+
+export const GoogleWorkspaceAnyConnectionConfigSchema = z.discriminatedUnion("connection_method", [
+  GoogleWorkspaceConnectionConfigSchema,
+  GoogleWorkspaceServiceAccountConnectionConfigSchema,
+]);
 
 export type GoogleWorkspaceConnectionStartConfig = z.output<
   typeof GoogleWorkspaceConnectionStartConfigSchema
 >;
 export type GoogleWorkspaceConnectionConfig = z.output<
-  typeof GoogleWorkspaceConnectionConfigSchema
+  typeof GoogleWorkspaceAnyConnectionConfigSchema
+>;
+export type GoogleWorkspaceServiceAccountConnectionConfig = z.output<
+  typeof GoogleWorkspaceServiceAccountConnectionConfigSchema
 >;

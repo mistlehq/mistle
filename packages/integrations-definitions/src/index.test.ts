@@ -308,9 +308,24 @@ describe("integrations-definitions index", () => {
             },
           },
         },
+        {
+          id: "google-workspace-service-account-domain-wide-delegation",
+          label: "Service account with domain-wide delegation",
+          kind: "form",
+          secretFields: [
+            {
+              name: "serviceAccountKeyJson",
+              label: "Service account JSON key",
+              inputType: "textarea",
+              secretType: "google_service_account_key_json",
+              slotKey: "google-workspace.google-workspace-mcp.service-account-key-json",
+            },
+          ],
+        },
       ],
     });
     expect(googleWorkspaceDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(googleWorkspaceDefinition?.credentialResolvers).toBeUndefined();
     expect(jiraDefinition).toMatchObject({
       familyId: "jira",
       variantId: "jira-default",

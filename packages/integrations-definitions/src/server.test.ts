@@ -334,6 +334,7 @@ describe("integrations-definitions server", () => {
     });
     expect(googleWorkspaceDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(googleWorkspaceDefinition?.authorizationRevocation).toBeDefined();
+    expect(googleWorkspaceDefinition?.credentialResolvers?.default).toBeDefined();
     expect(googleWorkspaceDefinition?.mcp).toBeDefined();
     expect(planetscaleDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(planetscaleDefinition?.webhookHandler).toBeUndefined();

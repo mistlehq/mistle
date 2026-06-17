@@ -3,6 +3,7 @@ export * from "./base-definition.js";
 export * from "./binding-config-form.js";
 export * from "./binding-config-schema.js";
 export * from "./compile-binding.js";
+export * from "./connection-config-form.js";
 export * from "./mcp-catalog.js";
 export * from "./target-config-schema.js";
 export * from "./target-secret-schema.js";
