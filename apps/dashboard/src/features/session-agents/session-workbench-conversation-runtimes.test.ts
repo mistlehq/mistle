@@ -233,6 +233,7 @@ function createOpenCodeRuntimeInput(reportedMessages: string[]): OpenCodeRuntime
 }
 
 function createClaudeCodeRuntimeInput(input: {
+  contextUsage?: ClaudeCodeRuntimeInput["contextUsage"];
   isBusy?: boolean;
   reportedMessages: string[];
   steeredPrompts: string[];
@@ -267,6 +268,7 @@ function createClaudeCodeRuntimeInput(input: {
       },
     },
     configControl: ComposerConfigControl,
+    contextUsage: input.contextUsage ?? null,
     sessionMessage: {
       clearSessionErrorMessage: () => {
         return;
@@ -698,6 +700,24 @@ describe("buildClaudeCodeConversationRuntime", () => {
     });
 
     expect(steeredPrompts).toEqual(["Keep going with context"]);
+  });
+
+  it("exposes Claude Code context window remaining through the shared composer contract", () => {
+    const runtime = buildClaudeCodeConversationRuntime(
+      createClaudeCodeRuntimeInput({
+        contextUsage: {
+          label: "72% context left",
+          title: "28,000 tokens used of 100,000 token context window.",
+        },
+        reportedMessages: [],
+        steeredPrompts: [],
+      }),
+    );
+
+    expect(runtime.composerRuntimeInput.contextUsage).toEqual({
+      label: "72% context left",
+      title: "28,000 tokens used of 100,000 token context window.",
+    });
   });
 });
 

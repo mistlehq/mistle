@@ -85,4 +85,59 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
     expect(ClaudeCodeRuntimeServerBundle).not.toContain('case "thread/read"');
     expect(ClaudeCodeRuntimeServerBundle).not.toContain('case "turn/start"');
   });
+
+  it("applies model and reasoning effort through Claude Code SDK query options", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain("selectedModel: null");
+    expect(ClaudeCodeRuntimeServerBundle).toContain("selectedReasoningEffort: null");
+    expect(ClaudeCodeRuntimeServerBundle).toContain("model: conversation.selectedModel");
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "reasoningEffort: conversation.selectedReasoningEffort",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "input.model === undefined || input.model === null ? {} : { model: input.model }",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain("{ effort: input.reasoningEffort }");
+  });
+
+  it("loads Claude Code model catalog lazily through the SDK", () => {
+    expect(ClaudeCodeRuntimeServerBundle).not.toContain("const ClaudeCodeModels = [");
+    expect(ClaudeCodeRuntimeServerBundle).toContain('case "session/model-catalog"');
+    expect(ClaudeCodeRuntimeServerBundle).toContain("function createIdlePromptStream");
+    expect(ClaudeCodeRuntimeServerBundle).toContain("await sdkQuery.supportedModels()");
+    expect(ClaudeCodeRuntimeServerBundle).toContain("conversation.modelCatalog = modelCatalog");
+    expect(ClaudeCodeRuntimeServerBundle).toContain('isDefault: modelInfo.value === "default"');
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      'displayName: modelInfo.value === "default" ? "Default" : modelInfo.displayName',
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain("defaultReasoningEffort: null");
+    expect(ClaudeCodeRuntimeServerBundle).not.toContain("isDefault: index === 0");
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "availableModels: conversation.modelCatalog ?? []",
+    );
+  });
+
+  it("exposes explicit Claude Code model configuration and context usage RPC state", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain('case "session/configure"');
+    expect(ClaudeCodeRuntimeServerBundle).toContain("function configureSession");
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "Claude Code model settings cannot be changed while a query is active.",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "config: buildConversationConfig(conversation)",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain("contextUsage: conversation.contextUsage");
+    expect(ClaudeCodeRuntimeServerBundle).toContain("function updateContextUsageFromResultMessage");
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "updateContextUsageFromResultMessage(conversation, message);",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).not.toContain("activeQuery.getContextUsage()");
+    expect(ClaudeCodeRuntimeServerBundle).not.toContain("throw contextUsageError;");
+    const runQueryBlock = ClaudeCodeRuntimeServerBundle.slice(
+      ClaudeCodeRuntimeServerBundle.indexOf("async function runClaudeQuery"),
+      ClaudeCodeRuntimeServerBundle.indexOf("function createClaudeQueryOptions"),
+    );
+    expect(runQueryBlock.indexOf("conversation.activeQueryId = null;")).toBeGreaterThan(
+      runQueryBlock.indexOf("finally {"),
+    );
+  });
 });

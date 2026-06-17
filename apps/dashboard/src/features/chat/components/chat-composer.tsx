@@ -410,6 +410,7 @@ export type ChatComposerViewModel = {
   onSubmit: () => void;
   onRuntimeCommandSubmit: (commandId: string) => void;
   onSecondarySubmit?: () => void;
+  onModelSelectorOpen?: () => void;
   onModelChange: (value: string) => void;
   onReasoningEffortChange: (value: string) => void;
   onPendingFilesAdded: (files: readonly File[]) => void;
@@ -577,6 +578,7 @@ export function ChatComposer({
   onSubmit,
   onRuntimeCommandSubmit,
   onSecondarySubmit,
+  onModelSelectorOpen,
   onModelChange,
   onReasoningEffortChange,
   onPendingFilesAdded,
@@ -1860,6 +1862,11 @@ export function ChatComposer({
               <>
                 <Select
                   disabled={configControlsDisabled}
+                  onOpenChange={(open) => {
+                    if (open) {
+                      onModelSelectorOpen?.();
+                    }
+                  }}
                   onValueChange={(value) => {
                     if (value === null) {
                       return;

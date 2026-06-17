@@ -364,6 +364,7 @@ export function buildClaudeCodeConversationRuntime(input: {
   bootstrap: SessionComposerRuntimeInput["bootstrap"];
   chat: UseClaudeCodeSessionStateResult["chat"];
   configControl: SessionComposerRuntimeInput["configControl"];
+  contextUsage: SessionComposerRuntimeInput["contextUsage"];
   sessionMessage: UseClaudeCodeSessionStateResult["sessionMessage"];
   sessionSnapshot: UseClaudeCodeSessionStateResult["lifecycle"]["sessionSnapshot"];
   startTurn: SessionTurnControl["startTurn"];
@@ -399,7 +400,7 @@ export function buildClaudeCodeConversationRuntime(input: {
       },
       sessionErrorMessage: input.sessionMessage.sessionErrorMessage,
       clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
-      contextUsage: null,
+      contextUsage: input.contextUsage,
       modelSelection: capabilities.composerModelSelection,
     },
     serverRequestsState: {

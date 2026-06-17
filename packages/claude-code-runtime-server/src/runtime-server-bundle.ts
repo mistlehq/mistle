@@ -16,6 +16,13 @@ if (!Number.isInteger(listenPort) || listenPort <= 0 || listenPort > 65535) {
 
 const conversations = new Map();
 const idempotentResults = new Map();
+const ClaudeCodeReasoningEffortLabels = new Map([
+  ["low", "Low"],
+  ["medium", "Medium"],
+  ["high", "High"],
+  ["xhigh", "Extra high"],
+  ["max", "Max"],
+]);
 
 function sendJson(socket, payload) {
   socket.send(JSON.stringify(payload));
@@ -64,16 +71,177 @@ function resolveClaudeCodeLookupCwd(cwd) {
 function createSession(input) {
   const sessionId = randomUUID();
   const cwd = resolveClaudeCodeCwd(input.cwd);
-  conversations.set(sessionId, {
+  conversations.set(sessionId, createConversationState({
     providerConversationId: sessionId,
     cwd,
+    sdkLookupCwd: cwd,
+    sdkSessionId: null,
+  }));
+  return sessionId;
+}
+
+function createConversationState(input) {
+  return {
+    providerConversationId: input.providerConversationId,
+    cwd: input.cwd,
     activeQueryId: null,
     queries: [],
-    sdkSessionId: null,
-    sdkLookupCwd: cwd,
+    sdkSessionId: input.sdkSessionId,
+    sdkLookupCwd: input.sdkLookupCwd,
     activeQueryAbortController: undefined,
+    selectedModel: null,
+    selectedReasoningEffort: null,
+    modelCatalog: null,
+    modelCatalogLoadPromise: null,
+    contextUsage: null,
+  };
+}
+
+function resolveClaudeCodeModelInput(model) {
+  if (model === undefined || model === null || model === "") {
+    return null;
+  }
+  if (typeof model !== "string") {
+    throw new Error("Claude Code model must be a string.");
+  }
+  return model;
+}
+
+function resolveClaudeCodeReasoningEffort(effort) {
+  if (effort === undefined || effort === null || effort === "") {
+    return null;
+  }
+  if (typeof effort !== "string") {
+    throw new Error("Claude Code reasoning effort must be a string.");
+  }
+  if (!ClaudeCodeReasoningEffortLabels.has(effort)) {
+    throw new Error("Unsupported Claude Code reasoning effort: " + effort);
+  }
+  return effort;
+}
+
+async function configureSession(conversation, input) {
+  const selectedModel = resolveClaudeCodeModelInput(input.model);
+  const selectedReasoningEffort = resolveClaudeCodeReasoningEffort(input.modelReasoningEffort);
+
+  if (selectedModel === null && selectedReasoningEffort !== null) {
+    throw new Error("Choose a Claude Code model before setting reasoning effort.");
+  }
+
+  const modelCatalog = selectedModel === null ? [] : await loadConversationModelCatalog(conversation, false);
+  const model =
+    selectedModel === null
+      ? null
+      : modelCatalog.find((candidate) => candidate.model === selectedModel) ?? null;
+  if (selectedModel !== null && model === null) {
+    throw new Error("Unsupported Claude Code model: " + selectedModel);
+  }
+
+  if (
+    model !== null &&
+    selectedReasoningEffort !== null &&
+    !model.reasoningEffortOptions.some((option) => option.value === selectedReasoningEffort)
+  ) {
+    throw new Error(
+      "Claude Code model " +
+        selectedModel +
+        " does not support reasoning effort " +
+        selectedReasoningEffort +
+        ".",
+    );
+  }
+  conversation.selectedModel = selectedModel;
+  conversation.selectedReasoningEffort = selectedReasoningEffort;
+  conversation.contextUsage = null;
+}
+
+function buildConversationConfig(conversation) {
+  return {
+    availableModels: conversation.modelCatalog ?? [],
+    model: conversation.selectedModel,
+    modelReasoningEffort: conversation.selectedReasoningEffort,
+  };
+}
+
+function createIdlePromptStream() {
+  return {
+    async next() {
+      return new Promise(() => {});
+    },
+    async return() {
+      return { done: true, value: undefined };
+    },
+    [Symbol.asyncIterator]() {
+      return this;
+    },
+  };
+}
+
+function mapClaudeCodeReasoningEffortOption(value) {
+  return {
+    value,
+    label: ClaudeCodeReasoningEffortLabels.get(value),
+  };
+}
+
+function mapClaudeCodeModelInfo(modelInfo) {
+  if (
+    modelInfo === null ||
+    typeof modelInfo !== "object" ||
+    typeof modelInfo.value !== "string" ||
+    modelInfo.value.length === 0 ||
+    typeof modelInfo.displayName !== "string" ||
+    modelInfo.displayName.length === 0
+  ) {
+    throw new Error("Claude Code returned an invalid model catalog entry.");
+  }
+  const supportedEffortLevels = Array.isArray(modelInfo.supportedEffortLevels)
+    ? modelInfo.supportedEffortLevels.filter((value) => ClaudeCodeReasoningEffortLabels.has(value))
+    : [];
+  return {
+    model: modelInfo.value,
+    displayName: modelInfo.value === "default" ? "Default" : modelInfo.displayName,
+    defaultReasoningEffort: null,
+    reasoningEffortOptions: supportedEffortLevels.map(mapClaudeCodeReasoningEffortOption),
+    inputModalities: ["text", "image"],
+    isDefault: modelInfo.value === "default",
+  };
+}
+
+async function fetchClaudeCodeModelCatalog(conversation) {
+  const sdkQuery = query({
+    prompt: createIdlePromptStream(),
+    options: createClaudeQueryOptions({
+      cwd: conversation.cwd,
+      session: { kind: "new", sessionId: randomUUID() },
+    }),
   });
-  return sessionId;
+  try {
+    const models = await sdkQuery.supportedModels();
+    return models.map(mapClaudeCodeModelInfo);
+  } finally {
+    await sdkQuery.close();
+  }
+}
+
+async function loadConversationModelCatalog(conversation, refresh) {
+  if (!refresh && conversation.modelCatalog !== null) {
+    return conversation.modelCatalog;
+  }
+  if (!refresh && conversation.modelCatalogLoadPromise !== null) {
+    return conversation.modelCatalogLoadPromise;
+  }
+  const loadPromise = fetchClaudeCodeModelCatalog(conversation);
+  conversation.modelCatalogLoadPromise = loadPromise;
+  try {
+    const modelCatalog = await loadPromise;
+    conversation.modelCatalog = modelCatalog;
+    return modelCatalog;
+  } finally {
+    if (conversation.modelCatalogLoadPromise === loadPromise) {
+      conversation.modelCatalogLoadPromise = null;
+    }
+  }
 }
 
 function idempotencyKeyForRequest(request) {
@@ -135,6 +303,8 @@ async function runClaudeQuery(conversation, queryId, inputText) {
       ? { kind: "new", sessionId: conversation.providerConversationId }
       : { kind: "resume", sessionId: conversation.sdkSessionId },
     abortController,
+    model: conversation.selectedModel,
+    reasoningEffort: conversation.selectedReasoningEffort,
   });
 
   conversation.activeQueryId = queryId;
@@ -158,6 +328,14 @@ async function runClaudeQuery(conversation, queryId, inputText) {
         queryId,
         message,
       });
+      if (
+        message !== null &&
+        typeof message === "object" &&
+        "type" in message &&
+        message.type === "result"
+      ) {
+        updateContextUsageFromResultMessage(conversation, message);
+      }
     }
   } finally {
     if (conversation.activeQueryId === queryId) {
@@ -184,8 +362,48 @@ function createClaudeQueryOptions(input) {
     systemPrompt: { type: "preset", preset: "claude_code" },
     includePartialMessages: true,
     ...(input.abortController === undefined ? {} : { abortController: input.abortController }),
+    ...(input.model === undefined || input.model === null ? {} : { model: input.model }),
+    ...(input.reasoningEffort === undefined || input.reasoningEffort === null
+      ? {}
+      : { effort: input.reasoningEffort }),
     ...sessionOptions,
   };
+}
+
+function updateContextUsageFromResultMessage(conversation, message) {
+  if (
+    !("modelUsage" in message) ||
+    message.modelUsage === null ||
+    typeof message.modelUsage !== "object"
+  ) {
+    return;
+  }
+  let latestUsage = null;
+  for (const modelUsage of Object.values(message.modelUsage)) {
+    if (modelUsage === null || typeof modelUsage !== "object") {
+      continue;
+    }
+    const contextWindow =
+      typeof modelUsage.contextWindow === "number" ? modelUsage.contextWindow : null;
+    if (contextWindow === null || contextWindow <= 0) {
+      continue;
+    }
+    const totalTokens =
+      readNumber(modelUsage, "inputTokens") +
+      readNumber(modelUsage, "outputTokens") +
+      readNumber(modelUsage, "cacheReadInputTokens") +
+      readNumber(modelUsage, "cacheCreationInputTokens");
+    latestUsage = {
+      tokens: totalTokens,
+      contextWindow,
+      percent: Math.round((totalTokens / contextWindow) * 100),
+    };
+  }
+  conversation.contextUsage = latestUsage;
+}
+
+function readNumber(value, key) {
+  return typeof value[key] === "number" ? value[key] : 0;
 }
 
 function collectAssistantText(message) {
@@ -374,17 +592,42 @@ async function handleRequest(request) {
       }
       if (!conversations.has(params.sessionId)) {
         const lookupCwd = resolveClaudeCodeLookupCwd(params.cwd);
-        conversations.set(params.sessionId, {
+        conversations.set(params.sessionId, createConversationState({
           providerConversationId: params.sessionId,
           cwd: lookupCwd,
-          activeQueryId: null,
-          queries: [],
           sdkSessionId: params.sessionId,
           sdkLookupCwd: lookupCwd,
-          activeQueryAbortController: undefined,
-        });
+        }));
       }
       return {};
+    }
+    case "session/configure": {
+      const params = request.params ?? {};
+      if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
+        throw new Error("session/configure requires params.sessionId.");
+      }
+      const conversation = requireSession(params.sessionId);
+      if (conversation.activeQueryId !== null) {
+        throw new Error("Claude Code model settings cannot be changed while a query is active.");
+      }
+      await configureSession(conversation, {
+        model: params.model,
+        modelReasoningEffort: params.modelReasoningEffort,
+      });
+      return {
+        config: buildConversationConfig(conversation),
+      };
+    }
+    case "session/model-catalog": {
+      const params = request.params ?? {};
+      if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
+        throw new Error("session/model-catalog requires params.sessionId.");
+      }
+      const conversation = requireSession(params.sessionId);
+      await loadConversationModelCatalog(conversation, params.refresh === true);
+      return {
+        config: buildConversationConfig(conversation),
+      };
     }
     case "title/generate": {
       const params = request.params ?? {};
@@ -412,6 +655,8 @@ async function handleRequest(request) {
           activeQueryId: conversation.activeQueryId,
           queries,
           lastError: conversation.lastError ?? null,
+          config: buildConversationConfig(conversation),
+          contextUsage: conversation.contextUsage,
         },
       };
     }

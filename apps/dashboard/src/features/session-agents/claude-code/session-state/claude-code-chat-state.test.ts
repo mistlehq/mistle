@@ -5,6 +5,12 @@ import {
   reduceClaudeCodeChatState,
 } from "./claude-code-chat-state.js";
 
+const ClaudeCodeTestSessionConfig = {
+  availableModels: [],
+  model: null,
+  modelReasoningEffort: null,
+};
+
 describe("reduceClaudeCodeChatState", () => {
   it("keeps a submitted Claude Code prompt visible after hydrating the active session", () => {
     const submittedState = reduceClaudeCodeChatState(createInitialClaudeCodeChatState(), {
@@ -19,6 +25,8 @@ describe("reduceClaudeCodeChatState", () => {
       session: {
         id: "session_123",
         activeQueryId: "query_123",
+        config: ClaudeCodeTestSessionConfig,
+        contextUsage: null,
         cwd: "/root",
         lastError: null,
         status: {
@@ -53,6 +61,8 @@ describe("reduceClaudeCodeChatState", () => {
       session: {
         id: "session_456",
         activeQueryId: null,
+        config: ClaudeCodeTestSessionConfig,
+        contextUsage: null,
         cwd: "/root",
         lastError: null,
         status: {

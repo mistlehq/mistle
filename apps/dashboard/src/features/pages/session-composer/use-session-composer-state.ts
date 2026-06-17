@@ -1114,6 +1114,9 @@ export function useSessionComposerState(input: {
       onSubmit: submitComposer,
       onRuntimeCommandSubmit: submitRuntimeCommand,
       onSecondarySubmit: queuePrompt,
+      ...(composerStateInput.configControl.refreshModelOptions === undefined
+        ? {}
+        : { onModelSelectorOpen: composerStateInput.configControl.refreshModelOptions }),
       onModelChange: handleModelChange,
       onReasoningEffortChange: handleReasoningEffortChange,
       onPendingFilesAdded: addPendingComposerFiles,
