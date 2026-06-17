@@ -1,7 +1,7 @@
 import type {
   CompileBindingInput,
   CompileBindingResult,
-  RuntimeArtifactInstallStep,
+  RuntimeExecCommand,
 } from "@mistle/integrations-core";
 
 import {
@@ -54,25 +54,59 @@ function renderInstallTensorlakeCliScript(input: {
   ].join("\n");
 }
 
-function createTensorlakeCliInstallStep(input: {
+function createTensorlakeCliInstallCommand(input: {
   installPath: string;
   packageInstallDir: string;
-}): RuntimeArtifactInstallStep {
+}): RuntimeExecCommand {
   return {
-    op: "exec",
-    command: {
-      args: [
-        "mise",
-        "exec",
-        TensorlakeCliNodeTool,
-        "--",
-        "sh",
-        "-euc",
-        renderInstallTensorlakeCliScript(input),
-      ],
-      timeoutMs: ArtifactCommandTimeoutMs,
-    },
+    args: [
+      "mise",
+      "exec",
+      TensorlakeCliNodeTool,
+      "--",
+      "sh",
+      "-euc",
+      renderInstallTensorlakeCliScript(input),
+    ],
+    timeoutMs: ArtifactCommandTimeoutMs,
   };
+}
+
+function createTensorlakeEgressRoutes(
+  input: TensorlakeCompileBindingInput,
+): CompileBindingResult["egressRoutes"] {
+  const credentialResolver = createCredentialResolver(input);
+
+  return [
+    {
+      match: {
+        hosts: [TensorlakeApiHost],
+        pathPrefixes: ["/"],
+      },
+      upstream: {
+        baseUrl: TensorlakeApiBaseUrl,
+      },
+      authInjection: {
+        type: "bearer",
+        target: "authorization",
+      },
+      credentialResolver,
+    },
+    {
+      match: {
+        hosts: [TensorlakeSandboxHost],
+        pathPrefixes: ["/"],
+      },
+      upstream: {
+        baseUrl: TensorlakeSandboxBaseUrl,
+      },
+      authInjection: {
+        type: "bearer",
+        target: "authorization",
+      },
+      credentialResolver,
+    },
+  ];
 }
 
 function createTensorlakeCliArtifact(): CompileBindingResult["artifacts"][number] {
@@ -86,10 +120,16 @@ function createTensorlakeCliArtifact(): CompileBindingResult["artifacts"][number
     },
     lifecycle: {
       install: ({ refs }) => [
-        createTensorlakeCliInstallStep({
-          installPath: refs.artifactBinPath("tensorlake"),
-          packageInstallDir: `${refs.sandboxPaths.runtimeArtifactDir}/${TensorlakeCliArtifactKey}`,
+        refs.mise.install({
+          tools: [TensorlakeCliNodeTool],
+          timeoutMs: ArtifactCommandTimeoutMs,
         }),
+        refs.command.exec(
+          createTensorlakeCliInstallCommand({
+            installPath: refs.artifactBinPath("tensorlake"),
+            packageInstallDir: `${refs.sandboxPaths.runtimeArtifactDir}/${TensorlakeCliArtifactKey}`,
+          }),
+        ),
       ],
     },
   };
@@ -98,42 +138,12 @@ function createTensorlakeCliArtifact(): CompileBindingResult["artifacts"][number
 export function compileTensorlakeBinding(
   input: TensorlakeCompileBindingInput,
 ): CompileBindingResult {
-  const credentialResolver = createCredentialResolver(input);
   const includesTensorlakeCli = input.binding.config.tools.includes(
     TensorlakeToolIds.TENSORLAKE_CLI,
   );
 
   return {
-    egressRoutes: [
-      {
-        match: {
-          hosts: [TensorlakeApiHost],
-          pathPrefixes: ["/"],
-        },
-        upstream: {
-          baseUrl: TensorlakeApiBaseUrl,
-        },
-        authInjection: {
-          type: "bearer",
-          target: "authorization",
-        },
-        credentialResolver,
-      },
-      {
-        match: {
-          hosts: [TensorlakeSandboxHost],
-          pathPrefixes: ["/"],
-        },
-        upstream: {
-          baseUrl: TensorlakeSandboxBaseUrl,
-        },
-        authInjection: {
-          type: "bearer",
-          target: "authorization",
-        },
-        credentialResolver,
-      },
-    ],
+    egressRoutes: includesTensorlakeCli ? createTensorlakeEgressRoutes(input) : [],
     artifacts: includesTensorlakeCli ? [createTensorlakeCliArtifact()] : [],
     runtimeClients: [],
   };

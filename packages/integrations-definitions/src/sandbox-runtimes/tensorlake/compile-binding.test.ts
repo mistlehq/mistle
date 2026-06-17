@@ -52,6 +52,8 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
         return {
           op: "mise_install",
           tools: input.tools,
+          ...(input.force === undefined ? {} : { force: input.force }),
+          ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
         };
       },
     },
@@ -116,8 +118,16 @@ function compileTensorlakeForTools(tools: TensorlakeSandboxRuntimeBindingConfig[
 }
 
 describe("compileTensorlakeBinding", () => {
-  it("builds managed egress routes for Tensorlake API and sandbox proxy hosts", () => {
+  it("omits routes and artifacts when the Tensorlake CLI is not selected", () => {
     const compiled = compileTensorlakeForTools([]);
+
+    expect(compiled.egressRoutes).toEqual([]);
+    expect(compiled.artifacts).toEqual([]);
+    expect(compiled.runtimeClients).toEqual([]);
+  });
+
+  it("builds managed egress routes for Tensorlake API and sandbox proxy hosts when the CLI is selected", () => {
+    const compiled = compileTensorlakeForTools(["tensorlake-cli"]);
 
     expect(compiled.egressRoutes).toEqual([
       {
@@ -159,8 +169,7 @@ describe("compileTensorlakeBinding", () => {
         },
       },
     ]);
-    expect(compiled.artifacts).toEqual([]);
-    expect(compiled.runtimeClients).toEqual([]);
+    expect(compiled.artifacts).toHaveLength(1);
   });
 
   it("installs Tensorlake CLI with placeholder API-key environment when selected", () => {
@@ -183,8 +192,13 @@ describe("compileTensorlakeBinding", () => {
     });
 
     const lifecycle = resolveArtifactLifecycleCommands(artifact);
-    expect(lifecycle.install).toHaveLength(1);
+    expect(lifecycle.install).toHaveLength(2);
     expect(lifecycle.install[0]).toMatchObject({
+      op: "mise_install",
+      tools: ["node@24.11.1"],
+      timeoutMs: 180_000,
+    });
+    expect(lifecycle.install[1]).toMatchObject({
       op: "exec",
       command: {
         args: [
@@ -199,7 +213,7 @@ describe("compileTensorlakeBinding", () => {
         timeoutMs: 180_000,
       },
     });
-    expect(lifecycle.install[0]).toMatchObject({
+    expect(lifecycle.install[1]).toMatchObject({
       command: {
         args: [
           expect.any(String),
@@ -212,7 +226,7 @@ describe("compileTensorlakeBinding", () => {
         ],
       },
     });
-    expect(lifecycle.install[0]).toMatchObject({
+    expect(lifecycle.install[1]).toMatchObject({
       command: {
         args: [
           expect.any(String),
