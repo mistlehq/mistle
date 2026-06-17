@@ -447,8 +447,8 @@ importers:
         specifier: 1.6.11
         version: 1.6.11(@opentelemetry/api@1.9.1)(drizzle-kit@0.31.10(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.28.17)(pg@8.20.0)(postgres@3.4.9)))(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.28.17)(pg@8.20.0)(postgres@3.4.9))(pg@8.20.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.3)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.3)(esbuild@0.25.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.3)))
       dockview:
-        specifier: ^6.0.3
-        version: 6.0.3(react@19.2.7)
+        specifier: ^6.6.1
+        version: 6.6.1(react@19.2.7)
       openapi-fetch:
         specifier: ^0.17.0
         version: 0.17.0
@@ -8028,11 +8028,11 @@ packages:
     resolution: {integrity: sha512-C52mvJ+7lcyhWNfrzVfFsbTrBfy/ezE9FGEYLpu17FUeBcCkxERk9nN7uDl/478ynDiQ4U+5DbQC2vENHkVEtQ==}
     engines: {node: '>= 14.17'}
 
-  dockview-core@6.0.6:
-    resolution: {integrity: sha512-d7MA42recquehve/52nC3yIbnFBHicRNbkHYX7bFepw3TlQF0XRHEOBnyYIT9OlVLkVRkv7aEOy5yIzZw5wyyA==}
+  dockview-core@6.6.1:
+    resolution: {integrity: sha512-WuNoO2wl3rGI8MaTuvmfgViek4WafHLD9Kf//Hw69g8TgAHSpAWr6RW15kU6U9vwtQxIi/YBxQNcIA5RzQ46Fw==}
 
-  dockview@6.0.3:
-    resolution: {integrity: sha512-V7zOA/9Zwu3wyfOKOA5XCsPBg/mQxQpaRH0UdvVd1JEuNm8irYTS8eGH5kC3a79khOW1Hy7c9aziSZkGh1N/lg==}
+  dockview@6.6.1:
+    resolution: {integrity: sha512-vBnxWVk0f665z1Zyx598l/BMUjHD3SK5V4XorxpYGjaSREM8lLc8O6ylgKTtw+ZnCOMYOhcwov9x0ubfFazvMw==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
@@ -20054,11 +20054,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  dockview-core@6.0.6: {}
+  dockview-core@6.6.1: {}
 
-  dockview@6.0.3(react@19.2.7):
+  dockview@6.6.1(react@19.2.7):
     dependencies:
-      dockview-core: 6.0.6
+      dockview-core: 6.6.1
       react: 19.2.7
 
   doctrine@3.0.0:
