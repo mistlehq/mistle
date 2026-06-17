@@ -11,6 +11,7 @@ const IntegrationLogoDarkVariantKeys = {
   railway: true,
   render: true,
   resend: true,
+  wasenderapi: true,
 } satisfies Record<string, true>;
 
 type IntegrationLogoColorScheme = "light" | "dark";
