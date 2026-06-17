@@ -32,7 +32,8 @@ type BuiltInIntegrationVariantId =
   | "jira-default"
   | "linear-default"
   | "openai-default"
-  | "signoz-mcp";
+  | "signoz-mcp"
+  | "wasenderapi-mcp";
 type DeviceAuthorizationExpiryScenario = "active" | "expired" | "expiringSoon";
 
 type StoryIntegrationSpec = {
@@ -98,6 +99,13 @@ function getStoryDefinitionOrThrow(
   if (variantId === "signoz-mcp") {
     return getDefinitionOrThrow({
       familyId: "signoz",
+      variantId,
+    });
+  }
+
+  if (variantId === "wasenderapi-mcp") {
+    return getDefinitionOrThrow({
+      familyId: "wasenderapi",
       variantId,
     });
   }
@@ -443,6 +451,14 @@ export const AddFlowStorySpecs = {
   SigNoz: {
     initialConnectionDisplayNameValue: "SigNoz Cloud",
     variantId: "signoz-mcp",
+  },
+  WasenderAPI: {
+    initialConnectionDisplayNameValue: "WasenderAPI Production",
+    initialSecrets: {
+      personalAccessToken: "wsk_storybook_personal_access_token",
+      webhookSecret: "wasender-storybook-webhook-secret",
+    },
+    variantId: "wasenderapi-mcp",
   },
   OpenAI: {
     variantId: "openai-default",

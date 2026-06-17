@@ -39,3 +39,10 @@ export const SigNoz: Story = {
     return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.SigNoz} />;
   },
 };
+
+export const WasenderAPI: Story = {
+  name: "WasenderAPI",
+  render: function RenderStory() {
+    return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.WasenderAPI} />;
+  },
+};

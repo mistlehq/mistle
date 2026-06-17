@@ -3,7 +3,11 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
-import { StoryAwsConnection } from "./integrations-editor-section-story-support.js";
+import {
+  StoryAwsConnection,
+  StoryWasenderApiConnection,
+  StoryWasenderApiTools,
+} from "./integrations-editor-section-story-support.js";
 import {
   DefaultSandboxProfileEditorStoryArgs,
   SandboxProfileEditorPageStory,
@@ -86,6 +90,23 @@ export const AwsCloudWatchMcpBinding: Story = {
           }
         : binding,
     ),
+  },
+};
+
+export const WasenderApiMcpBinding: Story = {
+  name: "WasenderAPI MCP binding",
+  args: {
+    initialBindings: [
+      ...StoryBindings,
+      {
+        id: "binding-wasenderapi-connector",
+        connectionId: StoryWasenderApiConnection.id,
+        kind: "connector",
+        config: {
+          tools: [...StoryWasenderApiTools],
+        },
+      },
+    ],
   },
 };
 

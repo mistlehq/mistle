@@ -14,6 +14,7 @@ import {
   createPlanetScaleDetailViewStoryProps,
   createSigNozDetailViewStoryProps,
   createSlackDetailViewStoryProps,
+  createWasenderApiDetailViewStoryProps,
 } from "./integration-story-harness.js";
 
 function mergeDetailViewStoryProps(
@@ -282,5 +283,12 @@ export const SigNoz: Story = {
   name: "SigNoz",
   args: {
     ...withoutStoryHandlers(createSigNozDetailViewStoryProps()),
+  },
+};
+
+export const WasenderAPI: Story = {
+  name: "WasenderAPI",
+  args: {
+    ...withoutStoryHandlers(createWasenderApiDetailViewStoryProps()),
   },
 };

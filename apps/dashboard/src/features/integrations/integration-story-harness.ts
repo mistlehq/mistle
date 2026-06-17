@@ -1524,3 +1524,41 @@ export function createSigNozDetailViewStoryProps(): IntegrationConnectionDetailV
     displayName: "SigNoz Hosted MCP",
   });
 }
+
+export function createWasenderApiDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  const connectionId = "icn_wasenderapi_dense";
+  const definition = getDefinitionOrThrow({
+    familyId: "wasenderapi",
+    variantId: "wasenderapi-mcp",
+  });
+
+  return createScenarioDetailViewStoryProps({
+    authMethod: {
+      familyId: "wasenderapi",
+      methodId: "api-key",
+      variantId: "wasenderapi-mcp",
+    },
+    bindingCount: 2,
+    connectionId,
+    displayName: "WasenderAPI Production",
+    webhookLifecycle: "implicit",
+    webhookSources: [
+      {
+        callbackUrl:
+          "https://control-plane.example.com/p/integration/webhooks/wasenderapi-mcp/ep_wasenderapi_prod",
+        createdAt: DenseStoryLastSyncedAt,
+        displayName: "WasenderAPI webhook",
+        endpointKey: "wasenderapi-mcp",
+        id: "iws_wasenderapi_prod",
+        integrationConnectionId: connectionId,
+        providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
+          definition,
+          events: ["messages.upsert", "messages.received"],
+        }),
+        status: "active",
+        targetKey: "wasenderapi-mcp",
+        updatedAt: DenseStoryLastSyncedAt,
+      },
+    ],
+  });
+}

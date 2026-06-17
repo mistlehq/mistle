@@ -10,6 +10,8 @@ export const StoryGitHubConnectionId = "conn_github_prod";
 export const StoryGitHubWebhookSourceId = "iws_github_prod";
 export const StorySlackConnectionId = "conn_slack_prod";
 export const StorySlackWebhookSourceId = "iws_slack_prod";
+export const StoryWasenderApiConnectionId = "conn_wasenderapi_prod";
+export const StoryWasenderApiWebhookSourceId = "iws_wasenderapi_prod";
 
 export function isRule(value: string) {
   return {
@@ -59,6 +61,14 @@ export const StoryPushDeletedTriggerId = createWebhookTriggerEventId({
 export const StorySlackAppMentionTriggerId = createWebhookTriggerEventId({
   webhookSourceId: StorySlackWebhookSourceId,
   eventType: "slack:app_mention",
+});
+export const StoryWasenderApiMessagesUpsertTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: StoryWasenderApiWebhookSourceId,
+  eventType: "wasenderapi.messages.upsert",
+});
+export const StoryWasenderApiMessagesReceivedTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: StoryWasenderApiWebhookSourceId,
+  eventType: "wasenderapi.messages.received",
 });
 
 const StoryGitHubRepositoryResources: IntegrationConnectionResources = {
@@ -331,6 +341,29 @@ export const StorySlackEventOptions: readonly WebhookTriggerEventOption[] = [
         prefix: "in",
       },
     ],
+  },
+];
+
+export const StoryWasenderApiEventOptions: readonly WebhookTriggerEventOption[] = [
+  {
+    id: StoryWasenderApiMessagesUpsertTriggerId,
+    eventType: "wasenderapi.messages.upsert",
+    integrationWebhookSourceId: StoryWasenderApiWebhookSourceId,
+    connectionId: StoryWasenderApiConnectionId,
+    connectionLabel: "WasenderAPI Production",
+    label: "Message upsert",
+    category: "WasenderAPI Production / Messages",
+    logoKey: "wasenderapi",
+  },
+  {
+    id: StoryWasenderApiMessagesReceivedTriggerId,
+    eventType: "wasenderapi.messages.received",
+    integrationWebhookSourceId: StoryWasenderApiWebhookSourceId,
+    connectionId: StoryWasenderApiConnectionId,
+    connectionLabel: "WasenderAPI Production",
+    label: "Message received",
+    category: "WasenderAPI Production / Messages",
+    logoKey: "wasenderapi",
   },
 ];
 
