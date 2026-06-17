@@ -50,11 +50,30 @@ export type ClaudeCodeSessionReadResult = {
     cwd: string | null;
     id: string;
     lastError: string | null;
+    pendingPermissions: readonly ClaudeCodePermissionRequest[];
     queries: readonly ClaudeCodeSessionQuery[];
     status: {
       type: ClaudeCodeSessionStatus;
     };
   };
+};
+
+export type ClaudeCodePermissionRequest = {
+  id: string;
+  sessionId: string;
+  toolInput: unknown;
+  toolName: string;
+};
+
+export type ClaudeCodePermissionResponseInput = {
+  answers?: readonly {
+    id: string;
+    value: string;
+  }[];
+  decision?: "always" | "once" | "reject";
+  message?: string;
+  requestId: string;
+  sessionId: string;
 };
 
 export type ClaudeCodeSessionSummary = {
@@ -79,6 +98,7 @@ export type ClaudeCodeSessionClient = {
     offset?: number;
   }): Promise<readonly ClaudeCodeSessionSummary[]>;
   readSession(input: { sessionId: string }): Promise<ClaudeCodeSessionReadResult>;
+  respondToPermission(input: ClaudeCodePermissionResponseInput): Promise<void>;
   refreshCommandCatalog(input: {
     refresh?: boolean;
     sessionId: string;
@@ -298,6 +318,24 @@ function parseClaudeCodeSessionConfigRpcResult(
   return parseClaudeCodeSessionConfig(config);
 }
 
+function parseClaudeCodePermissionRequest(value: unknown): ClaudeCodePermissionRequest {
+  if (!isRecord(value)) {
+    throw new Error("Claude Code session/read response included an invalid permission request.");
+  }
+  const id = readNestedString(value, ["id"]);
+  const sessionId = readNestedString(value, ["sessionId"]);
+  const toolName = readNestedString(value, ["toolName"]);
+  if (id === null || sessionId === null || toolName === null) {
+    throw new Error("Claude Code permission request response did not include required metadata.");
+  }
+  return {
+    id,
+    sessionId,
+    toolName,
+    toolInput: value["toolInput"],
+  };
+}
+
 function parseClaudeCodeContextUsage(value: unknown): ClaudeCodeContextUsage | null {
   if (value === null || value === undefined) {
     return null;
@@ -342,6 +380,12 @@ export function parseClaudeCodeSessionReadResult(result: unknown): ClaudeCodeSes
   if (!Array.isArray(rawQueries)) {
     throw new Error("Claude Code session/read response did not include session.queries.");
   }
+  const rawPendingPermissions = session["pendingPermissions"];
+  if (!Array.isArray(rawPendingPermissions)) {
+    throw new Error(
+      "Claude Code session/read response did not include session.pendingPermissions.",
+    );
+  }
 
   return {
     session: {
@@ -355,6 +399,7 @@ export function parseClaudeCodeSessionReadResult(result: unknown): ClaudeCodeSes
       config: parseClaudeCodeSessionConfig(session["config"]),
       contextUsage: parseClaudeCodeContextUsage(session["contextUsage"]),
       cwd: readNestedString(result, ["session", "cwd"]),
+      pendingPermissions: rawPendingPermissions.map(parseClaudeCodePermissionRequest),
       queries: rawQueries.map((query, index) => ({
         queryId: isRecord(query)
           ? (readNestedString(query, ["queryId"]) ?? `query_${String(index)}`)
@@ -417,6 +462,15 @@ export function createClaudeCodeSessionClient(
         sessionId: readInput.sessionId,
       });
       return parseClaudeCodeSessionReadResult(result);
+    },
+    async respondToPermission(permissionInput) {
+      await rpcClient.call("permission/reply", {
+        sessionId: permissionInput.sessionId,
+        requestId: permissionInput.requestId,
+        ...(permissionInput.decision === undefined ? {} : { decision: permissionInput.decision }),
+        ...(permissionInput.answers === undefined ? {} : { answers: permissionInput.answers }),
+        ...(permissionInput.message === undefined ? {} : { message: permissionInput.message }),
+      });
     },
     async refreshCommandCatalog(refreshInput) {
       const result = await rpcClient.call("session/command-catalog", {

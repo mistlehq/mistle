@@ -141,4 +141,42 @@ describe("ServerRequestsPanel", () => {
       },
     ]);
   });
+
+  it("renders Claude Code permission requests in the standalone panel", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: "permission-1",
+            method: "claude-code/permission/requestApproval",
+            kind: "claude-code-permission",
+            sessionId: "session-1",
+            toolName: "Bash",
+            toolInputJson: '{\n  "command": "pnpm test"\n}',
+            availableDecisions: ["once", "reject"],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Claude Code permission").textContent).toBe("Claude Code permission");
+    expect(screen.getByText("Bash").textContent).toBe("Bash");
+    expect(screen.getByText(/pnpm test/u).textContent).toContain("pnpm test");
+
+    fireEvent.click(screen.getByRole("button", { name: "reject" }));
+
+    expect(submittedResults).toEqual([
+      {
+        decision: "reject",
+      },
+    ]);
+  });
 });

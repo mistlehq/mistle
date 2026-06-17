@@ -108,6 +108,31 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain("skills: selectedClaudeCodeSkills");
   });
 
+  it("surfaces Claude Code SDK permission requests through runtime RPC state", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain("pendingPermissions: new Map()");
+    expect(ClaudeCodeRuntimeServerBundle).toContain("canUseTool:");
+    expect(ClaudeCodeRuntimeServerBundle).toContain("requestClaudeCodeToolPermission");
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "pendingPermissions: mapClaudeCodePendingPermissions(conversation)",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain('case "permission/reply"');
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "resolveClaudeCodePermissionResponse(permissionRequest, params)",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "Claude Code query options require a permission handler.",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "Claude Code title generation cannot use tools.",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain('request.toolName === "AskUserQuestion"');
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "Claude Code user input response requires answers.",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain('behavior: "allow"');
+    expect(ClaudeCodeRuntimeServerBundle).toContain('behavior: "deny"');
+  });
+
   it("loads Claude Code model catalog lazily through the SDK", () => {
     expect(ClaudeCodeRuntimeServerBundle).not.toContain("const ClaudeCodeModels = [");
     expect(ClaudeCodeRuntimeServerBundle).toContain('case "session/model-catalog"');

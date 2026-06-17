@@ -30,6 +30,7 @@ describe("reduceClaudeCodeChatState", () => {
         contextUsage: null,
         cwd: "/root",
         lastError: null,
+        pendingPermissions: [],
         status: {
           type: "active",
         },
@@ -66,6 +67,7 @@ describe("reduceClaudeCodeChatState", () => {
         contextUsage: null,
         cwd: "/root",
         lastError: null,
+        pendingPermissions: [],
         status: {
           type: "idle",
         },
@@ -110,6 +112,45 @@ describe("reduceClaudeCodeChatState", () => {
         status: "completed",
         text: "This repository contains the Mistle app.",
         turnId: "query_456",
+      },
+    ]);
+  });
+
+  it("stores pending Claude Code permissions from hydrated session state", () => {
+    const hydratedState = reduceClaudeCodeChatState(createInitialClaudeCodeChatState(), {
+      type: "hydrate_session",
+      session: {
+        id: "session_permissions",
+        activeQueryId: null,
+        config: ClaudeCodeTestSessionConfig,
+        contextUsage: null,
+        cwd: "/root",
+        lastError: null,
+        pendingPermissions: [
+          {
+            id: "permission_1",
+            sessionId: "session_permissions",
+            toolName: "Bash",
+            toolInput: {
+              command: "pnpm test",
+            },
+          },
+        ],
+        status: {
+          type: "idle",
+        },
+        queries: [],
+      },
+    });
+
+    expect(hydratedState.pendingPermissions).toEqual([
+      {
+        id: "permission_1",
+        sessionId: "session_permissions",
+        toolName: "Bash",
+        toolInput: {
+          command: "pnpm test",
+        },
       },
     ]);
   });

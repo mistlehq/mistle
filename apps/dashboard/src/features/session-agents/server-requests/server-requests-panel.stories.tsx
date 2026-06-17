@@ -85,6 +85,17 @@ const MixedServerRequestEntries: readonly ServerRequestEntry[] = [
     status: "pending",
     responseErrorMessage: null,
   },
+  {
+    requestId: "claude-code-permission-request-1",
+    method: "claude-code/permission/requestApproval",
+    kind: "claude-code-permission",
+    sessionId: "claude-code-session-1",
+    toolName: "Bash",
+    toolInputJson: '{\n  "command": "pnpm test"\n}',
+    availableDecisions: ["once", "reject"],
+    status: "pending",
+    responseErrorMessage: null,
+  },
 ];
 
 function createMixedServerRequestEntriesWithResponseErrors(): readonly ServerRequestEntry[] {

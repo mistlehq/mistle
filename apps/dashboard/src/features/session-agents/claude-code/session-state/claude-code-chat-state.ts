@@ -1,4 +1,5 @@
 import type {
+  ClaudeCodePermissionRequest,
   ClaudeCodeSessionQuery,
   ClaudeCodeSessionReadResult,
 } from "@mistle/integrations-definitions/agent-runtimes/claude-code/client";
@@ -8,6 +9,7 @@ import type { ChatEntry } from "../../../chat/chat-types.js";
 export type ClaudeCodeChatState = {
   completedErrorMessage: string | null;
   entries: readonly ChatEntry[];
+  pendingPermissions: readonly ClaudeCodePermissionRequest[];
   pendingQueryId: string | null;
   queries: readonly ClaudeCodeSessionQuery[];
   sessionId: string | null;
@@ -34,6 +36,7 @@ export function createInitialClaudeCodeChatState(): ClaudeCodeChatState {
   return {
     completedErrorMessage: null,
     entries: [],
+    pendingPermissions: [],
     pendingQueryId: null,
     queries: [],
     sessionId: null,
@@ -148,6 +151,7 @@ export function reduceClaudeCodeChatState(
           queries: action.session.queries,
           sessionId: action.session.id,
         }),
+        pendingPermissions: action.session.pendingPermissions,
         pendingQueryId: action.session.activeQueryId,
         queries: action.session.queries,
         sessionId: action.session.id,

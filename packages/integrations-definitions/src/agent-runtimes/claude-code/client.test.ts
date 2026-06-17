@@ -40,6 +40,16 @@ describe("parseClaudeCodeSessionReadResult", () => {
           },
           activeQueryId: null,
           queries: [],
+          pendingPermissions: [
+            {
+              id: "perm_1",
+              sessionId: "session_123",
+              toolName: "Bash",
+              toolInput: {
+                command: "pnpm test",
+              },
+            },
+          ],
           lastError: null,
           config: {
             availableCommands: [
@@ -77,6 +87,16 @@ describe("parseClaudeCodeSessionReadResult", () => {
         },
         activeQueryId: null,
         queries: [],
+        pendingPermissions: [
+          {
+            id: "perm_1",
+            sessionId: "session_123",
+            toolName: "Bash",
+            toolInput: {
+              command: "pnpm test",
+            },
+          },
+        ],
         lastError: null,
         config: {
           availableCommands: [
@@ -118,6 +138,7 @@ describe("parseClaudeCodeSessionReadResult", () => {
           },
           activeQueryId: null,
           queries: [],
+          pendingPermissions: [],
           lastError: null,
           config: {
             availableCommands: [],
@@ -150,6 +171,7 @@ describe("parseClaudeCodeSessionReadResult", () => {
           },
           activeQueryId: null,
           queries: [],
+          pendingPermissions: [],
           lastError: null,
           config: {
             availableCommands: [],
@@ -183,6 +205,7 @@ describe("parseClaudeCodeSessionReadResult", () => {
           },
           activeQueryId: null,
           queries: [],
+          pendingPermissions: [],
           lastError: null,
           config: {
             availableModels: [],
@@ -193,5 +216,29 @@ describe("parseClaudeCodeSessionReadResult", () => {
         },
       }),
     ).toThrow("Claude Code session config did not include availableCommands.");
+  });
+
+  it("rejects Claude Code session reads without pending permission metadata", () => {
+    expect(() =>
+      parseClaudeCodeSessionReadResult({
+        session: {
+          id: "session_123",
+          cwd: "/workspace",
+          status: {
+            type: "idle",
+          },
+          activeQueryId: null,
+          queries: [],
+          lastError: null,
+          config: {
+            availableCommands: [],
+            availableModels: [],
+            model: null,
+            modelReasoningEffort: null,
+          },
+          contextUsage: null,
+        },
+      }),
+    ).toThrow("Claude Code session/read response did not include session.pendingPermissions.");
   });
 });

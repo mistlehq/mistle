@@ -235,7 +235,9 @@ function createOpenCodeRuntimeInput(reportedMessages: string[]): OpenCodeRuntime
 function createClaudeCodeRuntimeInput(input: {
   contextUsage?: ClaudeCodeRuntimeInput["contextUsage"];
   isBusy?: boolean;
+  pendingPermissions?: ClaudeCodeRuntimeInput["chat"]["chatState"]["pendingPermissions"];
   reportedMessages: string[];
+  respondedPermissions?: Parameters<ClaudeCodeRuntimeInput["chat"]["respondToPermission"]>[0][];
   startedPrompts?: string[];
   steeredPrompts: string[];
 }): ClaudeCodeRuntimeInput {
@@ -250,6 +252,7 @@ function createClaudeCodeRuntimeInput(input: {
       chatState: {
         completedErrorMessage: null,
         entries: [],
+        pendingPermissions: input.pendingPermissions ?? [],
         pendingQueryId: input.isBusy === false ? null : "query_123",
         status: input.isBusy === false ? "idle" : "busy",
         sessionId: "session_123",
@@ -259,8 +262,12 @@ function createClaudeCodeRuntimeInput(input: {
         return;
       },
       isInterruptingTurn: false,
+      isRespondingToPermission: false,
       isStartingTurn: false,
       isSteeringTurn: false,
+      respondToPermission: async (permissionInput) => {
+        input.respondedPermissions?.push(permissionInput);
+      },
       sendPrompt: async () => {
         return;
       },
@@ -782,6 +789,54 @@ describe("buildClaudeCodeConversationRuntime", () => {
     expect(accepted).toBe(false);
     expect(reportedMessages).toEqual([
       "Unsupported Claude Code runtime command 'opencode.prompt.review'.",
+    ]);
+  });
+
+  it("exposes and responds to Claude Code permission requests", () => {
+    const respondedPermissions: Parameters<
+      ClaudeCodeRuntimeInput["chat"]["respondToPermission"]
+    >[0][] = [];
+    const runtime = buildClaudeCodeConversationRuntime(
+      createClaudeCodeRuntimeInput({
+        pendingPermissions: [
+          {
+            id: "permission-1",
+            sessionId: "session_123",
+            toolName: "Bash",
+            toolInput: {
+              command: "pnpm test",
+            },
+          },
+        ],
+        reportedMessages: [],
+        respondedPermissions,
+        steeredPrompts: [],
+      }),
+    );
+
+    expect(runtime.serverRequestsState.pendingServerRequests).toEqual([
+      {
+        requestId: "permission-1",
+        method: "claude-code/permission/requestApproval",
+        kind: "claude-code-permission",
+        sessionId: "session_123",
+        toolName: "Bash",
+        toolInputJson: '{\n  "command": "pnpm test"\n}',
+        availableDecisions: ["once", "reject"],
+        status: "pending",
+        responseErrorMessage: null,
+      },
+    ]);
+
+    runtime.serverRequestsState.respondToServerRequest("permission-1", {
+      decision: "once",
+    });
+
+    expect(respondedPermissions).toEqual([
+      {
+        requestId: "permission-1",
+        decision: "once",
+      },
     ]);
   });
 });

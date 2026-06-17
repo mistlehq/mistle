@@ -133,6 +133,7 @@ function createConversationState(input) {
     commandCatalog: null,
     commandCatalogLoadPromise: null,
     contextUsage: null,
+    pendingPermissions: new Map(),
   };
 }
 
@@ -252,6 +253,7 @@ async function fetchClaudeCodeModelCatalog(conversation) {
   const sdkQuery = query({
     prompt: createIdlePromptStream(),
     options: createClaudeQueryOptions({
+      conversation,
       cwd: conversation.cwd,
       session: { kind: "new", sessionId: randomUUID() },
     }),
@@ -323,6 +325,7 @@ async function fetchClaudeCodeCommandCatalog(conversation) {
   const sdkQuery = query({
     prompt: createIdlePromptStream(),
     options: createClaudeQueryOptions({
+      conversation,
       cwd: conversation.cwd,
       session: { kind: "new", sessionId: randomUUID() },
     }),
@@ -404,6 +407,7 @@ async function listSessionPage(input) {
 async function runClaudeQuery(conversation, queryId, inputText) {
   const abortController = new AbortController();
   const options = createClaudeQueryOptions({
+    conversation,
     cwd: conversation.cwd,
     session: conversation.sdkSessionId === null
       ? { kind: "new", sessionId: conversation.providerConversationId }
@@ -468,7 +472,155 @@ async function runClaudeQuery(conversation, queryId, inputText) {
   }
 }
 
+function readClaudePermissionContextSuggestions(context) {
+  if (context === null || typeof context !== "object" || !Array.isArray(context.suggestions)) {
+    return [];
+  }
+  return context.suggestions;
+}
+
+function readClaudePermissionContextSignal(context) {
+  if (
+    context === null ||
+    typeof context !== "object" ||
+    !("signal" in context) ||
+    typeof context.signal !== "object" ||
+    context.signal === null ||
+    typeof context.signal.addEventListener !== "function"
+  ) {
+    return null;
+  }
+  return context.signal;
+}
+
+function requestClaudeCodeToolPermission(conversation, toolName, toolInput, context) {
+  const requestId = randomUUID();
+  const suggestions = readClaudePermissionContextSuggestions(context);
+  const signal = readClaudePermissionContextSignal(context);
+  return new Promise((resolve) => {
+    const request = {
+      id: requestId,
+      sessionId: conversation.providerConversationId,
+      toolName,
+      toolInput,
+      suggestions,
+      resolve,
+    };
+    const resolveAndDelete = (result) => {
+      conversation.pendingPermissions.delete(requestId);
+      signal?.removeEventListener("abort", handleAbort);
+      resolve(result);
+    };
+    const handleAbort = () => {
+      resolveAndDelete({
+        behavior: "deny",
+        message: "Claude Code permission request was cancelled.",
+      });
+    };
+    request.resolve = resolveAndDelete;
+    conversation.pendingPermissions.set(requestId, request);
+    if (signal?.aborted === true) {
+      handleAbort();
+      return;
+    }
+    signal?.addEventListener("abort", handleAbort, { once: true });
+  });
+}
+
+function mapClaudeCodePendingPermissions(conversation) {
+  return [...conversation.pendingPermissions.values()].map((request) => ({
+    id: request.id,
+    sessionId: request.sessionId,
+    toolName: request.toolName,
+    toolInput: request.toolInput,
+  }));
+}
+
+function readClaudeCodePermissionDecision(value) {
+  if (value !== "once" && value !== "always" && value !== "reject") {
+    throw new Error("Claude Code permission response has an unsupported decision.");
+  }
+  return value;
+}
+
+function resolveClaudeCodePermissionResponse(request, params) {
+  if (request.toolName === "AskUserQuestion") {
+    if (!Array.isArray(params.answers)) {
+      throw new Error("Claude Code user input response requires answers.");
+    }
+    const questions =
+      request.toolInput !== null &&
+      typeof request.toolInput === "object" &&
+      Array.isArray(request.toolInput.questions)
+        ? request.toolInput.questions
+        : [];
+    const answers = {};
+    for (const answer of params.answers) {
+      if (
+        answer === null ||
+        typeof answer !== "object" ||
+        typeof answer.id !== "string" ||
+        typeof answer.value !== "string"
+      ) {
+        throw new Error("Claude Code user input response included an invalid answer.");
+      }
+      const questionIndex = Number.parseInt(answer.id, 10);
+      const question = questions[questionIndex];
+      if (
+        question === null ||
+        typeof question !== "object" ||
+        typeof question.question !== "string" ||
+        question.question.length === 0
+      ) {
+        throw new Error("Claude Code user input response referenced an unknown question.");
+      }
+      answers[question.question] = answer.value;
+    }
+    return {
+      behavior: "allow",
+      updatedInput: {
+        ...request.toolInput,
+        questions,
+        answers,
+      },
+    };
+  }
+
+  const decision = readClaudeCodePermissionDecision(params.decision);
+  if (decision === "reject") {
+    return {
+      behavior: "deny",
+      message:
+        typeof params.message === "string" && params.message.length > 0
+          ? params.message
+          : "User rejected this Claude Code tool request.",
+    };
+  }
+  const allowResponse = {
+    behavior: "allow",
+    updatedInput: request.toolInput,
+  };
+  if (decision === "always") {
+    if (request.suggestions.length === 0) {
+      throw new Error("Claude Code permission response cannot remember without SDK suggestions.");
+    }
+    return {
+      ...allowResponse,
+      updatedPermissions: request.suggestions,
+    };
+  }
+  return allowResponse;
+}
+
 function createClaudeQueryOptions(input) {
+  if (typeof input.canUseTool !== "function" && input.conversation === undefined) {
+    throw new Error("Claude Code query options require a permission handler.");
+  }
+  const canUseTool =
+    typeof input.canUseTool === "function"
+      ? input.canUseTool
+      : (toolName, toolInput, context) =>
+          requestClaudeCodeToolPermission(input.conversation, toolName, toolInput, context);
   const sessionOptions =
     input.session.kind === "new"
       ? { sessionId: input.session.sessionId }
@@ -486,6 +638,7 @@ function createClaudeQueryOptions(input) {
     systemPrompt: { type: "preset", preset: "claude_code" },
     includePartialMessages: true,
     ...skillOptions,
+    canUseTool,
     ...(input.abortController === undefined ? {} : { abortController: input.abortController }),
     ...(input.model === undefined || input.model === null ? {} : { model: input.model }),
     ...(input.reasoningEffort === undefined || input.reasoningEffort === null
@@ -652,6 +805,10 @@ async function generateTitle(inputText) {
   const sdkQuery = query({
     prompt,
     options: createClaudeQueryOptions({
+      canUseTool: () => ({
+        behavior: "deny",
+        message: "Claude Code title generation cannot use tools.",
+      }),
       session: { kind: "new", sessionId: randomUUID() },
     }),
   });
@@ -793,7 +950,26 @@ async function handleRequest(request) {
           lastError: conversation.lastError ?? null,
           config: buildConversationConfig(conversation),
           contextUsage: conversation.contextUsage,
+          pendingPermissions: mapClaudeCodePendingPermissions(conversation),
         },
+      };
+    }
+    case "permission/reply": {
+      const params = request.params ?? {};
+      if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
+        throw new Error("permission/reply requires params.sessionId.");
+      }
+      if (typeof params.requestId !== "string" || params.requestId.length === 0) {
+        throw new Error("permission/reply requires params.requestId.");
+      }
+      const conversation = requireSession(params.sessionId);
+      const permissionRequest = conversation.pendingPermissions.get(params.requestId);
+      if (permissionRequest === undefined) {
+        throw new Error("Claude Code permission request not found: " + params.requestId);
+      }
+      permissionRequest.resolve(resolveClaudeCodePermissionResponse(permissionRequest, params));
+      return {
+        replied: true,
       };
     }
     case "query/start":
