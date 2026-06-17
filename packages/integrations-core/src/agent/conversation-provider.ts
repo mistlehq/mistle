@@ -54,6 +54,24 @@ export type AgentConversationReadMetadataResult = {
   preview: string | null;
 };
 
+export type AgentConversationTranscriptTurn = {
+  id: string;
+  status: string | null;
+  items: readonly unknown[];
+};
+
+export type AgentConversationReadTranscriptInput = {
+  connection: AgentConversationConnection;
+  providerConversationId: string;
+};
+
+export type AgentConversationReadTranscriptResult = {
+  providerConversationId: string;
+  name: string | null;
+  preview: string | null;
+  turns: readonly AgentConversationTranscriptTurn[];
+};
+
 export type AgentConversationGenerateTitleInput = {
   connectionUrl: string;
   providerConversationId: string;
@@ -153,6 +171,10 @@ export type AgentConversationProvider = {
     this: void,
     input: AgentConversationReadMetadataInput,
   ): Promise<AgentConversationReadMetadataResult>;
+  readConversationTranscript?(
+    this: void,
+    input: AgentConversationReadTranscriptInput,
+  ): Promise<AgentConversationReadTranscriptResult>;
   generateConversationTitle?(
     this: void,
     input: AgentConversationGenerateTitleInput,

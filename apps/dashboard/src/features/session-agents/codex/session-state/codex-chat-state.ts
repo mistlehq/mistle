@@ -1559,6 +1559,15 @@ export function createInitialCodexChatState(): CodexChatState {
   });
 }
 
+export function hydrateCodexChatEntriesFromThreadReadTurns(
+  turns: readonly CodexThreadReadTurn[],
+): readonly ChatEntry[] {
+  return reduceCodexChatState(createInitialCodexChatState(), {
+    type: "hydrate_from_thread_read",
+    turns,
+  }).entries;
+}
+
 export function reduceCodexChatState(
   state: CodexChatState,
   action: CodexChatAction,

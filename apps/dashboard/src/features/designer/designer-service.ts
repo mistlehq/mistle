@@ -73,6 +73,27 @@ const SubmitDesignerRuntimeFollowUpResponseSchema = z
   })
   .strict();
 
+const DesignerRuntimeConversationTranscriptTurnSchema = z
+  .object({
+    id: z.string().min(1),
+    status: z.string().min(1).nullable(),
+    items: z.array(z.unknown()),
+  })
+  .strict();
+
+const GetDesignerRuntimeConversationTranscriptResponseSchema = z
+  .object({
+    runtimeConversationTranscript: z
+      .object({
+        providerConversationId: z.string().min(1),
+        name: z.string().nullable(),
+        preview: z.string().nullable(),
+        turns: z.array(DesignerRuntimeConversationTranscriptTurnSchema),
+      })
+      .strict(),
+  })
+  .strict();
+
 export type DesignerSession = z.output<typeof DesignerSessionSchema>;
 export type DesignerRuntimeConversationBootstrap = z.output<
   typeof BootstrapDesignerRuntimeConversationResponseSchema
@@ -80,11 +101,18 @@ export type DesignerRuntimeConversationBootstrap = z.output<
 export type DesignerRuntimeFollowUpSubmission = z.output<
   typeof SubmitDesignerRuntimeFollowUpResponseSchema
 >["runtimeFollowUp"];
+export type DesignerRuntimeConversationTranscript = z.output<
+  typeof GetDesignerRuntimeConversationTranscriptResponseSchema
+>["runtimeConversationTranscript"];
 
 export const designerSessionsQueryKey = ["designer", "sessions"] as const;
 export const designerRuntimeConversationBootstrapQueryKey = [
   "designer",
   "runtime-conversation-bootstrap",
+] as const;
+export const designerRuntimeConversationTranscriptQueryKey = [
+  "designer",
+  "runtime-conversation-transcript",
 ] as const;
 
 export async function listDesignerSessions(input?: {
@@ -274,6 +302,43 @@ export async function submitDesignerRuntimeFollowUp(input: {
         operation: "submitDesignerRuntimeFollowUp",
         error,
         fallbackMessage: "Could not submit Designer follow-up.",
+      }),
+    );
+  }
+}
+
+export async function getDesignerRuntimeConversationTranscript(input: {
+  sessionId: string;
+  signal?: AbortSignal;
+}): Promise<DesignerRuntimeConversationTranscript> {
+  try {
+    const response = await requestControlPlane({
+      operation: "getDesignerRuntimeConversationTranscript",
+      method: "GET",
+      pathname: `/v1/designer/sessions/${encodeURIComponent(input.sessionId)}/runtime-conversation/transcript`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not load Designer runtime conversation transcript.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse =
+      GetDesignerRuntimeConversationTranscriptResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new DesignerApiError({
+        operation: "getDesignerRuntimeConversationTranscript",
+        status: 500,
+        body: responseBody,
+        message: "Designer runtime conversation transcript response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data.runtimeConversationTranscript;
+  } catch (error) {
+    throw new DesignerApiError(
+      normalizeHttpApiError({
+        operation: "getDesignerRuntimeConversationTranscript",
+        error,
+        fallbackMessage: "Could not load Designer runtime conversation transcript.",
       }),
     );
   }

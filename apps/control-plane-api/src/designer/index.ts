@@ -5,6 +5,7 @@ export {
   createDesignerSessionResponseSchema as CreateDesignerSessionResponseSchema,
   bootstrapDesignerRuntimeConversationResponseSchema as BootstrapDesignerRuntimeConversationResponseSchema,
   designerSessionSchema as DesignerSessionSchema,
+  getDesignerRuntimeConversationTranscriptResponseSchema as GetDesignerRuntimeConversationTranscriptResponseSchema,
   getDesignerSessionResponseSchema as GetDesignerSessionResponseSchema,
   listDesignerSessionsQuerySchema as ListDesignerSessionsQuerySchema,
   listDesignerSessionsResponseSchema as ListDesignerSessionsResponseSchema,

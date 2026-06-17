@@ -169,8 +169,11 @@ export const Workspace: Story = {
             providerExecutionId: "turn_designer_triage_initial_prompt",
             initialPromptSubmittedAt: "2026-04-01T09:01:00.000Z",
           }}
+          runtimeConversationTranscript={null}
           session={StoryDesignerSessions[0] ?? null}
           sessionId="dsn_triage"
+          transcriptErrorMessage={null}
+          transcriptIsPending={false}
         />
       </MemoryRouter>
     );
