@@ -98,16 +98,20 @@ Create a Web application OAuth client in Google Auth Platform.
 For headless Workspace automation, you can connect with a Google Cloud service account. This lets Mistle mint short-lived Google access tokens without an interactive OAuth consent flow.
 
 <Note>
-  Authorize only the scopes required for the Workspace MCP servers you intend to use, and store the
-  service account JSON key carefully.
+  Service account connections require Google Workspace domain-wide delegation. A Workspace super
+  administrator must authorize the service account client ID for the full fixed Mistle scope set
+  listed above, even when a sandbox profile exposes only selected MCP servers.
 </Note>
 
 To use a service account connection:
 
 1. Create a Google Cloud service account in the same project used for the Workspace MCP services.
-2. Create a JSON key for the service account.
-3. In Mistle, choose **Service account** when adding a Google Workspace connection.
-4. Paste the service account JSON key.
+2. In the service account details, enable **Google Workspace domain-wide delegation** and copy the service account **Client ID**.
+3. In Google Workspace Admin Console, open **Security > Access and data control > API controls > Manage Domain Wide Delegation**.
+4. Click **Add new**, paste the service account Client ID, and authorize the full fixed Mistle OAuth scope set listed in **Configure OAuth Consent**.
+5. In Google Cloud, create a JSON key for the service account and store it carefully.
+6. In Mistle, choose **Service account** when adding a Google Workspace connection.
+7. Paste the service account JSON key.
 
 Mistle signs a Google OAuth JWT bearer assertion with the service account key, exchanges it for a short-lived Google access token, and injects that token into calls to the selected Google-hosted MCP servers.
 
@@ -138,3 +142,5 @@ Only selected MCP servers are exposed to sessions using that published profile.
 - [Configure Google Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers)
 - [Authenticate to Google and Google Cloud MCP servers](https://docs.cloud.google.com/mcp/authenticate-mcp)
 - [OAuth 2.0 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server)
+- [Using OAuth 2.0 for Server to Server Applications](https://developers.google.com/identity/protocols/oauth2/service-account)
+- [Control API access with domain-wide delegation](https://knowledge.workspace.google.com/admin/apps/control-api-access-with-domain-wide-delegation)

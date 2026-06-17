@@ -120,6 +120,8 @@ function startSimulatedGoogleOAuthTokenServer(input: {
   url: string;
   close(): Promise<void>;
 }> {
+  // Simulates Google's OAuth 2.0 service-account JWT bearer token endpoint:
+  // https://developers.google.com/identity/protocols/oauth2/service-account#httprest
   const server = createServer((request, response) => {
     input.onRequest(request, response).catch((error: unknown) => {
       response.statusCode = 500;
