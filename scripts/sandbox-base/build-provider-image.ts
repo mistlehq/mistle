@@ -30,10 +30,6 @@ const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..");
 const DEFAULT_REPOSITORY = "ghcr.io/mistlehq/sandbox-base";
 const DEFAULT_PLATFORM = "linux/amd64";
 const SANDBOX_BASE_DOCKERFILE_PATH = "packages/sandboxd/Dockerfile";
-const TENSORLAKE_SANDBOXD_BINARY_PATH = "packages/sandboxd/.generated/tensorlake/sandboxd";
-const TENSORLAKE_SANDBOXD_ARCHIVE_PATH = `${TENSORLAKE_SANDBOXD_BINARY_PATH}.gz`;
-const TENSORLAKE_SANDBOXD_ARCHIVE_PARTS_PATH =
-  "packages/sandboxd/.generated/tensorlake/sandboxd-parts";
 const OPENCOMPUTER_SANDBOXD_BINARY_PATH = "dev/.generated/sandbox-base/opencomputer/sandboxd";
 const OPENCOMPUTER_SANDBOXD_ARCHIVE_PATH = `${OPENCOMPUTER_SANDBOXD_BINARY_PATH}.gz`;
 const OPENCOMPUTER_SANDBOXD_ARCHIVE_PARTS_PATH =
@@ -41,7 +37,6 @@ const OPENCOMPUTER_SANDBOXD_ARCHIVE_PARTS_PATH =
 const SANDBOX_BASE_TARGET = "sandbox-base";
 const SANDBOX_BASE_SYSTEM_TESTS_TARGET = "sandbox-base-system-tests";
 const SANDBOXD_BUILD_ARTIFACT_PATH = "/app/packages/sandboxd/target/release/sandboxd";
-const TENSORLAKE_COPY_PART_SIZE = "512k";
 const OPENCOMPUTER_COPY_PART_SIZE = "64k";
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 const SandboxBaseImageRefEnv = "MISTLE_SANDBOX_BASE_IMAGE_REF";
@@ -115,12 +110,7 @@ Tensorlake options:
                                           Defaults to the deterministic name for --source-image-ref
   --source-image-ref <ref>             OCI image ref to import into Tensorlake
   --api-key <key>                      Tensorlake API key
-  --sandboxd-source <local|release>    sandboxd source for the Tensorlake SDK image
-  --sandboxd-artifact-url <url>        Release sandboxd artifact URL when --sandboxd-source release
-  --sandboxd-artifact-sha256 <sha256>  Release sandboxd artifact SHA256 when --sandboxd-source release
-  --sandboxd-artifact-version <value>  Release sandboxd version when --sandboxd-source release
-  --platform <value>                   Linux platform for the sandboxd build artifact (default: ${DEFAULT_PLATFORM})
-                                          Uses the Tensorlake SDK image builder
+                                          Imports the registry image directly
 
 OpenComputer options:
   --output-image-ref <name>            OpenComputer snapshot name
@@ -432,38 +422,6 @@ function createDevTag(gitHeadSha: string): string {
   return `dev-${uniqueHash}`;
 }
 
-function prepareTensorlakeSandboxdBinary(platform: string): void {
-  const archivePartsPath = resolve(REPO_ROOT, TENSORLAKE_SANDBOXD_ARCHIVE_PARTS_PATH);
-
-  prepareLocalSandboxdArchive({
-    archivePath: resolve(REPO_ROOT, TENSORLAKE_SANDBOXD_ARCHIVE_PATH),
-    binaryPath: resolve(REPO_ROOT, TENSORLAKE_SANDBOXD_BINARY_PATH),
-    buildImageTag: `mistle-sandboxd-tensorlake-build:${randomUUID()}`,
-    label: "Tensorlake",
-    platform,
-  });
-
-  rmSync(archivePartsPath, { force: true, recursive: true });
-  mkdirSync(archivePartsPath, { recursive: true });
-  execFileSync(
-    "split",
-    [
-      "-b",
-      TENSORLAKE_COPY_PART_SIZE,
-      resolve(REPO_ROOT, TENSORLAKE_SANDBOXD_ARCHIVE_PATH),
-      resolve(archivePartsPath, "part-"),
-    ],
-    {
-      cwd: REPO_ROOT,
-      stdio: "inherit",
-    },
-  );
-
-  console.log(
-    `Prepared ${String(readdirSync(archivePartsPath).length)} Tensorlake sandboxd archive parts.`,
-  );
-}
-
 function prepareOpenComputerSandboxdBinary(platform: string): void {
   const archivePartsPath = resolve(REPO_ROOT, OPENCOMPUTER_SANDBOXD_ARCHIVE_PARTS_PATH);
 
@@ -626,33 +584,6 @@ function createSdkImageReleaseSandboxdSource(
   return createReleaseSandboxdSource(argumentsList, provider);
 }
 
-function createTensorlakeSandboxdSource(argumentsList: ParsedCliArguments):
-  | {
-      kind: typeof SandboxSdkImageSandboxdSourceKinds.LOCAL;
-    }
-  | {
-      kind: typeof SandboxSdkImageSandboxdSourceKinds.RELEASE;
-      artifact: {
-        version: string;
-        url: string;
-        sha256: string;
-      };
-    }
-  | undefined {
-  const sandboxdSource = argumentsList.sandboxdSource;
-  if (sandboxdSource === undefined) {
-    throw new Error("--sandboxd-source is required when --provider is tensorlake.");
-  }
-
-  if (sandboxdSource === SandboxdSources.LOCAL) {
-    return {
-      kind: SandboxSdkImageSandboxdSourceKinds.LOCAL,
-    };
-  }
-
-  return createReleaseSandboxdSource(argumentsList, SandboxProvider.TENSORLAKE);
-}
-
 function createOpenComputerSandboxdSource(argumentsList: ParsedCliArguments):
   | {
       kind: typeof SandboxSdkImageSandboxdSourceKinds.LOCAL;
@@ -773,8 +704,12 @@ async function buildTensorlakeBaseImage(argumentsList: ParsedCliArguments): Prom
 
   if (argumentsList.target !== undefined) {
     throw new Error(
-      "--target is not supported when --provider is tensorlake. Tensorlake uses the provider SDK image builder.",
+      "--target is not supported when --provider is tensorlake. Tensorlake imports a prepared registry image.",
     );
+  }
+
+  if (argumentsList.platform !== undefined) {
+    throw new Error("--platform is not supported when --provider is tensorlake.");
   }
 
   if (argumentsList.publishMode !== SandboxBaseImagePublishModes.PUSH) {
@@ -788,13 +723,6 @@ async function buildTensorlakeBaseImage(argumentsList: ParsedCliArguments): Prom
   const sourceImageRef = requireSdkSourceImageRef(argumentsList, SandboxProvider.TENSORLAKE);
   const outputImageRef =
     argumentsList.outputImageRef ?? createTensorlakeRegisteredBaseImageName(sourceImageRef);
-  const sandboxd = createTensorlakeSandboxdSource(argumentsList);
-  if (sandboxd?.kind === SandboxSdkImageSandboxdSourceKinds.LOCAL) {
-    const platform = argumentsList.platform ?? DEFAULT_PLATFORM;
-    prepareTensorlakeSandboxdBinary(platform);
-  } else if (argumentsList.platform !== undefined) {
-    throw new Error("--platform is only supported when --sandboxd-source is local.");
-  }
 
   const builder = createSandboxBaseImageBuilder({
     provider: SandboxProvider.TENSORLAKE,
@@ -810,7 +738,6 @@ async function buildTensorlakeBaseImage(argumentsList: ParsedCliArguments): Prom
       baseImageRef: sourceImageRef,
       contextPath: REPO_ROOT,
       imageId: outputImageRef,
-      ...(sandboxd === undefined ? {} : { sandboxd }),
     },
   });
 

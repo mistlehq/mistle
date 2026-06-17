@@ -1,33 +1,20 @@
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-
 import { SandboxConfigurationError } from "../../errors.js";
 import {
   SandboxBaseImageSourceKinds,
-  SandboxSdkImageSandboxdSourceKinds,
   type SandboxBaseImageBuilder,
   type SandboxEnsureBaseImageRequest,
-  type SandboxSdkImageBaseImageSource,
   type SandboxImageHandle,
 } from "../../types.js";
 import { TensorlakeClientOperationIds, mapTensorlakeClientError } from "./client-errors.js";
 import { validateTensorlakeSandboxConfig, type TensorlakeSandboxConfig } from "./config.js";
-import { createTensorlakeRegisteredImageHandle } from "./image-handle.js";
+import {
+  createTensorlakeRegisteredBaseImageName,
+  createTensorlakeRegisteredImageHandle,
+} from "./image-handle.js";
 import { registerTensorlakeSandboxBaseImage } from "./image-registration.js";
-
-const TensorlakeLocalSandboxdPartsRelativePath =
-  "packages/sandboxd/.generated/tensorlake/sandboxd-parts";
-const TensorlakeCmddirRelativePath = "packages/sandboxd/scripts/cmddir";
-const TensorlakeBuildContextPlaceholderFile = ".mistle-tensorlake-context";
 
 export type TensorlakeBaseImageBuilderOptions = {
   readonly config: TensorlakeSandboxConfig;
-};
-
-export type TensorlakeSdkImageBuildContext = {
-  readonly path: string;
-  readonly cleanup: () => Promise<void>;
 };
 
 export class TensorlakeBaseImageBuilder implements SandboxBaseImageBuilder {
@@ -39,60 +26,24 @@ export class TensorlakeBaseImageBuilder implements SandboxBaseImageBuilder {
 
   async ensureBaseImage(request: SandboxEnsureBaseImageRequest): Promise<SandboxImageHandle> {
     const config = validateTensorlakeSandboxConfig(this.#options.config);
-
-    if (request.source.kind === SandboxBaseImageSourceKinds.IMAGE) {
-      return createTensorlakeRegisteredImageHandle(request.source.imageId);
-    }
-
-    if (request.source.kind !== SandboxBaseImageSourceKinds.SDK_IMAGE) {
-      throw new SandboxConfigurationError(
-        "Tensorlake base image builder requires an SDK image source.",
-      );
-    }
-
-    const source = request.source;
-    if (source.sandboxd === undefined) {
-      throw new SandboxConfigurationError(
-        "Tensorlake SDK image source requires a sandboxd artifact source.",
-      );
-    }
-    validateSdkImageSource({
-      ...(request.platform === undefined ? {} : { platform: request.platform }),
-      source,
-    });
-
-    const buildContext = await createTensorlakeSdkImageBuildContext(source);
-    let buildError: unknown;
+    const source = resolveTensorlakeImportSource(request);
+    let importError: unknown;
 
     try {
       await registerTensorlakeSandboxBaseImage({
         apiKey: config.apiKey,
-        contextPath: buildContext.path,
-        source: {
-          baseImageRef: source.baseImageRef,
-          imageId: source.imageId,
-          ...(source.sandboxd === undefined ? {} : { sandboxd: source.sandboxd }),
-        },
+        registeredName: source.registeredName,
+        sourceImageRef: source.sourceImageRef,
       });
     } catch (error) {
-      buildError = mapTensorlakeClientError(TensorlakeClientOperationIds.BUILD_BASE_IMAGE, error);
+      importError = mapTensorlakeClientError(TensorlakeClientOperationIds.IMPORT_BASE_IMAGE, error);
     }
 
-    try {
-      await buildContext.cleanup();
-    } catch (cleanupError) {
-      if (buildError === undefined) {
-        throw cleanupError;
-      }
-
-      console.error(`Failed to remove Tensorlake image build context ${buildContext.path}.`);
+    if (importError !== undefined) {
+      throw importError;
     }
 
-    if (buildError !== undefined) {
-      throw buildError;
-    }
-
-    return createTensorlakeRegisteredImageHandle(request.source.imageId);
+    return createTensorlakeRegisteredImageHandle(source.registeredName);
   }
 }
 
@@ -102,68 +53,51 @@ export function createTensorlakeBaseImageBuilder(
   return new TensorlakeBaseImageBuilder(options);
 }
 
-export async function createTensorlakeSdkImageBuildContext(
-  source: SandboxSdkImageBaseImageSource,
-): Promise<TensorlakeSdkImageBuildContext> {
-  const buildContextPath = await mkdtemp(join(tmpdir(), "mistle-tensorlake-image-context-"));
-
-  try {
-    await writeFile(join(buildContextPath, TensorlakeBuildContextPlaceholderFile), "");
-    await copyTensorlakeBuildContextFile({
-      buildContextPath,
-      sourceContextPath: source.contextPath,
-      relativePath: TensorlakeCmddirRelativePath,
-    });
-
-    if (source.sandboxd?.kind === SandboxSdkImageSandboxdSourceKinds.LOCAL) {
-      const sourcePath = resolve(source.contextPath, TensorlakeLocalSandboxdPartsRelativePath);
-      const destinationPath = resolve(buildContextPath, TensorlakeLocalSandboxdPartsRelativePath);
-      await mkdir(dirname(destinationPath), { recursive: true });
-      await cp(sourcePath, destinationPath, { recursive: true });
-    }
-
-    return {
-      path: buildContextPath,
-      cleanup: async () => {
-        await rm(buildContextPath, { force: true, recursive: true });
-      },
-    };
-  } catch (error) {
-    await rm(buildContextPath, { force: true, recursive: true });
-    throw error;
-  }
-}
-
-async function copyTensorlakeBuildContextFile(input: {
-  readonly buildContextPath: string;
-  readonly sourceContextPath: string;
-  readonly relativePath: string;
-}): Promise<void> {
-  const sourcePath = resolve(input.sourceContextPath, input.relativePath);
-  const destinationPath = resolve(input.buildContextPath, input.relativePath);
-  await mkdir(dirname(destinationPath), { recursive: true });
-  await cp(sourcePath, destinationPath);
-}
-
-function validateSdkImageSource(request: {
-  readonly platform?: string;
-  readonly source: SandboxSdkImageBaseImageSource;
-}): void {
+export function resolveTensorlakeImportSource(request: SandboxEnsureBaseImageRequest): {
+  readonly registeredName: string;
+  readonly sourceImageRef: string;
+} {
   if (request.platform !== undefined) {
     throw new SandboxConfigurationError(
-      "Tensorlake base image builder does not support platform overrides.",
+      "Tensorlake base image import does not support platform overrides.",
     );
   }
 
-  if (request.source.contextPath.trim() === "") {
-    throw new SandboxConfigurationError(
-      "Tensorlake base image builder requires a non-empty SDK image context path.",
-    );
+  if (request.source.kind === SandboxBaseImageSourceKinds.IMAGE) {
+    const sourceImageRef = requireNonEmptyValue({
+      field: "source image ref",
+      value: request.source.imageId,
+    });
+    return {
+      registeredName: createTensorlakeRegisteredBaseImageName(sourceImageRef),
+      sourceImageRef,
+    };
   }
 
-  if (request.source.baseImageRef.trim() === "") {
+  if (request.source.kind === SandboxBaseImageSourceKinds.SDK_IMAGE) {
+    return {
+      registeredName: requireNonEmptyValue({
+        field: "registered image name",
+        value: request.source.imageId,
+      }),
+      sourceImageRef: requireNonEmptyValue({
+        field: "source image ref",
+        value: request.source.baseImageRef,
+      }),
+    };
+  }
+
+  throw new SandboxConfigurationError(
+    "Tensorlake base image builder requires an image source or SDK image source.",
+  );
+}
+
+function requireNonEmptyValue(input: { readonly field: string; readonly value: string }): string {
+  const normalizedValue = input.value.trim();
+  if (normalizedValue.length === 0) {
     throw new SandboxConfigurationError(
-      "Tensorlake base image builder requires a non-empty source image ref.",
+      `Tensorlake base image import requires a non-empty ${input.field}.`,
     );
   }
+  return normalizedValue;
 }

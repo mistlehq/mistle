@@ -132,24 +132,9 @@ export function createSandboxRuntimeProviderResolver(input: {
         );
       }
 
-      const needsRuntimeImageArtifacts =
-        options.includeImagePreparationArtifacts && inputRuntime.connectionId !== undefined;
-      const sandboxdArtifact =
-        needsRuntimeImageArtifacts && input.sandboxdArtifactResolver !== undefined
-          ? await input.sandboxdArtifactResolver.resolve()
-          : undefined;
-
       return createTensorlakeSandboxRuntime({
         credentials,
         resources: inputRuntime.resources,
-        ...(sandboxdArtifact === undefined
-          ? {}
-          : {
-              sandboxd: {
-                kind: SandboxSdkImageSandboxdSourceKinds.RELEASE,
-                artifact: sandboxdArtifact,
-              },
-            }),
       });
     }
 
@@ -288,7 +273,6 @@ export function createE2BSandboxProviderConfig(input: {
 function createTensorlakeSandboxRuntime(input: {
   credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "tensorlake" }>;
   resources?: ResolveSandboxRuntimeInput["resources"];
-  sandboxd?: SandboxSdkImageReleaseSandboxdSource;
 }): ResolvedSandboxRuntime {
   const providerConfig = createTensorlakeSandboxProviderConfig(input);
 
@@ -329,15 +313,11 @@ function createOpenComputerSandboxRuntime(input: {
 export function createTensorlakeSandboxProviderConfig(input: {
   credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "tensorlake" }>;
   resources?: ResolveSandboxRuntimeInput["resources"];
-  sandboxd?: SandboxSdkImageReleaseSandboxdSource;
 }): CreateSandboxAdapterInput {
   return {
     provider: SandboxProvider.TENSORLAKE,
     tensorlake: {
       apiKey: input.credentials.apiKey,
-      ...(input.sandboxd === undefined
-        ? {}
-        : { sandboxd: createSandboxProviderSource(input.sandboxd) }),
     },
   };
 }

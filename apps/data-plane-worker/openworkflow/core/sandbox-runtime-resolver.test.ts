@@ -74,42 +74,6 @@ describe("createTensorlakeSandboxProviderConfig", () => {
       },
     });
   });
-
-  it("strips release-manifest target metadata from sandboxd artifacts", () => {
-    const artifact = {
-      version: "0.32.0",
-      target: "x86_64-unknown-linux-gnu",
-      url: "https://github.com/mistlehq/mistle/releases/download/v0.32.0/sandboxd-x86_64-unknown-linux-gnu.tar.gz",
-      sha256: "a".repeat(64),
-    };
-
-    expect(
-      createTensorlakeSandboxProviderConfig({
-        credentials: {
-          provider: "tensorlake",
-          source: "managed",
-          apiKey: "tensorlake-api-key",
-        },
-        sandboxd: {
-          kind: "release",
-          artifact,
-        },
-      }),
-    ).toEqual({
-      provider: "tensorlake",
-      tensorlake: {
-        apiKey: "tensorlake-api-key",
-        sandboxd: {
-          kind: "release",
-          artifact: {
-            version: "0.32.0",
-            url: "https://github.com/mistlehq/mistle/releases/download/v0.32.0/sandboxd-x86_64-unknown-linux-gnu.tar.gz",
-            sha256: "a".repeat(64),
-          },
-        },
-      },
-    });
-  });
 });
 
 describe("createModalSandboxProviderConfig", () => {
