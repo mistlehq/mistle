@@ -65,6 +65,7 @@ import {
 import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";
 
 type IntegrationChoice = {
+  bindingKind: SandboxIntegrationBindingKind;
   id: string;
   hasSelectableConnections: boolean;
   logoKey: string | undefined;
@@ -596,6 +597,7 @@ function resolveKindChoices(input: {
 
     seenTargetKeys.add(target.targetKey);
     choices.push({
+      bindingKind: input.kind,
       id: target.targetKey,
       hasSelectableConnections,
       logoKey: target.logoKey,
@@ -604,6 +606,35 @@ function resolveKindChoices(input: {
   }
 
   return choices;
+}
+
+function targetExposesAddableSandboxTools(target: IntegrationTargetSummary): boolean {
+  const definition = IntegrationRegistry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+
+  return definition?.kind === "sandbox" && definition.bindingConfigForm !== undefined;
+}
+
+function resolveAddableIntegrationChoices(input: {
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+}): IntegrationChoice[] {
+  return [
+    ...resolveKindChoices({
+      kind: "connector",
+      availableConnections: input.availableConnections,
+      availableTargets: input.availableTargets,
+      includeDisconnectedTargets: true,
+    }),
+    ...resolveKindChoices({
+      kind: "sandbox",
+      availableConnections: input.availableConnections,
+      availableTargets: input.availableTargets.filter(targetExposesAddableSandboxTools),
+      includeDisconnectedTargets: true,
+    }),
+  ];
 }
 
 function targetAllowsAgentRuntime(input: {
@@ -725,9 +756,9 @@ function buildDefaultConfig(input: {
   });
 }
 
-function AddConnectorTile(input: {
+function AddIntegrationTile(input: {
   choice: IntegrationChoice;
-  onAdd: (targetKey: string) => void;
+  onAdd: (choice: IntegrationChoice) => void;
 }): React.JSX.Element {
   return (
     <ActionTile
@@ -735,7 +766,7 @@ function AddConnectorTile(input: {
         input.choice.hasSelectableConnections ? (
           <Button
             onClick={() => {
-              input.onAdd(input.choice.id);
+              input.onAdd(input.choice);
             }}
             type="button"
           >
@@ -868,11 +899,9 @@ export function SandboxProfileIntegrationsSetupSection(
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
   });
-  const connectorChoices = resolveKindChoices({
-    kind: "connector",
+  const addableIntegrationChoices = resolveAddableIntegrationChoices({
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
-    includeDisconnectedTargets: true,
   });
 
   function publishAssociatedResourceRoutingDraftState(inputValue: {
@@ -946,7 +975,9 @@ export function SandboxProfileIntegrationsSetupSection(
     [input.integrationRows],
   );
   const gitRow = input.integrationRows.find((row) => row.kind === "git") ?? null;
-  const connectorRows = input.integrationRows.filter((row) => row.kind === "connector");
+  const connectorRows = input.integrationRows.filter(
+    (row) => row.kind === "connector" || row.kind === "sandbox",
+  );
   const agentRowResolution = useMemo(
     () =>
       resolveAgentBindingRowsForRuntime({
@@ -969,7 +1000,7 @@ export function SandboxProfileIntegrationsSetupSection(
       )
       .filter((targetKey): targetKey is string => typeof targetKey === "string"),
   );
-  const addConnectorChoices = connectorChoices.filter(
+  const addConnectorChoices = addableIntegrationChoices.filter(
     (choice) => !selectedConnectorTargetKeys.has(choice.id),
   );
   const agentIssues = agentRows.map((row) =>
@@ -1145,8 +1176,8 @@ export function SandboxProfileIntegrationsSetupSection(
     }
   }
 
-  async function addConnector(targetKey: string): Promise<void> {
-    const connections = resolveConnectionsForTarget(targetKey, input.availableConnections);
+  async function addConnector(choice: IntegrationChoice): Promise<void> {
+    const connections = resolveConnectionsForTarget(choice.id, input.availableConnections);
     const nextConnection = connections[0];
     if (nextConnection === undefined) {
       return;
@@ -1161,7 +1192,7 @@ export function SandboxProfileIntegrationsSetupSection(
     }
 
     const didSave = await input.onAddIntegrationBindingRow({
-      kind: "connector",
+      kind: choice.bindingKind,
       connectionId: nextConnection.id,
       config: nextConfig,
     });
@@ -1593,7 +1624,9 @@ export function SandboxProfileIntegrationsSetupSection(
                           {isReadOnly ? null : (
                             <RemoveIntegrationBindingButton
                               disabled={controlsAreDisabled}
-                              label="Remove connector"
+                              label={
+                                row.kind === "connector" ? "Remove connector" : "Remove integration"
+                              }
                               onRemove={() => {
                                 if (controlsAreDisabled) {
                                   return;
@@ -1641,15 +1674,15 @@ export function SandboxProfileIntegrationsSetupSection(
       >
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader variant="sectioned">
-            <DialogTitle>Add connectors</DialogTitle>
+            <DialogTitle>Add integration or tool</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {addConnectorChoices.map((choice) => (
-              <AddConnectorTile
+              <AddIntegrationTile
                 choice={choice}
                 key={choice.id}
-                onAdd={(targetKey) => {
-                  void addConnector(targetKey);
+                onAdd={(selectedChoice) => {
+                  void addConnector(selectedChoice);
                 }}
               />
             ))}
