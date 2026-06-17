@@ -12,6 +12,7 @@ import {
   DesignerSessionSchema,
   ListDesignerSessionsResponseSchema,
 } from "../src/designer/index.js";
+import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
@@ -47,6 +48,18 @@ describe.concurrent("designer sessions integration", () => {
     });
     expect(created.id).toMatch(/^dsn_[a-zA-Z0-9_-]+$/);
     expect(created.sandboxInstanceId).toMatch(/^sbi_[a-zA-Z0-9_-]+$/);
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: created.sandboxInstanceId,
+    });
+    const platformOpenAiRoute = queuedWorkflowInput.runtimePlan.egressRoutes.find(
+      (route) => route.credentialResolver.kind === "platform_openai_api_key",
+    );
+    expect(platformOpenAiRoute?.upstream.baseUrl).toBe("https://api.openai.com/v1");
+    const codexConfig = queuedWorkflowInput.runtimePlan.runtimeClients
+      .flatMap((client) => client.setup.files)
+      .find((file) => file.fileId === "codex_config");
+    expect(codexConfig?.content).toContain('base_url = "https://api.openai.com/v1"');
 
     const listResponse = await env.controlPlaneApi.http.fetch("/v1/designer/sessions", {
       headers: {
