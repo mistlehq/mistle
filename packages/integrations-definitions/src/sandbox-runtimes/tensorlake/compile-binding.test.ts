@@ -1,4 +1,5 @@
 import type {
+  RuntimeArtifactGitHubReleaseInstallHelperInput,
   RuntimeArtifactInstallStep,
   RuntimeArtifactSpec,
   RuntimeExecCommand,
@@ -58,12 +59,10 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
       },
     },
     githubReleases: {
-      install(): RuntimeArtifactInstallStep {
+      install(input: RuntimeArtifactGitHubReleaseInstallHelperInput): RuntimeArtifactInstallStep {
         return {
-          op: "exec",
-          command: {
-            args: ["github-releases.install"],
-          },
+          op: "github_release_install",
+          ...input,
         };
       },
     },
@@ -192,52 +191,33 @@ describe("compileTensorlakeBinding", () => {
     });
 
     const lifecycle = resolveArtifactLifecycleCommands(artifact);
-    expect(lifecycle.install).toHaveLength(2);
-    expect(lifecycle.install[0]).toMatchObject({
-      op: "mise_install",
-      tools: ["node@24.11.1"],
-      timeoutMs: 180_000,
-    });
-    expect(lifecycle.install[1]).toMatchObject({
-      op: "exec",
-      command: {
-        args: [
-          "mise",
-          "exec",
-          "node@24.11.1",
-          "--",
-          "sh",
-          "-euc",
-          expect.stringContaining("npm install --prefix"),
-        ],
+    expect(lifecycle.install).toEqual([
+      {
+        op: "github_release_install",
+        repository: "tensorlakeai/tensorlake",
+        release: {
+          kind: "tag",
+          match: "exact",
+          tag: "cli-v0.5.47",
+        },
+        asset: {
+          kind: "by_arch",
+          x86_64: {
+            fileName: "tensorlake-cli-linux-x86_64.tar.gz",
+            format: "tar.gz",
+            extractedPath: "tensorlake",
+            sha256: "9c02b09a94d6c1e592a8e6c43b5ce90273268585593ca492890db6d8afa77a49",
+          },
+          aarch64: {
+            fileName: "tensorlake-cli-linux-aarch64.tar.gz",
+            format: "tar.gz",
+            extractedPath: "tensorlake",
+            sha256: "443bce4b2d831298b7d784e8c5f1f326f92506fa188d3d3332c8537ab3afddfb",
+          },
+        },
+        installPath: "/usr/local/bin/tensorlake",
         timeoutMs: 180_000,
       },
-    });
-    expect(lifecycle.install[1]).toMatchObject({
-      command: {
-        args: [
-          expect.any(String),
-          expect.any(String),
-          expect.any(String),
-          expect.any(String),
-          expect.any(String),
-          expect.any(String),
-          expect.stringContaining("tensorlake@0.5.31"),
-        ],
-      },
-    });
-    expect(lifecycle.install[1]).toMatchObject({
-      command: {
-        args: [
-          expect.any(String),
-          expect.any(String),
-          expect.any(String),
-          expect.any(String),
-          expect.any(String),
-          expect.any(String),
-          expect.stringContaining("/var/lib/mistle/artifacts/tensorlake-cli"),
-        ],
-      },
-    });
+    ]);
   });
 });

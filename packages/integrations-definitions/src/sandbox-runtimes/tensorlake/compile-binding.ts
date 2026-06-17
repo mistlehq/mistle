@@ -1,8 +1,4 @@
-import type {
-  CompileBindingInput,
-  CompileBindingResult,
-  RuntimeExecCommand,
-} from "@mistle/integrations-core";
+import type { CompileBindingInput, CompileBindingResult } from "@mistle/integrations-core";
 
 import {
   TensorlakeSandboxRuntimeCredentialSecretTypes,
@@ -23,9 +19,9 @@ const TensorlakeApiBaseUrl = `https://${TensorlakeApiHost}`;
 const TensorlakeSandboxBaseUrl = `https://${TensorlakeSandboxHost}`;
 const TensorlakeCliArtifactKey = "tensorlake-cli";
 const TensorlakeCliArtifactName = "Tensorlake CLI";
-const TensorlakeCliVersion = "0.5.31";
+const TensorlakeGitHubRepository = "tensorlakeai/tensorlake";
+const TensorlakeCliReleaseTag = "cli-v0.5.47";
 const TensorlakeCliPlaceholderApiKey = "tl_apiKey_mistle_placeholder_for_managed_egress";
-const TensorlakeCliNodeTool = "node@24.11.1";
 const ArtifactCommandTimeoutMs = 180_000;
 
 function createCredentialResolver(
@@ -36,39 +32,6 @@ function createCredentialResolver(
     connectionId: input.connection.id,
     secretType: TensorlakeSandboxRuntimeCredentialSecretTypes.API_KEY,
     slotKey: TensorlakeSandboxRuntimeCredentialSlotKeys.API_KEY,
-  };
-}
-
-function renderInstallTensorlakeCliScript(input: {
-  installPath: string;
-  packageInstallDir: string;
-}): string {
-  return [
-    'package_spec="tensorlake@' + TensorlakeCliVersion + '"',
-    "install_path=" + JSON.stringify(input.installPath),
-    "package_install_dir=" + JSON.stringify(input.packageInstallDir),
-    'mkdir -p "$package_install_dir"',
-    'npm install --prefix "$package_install_dir" --omit=dev --ignore-scripts --no-audit --no-fund "$package_spec"',
-    'ln -sf "$package_install_dir/node_modules/.bin/tensorlake" "$install_path"',
-    'chmod 0755 "$install_path"',
-  ].join("\n");
-}
-
-function createTensorlakeCliInstallCommand(input: {
-  installPath: string;
-  packageInstallDir: string;
-}): RuntimeExecCommand {
-  return {
-    args: [
-      "mise",
-      "exec",
-      TensorlakeCliNodeTool,
-      "--",
-      "sh",
-      "-euc",
-      renderInstallTensorlakeCliScript(input),
-    ],
-    timeoutMs: ArtifactCommandTimeoutMs,
   };
 }
 
@@ -120,16 +83,31 @@ function createTensorlakeCliArtifact(): CompileBindingResult["artifacts"][number
     },
     lifecycle: {
       install: ({ refs }) => [
-        refs.mise.install({
-          tools: [TensorlakeCliNodeTool],
+        refs.githubReleases.install({
+          repository: TensorlakeGitHubRepository,
+          release: {
+            kind: "tag",
+            match: "exact",
+            tag: TensorlakeCliReleaseTag,
+          },
+          asset: {
+            kind: "by_arch",
+            x86_64: {
+              fileName: "tensorlake-cli-linux-x86_64.tar.gz",
+              format: "tar.gz",
+              extractedPath: "tensorlake",
+              sha256: "9c02b09a94d6c1e592a8e6c43b5ce90273268585593ca492890db6d8afa77a49",
+            },
+            aarch64: {
+              fileName: "tensorlake-cli-linux-aarch64.tar.gz",
+              format: "tar.gz",
+              extractedPath: "tensorlake",
+              sha256: "443bce4b2d831298b7d784e8c5f1f326f92506fa188d3d3332c8537ab3afddfb",
+            },
+          },
+          installPath: refs.artifactBinPath("tensorlake"),
           timeoutMs: ArtifactCommandTimeoutMs,
         }),
-        refs.command.exec(
-          createTensorlakeCliInstallCommand({
-            installPath: refs.artifactBinPath("tensorlake"),
-            packageInstallDir: `${refs.sandboxPaths.runtimeArtifactDir}/${TensorlakeCliArtifactKey}`,
-          }),
-        ),
       ],
     },
   };
