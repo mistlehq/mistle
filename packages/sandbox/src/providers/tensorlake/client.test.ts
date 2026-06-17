@@ -249,7 +249,6 @@ function createSandboxInfo(input: {
       memoryMb: 16_384,
       ephemeralDiskMb: 40_960,
     },
-    secretNames: [],
     name: input.name,
   };
 }
