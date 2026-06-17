@@ -56,8 +56,19 @@ describe("DesignerSessionPageView", () => {
 
     expect(screen.getByText("Build a triaging agent for Linear bugs.")).toBeDefined();
     expect(screen.getByText("Runtime conversation ready")).toBeDefined();
+    expect(screen.getByText("Runtime conversation")).toBeDefined();
+    expect(screen.getByText("Initial prompt submitted")).toBeDefined();
+    expect(screen.getByText("Submitted at 2026-04-01T09:01:00.000Z.")).toBeDefined();
     expect(screen.getByText("thread_designer_test")).toBeDefined();
-    expect(screen.getByText("turn_designer_initial_prompt")).toBeDefined();
+    expect(screen.getAllByText("turn_designer_initial_prompt")).toHaveLength(2);
+  });
+
+  it("shows the initial prompt as waiting before runtime bootstrap completes", () => {
+    renderDesignerSessionPageView();
+
+    expect(screen.getByText("Runtime conversation")).toBeDefined();
+    expect(screen.getByText("Initial prompt")).toBeDefined();
+    expect(screen.getByText("Waiting to submit to the Designer runtime.")).toBeDefined();
   });
 
   it("shows runtime bootstrap progress before the conversation is ready", () => {
@@ -66,6 +77,8 @@ describe("DesignerSessionPageView", () => {
     });
 
     expect(screen.getByText("Preparing runtime conversation")).toBeDefined();
+    expect(screen.getByText("Initial prompt submitting")).toBeDefined();
+    expect(screen.getByText("Submitting to the Designer runtime.")).toBeDefined();
     expect(
       screen.getByText("Submitting the initial prompt to the Designer runtime."),
     ).toBeDefined();
@@ -112,7 +125,8 @@ describe("DesignerSessionPageView", () => {
     });
 
     expect(screen.getByText("Runtime unavailable")).toBeDefined();
-    expect(screen.getByText("Could not start the Designer sandbox runtime.")).toBeDefined();
+    expect(screen.getAllByText("Could not start the Designer sandbox runtime.")).toHaveLength(2);
+    expect(screen.getByText("Initial prompt not submitted")).toBeDefined();
   });
 
   it("shows bootstrap endpoint errors without hiding the saved prompt", () => {
@@ -122,6 +136,8 @@ describe("DesignerSessionPageView", () => {
 
     expect(screen.getByText("Build a triaging agent for Linear bugs.")).toBeDefined();
     expect(screen.getByText("Runtime bootstrap failed")).toBeDefined();
+    expect(screen.getByText("Initial prompt status unknown")).toBeDefined();
+    expect(screen.getByText("Runtime bootstrap failed while submitting the prompt.")).toBeDefined();
     expect(
       screen.getByText("Designer sandbox is not ready for runtime conversation bootstrap."),
     ).toBeDefined();
