@@ -89,6 +89,20 @@ describe("dashboard integration logo assets", () => {
     }
   });
 
+  it("keeps dashboard SVG logo assets self-contained", () => {
+    for (const fileName of readdirSync(DashboardIntegrationLogoDirectory)) {
+      if (!fileName.endsWith(".svg")) {
+        continue;
+      }
+
+      const contents = readFileSync(join(DashboardIntegrationLogoDirectory, fileName), "utf8");
+      expect(
+        contents,
+        `${fileName} should not reference remote image or script assets`,
+      ).not.toMatch(/\b(?:href|src)\s*=\s*["']https?:\/\//);
+    }
+  });
+
   it("keeps the AWS logo square so it does not regress to the wide wordmark", () => {
     const { height, width } = readSvgViewBoxDimensions("aws.svg");
 

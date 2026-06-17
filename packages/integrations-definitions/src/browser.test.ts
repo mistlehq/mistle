@@ -28,6 +28,7 @@ import {
   SignozBrowserDefinition,
   SlackBrowserDefinition,
   TensorlakeSandboxRuntimeBrowserDefinition,
+  WasenderApiBrowserDefinition,
   ZaiBrowserDefinition,
 } from "./browser.js";
 
@@ -309,6 +310,27 @@ describe("browser definitions", () => {
     expect(ResendBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
     expect(ResendBrowserDefinition.webhookHandler).toBeUndefined();
     expect(ResendBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("registers WasenderAPI in the browser-safe definitions bundle without server-only hooks", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: WasenderApiBrowserDefinition.familyId,
+      variantId: WasenderApiBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "wasenderapi",
+      variantId: "wasenderapi-mcp",
+      kind: "connector",
+      displayName: "WasenderAPI",
+      logoKey: "wasenderapi",
+    });
+    expect(definition?.mcp).toBeDefined();
+    expect(definition?.webhookHandler).toBeUndefined();
+    expect(definition?.webhookSource).toBeUndefined();
+    expect(WasenderApiBrowserDefinition.mcp).toBeDefined();
+    expect(WasenderApiBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(WasenderApiBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("registers Tensorlake sandbox runtime in the browser-safe definitions bundle", () => {

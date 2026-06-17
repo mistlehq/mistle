@@ -129,6 +129,10 @@ describe("integrations-definitions index", () => {
       familyId: "resend",
       variantId: "resend-mcp",
     });
+    const wasenderApiDefinition = registry.getDefinition({
+      familyId: "wasenderapi",
+      variantId: "wasenderapi-mcp",
+    });
     const sentryDefinition = registry.getDefinition({
       familyId: "sentry",
       variantId: "sentry-mcp",
@@ -685,6 +689,37 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(resendDefinition?.mcp).toBeDefined();
+    expect(wasenderApiDefinition).toMatchObject({
+      familyId: "wasenderapi",
+      variantId: "wasenderapi-mcp",
+      kind: "connector",
+      displayName: "WasenderAPI",
+      logoKey: "wasenderapi",
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "Personal access token",
+          kind: "form",
+          secretFields: [
+            {
+              name: "personalAccessToken",
+              label: "Personal access token",
+              inputType: "password",
+              slotKey: "wasenderapi.wasenderapi-mcp.api-key.personal-access-token",
+            },
+            {
+              name: "webhookSecret",
+              label: "Webhook secret",
+              inputType: "password",
+              slotKey: "wasenderapi.wasenderapi-mcp.api-key.webhook-secret",
+            },
+          ],
+        },
+      ],
+    });
+    expect(wasenderApiDefinition?.mcp).toBeDefined();
+    expect(wasenderApiDefinition?.webhookHandler).toBeUndefined();
+    expect(wasenderApiDefinition?.webhookSource).toBeUndefined();
     expect(sentryDefinition).toMatchObject({
       familyId: "sentry",
       variantId: "sentry-mcp",
@@ -1113,7 +1148,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(35);
+    expect(definitions).toHaveLength(36);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -1151,6 +1186,7 @@ describe("integrations-definitions index", () => {
       "signoz::signoz-mcp",
       "slack::slack-default",
       "stripe::stripe-mcp",
+      "wasenderapi::wasenderapi-mcp",
       "zai::zai-coding-plan",
     ]);
   });
