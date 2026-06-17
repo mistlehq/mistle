@@ -429,6 +429,11 @@ describe("selectControlPlaneApiConfig", () => {
   it("projects Designer sandbox runtime config", () => {
     const config = selectControlPlaneApiConfig(
       createRootConfig({
+        platformCredentials: {
+          openai: {
+            api_key: "platform-openai-key",
+          },
+        },
         sandbox: {
           designer: {
             base_image: "registry.example.com/designer:latest",
@@ -456,6 +461,35 @@ describe("selectControlPlaneApiConfig", () => {
         diskMb: 8192,
       },
     });
+  });
+});
+
+describe("ConfigSchema", () => {
+  it("requires platform OpenAI credentials when Designer sandbox config is enabled", () => {
+    const result = ConfigSchema.safeParse(
+      createRootConfig({
+        sandbox: {
+          designer: {
+            base_image: "registry.example.com/designer:latest",
+            codex_cli_path: "codex",
+            sandbox_provider: "docker",
+            sandbox_connection_id: null,
+            sandbox_resources: null,
+          },
+        },
+      }),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ["platform_credentials", "openai", "api_key"],
+          message:
+            "Platform OpenAI credentials are required when Designer sandbox config is enabled.",
+        }),
+      ]),
+    );
   });
 });
 

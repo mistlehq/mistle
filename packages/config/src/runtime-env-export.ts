@@ -232,7 +232,7 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
     envVar: "MISTLE_DESIGNER_SANDBOX_PROVIDER",
   },
   {
-    path: ["sandbox", "designer", "sandboxConnectionId"],
+    readValue: readNullableDesignerSandboxConnectionId,
     envVar: "MISTLE_DESIGNER_SANDBOX_CONNECTION_ID",
   },
   {
@@ -558,6 +558,11 @@ function readControlPlaneApiValkeyCacheKeyPrefix(root: unknown): unknown {
   }
 
   return getValueAtPath(root, ["cache", "valkey", "keyPrefix"]);
+}
+
+function readNullableDesignerSandboxConnectionId(root: unknown): unknown {
+  const connectionId = getValueAtPath(root, ["sandbox", "designer", "sandboxConnectionId"]);
+  return connectionId === null ? undefined : connectionId;
 }
 
 function appendEntry(entries: RuntimeEnvExportEntry[], entry: RuntimeEnvExportEntry): void {

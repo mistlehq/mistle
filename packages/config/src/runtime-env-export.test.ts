@@ -143,6 +143,35 @@ describe("exportServiceConfigToEnv", () => {
     expectNoEntry(entries, "MISTLE_KV_CONTROL_PLANE_KEY_PREFIX");
   });
 
+  it("does not export null Designer sandbox connection ids", () => {
+    const loadedConfig = loadConfig({
+      app: AppIds.CONTROL_PLANE_API,
+      configPath: ConfigSamplePath,
+    });
+
+    const entries = exportServiceConfigToEnv({
+      app: AppIds.CONTROL_PLANE_API,
+      config: {
+        ...loadedConfig,
+        app: {
+          ...loadedConfig.app,
+          sandbox: {
+            ...loadedConfig.app.sandbox,
+            designer: {
+              baseImage: "registry.example.com/designer:latest",
+              codexCliPath: "codex",
+              sandboxProvider: "docker",
+              sandboxConnectionId: null,
+              sandboxResources: null,
+            },
+          },
+        },
+      },
+    });
+
+    expectNoEntry(entries, "MISTLE_DESIGNER_SANDBOX_CONNECTION_ID");
+  });
+
   it("exports control plane worker config to resource env entries", () => {
     const loadedConfig = loadConfig({
       app: AppIds.CONTROL_PLANE_WORKER,
