@@ -69,6 +69,10 @@ _Code name_: designer
 A structured setup recommendation produced by **Mistle Designer** for integrations, triggers, provider configuration resources, or sandbox profile configuration.
 _Avoid_: Chat suggestion when the recommendation has selectable product state
 
+**Designer action proposal**:
+An itemized **Mistle Designer** proposal for a user-reviewed change or operation that requires explicit user approval before it can take effect.
+_Avoid_: Provider configuration change when the change has not been approved or applied
+
 **User input request**:
 A runtime request that asks the user to answer one or more structured questions before the agent continues.
 _Avoid_: Approval request when the user is choosing configuration rather than granting permission

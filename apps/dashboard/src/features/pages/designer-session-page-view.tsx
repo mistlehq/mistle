@@ -5,6 +5,7 @@ import { ErrorNotice } from "../auth/error-notice.js";
 import { ChatComposer } from "../chat/components/chat-composer.js";
 import { ChatThread } from "../chat/components/chat-thread.js";
 import type {
+  DesignerActionProposal,
   DesignerRuntimeConversationBootstrap,
   DesignerRuntimeConversationTranscript,
   DesignerSession,
@@ -232,6 +233,9 @@ function RuntimeConversationPreview(input: {
         {input.transcriptErrorMessage === null ? null : (
           <p className="mt-2 text-xs text-destructive">{input.transcriptErrorMessage}</p>
         )}
+        <DesignerActionProposals
+          proposals={input.runtimeConversationTranscript?.actionProposals ?? []}
+        />
         <div className="mt-3">
           <ChatComposer
             canUploadAttachments={false}
@@ -284,6 +288,71 @@ function RuntimeConversationPreview(input: {
 
 function ignoreDesignerComposerAction(): void {}
 function ignoreDesignerServerRequest(): void {}
+
+function DesignerActionProposals(input: {
+  proposals: readonly DesignerActionProposal[];
+}): React.JSX.Element | null {
+  if (input.proposals.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">Action proposals</p>
+      {input.proposals.map((proposal) => (
+        <article className="rounded-lg border bg-muted/20 p-3" key={proposal.id}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-medium text-sm">{proposal.title}</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">{proposal.summary}</p>
+            </div>
+            <Badge variant="secondary">{formatDesignerActionProposalStatus(proposal.status)}</Badge>
+          </div>
+          <dl className="mt-3 grid gap-2 text-xs">
+            <div>
+              <dt className="text-muted-foreground">Operation</dt>
+              <dd className="mt-0.5">
+                {proposal.operation.provider} {proposal.operation.action}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Resource</dt>
+              <dd className="mt-0.5">
+                {proposal.operation.resourceType}
+                {proposal.operation.resourceLabel === null
+                  ? ""
+                  : `: ${proposal.operation.resourceLabel}`}
+              </dd>
+            </div>
+            {proposal.operation.details.map((detail, detailIndex) => (
+              <div key={`${proposal.id}:${String(detailIndex)}:${detail.label}`}>
+                <dt className="text-muted-foreground">{detail.label}</dt>
+                <dd className="mt-0.5 whitespace-pre-wrap">{detail.value}</dd>
+              </div>
+            ))}
+          </dl>
+          {proposal.status === "pending" ? (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Approval responses are not enabled for Designer action proposals yet.
+            </p>
+          ) : null}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function formatDesignerActionProposalStatus(status: DesignerActionProposal["status"]): string {
+  if (status === "pending") {
+    return "Review required";
+  }
+
+  if (status === "approved") {
+    return "Approved";
+  }
+
+  return "Declined";
+}
 
 function resolveRuntimeConversationPromptState(input: {
   bootstrapErrorMessage: string | null;

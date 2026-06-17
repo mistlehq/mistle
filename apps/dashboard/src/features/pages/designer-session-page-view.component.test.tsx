@@ -59,6 +59,33 @@ const RuntimeConversationTranscript = {
       ],
     },
   ],
+  actionProposals: [],
+} satisfies DesignerRuntimeConversationTranscript;
+
+const RuntimeConversationTranscriptWithActionProposal = {
+  ...RuntimeConversationTranscript,
+  actionProposals: [
+    {
+      id: "dap_github_webhook_setup",
+      kind: "designerActionProposal",
+      title: "Create GitHub webhook",
+      summary: "Create a webhook on the selected repository for pull request events.",
+      status: "pending",
+      operation: {
+        kind: "providerConfigurationChange",
+        provider: "GitHub",
+        resourceType: "repository webhook",
+        resourceLabel: "mistle/agent-runtime",
+        action: "create webhook",
+        details: [
+          {
+            label: "Events",
+            value: "pull_request, pull_request_review",
+          },
+        ],
+      },
+    },
+  ],
 } satisfies DesignerRuntimeConversationTranscript;
 
 function renderDesignerSessionPageView(input?: {
@@ -138,6 +165,27 @@ describe("DesignerSessionPageView", () => {
     expect(screen.getByText("Build a triaging agent for Linear bugs.")).toBeDefined();
     expect(screen.getByText("I can help design that workflow.")).toBeDefined();
     expect(screen.queryByText("Initial prompt submitted")).toBeNull();
+  });
+
+  it("renders Designer action proposals without approval controls", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      runtimeConversationTranscript: RuntimeConversationTranscriptWithActionProposal,
+    });
+
+    expect(screen.getByText("Action proposals")).toBeDefined();
+    expect(screen.getByText("Create GitHub webhook")).toBeDefined();
+    expect(
+      screen.getByText("Create a webhook on the selected repository for pull request events."),
+    ).toBeDefined();
+    expect(screen.getByText("GitHub create webhook")).toBeDefined();
+    expect(screen.getByText("repository webhook: mistle/agent-runtime")).toBeDefined();
+    expect(screen.getByText("pull_request, pull_request_review")).toBeDefined();
+    expect(
+      screen.getByText("Approval responses are not enabled for Designer action proposals yet."),
+    ).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /decline/i })).toBeNull();
   });
 
   it("shows transcript load errors while retaining the saved prompt preview", () => {

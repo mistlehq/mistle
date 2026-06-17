@@ -57,6 +57,7 @@ import type {
   SubmitDesignerRuntimeFollowUpBody,
   SubmitDesignerRuntimeFollowUpResponse,
 } from "../schemas.js";
+import { splitDesignerActionProposalsFromTranscriptTurns } from "./designer-action-proposals.js";
 
 type DesignerSessionActor = {
   kind: SandboxInstanceStarterKind;
@@ -885,17 +886,15 @@ export async function getDesignerRuntimeConversationTranscript(
       connection,
       providerConversationId: designerSession.runtimeProviderConversationId,
     });
+    const splitTranscript = splitDesignerActionProposalsFromTranscriptTurns(transcript.turns);
 
     return {
       runtimeConversationTranscript: {
         providerConversationId: transcript.providerConversationId,
         name: transcript.name,
         preview: transcript.preview,
-        turns: transcript.turns.map((turn) => ({
-          id: turn.id,
-          status: turn.status,
-          items: [...turn.items],
-        })),
+        turns: splitTranscript.turns,
+        actionProposals: splitTranscript.actionProposals,
       },
     };
   } finally {

@@ -1732,6 +1732,27 @@ export interface paths {
           content: {
             "application/json": {
               runtimeConversationTranscript: {
+                actionProposals: {
+                  id: string;
+                  /** @enum {string} */
+                  kind: "designerActionProposal";
+                  operation: {
+                    action: string;
+                    details: {
+                      label: string;
+                      value: string;
+                    }[];
+                    /** @enum {string} */
+                    kind: "providerConfigurationChange";
+                    provider: string;
+                    resourceLabel: string | null;
+                    resourceType: string;
+                  };
+                  /** @enum {string} */
+                  status: "pending" | "approved" | "declined";
+                  summary: string;
+                  title: string;
+                }[];
                 name: string | null;
                 preview: string | null;
                 providerConversationId: string;
