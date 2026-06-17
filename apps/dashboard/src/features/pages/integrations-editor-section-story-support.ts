@@ -4,6 +4,7 @@ import type {
 } from "@mistle/integrations-core";
 import {
   GitHubAssociatedResourceEventsCapability,
+  GoogleWorkspaceMcpServerIds,
   PlanetScaleToolIds,
   SlackAssociatedResourceEventsCapability,
   WasenderApiToolIds,
@@ -199,6 +200,29 @@ export const StoryGithubEnterpriseServerConnection: IntegrationConnectionSummary
     app_slug: "mistle-ghes",
     client_id: "Iv1.story-ghes-client",
     installation_id: "8842101",
+  },
+};
+
+export const StoryGoogleWorkspaceTarget: IntegrationTargetSummary = {
+  targetKey: "target-google-workspace",
+  displayName: "Google Workspace",
+  logoKey: "google-workspace",
+  familyId: "google-workspace",
+  variantId: "google-workspace-mcp",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+export const StoryGoogleWorkspaceConnection: IntegrationConnectionSummary = {
+  id: "connection-google-workspace",
+  displayName: "Google Workspace Production",
+  targetKey: StoryGoogleWorkspaceTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "oauth2-authorization-code",
+    client_id: "google-workspace-story-client",
   },
 };
 
@@ -442,6 +466,7 @@ export const StoryIntegrationTargets = [
   StoryOpenCodeGoTarget,
   StoryGithubTarget,
   StoryGithubEnterpriseServerTarget,
+  StoryGoogleWorkspaceTarget,
   StoryAwsTarget,
   StoryDatadogTarget,
   StoryJiraTarget,
@@ -458,6 +483,7 @@ export const StoryIntegrationConnections = [
   StoryOpenCodeGoConnection,
   StoryGithubConnection,
   StoryGithubEnterpriseServerConnection,
+  StoryGoogleWorkspaceConnection,
   StoryAwsConnection,
   StoryDatadogConnection,
   StoryJiraConnection,
@@ -611,3 +637,9 @@ export const StoryPlanetScaleTools = [
 export const StoryWasenderApiTools = [WasenderApiToolIds.WASENDERAPI_MCP] as const;
 
 export const StoryWhapiTools: readonly string[] = [WhapiToolIds.WHAPI_MCP];
+
+export const StoryGoogleWorkspaceTools = [
+  GoogleWorkspaceMcpServerIds.GMAIL,
+  GoogleWorkspaceMcpServerIds.DRIVE,
+  GoogleWorkspaceMcpServerIds.CALENDAR,
+] as const;

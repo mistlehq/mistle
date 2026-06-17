@@ -5,6 +5,8 @@ import { expect, userEvent, within } from "storybook/test";
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import {
   StoryAwsConnection,
+  StoryGoogleWorkspaceConnection,
+  StoryGoogleWorkspaceTools,
   StorySupabaseConnection,
   StorySupabaseTarget,
   StoryWasenderApiConnection,
@@ -125,6 +127,23 @@ export const WhapiMcpBinding: Story = {
         kind: "connector",
         config: {
           tools: [...StoryWhapiTools],
+        },
+      },
+    ],
+  },
+};
+
+export const GoogleWorkspaceMcpBinding: Story = {
+  name: "Google Workspace MCP binding",
+  args: {
+    initialBindings: [
+      ...StoryBindings,
+      {
+        id: "binding-google-workspace-connector",
+        connectionId: StoryGoogleWorkspaceConnection.id,
+        kind: "connector",
+        config: {
+          mcpServers: [...StoryGoogleWorkspaceTools],
         },
       },
     ],

@@ -17,6 +17,7 @@ import { FireworksDefinition } from "./fireworks/index.js";
 import { GcpMcpBaseDefinition } from "./gcp/variants/gcp-mcp/base-definition.js";
 import { GitHubCloudBaseDefinition } from "./github/variants/github-cloud/base-definition.js";
 import { GitHubEnterpriseServerBaseDefinition } from "./github/variants/github-enterprise-server/base-definition.js";
+import { GoogleWorkspaceMcpBaseDefinition } from "./google-workspace/variants/google-workspace-mcp/base-definition.js";
 import { InceptionDefinition } from "./inception/index.js";
 import { JiraBaseDefinition } from "./jira/variants/jira-default/base-definition.js";
 import { KimiDefinition } from "./kimi/index.js";
@@ -58,6 +59,7 @@ export const FireworksBrowserDefinition = FireworksDefinition;
 export const GcpBrowserDefinition = GcpMcpBaseDefinition;
 export const GitHubCloudBrowserDefinition = GitHubCloudBaseDefinition;
 export const GitHubEnterpriseServerBrowserDefinition = GitHubEnterpriseServerBaseDefinition;
+export const GoogleWorkspaceBrowserDefinition = GoogleWorkspaceMcpBaseDefinition;
 export const InceptionBrowserDefinition = InceptionDefinition;
 export const JiraBrowserDefinition = JiraBaseDefinition;
 export const KimiBrowserDefinition = KimiDefinition;
@@ -95,6 +97,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   ExpoBrowserDefinition,
   FireworksBrowserDefinition,
   GcpBrowserDefinition,
+  GoogleWorkspaceBrowserDefinition,
   InceptionBrowserDefinition,
   JiraBrowserDefinition,
   KimiBrowserDefinition,
@@ -152,6 +155,7 @@ export * from "./deepseek/index.js";
 export * from "./expo/browser.js";
 export * from "./fireworks/index.js";
 export * from "./gcp/browser.js";
+export * from "./google-workspace/browser.js";
 export * from "./github/browser.js";
 export * from "./inception/index.js";
 export * from "./jira/browser.js";

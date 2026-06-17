@@ -74,6 +74,11 @@
       "config": {}
     },
     {
+      "targetKey": "google-workspace-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "inception-default",
       "enabled": true,
       "config": {}

@@ -12,6 +12,7 @@ import {
   FireworksBrowserDefinition,
   GcpBrowserDefinition,
   GitHubCloudBrowserDefinition,
+  GoogleWorkspaceBrowserDefinition,
   InceptionBrowserDefinition,
   JiraBrowserDefinition,
   KimiBrowserDefinition,
@@ -243,6 +244,22 @@ describe("browser definitions", () => {
 
   it("keeps GCP browser definitions free of server-only OAuth handlers", () => {
     expect(GcpBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+  });
+
+  it("keeps Google Workspace browser definitions free of server-only OAuth handlers", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: GoogleWorkspaceBrowserDefinition.familyId,
+      variantId: GoogleWorkspaceBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "google-workspace",
+      variantId: "google-workspace-mcp",
+      kind: "connector",
+      displayName: "Google Workspace",
+      logoKey: "google",
+    });
+    expect(GoogleWorkspaceBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
   });
 
   it("keeps PostHog browser definitions free of server-only OAuth handlers", () => {

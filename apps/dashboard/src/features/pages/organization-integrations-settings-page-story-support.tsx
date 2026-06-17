@@ -29,6 +29,7 @@ const IntegrationRegistry = createBrowserIntegrationRegistry();
 type BuiltInIntegrationVariantId =
   | "github-cloud"
   | "github-enterprise-server"
+  | "google-workspace-mcp"
   | "jira-default"
   | "linear-default"
   | "openai-default"
@@ -80,6 +81,13 @@ function getStoryDefinitionOrThrow(
   if (variantId === "github-cloud" || variantId === "github-enterprise-server") {
     return getDefinitionOrThrow({
       familyId: "github",
+      variantId,
+    });
+  }
+
+  if (variantId === "google-workspace-mcp") {
+    return getDefinitionOrThrow({
+      familyId: "google-workspace",
       variantId,
     });
   }
@@ -460,6 +468,10 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
 export const AddFlowStorySpecs = {
   GitHubEnterpriseServer: {
     variantId: "github-enterprise-server",
+  },
+  GoogleWorkspace: {
+    initialConnectionDisplayNameValue: "Google Workspace Production",
+    variantId: "google-workspace-mcp",
   },
   Linear: {
     variantId: "linear-default",
