@@ -280,6 +280,11 @@ function config(input: {
     internalAuth: {
       serviceToken: "integration-new-internal-service-token",
     },
+    platformCredentials: {
+      openai: {
+        apiKey: "integration-new-platform-openai-api-key",
+      },
+    },
     sandbox: {
       defaultBaseImage: readSandboxBaseImageRef({
         sandbox: input.sandbox,

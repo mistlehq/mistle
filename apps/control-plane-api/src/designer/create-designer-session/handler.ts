@@ -18,6 +18,7 @@ const routeHandler = async (
     {
       db: ctx.get("db"),
       dataPlaneClient: ctx.get("dataPlaneClient"),
+      mcpConfig: ctx.get("config").mcp,
       sandboxConfig: ctx.get("sandboxConfig"),
     },
     {

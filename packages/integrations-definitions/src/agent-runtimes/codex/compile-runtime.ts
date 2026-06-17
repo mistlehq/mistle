@@ -292,3 +292,29 @@ export function compileCodexRuntime(
     ],
   };
 }
+
+export function compileInstalledCodexRuntime(input: {
+  codexCliPath: string;
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
+}): CompileAgentRuntimeResult {
+  return {
+    artifacts: [],
+    runtimeClients: buildCodexRuntimeClients({
+      codexCliInstallPath: input.codexCliPath,
+      setupFiles: buildCodexSetupFilesFromEgressRoutes({
+        egressRoutes: input.egressRoutes,
+        mcpServers: input.mcpServers,
+      }),
+    }),
+    agentRuntimes: [
+      {
+        runtimeId: "codex",
+        runtimeKey: CodexAppServerProcessKey,
+        clientId: "codex-cli",
+        endpointKey: CodexAppServerEndpointKey,
+        ptyLaunch: CodexPtyLaunchSpec,
+      },
+    ],
+  };
+}

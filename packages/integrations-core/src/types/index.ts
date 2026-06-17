@@ -1800,11 +1800,22 @@ export type MistleMcpSetupAssistantTokenEgressCredentialResolverRef = {
   sandboxProfileVersion: number;
 };
 
+export type MistleMcpDesignerTokenEgressCredentialResolverRef = {
+  kind: "mistle_mcp_designer_token";
+  designerSessionId: string;
+};
+
+export type PlatformOpenAiApiKeyEgressCredentialResolverRef = {
+  kind: "platform_openai_api_key";
+};
+
 export type EgressCredentialResolverRef =
   | IntegrationConnectionEgressCredentialResolverRef
   | LinkedPrincipalEgressCredentialResolverRef
   | MistleMcpTokenEgressCredentialResolverRef
-  | MistleMcpSetupAssistantTokenEgressCredentialResolverRef;
+  | MistleMcpSetupAssistantTokenEgressCredentialResolverRef
+  | MistleMcpDesignerTokenEgressCredentialResolverRef
+  | PlatformOpenAiApiKeyEgressCredentialResolverRef;
 
 export type IntegrationEgressCredentialResolverSelectionInput = {
   organizationId: string;

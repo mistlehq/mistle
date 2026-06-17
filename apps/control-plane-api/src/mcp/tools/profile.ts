@@ -53,7 +53,10 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
         OrganizationPermissions.SANDBOX_PROFILE_READ,
       );
 
-      if (context.organizationActor.kind === "mcp_capability") {
+      if (
+        context.organizationActor.kind === "mcp_capability" &&
+        context.organizationActor.capability.kind === "setup_assistant"
+      ) {
         const profile = await getProfile(
           {
             db: context.db,
@@ -104,7 +107,10 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
         context.organizationActor,
         OrganizationPermissions.SANDBOX_PROFILE_READ,
       );
-      if (context.organizationActor.kind === "mcp_capability") {
+      if (
+        context.organizationActor.kind === "mcp_capability" &&
+        context.organizationActor.capability.kind === "setup_assistant"
+      ) {
         requireMcpSandboxProfileScope(context.organizationActor, {
           profileId,
           version: context.organizationActor.capability.sandboxProfileVersion,

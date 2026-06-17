@@ -337,6 +337,32 @@
                           },
                           "required": ["kind", "sandboxProfileId", "sandboxProfileVersion"],
                           "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "mistle_mcp_designer_token"
+                            },
+                            "designerSessionId": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["kind", "designerSessionId"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "platform_openai_api_key"
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
                         }
                       ]
                     }
@@ -443,6 +469,32 @@
                       }
                     },
                     "required": ["kind", "sandboxProfileId", "sandboxProfileVersion"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "mistle_mcp_designer_token"
+                      },
+                      "designerSessionId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["kind", "designerSessionId"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "platform_openai_api_key"
+                      }
+                    },
+                    "required": ["kind"],
                     "additionalProperties": false
                   }
                 ]

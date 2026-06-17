@@ -43,6 +43,11 @@ function createDataPlaneGatewayConfigInput() {
     internalAuth: {
       serviceToken: "service-token",
     },
+    platformCredentials: {
+      openai: {
+        apiKey: "sk-platform-openai",
+      },
+    },
     sandbox: {
       defaultBaseImage: "registry.example.com/mistle/sandbox-base:prod",
       gatewayWsUrl: "wss://gateway.example.com/tunnel/sandbox",

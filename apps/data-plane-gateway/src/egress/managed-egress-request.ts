@@ -24,6 +24,12 @@ type RuntimePlanEgressCredentialResolver = RuntimePlanEgressRoute["credentialRes
 type AwsSessionCredential = Extract<CachedCredential, { kind: "aws_session" }>;
 const MistleMcpTokenTtlSeconds = 300;
 
+export type GatewayPlatformCredentialConfig = {
+  openai: {
+    apiKey: string;
+  };
+};
+
 type MutableManagedEgressRequest = {
   body: Uint8Array | undefined;
   headers: Headers;
@@ -60,6 +66,15 @@ type CredentialResolverInput =
       sandboxInstanceId: string;
       sandboxProfileId: string;
       sandboxProfileVersion: number;
+    }
+  | {
+      credentialResolverKind: "mistle_mcp_designer_token";
+      organizationId: string;
+      sandboxInstanceId: string;
+      designerSessionId: string;
+    }
+  | {
+      credentialResolverKind: "platform_openai_api_key";
     };
 type CredentialResolverRef =
   | {
@@ -86,6 +101,13 @@ type CredentialResolverRef =
       kind: "mistle_mcp_setup_assistant_token";
       sandboxProfileId: string;
       sandboxProfileVersion: number;
+    }
+  | {
+      kind: "mistle_mcp_designer_token";
+      designerSessionId: string;
+    }
+  | {
+      kind: "platform_openai_api_key";
     };
 
 type CredentialResolutionLogFields = {
@@ -100,6 +122,7 @@ type CredentialResolutionLogFields = {
   credentialMistleMcpApiKeyId?: string;
   credentialMistleMcpSandboxProfileId?: string;
   credentialMistleMcpSandboxProfileVersion?: number;
+  credentialMistleMcpDesignerSessionId?: string;
   credentialProviderFamily?: string;
   credentialResolverKey?: string;
   credentialSecretType?: string;
@@ -130,6 +153,7 @@ export async function buildManagedEgressRequest(input: {
   credentialCache: CredentialCache;
   mcpTokenConfig: McpTokenConfig;
   organizationId: string;
+  platformCredentials?: GatewayPlatformCredentialConfig;
   request: GatewayEgressHttpRequest;
   route: RuntimePlanEgressRoute;
   sandboxInstanceId: string;
@@ -174,6 +198,9 @@ export async function buildManagedEgressRequest(input: {
     primaryResolver,
     route: input.route,
     ...(fallbackResolver === undefined ? {} : { fallbackResolver }),
+    ...(input.platformCredentials === undefined
+      ? {}
+      : { platformCredentials: input.platformCredentials }),
     ...(input.testEnvironmentId === undefined
       ? {}
       : { testEnvironmentId: input.testEnvironmentId }),
@@ -201,6 +228,9 @@ export async function buildManagedEgressRequest(input: {
           credentialResolver: header.credentialResolver,
         }),
         mcpTokenConfig: input.mcpTokenConfig,
+        ...(input.platformCredentials === undefined
+          ? {}
+          : { platformCredentials: input.platformCredentials }),
         ...(input.testEnvironmentId === undefined
           ? {}
           : { testEnvironmentId: input.testEnvironmentId }),
@@ -504,6 +534,19 @@ function toCredentialResolverRef(input: {
     };
   }
 
+  if (input.resolver.kind === "mistle_mcp_designer_token") {
+    return {
+      kind: "mistle_mcp_designer_token",
+      designerSessionId: input.resolver.designerSessionId,
+    };
+  }
+
+  if (input.resolver.kind === "platform_openai_api_key") {
+    return {
+      kind: "platform_openai_api_key",
+    };
+  }
+
   return {
     kind: "linked_principal",
     providerFamily: input.resolver.providerFamily,
@@ -555,6 +598,21 @@ function toCredentialResolverInputFromRef(input: {
     };
   }
 
+  if (input.credentialResolver.kind === "mistle_mcp_designer_token") {
+    return {
+      credentialResolverKind: "mistle_mcp_designer_token",
+      organizationId: input.organizationId,
+      sandboxInstanceId: input.sandboxInstanceId,
+      designerSessionId: input.credentialResolver.designerSessionId,
+    };
+  }
+
+  if (input.credentialResolver.kind === "platform_openai_api_key") {
+    return {
+      credentialResolverKind: "platform_openai_api_key",
+    };
+  }
+
   if (input.credentialResolver.actingUserRequired && input.actingUserId === undefined) {
     throw new GatewayManagedEgressUnsupportedRouteError(
       "Linked-principal credential resolver is missing actingUserId.",
@@ -603,6 +661,19 @@ function normalizeSelectedCredentialResolver(
       kind: "mistle_mcp_setup_assistant_token",
       sandboxProfileId: credentialResolver.sandboxProfileId,
       sandboxProfileVersion: credentialResolver.sandboxProfileVersion,
+    };
+  }
+
+  if (credentialResolver.kind === "mistle_mcp_designer_token") {
+    return {
+      kind: "mistle_mcp_designer_token",
+      designerSessionId: credentialResolver.designerSessionId,
+    };
+  }
+
+  if (credentialResolver.kind === "platform_openai_api_key") {
+    return {
+      kind: "platform_openai_api_key",
     };
   }
 
@@ -740,6 +811,29 @@ function createCredentialCacheKey(input: {
     };
   }
 
+  if (input.resolver.credentialResolverKind === "mistle_mcp_designer_token") {
+    return {
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+      bindingId: input.bindingId,
+      credentialResolverKind: "mistle_mcp_designer_token",
+      organizationId: input.resolver.organizationId,
+      sandboxInstanceId: input.resolver.sandboxInstanceId,
+      designerSessionId: input.resolver.designerSessionId,
+    };
+  }
+
+  if (input.resolver.credentialResolverKind === "platform_openai_api_key") {
+    return {
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+      bindingId: input.bindingId,
+      credentialResolverKind: "platform_openai_api_key",
+    };
+  }
+
   return {
     ...(input.testEnvironmentId === undefined
       ? {}
@@ -764,6 +858,7 @@ async function resolveCredentialWithCache(input: {
   controlPlaneInternalClient: ControlPlaneInternalClient;
   credentialCache: CredentialCache;
   mcpTokenConfig: McpTokenConfig;
+  platformCredentials?: GatewayPlatformCredentialConfig;
   resolver: CredentialResolverInput;
   testEnvironmentId?: string;
 }): Promise<CachedCredential> {
@@ -846,6 +941,35 @@ async function resolveCredentialWithCache(input: {
       kind: "value",
       value: mintedToken.token,
       expiresAt: mintedToken.expiresAt.toISOString(),
+    };
+  } else if (input.resolver.credentialResolverKind === "mistle_mcp_designer_token") {
+    const mintedToken = await mintMcpToken({
+      claims: {
+        kind: "designer",
+        sub: input.resolver.sandboxInstanceId,
+        organizationId: input.resolver.organizationId,
+        designerSessionId: input.resolver.designerSessionId,
+      },
+      config: input.mcpTokenConfig,
+      ttlSeconds: MistleMcpTokenTtlSeconds,
+    });
+
+    resolvedCredential = {
+      kind: "value",
+      value: mintedToken.token,
+      expiresAt: mintedToken.expiresAt.toISOString(),
+    };
+  } else if (input.resolver.credentialResolverKind === "platform_openai_api_key") {
+    if (input.platformCredentials === undefined) {
+      throw new GatewayManagedEgressUnsupportedRouteError(
+        "Platform OpenAI credential resolver requires gateway platform credential config.",
+        "credential_resolution_failed",
+      );
+    }
+
+    resolvedCredential = {
+      kind: "value",
+      value: input.platformCredentials.openai.apiKey,
     };
   } else {
     resolvedCredential =
@@ -952,6 +1076,29 @@ function createCredentialResolutionLogFields(input: {
     };
   }
 
+  if (input.resolver.credentialResolverKind === "mistle_mcp_designer_token") {
+    return {
+      bindingId: input.bindingId,
+      credentialMistleMcpDesignerSessionId: input.resolver.designerSessionId,
+      credentialResolverKind: input.resolver.credentialResolverKind,
+      organizationId: input.resolver.organizationId,
+      sandboxInstanceId: input.resolver.sandboxInstanceId,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+    };
+  }
+
+  if (input.resolver.credentialResolverKind === "platform_openai_api_key") {
+    return {
+      bindingId: input.bindingId,
+      credentialResolverKind: input.resolver.credentialResolverKind,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+    };
+  }
+
   return {
     bindingId: input.bindingId,
     ...(input.resolver.credentialKind === undefined
@@ -973,6 +1120,7 @@ async function resolveCredentialWithFallback(input: {
   credentialCache: CredentialCache;
   fallbackResolver?: CredentialResolverInput;
   mcpTokenConfig: McpTokenConfig;
+  platformCredentials?: GatewayPlatformCredentialConfig;
   primaryResolver: CredentialResolverInput;
   route: RuntimePlanEgressRoute;
   testEnvironmentId?: string;
@@ -984,6 +1132,9 @@ async function resolveCredentialWithFallback(input: {
       credentialCache: input.credentialCache,
       mcpTokenConfig: input.mcpTokenConfig,
       resolver: input.primaryResolver,
+      ...(input.platformCredentials === undefined
+        ? {}
+        : { platformCredentials: input.platformCredentials }),
       ...(input.testEnvironmentId === undefined
         ? {}
         : { testEnvironmentId: input.testEnvironmentId }),
@@ -1007,6 +1158,9 @@ async function resolveCredentialWithFallback(input: {
       credentialCache: input.credentialCache,
       mcpTokenConfig: input.mcpTokenConfig,
       resolver: input.fallbackResolver,
+      ...(input.platformCredentials === undefined
+        ? {}
+        : { platformCredentials: input.platformCredentials }),
       ...(input.testEnvironmentId === undefined
         ? {}
         : { testEnvironmentId: input.testEnvironmentId }),

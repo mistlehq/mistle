@@ -38,6 +38,19 @@ export type CredentialCacheKeyInput =
       sandboxInstanceId: string;
       sandboxProfileId: string;
       sandboxProfileVersion: number;
+    }
+  | {
+      testEnvironmentId?: string;
+      bindingId: string;
+      credentialResolverKind: "mistle_mcp_designer_token";
+      organizationId: string;
+      sandboxInstanceId: string;
+      designerSessionId: string;
+    }
+  | {
+      testEnvironmentId?: string;
+      bindingId: string;
+      credentialResolverKind: "platform_openai_api_key";
     };
 
 export type CachedCredential =
@@ -153,6 +166,25 @@ function toCacheKey(input: CredentialCacheKeyInput): string {
       input.sandboxInstanceId,
       input.sandboxProfileId,
       String(input.sandboxProfileVersion),
+    ].join(":")}`;
+  }
+
+  if (input.credentialResolverKind === "mistle_mcp_designer_token") {
+    return `gateway-egress-credential:${[
+      input.testEnvironmentId ?? "",
+      input.bindingId,
+      input.credentialResolverKind,
+      input.organizationId,
+      input.sandboxInstanceId,
+      input.designerSessionId,
+    ].join(":")}`;
+  }
+
+  if (input.credentialResolverKind === "platform_openai_api_key") {
+    return `gateway-egress-credential:${[
+      input.testEnvironmentId ?? "",
+      input.bindingId,
+      input.credentialResolverKind,
     ].join(":")}`;
   }
 
