@@ -104,7 +104,7 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain(
       "MISTLE_CLAUDE_CODE_SKILLS must be a JSON array of skill names.",
     );
-    expect(ClaudeCodeRuntimeServerBundle).toContain('settingSources: ["user", "project"]');
+    expect(ClaudeCodeRuntimeServerBundle).not.toContain("settingSources");
     expect(ClaudeCodeRuntimeServerBundle).toContain("skills: selectedClaudeCodeSkills");
   });
 

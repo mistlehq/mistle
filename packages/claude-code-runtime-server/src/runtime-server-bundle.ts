@@ -477,7 +477,6 @@ function createClaudeQueryOptions(input) {
     selectedClaudeCodeSkills.length === 0
       ? {}
       : {
-          settingSources: ["user", "project"],
           skills: selectedClaudeCodeSkills,
         };
   return {
