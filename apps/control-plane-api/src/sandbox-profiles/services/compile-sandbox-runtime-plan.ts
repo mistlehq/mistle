@@ -4,6 +4,7 @@ import type {
   SandboxProfileVersionSkillsConfig,
   SandboxProfileVersionAgentRuntimeId,
 } from "@mistle/db/control-plane";
+import { SandboxProfileVersionAgentRuntimeIds } from "@mistle/db/control-plane";
 import {
   CompilerErrorCodes,
   DefaultSandboxWorkspaceDir,
@@ -36,6 +37,7 @@ const MistleMcpEgressRuleId = "egress_rule_platform_mistle_mcp";
 const MistleMcpBindingId = "platform-mistle-mcp";
 const MistleMcpFamilyId = "mistle";
 const MistleMcpVariantId = "mistle-mcp";
+const ClaudeCodeSelectedSkillsEnv = "MISTLE_CLAUDE_CODE_SKILLS";
 
 export const SandboxRuntimePlanCompilerErrorCodes = {
   PROFILE_NOT_FOUND: "PROFILE_NOT_FOUND",
@@ -558,6 +560,10 @@ export async function compileSandboxRuntimePlan(
       runtimePlan: runtimePlanWithSkillsSources,
       skillsConfig: sandboxProfileVersion.skillsConfig,
     });
+    const runtimePlanWithClaudeCodeSkills = resolveRuntimePlanWithClaudeCodeSkills({
+      runtimePlan: runtimePlanWithSkillsSources,
+      skills,
+    });
 
     const snapshotPreparationScriptKind = input.snapshotPreparationScriptKind ?? "setup";
     const snapshotPreparationScript = normalizeSnapshotPreparationScript(
@@ -567,7 +573,7 @@ export async function compileSandboxRuntimePlan(
     );
 
     return {
-      ...runtimePlanWithSkillsSources,
+      ...runtimePlanWithClaudeCodeSkills,
       ...(skills === undefined ? {} : { skills }),
       ...(snapshotPreparationScript === undefined
         ? {}
@@ -584,6 +590,49 @@ export async function compileSandboxRuntimePlan(
 
     throw error;
   }
+}
+
+function resolveRuntimePlanWithClaudeCodeSkills(input: {
+  runtimePlan: CompiledRuntimePlan;
+  skills: CompiledRuntimePlanSkills | undefined;
+}): CompiledRuntimePlan {
+  if (input.skills === undefined || input.skills.selectedSkills.length === 0) {
+    return input.runtimePlan;
+  }
+
+  const claudeCodeRuntimeClientIds = new Set(
+    input.runtimePlan.agentRuntimes
+      .filter(
+        (agentRuntime) =>
+          agentRuntime.runtimeId === SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE,
+      )
+      .map((agentRuntime) => agentRuntime.clientId),
+  );
+
+  if (claudeCodeRuntimeClientIds.size === 0) {
+    return input.runtimePlan;
+  }
+
+  const selectedSkillNames = input.skills.selectedSkills.map((skill) => skill.name);
+  return {
+    ...input.runtimePlan,
+    runtimeClients: input.runtimePlan.runtimeClients.map((runtimeClient) => {
+      if (!claudeCodeRuntimeClientIds.has(runtimeClient.clientId)) {
+        return runtimeClient;
+      }
+
+      return {
+        ...runtimeClient,
+        setup: {
+          ...runtimeClient.setup,
+          env: {
+            ...runtimeClient.setup.env,
+            [ClaudeCodeSelectedSkillsEnv]: JSON.stringify(selectedSkillNames),
+          },
+        },
+      };
+    }),
+  };
 }
 
 function resolveRuntimePlanWithSkillsSources(input: {

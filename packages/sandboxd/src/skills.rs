@@ -16,6 +16,7 @@ use yaml_rust2::{Yaml, YamlLoader};
 
 const SKILL_FILE_NAME: &str = "SKILL.md";
 const AGENT_SKILLS_TARGET_ROOT: &str = "/root/.agents/skills";
+const CLAUDE_CODE_SKILLS_TARGET_ROOT: &str = "/root/.claude/skills";
 const MANAGED_SKILLS_MANIFEST_FILE_NAME: &str = ".mistle-managed-skills.json";
 const MANAGED_SKILLS_MANIFEST_VERSION: u32 = 1;
 
@@ -210,6 +211,7 @@ impl std::error::Error for SkillsDiscoverError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SkillsRuntime {
+    ClaudeCode,
     Codex,
     OpenCode,
     Pi,
@@ -218,6 +220,7 @@ pub enum SkillsRuntime {
 impl SkillsRuntime {
     pub fn parse(value: &str) -> Result<Self, SkillsReconcileError> {
         match value {
+            "claude-code" => Ok(Self::ClaudeCode),
             "codex" => Ok(Self::Codex),
             "opencode" => Ok(Self::OpenCode),
             "pi" => Ok(Self::Pi),
@@ -227,6 +230,7 @@ impl SkillsRuntime {
 
     fn as_str(&self) -> &'static str {
         match self {
+            Self::ClaudeCode => "claude-code",
             Self::Codex => "codex",
             Self::OpenCode => "opencode",
             Self::Pi => "pi",
@@ -234,7 +238,10 @@ impl SkillsRuntime {
     }
 
     fn default_target_root(&self) -> PathBuf {
-        PathBuf::from(AGENT_SKILLS_TARGET_ROOT)
+        match self {
+            Self::ClaudeCode => PathBuf::from(CLAUDE_CODE_SKILLS_TARGET_ROOT),
+            Self::Codex | Self::OpenCode | Self::Pi => PathBuf::from(AGENT_SKILLS_TARGET_ROOT),
+        }
     }
 }
 
@@ -513,7 +520,7 @@ impl fmt::Display for SkillsReconcileError {
             Self::UnknownRuntime(runtime) => {
                 write!(
                     f,
-                    "unknown skills runtime '{runtime}' (expected 'codex', 'opencode', or 'pi')"
+                    "unknown skills runtime '{runtime}' (expected 'claude-code', 'codex', 'opencode', or 'pi')"
                 )
             }
             Self::Discover(error) => write!(f, "{error}"),
@@ -1889,6 +1896,31 @@ description: Local skill.
 
         fs::remove_dir_all(repo_root).expect("repo should be removable");
         fs::remove_dir_all(target_root).expect("target root should be removable");
+    }
+
+    #[test]
+    fn claude_code_runtime_targets_native_claude_skills_directory() {
+        let runtime = SkillsRuntime::parse("claude-code")
+            .expect("claude-code should be a supported skills runtime");
+
+        assert_eq!(runtime.as_str(), "claude-code");
+        assert_eq!(
+            runtime.default_target_root(),
+            PathBuf::from("/root/.claude/skills")
+        );
+    }
+
+    #[test]
+    fn codex_opencode_and_pi_keep_shared_agent_skills_directory() {
+        for runtime_id in ["codex", "opencode", "pi"] {
+            let runtime =
+                SkillsRuntime::parse(runtime_id).expect("runtime should be supported for skills");
+
+            assert_eq!(
+                runtime.default_target_root(),
+                PathBuf::from("/root/.agents/skills")
+            );
+        }
     }
 
     #[test]

@@ -99,6 +99,15 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain("{ effort: input.reasoningEffort }");
   });
 
+  it("enables Mistle-selected Claude Code skills through SDK query options", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain("process.env.MISTLE_CLAUDE_CODE_SKILLS");
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "MISTLE_CLAUDE_CODE_SKILLS must be a JSON array of skill names.",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain('settingSources: ["user", "project"]');
+    expect(ClaudeCodeRuntimeServerBundle).toContain("skills: selectedClaudeCodeSkills");
+  });
+
   it("loads Claude Code model catalog lazily through the SDK", () => {
     expect(ClaudeCodeRuntimeServerBundle).not.toContain("const ClaudeCodeModels = [");
     expect(ClaudeCodeRuntimeServerBundle).toContain('case "session/model-catalog"');
