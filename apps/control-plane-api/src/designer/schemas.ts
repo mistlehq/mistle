@@ -100,12 +100,40 @@ const designerRuntimeConversationTranscriptTurnSchema = z
   })
   .strict();
 
+const designerActionProposalDetailSchema = z
+  .object({
+    label: z.string().min(1).max(120),
+    value: z.string().min(1).max(2_000),
+  })
+  .strict();
+
+export const designerActionProposalSchema = z
+  .object({
+    id: z.string().min(1).max(255),
+    kind: z.literal("designerActionProposal"),
+    title: z.string().min(1).max(160),
+    summary: z.string().min(1).max(2_000),
+    status: z.enum(["pending", "approved", "declined"]),
+    operation: z
+      .object({
+        kind: z.literal("providerConfigurationChange"),
+        provider: z.string().min(1).max(120),
+        resourceType: z.string().min(1).max(120),
+        resourceLabel: z.string().min(1).max(240).nullable(),
+        action: z.string().min(1).max(160),
+        details: z.array(designerActionProposalDetailSchema).max(20),
+      })
+      .strict(),
+  })
+  .strict();
+
 const designerRuntimeConversationTranscriptSchema = z
   .object({
     providerConversationId: z.string().min(1),
     name: z.string().nullable(),
     preview: z.string().nullable(),
     turns: z.array(designerRuntimeConversationTranscriptTurnSchema),
+    actionProposals: z.array(designerActionProposalSchema),
   })
   .strict();
 
@@ -136,6 +164,7 @@ export const getDesignerRuntimeConversationTranscriptResponseSchema = z
   .strict();
 
 export type DesignerSessionResponse = z.infer<typeof designerSessionSchema>;
+export type DesignerActionProposal = z.infer<typeof designerActionProposalSchema>;
 export type CreateDesignerSessionBody = z.infer<typeof createDesignerSessionBodySchema>;
 export type PutDesignerSessionCanvasTabsBody = z.infer<
   typeof putDesignerSessionCanvasTabsBodySchema

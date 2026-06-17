@@ -81,6 +81,33 @@ const DesignerRuntimeConversationTranscriptTurnSchema = z
   })
   .strict();
 
+const DesignerActionProposalDetailSchema = z
+  .object({
+    label: z.string().min(1),
+    value: z.string().min(1),
+  })
+  .strict();
+
+const DesignerActionProposalSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: z.literal("designerActionProposal"),
+    title: z.string().min(1),
+    summary: z.string().min(1),
+    status: z.enum(["pending", "approved", "declined"]),
+    operation: z
+      .object({
+        kind: z.literal("providerConfigurationChange"),
+        provider: z.string().min(1),
+        resourceType: z.string().min(1),
+        resourceLabel: z.string().min(1).nullable(),
+        action: z.string().min(1),
+        details: z.array(DesignerActionProposalDetailSchema),
+      })
+      .strict(),
+  })
+  .strict();
+
 const GetDesignerRuntimeConversationTranscriptResponseSchema = z
   .object({
     runtimeConversationTranscript: z
@@ -89,6 +116,7 @@ const GetDesignerRuntimeConversationTranscriptResponseSchema = z
         name: z.string().nullable(),
         preview: z.string().nullable(),
         turns: z.array(DesignerRuntimeConversationTranscriptTurnSchema),
+        actionProposals: z.array(DesignerActionProposalSchema),
       })
       .strict(),
   })
@@ -104,6 +132,7 @@ export type DesignerRuntimeFollowUpSubmission = z.output<
 export type DesignerRuntimeConversationTranscript = z.output<
   typeof GetDesignerRuntimeConversationTranscriptResponseSchema
 >["runtimeConversationTranscript"];
+export type DesignerActionProposal = z.output<typeof DesignerActionProposalSchema>;
 
 export const designerSessionsQueryKey = ["designer", "sessions"] as const;
 export const designerRuntimeConversationBootstrapQueryKey = [

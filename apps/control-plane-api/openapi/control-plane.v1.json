@@ -1323,9 +1323,107 @@
                             "required": ["id", "status", "items"],
                             "additionalProperties": false
                           }
+                        },
+                        "actionProposals": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 255
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": ["designerActionProposal"]
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "summary": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2000
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": ["pending", "approved", "declined"]
+                              },
+                              "operation": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["providerConfigurationChange"]
+                                  },
+                                  "provider": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 120
+                                  },
+                                  "resourceType": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 120
+                                  },
+                                  "resourceLabel": {
+                                    "type": ["string", "null"],
+                                    "minLength": 1,
+                                    "maxLength": 240
+                                  },
+                                  "action": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "details": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 120
+                                        },
+                                        "value": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": ["label", "value"],
+                                      "additionalProperties": false
+                                    },
+                                    "maxItems": 20
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "provider",
+                                  "resourceType",
+                                  "resourceLabel",
+                                  "action",
+                                  "details"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": ["id", "kind", "title", "summary", "status", "operation"],
+                            "additionalProperties": false
+                          }
                         }
                       },
-                      "required": ["providerConversationId", "name", "preview", "turns"],
+                      "required": [
+                        "providerConversationId",
+                        "name",
+                        "preview",
+                        "turns",
+                        "actionProposals"
+                      ],
                       "additionalProperties": false
                     }
                   },

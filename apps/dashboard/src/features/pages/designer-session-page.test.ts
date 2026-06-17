@@ -11,6 +11,7 @@ function createTranscript(
     name: null,
     preview: null,
     turns,
+    actionProposals: [],
   };
 }
 
