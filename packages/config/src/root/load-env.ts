@@ -453,6 +453,37 @@ const RootEnvDescriptors = [
     path: ["sandbox", "default_base_image"],
   },
   {
+    envVar: "MISTLE_DESIGNER_SANDBOX_BASE_IMAGE",
+    path: ["sandbox", "designer", "base_image"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_CODEX_CLI_PATH",
+    path: ["sandbox", "designer", "codex_cli_path"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_SANDBOX_PROVIDER",
+    path: ["sandbox", "designer", "sandbox_provider"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_SANDBOX_CONNECTION_ID",
+    path: ["sandbox", "designer", "sandbox_connection_id"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_SANDBOX_VCPU_COUNT",
+    path: ["sandbox", "designer", "sandbox_resources", "vcpu_count"],
+    parse: parseNumberEnv,
+  },
+  {
+    envVar: "MISTLE_DESIGNER_SANDBOX_MEMORY_MB",
+    path: ["sandbox", "designer", "sandbox_resources", "memory_mb"],
+    parse: parseNumberEnv,
+  },
+  {
+    envVar: "MISTLE_DESIGNER_SANDBOX_DISK_MB",
+    path: ["sandbox", "designer", "sandbox_resources", "disk_mb"],
+    parse: parseNumberEnv,
+  },
+  {
     envVar: "MISTLE_SANDBOX_DOCKER_ENABLED",
     path: ["sandbox", "docker", "enabled"],
     parse: parseBooleanEnv,

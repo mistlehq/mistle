@@ -89,6 +89,13 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: "control",
       MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID: "data",
       MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: "registry.example.com/sandbox:latest",
+      MISTLE_DESIGNER_SANDBOX_BASE_IMAGE: "registry.example.com/designer:latest",
+      MISTLE_DESIGNER_CODEX_CLI_PATH: "/usr/local/bin/codex",
+      MISTLE_DESIGNER_SANDBOX_PROVIDER: "docker",
+      MISTLE_DESIGNER_SANDBOX_CONNECTION_ID: "sbc_designer",
+      MISTLE_DESIGNER_SANDBOX_VCPU_COUNT: "2",
+      MISTLE_DESIGNER_SANDBOX_MEMORY_MB: "4096",
+      MISTLE_DESIGNER_SANDBOX_DISK_MB: "8192",
       MISTLE_SANDBOX_DOCKER_ENABLED: "true",
       MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
       MISTLE_SANDBOX_DOCKER_NETWORK_NAME: "mistle-sandbox",
@@ -286,6 +293,17 @@ describe("loadRootConfigFromEnv", () => {
       sandbox: {
         default_base_image: "registry.example.com/sandbox:latest",
         publish_base_domain: "mistle.example",
+        designer: {
+          base_image: "registry.example.com/designer:latest",
+          codex_cli_path: "/usr/local/bin/codex",
+          sandbox_provider: "docker",
+          sandbox_connection_id: "sbc_designer",
+          sandbox_resources: {
+            vcpu_count: 2,
+            memory_mb: 4096,
+            disk_mb: 8192,
+          },
+        },
         docker: {
           enabled: true,
           socket_path: "/var/run/docker.sock",
