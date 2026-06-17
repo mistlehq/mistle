@@ -21,6 +21,7 @@ function createRootConfig(input: {
     client_secret: string;
   };
   kvControlPlane?: Config["kv"]["control_plane"];
+  platformCredentials?: Config["platform_credentials"];
   sandbox?: Partial<Config["sandbox"]>;
   welcomeEmail?: Config["services"]["control_plane_api"]["auth"]["welcome_email"];
 }): Config {
@@ -134,6 +135,9 @@ function createRootConfig(input: {
     gateway_relay: input.gatewayRelay ?? {
       backend: "memory",
     },
+    ...(input.platformCredentials === undefined
+      ? {}
+      : { platform_credentials: input.platformCredentials }),
     object_store: {
       assets: {
         bucket_name: "assets",
@@ -575,6 +579,24 @@ describe("selectDataPlaneGatewayConfig", () => {
 
     expect(config.portAccess).toEqual({
       authorizationTimeoutMs: 250,
+    });
+  });
+
+  it("projects platform credentials for gateway managed egress", () => {
+    const config = selectDataPlaneGatewayConfig(
+      createRootConfig({
+        platformCredentials: {
+          openai: {
+            api_key: "platform-openai-key",
+          },
+        },
+      }),
+    );
+
+    expect(config.platformCredentials).toEqual({
+      openai: {
+        apiKey: "platform-openai-key",
+      },
     });
   });
 });

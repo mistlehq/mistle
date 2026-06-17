@@ -466,6 +466,14 @@ export function selectDataPlaneGatewayConfig(config: Config): DataPlaneGatewayCo
     internalAuth: {
       serviceToken: config.internal_auth.shared_token.token,
     },
+    platformCredentials:
+      config.platform_credentials?.openai === undefined
+        ? undefined
+        : {
+            openai: {
+              apiKey: config.platform_credentials.openai.api_key,
+            },
+          },
     sandbox: globalConfig.sandbox,
     telemetry: globalConfig.telemetry,
   };

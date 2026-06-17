@@ -117,6 +117,17 @@ const GatewayRelaySchema = z
   ])
   .default({ backend: "memory" });
 
+const PlatformCredentialsSchema = z
+  .object({
+    openai: z
+      .object({
+        api_key: z.string().trim().min(1),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 const SandboxDockerProviderConfigSchema = z.discriminatedUnion("enabled", [
   z
     .object({
@@ -401,6 +412,7 @@ export const ConfigSchema = z
       })
       .strict(),
     gateway_relay: GatewayRelaySchema,
+    platform_credentials: PlatformCredentialsSchema.optional(),
     object_store: z
       .object({
         assets: ObjectStoreSchema,
