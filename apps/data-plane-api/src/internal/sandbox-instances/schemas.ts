@@ -63,7 +63,14 @@ export const GetSandboxInstanceResponseSchema = z
 export const SandboxInstanceMetadataResponseSchema = z
   .object({
     id: z.string().min(1),
-    purpose: z.enum(["session", "snapshot", "setup_assistant", "setup_check", "skills_discovery"]),
+    purpose: z.enum([
+      "session",
+      "designer",
+      "snapshot",
+      "setup_assistant",
+      "setup_check",
+      "skills_discovery",
+    ]),
     deletedAt: z.string().min(1).nullable(),
   })
   .strict()

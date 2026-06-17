@@ -381,6 +381,7 @@ function createRuntimeStateDecisionSnapshot(
 export function isWorkflowUserStopReasonSupportedPurpose(purpose: SandboxInstancePurpose): boolean {
   return (
     purpose === SandboxInstancePurposes.SESSION ||
+    purpose === SandboxInstancePurposes.DESIGNER ||
     purpose === SandboxInstancePurposes.SETUP_ASSISTANT ||
     purpose === SandboxInstancePurposes.SETUP_CHECK ||
     purpose === SandboxInstancePurposes.SKILLS_DISCOVERY

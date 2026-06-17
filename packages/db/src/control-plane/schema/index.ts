@@ -1,5 +1,12 @@
 export { accounts } from "./accounts.js";
 export {
+  designerSessions,
+  type DesignerSession,
+  type DesignerSessionCanvasTab,
+  type DesignerSessionCanvasTabs,
+  type InsertDesignerSession,
+} from "./designer-sessions.js";
+export {
   apiKeyPermissions,
   type ApiKeyPermission,
   type InsertApiKeyPermission,

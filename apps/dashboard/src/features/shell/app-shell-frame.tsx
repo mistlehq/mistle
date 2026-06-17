@@ -5,7 +5,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@mistle/ui";
-import { HouseIcon, LightningIcon, PackageIcon, PuzzlePieceIcon } from "@phosphor-icons/react";
+import {
+  HouseIcon,
+  LightningIcon,
+  PackageIcon,
+  PuzzlePieceIcon,
+  SparkleIcon,
+} from "@phosphor-icons/react";
 import { NavLink } from "react-router";
 
 import { ErrorNotice } from "../auth/error-notice.js";
@@ -24,6 +30,13 @@ import { TopLoadingBar } from "./top-loading-bar.js";
 
 function HomeNavIcon(props: { className?: string; "aria-hidden"?: boolean }): React.JSX.Element {
   return <HouseIcon {...props} />;
+}
+
+function DesignerNavIcon(props: {
+  className?: string;
+  "aria-hidden"?: boolean;
+}): React.JSX.Element {
+  return <SparkleIcon {...props} />;
 }
 
 function SandboxProfilesNavIcon(props: {
@@ -64,10 +77,6 @@ export function resolveAppShellFrame(input: {
   handleNavigateToSettings: () => void;
   handleSignOut: () => void;
   handleSwitchOrganization: (organizationId: string) => void;
-  inDashboardRoot: boolean;
-  inIntegrations: boolean;
-  inSandboxProfiles: boolean;
-  inSessionDetail: boolean;
   inSessions: boolean;
   inSettings: boolean;
   isSigningOut: boolean;
@@ -107,7 +116,7 @@ export function resolveAppShellFrame(input: {
 
   return {
     contentInsetOwner: input.pageMeta.appShellInsetOwner,
-    renderSidebarTrigger: !input.inSessionDetail,
+    renderSidebarTrigger: input.pageMeta.sidebarTriggerOwner === "page-frame",
     sidebarContent: showDedicatedSessionsSidebar ? (
       <div className="animate-in fade-in-0 duration-200">
         <SessionsSidebarHeader
@@ -145,7 +154,7 @@ export function resolveAppShellFrame(input: {
       />
     ),
     topLoadingBar: <TopLoadingBar />,
-    viewportMode: input.inSessionDetail ? "workspace" : input.pageMeta.appShellViewportMode,
+    viewportMode: input.pageMeta.appShellViewportMode,
   };
 }
 
@@ -177,6 +186,18 @@ function MainSidebarContent(input: {
             >
               <HomeNavIcon aria-hidden className="size-5 shrink-0 md:size-4" />
               <span>Home</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={
+                input.locationPathname === "/designer" ||
+                input.locationPathname.startsWith("/designer/")
+              }
+              render={<NavLink to="/designer" />}
+            >
+              <DesignerNavIcon aria-hidden className="size-5 shrink-0 md:size-4" />
+              <span>Designer</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>

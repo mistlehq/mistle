@@ -38,6 +38,7 @@ export type AppBreadcrumb = {
 export type AppPageMeta = {
   appShellInsetOwner: "app-shell" | "child";
   appShellViewportMode: "document" | "workspace";
+  sidebarTriggerOwner: "none" | "page-frame" | "workspace";
   title: string | null;
   headerIcon: React.ReactNode | null;
   supportingText: string | null;
@@ -370,6 +371,7 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
       supportingText: null,
       appShellInsetOwner: "app-shell",
       appShellViewportMode: "document",
+      sidebarTriggerOwner: "page-frame",
     };
   }
 
@@ -396,6 +398,7 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
         supportingText,
         appShellInsetOwner: handle.appShellInsetOwner ?? "app-shell",
         appShellViewportMode: handle.appShellViewportMode ?? "document",
+        sidebarTriggerOwner: handle.sidebarTriggerOwner ?? "page-frame",
       };
     }
   }
@@ -406,6 +409,7 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
     supportingText: null,
     appShellInsetOwner: "app-shell",
     appShellViewportMode: "document",
+    sidebarTriggerOwner: "page-frame",
   };
 }
 

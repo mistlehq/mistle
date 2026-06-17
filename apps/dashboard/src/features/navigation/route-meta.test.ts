@@ -167,6 +167,7 @@ describe("route breadcrumb metadata", () => {
     ).toEqual({
       appShellInsetOwner: "app-shell",
       appShellViewportMode: "document",
+      sidebarTriggerOwner: "page-frame",
       title: "Integrations",
       headerIcon: null,
       supportingText: "",
@@ -191,6 +192,7 @@ describe("route breadcrumb metadata", () => {
     ).toEqual({
       appShellInsetOwner: "app-shell",
       appShellViewportMode: "document",
+      sidebarTriggerOwner: "page-frame",
       title: "Integration connection",
       headerIcon: "Custom icon",
       supportingText: "github-cloud",
@@ -214,6 +216,7 @@ describe("route breadcrumb metadata", () => {
     ).toEqual({
       appShellInsetOwner: "child",
       appShellViewportMode: "workspace",
+      sidebarTriggerOwner: "page-frame",
       title: "Create trigger",
       headerIcon: null,
       supportingText: "",

@@ -30,6 +30,7 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
     {
       organizationId: query.organizationId,
       instanceId: params.id,
+      ...(query.allowedPurposes === undefined ? {} : { allowedPurposes: query.allowedPurposes }),
     },
   );
 

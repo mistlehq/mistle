@@ -1014,6 +1014,456 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/designer/sessions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          limit?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description List Designer sessions. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              items: {
+                canvasTabs: {
+                  href: string;
+                  id: string;
+                  title: string;
+                }[];
+                connectable: boolean;
+                createdAt: string;
+                failureCode: string | null;
+                failureMessage: string | null;
+                id: string;
+                initialPrompt: string | null;
+                organizationId: string;
+                sandboxInstanceId: string;
+                /** @enum {string|null} */
+                status:
+                  | "pending"
+                  | "starting"
+                  | "started"
+                  | "initializing"
+                  | "running"
+                  | "degraded"
+                  | "reconnecting"
+                  | "stopping"
+                  | "stopped"
+                  | "failed"
+                  | null;
+                title: string | null;
+                updatedAt: string;
+              }[];
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            idempotencyKey?: string;
+            prompt: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Create a Designer session. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              canvasTabs: {
+                href: string;
+                id: string;
+                title: string;
+              }[];
+              connectable: boolean;
+              createdAt: string;
+              failureCode: string | null;
+              failureMessage: string | null;
+              id: string;
+              initialPrompt: string | null;
+              organizationId: string;
+              sandboxInstanceId: string;
+              /** @enum {string|null} */
+              status:
+                | "pending"
+                | "starting"
+                | "started"
+                | "initializing"
+                | "running"
+                | "degraded"
+                | "reconnecting"
+                | "stopping"
+                | "stopped"
+                | "failed"
+                | null;
+              title: string | null;
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "DESIGNER_SANDBOX_RUNTIME_UNAVAILABLE";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/designer/sessions/{sessionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          sessionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Get a Designer session. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              canvasTabs: {
+                href: string;
+                id: string;
+                title: string;
+              }[];
+              connectable: boolean;
+              createdAt: string;
+              failureCode: string | null;
+              failureMessage: string | null;
+              id: string;
+              initialPrompt: string | null;
+              organizationId: string;
+              sandboxInstanceId: string;
+              /** @enum {string|null} */
+              status:
+                | "pending"
+                | "starting"
+                | "started"
+                | "initializing"
+                | "running"
+                | "degraded"
+                | "reconnecting"
+                | "stopping"
+                | "stopped"
+                | "failed"
+                | null;
+              title: string | null;
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Designer session was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "DESIGNER_SESSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/designer/sessions/{sessionId}/canvas-tabs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          sessionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            tabs: {
+              href: string;
+              id: string;
+              title: string;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Update Designer session canvas tabs. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              canvasTabs: {
+                href: string;
+                id: string;
+                title: string;
+              }[];
+              connectable: boolean;
+              createdAt: string;
+              failureCode: string | null;
+              failureMessage: string | null;
+              id: string;
+              initialPrompt: string | null;
+              organizationId: string;
+              sandboxInstanceId: string;
+              /** @enum {string|null} */
+              status:
+                | "pending"
+                | "starting"
+                | "started"
+                | "initializing"
+                | "running"
+                | "degraded"
+                | "reconnecting"
+                | "stopping"
+                | "stopped"
+                | "failed"
+                | null;
+              title: string | null;
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Designer session was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "DESIGNER_SESSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/home": {
     parameters: {
       query?: never;

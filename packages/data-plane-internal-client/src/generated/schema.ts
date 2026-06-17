@@ -241,6 +241,7 @@ export interface paths {
             /** @enum {string} */
             purpose:
               | "session"
+              | "designer"
               | "snapshot"
               | "setup_assistant"
               | "setup_check"
@@ -729,6 +730,7 @@ export interface paths {
     get: {
       parameters: {
         query: {
+          allowedPurposes?: string;
           organizationId: string;
         };
         header?: never;
@@ -1545,6 +1547,7 @@ export interface paths {
               /** @enum {string} */
               purpose:
                 | "session"
+                | "designer"
                 | "snapshot"
                 | "setup_assistant"
                 | "setup_check"

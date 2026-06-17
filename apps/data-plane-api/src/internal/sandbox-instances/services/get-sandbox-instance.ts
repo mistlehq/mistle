@@ -14,7 +14,7 @@ import {
   SandboxInspectStates,
   type SandboxAdapter,
 } from "@mistle/sandbox";
-import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { AppRuntimeResources } from "../../../resources.js";
 import { assertRuntimeSandboxProvider } from "../../../sandbox/adapter.js";
@@ -38,6 +38,13 @@ type GetSandboxInstanceContext = {
   tables: Pick<DataPlaneTables, "sandboxInstances">;
   runtimeStateReader: AppRuntimeResources["runtimeStateReader"];
 };
+
+const DefaultReadableSandboxInstancePurposes = [
+  SandboxInstancePurposes.SESSION,
+  SandboxInstancePurposes.SETUP_ASSISTANT,
+  SandboxInstancePurposes.SETUP_CHECK,
+  SandboxInstancePurposes.SKILLS_DISCOVERY,
+] as const;
 
 type SandboxInstanceRuntimeSelection = {
   organizationId: string;
@@ -600,6 +607,7 @@ export async function getSandboxInstance(
   ctx: GetSandboxInstanceContext,
   input: GetSandboxInstanceInput,
 ): Promise<GetSandboxInstanceResponse> {
+  const allowedPurposes = input.allowedPurposes ?? DefaultReadableSandboxInstancePurposes;
   const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
     columns: {
       id: true,
@@ -622,12 +630,7 @@ export async function getSandboxInstance(
         eq(table.id, input.instanceId),
         whereEq(table.organizationId, input.organizationId),
         isNull(table.deletedAt),
-        or(
-          whereEq(table.purpose, SandboxInstancePurposes.SESSION),
-          whereEq(table.purpose, SandboxInstancePurposes.SETUP_ASSISTANT),
-          whereEq(table.purpose, SandboxInstancePurposes.SETUP_CHECK),
-          whereEq(table.purpose, SandboxInstancePurposes.SKILLS_DISCOVERY),
-        ),
+        inArray(table.purpose, allowedPurposes),
       ),
   });
   if (sandboxInstance === undefined) {
