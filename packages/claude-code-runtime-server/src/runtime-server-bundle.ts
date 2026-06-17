@@ -9,6 +9,9 @@ const listenPort = Number.parseInt(process.env.MISTLE_CLAUDE_CODE_RUNTIME_PORT ?
 const healthPath = process.env.MISTLE_CLAUDE_CODE_RUNTIME_HEALTH_PATH ?? "/health";
 const websocketPath = process.env.MISTLE_CLAUDE_CODE_RUNTIME_WS_PATH ?? "/agent";
 const defaultWorkspaceRoot = "/root";
+const selectedClaudeCodeSkills = parseSelectedClaudeCodeSkills(
+  process.env.MISTLE_CLAUDE_CODE_SKILLS,
+);
 
 if (!Number.isInteger(listenPort) || listenPort <= 0 || listenPort > 65535) {
   throw new Error("MISTLE_CLAUDE_CODE_RUNTIME_PORT must be a valid TCP port.");
@@ -23,6 +26,40 @@ const ClaudeCodeReasoningEffortLabels = new Map([
   ["xhigh", "Extra high"],
   ["max", "Max"],
 ]);
+
+function parseSelectedClaudeCodeSkills(rawValue) {
+  if (rawValue === undefined || rawValue.length === 0) {
+    return [];
+  }
+
+  let parsedValue;
+  try {
+    parsedValue = JSON.parse(rawValue);
+  } catch (error) {
+    throw new Error("MISTLE_CLAUDE_CODE_SKILLS must be a JSON array of skill names.", {
+      cause: error,
+    });
+  }
+
+  if (!Array.isArray(parsedValue)) {
+    throw new Error("MISTLE_CLAUDE_CODE_SKILLS must be a JSON array of skill names.");
+  }
+
+  const selectedSkills = [];
+  const seenSkillNames = new Set();
+  for (const skillName of parsedValue) {
+    if (typeof skillName !== "string" || skillName.length === 0) {
+      throw new Error("MISTLE_CLAUDE_CODE_SKILLS must contain only non-empty skill names.");
+    }
+    if (seenSkillNames.has(skillName)) {
+      throw new Error("MISTLE_CLAUDE_CODE_SKILLS must not contain duplicate skill names.");
+    }
+    seenSkillNames.add(skillName);
+    selectedSkills.push(skillName);
+  }
+
+  return selectedSkills;
+}
 
 function sendJson(socket, payload) {
   socket.send(JSON.stringify(payload));
@@ -436,12 +473,19 @@ function createClaudeQueryOptions(input) {
     input.session.kind === "new"
       ? { sessionId: input.session.sessionId }
       : { resume: input.session.sessionId };
+  const skillOptions =
+    selectedClaudeCodeSkills.length === 0
+      ? {}
+      : {
+          skills: selectedClaudeCodeSkills,
+        };
   return {
     ...(input.cwd === undefined || input.cwd === null
       ? {}
       : { cwd: resolveClaudeCodeCwd(input.cwd) }),
     systemPrompt: { type: "preset", preset: "claude_code" },
     includePartialMessages: true,
+    ...skillOptions,
     ...(input.abortController === undefined ? {} : { abortController: input.abortController }),
     ...(input.model === undefined || input.model === null ? {} : { model: input.model }),
     ...(input.reasoningEffort === undefined || input.reasoningEffort === null

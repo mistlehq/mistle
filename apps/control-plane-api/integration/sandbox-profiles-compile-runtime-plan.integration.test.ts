@@ -891,6 +891,77 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     });
   });
 
+  it("passes selected sandbox profile skills to Claude Code runtime setup", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-compile-claude-code-skills@example.com",
+    });
+
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_claude_code_skills",
+      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE,
+      skillsConfig: {
+        originUrl: "https://github.com/acme/agent-skills.git",
+        selectedSkills: [
+          {
+            name: "grill-with-docs",
+            relativePath: "skills/grill-with-docs",
+          },
+          {
+            name: "write-a-skill",
+            relativePath: "skills/write-a-skill",
+          },
+        ],
+      },
+    });
+    await seedAgentBinding(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_claude_code_skills",
+      targetKey: "anthropic-default-compile-claude-code-skills",
+      connectionId: "icn_compile_claude_code_skills_anthropic",
+      bindingId: "ibd_compile_claude_code_skills_anthropic",
+      familyId: "anthropic",
+      variantId: "anthropic-default",
+      displayName: "Compile Claude Code Skills Anthropic Connection",
+      config: {},
+    });
+
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_claude_code_skills",
+    });
+    const claudeRuntimeClient = runtimePlan.runtimeClients.find(
+      (runtimeClient) => runtimeClient.clientId === "claude-code-runtime-server",
+    );
+
+    expect(runtimePlan.workspaceSources).toContainEqual({
+      sourceKind: "git-clone",
+      resourceKind: "repository",
+      path: "/root/acme/agent-skills",
+      originUrl: "https://github.com/acme/agent-skills.git",
+    });
+    expect(runtimePlan.skills).toEqual({
+      originUrl: "https://github.com/acme/agent-skills.git",
+      selectedSkills: [
+        {
+          name: "grill-with-docs",
+          relativePath: "skills/grill-with-docs",
+        },
+        {
+          name: "write-a-skill",
+          relativePath: "skills/write-a-skill",
+        },
+      ],
+    });
+    expect(claudeRuntimeClient).toMatchObject({
+      setup: {
+        env: {
+          MISTLE_CLAUDE_CODE_SKILLS: JSON.stringify(["grill-with-docs", "write-a-skill"]),
+        },
+      },
+    });
+  });
+
   it("includes Mistle MCP config for Pi when enabled on the profile version", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-mistle-mcp-pi@example.com",
