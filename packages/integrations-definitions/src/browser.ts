@@ -42,6 +42,7 @@ import { SentryMcpBaseDefinition } from "./sentry/variants/sentry-mcp/base-defin
 import { SignozMcpBaseDefinition } from "./signoz/variants/signoz-mcp/base-definition.js";
 import { SlackBaseDefinition } from "./slack/variants/slack-default/base-definition.js";
 import { StripeMcpBaseDefinition } from "./stripe/variants/stripe-mcp/base-definition.js";
+import { SupabaseMcpBaseDefinition } from "./supabase/variants/supabase-mcp/base-definition.js";
 import { WasenderApiBaseDefinition } from "./wasenderapi/variants/wasenderapi-mcp/base-definition.js";
 import { WhapiMcpBaseDefinition } from "./whapi/variants/whapi-mcp/base-definition.js";
 import { ZaiDefinition } from "./zai/index.js";
@@ -78,6 +79,7 @@ export const SentryBrowserDefinition = SentryMcpBaseDefinition;
 export const SignozBrowserDefinition = SignozMcpBaseDefinition;
 export const SlackBrowserDefinition = SlackBaseDefinition;
 export const StripeBrowserDefinition = StripeMcpBaseDefinition;
+export const SupabaseBrowserDefinition = SupabaseMcpBaseDefinition;
 export const WasenderApiBrowserDefinition = WasenderApiBaseDefinition;
 export const WhapiBrowserDefinition = WhapiMcpBaseDefinition;
 export const ZaiBrowserDefinition = ZaiDefinition;
@@ -117,6 +119,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   SignozBrowserDefinition,
   SlackBrowserDefinition,
   StripeBrowserDefinition,
+  SupabaseBrowserDefinition,
   WasenderApiBrowserDefinition,
   WhapiBrowserDefinition,
   ZaiBrowserDefinition,
@@ -167,6 +170,7 @@ export * from "./sentry/browser.js";
 export * from "./shared/remote-mcp-server-catalog/index.js";
 export * from "./slack/browser.js";
 export * from "./stripe/browser.js";
+export * from "./supabase/browser.js";
 export * from "./wasenderapi/browser.js";
 export * from "./whapi/browser.js";
 export * from "./zai/index.js";

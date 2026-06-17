@@ -241,6 +241,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "supabase-mcp",
+        familyId: "supabase",
+        variantId: "supabase-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "tensorlake-default",
         familyId: "tensorlake",
         variantId: "tensorlake-default",

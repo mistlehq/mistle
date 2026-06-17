@@ -40,6 +40,12 @@ export const SigNoz: Story = {
   },
 };
 
+export const Supabase: Story = {
+  render: function RenderStory() {
+    return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.Supabase} />;
+  },
+};
+
 export const WasenderAPI: Story = {
   name: "WasenderAPI",
   render: function RenderStory() {

@@ -365,6 +365,29 @@ export const StoryWasenderApiConnection: IntegrationConnectionSummary = {
   },
 };
 
+export const StorySupabaseTarget: IntegrationTargetSummary = {
+  targetKey: "target-supabase",
+  displayName: "Supabase",
+  logoKey: "supabase",
+  familyId: "supabase",
+  variantId: "supabase-mcp",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+export const StorySupabaseConnection: IntegrationConnectionSummary = {
+  id: "connection-supabase",
+  displayName: "Supabase Production",
+  targetKey: StorySupabaseTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "oauth2-authorization-code",
+    client_id: "supabase-story-client",
+  },
+};
+
 export const StoryWhapiTarget: IntegrationTargetSummary = {
   targetKey: "target-whapi",
   displayName: "Whapi",
