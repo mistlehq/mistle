@@ -11,7 +11,6 @@ import {
   buildGoogleWorkspaceServiceAccountJwtAssertion,
   buildGoogleWorkspaceServiceAccountTokenRequestBody,
   exchangeGoogleWorkspaceServiceAccountToken,
-  GoogleWorkspaceServiceAccountCredentialResolver,
   resolveGoogleWorkspaceServiceAccountAccessToken,
   resolveGoogleWorkspaceServiceAccountContext,
 } from "./service-account-credential-resolver.server.js";
@@ -261,7 +260,7 @@ describe("GoogleWorkspaceServiceAccountCredentialResolver", () => {
         );
       },
     });
-    cleanupCallbacks.push(simulatedGoogleOAuthServer.close);
+    cleanupCallbacks.push(() => simulatedGoogleOAuthServer.close());
 
     const response = await exchangeGoogleWorkspaceServiceAccountToken({
       tokenEndpoint: simulatedGoogleOAuthServer.url,

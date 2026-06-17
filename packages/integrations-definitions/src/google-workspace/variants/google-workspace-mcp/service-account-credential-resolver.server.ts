@@ -24,9 +24,9 @@ const GoogleWorkspaceServiceAccountTokenTtlSeconds = 3600;
 const GoogleWorkspaceServiceAccountKeySchema = z
   .object({
     type: z.literal("service_account"),
-    client_email: z.string().email(),
+    client_email: z.email(),
     private_key: z.string().min(1),
-    token_uri: z.string().url().optional(),
+    token_uri: z.url().optional(),
   })
   .loose();
 
