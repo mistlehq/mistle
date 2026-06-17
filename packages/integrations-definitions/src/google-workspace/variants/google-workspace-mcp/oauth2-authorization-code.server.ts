@@ -243,21 +243,27 @@ function parseGoogleWorkspaceOAuthErrorBody(
     return {};
   }
 
-  const parsed = GoogleWorkspaceOAuthErrorBodySchema.safeParse(JSON.parse(body));
-  if (!parsed.success) {
-    return {};
-  }
-
-  return parsed.data;
+  return GoogleWorkspaceOAuthErrorBodySchema.parse(JSON.parse(body));
 }
 
 export function classifyGoogleWorkspaceRefreshFailure(input: {
   status: number;
   body: string;
 }): GoogleWorkspaceRefreshFailure {
-  const errorBody = parseGoogleWorkspaceOAuthErrorBody(input.body);
+  const errorBody = (() => {
+    try {
+      return parseGoogleWorkspaceOAuthErrorBody(input.body);
+    } catch {
+      return {};
+    }
+  })();
 
-  if (input.status >= 500 || errorBody.error === "temporarily_unavailable") {
+  if (
+    input.status === 429 ||
+    input.status >= 500 ||
+    errorBody.error === "server_error" ||
+    errorBody.error === "temporarily_unavailable"
+  ) {
     return {
       classification:
         IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications.TEMPORARY,

@@ -317,7 +317,7 @@ describe("integrations-definitions index", () => {
               name: "serviceAccountKeyJson",
               label: "Service account JSON key",
               inputType: "textarea",
-              secretType: "google_service_account_key_json",
+              secretType: "api_key",
               slotKey: "google-workspace.google-workspace-mcp.service-account-key-json",
             },
           ],

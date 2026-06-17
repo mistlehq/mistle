@@ -194,5 +194,26 @@ describe("Google Workspace OAuth authorization code helpers", () => {
       message: "Google Workspace access token refresh failed with status 500.",
       code: "server_error",
     });
+
+    expect(
+      classifyGoogleWorkspaceRefreshFailure({
+        status: 429,
+        body: "too many requests",
+      }),
+    ).toEqual({
+      classification: "temporary",
+      message: "Google Workspace access token refresh failed with status 429.",
+    });
+
+    expect(
+      classifyGoogleWorkspaceRefreshFailure({
+        status: 400,
+        body: '{"error":"temporarily_unavailable"}',
+      }),
+    ).toEqual({
+      classification: "temporary",
+      message: "Google Workspace access token refresh failed with status 400.",
+      code: "temporarily_unavailable",
+    });
   });
 });

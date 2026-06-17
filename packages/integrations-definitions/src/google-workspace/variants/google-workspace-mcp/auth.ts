@@ -9,10 +9,10 @@ export const GoogleWorkspaceMcpVariantId = "google-workspace-mcp";
 
 export const GoogleWorkspaceCredentialSecretTypes: {
   OAUTH2_ACCESS_TOKEN: "oauth2_access_token";
-  SERVICE_ACCOUNT_KEY_JSON: "google_service_account_key_json";
+  SERVICE_ACCOUNT_KEY_JSON: "api_key";
 } = {
   OAUTH2_ACCESS_TOKEN: "oauth2_access_token",
-  SERVICE_ACCOUNT_KEY_JSON: "google_service_account_key_json",
+  SERVICE_ACCOUNT_KEY_JSON: "api_key",
 };
 
 export const GoogleWorkspaceCredentialSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
