@@ -20,6 +20,7 @@ import {
   mcpSandboxOperationEventsListInputSchema,
 } from "../tool-schemas.js";
 import {
+  requireMcpDesignerSandboxInstanceScope,
   requireMcpSandboxInstanceScope,
   requireMcpSandboxInstanceProfileScope,
   requireMcpSandboxProfileScope,
@@ -267,6 +268,9 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
         sandboxProfileId: sandboxInstance.sandboxProfileId,
         sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
       });
+      requireMcpDesignerSandboxInstanceScope(context.organizationActor, {
+        sandboxInstanceId: sandboxInstance.id,
+      });
 
       return structuredResult(sandboxInstance);
     },
@@ -302,6 +306,9 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
       requireMcpSandboxInstanceProfileScope(context.organizationActor, {
         sandboxProfileId: sandboxInstance.sandboxProfileId,
         sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+      });
+      requireMcpDesignerSandboxInstanceScope(context.organizationActor, {
+        sandboxInstanceId: sandboxInstance.id,
       });
 
       const operationEvents = await listOperationEvents(
