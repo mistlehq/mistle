@@ -10,6 +10,7 @@ import { GoogleWorkspaceCredentialSecretTypes, GoogleWorkspaceCredentialSlotKeys
 import {
   buildGoogleWorkspaceServiceAccountJwtAssertion,
   buildGoogleWorkspaceServiceAccountTokenRequestBody,
+  exchangeGoogleWorkspaceServiceAccountToken,
   GoogleWorkspaceServiceAccountCredentialResolver,
   resolveGoogleWorkspaceServiceAccountAccessToken,
   resolveGoogleWorkspaceServiceAccountContext,
@@ -183,7 +184,7 @@ describe("GoogleWorkspaceServiceAccountCredentialResolver", () => {
       sub: "workspace-user@example.com",
     });
     expect(payload.scope).toContain("https://www.googleapis.com/auth/gmail.readonly");
-    expect(payload.scope).toContain("https://www.googleapis.com/auth/chat.messages");
+    expect(payload.scope).toContain("https://www.googleapis.com/auth/chat.messages.create");
   });
 
   it("builds the OAuth JWT bearer token request body", () => {
@@ -201,15 +202,28 @@ describe("GoogleWorkspaceServiceAccountCredentialResolver", () => {
       resolveGoogleWorkspaceServiceAccountContext(
         createResolverInput({
           privateKey: createRsaPrivateKeyPem(),
-          tokenEndpoint: "https://oauth2.example.test/token",
+          tokenEndpoint: "https://oauth2.googleapis.com/token",
           workspaceUserEmail: "workspace-user@example.com",
         }),
       ),
     ).toMatchObject({
       workspaceUserEmail: "workspace-user@example.com",
       clientEmail: "workspace-mcp@example-project.iam.gserviceaccount.com",
-      tokenEndpoint: "https://oauth2.example.test/token",
+      tokenEndpoint: "https://oauth2.googleapis.com/token",
     });
+  });
+
+  it("rejects service account JSON with a non-Google token endpoint", () => {
+    expect(() =>
+      resolveGoogleWorkspaceServiceAccountContext(
+        createResolverInput({
+          privateKey: createRsaPrivateKeyPem(),
+          tokenEndpoint: "https://oauth2.example.test/token",
+        }),
+      ),
+    ).toThrow(
+      "Google Workspace service account credential resolution failed: service account key token_uri must be https://oauth2.googleapis.com/token.",
+    );
   });
 
   it("resolves token response expiry from expires_in", () => {
@@ -249,18 +263,21 @@ describe("GoogleWorkspaceServiceAccountCredentialResolver", () => {
     });
     cleanupCallbacks.push(simulatedGoogleOAuthServer.close);
 
-    const resolvedCredential = await GoogleWorkspaceServiceAccountCredentialResolver.resolve(
-      createResolverInput({
+    const response = await exchangeGoogleWorkspaceServiceAccountToken({
+      tokenEndpoint: simulatedGoogleOAuthServer.url,
+      assertion: buildGoogleWorkspaceServiceAccountJwtAssertion({
+        clientEmail: "workspace-mcp@example-project.iam.gserviceaccount.com",
+        workspaceUserEmail: "workspace-user@example.com",
         privateKey: createRsaPrivateKeyPem(),
         tokenEndpoint: simulatedGoogleOAuthServer.url,
+        issuedAtEpochSeconds: 1_700_000_000,
       }),
-    );
-
-    expect(resolvedCredential).toMatchObject({
-      kind: "value",
-      value: "google_workspace_access_token",
     });
-    expect(resolvedCredential.expiresAt).toBeDefined();
+
+    expect(response).toMatchObject({
+      access_token: "google_workspace_access_token",
+      expires_in: 3600,
+    });
 
     if (receivedBody === undefined) {
       throw new Error("Expected simulated Google OAuth server to receive a request body.");

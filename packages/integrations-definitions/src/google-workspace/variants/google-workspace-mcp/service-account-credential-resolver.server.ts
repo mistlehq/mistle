@@ -62,7 +62,13 @@ function base64UrlEncodeUtf8(value: string): string {
 }
 
 function resolveGoogleWorkspaceTokenEndpoint(key: GoogleWorkspaceServiceAccountKey): string {
-  return key.token_uri ?? GoogleWorkspaceDefaultTokenEndpoint;
+  if (key.token_uri === undefined || key.token_uri === GoogleWorkspaceDefaultTokenEndpoint) {
+    return GoogleWorkspaceDefaultTokenEndpoint;
+  }
+
+  throw new IntegrationCredentialResolutionError(
+    "Google Workspace service account credential resolution failed: service account key token_uri must be https://oauth2.googleapis.com/token.",
+  );
 }
 
 export function buildGoogleWorkspaceServiceAccountJwtAssertion(input: {
@@ -212,7 +218,7 @@ function resolveGoogleWorkspaceServiceAccountTokenErrorMessage(input: {
   return `Google Workspace service account token exchange failed with status ${input.status}.`;
 }
 
-async function exchangeGoogleWorkspaceServiceAccountToken(input: {
+export async function exchangeGoogleWorkspaceServiceAccountToken(input: {
   tokenEndpoint: string;
   assertion: string;
 }): Promise<GoogleWorkspaceServiceAccountTokenResponse> {
