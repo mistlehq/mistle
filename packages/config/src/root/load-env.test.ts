@@ -27,6 +27,7 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_GATEWAY_RELAY_BACKEND: "nats",
       MISTLE_GATEWAY_RELAY_NATS_URL: "nats://gateway-relay:4222",
       MISTLE_GATEWAY_RELAY_NATS_NAME_PREFIX: "mistle-prod",
+      MISTLE_PLATFORM_OPENAI_API_KEY: "platform-openai-key",
       MISTLE_OBJECT_STORE_ASSETS_BUCKET_NAME: "assets",
       MISTLE_OBJECT_STORE_ASSETS_REGION: "us-east-1",
       MISTLE_OBJECT_STORE_ASSETS_ENDPOINT: "https://assets.example",
@@ -170,6 +171,11 @@ describe("loadRootConfigFromEnv", () => {
         nats: {
           url: "nats://gateway-relay:4222",
           name_prefix: "mistle-prod",
+        },
+      },
+      platform_credentials: {
+        openai: {
+          api_key: "platform-openai-key",
         },
       },
       object_store: {

@@ -183,6 +183,10 @@ const RootEnvDescriptors = [
     path: ["gateway_relay", "nats", "name_prefix"],
   },
   {
+    envVar: "MISTLE_PLATFORM_OPENAI_API_KEY",
+    path: ["platform_credentials", "openai", "api_key"],
+  },
+  {
     envVar: "MISTLE_OBJECT_STORE_ASSETS_BUCKET_NAME",
     path: ["object_store", "assets", "bucket_name"],
   },
