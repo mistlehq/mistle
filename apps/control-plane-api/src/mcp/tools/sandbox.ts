@@ -21,9 +21,9 @@ import {
 } from "../tool-schemas.js";
 import {
   requireMcpDesignerSandboxInstanceScope,
-  requireMcpSandboxInstanceScope,
   requireMcpSandboxInstanceProfileScope,
   requireMcpSandboxProfileScope,
+  requireMcpSetupAssistantSandboxInstanceScope,
   requireMcpToolPermission,
   structuredResult,
 } from "./shared.js";
@@ -211,7 +211,7 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
         sandboxProfileId: sandboxInstance.sandboxProfileId,
         sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
       });
-      requireMcpSandboxInstanceScope(context.organizationActor, {
+      requireMcpSetupAssistantSandboxInstanceScope(context.organizationActor, {
         sandboxInstanceId: sandboxInstance.id,
       });
 

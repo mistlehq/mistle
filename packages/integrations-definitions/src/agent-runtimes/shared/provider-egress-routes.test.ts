@@ -108,6 +108,17 @@ describe("provider egress route helpers", () => {
         }),
       ),
     ).toBe(true);
+    expect(
+      isOpenAiApiRoute(
+        createRoute({
+          familyId: "openai",
+          host: "api.openai.com",
+          credentialResolver: {
+            kind: "platform_openai_api_key",
+          },
+        }),
+      ),
+    ).toBe(true);
 
     expect(
       isOpenAiChatGptSubscriptionRoute(

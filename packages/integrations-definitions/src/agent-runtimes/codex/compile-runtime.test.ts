@@ -9,7 +9,7 @@ import type {
 } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { compileCodexRuntime } from "./compile-runtime.js";
+import { compileCodexRuntime, compileInstalledCodexRuntime } from "./compile-runtime.js";
 
 function createCompiledOpenAiRoute(input: {
   egressRuleId: string;
@@ -342,6 +342,35 @@ describe("compileCodexRuntime", () => {
         },
       },
     ]);
+  });
+
+  it("uses the same agent runtime descriptor for installed Codex runtimes", () => {
+    const compiled = compileCodexRuntime({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      runtimeId: "codex",
+      runtimeConfig: {},
+      mcpServers: [],
+      refs: {
+        sandboxPaths: {
+          userHomeDir: "/root",
+          workspaceDir: "/root",
+          runtimeDataDir: "/var/lib/mistle",
+          runtimeArtifactDir: "/var/lib/mistle/artifacts",
+          runtimeArtifactBinDir: "/usr/local/bin",
+        },
+        artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
+      },
+    });
+    const installed = compileInstalledCodexRuntime({
+      codexCliPath: "codex",
+      egressRoutes: [],
+      mcpServers: [],
+    });
+
+    expect(installed.artifacts).toEqual([]);
+    expect(installed.agentRuntimes).toEqual(compiled.agentRuntimes);
   });
 
   it("mentions Mistle MCP tools in managed instructions when Mistle MCP is configured", () => {

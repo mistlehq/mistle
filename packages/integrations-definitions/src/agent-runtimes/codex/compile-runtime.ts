@@ -281,15 +281,7 @@ export function compileCodexRuntime(
           mcpServers: input.mcpServers,
         }),
       }),
-    agentRuntimes: [
-      {
-        runtimeId: "codex",
-        runtimeKey: CodexAppServerProcessKey,
-        clientId: "codex-cli",
-        endpointKey: CodexAppServerEndpointKey,
-        ptyLaunch: CodexPtyLaunchSpec,
-      },
-    ],
+    agentRuntimes: buildCodexAgentRuntimes(),
   };
 }
 
@@ -307,14 +299,18 @@ export function compileInstalledCodexRuntime(input: {
         mcpServers: input.mcpServers,
       }),
     }),
-    agentRuntimes: [
-      {
-        runtimeId: "codex",
-        runtimeKey: CodexAppServerProcessKey,
-        clientId: "codex-cli",
-        endpointKey: CodexAppServerEndpointKey,
-        ptyLaunch: CodexPtyLaunchSpec,
-      },
-    ],
+    agentRuntimes: buildCodexAgentRuntimes(),
   };
+}
+
+function buildCodexAgentRuntimes(): CompileAgentRuntimeResult["agentRuntimes"] {
+  return [
+    {
+      runtimeId: "codex",
+      runtimeKey: CodexAppServerProcessKey,
+      clientId: "codex-cli",
+      endpointKey: CodexAppServerEndpointKey,
+      ptyLaunch: CodexPtyLaunchSpec,
+    },
+  ];
 }

@@ -16,6 +16,7 @@ import {
   mcpSandboxProfileVersionParamsSchema,
 } from "../tool-schemas.js";
 import {
+  requireMcpSandboxProfileIdScope,
   requireMcpSandboxProfileScope,
   requireMcpToolPermission,
   structuredResult,
@@ -107,15 +108,9 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
         context.organizationActor,
         OrganizationPermissions.SANDBOX_PROFILE_READ,
       );
-      if (
-        context.organizationActor.kind === "mcp_capability" &&
-        context.organizationActor.capability.kind === "setup_assistant"
-      ) {
-        requireMcpSandboxProfileScope(context.organizationActor, {
-          profileId,
-          version: context.organizationActor.capability.sandboxProfileVersion,
-        });
-      }
+      requireMcpSandboxProfileIdScope(context.organizationActor, {
+        profileId,
+      });
 
       const profile = await getProfile(
         {
