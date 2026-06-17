@@ -147,6 +147,7 @@ export function registerTriggerTools(server: McpServer, context: MistleMcpServer
       inputSchema: mcpCreateScheduledTriggerInputSchema,
       annotations: {
         ...MutatingToolAnnotations,
+        idempotentHint: false,
         title: "Create scheduled trigger",
       },
     },
@@ -207,6 +208,7 @@ export function registerTriggerTools(server: McpServer, context: MistleMcpServer
       inputSchema: mcpCreateWebhookTriggerInputSchema,
       annotations: {
         ...MutatingToolAnnotations,
+        idempotentHint: false,
         title: "Create webhook trigger",
       },
     },
