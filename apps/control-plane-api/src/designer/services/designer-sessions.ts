@@ -78,7 +78,7 @@ function createPlatformOpenAiEgressRoute(): EgressCredentialRoute {
       methods: ["GET", "POST"],
     },
     upstream: {
-      baseUrl: "https://api.openai.com",
+      baseUrl: "https://api.openai.com/v1",
     },
     authInjection: {
       type: "bearer",
