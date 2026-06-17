@@ -12,11 +12,14 @@ import type { McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 
 import {
   OrganizationPermissions,
+  hasTriggerCreatePermission,
   hasTriggerReadPermission,
   hasTriggerUpdatePermission,
 } from "../../auth/services/organization-policy.js";
 import { resolveTargetMetadataFromPersistedTarget } from "../../integration-targets/services/resolve-target-metadata.js";
+import { createTriggerSchedule } from "../../trigger-schedules/services/create-trigger-schedule.js";
 import { updateTriggerSchedule } from "../../trigger-schedules/services/update-trigger-schedule.js";
+import { createTriggerWebhook } from "../../trigger-webhooks/services/create-trigger-webhook.js";
 import { updateTriggerWebhook } from "../../trigger-webhooks/services/update-trigger-webhook.js";
 import {
   getTrigger,
@@ -25,6 +28,8 @@ import {
 } from "../../triggers/services/trigger-summaries.js";
 import type { MistleMcpServerContext } from "../server.js";
 import {
+  mcpCreateScheduledTriggerInputSchema,
+  mcpCreateWebhookTriggerInputSchema,
   mcpListTriggerWebhookEventsInputSchema,
   mcpListTriggersInputSchema,
   mcpRenameTriggerInputSchema,
@@ -130,6 +135,124 @@ export function registerTriggerTools(server: McpServer, context: MistleMcpServer
       );
 
       return structuredResult(trigger);
+    },
+  );
+
+  server.registerTool(
+    "create_scheduled_trigger",
+    {
+      title: "Create scheduled trigger",
+      description:
+        "Create a recurring schedule-based Mistle trigger that automatically starts sandbox sessions for a sandbox profile. Provide a cron expression, timezone, target sandbox profile, and user message for the agent to receive each time the trigger runs.",
+      inputSchema: mcpCreateScheduledTriggerInputSchema,
+      annotations: {
+        ...MutatingToolAnnotations,
+        title: "Create scheduled trigger",
+      },
+    },
+    async ({
+      conversationKeyTemplate,
+      cronExpression,
+      enabled,
+      idempotencyKeyTemplate,
+      name,
+      target,
+      timezone,
+      userMessage,
+    }) => {
+      requireMcpToolPermission(context.organizationActor, OrganizationPermissions.TRIGGER_CREATE);
+
+      const created = await createTriggerSchedule(
+        {
+          db: context.db,
+          openWorkflow: context.openWorkflow,
+        },
+        {
+          organizationId: context.organizationActor.organizationId,
+          name,
+          ...(enabled === undefined ? {} : { enabled }),
+          schedule: {
+            kind: "recurring",
+            cronExpression,
+            timezone,
+          },
+          inputTemplate: userMessage,
+          ...(conversationKeyTemplate === undefined ? {} : { conversationKeyTemplate }),
+          ...(idempotencyKeyTemplate === undefined ? {} : { idempotencyKeyTemplate }),
+          target,
+          now: context.clock.nowDate(),
+        },
+      );
+
+      return structuredResult(
+        await getTrigger(
+          {
+            db: context.db,
+          },
+          {
+            organizationId: context.organizationActor.organizationId,
+            triggerId: created.id,
+          },
+        ),
+      );
+    },
+  );
+
+  server.registerTool(
+    "create_webhook_trigger",
+    {
+      title: "Create webhook trigger",
+      description:
+        "Create a webhook-based Mistle trigger that automatically starts sandbox sessions for a sandbox profile when selected webhook events arrive. Use list_trigger_webhook_events first to discover valid eventTypes for the target sandbox profile and integration webhook source.",
+      inputSchema: mcpCreateWebhookTriggerInputSchema,
+      annotations: {
+        ...MutatingToolAnnotations,
+        title: "Create webhook trigger",
+      },
+    },
+    async ({
+      conversationKeyTemplate,
+      enabled,
+      eventTypes,
+      idempotencyKeyTemplate,
+      instructions,
+      integrationWebhookSourceId,
+      name,
+      target,
+      userMessage,
+    }) => {
+      requireMcpTriggerCreatePermission(context);
+
+      const created = await createTriggerWebhook(
+        {
+          db: context.db,
+          integrationRegistry: context.integrationRegistry,
+        },
+        {
+          organizationId: context.organizationActor.organizationId,
+          name,
+          ...(enabled === undefined ? {} : { enabled }),
+          integrationWebhookSourceId,
+          eventTypes,
+          inputTemplate: userMessage,
+          ...(instructions === undefined ? {} : { instructions }),
+          conversationKeyTemplate,
+          ...(idempotencyKeyTemplate === undefined ? {} : { idempotencyKeyTemplate }),
+          target,
+        },
+      );
+
+      return structuredResult(
+        await getTrigger(
+          {
+            db: context.db,
+          },
+          {
+            organizationId: context.organizationActor.organizationId,
+            triggerId: created.id,
+          },
+        ),
+      );
     },
   );
 
@@ -332,6 +455,14 @@ function requireMcpTriggerReadPermission(context: MistleMcpServerContext): void 
   }
 
   throw new ForbiddenError("FORBIDDEN", "Missing required MCP permission: trigger:read.");
+}
+
+function requireMcpTriggerCreatePermission(context: MistleMcpServerContext): void {
+  if (hasTriggerCreatePermission(context.organizationActor.permissions)) {
+    return;
+  }
+
+  throw new ForbiddenError("FORBIDDEN", "Missing required MCP permission: trigger:create.");
 }
 
 function requireMcpTriggerUpdatePermission(context: MistleMcpServerContext): void {

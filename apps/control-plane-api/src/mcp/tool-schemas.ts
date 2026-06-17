@@ -130,6 +130,41 @@ export const mcpListTriggersInputSchema = z
   })
   .strict();
 
+const mcpCreateTriggerTargetInputSchema = z
+  .object({
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileVersion: z.number().int().min(1).optional(),
+    primaryRepositoryId: z.string().min(1).nullable().optional(),
+  })
+  .strict();
+
+export const mcpCreateScheduledTriggerInputSchema = z
+  .object({
+    name: z.string().min(1),
+    enabled: z.boolean().optional(),
+    cronExpression: z.string().min(1),
+    timezone: z.string().min(1),
+    userMessage: z.string().min(1),
+    conversationKeyTemplate: z.string().min(1).optional(),
+    idempotencyKeyTemplate: z.string().min(1).nullable().optional(),
+    target: mcpCreateTriggerTargetInputSchema,
+  })
+  .strict();
+
+export const mcpCreateWebhookTriggerInputSchema = z
+  .object({
+    name: z.string().min(1),
+    enabled: z.boolean().optional(),
+    integrationWebhookSourceId: z.string().min(1),
+    eventTypes: z.array(z.string().min(1)).min(1),
+    userMessage: z.string().min(1),
+    instructions: z.string().min(1).nullable().optional(),
+    conversationKeyTemplate: z.string().min(1),
+    idempotencyKeyTemplate: z.string().min(1).nullable().optional(),
+    target: mcpCreateTriggerTargetInputSchema,
+  })
+  .strict();
+
 export const mcpSetTriggerEnabledInputSchema = mcpTriggerIdParamsSchema
   .extend({
     enabled: z.boolean(),

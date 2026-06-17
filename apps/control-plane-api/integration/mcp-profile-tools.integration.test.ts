@@ -125,6 +125,8 @@ describe.concurrent("MCP profile tools integration", () => {
     const tools = await listMcpTools({ env, token });
 
     expect(tools.map((tool) => tool.name).sort()).toEqual([
+      "create_scheduled_trigger",
+      "create_webhook_trigger",
       "get_trigger",
       "list_trigger_webhook_events",
       "list_triggers",
