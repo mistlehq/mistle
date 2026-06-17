@@ -73,6 +73,22 @@ const SubmitDesignerRuntimeFollowUpResponseSchema = z
   })
   .strict();
 
+const DesignerActionProposalResponseSchema = z.enum(["approved", "declined"]);
+
+const SubmitDesignerActionProposalResponseResponseSchema = z
+  .object({
+    actionProposalResponse: z
+      .object({
+        proposalId: z.string().min(1),
+        response: DesignerActionProposalResponseSchema,
+        providerConversationId: z.string().min(1),
+        providerExecutionId: z.string().min(1).nullable(),
+        submittedAt: z.string().min(1),
+      })
+      .strict(),
+  })
+  .strict();
+
 const DesignerRuntimeConversationTranscriptTurnSchema = z
   .object({
     id: z.string().min(1),
@@ -129,6 +145,10 @@ export type DesignerRuntimeConversationBootstrap = z.output<
 export type DesignerRuntimeFollowUpSubmission = z.output<
   typeof SubmitDesignerRuntimeFollowUpResponseSchema
 >["runtimeFollowUp"];
+export type DesignerActionProposalResponse = z.output<typeof DesignerActionProposalResponseSchema>;
+export type DesignerActionProposalResponseSubmission = z.output<
+  typeof SubmitDesignerActionProposalResponseResponseSchema
+>["actionProposalResponse"];
 export type DesignerRuntimeConversationTranscript = z.output<
   typeof GetDesignerRuntimeConversationTranscriptResponseSchema
 >["runtimeConversationTranscript"];
@@ -331,6 +351,50 @@ export async function submitDesignerRuntimeFollowUp(input: {
         operation: "submitDesignerRuntimeFollowUp",
         error,
         fallbackMessage: "Could not submit Designer follow-up.",
+      }),
+    );
+  }
+}
+
+export async function submitDesignerActionProposalResponse(input: {
+  sessionId: string;
+  proposalId: string;
+  response: DesignerActionProposalResponse;
+  idempotencyKey: string;
+  signal?: AbortSignal;
+}): Promise<DesignerActionProposalResponseSubmission> {
+  try {
+    const response = await requestControlPlane({
+      operation: "submitDesignerActionProposalResponse",
+      method: "POST",
+      pathname: `/v1/designer/sessions/${encodeURIComponent(input.sessionId)}/runtime-conversation/action-proposals/${encodeURIComponent(input.proposalId)}/responses`,
+      body: {
+        response: input.response,
+        idempotencyKey: input.idempotencyKey,
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not submit Designer action proposal response.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse =
+      SubmitDesignerActionProposalResponseResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new DesignerApiError({
+        operation: "submitDesignerActionProposalResponse",
+        status: 500,
+        body: responseBody,
+        message: "Designer action proposal response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data.actionProposalResponse;
+  } catch (error) {
+    throw new DesignerApiError(
+      normalizeHttpApiError({
+        operation: "submitDesignerActionProposalResponse",
+        error,
+        fallbackMessage: "Could not submit Designer action proposal response.",
       }),
     );
   }

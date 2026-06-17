@@ -11,5 +11,6 @@ export {
   listDesignerSessionsResponseSchema as ListDesignerSessionsResponseSchema,
   putDesignerSessionCanvasTabsBodySchema as PutDesignerSessionCanvasTabsBodySchema,
   putDesignerSessionCanvasTabsResponseSchema as PutDesignerSessionCanvasTabsResponseSchema,
+  submitDesignerActionProposalResponseResponseSchema as SubmitDesignerActionProposalResponseResponseSchema,
   submitDesignerRuntimeFollowUpResponseSchema as SubmitDesignerRuntimeFollowUpResponseSchema,
 } from "./schemas.js";

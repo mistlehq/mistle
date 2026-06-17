@@ -309,6 +309,22 @@ describe.concurrent("designer sessions integration", () => {
       },
     );
     expect(rejectedFollowUpResponse.status).toBe(403);
+
+    const rejectedActionProposalResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/designer/sessions/${encodeURIComponent(created.id)}/runtime-conversation/action-proposals/${encodeURIComponent("dap_api_key_rejection")}/responses`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKeySecret.token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          response: "approved",
+          idempotencyKey: "designer-session-api-key-rejection-action-proposal-response",
+        }),
+      },
+    );
+    expect(rejectedActionProposalResponse.status).toBe(403);
   });
 
   it("rejects Designer runtime follow-ups before the runtime conversation is ready", async ({
@@ -346,6 +362,77 @@ describe.concurrent("designer sessions integration", () => {
       code: "DESIGNER_RUNTIME_CONVERSATION_NOT_READY",
       message: `Designer session '${designerSessionId}' runtime conversation is not ready for follow-up submission.`,
     });
+  });
+
+  it("rejects Designer action proposal responses before the runtime conversation is ready", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-designer-action-proposal-response-not-ready@example.com",
+    });
+    const designerSessionId = "dsn_action_proposal_response_not_ready";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: designerSessionId,
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_designer_action_proposal_response_not_ready",
+      initialPrompt: "Build a support triage agent.",
+      canvasTabs: [],
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      `/v1/designer/sessions/${encodeURIComponent(designerSessionId)}/runtime-conversation/action-proposals/${encodeURIComponent("dap_support_label")}/responses`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          response: "declined",
+          idempotencyKey: "designer-action-proposal-response-not-ready",
+        }),
+      },
+    );
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      code: "DESIGNER_RUNTIME_CONVERSATION_NOT_READY",
+      message: `Designer session '${designerSessionId}' runtime conversation is not ready for follow-up submission.`,
+    });
+  });
+
+  it("validates Designer action proposal response payloads", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-designer-action-proposal-response-validation@example.com",
+    });
+    const designerSessionId = "dsn_action_proposal_response_validation";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: designerSessionId,
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_designer_action_proposal_response_validation",
+      initialPrompt: "Build a support triage agent.",
+      runtimeProviderConversationId: "thread_action_proposal_response_validation",
+      initialPromptProviderExecutionId: "turn_action_proposal_response_validation",
+      initialPromptSubmittedAt: "2026-06-18 01:02:03+00",
+      canvasTabs: [],
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      `/v1/designer/sessions/${encodeURIComponent(designerSessionId)}/runtime-conversation/action-proposals/${encodeURIComponent("dap_support_label")}/responses`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          response: "accepted",
+          idempotencyKey: "designer-action-proposal-response-validation",
+        }),
+      },
+    );
+    expect(response.status).toBe(400);
   });
 
   it("returns a persisted completed Designer runtime conversation bootstrap on repeated requests", async ({
