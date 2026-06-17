@@ -25,6 +25,16 @@ Repo runtime provided by `nix develop`:
 
 ### Setup
 
+Before entering the development shell, agents and contributors can check whether repo commands are reachable from the current shell with:
+
+```bash
+node --experimental-strip-types ./scripts/dev/agent-bootstrap-doctor.ts
+```
+
+If `pnpm` is already reachable, `pnpm doctor:agent` runs the same check. If `pnpm` is only reachable through Nix, use `nix develop --command pnpm doctor:agent`.
+
+The doctor reports whether to run commands directly, for example `pnpm check:fast`, or through the Nix wrapper, for example `nix develop --command pnpm check:fast`.
+
 1. Enter the development shell:
 
 ```bash

@@ -26,6 +26,7 @@
     "dev:workspace:distributed": "turbo watch dev dev:schedules @mistle/dev-data-plane-gateway-a#dev @mistle/dev-data-plane-gateway-b#dev --ui=tui --filter=!@mistle/docs --filter=!@mistle/data-plane-gateway --filter=!@mistle/dev-data-plane-gateway-a --filter=!@mistle/dev-data-plane-gateway-b --env-mode=loose",
     "dev:workspace": "turbo watch dev dev:schedules --ui=tui --filter=!@mistle/docs --filter=!@mistle/dev-data-plane-gateway-a --filter=!@mistle/dev-data-plane-gateway-b --env-mode=loose",
     "docs:dev": "nix develop .#docs -c pnpm --filter @mistle/docs dev",
+    "doctor:agent": "node --experimental-strip-types ./scripts/dev/agent-bootstrap-doctor.ts",
     "emails:preview": "pnpm --filter @mistle/emails preview",
     "format": "oxfmt . && pnpm --filter @mistle/sandboxd format && pnpm --filter @mistle/commit-sign format && pnpm --filter @mistle/mstl-core format && pnpm --filter @mistle/mstl-cli format",
     "format:check": "oxfmt --check . && pnpm --filter @mistle/sandboxd format:check && pnpm --filter @mistle/commit-sign format:check && pnpm --filter @mistle/mstl-core format:check && pnpm --filter @mistle/mstl-cli format:check",
