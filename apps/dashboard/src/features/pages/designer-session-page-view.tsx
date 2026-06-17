@@ -3,10 +3,13 @@ import { Badge } from "@mistle/ui";
 
 import { ErrorNotice } from "../auth/error-notice.js";
 import { ChatComposer } from "../chat/components/chat-composer.js";
+import { ChatThread } from "../chat/components/chat-thread.js";
 import type {
   DesignerRuntimeConversationBootstrap,
+  DesignerRuntimeConversationTranscript,
   DesignerSession,
 } from "../designer/designer-service.js";
+import { hydrateCodexChatEntriesFromThreadReadTurns } from "../session-agents/codex/session-state/index.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 
 export type DesignerSessionPageViewProps = {
@@ -20,6 +23,9 @@ export type DesignerSessionPageViewProps = {
   onFollowUpDraftChange: (draft: string) => void;
   onFollowUpSubmit: () => void;
   runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
+  runtimeConversationTranscript: DesignerRuntimeConversationTranscript | null;
+  transcriptErrorMessage: string | null;
+  transcriptIsPending: boolean;
   session: DesignerSession | null;
   sessionId: string;
 };
@@ -168,7 +174,10 @@ function RuntimeConversationPreview(input: {
   onFollowUpDraftChange: (draft: string) => void;
   onFollowUpSubmit: () => void;
   runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
+  runtimeConversationTranscript: DesignerRuntimeConversationTranscript | null;
   session: DesignerSession | null;
+  transcriptErrorMessage: string | null;
+  transcriptIsPending: boolean;
 }): React.JSX.Element | null {
   const initialPrompt = input.session?.initialPrompt ?? null;
   if (initialPrompt === null) {
@@ -180,6 +189,10 @@ function RuntimeConversationPreview(input: {
     input.runtimeConversationBootstrap !== null &&
     input.followUpDraft.trim().length > 0 &&
     !input.followUpIsPending;
+  const chatEntries =
+    input.runtimeConversationTranscript === null
+      ? []
+      : hydrateCodexChatEntriesFromThreadReadTurns(input.runtimeConversationTranscript.turns);
 
   return (
     <section className="rounded-lg border bg-background">
@@ -187,20 +200,38 @@ function RuntimeConversationPreview(input: {
         <p className="text-xs font-medium text-muted-foreground">Runtime conversation</p>
       </div>
       <div className="p-3">
-        <div className="rounded-md bg-muted/40 p-3">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-medium text-muted-foreground">You</p>
-            <Badge variant="secondary">{promptState.label}</Badge>
+        {chatEntries.length > 0 ? (
+          <div className="max-h-[calc(100svh-20rem)] overflow-y-auto pr-1">
+            <ChatThread
+              entries={chatEntries}
+              formatInitialUserMessageAsTriggerInput
+              isRespondingToServerRequest={false}
+              onRespondToServerRequest={ignoreDesignerServerRequest}
+              pendingServerRequests={[]}
+            />
           </div>
-          <p className="mt-1 whitespace-pre-wrap text-sm">{initialPrompt}</p>
-          <p className="mt-2 text-xs text-muted-foreground">{promptState.detail}</p>
-          {input.runtimeConversationBootstrap?.providerExecutionId === undefined ||
-          input.runtimeConversationBootstrap.providerExecutionId === null ? null : (
-            <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
-              {input.runtimeConversationBootstrap.providerExecutionId}
-            </p>
-          )}
-        </div>
+        ) : (
+          <div className="rounded-md bg-muted/40 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-medium text-muted-foreground">You</p>
+              <Badge variant="secondary">{promptState.label}</Badge>
+            </div>
+            <p className="mt-1 whitespace-pre-wrap text-sm">{initialPrompt}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{promptState.detail}</p>
+            {input.runtimeConversationBootstrap?.providerExecutionId === undefined ||
+            input.runtimeConversationBootstrap.providerExecutionId === null ? null : (
+              <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                {input.runtimeConversationBootstrap.providerExecutionId}
+              </p>
+            )}
+            {input.transcriptIsPending ? (
+              <p className="mt-2 text-xs text-muted-foreground">Loading provider transcript...</p>
+            ) : null}
+          </div>
+        )}
+        {input.transcriptErrorMessage === null ? null : (
+          <p className="mt-2 text-xs text-destructive">{input.transcriptErrorMessage}</p>
+        )}
         <div className="mt-3">
           <ChatComposer
             canUploadAttachments={false}
@@ -252,6 +283,7 @@ function RuntimeConversationPreview(input: {
 }
 
 function ignoreDesignerComposerAction(): void {}
+function ignoreDesignerServerRequest(): void {}
 
 function resolveRuntimeConversationPromptState(input: {
   bootstrapErrorMessage: string | null;
@@ -342,7 +374,10 @@ export function DesignerSessionPageView(input: DesignerSessionPageViewProps): Re
               onFollowUpDraftChange={input.onFollowUpDraftChange}
               onFollowUpSubmit={input.onFollowUpSubmit}
               runtimeConversationBootstrap={input.runtimeConversationBootstrap}
+              runtimeConversationTranscript={input.runtimeConversationTranscript}
               session={input.session}
+              transcriptErrorMessage={input.transcriptErrorMessage}
+              transcriptIsPending={input.transcriptIsPending}
             />
           </div>
         </div>

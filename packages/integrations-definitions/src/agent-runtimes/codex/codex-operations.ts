@@ -720,6 +720,16 @@ export async function readCodexThread(input: {
     includeTurns: true,
   });
 
+  return parseCodexThreadReadResponse(response);
+}
+
+export function parseCodexThreadReadResponse(response: unknown): {
+  threadId: string;
+  name: string | null;
+  preview: string | null;
+  turns: readonly CodexThreadReadTurn[];
+  response: unknown;
+} {
   const parsedResponse = ThreadReadResponseSchema.safeParse(response);
   if (!parsedResponse.success) {
     throw new Error(

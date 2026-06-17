@@ -52,6 +52,7 @@ import type {
   BootstrapDesignerRuntimeConversationResponse,
   CreateDesignerSessionBody,
   DesignerSessionResponse,
+  GetDesignerRuntimeConversationTranscriptResponse,
   PutDesignerSessionCanvasTabsBody,
   SubmitDesignerRuntimeFollowUpBody,
   SubmitDesignerRuntimeFollowUpResponse,
@@ -847,6 +848,59 @@ export async function submitDesignerRuntimeFollowUp(
       },
     );
   });
+}
+
+export async function getDesignerRuntimeConversationTranscript(
+  ctx: DesignerRuntimeConversationContext,
+  input: {
+    organizationId: string;
+    sessionId: string;
+    actingUserId: string;
+  },
+): Promise<GetDesignerRuntimeConversationTranscriptResponse> {
+  const designerSession = await readReadyRuntimeConversationDesignerSession(ctx, input);
+  const connectionToken = await mintDesignerRuntimeConnectionToken(ctx, {
+    organizationId: input.organizationId,
+    sandboxInstanceId: designerSession.sandboxInstanceId,
+    actingUserId: input.actingUserId,
+  });
+
+  const provider = resolveAgentConversationProvider(DesignerRuntimeId);
+  if (provider.readConversationTranscript === undefined) {
+    throw new Error(
+      `Agent runtime '${DesignerRuntimeId}' does not support runtime conversation transcript reads.`,
+    );
+  }
+
+  const connection = await provider.connect({
+    connectionUrl: connectionToken.url,
+  });
+
+  try {
+    await provider.resumeConversation({
+      connection,
+      providerConversationId: designerSession.runtimeProviderConversationId,
+    });
+    const transcript = await provider.readConversationTranscript({
+      connection,
+      providerConversationId: designerSession.runtimeProviderConversationId,
+    });
+
+    return {
+      runtimeConversationTranscript: {
+        providerConversationId: transcript.providerConversationId,
+        name: transcript.name,
+        preview: transcript.preview,
+        turns: transcript.turns.map((turn) => ({
+          id: turn.id,
+          status: turn.status,
+          items: [...turn.items],
+        })),
+      },
+    };
+  } finally {
+    await connection.close();
+  }
 }
 
 async function submitDesignerRuntimeFollowUpWithLock(

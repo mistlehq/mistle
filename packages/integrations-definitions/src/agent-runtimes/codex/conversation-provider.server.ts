@@ -13,6 +13,7 @@ import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { CodexJsonRpcClient, CodexJsonRpcRequestError } from "./codex-json-rpc.js";
 import {
   AllCodexThreadSourceKinds,
+  parseCodexThreadReadResponse,
   parseCodexThreadListResponse,
   resolveOriginalCodexThreadId,
   type CodexThreadSummary,
@@ -1105,6 +1106,53 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
       return {
         name: readNestedString(threadResult, ["thread", "name"]),
         preview: readNestedString(threadResult, ["thread", "preview"]),
+      };
+    },
+    readConversationTranscript: async (input) => {
+      let threadResult: unknown;
+      try {
+        threadResult = await input.connection.request({
+          method: CodexMethodNames.THREAD_READ,
+          params: {
+            threadId: input.providerConversationId,
+            includeTurns: true,
+          },
+        });
+      } catch (error) {
+        if (isProviderConversationMissingError(error)) {
+          throw new ConversationProviderError({
+            code: ConversationProviderErrorCodes.PROVIDER_CONVERSATION_MISSING,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Codex read conversation transcript failed with non-error exception.",
+            cause: error,
+          });
+        }
+        if (isUnmaterializedCodexIncludeTurnsError(error)) {
+          return {
+            providerConversationId: input.providerConversationId,
+            name: null,
+            preview: null,
+            turns: [],
+          };
+        }
+        throw new ConversationProviderError({
+          code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Codex read conversation transcript failed with non-error exception.",
+          cause: error,
+        });
+      }
+
+      const parsedThread = parseCodexThreadReadResponse(threadResult);
+      return {
+        providerConversationId: parsedThread.threadId,
+        name: parsedThread.name,
+        preview: parsedThread.preview,
+        turns: parsedThread.turns,
       };
     },
     generateConversationTitle: async (input) => {

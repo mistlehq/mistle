@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import type {
   DesignerRuntimeConversationBootstrap,
+  DesignerRuntimeConversationTranscript,
   DesignerSession,
 } from "../designer/designer-service.js";
 import { DesignerSessionPageView } from "./designer-session-page-view.js";
@@ -30,6 +31,36 @@ const RuntimeConversationBootstrap = {
   initialPromptSubmittedAt: "2026-04-01T09:01:00.000Z",
 } satisfies DesignerRuntimeConversationBootstrap;
 
+const RuntimeConversationTranscript = {
+  providerConversationId: "thread_designer_test",
+  name: "Design triage agent",
+  preview: "I can help design that workflow.",
+  turns: [
+    {
+      id: "turn_designer_initial_prompt",
+      status: "completed",
+      items: [
+        {
+          id: "item_user_initial_prompt",
+          type: "userMessage",
+          content: [
+            {
+              type: "text",
+              text: "Build a triaging agent for Linear bugs.",
+            },
+          ],
+        },
+        {
+          id: "item_assistant_initial_response",
+          type: "agentMessage",
+          text: "I can help design that workflow.",
+          status: "completed",
+        },
+      ],
+    },
+  ],
+} satisfies DesignerRuntimeConversationTranscript;
+
 function renderDesignerSessionPageView(input?: {
   bootstrapErrorMessage?: string | null;
   bootstrapIsPending?: boolean;
@@ -38,7 +69,10 @@ function renderDesignerSessionPageView(input?: {
   followUpIsPending?: boolean;
   followUpSuccessMessage?: string | null;
   runtimeConversationBootstrap?: DesignerRuntimeConversationBootstrap | null;
+  runtimeConversationTranscript?: DesignerRuntimeConversationTranscript | null;
   session?: DesignerSession | null;
+  transcriptErrorMessage?: string | null;
+  transcriptIsPending?: boolean;
 }): void {
   render(
     <DesignerSessionPageView
@@ -52,8 +86,11 @@ function renderDesignerSessionPageView(input?: {
       onFollowUpDraftChange={() => {}}
       onFollowUpSubmit={() => {}}
       runtimeConversationBootstrap={input?.runtimeConversationBootstrap ?? null}
+      runtimeConversationTranscript={input?.runtimeConversationTranscript ?? null}
       session={input?.session ?? BaseDesignerSession}
       sessionId="dsn_test"
+      transcriptErrorMessage={input?.transcriptErrorMessage ?? null}
+      transcriptIsPending={input?.transcriptIsPending ?? false}
     />,
   );
 }
@@ -90,6 +127,42 @@ describe("DesignerSessionPageView", () => {
     });
 
     expect(screen.getByText("Follow-up submitted at 2026-04-01T09:02:00.000Z.")).toBeDefined();
+  });
+
+  it("hydrates the runtime conversation from provider transcript turns", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      runtimeConversationTranscript: RuntimeConversationTranscript,
+    });
+
+    expect(screen.getByText("Build a triaging agent for Linear bugs.")).toBeDefined();
+    expect(screen.getByText("I can help design that workflow.")).toBeDefined();
+    expect(screen.queryByText("Initial prompt submitted")).toBeNull();
+  });
+
+  it("shows transcript load errors while retaining the saved prompt preview", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      transcriptErrorMessage: "Could not load Designer runtime conversation transcript.",
+    });
+
+    expect(screen.getByText("Build a triaging agent for Linear bugs.")).toBeDefined();
+    expect(
+      screen.getByText("Could not load Designer runtime conversation transcript."),
+    ).toBeDefined();
+  });
+
+  it("shows transcript refresh errors while retaining hydrated transcript content", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      runtimeConversationTranscript: RuntimeConversationTranscript,
+      transcriptErrorMessage: "Could not refresh Designer runtime conversation transcript.",
+    });
+
+    expect(screen.getByText("I can help design that workflow.")).toBeDefined();
+    expect(
+      screen.getByText("Could not refresh Designer runtime conversation transcript."),
+    ).toBeDefined();
   });
 
   it("shows runtime follow-up submission errors without hiding the conversation", () => {

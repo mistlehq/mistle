@@ -11,15 +11,25 @@ import { readHttpErrorStatus } from "../api/http-api-error.js";
 import {
   bootstrapDesignerRuntimeConversation,
   designerRuntimeConversationBootstrapQueryKey,
+  designerRuntimeConversationTranscriptQueryKey,
   designerSessionsQueryKey,
+  getDesignerRuntimeConversationTranscript,
   getDesignerSession,
   submitDesignerRuntimeFollowUp,
+  type DesignerRuntimeConversationTranscript,
   type DesignerSession,
 } from "../designer/designer-service.js";
 import { DesignerSessionPageView } from "./designer-session-page-view.js";
 
 const DesignerSessionRuntimeBootstrapPollIntervalMs = 2_000;
 const DesignerSessionRuntimeBootstrapMaxRetries = 5;
+const DesignerSessionRuntimeTranscriptPollIntervalMs = 2_000;
+const TerminalDesignerRuntimeTurnStatuses = new Set<string>([
+  "completed",
+  "failed",
+  "cancelled",
+  "interrupted",
+]);
 
 function useDesignerSessionId(): string {
   const params = useParams();
@@ -73,6 +83,29 @@ function shouldPollDesignerSessionForRuntimeBootstrap(session: DesignerSession |
   return (
     getSandboxDeliveryDisposition(status) === SandboxDeliveryDispositions.WAIT ||
     status === SandboxInstanceStatuses.STOPPING
+  );
+}
+
+export function shouldPollDesignerRuntimeTranscript(
+  transcript: DesignerRuntimeConversationTranscript | null,
+  expectedProviderExecutionId?: string | null,
+): boolean {
+  if (transcript === null) {
+    return true;
+  }
+  if (transcript.turns.length === 0) {
+    return true;
+  }
+  if (
+    expectedProviderExecutionId !== undefined &&
+    expectedProviderExecutionId !== null &&
+    !transcript.turns.some((turn) => turn.id === expectedProviderExecutionId)
+  ) {
+    return true;
+  }
+
+  return transcript.turns.some(
+    (turn) => turn.status === null || !TerminalDesignerRuntimeTurnStatuses.has(turn.status),
   );
 }
 
@@ -166,9 +199,28 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
         queryClient,
         sessionId: variables.sessionId,
       });
+      void queryClient.invalidateQueries({
+        queryKey: [...designerRuntimeConversationTranscriptQueryKey, variables.sessionId],
+      });
       setFollowUpDraft("");
       setFollowUpSubmissionIdempotencyKey(null);
     },
+  });
+  const runtimeConversationTranscriptQuery = useQuery({
+    queryKey: [...designerRuntimeConversationTranscriptQueryKey, sessionId],
+    queryFn: async ({ signal }) =>
+      getDesignerRuntimeConversationTranscript({
+        sessionId,
+        signal,
+      }),
+    enabled: runtimeConversationBootstrapQuery.data !== undefined,
+    refetchInterval: (query) =>
+      shouldPollDesignerRuntimeTranscript(
+        query.state.data ?? null,
+        submitFollowUpMutation.data?.providerExecutionId ?? null,
+      )
+        ? DesignerSessionRuntimeTranscriptPollIntervalMs
+        : false,
   });
   const trimmedFollowUpDraft = followUpDraft.trim();
 
@@ -181,6 +233,13 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
           runtimeConversationBootstrapQuery.isFetching)
       }
       runtimeConversationBootstrap={runtimeConversationBootstrapQuery.data ?? null}
+      runtimeConversationTranscript={runtimeConversationTranscriptQuery.data ?? null}
+      transcriptErrorMessage={runtimeConversationTranscriptQuery.error?.message ?? null}
+      transcriptIsPending={
+        runtimeConversationBootstrapQuery.data !== undefined &&
+        (runtimeConversationTranscriptQuery.isPending ||
+          runtimeConversationTranscriptQuery.isFetching)
+      }
       followUpDraft={followUpDraft}
       followUpErrorMessage={submitFollowUpMutation.error?.message ?? null}
       followUpIsPending={submitFollowUpMutation.isPending}

@@ -1706,6 +1706,117 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/designer/sessions/{sessionId}/runtime-conversation/transcript": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          sessionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Read the current Designer runtime conversation transcript from the provider. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              runtimeConversationTranscript: {
+                name: string | null;
+                preview: string | null;
+                providerConversationId: string;
+                turns: {
+                  id: string;
+                  items: unknown[];
+                  status: string | null;
+                }[];
+              };
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Designer session not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "DESIGNER_SESSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Designer runtime conversation is not ready for transcript reads. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code:
+                | "DESIGNER_RUNTIME_CONVERSATION_NOT_READY"
+                | "DESIGNER_RUNTIME_CONVERSATION_BUSY";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/home": {
     parameters: {
       query?: never;

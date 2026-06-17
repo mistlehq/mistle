@@ -1266,6 +1266,180 @@
         }
       }
     },
+    "/v1/designer/sessions/{sessionId}/runtime-conversation/transcript": {
+      "get": {
+        "tags": ["Designer"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^dsn_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "sessionId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read the current Designer runtime conversation transcript from the provider.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runtimeConversationTranscript": {
+                      "type": "object",
+                      "properties": {
+                        "providerConversationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": ["string", "null"]
+                        },
+                        "preview": {
+                          "type": ["string", "null"]
+                        },
+                        "turns": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "status": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
+                              "items": {
+                                "type": "array",
+                                "items": {}
+                              }
+                            },
+                            "required": ["id", "status", "items"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["providerConversationId", "name", "preview", "turns"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["runtimeConversationTranscript"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Designer session not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["DESIGNER_SESSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Designer runtime conversation is not ready for transcript reads.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "DESIGNER_RUNTIME_CONVERSATION_NOT_READY",
+                        "DESIGNER_RUNTIME_CONVERSATION_BUSY"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/designer/sessions/{sessionId}/runtime-conversation/follow-ups": {
       "post": {
         "tags": ["Designer"],

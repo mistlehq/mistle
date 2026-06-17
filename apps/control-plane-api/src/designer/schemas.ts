@@ -92,6 +92,23 @@ const designerRuntimeFollowUpSubmissionSchema = z
   })
   .strict();
 
+const designerRuntimeConversationTranscriptTurnSchema = z
+  .object({
+    id: z.string().min(1),
+    status: z.string().min(1).nullable(),
+    items: z.array(z.unknown()),
+  })
+  .strict();
+
+const designerRuntimeConversationTranscriptSchema = z
+  .object({
+    providerConversationId: z.string().min(1),
+    name: z.string().nullable(),
+    preview: z.string().nullable(),
+    turns: z.array(designerRuntimeConversationTranscriptTurnSchema),
+  })
+  .strict();
+
 export const createDesignerSessionResponseSchema = designerSessionSchema;
 
 export const listDesignerSessionsResponseSchema = z
@@ -112,6 +129,11 @@ export const submitDesignerRuntimeFollowUpResponseSchema = z
     runtimeFollowUp: designerRuntimeFollowUpSubmissionSchema,
   })
   .strict();
+export const getDesignerRuntimeConversationTranscriptResponseSchema = z
+  .object({
+    runtimeConversationTranscript: designerRuntimeConversationTranscriptSchema,
+  })
+  .strict();
 
 export type DesignerSessionResponse = z.infer<typeof designerSessionSchema>;
 export type CreateDesignerSessionBody = z.infer<typeof createDesignerSessionBodySchema>;
@@ -126,4 +148,7 @@ export type BootstrapDesignerRuntimeConversationResponse = z.infer<
 >;
 export type SubmitDesignerRuntimeFollowUpResponse = z.infer<
   typeof submitDesignerRuntimeFollowUpResponseSchema
+>;
+export type GetDesignerRuntimeConversationTranscriptResponse = z.infer<
+  typeof getDesignerRuntimeConversationTranscriptResponseSchema
 >;
