@@ -499,6 +499,19 @@ export const ConfigSchema = z
       })
       .strict(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (
+      value.sandbox.designer !== undefined &&
+      value.platform_credentials?.openai?.api_key === undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["platform_credentials", "openai", "api_key"],
+        message:
+          "Platform OpenAI credentials are required when Designer sandbox config is enabled.",
+      });
+    }
+  });
 
 export type Config = z.infer<typeof ConfigSchema>;
