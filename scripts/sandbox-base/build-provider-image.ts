@@ -658,6 +658,32 @@ function createReleaseSandboxdSource(
   };
 }
 
+function rejectTensorlakeSandboxdArguments(argumentsList: ParsedCliArguments): void {
+  if (argumentsList.sandboxdSource !== undefined) {
+    throw new Error(
+      "--sandboxd-source is not supported when --provider is tensorlake. Tensorlake imports a prepared registry image.",
+    );
+  }
+
+  if (argumentsList.sandboxdArtifactUrl !== undefined) {
+    throw new Error(
+      "--sandboxd-artifact-url is not supported when --provider is tensorlake. Tensorlake imports a prepared registry image.",
+    );
+  }
+
+  if (argumentsList.sandboxdArtifactSha256 !== undefined) {
+    throw new Error(
+      "--sandboxd-artifact-sha256 is not supported when --provider is tensorlake. Tensorlake imports a prepared registry image.",
+    );
+  }
+
+  if (argumentsList.sandboxdArtifactVersion !== undefined) {
+    throw new Error(
+      "--sandboxd-artifact-version is not supported when --provider is tensorlake. Tensorlake imports a prepared registry image.",
+    );
+  }
+}
+
 async function buildDockerBaseImage(argumentsList: ParsedCliArguments): Promise<void> {
   const gitHeadSha = readGitHeadSha();
   const tag = argumentsList.tag ?? createDevTag(gitHeadSha);
@@ -691,6 +717,8 @@ async function buildDockerBaseImage(argumentsList: ParsedCliArguments): Promise<
 }
 
 async function buildTensorlakeBaseImage(argumentsList: ParsedCliArguments): Promise<void> {
+  rejectTensorlakeSandboxdArguments(argumentsList);
+
   const apiKey =
     argumentsList.apiKey ??
     readOptionalEnv(TensorlakeApiKeyEnv) ??

@@ -75,6 +75,12 @@ export function resolveTensorlakeImportSource(request: SandboxEnsureBaseImageReq
   }
 
   if (request.source.kind === SandboxBaseImageSourceKinds.SDK_IMAGE) {
+    if (request.source.sandboxd !== undefined) {
+      throw new SandboxConfigurationError(
+        "Tensorlake base image import does not support SDK image sandboxd sources. Build and publish a registry image that already contains sandboxd, then import that image.",
+      );
+    }
+
     return {
       registeredName: requireNonEmptyValue({
         field: "registered image name",

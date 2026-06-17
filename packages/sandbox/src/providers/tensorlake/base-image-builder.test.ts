@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { SandboxConfigurationError } from "../../errors.js";
-import { SandboxBaseImageSourceKinds } from "../../types.js";
+import { SandboxBaseImageSourceKinds, SandboxSdkImageSandboxdSourceKinds } from "../../types.js";
 import { resolveTensorlakeImportSource } from "./base-image-builder.js";
 import { createTensorlakeRegisteredBaseImageName } from "./image-handle.js";
 
@@ -50,6 +50,29 @@ describe("resolveTensorlakeImportSource", () => {
         },
       }),
     ).toThrow("Tensorlake base image builder requires an image source or SDK image source.");
+  });
+
+  it("fails fast for SDK image sandboxd sources because Tensorlake imports registry images", () => {
+    expect(() =>
+      resolveTensorlakeImportSource({
+        source: {
+          kind: SandboxBaseImageSourceKinds.SDK_IMAGE,
+          baseImageRef: "ghcr.io/mistlehq/sandbox-base:v1.2.3",
+          contextPath: ".",
+          imageId: "mistle-base",
+          sandboxd: {
+            kind: SandboxSdkImageSandboxdSourceKinds.RELEASE,
+            artifact: {
+              sha256: "b".repeat(64),
+              url: "https://example.com/sandboxd.gz",
+              version: "v1.2.3",
+            },
+          },
+        },
+      }),
+    ).toThrow(
+      "Tensorlake base image import does not support SDK image sandboxd sources. Build and publish a registry image that already contains sandboxd, then import that image.",
+    );
   });
 
   it("fails fast for platform overrides because Tensorlake import resolves the registry ref", () => {
