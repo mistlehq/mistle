@@ -1173,12 +1173,14 @@ function SandboxProfileEditorPageStoryView(
           activeVersion: 1,
           hasDraft: input.lifecycleState === "published-with-draft",
           draftVersion: input.lifecycleState === "published-with-draft" ? 2 : null,
+          canDiscardDraft: input.lifecycleState === "published-with-draft",
         }
       : {
           kind: "draft" as const,
           version: input.lifecycleState === "draft-with-published" ? 2 : 1,
           activeVersion: input.lifecycleState === "draft-with-published" ? 1 : null,
           hasDraft: true as const,
+          canDiscardDraft: input.lifecycleState === "draft-with-published",
         };
   const snapshotStatus = resolveSnapshotStoryStatus({
     lifecycleState: input.lifecycleState,

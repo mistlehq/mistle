@@ -3975,13 +3975,13 @@ function SandboxProfileLifecycleActions(input: {
 function resolveDiscardDraftInput(
   mode: SandboxProfileEditorVersionMode,
 ): { draftVersion: number } | null {
-  if (mode.kind === "draft" && mode.activeVersion !== null) {
+  if (mode.kind === "draft" && mode.canDiscardDraft) {
     return {
       draftVersion: mode.version,
     };
   }
 
-  if (mode.kind === "active" && mode.draftVersion !== null) {
+  if (mode.kind === "active" && mode.draftVersion !== null && mode.canDiscardDraft) {
     return {
       draftVersion: mode.draftVersion,
     };

@@ -508,15 +508,17 @@ _Avoid_: Schema mismatch prompt, refresh modal
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
 - A **Publish-worthy change** is evaluated against the draft's **Source sandbox profile version**.
+- A draft **Sandbox profile version**'s **Source sandbox profile version** is the latest earlier published **Sandbox profile version**.
 - **Sandbox profile version configuration** excludes external dependency state, snapshot image state, snapshot job history, and other lifecycle timestamps.
 - **Sandbox profile version configuration** excludes **Sandbox profile** metadata such as the profile display name.
 - A **Snapshot maintenance script** belongs to a **Sandbox profile version** but is not a **Publish-worthy change** by itself.
 - **Automatic snapshot refresh** belongs to a published **Sandbox profile version** but is not a **Publish-worthy change** by itself.
 - A **Sandbox profile version** without a **Publish-worthy change** should not be publishable.
-- A saved draft **Sandbox profile version** without a **Publish-worthy change** may be discarded without preserving the draft.
+- A saved draft **Sandbox profile version** without a **Publish-worthy change** may be discarded when it has a **Source sandbox profile version**.
 - A saved first draft **Sandbox profile version** is not discarded through the no-change draft cancellation flow.
 - Publishing the first **Sandbox profile version** is publish-worthy when no **Source sandbox profile version** exists.
 - Publishing the first **Sandbox profile version** does not require a **Source sandbox profile version**.
+- The latest published **Sandbox profile version** may be inspectable even when no **Sandbox profile version** is active.
 - A snapshot-neutral change can still be a **Publish-worthy change**.
 - Snapshot reuse depends on a usable **Snapshot**, not only on the **Source sandbox profile version**.
 - Unsaved editor changes may become a **Publish-worthy change** after they are saved to the draft **Sandbox profile version**.

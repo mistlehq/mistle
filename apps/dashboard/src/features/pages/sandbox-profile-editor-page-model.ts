@@ -13,6 +13,7 @@ export type SandboxProfileEditorVersionMode =
       version: number;
       activeVersion: number | null;
       hasDraft: true;
+      canDiscardDraft: boolean;
     }
   | {
       kind: "active";
@@ -20,6 +21,7 @@ export type SandboxProfileEditorVersionMode =
       activeVersion: number | null;
       hasDraft: boolean;
       draftVersion: number | null;
+      canDiscardDraft: boolean;
     };
 
 export type SetupAssistantStartDialogVariant = "choice" | "save-required" | "use-saved-required";
@@ -66,6 +68,10 @@ export function resolveSandboxProfileEditorVersionMode(input: {
       : publishedVersions.reduce((latestVersion, currentVersion) =>
           currentVersion.version > latestVersion.version ? currentVersion : latestVersion,
         );
+  const draftCanBeDiscarded =
+    draftVersion === null
+      ? false
+      : publishedVersions.some((version) => version.version < draftVersion.version);
 
   if (input.activeVersion !== null && activeVersion === null) {
     return {
@@ -89,6 +95,7 @@ export function resolveSandboxProfileEditorVersionMode(input: {
         version: draftVersion.version,
         activeVersion: input.activeVersion,
         hasDraft: true,
+        canDiscardDraft: draftCanBeDiscarded,
       },
     };
   }
@@ -102,6 +109,7 @@ export function resolveSandboxProfileEditorVersionMode(input: {
         activeVersion: input.activeVersion,
         hasDraft: draftVersion !== null,
         draftVersion: draftVersion?.version ?? null,
+        canDiscardDraft: draftCanBeDiscarded,
       },
     };
   }
