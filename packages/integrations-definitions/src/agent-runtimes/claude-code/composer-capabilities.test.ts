@@ -131,6 +131,7 @@ describe("Claude Code composer capabilities", () => {
     expect(shouldExposeClaudeCodeSlashCommand({ name: "model" })).toBe(false);
     expect(shouldExposeClaudeCodeSlashCommand({ name: "permissions" })).toBe(false);
     expect(shouldExposeClaudeCodeSlashCommand({ name: "debug" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "mcp__github__issue" })).toBe(false);
     expect(shouldExposeClaudeCodeSlashCommand({ name: "resume" })).toBe(false);
     expect(shouldExposeClaudeCodeSlashCommand({ name: "rewind" })).toBe(false);
     expect(shouldExposeClaudeCodeSlashCommand({ name: "terminal-setup" })).toBe(false);
@@ -150,6 +151,10 @@ describe("Claude Code composer capabilities", () => {
         {
           name: "debug",
           description: "Debug failures",
+        },
+        {
+          name: "mcp__github__issue",
+          description: "Run a GitHub MCP prompt",
         },
       ]),
     ).toEqual([]);

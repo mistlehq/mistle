@@ -3,6 +3,7 @@ import type { ComposerCapability } from "@mistle/integrations-core";
 import type { ClaudeCodeCommandSummary } from "./client.js";
 
 const ClaudeCodeSlashCommandIdPrefix = "claude-code.slash.";
+const ClaudeCodeMcpPromptCommandNamePrefix = "mcp__";
 const ExposedClaudeCodeBuiltInSlashCommandNames = new Set(["compact", "context", "plan", "review"]);
 const HiddenClaudeCodeBuiltInSlashCommandNames = new Set([
   "add-dir",
@@ -136,6 +137,9 @@ export function shouldExposeClaudeCodeSlashCommand(
 ): boolean {
   if (ExposedClaudeCodeBuiltInSlashCommandNames.has(command.name)) {
     return true;
+  }
+  if (command.name.startsWith(ClaudeCodeMcpPromptCommandNamePrefix)) {
+    return false;
   }
   return !HiddenClaudeCodeBuiltInSlashCommandNames.has(command.name);
 }
