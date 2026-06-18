@@ -34,6 +34,7 @@ describe.concurrent("designer sessions integration", () => {
       },
       body: JSON.stringify({
         idempotencyKey: "designer-session-integration-create",
+        prompt: "Build a triage agent for GitHub issues and Linear bugs.",
       }),
     });
     expect(createResponse.status).toBe(201);
@@ -42,6 +43,7 @@ describe.concurrent("designer sessions integration", () => {
       organizationId: session.organizationId,
       status: "pending",
       connectable: false,
+      initialPrompt: "Build a triage agent for GitHub issues and Linear bugs.",
       canvasTabs: [],
     });
     expect(created.id).toMatch(/^dsn_[a-zA-Z0-9_-]+$/);
@@ -57,6 +59,11 @@ describe.concurrent("designer sessions integration", () => {
     const codexConfig = queuedWorkflowInput.runtimePlan.runtimeClients
       .flatMap((client) => client.setup.files)
       .find((file) => file.fileId === "codex_config");
+    const codexRuntimeProcess = queuedWorkflowInput.runtimePlan.runtimeClients
+      .flatMap((client) => client.processes)
+      .find((process) => process.processKey === "codex-app-server");
+    expect(queuedWorkflowInput.runtimePlan.artifacts).toEqual([]);
+    expect(codexRuntimeProcess?.command.args[0]).toBe("codex");
     expect(codexConfig?.content).toContain('base_url = "https://api.openai.com/v1"');
     expect(codexConfig?.content).toContain("[mcp_servers.mistle_docs]");
     expect(codexConfig?.content).toContain('url = "https://docs.mistle.dev/mcp"');
@@ -66,6 +73,12 @@ describe.concurrent("designer sessions integration", () => {
     expect(codexAgents?.content).toContain("Mistle-managed sandbox context:");
     expect(codexAgents?.content).toContain("<!-- MISTLE-MANAGED:START mistle-designer-context -->");
     expect(codexAgents?.content).toContain("# Mistle Designer");
+    expect(codexAgents?.content).toContain(
+      "<!-- MISTLE-MANAGED:START mistle-designer-initial-request -->",
+    );
+    expect(codexAgents?.content).toContain(
+      "Build a triage agent for GitHub issues and Linear bugs.",
+    );
     expect(codexAgents?.content).toContain(
       "Do not publish sandbox profile versions, start sandbox sessions, create provider-side resources, or mutate external provider configuration unless there is an explicit approved Designer action for that operation.",
     );
@@ -217,6 +230,7 @@ describe.concurrent("designer sessions integration", () => {
       },
       body: JSON.stringify({
         idempotencyKey: "designer-session-canvas-href-validation",
+        prompt: "Build a Designer canvas validation check.",
       }),
     });
     expect(createResponse.status).toBe(201);
@@ -262,6 +276,7 @@ describe.concurrent("designer sessions integration", () => {
       },
       body: JSON.stringify({
         idempotencyKey: "designer-session-integration-org-boundary",
+        prompt: "Build an organization-scoped Designer agent.",
       }),
     });
     expect(createResponse.status).toBe(201);
@@ -343,6 +358,7 @@ describe.concurrent("designer sessions integration", () => {
       },
       body: JSON.stringify({
         idempotencyKey: "designer-session-api-key-rejection-create",
+        prompt: "Build an API key rejection test Designer agent.",
       }),
     });
     expect(createResponse.status).toBe(201);
@@ -384,6 +400,7 @@ describe.concurrent("designer sessions integration", () => {
       headers: apiKeyHeaders,
       body: JSON.stringify({
         idempotencyKey: "designer-session-api-key-rejection-forbidden",
+        prompt: "Build a forbidden API key Designer agent.",
       }),
     });
     expect(rejectedCreateResponse.status).toBe(403);

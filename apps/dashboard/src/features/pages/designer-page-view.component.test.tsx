@@ -19,6 +19,7 @@ const SampleDesignerSession = {
   failureCode: null,
   failureMessage: null,
   startupOperation: null,
+  initialPrompt: "Build a triage agent.",
   canvasTabs: [],
   createdAt: "2026-04-01T09:00:00.000Z",
   updatedAt: "2026-04-01T09:00:00.000Z",

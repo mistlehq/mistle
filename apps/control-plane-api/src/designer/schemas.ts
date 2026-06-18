@@ -76,6 +76,7 @@ export const designerSandboxInstanceIdParamsSchema = z
 export const createDesignerSessionBodySchema = z
   .object({
     idempotencyKey: z.string().min(1).max(255),
+    prompt: z.string().trim().min(1).max(20_000),
   })
   .strict();
 
@@ -102,6 +103,7 @@ export const designerSessionSchema = z
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
     startupOperation: designerSessionStartupOperationSchema.nullable(),
+    initialPrompt: z.string().min(1).nullable(),
     canvasTabs: z.array(designerSessionCanvasTabSchema),
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),

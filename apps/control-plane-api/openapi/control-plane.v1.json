@@ -679,9 +679,14 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20000
                   }
                 },
-                "required": ["idempotencyKey"],
+                "required": ["idempotencyKey", "prompt"],
                 "additionalProperties": false
               }
             }
@@ -753,6 +758,10 @@
                       "required": ["operationId", "operationKind"],
                       "additionalProperties": false
                     },
+                    "initialPrompt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
                     "canvasTabs": {
                       "type": "array",
                       "items": {
@@ -797,6 +806,7 @@
                     "failureCode",
                     "failureMessage",
                     "startupOperation",
+                    "initialPrompt",
                     "canvasTabs",
                     "createdAt",
                     "updatedAt"
@@ -990,6 +1000,10 @@
                             "required": ["operationId", "operationKind"],
                             "additionalProperties": false
                           },
+                          "initialPrompt": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
                           "canvasTabs": {
                             "type": "array",
                             "items": {
@@ -1034,6 +1048,7 @@
                           "failureCode",
                           "failureMessage",
                           "startupOperation",
+                          "initialPrompt",
                           "canvasTabs",
                           "createdAt",
                           "updatedAt"
@@ -1187,6 +1202,10 @@
                       "required": ["operationId", "operationKind"],
                       "additionalProperties": false
                     },
+                    "initialPrompt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
                     "canvasTabs": {
                       "type": "array",
                       "items": {
@@ -1231,6 +1250,7 @@
                     "failureCode",
                     "failureMessage",
                     "startupOperation",
+                    "initialPrompt",
                     "canvasTabs",
                     "createdAt",
                     "updatedAt"
@@ -1440,6 +1460,10 @@
                       "required": ["operationId", "operationKind"],
                       "additionalProperties": false
                     },
+                    "initialPrompt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
                     "canvasTabs": {
                       "type": "array",
                       "items": {
@@ -1484,6 +1508,7 @@
                     "failureCode",
                     "failureMessage",
                     "startupOperation",
+                    "initialPrompt",
                     "canvasTabs",
                     "createdAt",
                     "updatedAt"
@@ -1654,6 +1679,10 @@
                       "required": ["operationId", "operationKind"],
                       "additionalProperties": false
                     },
+                    "initialPrompt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
                     "canvasTabs": {
                       "type": "array",
                       "items": {
@@ -1698,6 +1727,7 @@
                     "failureCode",
                     "failureMessage",
                     "startupOperation",
+                    "initialPrompt",
                     "canvasTabs",
                     "createdAt",
                     "updatedAt"
@@ -1907,6 +1937,10 @@
                       "required": ["operationId", "operationKind"],
                       "additionalProperties": false
                     },
+                    "initialPrompt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
                     "canvasTabs": {
                       "type": "array",
                       "items": {
@@ -1951,6 +1985,7 @@
                     "failureCode",
                     "failureMessage",
                     "startupOperation",
+                    "initialPrompt",
                     "canvasTabs",
                     "createdAt",
                     "updatedAt"

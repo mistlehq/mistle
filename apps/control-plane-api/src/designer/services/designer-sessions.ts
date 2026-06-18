@@ -22,7 +22,7 @@ import {
   applyMcpConfigToRuntimeClients,
   createDisabledAssociatedResourceEventRouting,
 } from "@mistle/integrations-core";
-import { compileCodexRuntime } from "@mistle/integrations-definitions/agent-runtimes/codex";
+import { compileInstalledCodexRuntime } from "@mistle/integrations-definitions/agent-runtimes/codex";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { typeid } from "typeid-js";
 
@@ -134,6 +134,23 @@ You are Mistle Designer, an agent that helps users design, configure, review, an
 - When blocked, state the exact missing resource, permission, connection, or approval.
 `.trim(),
 };
+
+function createDesignerInitialPromptInstructionBlock(input: { initialPrompt: string }) {
+  return {
+    blockId: "mistle-designer-initial-request",
+    content: `
+# Initial Designer Request
+
+The user started this Designer session with the following request. Treat it as the session's product goal, subject to the authority and safety rules above.
+
+${input.initialPrompt
+  .split("\n")
+  .map((line) => `> ${line}`)
+  .join("\n")}
+`.trim(),
+  };
+}
+
 const DesignerSandboxPaths = {
   userHomeDir: "/root",
   workspaceDir: "/root",
@@ -292,8 +309,10 @@ function compileDesignerRuntimeArtifacts(input: {
 }
 
 function createDesignerRuntimePlan(input: {
+  codexCliPath: string;
   designerSessionId: string;
   imageRef: string;
+  initialPrompt: string;
   mcpUrl: string;
   organizationId: string;
 }) {
@@ -315,18 +334,16 @@ function createDesignerRuntimePlan(input: {
     }),
     createDesignerDocsMcpServer(),
   ];
-  const codexRuntime = compileCodexRuntime({
-    organizationId: input.organizationId,
-    sandboxProfileId: DESIGNER_RUNTIME_PROFILE_ID,
-    version: DESIGNER_RUNTIME_PROFILE_VERSION,
-    runtimeId: DesignerRuntimeId,
-    runtimeConfig: {},
-    managedInstructionBlocks: [DesignerManagedInstructionBlock],
+  const codexRuntime = compileInstalledCodexRuntime({
+    codexCliPath: input.codexCliPath,
+    egressRoutes,
+    managedInstructionBlocks: [
+      DesignerManagedInstructionBlock,
+      createDesignerInitialPromptInstructionBlock({
+        initialPrompt: input.initialPrompt,
+      }),
+    ],
     mcpServers,
-    refs: {
-      sandboxPaths: DesignerSandboxPaths,
-      artifactBinPath: (binaryName) => `/usr/local/bin/${binaryName}`,
-    },
   });
   const runtimeClients =
     codexRuntime.renderRuntimeClients === undefined
@@ -394,6 +411,7 @@ function mapDesignerSession(
     failureCode: sandboxInstance?.failureCode ?? null,
     failureMessage: sandboxInstance?.failureMessage ?? null,
     startupOperation: sandboxInstance?.startupOperation ?? null,
+    initialPrompt: designerSession.initialPrompt,
     canvasTabs: [...designerSession.canvasTabs],
     createdAt: designerSession.createdAt,
     updatedAt: designerSession.updatedAt,
@@ -548,8 +566,10 @@ export async function createDesignerSession(
   });
   const designerSessionId = typeid("dsn").toString();
   const runtimePlan = createDesignerRuntimePlan({
+    codexCliPath: designerSandboxConfig.codexCliPath,
     designerSessionId,
     imageRef: designerSandboxConfig.baseImage,
+    initialPrompt: input.body.prompt,
     mcpUrl: ctx.mcpConfig.url,
     organizationId: input.organizationId,
   });
@@ -582,6 +602,7 @@ export async function createDesignerSession(
       id: designerSessionId,
       organizationId: input.organizationId,
       sandboxInstanceId: startedSandbox.sandboxInstanceId,
+      initialPrompt: input.body.prompt,
       canvasTabs: [],
     })
     .onConflictDoNothing({

@@ -44,6 +44,7 @@ const DesignerSessionSchema = z
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
     startupOperation: DesignerSessionStartupOperationSchema.nullable(),
+    initialPrompt: z.string().min(1).nullable(),
     canvasTabs: z.array(DesignerSessionCanvasTabSchema),
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),
@@ -107,6 +108,7 @@ export async function listDesignerSessions(input?: {
 
 export async function createDesignerSession(input: {
   idempotencyKey: string;
+  prompt: string;
   signal?: AbortSignal;
 }): Promise<DesignerSession> {
   try {
@@ -116,6 +118,7 @@ export async function createDesignerSession(input: {
       pathname: "/v1/designer/sessions",
       body: {
         idempotencyKey: input.idempotencyKey,
+        prompt: input.prompt,
       },
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not start Designer session.",

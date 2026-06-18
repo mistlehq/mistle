@@ -21,6 +21,7 @@ export function DesignerPage(): React.JSX.Element {
     mutationFn: async () =>
       createDesignerSession({
         idempotencyKey: crypto.randomUUID(),
+        prompt,
       }),
     onSuccess: (session) => {
       void queryClient.invalidateQueries({ queryKey: designerSessionsQueryKey });

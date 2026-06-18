@@ -18,6 +18,7 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
     failureCode: null,
     failureMessage: null,
     startupOperation: null,
+    initialPrompt: "Build a triage agent for incoming GitHub issues and Linear bugs.",
     canvasTabs: [
       {
         id: "integrations",
@@ -47,6 +48,7 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
       operationId: "owfr_story_designer_billing_startup",
       operationKind: "start",
     },
+    initialPrompt: "Design a billing reconciliation agent for escalations.",
     canvasTabs: [],
     createdAt: "2026-04-01T08:55:00.000Z",
     updatedAt: "2026-04-01T08:55:00.000Z",
@@ -62,6 +64,7 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
     failureCode: null,
     failureMessage: null,
     startupOperation: null,
+    initialPrompt: "Compare sidebar truncation behavior.",
     canvasTabs: [],
     createdAt: "2026-03-31T15:30:00.000Z",
     updatedAt: "2026-03-31T15:30:00.000Z",
@@ -76,6 +79,7 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
     failureCode: "sandbox_bootstrap_failed",
     failureMessage: "Could not start the Designer sandbox runtime because image pull failed.",
     startupOperation: null,
+    initialPrompt: "Build a webhook failure triage agent.",
     canvasTabs: [],
     createdAt: "2026-03-31T12:00:00.000Z",
     updatedAt: "2026-03-31T12:00:00.000Z",
