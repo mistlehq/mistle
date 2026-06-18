@@ -750,6 +750,26 @@ describe("buildClaudeCodeConversationRuntime", () => {
     expect(startedPrompts).toEqual(["/review current changes"]);
   });
 
+  it("routes Claude Code custom slash commands with arguments through normal turn start", () => {
+    const startedPrompts: string[] = [];
+    const runtime = buildClaudeCodeConversationRuntime(
+      createClaudeCodeRuntimeInput({
+        isBusy: false,
+        reportedMessages: [],
+        startedPrompts,
+        steeredPrompts: [],
+      }),
+    );
+
+    const accepted = runtime.composerRuntimeInput.executeTypedRuntimeCommand?.({
+      commandId: "claude-code.slash.fix-issue",
+      text: "/fix-issue 123 high",
+    });
+
+    expect(accepted).toBe(true);
+    expect(startedPrompts).toEqual(["/fix-issue 123 high"]);
+  });
+
   it("rejects Claude Code slash commands while the session is busy", () => {
     const reportedMessages: string[] = [];
     const startedPrompts: string[] = [];

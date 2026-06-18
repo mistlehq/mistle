@@ -3,7 +3,22 @@ import type { ComposerCapability } from "@mistle/integrations-core";
 import type { ClaudeCodeCommandSummary } from "./client.js";
 
 const ClaudeCodeSlashCommandIdPrefix = "claude-code.slash.";
-const ExposedClaudeCodeSlashCommandNames = new Set(["compact", "context", "plan", "review"]);
+const HiddenClaudeCodeSlashCommandNames = new Set([
+  "agents",
+  "clear",
+  "cost",
+  "debug",
+  "doctor",
+  "help",
+  "hooks",
+  "mcp",
+  "memory",
+  "model",
+  "permissions",
+  "plugin",
+  "status",
+  "usage",
+]);
 
 type ClaudeCodeCommandDescriptor = Pick<ClaudeCodeCommandSummary, "description" | "name">;
 
@@ -18,7 +33,7 @@ export function isClaudeCodeSlashCommandId(commandId: string): boolean {
 export function shouldExposeClaudeCodeSlashCommand(
   command: Pick<ClaudeCodeCommandSummary, "name">,
 ): boolean {
-  return ExposedClaudeCodeSlashCommandNames.has(command.name);
+  return !HiddenClaudeCodeSlashCommandNames.has(command.name) && !command.name.includes(":");
 }
 
 export function mapClaudeCodeSlashCommandsToComposerCapabilities(
