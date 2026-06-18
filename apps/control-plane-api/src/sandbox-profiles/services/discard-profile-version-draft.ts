@@ -34,7 +34,6 @@ export async function discardProfileVersionDraft(
     const sandboxProfile = await tx.query.sandboxProfiles.findFirst({
       columns: {
         activeVersion: true,
-        id: true,
       },
       where: (table, { and, eq }) =>
         and(eq(table.id, input.profileId), eq(table.organizationId, input.organizationId)),
@@ -47,13 +46,6 @@ export async function discardProfileVersionDraft(
       );
     }
 
-    if (sandboxProfile.activeVersion === null) {
-      throw new SandboxProfilesConflictError(
-        SandboxProfilesConflictCodes.DRAFT_ONLY_PROFILE_VERSION_CANNOT_BE_DISCARDED,
-        "Draft-only sandbox profiles cannot discard their only version. Delete the profile instead.",
-      );
-    }
-
     if (sandboxProfile.activeVersion === input.profileVersion) {
       throw new SandboxProfilesConflictError(
         SandboxProfilesConflictCodes.PROFILE_VERSION_ACTIVE,
@@ -63,8 +55,6 @@ export async function discardProfileVersionDraft(
 
     const [lockedVersion] = await tx
       .select({
-        sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
-        version: tables.sandboxProfileVersions.version,
         state: tables.sandboxProfileVersions.state,
       })
       .from(tables.sandboxProfileVersions)
@@ -88,6 +78,26 @@ export async function discardProfileVersionDraft(
       throw new SandboxProfilesConflictError(
         SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_DRAFT,
         `Sandbox profile version '${String(input.profileVersion)}' is not a draft.`,
+      );
+    }
+
+    const sourceVersion = await tx.query.sandboxProfileVersions.findFirst({
+      columns: {
+        version: true,
+      },
+      where: (table, { and, eq, lt }) =>
+        and(
+          eq(table.sandboxProfileId, input.profileId),
+          eq(table.state, SandboxProfileVersionStates.PUBLISHED),
+          lt(table.version, input.profileVersion),
+        ),
+      orderBy: (table, { desc }) => [desc(table.version)],
+    });
+
+    if (sourceVersion === undefined) {
+      throw new SandboxProfilesConflictError(
+        SandboxProfilesConflictCodes.DRAFT_ONLY_PROFILE_VERSION_CANNOT_BE_DISCARDED,
+        "Draft-only sandbox profiles cannot discard their only version. Delete the profile instead.",
       );
     }
 
