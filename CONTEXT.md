@@ -81,6 +81,10 @@ _Avoid_: Provider configuration change when the response has not caused an exter
 A durable **Mistle Designer session** record that owns one user-reviewed **Designer action proposal response**, its operation kind, idempotency, and execution status.
 _Avoid_: Provider write when no explicit operation handler has executed
 
+**Designer action operation**:
+A typed operation stored on a **Designer action request** that may execute only through an explicit supported handler after approval.
+_Avoid_: Provider configuration change when the operation mutates a Mistle-owned resource
+
 **User input request**:
 A runtime request that asks the user to answer one or more structured questions before the agent continues.
 _Avoid_: Approval request when the user is choosing configuration rather than granting permission

@@ -33,6 +33,20 @@ const ApprovedDesignerActionProposalItem = {
   summary: "The webhook was approved.",
 } satisfies DesignerActionProposal;
 
+const SandboxProfileDraftSetupScriptProposalItem = {
+  id: "dap_profile_setup_script",
+  kind: "designerActionProposal",
+  title: "Update setup script",
+  summary: "Update the draft setup script for the selected sandbox profile.",
+  status: "pending",
+  operation: {
+    kind: "sandboxProfileDraftSetupScriptPut",
+    profileId: "sbp_designer_setup_script",
+    version: 2,
+    setupScript: "pnpm install\npnpm build",
+  },
+} satisfies DesignerActionProposal;
+
 describe("Designer action proposals", () => {
   it("extracts strictly shaped proposal items once and keeps them out of chat transcript items", () => {
     const chatItem = {
@@ -75,6 +89,18 @@ describe("Designer action proposals", () => {
         },
       ],
     });
+  });
+
+  it("accepts a typed sandbox profile draft setup script operation", () => {
+    expect(
+      splitDesignerActionProposalsFromTranscriptTurns([
+        {
+          id: "turn_setup_script",
+          status: "completed",
+          items: [SandboxProfileDraftSetupScriptProposalItem],
+        },
+      ]).actionProposals,
+    ).toEqual([SandboxProfileDraftSetupScriptProposalItem]);
   });
 
   it("formats action proposal responses as bounded Designer conversation input", () => {

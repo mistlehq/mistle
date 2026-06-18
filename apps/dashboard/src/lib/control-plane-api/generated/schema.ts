@@ -1881,18 +1881,26 @@ export interface paths {
                   id: string;
                   /** @enum {string} */
                   kind: "designerActionProposal";
-                  operation: {
-                    action: string;
-                    details: {
-                      label: string;
-                      value: string;
-                    }[];
-                    /** @enum {string} */
-                    kind: "providerConfigurationChange";
-                    provider: string;
-                    resourceLabel: string | null;
-                    resourceType: string;
-                  };
+                  operation:
+                    | {
+                        action: string;
+                        details: {
+                          label: string;
+                          value: string;
+                        }[];
+                        /** @enum {string} */
+                        kind: "providerConfigurationChange";
+                        provider: string;
+                        resourceLabel: string | null;
+                        resourceType: string;
+                      }
+                    | {
+                        /** @enum {string} */
+                        kind: "sandboxProfileDraftSetupScriptPut";
+                        profileId: string;
+                        setupScript: string | null;
+                        version: number;
+                      };
                   /** @enum {string} */
                   status: "pending" | "approved" | "declined";
                   summary: string;

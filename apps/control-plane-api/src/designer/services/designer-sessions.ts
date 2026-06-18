@@ -23,6 +23,7 @@ import {
   type EgressCredentialRoute,
   SandboxImageSources,
   createDisabledAssociatedResourceEventRouting,
+  type IntegrationRegistry,
 } from "@mistle/integrations-core";
 import { compileInstalledCodexRuntime } from "@mistle/integrations-definitions/agent-runtimes/codex";
 import { resolveAgentConversationProvider } from "@mistle/integrations-definitions/agent-runtimes/server";
@@ -109,6 +110,17 @@ type DesignerRuntimeConversationContext = Pick<DesignerSessionServiceContext, "d
   integrationsConfig: {
     masterEncryptionKeys: Record<string, string>;
   };
+};
+
+type DesignerOperationExecutionContext = {
+  db: ControlPlaneDatabase;
+  integrationRegistry: IntegrationRegistry;
+  sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
+};
+
+type DesignerActionProposalResponseContext = DesignerRuntimeConversationContext & {
+  integrationRegistry: IntegrationRegistry;
+  sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
 };
 
 type LockedDesignerRuntimeConversationContext = Omit<DesignerRuntimeConversationContext, "db"> & {
@@ -282,10 +294,8 @@ function mapSubmittedDesignerActionProposalResponse(input: {
 }
 
 export async function completeApprovedDesignerActionRequestExecution(input: {
-  ctx: { db: ControlPlaneDatabase };
+  ctx: DesignerOperationExecutionContext;
   organizationId: string;
-  sessionId: string;
-  proposalId: string;
   actionRequest: DesignerActionRequest;
   response: SubmitDesignerActionProposalResponseResponse;
 }): Promise<SubmitDesignerActionProposalResponseResponse> {
@@ -307,11 +317,9 @@ export async function completeApprovedDesignerActionRequestExecution(input: {
     };
   }
 
-  const executionResult = await executeApprovedDesignerOperation({
-    actionRequestId: claimedActionRequest.id,
+  const executionResult = await executeApprovedDesignerOperation(input.ctx, {
     organizationId: input.organizationId,
-    sessionId: input.sessionId,
-    proposalId: input.proposalId,
+    requestedByUserId: claimedActionRequest.requestedByUserId,
     operation: claimedActionRequest.operation,
   });
   const actionRequest = await updateDesignerActionRequestExecutionStatus(input.ctx, {
@@ -974,7 +982,7 @@ export async function submitDesignerRuntimeFollowUp(
 }
 
 export async function submitDesignerActionProposalResponse(
-  ctx: Omit<DesignerRuntimeConversationContext, "db"> & { db: ControlPlaneDatabase },
+  ctx: DesignerActionProposalResponseContext,
   input: {
     organizationId: string;
     sessionId: string;
@@ -1005,8 +1013,6 @@ export async function submitDesignerActionProposalResponse(
     return completeApprovedDesignerActionRequestExecution({
       ctx,
       organizationId: input.organizationId,
-      sessionId: input.sessionId,
-      proposalId: input.proposalId,
       actionRequest: existingActionRequest,
       response,
     });
@@ -1116,8 +1122,6 @@ export async function submitDesignerActionProposalResponse(
   return completeApprovedDesignerActionRequestExecution({
     ctx,
     organizationId: input.organizationId,
-    sessionId: input.sessionId,
-    proposalId: input.proposalId,
     actionRequest: submittedResponse.actionRequest,
     response: submittedResponse.response,
   });

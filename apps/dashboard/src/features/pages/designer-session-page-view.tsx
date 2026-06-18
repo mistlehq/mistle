@@ -332,27 +332,14 @@ function DesignerActionProposals(input: {
             <Badge variant="secondary">{formatDesignerActionProposalStatus(proposal.status)}</Badge>
           </div>
           <dl className="mt-3 grid gap-2 text-xs">
-            <div>
-              <dt className="text-muted-foreground">Operation</dt>
-              <dd className="mt-0.5">
-                {proposal.operation.provider} {proposal.operation.action}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Resource</dt>
-              <dd className="mt-0.5">
-                {proposal.operation.resourceType}
-                {proposal.operation.resourceLabel === null
-                  ? ""
-                  : `: ${proposal.operation.resourceLabel}`}
-              </dd>
-            </div>
-            {proposal.operation.details.map((detail, detailIndex) => (
-              <div key={`${proposal.id}:${String(detailIndex)}:${detail.label}`}>
-                <dt className="text-muted-foreground">{detail.label}</dt>
-                <dd className="mt-0.5 whitespace-pre-wrap">{detail.value}</dd>
-              </div>
-            ))}
+            {getDesignerActionProposalOperationRows(proposal.operation).map(
+              (detail, detailIndex) => (
+                <div key={`${proposal.id}:${String(detailIndex)}:${detail.label}`}>
+                  <dt className="text-muted-foreground">{detail.label}</dt>
+                  <dd className="mt-0.5 whitespace-pre-wrap">{detail.value}</dd>
+                </div>
+              ),
+            )}
           </dl>
           {proposal.status === "pending" ? (
             <div className="mt-3 flex flex-wrap gap-2">
@@ -386,6 +373,47 @@ function DesignerActionProposals(input: {
       )}
     </div>
   );
+}
+
+function getDesignerActionProposalOperationRows(
+  operation: DesignerActionProposal["operation"],
+): { label: string; value: string }[] {
+  if (operation.kind === "providerConfigurationChange") {
+    const resource =
+      operation.resourceLabel === null
+        ? operation.resourceType
+        : `${operation.resourceType}: ${operation.resourceLabel}`;
+
+    return [
+      {
+        label: "Operation",
+        value: `${operation.provider} ${operation.action}`,
+      },
+      {
+        label: "Resource",
+        value: resource,
+      },
+      ...operation.details.map((detail) => ({
+        label: detail.label,
+        value: detail.value,
+      })),
+    ];
+  }
+
+  return [
+    {
+      label: "Operation",
+      value: "Update sandbox profile draft setup script",
+    },
+    {
+      label: "Resource",
+      value: `${operation.profileId} version ${String(operation.version)}`,
+    },
+    {
+      label: "Setup script",
+      value: operation.setupScript ?? "Clear setup script",
+    },
+  ];
 }
 
 function formatDesignerActionProposalStatus(status: DesignerActionProposal["status"]): string {

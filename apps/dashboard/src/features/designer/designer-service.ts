@@ -119,6 +119,26 @@ const DesignerActionProposalDetailSchema = z
   })
   .strict();
 
+const DesignerProviderConfigurationChangeOperationSchema = z
+  .object({
+    kind: z.literal("providerConfigurationChange"),
+    provider: z.string().min(1),
+    resourceType: z.string().min(1),
+    resourceLabel: z.string().min(1).nullable(),
+    action: z.string().min(1),
+    details: z.array(DesignerActionProposalDetailSchema),
+  })
+  .strict();
+
+const DesignerSandboxProfileDraftSetupScriptPutOperationSchema = z
+  .object({
+    kind: z.literal("sandboxProfileDraftSetupScriptPut"),
+    profileId: z.string().min(1),
+    version: z.number().int().min(1),
+    setupScript: z.string().min(1).nullable(),
+  })
+  .strict();
+
 const DesignerActionProposalSchema = z
   .object({
     id: z.string().min(1),
@@ -126,16 +146,10 @@ const DesignerActionProposalSchema = z
     title: z.string().min(1),
     summary: z.string().min(1),
     status: z.enum(["pending", "approved", "declined"]),
-    operation: z
-      .object({
-        kind: z.literal("providerConfigurationChange"),
-        provider: z.string().min(1),
-        resourceType: z.string().min(1),
-        resourceLabel: z.string().min(1).nullable(),
-        action: z.string().min(1),
-        details: z.array(DesignerActionProposalDetailSchema),
-      })
-      .strict(),
+    operation: z.discriminatedUnion("kind", [
+      DesignerProviderConfigurationChangeOperationSchema,
+      DesignerSandboxProfileDraftSetupScriptPutOperationSchema,
+    ]),
   })
   .strict();
 

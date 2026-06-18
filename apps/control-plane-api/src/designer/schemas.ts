@@ -1,5 +1,8 @@
 import { z } from "@hono/zod-openapi";
-import { DesignerActionRequestStatuses } from "@mistle/db/control-plane";
+import {
+  DesignerActionRequestOperationKinds,
+  DesignerActionRequestStatuses,
+} from "@mistle/db/control-plane";
 import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 
 const designerSessionCanvasTabSchema = z
@@ -151,6 +154,31 @@ const designerActionProposalDetailSchema = z
   })
   .strict();
 
+const designerProviderConfigurationChangeOperationSchema = z
+  .object({
+    kind: z.literal(DesignerActionRequestOperationKinds.PROVIDER_CONFIGURATION_CHANGE),
+    provider: z.string().min(1).max(120),
+    resourceType: z.string().min(1).max(120),
+    resourceLabel: z.string().min(1).max(240).nullable(),
+    action: z.string().min(1).max(160),
+    details: z.array(designerActionProposalDetailSchema).max(20),
+  })
+  .strict();
+
+const designerSandboxProfileDraftSetupScriptPutOperationSchema = z
+  .object({
+    kind: z.literal(DesignerActionRequestOperationKinds.SANDBOX_PROFILE_DRAFT_SETUP_SCRIPT_PUT),
+    profileId: z
+      .string()
+      .min(1)
+      .regex(/^sbp_[a-zA-Z0-9_-]+$/, {
+        message: "`profileId` must be a sandbox profile id.",
+      }),
+    version: z.number().int().min(1),
+    setupScript: z.string().min(1).max(200_000).nullable(),
+  })
+  .strict();
+
 export const designerActionProposalSchema = z
   .object({
     id: z.string().min(1).max(255),
@@ -158,16 +186,10 @@ export const designerActionProposalSchema = z
     title: z.string().min(1).max(160),
     summary: z.string().min(1).max(2_000),
     status: z.enum(["pending", "approved", "declined"]),
-    operation: z
-      .object({
-        kind: z.literal("providerConfigurationChange"),
-        provider: z.string().min(1).max(120),
-        resourceType: z.string().min(1).max(120),
-        resourceLabel: z.string().min(1).max(240).nullable(),
-        action: z.string().min(1).max(160),
-        details: z.array(designerActionProposalDetailSchema).max(20),
-      })
-      .strict(),
+    operation: z.discriminatedUnion("kind", [
+      designerProviderConfigurationChangeOperationSchema,
+      designerSandboxProfileDraftSetupScriptPutOperationSchema,
+    ]),
   })
   .strict();
 

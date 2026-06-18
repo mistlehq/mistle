@@ -1353,63 +1353,92 @@
                                 "enum": ["pending", "approved", "declined"]
                               },
                               "operation": {
-                                "type": "object",
-                                "properties": {
-                                  "kind": {
-                                    "type": "string",
-                                    "enum": ["providerConfigurationChange"]
-                                  },
-                                  "provider": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 120
-                                  },
-                                  "resourceType": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 120
-                                  },
-                                  "resourceLabel": {
-                                    "type": ["string", "null"],
-                                    "minLength": 1,
-                                    "maxLength": 240
-                                  },
-                                  "action": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 160
-                                  },
-                                  "details": {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "object",
-                                      "properties": {
-                                        "label": {
-                                          "type": "string",
-                                          "minLength": 1,
-                                          "maxLength": 120
-                                        },
-                                        "value": {
-                                          "type": "string",
-                                          "minLength": 1,
-                                          "maxLength": 2000
-                                        }
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["providerConfigurationChange"]
                                       },
-                                      "required": ["label", "value"],
-                                      "additionalProperties": false
+                                      "provider": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 120
+                                      },
+                                      "resourceType": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 120
+                                      },
+                                      "resourceLabel": {
+                                        "type": ["string", "null"],
+                                        "minLength": 1,
+                                        "maxLength": 240
+                                      },
+                                      "action": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 160
+                                      },
+                                      "details": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 120
+                                            },
+                                            "value": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            }
+                                          },
+                                          "required": ["label", "value"],
+                                          "additionalProperties": false
+                                        },
+                                        "maxItems": 20
+                                      }
                                     },
-                                    "maxItems": 20
+                                    "required": [
+                                      "kind",
+                                      "provider",
+                                      "resourceType",
+                                      "resourceLabel",
+                                      "action",
+                                      "details"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["sandboxProfileDraftSetupScriptPut"]
+                                      },
+                                      "profileId": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+                                      },
+                                      "version": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                      },
+                                      "setupScript": {
+                                        "type": ["string", "null"],
+                                        "minLength": 1,
+                                        "maxLength": 200000
+                                      }
+                                    },
+                                    "required": ["kind", "profileId", "version", "setupScript"],
+                                    "additionalProperties": false
                                   }
-                                },
-                                "required": [
-                                  "kind",
-                                  "provider",
-                                  "resourceType",
-                                  "resourceLabel",
-                                  "action",
-                                  "details"
-                                ],
-                                "additionalProperties": false
+                                ]
                               }
                             },
                             "required": ["id", "kind", "title", "summary", "status", "operation"],
