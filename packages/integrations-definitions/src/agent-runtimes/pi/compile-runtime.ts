@@ -34,7 +34,7 @@ import {
 } from "./server.js";
 
 const PiCliArtifactKey = "pi-cli";
-const PiCliVersion = "0.79.6";
+const PiCliVersion = "0.79.7";
 const PiCliReleaseTag = `v${PiCliVersion}`;
 const PiGitHubRepository = "earendil-works/pi";
 const PiCliArchiveDirectory = "pi";
@@ -50,11 +50,11 @@ const PiManagedInstructionsPath = `${PiAgentDir}/prompts/mistle-managed.md`;
 const PiCliGitHubAssets = {
   x86_64: {
     fileName: "pi-linux-x64.tar.gz",
-    sha256: "05000ec8f5b2a8a2df8e2f505aab89eb80552dcf6dc11680fa0f3285839bb4cf",
+    sha256: "bcb8dee8bb074f2dc08ae7f60e0061aca788e171d5481cf1ad5379c881e40f4b",
   },
   aarch64: {
     fileName: "pi-linux-arm64.tar.gz",
-    sha256: "c4c6f3984e7b556a4f447c0b6a458a20d1d53bb646565cadb7a0ca080ce690d8",
+    sha256: "ed1d5968eaf49690048217f7dd953bb4e5cb695d1c558bd90ea461515b77b668",
   },
 };
 const ArtifactCommandTimeoutMs = 120_000;
