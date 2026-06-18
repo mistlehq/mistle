@@ -130,12 +130,64 @@ const designerActionRequestStatusSchema = z.enum([
   DesignerActionRequestStatuses.FAILED,
 ]);
 
+const designerSandboxProfileDraftSetupScriptPutResultSchema = z
+  .object({
+    kind: z.literal(DesignerActionRequestOperationKinds.SANDBOX_PROFILE_DRAFT_SETUP_SCRIPT_PUT),
+    profileId: z.string().min(1),
+    version: z.number().int().min(1),
+  })
+  .strict();
+
+const designerSandboxProfileDraftPublishResultSchema = z
+  .object({
+    kind: z.literal(DesignerActionRequestOperationKinds.SANDBOX_PROFILE_DRAFT_PUBLISH),
+    profileId: z.string().min(1),
+    version: z.number().int().min(1),
+    publishedAt: z.string().min(1),
+    snapshotAction: z.discriminatedUnion("kind", [
+      z
+        .object({
+          kind: z.literal("created"),
+          snapshotJobId: z.string().min(1),
+          sandboxInstanceId: z.string().min(1).nullable(),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal("reused"),
+          snapshotImageProvider: z.string().min(1),
+          snapshotImageId: z.string().min(1),
+        })
+        .strict(),
+    ]),
+  })
+  .strict();
+
+const designerSandboxProfileVersionLaunchResultSchema = z
+  .object({
+    kind: z.literal(DesignerActionRequestOperationKinds.SANDBOX_PROFILE_VERSION_LAUNCH),
+    profileId: z.string().min(1),
+    version: z.number().int().min(1),
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1),
+  })
+  .strict();
+
+const designerActionRequestOperationResultSchema = z
+  .discriminatedUnion("kind", [
+    designerSandboxProfileDraftPublishResultSchema,
+    designerSandboxProfileDraftSetupScriptPutResultSchema,
+    designerSandboxProfileVersionLaunchResultSchema,
+  ])
+  .nullable();
+
 const designerActionRequestSchema = z
   .object({
     id: z.string().min(1),
     status: designerActionRequestStatusSchema,
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+    operationResult: designerActionRequestOperationResultSchema,
   })
   .strict();
 

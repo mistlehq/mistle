@@ -7,8 +7,12 @@ export {
   type DesignerActionRequest,
   type DesignerActionRequestOperation,
   type DesignerActionRequestOperationKind,
+  type DesignerActionRequestOperationResult,
   type DesignerActionRequestResponse,
   type DesignerActionRequestStatus,
+  type DesignerSandboxProfileDraftPublishResult,
+  type DesignerSandboxProfileDraftSetupScriptPutResult,
+  type DesignerSandboxProfileVersionLaunchResult,
   type InsertDesignerActionRequest,
 } from "./designer-action-requests.js";
 export {

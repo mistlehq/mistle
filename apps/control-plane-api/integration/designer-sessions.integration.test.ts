@@ -637,6 +637,7 @@ describe.concurrent("designer sessions integration", () => {
           status: submitted.status,
           failureCode: submitted.failureCode,
           failureMessage: submitted.failureMessage,
+          operationResult: submitted.operationResult,
         },
       },
     });
@@ -644,6 +645,7 @@ describe.concurrent("designer sessions integration", () => {
       id: submitted.id,
       status: DesignerActionRequestStatuses.EXECUTION_UNSUPPORTED,
       failureCode: "DESIGNER_OPERATION_HANDLER_UNSUPPORTED",
+      operationResult: null,
     });
 
     await expect(
@@ -664,6 +666,7 @@ describe.concurrent("designer sessions integration", () => {
       status: DesignerActionRequestStatuses.EXECUTION_UNSUPPORTED,
       runtimeProviderExecutionId: "turn_action_request_response",
       responseSubmittedAt: "2026-06-18 01:03:04+00",
+      operationResult: null,
     });
   });
 
@@ -758,6 +761,7 @@ describe.concurrent("designer sessions integration", () => {
           status: submitted.status,
           failureCode: submitted.failureCode,
           failureMessage: submitted.failureMessage,
+          operationResult: submitted.operationResult,
         },
       },
     });
@@ -766,6 +770,11 @@ describe.concurrent("designer sessions integration", () => {
       status: DesignerActionRequestStatuses.COMPLETED,
       failureCode: null,
       failureMessage: null,
+      operationResult: {
+        kind: "sandboxProfileDraftSetupScriptPut",
+        profileId,
+        version: 2,
+      },
     });
 
     const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
@@ -880,6 +889,7 @@ describe.concurrent("designer sessions integration", () => {
           status: submitted.status,
           failureCode: submitted.failureCode,
           failureMessage: submitted.failureMessage,
+          operationResult: submitted.operationResult,
         },
       },
     });
@@ -888,6 +898,7 @@ describe.concurrent("designer sessions integration", () => {
       status: DesignerActionRequestStatuses.FAILED,
       failureCode: "FORBIDDEN",
       failureMessage: "Forbidden API request.",
+      operationResult: null,
     });
 
     const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
@@ -1018,6 +1029,7 @@ describe.concurrent("designer sessions integration", () => {
         status: submitted.status,
         failureCode: submitted.failureCode,
         failureMessage: submitted.failureMessage,
+        operationResult: submitted.operationResult,
       },
     };
     const completed = await completeDesignerActionRequestExecution(env, {
@@ -1066,6 +1078,17 @@ describe.concurrent("designer sessions integration", () => {
       sandboxProfileVersion: 2,
       snapshotPreparationScriptKind: "setup",
     });
+    expect(completed.actionRequest.operationResult).toEqual({
+      kind: "sandboxProfileDraftPublish",
+      profileId,
+      version: 2,
+      publishedAt: persistedVersion?.publishedAt,
+      snapshotAction: {
+        kind: "created",
+        snapshotJobId: snapshotJob.id,
+        sandboxInstanceId: snapshotJob.sandboxInstanceId,
+      },
+    });
 
     const repeated = await completeDesignerActionRequestExecution(env, {
       organizationId: session.organizationId,
@@ -1075,6 +1098,7 @@ describe.concurrent("designer sessions integration", () => {
     expect(repeated.actionRequest).toMatchObject({
       id: submitted.id,
       status: DesignerActionRequestStatuses.COMPLETED,
+      operationResult: completed.actionRequest.operationResult,
     });
     const repeatedSnapshotJobs =
       await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findMany({
@@ -1162,6 +1186,7 @@ describe.concurrent("designer sessions integration", () => {
         status: submitted.status,
         failureCode: submitted.failureCode,
         failureMessage: submitted.failureMessage,
+        operationResult: submitted.operationResult,
       },
     };
     const completed = await completeDesignerActionRequestExecution(env, {
@@ -1200,6 +1225,16 @@ describe.concurrent("designer sessions integration", () => {
       startedByKind: "user",
       startedById: session.userId,
     });
+    expect(completed.actionRequest.operationResult).toMatchObject({
+      kind: "sandboxProfileVersionLaunch",
+      profileId,
+      version: 1,
+      sandboxInstanceId: launchedInstance.id,
+    });
+    if (completed.actionRequest.operationResult?.kind !== "sandboxProfileVersionLaunch") {
+      throw new Error("Expected Designer launch operation to persist a launch result.");
+    }
+    expect(completed.actionRequest.operationResult.workflowRunId.length).toBeGreaterThan(0);
 
     const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
       env,
@@ -1224,6 +1259,7 @@ describe.concurrent("designer sessions integration", () => {
     expect(repeated.actionRequest).toMatchObject({
       id: submitted.id,
       status: DesignerActionRequestStatuses.COMPLETED,
+      operationResult: completed.actionRequest.operationResult,
     });
     await expect(
       countQueuedStartWorkflows({
@@ -1283,12 +1319,18 @@ describe.concurrent("designer sessions integration", () => {
           status: secondSubmitted.status,
           failureCode: secondSubmitted.failureCode,
           failureMessage: secondSubmitted.failureMessage,
+          operationResult: secondSubmitted.operationResult,
         },
       },
     });
     expect(secondCompleted.actionRequest).toMatchObject({
       id: secondSubmitted.id,
       status: DesignerActionRequestStatuses.COMPLETED,
+      operationResult: {
+        kind: "sandboxProfileVersionLaunch",
+        profileId,
+        version: 1,
+      },
     });
     await expect(
       countQueuedStartWorkflows({
@@ -1392,6 +1434,7 @@ describe.concurrent("designer sessions integration", () => {
           status: submitted.status,
           failureCode: submitted.failureCode,
           failureMessage: submitted.failureMessage,
+          operationResult: submitted.operationResult,
         },
       },
     });
@@ -1400,6 +1443,7 @@ describe.concurrent("designer sessions integration", () => {
       status: DesignerActionRequestStatuses.FAILED,
       failureCode: "FORBIDDEN",
       failureMessage: "Forbidden API request.",
+      operationResult: null,
     });
 
     await expect(

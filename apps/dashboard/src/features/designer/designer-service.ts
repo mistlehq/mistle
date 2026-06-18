@@ -75,6 +75,57 @@ const SubmitDesignerRuntimeFollowUpResponseSchema = z
 
 const DesignerActionProposalResponseSchema = z.enum(["approved", "declined"]);
 
+const DesignerSandboxProfileDraftSetupScriptPutResultSchema = z
+  .object({
+    kind: z.literal("sandboxProfileDraftSetupScriptPut"),
+    profileId: z.string().min(1),
+    version: z.number().int().min(1),
+  })
+  .strict();
+
+const DesignerSandboxProfileDraftPublishResultSchema = z
+  .object({
+    kind: z.literal("sandboxProfileDraftPublish"),
+    profileId: z.string().min(1),
+    version: z.number().int().min(1),
+    publishedAt: z.string().min(1),
+    snapshotAction: z.discriminatedUnion("kind", [
+      z
+        .object({
+          kind: z.literal("created"),
+          snapshotJobId: z.string().min(1),
+          sandboxInstanceId: z.string().min(1).nullable(),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal("reused"),
+          snapshotImageProvider: z.string().min(1),
+          snapshotImageId: z.string().min(1),
+        })
+        .strict(),
+    ]),
+  })
+  .strict();
+
+const DesignerSandboxProfileVersionLaunchResultSchema = z
+  .object({
+    kind: z.literal("sandboxProfileVersionLaunch"),
+    profileId: z.string().min(1),
+    version: z.number().int().min(1),
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1),
+  })
+  .strict();
+
+const DesignerActionRequestOperationResultSchema = z
+  .discriminatedUnion("kind", [
+    DesignerSandboxProfileDraftPublishResultSchema,
+    DesignerSandboxProfileDraftSetupScriptPutResultSchema,
+    DesignerSandboxProfileVersionLaunchResultSchema,
+  ])
+  .nullable();
+
 const SubmitDesignerActionProposalResponseResponseSchema = z
   .object({
     actionProposalResponse: z
@@ -99,6 +150,7 @@ const SubmitDesignerActionProposalResponseResponseSchema = z
         ]),
         failureCode: z.string().min(1).nullable(),
         failureMessage: z.string().min(1).nullable(),
+        operationResult: DesignerActionRequestOperationResultSchema,
       })
       .strict(),
   })

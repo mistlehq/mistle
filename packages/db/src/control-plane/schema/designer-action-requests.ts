@@ -62,6 +62,43 @@ export type DesignerActionRequestOperation =
   | DesignerSandboxProfileDraftSetupScriptPutOperation
   | DesignerSandboxProfileVersionLaunchOperation;
 
+export type DesignerSandboxProfileDraftSetupScriptPutResult = {
+  kind: typeof DesignerActionRequestOperationKinds.SANDBOX_PROFILE_DRAFT_SETUP_SCRIPT_PUT;
+  profileId: string;
+  version: number;
+};
+
+export type DesignerSandboxProfileDraftPublishResult = {
+  kind: typeof DesignerActionRequestOperationKinds.SANDBOX_PROFILE_DRAFT_PUBLISH;
+  profileId: string;
+  version: number;
+  publishedAt: string;
+  snapshotAction:
+    | {
+        kind: "created";
+        snapshotJobId: string;
+        sandboxInstanceId: string | null;
+      }
+    | {
+        kind: "reused";
+        snapshotImageProvider: string;
+        snapshotImageId: string;
+      };
+};
+
+export type DesignerSandboxProfileVersionLaunchResult = {
+  kind: typeof DesignerActionRequestOperationKinds.SANDBOX_PROFILE_VERSION_LAUNCH;
+  profileId: string;
+  version: number;
+  sandboxInstanceId: string;
+  workflowRunId: string;
+};
+
+export type DesignerActionRequestOperationResult =
+  | DesignerSandboxProfileDraftPublishResult
+  | DesignerSandboxProfileDraftSetupScriptPutResult
+  | DesignerSandboxProfileVersionLaunchResult;
+
 export const DesignerActionRequestStatuses = {
   APPROVED: "approved",
   DECLINED: "declined",
@@ -92,6 +129,7 @@ export function defineDesignerActionRequests(schema: PgSchema) {
       responseIdempotencyKey: text("response_idempotency_key").notNull(),
       operationKind: text("operation_kind").notNull().$type<DesignerActionRequestOperationKind>(),
       operation: jsonb("operation").$type<DesignerActionRequestOperation>().notNull(),
+      operationResult: jsonb("operation_result").$type<DesignerActionRequestOperationResult>(),
       status: text("status").notNull().$type<DesignerActionRequestStatus>(),
       requestedByUserId: text("requested_by_user_id").notNull(),
       runtimeProviderConversationId: text("runtime_provider_conversation_id").notNull(),

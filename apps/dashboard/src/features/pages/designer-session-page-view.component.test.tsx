@@ -6,10 +6,12 @@ import { describe, expect, it } from "vitest";
 
 import type {
   DesignerActionProposalResponse,
+  DesignerActionProposalResponseResult,
   DesignerRuntimeConversationBootstrap,
   DesignerRuntimeConversationTranscript,
   DesignerSession,
 } from "../designer/designer-service.js";
+import { formatDesignerActionProposalResponseSuccessMessage } from "./designer-action-proposal-response-copy.js";
 import { DesignerSessionPageView } from "./designer-session-page-view.js";
 
 const BaseDesignerSession = {
@@ -369,6 +371,68 @@ describe("DesignerSessionPageView", () => {
     expect(
       screen.getByText("Action proposal response submitted at 2026-04-01T09:03:00.000Z."),
     ).toBeDefined();
+  });
+
+  it("formats completed Designer publish results with persisted snapshot metadata", () => {
+    const result = {
+      actionProposalResponse: {
+        proposalId: "dap_profile_publish",
+        response: "approved",
+        providerConversationId: "thread_designer_test",
+        providerExecutionId: "turn_publish_response",
+        submittedAt: "2026-04-01T09:03:00.000Z",
+      },
+      actionRequest: {
+        id: "dar_profile_publish",
+        status: "completed",
+        failureCode: null,
+        failureMessage: null,
+        operationResult: {
+          kind: "sandboxProfileDraftPublish",
+          profileId: "sbp_designer_publish",
+          version: 3,
+          publishedAt: "2026-04-01T09:03:01.000Z",
+          snapshotAction: {
+            kind: "created",
+            snapshotJobId: "spv_snapshot_job_designer_publish",
+            sandboxInstanceId: "sbi_designer_publish_snapshot",
+          },
+        },
+      },
+    } satisfies DesignerActionProposalResponseResult;
+
+    expect(formatDesignerActionProposalResponseSuccessMessage(result)).toBe(
+      "Action proposal response submitted at 2026-04-01T09:03:00.000Z. Published sbp_designer_publish version 3 and queued snapshot job spv_snapshot_job_designer_publish.",
+    );
+  });
+
+  it("formats completed Designer launch results with the launched sandbox instance", () => {
+    const result = {
+      actionProposalResponse: {
+        proposalId: "dap_profile_launch",
+        response: "approved",
+        providerConversationId: "thread_designer_test",
+        providerExecutionId: "turn_launch_response",
+        submittedAt: "2026-04-01T09:04:00.000Z",
+      },
+      actionRequest: {
+        id: "dar_profile_launch",
+        status: "completed",
+        failureCode: null,
+        failureMessage: null,
+        operationResult: {
+          kind: "sandboxProfileVersionLaunch",
+          profileId: "sbp_designer_launch",
+          version: 4,
+          sandboxInstanceId: "sbi_designer_launch",
+          workflowRunId: "workflow_designer_launch",
+        },
+      },
+    } satisfies DesignerActionProposalResponseResult;
+
+    expect(formatDesignerActionProposalResponseSuccessMessage(result)).toBe(
+      "Action proposal response submitted at 2026-04-01T09:04:00.000Z. Launched sandbox session sbi_designer_launch.",
+    );
   });
 
   it("shows transcript load errors while retaining the saved prompt preview", () => {

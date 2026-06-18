@@ -6,6 +6,7 @@ import {
   getControlPlaneDatabaseSchema,
   type DesignerActionRequest,
   type DesignerActionRequestOperation,
+  type DesignerActionRequestOperationResult,
   type DesignerActionRequestResponse,
   type DesignerActionRequestStatus,
 } from "@mistle/db/control-plane";
@@ -188,8 +189,16 @@ export async function updateDesignerActionRequestExecutionStatus(
     status: DesignerActionRequestStatus;
     failureCode: string | null;
     failureMessage: string | null;
+    operationResult: DesignerActionRequestOperationResult | null;
   },
 ): Promise<DesignerActionRequest> {
+  if (input.status === DesignerActionRequestStatuses.COMPLETED && input.operationResult === null) {
+    throw new Error("Completed Designer action request execution requires an operation result.");
+  }
+  if (input.status !== DesignerActionRequestStatuses.COMPLETED && input.operationResult !== null) {
+    throw new Error("Only completed Designer action request execution can store operation result.");
+  }
+
   const tables = getControlPlaneDatabaseSchema(ctx.db);
   const updatedRows = await ctx.db
     .update(tables.designerActionRequests)
@@ -197,6 +206,7 @@ export async function updateDesignerActionRequestExecutionStatus(
       status: input.status,
       failureCode: input.failureCode,
       failureMessage: input.failureMessage,
+      operationResult: input.operationResult,
       updatedAt: sql`now()`,
     })
     .where(
@@ -229,6 +239,7 @@ export async function claimDesignerActionRequestExecution(
       status: DesignerActionRequestStatuses.EXECUTING,
       failureCode: null,
       failureMessage: null,
+      operationResult: null,
       updatedAt: sql`now()`,
     })
     .where(

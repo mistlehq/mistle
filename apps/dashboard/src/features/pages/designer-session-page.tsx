@@ -18,10 +18,10 @@ import {
   submitDesignerActionProposalResponse,
   submitDesignerRuntimeFollowUp,
   type DesignerActionProposalResponse,
-  type DesignerActionProposalResponseResult,
   type DesignerRuntimeConversationTranscript,
   type DesignerSession,
 } from "../designer/designer-service.js";
+import { formatDesignerActionProposalResponseSuccessMessage } from "./designer-action-proposal-response-copy.js";
 import { DesignerSessionPageView } from "./designer-session-page-view.js";
 
 const DesignerSessionRuntimeBootstrapPollIntervalMs = 2_000;
@@ -354,25 +354,4 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
       sessionId={sessionId}
     />
   );
-}
-
-function formatDesignerActionProposalResponseSuccessMessage(
-  result: DesignerActionProposalResponseResult,
-): string {
-  const submittedAt = result.actionProposalResponse.submittedAt;
-  if (result.actionRequest.status === "executing") {
-    return `Action proposal response submitted at ${submittedAt}. Execution is in progress.`;
-  }
-
-  if (result.actionRequest.status === "execution_unsupported") {
-    return `Action proposal response submitted at ${submittedAt}. Execution is not supported for this operation yet.`;
-  }
-
-  if (result.actionRequest.status === "failed") {
-    return result.actionRequest.failureMessage === null
-      ? `Action proposal response submitted at ${submittedAt}, but execution failed.`
-      : `Action proposal response submitted at ${submittedAt}, but execution failed: ${result.actionRequest.failureMessage}`;
-  }
-
-  return `Action proposal response submitted at ${submittedAt}.`;
 }

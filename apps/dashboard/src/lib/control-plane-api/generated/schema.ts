@@ -1628,6 +1628,42 @@ export interface paths {
                 failureCode: string | null;
                 failureMessage: string | null;
                 id: string;
+                operationResult:
+                  | {
+                      /** @enum {string} */
+                      kind: "sandboxProfileDraftPublish";
+                      profileId: string;
+                      publishedAt: string;
+                      snapshotAction:
+                        | {
+                            /** @enum {string} */
+                            kind: "created";
+                            sandboxInstanceId: string | null;
+                            snapshotJobId: string;
+                          }
+                        | {
+                            /** @enum {string} */
+                            kind: "reused";
+                            snapshotImageId: string;
+                            snapshotImageProvider: string;
+                          };
+                      version: number;
+                    }
+                  | {
+                      /** @enum {string} */
+                      kind: "sandboxProfileDraftSetupScriptPut";
+                      profileId: string;
+                      version: number;
+                    }
+                  | {
+                      /** @enum {string} */
+                      kind: "sandboxProfileVersionLaunch";
+                      profileId: string;
+                      sandboxInstanceId: string;
+                      version: number;
+                      workflowRunId: string;
+                    }
+                  | null;
                 /** @enum {string} */
                 status:
                   | "approved"
