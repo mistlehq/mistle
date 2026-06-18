@@ -17,14 +17,18 @@ import { SandboxInstancePurposes, type SandboxInstanceStarterKind } from "@mistl
 import {
   AgentConversationStatuses,
   CompiledRuntimePlanSchema,
+  type CompiledRuntimeArtifactSpec,
   type AgentConversationConnection,
   type AgentConversationIdempotencyMetadata,
   type AgentConversationProvider,
   type EgressCredentialRoute,
+  type RuntimeArtifactRefs,
+  type RuntimeArtifactSpec,
+  type RuntimeExecCommand,
   SandboxImageSources,
   createDisabledAssociatedResourceEventRouting,
 } from "@mistle/integrations-core";
-import { compileInstalledCodexRuntime } from "@mistle/integrations-definitions/agent-runtimes/codex";
+import { compileCodexRuntime } from "@mistle/integrations-definitions/agent-runtimes/codex";
 import { resolveAgentConversationProvider } from "@mistle/integrations-definitions/agent-runtimes/server";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { typeid } from "typeid-js";
@@ -136,6 +140,13 @@ type RuntimeConversationBootstrapResult = {
 
 const DesignerRuntimeId = "codex";
 const DesignerRuntimeWorkingDirectory = "/root";
+const DesignerSandboxPaths = {
+  userHomeDir: "/root",
+  workspaceDir: "/root",
+  runtimeDataDir: "/var/lib/mistle",
+  runtimeArtifactDir: "/var/lib/mistle/artifacts",
+  runtimeArtifactBinDir: "/usr/local/bin",
+} as const;
 
 function resolveDesignerSandboxConfig(sandboxConfig: ControlPlaneApiSandboxRuntimeConfig) {
   if (sandboxConfig.designer === undefined) {
@@ -170,6 +181,105 @@ function createPlatformOpenAiEgressRoute(): EgressCredentialRoute {
       kind: "platform_openai_api_key",
     },
   };
+}
+
+function createRuntimeExecCommand(command: RuntimeExecCommand): RuntimeExecCommand {
+  return {
+    args: [...command.args],
+    ...(command.env === undefined ? {} : { env: { ...command.env } }),
+    ...(command.cwd === undefined ? {} : { cwd: command.cwd }),
+    ...(command.timeoutMs === undefined ? {} : { timeoutMs: command.timeoutMs }),
+  };
+}
+
+function createDesignerRuntimeArtifactRefs(input: {
+  organizationId: string;
+  sandboxProfileId: string;
+  version: number;
+}): RuntimeArtifactRefs {
+  return {
+    command: {
+      exec: (command) => ({
+        op: "exec",
+        command: createRuntimeExecCommand(command),
+      }),
+    },
+    sandboxPaths: DesignerSandboxPaths,
+    artifactBinPath: (binaryName) => `${DesignerSandboxPaths.runtimeArtifactBinDir}/${binaryName}`,
+    mise: {
+      install: (installInput) => ({
+        op: "mise_install",
+        tools: [...installInput.tools],
+        ...(installInput.force === undefined ? {} : { force: installInput.force }),
+        ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
+      }),
+    },
+    githubReleases: {
+      install: (installInput) => ({
+        op: "github_release_install",
+        repository: installInput.repository,
+        release:
+          installInput.release.kind === "latest"
+            ? { kind: "latest" }
+            : installInput.release.match === "exact"
+              ? {
+                  kind: "tag",
+                  match: "exact",
+                  tag: installInput.release.tag,
+                }
+              : {
+                  kind: "tag",
+                  match: "latest_matching_prefix",
+                  prefix: installInput.release.prefix,
+                },
+        asset:
+          installInput.asset.kind === "exact"
+            ? { ...installInput.asset }
+            : {
+                kind: "by_arch",
+                x86_64: { ...installInput.asset.x86_64 },
+                aarch64: { ...installInput.asset.aarch64 },
+              },
+        installPath: installInput.installPath,
+        ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
+      }),
+    },
+    compileContext: {
+      organizationId: input.organizationId,
+      sandboxProfileId: input.sandboxProfileId,
+      version: input.version,
+      targetKey: "agent-runtime",
+      bindingId: `agent-runtime-${DesignerRuntimeId}`,
+    },
+  };
+}
+
+function compileDesignerRuntimeArtifacts(input: {
+  artifacts: ReadonlyArray<RuntimeArtifactSpec>;
+  organizationId: string;
+}): ReadonlyArray<CompiledRuntimeArtifactSpec> {
+  const refs = createDesignerRuntimeArtifactRefs({
+    organizationId: input.organizationId,
+    sandboxProfileId: DESIGNER_RUNTIME_PROFILE_ID,
+    version: DESIGNER_RUNTIME_PROFILE_VERSION,
+  });
+
+  return input.artifacts.map((artifact) => {
+    const install =
+      typeof artifact.lifecycle.install === "function"
+        ? artifact.lifecycle.install({ refs })
+        : artifact.lifecycle.install;
+
+    return {
+      artifactKey: artifact.artifactKey,
+      name: artifact.name,
+      ...(artifact.description === undefined ? {} : { description: artifact.description }),
+      ...(artifact.env === undefined ? {} : { env: { ...artifact.env } }),
+      lifecycle: {
+        install,
+      },
+    };
+  });
 }
 
 function createRuntimeRequestFingerprint(input: {
@@ -342,10 +452,10 @@ export async function completeApprovedDesignerActionRequestExecution(input: {
 }
 
 function createDesignerRuntimePlan(input: {
-  codexCliPath: string;
   designerSessionId: string;
   imageRef: string;
   mcpUrl: string;
+  organizationId: string;
 }) {
   const egressRoutes = [
     createPlatformOpenAiEgressRoute(),
@@ -362,10 +472,25 @@ function createDesignerRuntimePlan(input: {
     enabled: true,
     url: input.mcpUrl,
   });
-  const codexRuntime = compileInstalledCodexRuntime({
-    codexCliPath: input.codexCliPath,
-    egressRoutes,
+  const codexRuntime = compileCodexRuntime({
+    organizationId: input.organizationId,
+    sandboxProfileId: DESIGNER_RUNTIME_PROFILE_ID,
+    version: DESIGNER_RUNTIME_PROFILE_VERSION,
+    runtimeId: DesignerRuntimeId,
+    runtimeConfig: {},
     mcpServers,
+    refs: {
+      sandboxPaths: DesignerSandboxPaths,
+      artifactBinPath: (binaryName) => `/usr/local/bin/${binaryName}`,
+    },
+  });
+  const runtimeClients =
+    codexRuntime.renderRuntimeClients === undefined
+      ? codexRuntime.runtimeClients
+      : codexRuntime.renderRuntimeClients({ egressRoutes });
+  const artifacts = compileDesignerRuntimeArtifacts({
+    artifacts: codexRuntime.artifacts ?? [],
+    organizationId: input.organizationId,
   });
 
   return CompiledRuntimePlanSchema.parse({
@@ -377,9 +502,9 @@ function createDesignerRuntimePlan(input: {
     },
     associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     egressRoutes,
-    artifacts: codexRuntime.artifacts,
+    artifacts,
     workspaceSources: [],
-    runtimeClients: codexRuntime.runtimeClients,
+    runtimeClients,
     agentRuntimes: codexRuntime.agentRuntimes,
   });
 }
@@ -435,10 +560,10 @@ export async function createDesignerSession(
   });
   const designerSessionId = typeid("dsn").toString();
   const runtimePlan = createDesignerRuntimePlan({
-    codexCliPath: designerSandboxConfig.codexCliPath,
     designerSessionId,
     imageRef: designerSandboxConfig.baseImage,
     mcpUrl: ctx.mcpConfig.url,
+    organizationId: input.organizationId,
   });
   const startedSandbox = await ctx.dataPlaneClient.startSandboxInstance({
     organizationId: input.organizationId,
@@ -833,6 +958,7 @@ async function mintDesignerRuntimeConnectionToken(
       },
     },
     {
+      allowedPurposes: [SandboxInstancePurposes.DESIGNER],
       organizationId: input.organizationId,
       instanceId: input.sandboxInstanceId,
       actingUserId: input.actingUserId,

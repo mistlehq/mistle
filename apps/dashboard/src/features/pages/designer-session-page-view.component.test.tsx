@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
+import { SidebarProvider } from "@mistle/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -222,7 +223,12 @@ const RuntimeConversationTranscriptWithFailedActionRequest = {
   ],
 } satisfies DesignerRuntimeConversationTranscript;
 
-function renderWithQueryClient(ui: React.JSX.Element): ReturnType<typeof render> {
+function renderWithQueryClient(
+  ui: React.JSX.Element,
+  input?: {
+    sidebarDefaultOpen?: boolean;
+  },
+): ReturnType<typeof render> {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -231,7 +237,11 @@ function renderWithQueryClient(ui: React.JSX.Element): ReturnType<typeof render>
     },
   });
 
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return render(
+    <SidebarProvider defaultOpen={input?.sidebarDefaultOpen ?? true}>
+      <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    </SidebarProvider>,
+  );
 }
 
 function renderDesignerSessionPageView(input?: {
@@ -247,6 +257,7 @@ function renderDesignerSessionPageView(input?: {
   runtimeConversationBootstrap?: DesignerRuntimeConversationBootstrap | null;
   runtimeConversationTranscript?: DesignerRuntimeConversationTranscript | null;
   session?: DesignerSession | null;
+  sidebarDefaultOpen?: boolean;
   onTitleSave?: (title: string) => Promise<void> | void;
   transcriptErrorMessage?: string | null;
   transcriptIsPending?: boolean;
@@ -289,6 +300,11 @@ function renderDesignerSessionPageView(input?: {
       userInputRequestResponseIsPending={input?.userInputRequestResponseIsPending ?? false}
       userInputRequestResponsePendingId={input?.userInputRequestResponsePendingId ?? null}
     />,
+    input?.sidebarDefaultOpen === undefined
+      ? undefined
+      : {
+          sidebarDefaultOpen: input.sidebarDefaultOpen,
+        },
   );
 }
 
@@ -482,7 +498,22 @@ describe("DesignerSessionPageView", () => {
     const conversationRegion = screen.getByRole("region", { name: "Designer conversation" });
 
     expect(conversationRegion.getAttribute("style")).toBe("scrollbar-gutter: stable;");
-    expect(conversationRegion.className).toContain("mr-2");
+    expect(conversationRegion.className).toContain("overflow-y-auto");
+    expect(screen.getAllByRole("region", { name: "Designer conversation" })).toHaveLength(1);
+  });
+
+  it("renders the sidebar trigger in the Designer session header when the sidebar is collapsed", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      sidebarDefaultOpen: false,
+    });
+    const workspaceHeader = screen.getByRole("banner");
+
+    expect(
+      within(workspaceHeader).getByRole("button", {
+        name: "Toggle Sidebar",
+      }),
+    ).toBeTruthy();
   });
 
   it("renders the shared workbench split between the Designer conversation and canvas", () => {
@@ -508,7 +539,7 @@ describe("DesignerSessionPageView", () => {
   });
 
   it("submits Designer title edits from the shared inline title control", async () => {
-    render(<DesignerSessionPageViewTitleHarness />);
+    renderWithQueryClient(<DesignerSessionPageViewTitleHarness />);
 
     const titleInput = screen.getByRole("textbox", { name: "Designer session title" });
     fireEvent.change(titleInput, { target: { value: "Design GitHub triage" } });
@@ -555,11 +586,12 @@ describe("DesignerSessionPageView", () => {
       runtimeConversationTranscript: RuntimeConversationTranscriptWithActionProposal,
     });
 
-    expect(screen.getByText("Action proposals")).toBeDefined();
+    expect(screen.queryByText("Action proposals")).toBeNull();
     expect(screen.getByText("Create GitHub webhook")).toBeDefined();
     expect(
       screen.getByText("Create a webhook on the selected repository for pull request events."),
     ).toBeDefined();
+    expect(screen.queryByText("Review required")).toBeNull();
     expect(screen.getByText("pull_request, pull_request_review")).toBeDefined();
     expect(screen.queryByText("GitHub create webhook")).toBeNull();
     expect(screen.queryByText("repository webhook: mistle/agent-runtime")).toBeNull();
@@ -569,6 +601,14 @@ describe("DesignerSessionPageView", () => {
     expect(actionButtons.map((button) => button.textContent)).toEqual(["Decline", "Approve"]);
     expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Decline" })).toBeDefined();
+    expect(
+      Boolean(
+        screen
+          .getByText("Create GitHub webhook")
+          .compareDocumentPosition(screen.getByLabelText("Submit follow-up")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
   });
 
   it("renders typed Designer setup script action proposals", () => {
@@ -622,7 +662,7 @@ describe("DesignerSessionPageView", () => {
       runtimeConversationTranscript: RuntimeConversationTranscriptWithCompletedLaunchActionRequest,
     });
 
-    expect(screen.getAllByText("Completed")).toHaveLength(1);
+    expect(screen.queryByText("Completed")).toBeNull();
     expect(screen.getByText("Action request")).toBeDefined();
     expect(screen.getByText("dar_profile_launch")).toBeDefined();
     expect(screen.getByText("Launched sandbox session sbi_designer_launch.")).toBeDefined();
@@ -636,7 +676,7 @@ describe("DesignerSessionPageView", () => {
       runtimeConversationTranscript: RuntimeConversationTranscriptWithFailedActionRequest,
     });
 
-    expect(screen.getAllByText("Failed")).toHaveLength(1);
+    expect(screen.queryByText("Failed")).toBeNull();
     expect(screen.getByText("DESIGNER_OPERATION_FAILED")).toBeDefined();
     expect(screen.getByText("GitHub rejected the webhook configuration.")).toBeDefined();
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
@@ -644,7 +684,7 @@ describe("DesignerSessionPageView", () => {
   });
 
   it("submits Designer action proposal responses with the selected proposal decision", () => {
-    render(<DesignerSessionPageViewActionResponseHarness />);
+    renderWithQueryClient(<DesignerSessionPageViewActionResponseHarness />);
 
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
 
@@ -654,7 +694,7 @@ describe("DesignerSessionPageView", () => {
   });
 
   it("submits Designer user input request responses with collected answers", () => {
-    render(<DesignerSessionPageViewUserInputResponseHarness />);
+    renderWithQueryClient(<DesignerSessionPageViewUserInputResponseHarness />);
 
     fireEvent.click(screen.getByRole("button", { name: "mistle/app" }));
     fireEvent.click(screen.getByRole("button", { name: "Submit responses" }));

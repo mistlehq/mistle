@@ -38,7 +38,9 @@ type SessionWorkbenchPageViewProps = {
   sandboxInstanceId: string | null;
   alert: SessionWorkbenchAlert | null;
   isPrimaryPanelTransitioning?: boolean;
+  mainContentAriaLabel?: string;
   mainContentLayout?: SessionWorkbenchMainContentLayout;
+  mainContentScrollbarGutter?: "stable" | "stable both-edges";
   mainContentScrollContainerRef?: React.Ref<HTMLDivElement>;
   secondaryPanelDefaultSize?: string;
   secondaryPanelLayoutKey?: string;
@@ -63,7 +65,9 @@ export function SessionWorkbenchPageView({
   sandboxInstanceId,
   alert,
   isPrimaryPanelTransitioning = false,
+  mainContentAriaLabel = "Conversation chat",
   mainContentLayout = { scroll: "page", width: "chat" },
+  mainContentScrollbarGutter,
   mainContentScrollContainerRef,
   secondaryPanelDefaultSize,
   secondaryPanelLayoutKey = "default",
@@ -147,15 +151,20 @@ export function SessionWorkbenchPageView({
     mainContentLayout.scroll === "contained"
       ? "min-h-0 flex-1 overflow-hidden"
       : "min-h-0 flex-1 overflow-y-auto";
+  const resolvedMainContentScrollbarGutter =
+    mainContentScrollbarGutter ??
+    (mainContentLayout.width === "full" ? undefined : "stable both-edges");
   const mainContentScrollbarGutterStyle =
-    mainContentLayout.width === "full" ? undefined : { scrollbarGutter: "stable both-edges" };
+    resolvedMainContentScrollbarGutter === undefined
+      ? undefined
+      : { scrollbarGutter: resolvedMainContentScrollbarGutter };
   const primaryPanelTransitionClassName = isPrimaryPanelTransitioning
     ? "opacity-0 transition-opacity duration-200 ease-out"
     : "opacity-100 transition-opacity duration-200 ease-in";
   const mainWorkspaceContent = (
     <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
       <div
-        aria-label="Conversation chat"
+        aria-label={mainContentAriaLabel}
         className={mainContentRegionClassName}
         ref={mainContentScrollContainerRef}
         role="region"

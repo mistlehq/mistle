@@ -514,6 +514,7 @@ export const SessionTerminalWorkspaceView = forwardRef<
           <DockviewReact
             className="h-full"
             components={DockviewTerminalComponents}
+            disableTabsOverflowList
             onReady={(event: { api: DockviewApi }) => {
               apiRef.current = event.api;
               setReadyApi(event.api);

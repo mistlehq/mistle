@@ -1,4 +1,4 @@
-import { Badge } from "@mistle/ui";
+import { SidebarTrigger, useSidebar } from "@mistle/ui";
 
 import "dockview/dist/styles/dockview.css";
 import "./session-terminal-workspace.css";
@@ -24,6 +24,7 @@ import type {
 import { hydrateCodexChatEntriesFromThreadReadTurns } from "../session-agents/codex/session-state/index.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { ConversationWorkspaceHeader } from "../shared/conversation-workspace-frame.js";
+import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
 import { formatDesignerActionRequestOperationResult } from "./designer-action-proposal-response-copy.js";
 import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
@@ -43,6 +44,36 @@ type DesignerCanvasDockviewParams = {
 };
 
 type DesignerCanvasDockviewPanelProps = IDockviewPanelProps<DesignerCanvasDockviewParams>;
+
+type DesignerRuntimeConversationPanelInput = {
+  followUpDraft: string;
+  followUpErrorMessage: string | null;
+  followUpIsPending: boolean;
+  followUpSuccessMessage: string | null;
+  actionProposalResponseErrorMessage: string | null;
+  actionProposalResponsePendingId: string | null;
+  submittedActionProposalResponseId: string | null;
+  onActionProposalResponseSubmit: (
+    proposalId: string,
+    response: DesignerActionProposalResponse,
+  ) => void;
+  onFollowUpDraftChange: (draft: string) => void;
+  onFollowUpSubmit: () => void;
+  onUserInputRequestResponseSubmit: (requestId: string | number, result: unknown) => void;
+  runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
+  runtimeConversationTranscript: DesignerRuntimeConversationTranscript | null;
+  session: DesignerSession | null;
+  transcriptErrorMessage: string | null;
+  transcriptIsPending: boolean;
+  userInputRequestResponseErrorMessage: string | null;
+  userInputRequestResponseIsPending: boolean;
+  userInputRequestResponsePendingId: string | number | null;
+};
+
+type DesignerRuntimeConversationPanels = {
+  mainContent: React.ReactNode;
+  bottomPanel: React.ReactNode;
+};
 
 export type DesignerSessionPageViewProps = {
   actionProposalResponseErrorMessage: string | null;
@@ -67,6 +98,7 @@ export type DesignerSessionPageViewProps = {
   runtimeConversationTranscript: DesignerRuntimeConversationTranscript | null;
   transcriptErrorMessage: string | null;
   transcriptIsPending: boolean;
+  submittedActionProposalResponseId: string | null;
   userInputRequestResponseErrorMessage: string | null;
   userInputRequestResponseIsPending: boolean;
   userInputRequestResponsePendingId: string | number | null;
@@ -74,30 +106,9 @@ export type DesignerSessionPageViewProps = {
   sessionId: string;
 };
 
-function RuntimeConversationPreview(input: {
-  followUpDraft: string;
-  followUpErrorMessage: string | null;
-  followUpIsPending: boolean;
-  followUpSuccessMessage: string | null;
-  actionProposalResponseErrorMessage: string | null;
-  actionProposalResponsePendingId: string | null;
-  actionProposalResponseSuccessMessage: string | null;
-  onActionProposalResponseSubmit: (
-    proposalId: string,
-    response: DesignerActionProposalResponse,
-  ) => void;
-  onFollowUpDraftChange: (draft: string) => void;
-  onFollowUpSubmit: () => void;
-  onUserInputRequestResponseSubmit: (requestId: string | number, result: unknown) => void;
-  runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
-  runtimeConversationTranscript: DesignerRuntimeConversationTranscript | null;
-  session: DesignerSession | null;
-  transcriptErrorMessage: string | null;
-  transcriptIsPending: boolean;
-  userInputRequestResponseErrorMessage: string | null;
-  userInputRequestResponseIsPending: boolean;
-  userInputRequestResponsePendingId: string | number | null;
-}): React.JSX.Element | null {
+function buildDesignerRuntimeConversationPanels(
+  input: DesignerRuntimeConversationPanelInput,
+): DesignerRuntimeConversationPanels | null {
   const initialPrompt = input.session?.initialPrompt ?? null;
   if (initialPrompt === null) {
     return null;
@@ -135,14 +146,9 @@ function RuntimeConversationPreview(input: {
     transcriptIsPending: input.transcriptIsPending,
   });
 
-  return (
-    <>
-      <div
-        aria-label="Designer conversation"
-        className="mr-2 min-h-0 flex-1 overflow-y-auto px-4 py-4"
-        role="region"
-        style={{ scrollbarGutter: "stable" }}
-      >
+  return {
+    mainContent: (
+      <div className="mr-2 px-4 py-4">
         <SessionConversationMainContent
           activeTurnId={null}
           autoScrollToBottomOnInitialLoad
@@ -155,15 +161,17 @@ function RuntimeConversationPreview(input: {
           scrollBehavior="follow-streaming-at-bottom"
           serverRequestPanelEntries={serverRequestPanelEntries}
         />
+      </div>
+    ),
+    bottomPanel: (
+      <>
         <DesignerActionProposals
           errorMessage={input.actionProposalResponseErrorMessage}
           onSubmitResponse={input.onActionProposalResponseSubmit}
           pendingProposalId={input.actionProposalResponsePendingId}
           proposals={input.runtimeConversationTranscript?.actionProposals ?? []}
-          successMessage={input.actionProposalResponseSuccessMessage}
+          submittedProposalId={input.submittedActionProposalResponseId}
         />
-      </div>
-      <div className="bg-background px-4 py-3">
         <SessionConversationBottomPanel
           chatEntries={chatEntries}
           composerViewModel={{
@@ -210,9 +218,9 @@ function RuntimeConversationPreview(input: {
           statusMessage={statusMessage}
           showWorkingIndicator={input.followUpIsPending || input.transcriptIsPending}
         />
-      </div>
-    </>
-  );
+      </>
+    ),
+  };
 }
 
 function ignoreDesignerComposerAction(): void {}
@@ -332,31 +340,31 @@ function DesignerActionProposals(input: {
   onSubmitResponse: (proposalId: string, response: DesignerActionProposalResponse) => void;
   pendingProposalId: string | null;
   proposals: readonly DesignerActionProposal[];
-  successMessage: string | null;
+  submittedProposalId: string | null;
 }): React.JSX.Element | null {
-  if (input.proposals.length === 0) {
+  const visibleProposals = input.proposals.filter(
+    (proposal) => proposal.status === "pending" && proposal.id !== input.submittedProposalId,
+  );
+
+  if (visibleProposals.length === 0 && input.errorMessage === null) {
     return null;
   }
 
   return (
-    <div className="mt-3 space-y-2">
-      <p className="text-xs font-medium text-muted-foreground">Action proposals</p>
-      {input.proposals.map((proposal) => {
+    <div className="mb-4 max-h-72 space-y-2 overflow-y-auto px-1 pr-2">
+      {visibleProposals.map((proposal) => {
         const reviewRows = getDesignerActionProposalReviewRows(proposal.operation);
 
         return (
-          <article className="rounded-lg border bg-muted/20 p-3" key={proposal.id}>
-            <div className="flex items-start justify-between gap-3">
+          <article className="rounded-xl border bg-background p-4 shadow-sm" key={proposal.id}>
+            <div>
               <div className="min-w-0">
-                <p className="font-medium text-sm">{proposal.title}</p>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">{proposal.summary}</p>
+                <p className="font-medium text-base">{proposal.title}</p>
+                <p className="mt-1 text-base leading-7 text-muted-foreground">{proposal.summary}</p>
               </div>
-              <Badge variant="secondary">
-                {formatDesignerActionProposalStatus(proposal.status)}
-              </Badge>
             </div>
             {reviewRows.length === 0 ? null : (
-              <dl className="mt-3 grid gap-2 text-xs">
+              <dl className="mt-4 grid gap-3 text-sm">
                 {reviewRows.map((detail, detailIndex) => (
                   <div key={`${proposal.id}:${String(detailIndex)}:${detail.label}`}>
                     <dt className="text-muted-foreground">{detail.label}</dt>
@@ -396,9 +404,6 @@ function DesignerActionProposals(input: {
         );
       })}
       <ErrorNotice message={input.errorMessage} />
-      {input.successMessage === null ? null : (
-        <p className="text-xs text-muted-foreground">{input.successMessage}</p>
-      )}
     </div>
   );
 }
@@ -474,25 +479,6 @@ function getDesignerActionProposalReviewRows(
   }
 }
 
-function formatDesignerActionProposalStatus(status: DesignerActionProposal["status"]): string {
-  switch (status) {
-    case "pending":
-      return "Review required";
-    case "approved":
-      return "Approved";
-    case "declined":
-      return "Declined";
-    case "executing":
-      return "Executing";
-    case "execution_unsupported":
-      return "Unsupported";
-    case "completed":
-      return "Completed";
-    case "failed":
-      return "Failed";
-  }
-}
-
 function readRequiredDesignerCanvasHref(parameters: unknown): string {
   if (typeof parameters !== "object" || parameters === null || Array.isArray(parameters)) {
     throw new Error("Designer canvas panel parameters must include href.");
@@ -561,6 +547,7 @@ function DesignerCanvasWorkspace(input: { tabs: readonly DesignerCanvasTab[] }):
       <DockviewReact
         className="h-full"
         components={DesignerCanvasDockviewComponents}
+        disableTabsOverflowList
         disableFloatingGroups
         dndEdges={false}
         onReady={(event: { api: DockviewApi }) => {
@@ -593,6 +580,30 @@ export function DesignerSessionPageView(input: DesignerSessionPageViewProps): Re
     session: input.session,
     transcriptIsPending: input.transcriptIsPending,
   });
+  const runtimeConversationPanels =
+    startupState === null
+      ? buildDesignerRuntimeConversationPanels({
+          actionProposalResponseErrorMessage: input.actionProposalResponseErrorMessage,
+          actionProposalResponsePendingId: input.actionProposalResponsePendingId,
+          followUpDraft: input.followUpDraft,
+          followUpErrorMessage: input.followUpErrorMessage,
+          followUpIsPending: input.followUpIsPending,
+          followUpSuccessMessage: input.followUpSuccessMessage,
+          onActionProposalResponseSubmit: input.onActionProposalResponseSubmit,
+          onFollowUpDraftChange: input.onFollowUpDraftChange,
+          onFollowUpSubmit: input.onFollowUpSubmit,
+          onUserInputRequestResponseSubmit: input.onUserInputRequestResponseSubmit,
+          runtimeConversationBootstrap: input.runtimeConversationBootstrap,
+          runtimeConversationTranscript: input.runtimeConversationTranscript,
+          session: input.session,
+          submittedActionProposalResponseId: input.submittedActionProposalResponseId,
+          transcriptErrorMessage: input.transcriptErrorMessage,
+          transcriptIsPending: input.transcriptIsPending,
+          userInputRequestResponseErrorMessage: input.userInputRequestResponseErrorMessage,
+          userInputRequestResponseIsPending: input.userInputRequestResponseIsPending,
+          userInputRequestResponsePendingId: input.userInputRequestResponsePendingId,
+        })
+      : null;
 
   const conversationPanel = (
     <aside className="flex h-full min-h-0 flex-col">
@@ -608,6 +619,7 @@ export function DesignerSessionPageView(input: DesignerSessionPageViewProps): Re
             title={statusUi.label}
           />
         }
+        leadingControl={<DesignerSessionSidebarTrigger />}
         title={
           <AutoSaveTitleHeading
             ariaLabel="Designer session title"
@@ -625,27 +637,7 @@ export function DesignerSessionPageView(input: DesignerSessionPageViewProps): Re
       <div className="flex min-h-0 flex-1 flex-col">
         <ErrorNotice message={input.errorMessage} />
         {startupState === null ? (
-          <RuntimeConversationPreview
-            actionProposalResponseErrorMessage={input.actionProposalResponseErrorMessage}
-            actionProposalResponsePendingId={input.actionProposalResponsePendingId}
-            actionProposalResponseSuccessMessage={input.actionProposalResponseSuccessMessage}
-            followUpDraft={input.followUpDraft}
-            followUpErrorMessage={input.followUpErrorMessage}
-            followUpIsPending={input.followUpIsPending}
-            followUpSuccessMessage={input.followUpSuccessMessage}
-            onActionProposalResponseSubmit={input.onActionProposalResponseSubmit}
-            onFollowUpDraftChange={input.onFollowUpDraftChange}
-            onFollowUpSubmit={input.onFollowUpSubmit}
-            onUserInputRequestResponseSubmit={input.onUserInputRequestResponseSubmit}
-            runtimeConversationBootstrap={input.runtimeConversationBootstrap}
-            runtimeConversationTranscript={input.runtimeConversationTranscript}
-            session={input.session}
-            transcriptErrorMessage={input.transcriptErrorMessage}
-            transcriptIsPending={input.transcriptIsPending}
-            userInputRequestResponseErrorMessage={input.userInputRequestResponseErrorMessage}
-            userInputRequestResponseIsPending={input.userInputRequestResponseIsPending}
-            userInputRequestResponsePendingId={input.userInputRequestResponsePendingId}
-          />
+          runtimeConversationPanels?.mainContent
         ) : (
           <DesignerSessionStartupPanel
             sandboxInstanceId={input.session?.sandboxInstanceId ?? null}
@@ -673,8 +665,10 @@ export function DesignerSessionPageView(input: DesignerSessionPageViewProps): Re
         isBottomPanelVisible={false}
         isSecondaryPanelVisible
         mainContent={conversationPanel}
-        mainContentLayout={{ scroll: "contained", width: "full" }}
-        primaryBottomPanel={null}
+        mainContentAriaLabel="Designer conversation"
+        mainContentLayout={{ scroll: "page", width: "full" }}
+        mainContentScrollbarGutter="stable"
+        primaryBottomPanel={runtimeConversationPanels?.bottomPanel ?? null}
         primaryPanelMinSize="22rem"
         sandboxInstanceId={input.sessionId}
         secondaryPanel={canvasPanel}
@@ -683,4 +677,15 @@ export function DesignerSessionPageView(input: DesignerSessionPageViewProps): Re
       />
     </div>
   );
+}
+
+function DesignerSessionSidebarTrigger(): React.JSX.Element | null {
+  const { isMobile, openMobile, state } = useSidebar();
+  const shouldShowSidebarTrigger = shouldRenderSidebarTrigger({
+    isMobile,
+    openMobile,
+    sidebarState: state,
+  });
+
+  return shouldShowSidebarTrigger ? <SidebarTrigger className="-ml-1" /> : null;
 }
