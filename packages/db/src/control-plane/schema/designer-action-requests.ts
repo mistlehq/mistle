@@ -15,6 +15,7 @@ export type DesignerActionRequestResponse =
 
 export const DesignerActionRequestOperationKinds = {
   PROVIDER_CONFIGURATION_CHANGE: "providerConfigurationChange",
+  SANDBOX_PROFILE_DRAFT_PUBLISH: "sandboxProfileDraftPublish",
   SANDBOX_PROFILE_DRAFT_SETUP_SCRIPT_PUT: "sandboxProfileDraftSetupScriptPut",
 } as const;
 
@@ -40,8 +41,15 @@ export type DesignerSandboxProfileDraftSetupScriptPutOperation = {
   setupScript: string | null;
 };
 
+export type DesignerSandboxProfileDraftPublishOperation = {
+  kind: typeof DesignerActionRequestOperationKinds.SANDBOX_PROFILE_DRAFT_PUBLISH;
+  profileId: string;
+  version: number;
+};
+
 export type DesignerActionRequestOperation =
   | DesignerProviderConfigurationChangeOperation
+  | DesignerSandboxProfileDraftPublishOperation
   | DesignerSandboxProfileDraftSetupScriptPutOperation;
 
 export const DesignerActionRequestStatuses = {

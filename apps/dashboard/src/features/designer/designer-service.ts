@@ -139,6 +139,14 @@ const DesignerSandboxProfileDraftSetupScriptPutOperationSchema = z
   })
   .strict();
 
+const DesignerSandboxProfileDraftPublishOperationSchema = z
+  .object({
+    kind: z.literal("sandboxProfileDraftPublish"),
+    profileId: z.string().min(1),
+    version: z.number().int().min(1),
+  })
+  .strict();
+
 const DesignerActionProposalSchema = z
   .object({
     id: z.string().min(1),
@@ -148,6 +156,7 @@ const DesignerActionProposalSchema = z
     status: z.enum(["pending", "approved", "declined"]),
     operation: z.discriminatedUnion("kind", [
       DesignerProviderConfigurationChangeOperationSchema,
+      DesignerSandboxProfileDraftPublishOperationSchema,
       DesignerSandboxProfileDraftSetupScriptPutOperationSchema,
     ]),
   })

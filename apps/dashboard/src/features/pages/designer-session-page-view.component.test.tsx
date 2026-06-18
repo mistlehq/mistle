@@ -109,6 +109,24 @@ const RuntimeConversationTranscriptWithSetupScriptActionProposal = {
   ],
 } satisfies DesignerRuntimeConversationTranscript;
 
+const RuntimeConversationTranscriptWithPublishActionProposal = {
+  ...RuntimeConversationTranscript,
+  actionProposals: [
+    {
+      id: "dap_profile_publish",
+      kind: "designerActionProposal",
+      title: "Publish draft profile",
+      summary: "Publish the selected sandbox profile draft.",
+      status: "pending",
+      operation: {
+        kind: "sandboxProfileDraftPublish",
+        profileId: "sbp_designer_publish",
+        version: 3,
+      },
+    },
+  ],
+} satisfies DesignerRuntimeConversationTranscript;
+
 function renderDesignerSessionPageView(input?: {
   bootstrapErrorMessage?: string | null;
   bootstrapIsPending?: boolean;
@@ -261,6 +279,18 @@ describe("DesignerSessionPageView", () => {
     expect(
       screen.getByText((_, element) => element?.textContent === "pnpm install\npnpm build"),
     ).toBeDefined();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
+  });
+
+  it("renders typed Designer publish action proposals", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      runtimeConversationTranscript: RuntimeConversationTranscriptWithPublishActionProposal,
+    });
+
+    expect(screen.getByText("Publish draft profile")).toBeDefined();
+    expect(screen.getByText("Publish sandbox profile draft")).toBeDefined();
+    expect(screen.getByText("sbp_designer_publish version 3")).toBeDefined();
     expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
   });
 

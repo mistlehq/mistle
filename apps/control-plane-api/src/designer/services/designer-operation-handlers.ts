@@ -3,20 +3,23 @@ import {
   DesignerActionRequestOperationKinds,
   DesignerActionRequestStatuses,
   type DesignerActionRequestStatus,
-  type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
-import type { IntegrationRegistry } from "@mistle/integrations-core";
 
 import { requireOrganizationPermission } from "../../auth/services/organization-authorization.js";
 import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
+import { publishProfileVersion } from "../../sandbox-profiles/services/publish-profile-version.js";
 import { putProfileVersionDraft } from "../../sandbox-profiles/services/put-profile-version-draft.js";
-import type { ControlPlaneApiSandboxRuntimeConfig } from "../../types.js";
+import type { CreateSandboxProfilesServiceInput } from "../../sandbox-profiles/services/types.js";
 
-type DesignerOperationHandlerContext = {
-  db: ControlPlaneDatabase;
-  integrationRegistry: IntegrationRegistry;
-  sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
-};
+export type DesignerOperationExecutionContext = Pick<
+  CreateSandboxProfilesServiceInput,
+  | "db"
+  | "dataPlaneClient"
+  | "integrationsConfig"
+  | "integrationRegistry"
+  | "mcpConfig"
+  | "sandboxConfig"
+>;
 
 type DesignerOperationHandlerInput = {
   organizationId: string;
@@ -31,13 +34,15 @@ type DesignerOperationHandlerResult = {
 };
 
 type DesignerOperationHandler = (
-  ctx: DesignerOperationHandlerContext,
+  ctx: DesignerOperationExecutionContext,
   input: DesignerOperationHandlerInput,
 ) => Promise<DesignerOperationHandlerResult>;
 
 const DesignerOperationHandlers: Partial<
   Record<DesignerActionRequestOperation["kind"], DesignerOperationHandler>
 > = {
+  [DesignerActionRequestOperationKinds.SANDBOX_PROFILE_DRAFT_PUBLISH]:
+    executeSandboxProfileDraftPublishOperation,
   [DesignerActionRequestOperationKinds.SANDBOX_PROFILE_DRAFT_SETUP_SCRIPT_PUT]:
     executeSandboxProfileDraftSetupScriptPutOperation,
 };
@@ -62,7 +67,7 @@ function getDesignerOperationFailureMessage(error: unknown): string {
 }
 
 export async function executeApprovedDesignerOperation(
-  ctx: DesignerOperationHandlerContext,
+  ctx: DesignerOperationExecutionContext,
   input: DesignerOperationHandlerInput,
 ): Promise<DesignerOperationHandlerResult> {
   const handler = DesignerOperationHandlers[input.operation.kind];
@@ -86,7 +91,7 @@ export async function executeApprovedDesignerOperation(
 }
 
 async function executeSandboxProfileDraftSetupScriptPutOperation(
-  ctx: DesignerOperationHandlerContext,
+  ctx: DesignerOperationExecutionContext,
   input: DesignerOperationHandlerInput,
 ): Promise<DesignerOperationHandlerResult> {
   if (
@@ -116,6 +121,47 @@ async function executeSandboxProfileDraftSetupScriptPutOperation(
       profileId: input.operation.profileId,
       profileVersion: input.operation.version,
       setupScript: input.operation.setupScript,
+    },
+  );
+
+  return {
+    status: DesignerActionRequestStatuses.COMPLETED,
+    failureCode: null,
+    failureMessage: null,
+  };
+}
+
+async function executeSandboxProfileDraftPublishOperation(
+  ctx: DesignerOperationExecutionContext,
+  input: DesignerOperationHandlerInput,
+): Promise<DesignerOperationHandlerResult> {
+  if (input.operation.kind !== DesignerActionRequestOperationKinds.SANDBOX_PROFILE_DRAFT_PUBLISH) {
+    throw new Error(
+      `Designer operation handler received unexpected operation kind '${input.operation.kind}'.`,
+    );
+  }
+
+  await requireOrganizationPermission({
+    db: ctx.db,
+    actorUserId: input.requestedByUserId,
+    organizationId: input.organizationId,
+    permission: OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+  });
+
+  await publishProfileVersion(
+    {
+      db: ctx.db,
+      dataPlaneClient: ctx.dataPlaneClient,
+      defaultBaseImage: ctx.sandboxConfig.defaultBaseImage,
+      integrationsConfig: ctx.integrationsConfig,
+      integrationRegistry: ctx.integrationRegistry,
+      mcpConfig: ctx.mcpConfig,
+      sandboxConfig: ctx.sandboxConfig,
+    },
+    {
+      organizationId: input.organizationId,
+      profileId: input.operation.profileId,
+      profileVersion: input.operation.version,
     },
   );
 

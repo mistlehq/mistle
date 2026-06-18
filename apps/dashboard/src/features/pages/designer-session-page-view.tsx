@@ -378,42 +378,55 @@ function DesignerActionProposals(input: {
 function getDesignerActionProposalOperationRows(
   operation: DesignerActionProposal["operation"],
 ): { label: string; value: string }[] {
-  if (operation.kind === "providerConfigurationChange") {
-    const resource =
-      operation.resourceLabel === null
-        ? operation.resourceType
-        : `${operation.resourceType}: ${operation.resourceLabel}`;
+  switch (operation.kind) {
+    case "providerConfigurationChange": {
+      const resource =
+        operation.resourceLabel === null
+          ? operation.resourceType
+          : `${operation.resourceType}: ${operation.resourceLabel}`;
 
-    return [
-      {
-        label: "Operation",
-        value: `${operation.provider} ${operation.action}`,
-      },
-      {
-        label: "Resource",
-        value: resource,
-      },
-      ...operation.details.map((detail) => ({
-        label: detail.label,
-        value: detail.value,
-      })),
-    ];
+      return [
+        {
+          label: "Operation",
+          value: `${operation.provider} ${operation.action}`,
+        },
+        {
+          label: "Resource",
+          value: resource,
+        },
+        ...operation.details.map((detail) => ({
+          label: detail.label,
+          value: detail.value,
+        })),
+      ];
+    }
+    case "sandboxProfileDraftPublish":
+      return [
+        {
+          label: "Operation",
+          value: "Publish sandbox profile draft",
+        },
+        {
+          label: "Resource",
+          value: `${operation.profileId} version ${String(operation.version)}`,
+        },
+      ];
+    case "sandboxProfileDraftSetupScriptPut":
+      return [
+        {
+          label: "Operation",
+          value: "Update sandbox profile draft setup script",
+        },
+        {
+          label: "Resource",
+          value: `${operation.profileId} version ${String(operation.version)}`,
+        },
+        {
+          label: "Setup script",
+          value: operation.setupScript ?? "Clear setup script",
+        },
+      ];
   }
-
-  return [
-    {
-      label: "Operation",
-      value: "Update sandbox profile draft setup script",
-    },
-    {
-      label: "Resource",
-      value: `${operation.profileId} version ${String(operation.version)}`,
-    },
-    {
-      label: "Setup script",
-      value: operation.setupScript ?? "Clear setup script",
-    },
-  ];
 }
 
 function formatDesignerActionProposalStatus(status: DesignerActionProposal["status"]): string {

@@ -23,7 +23,6 @@ import {
   type EgressCredentialRoute,
   SandboxImageSources,
   createDisabledAssociatedResourceEventRouting,
-  type IntegrationRegistry,
 } from "@mistle/integrations-core";
 import { compileInstalledCodexRuntime } from "@mistle/integrations-definitions/agent-runtimes/codex";
 import { resolveAgentConversationProvider } from "@mistle/integrations-definitions/agent-runtimes/server";
@@ -38,6 +37,7 @@ import {
 } from "../../sandbox-profiles/services/compile-sandbox-runtime-plan.js";
 import { createWorkflowSandboxRuntime } from "../../sandbox-profiles/services/profile-version-runtime-config.js";
 import type {
+  ControlPlaneApiConfig,
   ControlPlaneApiConnectionTokenConfig,
   ControlPlaneApiMcpConfig,
   ControlPlaneApiSandboxRuntimeConfig,
@@ -78,7 +78,10 @@ import {
   toDesignerActionRequestOperation,
   updateDesignerActionRequestExecutionStatus,
 } from "./designer-action-requests.js";
-import { executeApprovedDesignerOperation } from "./designer-operation-handlers.js";
+import {
+  executeApprovedDesignerOperation,
+  type DesignerOperationExecutionContext,
+} from "./designer-operation-handlers.js";
 
 type DesignerSessionActor = {
   kind: SandboxInstanceStarterKind;
@@ -107,21 +110,11 @@ type DesignerRuntimeConversationContext = Pick<DesignerSessionServiceContext, "d
     "getSandboxInstance" | "resumeSandboxInstance"
   >;
   gatewayWebsocketUrl: string;
-  integrationsConfig: {
-    masterEncryptionKeys: Record<string, string>;
-  };
+  integrationsConfig: Pick<ControlPlaneApiConfig["integrations"], "masterEncryptionKeys">;
 };
 
-type DesignerOperationExecutionContext = {
-  db: ControlPlaneDatabase;
-  integrationRegistry: IntegrationRegistry;
-  sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
-};
-
-type DesignerActionProposalResponseContext = DesignerRuntimeConversationContext & {
-  integrationRegistry: IntegrationRegistry;
-  sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
-};
+type DesignerActionProposalResponseContext = DesignerRuntimeConversationContext &
+  DesignerOperationExecutionContext;
 
 type LockedDesignerRuntimeConversationContext = Omit<DesignerRuntimeConversationContext, "db"> & {
   db: ControlPlaneTransaction;

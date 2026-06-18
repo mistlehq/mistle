@@ -26,26 +26,33 @@ type ClaimedDesignerActionRequest = {
 export function toDesignerActionRequestOperation(
   operation: DesignerActionProposal["operation"],
 ): DesignerActionRequestOperation {
-  if (operation.kind === DesignerActionRequestOperationKinds.PROVIDER_CONFIGURATION_CHANGE) {
-    return {
-      kind: operation.kind,
-      provider: operation.provider,
-      resourceType: operation.resourceType,
-      resourceLabel: operation.resourceLabel,
-      action: operation.action,
-      details: operation.details.map((detail) => ({
-        label: detail.label,
-        value: detail.value,
-      })),
-    };
+  switch (operation.kind) {
+    case DesignerActionRequestOperationKinds.PROVIDER_CONFIGURATION_CHANGE:
+      return {
+        kind: operation.kind,
+        provider: operation.provider,
+        resourceType: operation.resourceType,
+        resourceLabel: operation.resourceLabel,
+        action: operation.action,
+        details: operation.details.map((detail) => ({
+          label: detail.label,
+          value: detail.value,
+        })),
+      };
+    case DesignerActionRequestOperationKinds.SANDBOX_PROFILE_DRAFT_PUBLISH:
+      return {
+        kind: operation.kind,
+        profileId: operation.profileId,
+        version: operation.version,
+      };
+    case DesignerActionRequestOperationKinds.SANDBOX_PROFILE_DRAFT_SETUP_SCRIPT_PUT:
+      return {
+        kind: operation.kind,
+        profileId: operation.profileId,
+        version: operation.version,
+        setupScript: operation.setupScript,
+      };
   }
-
-  return {
-    kind: operation.kind,
-    profileId: operation.profileId,
-    version: operation.version,
-    setupScript: operation.setupScript,
-  };
 }
 
 export async function claimDesignerActionRequest(

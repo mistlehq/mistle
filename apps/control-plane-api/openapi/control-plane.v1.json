@@ -1418,6 +1418,26 @@
                                     "properties": {
                                       "kind": {
                                         "type": "string",
+                                        "enum": ["sandboxProfileDraftPublish"]
+                                      },
+                                      "profileId": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+                                      },
+                                      "version": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                      }
+                                    },
+                                    "required": ["kind", "profileId", "version"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
                                         "enum": ["sandboxProfileDraftSetupScriptPut"]
                                       },
                                       "profileId": {
