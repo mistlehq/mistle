@@ -281,7 +281,7 @@ export function ServerRequestsPanel({
 
           if (entry.kind === "claude-code-permission") {
             return (
-              <AboveComposerActionPanel
+              <ComposerActionPanel
                 actions={
                   <ApprovalDecisionButtons
                     appearance="panel"
@@ -311,7 +311,7 @@ export function ServerRequestsPanel({
 
           if (entry.kind === "pi-extension-ui-confirm") {
             return (
-              <AboveComposerActionPanel
+              <ComposerActionPanel
                 actions={
                   <ApprovalDecisionButtons
                     appearance="panel"
