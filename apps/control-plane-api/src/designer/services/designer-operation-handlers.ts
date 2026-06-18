@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   type DesignerActionRequestOperation,
   DesignerActionRequestOperationKinds,
@@ -9,11 +11,13 @@ import { requireOrganizationPermission } from "../../auth/services/organization-
 import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
 import { publishProfileVersion } from "../../sandbox-profiles/services/publish-profile-version.js";
 import { putProfileVersionDraft } from "../../sandbox-profiles/services/put-profile-version-draft.js";
+import { startProfileInstance } from "../../sandbox-profiles/services/start-profile-instance.js";
 import type { CreateSandboxProfilesServiceInput } from "../../sandbox-profiles/services/types.js";
 
 export type DesignerOperationExecutionContext = Pick<
   CreateSandboxProfilesServiceInput,
   | "db"
+  | "cache"
   | "dataPlaneClient"
   | "integrationsConfig"
   | "integrationRegistry"
@@ -23,6 +27,7 @@ export type DesignerOperationExecutionContext = Pick<
 
 type DesignerOperationHandlerInput = {
   organizationId: string;
+  actionRequestId: string;
   requestedByUserId: string;
   operation: DesignerActionRequestOperation;
 };
@@ -45,6 +50,8 @@ const DesignerOperationHandlers: Partial<
     executeSandboxProfileDraftPublishOperation,
   [DesignerActionRequestOperationKinds.SANDBOX_PROFILE_DRAFT_SETUP_SCRIPT_PUT]:
     executeSandboxProfileDraftSetupScriptPutOperation,
+  [DesignerActionRequestOperationKinds.SANDBOX_PROFILE_VERSION_LAUNCH]:
+    executeSandboxProfileVersionLaunchOperation,
 };
 
 function getDesignerOperationFailureCode(error: unknown): string {
@@ -64,6 +71,14 @@ function getDesignerOperationFailureMessage(error: unknown): string {
   }
 
   return "Designer operation handler failed.";
+}
+
+function createDesignerLaunchStartIdempotencyKey(input: {
+  actionRequestId: string;
+  operationIdempotencyKey: string;
+}): string {
+  const digest = createHash("sha256").update(input.operationIdempotencyKey).digest("hex");
+  return `designer-action-request:${input.actionRequestId}:launch:${digest}`;
 }
 
 export async function executeApprovedDesignerOperation(
@@ -162,6 +177,61 @@ async function executeSandboxProfileDraftPublishOperation(
       organizationId: input.organizationId,
       profileId: input.operation.profileId,
       profileVersion: input.operation.version,
+    },
+  );
+
+  return {
+    status: DesignerActionRequestStatuses.COMPLETED,
+    failureCode: null,
+    failureMessage: null,
+  };
+}
+
+async function executeSandboxProfileVersionLaunchOperation(
+  ctx: DesignerOperationExecutionContext,
+  input: DesignerOperationHandlerInput,
+): Promise<DesignerOperationHandlerResult> {
+  if (input.operation.kind !== DesignerActionRequestOperationKinds.SANDBOX_PROFILE_VERSION_LAUNCH) {
+    throw new Error(
+      `Designer operation handler received unexpected operation kind '${input.operation.kind}'.`,
+    );
+  }
+
+  await requireOrganizationPermission({
+    db: ctx.db,
+    actorUserId: input.requestedByUserId,
+    organizationId: input.organizationId,
+    permission: OrganizationPermissions.SANDBOX_SESSION_CREATE,
+  });
+
+  await startProfileInstance(
+    {
+      db: ctx.db,
+      cache: ctx.cache,
+      integrationsConfig: ctx.integrationsConfig,
+      mcpConfig: ctx.mcpConfig,
+      dataPlaneClient: ctx.dataPlaneClient,
+      defaultBaseImage: ctx.sandboxConfig.defaultBaseImage,
+    },
+    {
+      organizationId: input.organizationId,
+      profileId: input.operation.profileId,
+      profileVersion: input.operation.version,
+      startedBy: {
+        kind: "user",
+        id: input.requestedByUserId,
+      },
+      actingUser: {
+        userId: input.requestedByUserId,
+      },
+      source: "dashboard",
+      ...(input.operation.primaryRepositoryId === undefined
+        ? {}
+        : { primaryRepositoryId: input.operation.primaryRepositoryId }),
+      idempotencyKey: createDesignerLaunchStartIdempotencyKey({
+        actionRequestId: input.actionRequestId,
+        operationIdempotencyKey: input.operation.idempotencyKey,
+      }),
     },
   );
 

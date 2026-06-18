@@ -192,6 +192,21 @@ const designerSandboxProfileDraftPublishOperationSchema = z
   })
   .strict();
 
+const designerSandboxProfileVersionLaunchOperationSchema = z
+  .object({
+    kind: z.literal(DesignerActionRequestOperationKinds.SANDBOX_PROFILE_VERSION_LAUNCH),
+    profileId: z
+      .string()
+      .min(1)
+      .regex(/^sbp_[a-zA-Z0-9_-]+$/, {
+        message: "`profileId` must be a sandbox profile id.",
+      }),
+    version: z.number().int().min(1),
+    primaryRepositoryId: z.string().min(1).nullable().optional(),
+    idempotencyKey: z.string().min(1).max(255),
+  })
+  .strict();
+
 export const designerActionProposalSchema = z
   .object({
     id: z.string().min(1).max(255),
@@ -203,6 +218,7 @@ export const designerActionProposalSchema = z
       designerProviderConfigurationChangeOperationSchema,
       designerSandboxProfileDraftPublishOperationSchema,
       designerSandboxProfileDraftSetupScriptPutOperationSchema,
+      designerSandboxProfileVersionLaunchOperationSchema,
     ]),
   })
   .strict();

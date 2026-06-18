@@ -17,6 +17,7 @@ export const DesignerActionRequestOperationKinds = {
   PROVIDER_CONFIGURATION_CHANGE: "providerConfigurationChange",
   SANDBOX_PROFILE_DRAFT_PUBLISH: "sandboxProfileDraftPublish",
   SANDBOX_PROFILE_DRAFT_SETUP_SCRIPT_PUT: "sandboxProfileDraftSetupScriptPut",
+  SANDBOX_PROFILE_VERSION_LAUNCH: "sandboxProfileVersionLaunch",
 } as const;
 
 export type DesignerActionRequestOperationKind =
@@ -47,10 +48,19 @@ export type DesignerSandboxProfileDraftPublishOperation = {
   version: number;
 };
 
+export type DesignerSandboxProfileVersionLaunchOperation = {
+  kind: typeof DesignerActionRequestOperationKinds.SANDBOX_PROFILE_VERSION_LAUNCH;
+  profileId: string;
+  version: number;
+  primaryRepositoryId?: string | null;
+  idempotencyKey: string;
+};
+
 export type DesignerActionRequestOperation =
   | DesignerProviderConfigurationChangeOperation
   | DesignerSandboxProfileDraftPublishOperation
-  | DesignerSandboxProfileDraftSetupScriptPutOperation;
+  | DesignerSandboxProfileDraftSetupScriptPutOperation
+  | DesignerSandboxProfileVersionLaunchOperation;
 
 export const DesignerActionRequestStatuses = {
   APPROVED: "approved",

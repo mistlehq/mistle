@@ -426,6 +426,25 @@ function getDesignerActionProposalOperationRows(
           value: operation.setupScript ?? "Clear setup script",
         },
       ];
+    case "sandboxProfileVersionLaunch":
+      return [
+        {
+          label: "Operation",
+          value: "Launch sandbox session",
+        },
+        {
+          label: "Resource",
+          value: `${operation.profileId} version ${String(operation.version)}`,
+        },
+        {
+          label: "Primary repository",
+          value: operation.primaryRepositoryId ?? "Workspace root",
+        },
+        {
+          label: "Idempotency key",
+          value: operation.idempotencyKey,
+        },
+      ];
   }
 }
 

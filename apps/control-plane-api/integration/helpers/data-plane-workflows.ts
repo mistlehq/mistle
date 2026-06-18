@@ -1,3 +1,4 @@
+import { createDataPlaneWorkflowNamespaceId } from "@mistle/db/test-environment";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { systemClock, systemSleeper } from "@mistle/time";
@@ -167,6 +168,23 @@ export async function waitForQueuedStartWorkflowInput(input: {
   throw new Error(
     `Timed out waiting for queued start workflow input for sandbox '${input.sandboxInstanceId}'.`,
   );
+}
+
+export async function countQueuedStartWorkflows(input: {
+  env: IntegrationTestEnvironment;
+  inputEquals: Record<string, unknown>;
+}): Promise<number> {
+  const workflowNamespaceId = createDataPlaneWorkflowNamespaceId(input.env.id);
+  const result = await input.env.dataPlaneDb.execute(sql<{ count: string }>`
+    select count(*)::text as count
+    from data_plane_openworkflow.workflow_runs
+    where
+      namespace_id = ${workflowNamespaceId}
+      and workflow_name = ${StartWorkflowName}
+      and input @> ${JSON.stringify(input.inputEquals)}::jsonb
+  `);
+
+  return Number(result.rows[0]?.count ?? "0");
 }
 
 export async function waitForQueuedResumeWorkflowInput(input: {

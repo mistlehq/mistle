@@ -312,6 +312,7 @@ export async function completeApprovedDesignerActionRequestExecution(input: {
 
   const executionResult = await executeApprovedDesignerOperation(input.ctx, {
     organizationId: input.organizationId,
+    actionRequestId: claimedActionRequest.id,
     requestedByUserId: claimedActionRequest.requestedByUserId,
     operation: claimedActionRequest.operation,
   });

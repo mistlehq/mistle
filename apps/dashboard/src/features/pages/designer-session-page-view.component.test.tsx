@@ -127,6 +127,26 @@ const RuntimeConversationTranscriptWithPublishActionProposal = {
   ],
 } satisfies DesignerRuntimeConversationTranscript;
 
+const RuntimeConversationTranscriptWithLaunchActionProposal = {
+  ...RuntimeConversationTranscript,
+  actionProposals: [
+    {
+      id: "dap_profile_launch",
+      kind: "designerActionProposal",
+      title: "Launch sandbox session",
+      summary: "Start an ordinary sandbox session from the selected sandbox profile version.",
+      status: "pending",
+      operation: {
+        kind: "sandboxProfileVersionLaunch",
+        profileId: "sbp_designer_launch",
+        version: 4,
+        primaryRepositoryId: null,
+        idempotencyKey: "designer-launch-001",
+      },
+    },
+  ],
+} satisfies DesignerRuntimeConversationTranscript;
+
 function renderDesignerSessionPageView(input?: {
   bootstrapErrorMessage?: string | null;
   bootstrapIsPending?: boolean;
@@ -291,6 +311,24 @@ describe("DesignerSessionPageView", () => {
     expect(screen.getByText("Publish draft profile")).toBeDefined();
     expect(screen.getByText("Publish sandbox profile draft")).toBeDefined();
     expect(screen.getByText("sbp_designer_publish version 3")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
+  });
+
+  it("renders typed Designer launch action proposals", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      runtimeConversationTranscript: RuntimeConversationTranscriptWithLaunchActionProposal,
+    });
+
+    expect(screen.getAllByText("Launch sandbox session")).toHaveLength(2);
+    expect(
+      screen.getByText(
+        "Start an ordinary sandbox session from the selected sandbox profile version.",
+      ),
+    ).toBeDefined();
+    expect(screen.getByText("sbp_designer_launch version 4")).toBeDefined();
+    expect(screen.getByText("Workspace root")).toBeDefined();
+    expect(screen.getByText("designer-launch-001")).toBeDefined();
     expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
   });
 

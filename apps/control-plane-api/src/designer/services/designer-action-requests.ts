@@ -52,6 +52,16 @@ export function toDesignerActionRequestOperation(
         version: operation.version,
         setupScript: operation.setupScript,
       };
+    case DesignerActionRequestOperationKinds.SANDBOX_PROFILE_VERSION_LAUNCH:
+      return {
+        kind: operation.kind,
+        profileId: operation.profileId,
+        version: operation.version,
+        ...(operation.primaryRepositoryId === undefined
+          ? {}
+          : { primaryRepositoryId: operation.primaryRepositoryId }),
+        idempotencyKey: operation.idempotencyKey,
+      };
   }
 }
 
