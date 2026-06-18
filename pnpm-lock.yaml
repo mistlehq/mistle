@@ -1109,8 +1109,8 @@ importers:
         specifier: 0.7.6
         version: 0.7.6
       tensorlake:
-        specifier: 0.5.47
-        version: 0.5.47
+        specifier: 0.5.31
+        version: 0.5.31
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -11802,8 +11802,8 @@ packages:
   teex@1.0.1:
     resolution: {integrity: sha512-eYE6iEI62Ni1H8oIa7KlDU6uQBtqr4Eajni3wX7rpfXD8ysFx8z0+dri+KWEPWpBsxXfxu58x/0jvTVT1ekOSg==}
 
-  tensorlake@0.5.47:
-    resolution: {integrity: sha512-CgAfFiaTtgFoCpqJtxJBweQJ8FaNlIyntnzMiGnnoYGjRfhZ213RMFGPBqBwhSbRIR3wFmxp1i3XmleKNTL3CQ==}
+  tensorlake@0.5.31:
+    resolution: {integrity: sha512-uZrbQmT77VDig6mLnkfxIoETKug4AN5a1VKIULN5b/PeaVhU0NkNJvjgh88JkJPGLjMFabS7u+bC7xNyXfjnEw==}
     engines: {node: '>=22.0.0'}
     hasBin: true
 
@@ -12068,10 +12068,6 @@ packages:
 
   undici@8.2.0:
     resolution: {integrity: sha512-Z+4Hx9GE26Lh9Upwfnc8C7SsrpBPGaM/Gm6kMFtiG7c+5IvQKlXi/t+9x9DrrCh29cww5TSP9YdVaBcnLDs5fQ==}
-    engines: {node: '>=22.19.0'}
-
-  undici@8.3.0:
-    resolution: {integrity: sha512-TkUDgb6tl7KOGZ+7e8E3d2FYgUQgF6z5YypqjWmixVQSQERFcVrVg0ySADm2LVLRh5ljAaHTCR5Fmz3Q34rB7Q==}
     engines: {node: '>=22.19.0'}
 
   unicorn-magic@0.1.0:
@@ -25176,9 +25172,9 @@ snapshots:
       - bare-abort-controller
       - react-native-b4a
 
-  tensorlake@0.5.47:
+  tensorlake@0.5.31:
     dependencies:
-      undici: 8.3.0
+      undici: 8.2.0
       ws: 8.21.0
     transitivePeerDependencies:
       - bufferutil
@@ -25450,8 +25446,6 @@ snapshots:
   undici@7.27.1: {}
 
   undici@8.2.0: {}
-
-  undici@8.3.0: {}
 
   unicorn-magic@0.1.0: {}
 
