@@ -1,5 +1,7 @@
 export const ClaudeCodeRuntimeServerBundle = String.raw`#!/usr/bin/env node
+import fs from "node:fs";
 import http from "node:http";
+import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
 import { getSessionMessages, listSessions, query } from "@anthropic-ai/claude-agent-sdk";
@@ -9,6 +11,8 @@ const listenPort = Number.parseInt(process.env.MISTLE_CLAUDE_CODE_RUNTIME_PORT ?
 const healthPath = process.env.MISTLE_CLAUDE_CODE_RUNTIME_HEALTH_PATH ?? "/health";
 const websocketPath = process.env.MISTLE_CLAUDE_CODE_RUNTIME_WS_PATH ?? "/agent";
 const defaultWorkspaceRoot = "/root";
+const claudeCodeProjectSkillsDirectory = ".claude/skills";
+const claudeCodeSkillFileName = "SKILL.md";
 const selectedClaudeCodeSkills = parseSelectedClaudeCodeSkills(
   process.env.MISTLE_CLAUDE_CODE_SKILLS,
 );
@@ -103,6 +107,104 @@ function resolveClaudeCodeLookupCwd(cwd) {
     return null;
   }
   return resolveClaudeCodeCwd(cwd);
+}
+
+function resolveClaudeCodeSkillAllowlist(cwd) {
+  if (selectedClaudeCodeSkills.length === 0) {
+    return [];
+  }
+
+  const seenSkillNames = new Set(selectedClaudeCodeSkills);
+  const skillNames = [...selectedClaudeCodeSkills];
+  for (const projectSkillName of discoverClaudeCodeProjectSkillNames(resolveClaudeCodeCwd(cwd))) {
+    if (!seenSkillNames.has(projectSkillName)) {
+      seenSkillNames.add(projectSkillName);
+      skillNames.push(projectSkillName);
+    }
+  }
+  return skillNames;
+}
+
+function discoverClaudeCodeProjectSkillNames(cwd) {
+  const skillNames = [];
+  const seenSkillNames = new Set();
+  const userSkillsRoot = path.join(defaultWorkspaceRoot, claudeCodeProjectSkillsDirectory);
+  let currentDirectory = path.resolve(cwd);
+  const stopDirectory = path.resolve(defaultWorkspaceRoot);
+
+  while (isClaudeCodeWorkspacePath(currentDirectory, stopDirectory)) {
+    const projectSkillsRoot = path.join(currentDirectory, claudeCodeProjectSkillsDirectory);
+    if (projectSkillsRoot !== userSkillsRoot) {
+      for (const skillName of readClaudeCodeSkillNamesFromDirectory(projectSkillsRoot)) {
+        if (!seenSkillNames.has(skillName)) {
+          seenSkillNames.add(skillName);
+          skillNames.push(skillName);
+        }
+      }
+    }
+    if (currentDirectory === stopDirectory) {
+      break;
+    }
+    currentDirectory = path.dirname(currentDirectory);
+  }
+
+  return skillNames;
+}
+
+function isClaudeCodeWorkspacePath(currentDirectory, stopDirectory) {
+  const relativePath = path.relative(stopDirectory, currentDirectory);
+  return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
+}
+
+function readClaudeCodeSkillNamesFromDirectory(skillsRoot) {
+  if (!fs.existsSync(skillsRoot)) {
+    return [];
+  }
+  const stat = fs.statSync(skillsRoot);
+  if (!stat.isDirectory()) {
+    throw new Error("Claude Code project skills path is not a directory: " + skillsRoot);
+  }
+
+  const skillNames = [];
+  for (const entry of fs.readdirSync(skillsRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const skillFilePath = path.join(skillsRoot, entry.name, claudeCodeSkillFileName);
+    if (!fs.existsSync(skillFilePath)) {
+      continue;
+    }
+    skillNames.push(readClaudeCodeSkillName(skillFilePath));
+  }
+  return skillNames;
+}
+
+function readClaudeCodeSkillName(skillFilePath) {
+  const content = fs.readFileSync(skillFilePath, "utf8");
+  const frontmatter = readClaudeCodeSkillFrontmatter(skillFilePath, content);
+  for (const line of frontmatter.split(/\r?\n/)) {
+    const match = line.match(/^name:\s*(.+)\s*$/);
+    if (match === null) {
+      continue;
+    }
+    const skillName = match[1].trim().replace(/^["']|["']$/g, "");
+    if (skillName.length === 0) {
+      throw new Error("Claude Code project skill has an empty name: " + skillFilePath);
+    }
+    return skillName;
+  }
+  throw new Error("Claude Code project skill is missing a name: " + skillFilePath);
+}
+
+function readClaudeCodeSkillFrontmatter(skillFilePath, content) {
+  if (!content.startsWith("---")) {
+    throw new Error("Claude Code project skill is missing frontmatter: " + skillFilePath);
+  }
+  const frontmatterEnd = content.indexOf("\n---", 3);
+  if (frontmatterEnd < 0) {
+    throw new Error("Claude Code project skill has unterminated frontmatter: " + skillFilePath);
+  }
+  return content.slice(3, frontmatterEnd);
 }
 
 function createSession(input) {
@@ -625,11 +727,12 @@ function createClaudeQueryOptions(input) {
     input.session.kind === "new"
       ? { sessionId: input.session.sessionId }
       : { resume: input.session.sessionId };
+  const skillAllowlist = resolveClaudeCodeSkillAllowlist(input.cwd);
   const skillOptions =
-    selectedClaudeCodeSkills.length === 0
+    skillAllowlist.length === 0
       ? {}
       : {
-          skills: selectedClaudeCodeSkills,
+          skills: skillAllowlist,
         };
   return {
     ...(input.cwd === undefined || input.cwd === null
