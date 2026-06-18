@@ -1,33 +1,39 @@
+import type {
+  AgentStreamClient,
+  CodexJsonRpcClient,
+} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import {
   getSandboxDeliveryDisposition,
   SandboxDeliveryDispositions,
   SandboxInstanceStatuses,
 } from "@mistle/sandbox-lifecycle";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 
 import { readHttpErrorStatus } from "../api/http-api-error.js";
 import {
   bootstrapDesignerRuntimeConversation,
+  createDesignerRuntimeConnectionToken,
   designerRuntimeConversationBootstrapQueryKey,
   designerRuntimeConversationTranscriptQueryKey,
   designerSessionsQueryKey,
   getDesignerRuntimeConversationTranscript,
   getDesignerSession,
   submitDesignerActionProposalResponse,
-  submitDesignerRuntimeFollowUp,
   submitDesignerUserInputRequestResponse,
   type DesignerActionProposalResponse,
   type DesignerRuntimeConversationTranscript,
   type DesignerSession,
 } from "../designer/designer-service.js";
+import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { applyPatchedSessionTitleToCache } from "../sessions/session-header-title-model.js";
 import {
   patchSandboxInstanceTitle,
   type PatchSandboxInstanceTitleResult,
 } from "../sessions/sessions-service.js";
 import { DesignerSessionPageView } from "./designer-session-page-view.js";
+import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
 
 const DesignerSessionRuntimeBootstrapPollIntervalMs = 2_000;
 const DesignerSessionRuntimeBootstrapMaxRetries = 5;
@@ -197,13 +203,13 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
   const sessionId = input.sessionId;
   const queryClient = useQueryClient();
   const [followUpDraft, setFollowUpDraft] = useState("");
-  const [followUpSubmissionIdempotencyKey, setFollowUpSubmissionIdempotencyKey] = useState<
-    string | null
-  >(null);
   const [
     latestRuntimeSubmissionProviderExecutionId,
     setLatestRuntimeSubmissionProviderExecutionId,
   ] = useState<string | null>(null);
+  const sessionClientRef = useRef<AgentStreamClient | null>(null);
+  const rpcClientRef = useRef<CodexJsonRpcClient | null>(null);
+  const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
 
   const designerSessionQuery = useQuery({
     queryKey: [...designerSessionsQueryKey, sessionId],
@@ -214,6 +220,26 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
         : false,
   });
   const session = designerSessionQuery.data ?? null;
+  const mintDesignerConnectionToken = useCallback(
+    async () =>
+      await createDesignerRuntimeConnectionToken({
+        sessionId,
+      }),
+    [sessionId],
+  );
+  const transportManager = useSessionWorkbenchTransport({
+    mintConnectionToken: mintDesignerConnectionToken,
+    sandboxInstanceId: session?.sandboxInstanceId ?? null,
+  });
+  const codexSessionState = useCodexSessionState({
+    ensureTransportConnected: transportManager.ensureTransportConnected,
+    sessionClientRef,
+    rpcClientRef,
+    sessionEventUnsubscribersRef,
+  });
+  const codexLifecycle = codexSessionState.lifecycle;
+  const codexChat = codexSessionState.chat;
+  const codexSessionMessage = codexSessionState.sessionMessage;
   const bootstrapIsEnabled = canBootstrapRuntimeConversation(session);
   const runtimeConversationBootstrapQuery = useQuery({
     queryKey: [...designerRuntimeConversationBootstrapQueryKey, sessionId],
@@ -240,30 +266,42 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
     retryDelay: DesignerSessionRuntimeBootstrapPollIntervalMs,
     staleTime: Number.POSITIVE_INFINITY,
   });
-  const submitFollowUpMutation = useMutation({
-    mutationFn: async (input: { sessionId: string; prompt: string; idempotencyKey: string }) =>
-      submitDesignerRuntimeFollowUp({
-        sessionId: input.sessionId,
-        prompt: input.prompt,
-        idempotencyKey: input.idempotencyKey,
-      }),
-    onSuccess: (submission, variables) => {
-      if (variables.sessionId !== sessionId) {
-        return;
-      }
+  const runtimeConversationBootstrap = runtimeConversationBootstrapQuery.data ?? null;
+  const codexSessionSnapshot = codexLifecycle.sessionSnapshot;
+  const connectedDesignerThreadId = codexSessionSnapshot?.activeThreadId ?? null;
 
-      setLatestRuntimeSubmissionProviderExecutionId(submission.providerExecutionId);
-      void invalidateDesignerSessionQuery({
-        queryClient,
-        sessionId: variables.sessionId,
-      });
-      void queryClient.invalidateQueries({
-        queryKey: [...designerRuntimeConversationTranscriptQueryKey, variables.sessionId],
-      });
-      setFollowUpDraft("");
-      setFollowUpSubmissionIdempotencyKey(null);
-    },
-  });
+  useEffect(() => {
+    if (session === null || runtimeConversationBootstrap === null) {
+      return;
+    }
+
+    const providerConversationId = runtimeConversationBootstrap.providerConversationId;
+    const sessionSnapshot = codexSessionSnapshot;
+    if (
+      sessionSnapshot !== null &&
+      sessionSnapshot.sandboxInstanceId === session.sandboxInstanceId &&
+      sessionSnapshot.activeThreadId === providerConversationId
+    ) {
+      return;
+    }
+
+    codexLifecycle.connectSession({
+      sandboxInstanceId: session.sandboxInstanceId,
+      targetThreadId: providerConversationId,
+      providerThreadId: providerConversationId,
+    });
+  }, [codexLifecycle.connectSession, codexSessionSnapshot, runtimeConversationBootstrap, session]);
+
+  useEffect(() => {
+    if (
+      runtimeConversationBootstrap === null ||
+      connectedDesignerThreadId !== runtimeConversationBootstrap.providerConversationId
+    ) {
+      return;
+    }
+
+    void codexChat.hydrateChatFromThread();
+  }, [codexChat.hydrateChatFromThread, connectedDesignerThreadId, runtimeConversationBootstrap]);
   const submitActionProposalResponseMutation = useMutation({
     mutationFn: async (input: {
       sessionId: string;
@@ -292,6 +330,7 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
       void queryClient.invalidateQueries({
         queryKey: [...designerRuntimeConversationTranscriptQueryKey, variables.sessionId],
       });
+      void codexChat.hydrateChatFromThread();
     },
   });
   const submitUserInputRequestResponseMutation = useMutation({
@@ -313,6 +352,7 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
       void queryClient.invalidateQueries({
         queryKey: [...designerRuntimeConversationTranscriptQueryKey, variables.sessionId],
       });
+      void codexChat.hydrateChatFromThread();
     },
   });
   const patchTitleMutation = useMutation({
@@ -369,7 +409,8 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
         (runtimeConversationBootstrapQuery.isPending ||
           runtimeConversationBootstrapQuery.isFetching)
       }
-      runtimeConversationBootstrap={runtimeConversationBootstrapQuery.data ?? null}
+      chatState={codexChat.chatState}
+      runtimeConversationBootstrap={runtimeConversationBootstrap}
       runtimeConversationTranscript={runtimeConversationTranscriptQuery.data ?? null}
       transcriptErrorMessage={runtimeConversationTranscriptQuery.error?.message ?? null}
       transcriptIsPending={
@@ -378,13 +419,13 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
           runtimeConversationTranscriptQuery.isFetching)
       }
       followUpDraft={followUpDraft}
-      followUpErrorMessage={submitFollowUpMutation.error?.message ?? null}
-      followUpIsPending={submitFollowUpMutation.isPending}
-      followUpSuccessMessage={
-        submitFollowUpMutation.data === undefined
-          ? null
-          : `Follow-up submitted at ${submitFollowUpMutation.data.submittedAt}.`
+      followUpErrorMessage={codexSessionMessage.sessionErrorMessage}
+      followUpIsPending={
+        codexChat.isStartingTurn ||
+        codexChat.isSteeringTurn ||
+        codexChat.chatState.status === "inProgress"
       }
+      followUpSuccessMessage={null}
       actionProposalResponseErrorMessage={
         submitActionProposalResponseMutation.error?.message ?? null
       }
@@ -395,32 +436,32 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
       errorMessage={designerSessionQuery.error?.message ?? null}
       onFollowUpDraftChange={(draft) => {
         setFollowUpDraft(draft);
-        setFollowUpSubmissionIdempotencyKey(null);
-        if (
-          !submitFollowUpMutation.isPending &&
-          (submitFollowUpMutation.data !== undefined || submitFollowUpMutation.error !== null)
-        ) {
-          submitFollowUpMutation.reset();
-        }
+        codexSessionMessage.clearSessionErrorMessage();
       }}
       onFollowUpSubmit={() => {
-        if (
-          runtimeConversationBootstrapQuery.data === undefined ||
-          trimmedFollowUpDraft.length === 0
-        ) {
+        if (runtimeConversationBootstrap === null || trimmedFollowUpDraft.length === 0) {
           return;
         }
 
-        const idempotencyKey = followUpSubmissionIdempotencyKey ?? crypto.randomUUID();
-        setFollowUpSubmissionIdempotencyKey(idempotencyKey);
         if (!submitActionProposalResponseMutation.isPending) {
           submitActionProposalResponseMutation.reset();
         }
-        submitFollowUpMutation.mutate({
-          sessionId,
-          prompt: trimmedFollowUpDraft,
-          idempotencyKey,
-        });
+        void codexChat
+          .startTurn({
+            submittedPrompt: trimmedFollowUpDraft,
+            resolveSkillMentions: false,
+          })
+          .then(() => {
+            setFollowUpDraft("");
+            void queryClient.invalidateQueries({
+              queryKey: [...designerRuntimeConversationTranscriptQueryKey, sessionId],
+            });
+          })
+          .catch((error: unknown) => {
+            codexSessionMessage.reportSessionErrorMessage(
+              error instanceof Error ? error.message : "Could not submit Designer follow-up.",
+            );
+          });
       }}
       onActionProposalResponseSubmit={(proposalId, response) => {
         if (
@@ -430,9 +471,6 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
           return;
         }
 
-        if (!submitFollowUpMutation.isPending) {
-          submitFollowUpMutation.reset();
-        }
         submitActionProposalResponseMutation.mutate({
           sessionId,
           proposalId,
@@ -458,9 +496,6 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
           return;
         }
 
-        if (!submitFollowUpMutation.isPending) {
-          submitFollowUpMutation.reset();
-        }
         if (!submitActionProposalResponseMutation.isPending) {
           submitActionProposalResponseMutation.reset();
         }

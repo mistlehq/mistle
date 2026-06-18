@@ -14,6 +14,7 @@ import {
   IntegrationConnectionStatuses,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import { SandboxInstancePurposes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import { SandboxProvider } from "@mistle/sandbox";
@@ -253,6 +254,69 @@ describe.concurrent("designer sessions integration", () => {
     expect(updateFromOtherOrgResponse.status).toBe(404);
   });
 
+  it("authorizes Designer runtime connection token requests only for the owning organization", async ({
+    env,
+  }) => {
+    const firstOrgSession = await env.auth.createSession({
+      email: "integration-new-designer-connection-token-org-a@example.com",
+    });
+    const secondOrgSession = await env.auth.createSession({
+      email: "integration-new-designer-connection-token-org-b@example.com",
+    });
+    const designerSessionId = "dsn_designer_connection_token";
+    const sandboxInstanceId = "sbi_designer_connection_token";
+
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
+      id: sandboxInstanceId,
+      organizationId: firstOrgSession.organizationId,
+      sandboxProfileId: "sbp_designer_connection_token",
+      title: "Designer connection token",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId: "provider_designer_connection_token",
+      status: SandboxInstanceStatuses.RUNNING,
+      startedByKind: "user",
+      startedById: firstOrgSession.userId,
+      source: "dashboard",
+      purpose: SandboxInstancePurposes.DESIGNER,
+      failureCode: null,
+      failureMessage: null,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: designerSessionId,
+      organizationId: firstOrgSession.organizationId,
+      sandboxInstanceId,
+      initialPrompt: "Build a triaging agent.",
+      canvasTabs: [],
+    });
+
+    const mintResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/designer/sessions/${encodeURIComponent(designerSessionId)}/connection-tokens`,
+      {
+        method: "POST",
+        headers: {
+          cookie: firstOrgSession.cookie,
+        },
+      },
+    );
+    expect(mintResponse.status).toBe(409);
+    expect(await mintResponse.json()).toMatchObject({
+      code: "INSTANCE_FAILED",
+      message: expect.stringContaining(sandboxInstanceId),
+    });
+
+    const otherOrgResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/designer/sessions/${encodeURIComponent(designerSessionId)}/connection-tokens`,
+      {
+        method: "POST",
+        headers: {
+          cookie: secondOrgSession.cookie,
+        },
+      },
+    );
+    expect(otherOrgResponse.status).toBe(404);
+  });
+
   it("rejects API key actors on Designer routes", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-designer-session-api-key@example.com",
@@ -358,6 +422,17 @@ describe.concurrent("designer sessions integration", () => {
       },
     );
     expect(rejectedBootstrapResponse.status).toBe(403);
+
+    const rejectedConnectionTokenResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/designer/sessions/${encodeURIComponent(created.id)}/connection-tokens`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKeySecret.token}`,
+        },
+      },
+    );
+    expect(rejectedConnectionTokenResponse.status).toBe(403);
 
     const rejectedFollowUpResponse = await env.controlPlaneApi.http.fetch(
       `/v1/designer/sessions/${encodeURIComponent(created.id)}/runtime-conversation/follow-ups`,

@@ -275,6 +275,7 @@ function renderDesignerSessionPageView(input?: {
     <DesignerSessionPageView
       bootstrapErrorMessage={input?.bootstrapErrorMessage ?? null}
       bootstrapIsPending={input?.bootstrapIsPending ?? false}
+      chatState={null}
       actionProposalResponseErrorMessage={input?.actionProposalResponseErrorMessage ?? null}
       actionProposalResponsePendingId={input?.actionProposalResponsePendingId ?? null}
       submittedActionProposalResponseId={input?.submittedActionProposalResponseId ?? null}
@@ -312,6 +313,7 @@ function DesignerSessionPageViewActionResponseHarness(): React.JSX.Element {
   return (
     <>
       <DesignerSessionPageView
+        chatState={null}
         actionProposalResponseErrorMessage={null}
         actionProposalResponsePendingId={null}
         submittedActionProposalResponseId={null}
@@ -353,6 +355,7 @@ function DesignerSessionPageViewUserInputResponseHarness(): React.JSX.Element {
   return (
     <>
       <DesignerSessionPageView
+        chatState={null}
         actionProposalResponseErrorMessage={null}
         actionProposalResponsePendingId={null}
         submittedActionProposalResponseId={null}
@@ -426,6 +429,7 @@ function DesignerSessionPageViewTitleHarness(): React.JSX.Element {
   return (
     <>
       <DesignerSessionPageView
+        chatState={null}
         actionProposalResponseErrorMessage={null}
         actionProposalResponsePendingId={null}
         submittedActionProposalResponseId={null}

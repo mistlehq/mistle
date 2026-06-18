@@ -1,4 +1,4 @@
-import { SidebarTrigger, useSidebar } from "@mistle/ui";
+import { Button, SidebarTrigger, useSidebar } from "@mistle/ui";
 
 import "dockview/dist/styles/dockview.css";
 import "./session-terminal-workspace.css";
@@ -21,11 +21,17 @@ import type {
   DesignerRuntimeConversationTranscript,
   DesignerSession,
 } from "../designer/designer-service.js";
+import type { UseCodexSessionStateResult } from "../session-agents/codex/session-state/index.js";
 import { hydrateCodexChatEntriesFromThreadReadTurns } from "../session-agents/codex/session-state/index.js";
+import {
+  AboveComposerActionDetailList,
+  AboveComposerActionPanel,
+  AboveComposerActionPanelStack,
+  type AboveComposerActionDetail,
+} from "../shared/above-composer-action-panel.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { ConversationWorkspaceHeader } from "../shared/conversation-workspace-frame.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
-import { formatDesignerActionRequestOperationResult } from "./designer-action-proposal-response-copy.js";
 import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
@@ -46,6 +52,7 @@ type DesignerCanvasDockviewParams = {
 type DesignerCanvasDockviewPanelProps = IDockviewPanelProps<DesignerCanvasDockviewParams>;
 
 type DesignerRuntimeConversationPanelInput = {
+  chatState: UseCodexSessionStateResult["chat"]["chatState"] | null;
   followUpDraft: string;
   followUpErrorMessage: string | null;
   followUpIsPending: boolean;
@@ -80,6 +87,7 @@ export type DesignerSessionPageViewProps = {
   actionProposalResponsePendingId: string | null;
   bootstrapErrorMessage: string | null;
   bootstrapIsPending: boolean;
+  chatState: UseCodexSessionStateResult["chat"]["chatState"] | null;
   errorMessage: string | null;
   followUpDraft: string;
   followUpErrorMessage: string | null;
@@ -118,6 +126,7 @@ function buildDesignerRuntimeConversationPanels(
     input.followUpDraft.trim().length > 0 &&
     !input.followUpIsPending;
   const chatEntries = resolveDesignerChatEntries({
+    chatState: input.chatState,
     initialPrompt,
     runtimeConversationBootstrap: input.runtimeConversationBootstrap,
     runtimeConversationTranscript: input.runtimeConversationTranscript,
@@ -149,14 +158,18 @@ function buildDesignerRuntimeConversationPanels(
     mainContent: (
       <div className="mr-2 px-4 py-4">
         <SessionConversationMainContent
-          activeTurnId={null}
+          activeTurnId={input.chatState?.activeTurnId ?? null}
           autoScrollToBottomOnInitialLoad
           chatEntries={chatEntries}
           formatInitialUserMessageAsTriggerInput
           isRespondingToServerRequest={input.userInputRequestResponseIsPending}
-          isTurnInProgress={input.followUpIsPending || input.transcriptIsPending}
+          isTurnInProgress={
+            input.chatState?.status === "inProgress" ||
+            input.followUpIsPending ||
+            input.transcriptIsPending
+          }
           onRespondToServerRequest={input.onUserInputRequestResponseSubmit}
-          pendingTurnId={null}
+          pendingTurnId={input.chatState?.pendingTurnId ?? null}
           scrollBehavior="follow-streaming-at-bottom"
           serverRequestPanelEntries={serverRequestPanelEntries}
         />
@@ -269,10 +282,15 @@ function DesignerSessionStartupPanel(input: {
 }
 
 function resolveDesignerChatEntries(input: {
+  chatState: UseCodexSessionStateResult["chat"]["chatState"] | null;
   initialPrompt: string;
   runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
   runtimeConversationTranscript: DesignerRuntimeConversationTranscript | null;
 }): readonly ChatEntry[] {
+  if (input.chatState !== null && input.chatState.entries.length > 0) {
+    return input.chatState.entries;
+  }
+
   const transcriptEntries =
     input.runtimeConversationTranscript === null
       ? []
@@ -348,45 +366,25 @@ function DesignerActionProposals(input: {
   }
 
   return (
-    <div className="mb-4 max-h-72 space-y-2 overflow-y-auto px-1 pr-2">
+    <AboveComposerActionPanelStack>
       {visibleProposals.map((proposal) => {
         const reviewRows = getDesignerActionProposalReviewRows(proposal.operation);
 
         return (
-          <article className="rounded-xl border bg-background p-4 shadow-sm" key={proposal.id}>
-            <div>
-              <div className="min-w-0">
-                <p className="font-medium text-base">{proposal.title}</p>
-                <p className="mt-1 text-base leading-7 text-muted-foreground">{proposal.summary}</p>
-              </div>
-            </div>
-            {reviewRows.length === 0 ? null : (
-              <dl className="mt-4 grid gap-3 text-sm">
-                {reviewRows.map((detail, detailIndex) => (
-                  <div key={`${proposal.id}:${String(detailIndex)}:${detail.label}`}>
-                    <dt className="text-muted-foreground">{detail.label}</dt>
-                    <dd className="mt-0.5 whitespace-pre-wrap">{detail.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-            {proposal.actionRequest === null ? null : (
-              <DesignerActionProposalDurableState actionRequest={proposal.actionRequest} />
-            )}
-            {proposal.status === "pending" ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
+          <AboveComposerActionPanel
+            actions={
+              <>
+                <Button
                   disabled={input.pendingProposalId !== null}
                   onClick={() => {
                     input.onSubmitResponse(proposal.id, "declined");
                   }}
                   type="button"
+                  variant="outline"
                 >
                   {input.pendingProposalId === proposal.id ? "Submitting" : "Decline"}
-                </button>
-                <button
-                  className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                </Button>
+                <Button
                   disabled={input.pendingProposalId !== null}
                   onClick={() => {
                     input.onSubmitResponse(proposal.id, "approved");
@@ -394,58 +392,28 @@ function DesignerActionProposals(input: {
                   type="button"
                 >
                   {input.pendingProposalId === proposal.id ? "Submitting" : "Approve"}
-                </button>
+                </Button>
+              </>
+            }
+            details={
+              <div className="space-y-4">
+                <p className="text-base leading-7 text-muted-foreground">{proposal.summary}</p>
+                <AboveComposerActionDetailList details={reviewRows} />
               </div>
-            ) : null}
-          </article>
+            }
+            key={proposal.id}
+            title={proposal.title}
+          />
         );
       })}
       <ErrorNotice message={input.errorMessage} />
-    </div>
-  );
-}
-
-function DesignerActionProposalDurableState(input: {
-  actionRequest: NonNullable<DesignerActionProposal["actionRequest"]>;
-}): React.JSX.Element {
-  const resultLabel = formatDesignerActionRequestOperationResult(
-    input.actionRequest.operationResult,
-  );
-
-  return (
-    <div className="mt-3 rounded-md border bg-background/70 p-3">
-      <p className="text-xs font-medium text-muted-foreground">Action request</p>
-      <dl className="mt-2 grid gap-2 text-xs">
-        <div>
-          <dt className="text-muted-foreground">Request</dt>
-          <dd className="mt-0.5 break-all font-mono">{input.actionRequest.id}</dd>
-        </div>
-        {resultLabel === null ? null : (
-          <div>
-            <dt className="text-muted-foreground">Result</dt>
-            <dd className="mt-0.5">{resultLabel}</dd>
-          </div>
-        )}
-        {input.actionRequest.failureCode === null ? null : (
-          <div>
-            <dt className="text-muted-foreground">Failure code</dt>
-            <dd className="mt-0.5 break-all font-mono">{input.actionRequest.failureCode}</dd>
-          </div>
-        )}
-        {input.actionRequest.failureMessage === null ? null : (
-          <div>
-            <dt className="text-muted-foreground">Failure</dt>
-            <dd className="mt-0.5">{input.actionRequest.failureMessage}</dd>
-          </div>
-        )}
-      </dl>
-    </div>
+    </AboveComposerActionPanelStack>
   );
 }
 
 function getDesignerActionProposalReviewRows(
   operation: DesignerActionProposal["operation"],
-): { label: string; value: string }[] {
+): AboveComposerActionDetail[] {
   switch (operation.kind) {
     case "providerConfigurationChange":
       return operation.details.map((detail) => ({
@@ -582,6 +550,7 @@ export function DesignerSessionPageView(input: DesignerSessionPageViewProps): Re
       ? buildDesignerRuntimeConversationPanels({
           actionProposalResponseErrorMessage: input.actionProposalResponseErrorMessage,
           actionProposalResponsePendingId: input.actionProposalResponsePendingId,
+          chatState: input.chatState,
           followUpDraft: input.followUpDraft,
           followUpErrorMessage: input.followUpErrorMessage,
           followUpIsPending: input.followUpIsPending,

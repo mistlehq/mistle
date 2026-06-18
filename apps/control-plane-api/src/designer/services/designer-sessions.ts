@@ -966,6 +966,39 @@ async function mintDesignerRuntimeConnectionToken(
   );
 }
 
+export async function createDesignerRuntimeConnectionToken(
+  ctx: DesignerRuntimeConversationContext,
+  input: {
+    organizationId: string;
+    sessionId: string;
+    actingUserId: string;
+  },
+) {
+  const designerSession = await ctx.db.query.designerSessions.findFirst({
+    columns: {
+      sandboxInstanceId: true,
+    },
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.id, input.sessionId),
+        whereEq(table.organizationId, input.organizationId),
+      ),
+  });
+
+  if (designerSession === undefined) {
+    throw new DesignerNotFoundError(
+      DesignerNotFoundCodes.DESIGNER_SESSION_NOT_FOUND,
+      `Designer session '${input.sessionId}' was not found.`,
+    );
+  }
+
+  return mintDesignerRuntimeConnectionToken(ctx, {
+    organizationId: input.organizationId,
+    sandboxInstanceId: designerSession.sandboxInstanceId,
+    actingUserId: input.actingUserId,
+  });
+}
+
 export async function bootstrapDesignerRuntimeConversation(
   ctx: DesignerRuntimeConversationContext,
   input: {

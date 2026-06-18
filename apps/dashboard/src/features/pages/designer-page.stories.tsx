@@ -500,6 +500,7 @@ function DesignerActionProposalStory(input: {
   return (
     <DesignerWorkspaceStoryFrame initialEntries={[`/designer/${StoryDesignerSpecificSession.id}`]}>
       <DesignerSessionPageView
+        chatState={null}
         actionProposalResponseErrorMessage={input.errorMessage ?? null}
         actionProposalResponsePendingId={input.pendingProposalId ?? null}
         submittedActionProposalResponseId={input.submittedProposalId ?? null}
@@ -609,6 +610,7 @@ export const Workspace: Story = {
     return (
       <DesignerWorkspaceStoryFrame initialEntries={["/designer/dsn_triage_agent_story"]}>
         <DesignerSessionPageView
+          chatState={null}
           actionProposalResponseErrorMessage={null}
           actionProposalResponsePendingId={null}
           submittedActionProposalResponseId={null}
@@ -650,6 +652,7 @@ export const WorkspaceDesignerSpecificUi: Story = {
     return (
       <DesignerWorkspaceStoryFrame initialEntries={["/designer/dsn_designer_specific_ui"]}>
         <DesignerSessionPageView
+          chatState={null}
           actionProposalResponseErrorMessage={null}
           actionProposalResponsePendingId={null}
           submittedActionProposalResponseId={null}
@@ -691,6 +694,7 @@ export const WorkspaceEmptyCanvas: Story = {
     return (
       <DesignerWorkspaceStoryFrame initialEntries={["/designer/dsn_designer_empty_canvas"]}>
         <DesignerSessionPageView
+          chatState={null}
           actionProposalResponseErrorMessage={null}
           actionProposalResponsePendingId={null}
           submittedActionProposalResponseId={null}

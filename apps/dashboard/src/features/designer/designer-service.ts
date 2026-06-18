@@ -51,6 +51,15 @@ const DesignerSessionSchema = z
   })
   .strict();
 
+const SandboxInstanceConnectionTokenSchema = z
+  .object({
+    instanceId: z.string().min(1),
+    url: z.url(),
+    token: z.string().min(1),
+    expiresAt: z.string().min(1),
+  })
+  .strict();
+
 const ListDesignerSessionsResponseSchema = z
   .object({
     items: z.array(DesignerSessionSchema),
@@ -318,6 +327,12 @@ export type DesignerSession = z.output<typeof DesignerSessionSchema>;
 export type DesignerRuntimeConversationBootstrap = z.output<
   typeof BootstrapDesignerRuntimeConversationResponseSchema
 >["runtimeConversation"];
+export type DesignerRuntimeConnectionToken = {
+  instanceId: string;
+  connectionUrl: string;
+  connectionToken: string;
+  connectionExpiresAt: string;
+};
 export type DesignerRuntimeFollowUpSubmission = z.output<
   typeof SubmitDesignerRuntimeFollowUpResponseSchema
 >["runtimeFollowUp"];
@@ -488,6 +503,47 @@ export async function bootstrapDesignerRuntimeConversation(input: {
         operation: "bootstrapDesignerRuntimeConversation",
         error,
         fallbackMessage: "Could not prepare Designer runtime conversation.",
+      }),
+    );
+  }
+}
+
+export async function createDesignerRuntimeConnectionToken(input: {
+  sessionId: string;
+  signal?: AbortSignal;
+}): Promise<DesignerRuntimeConnectionToken> {
+  try {
+    const response = await requestControlPlane({
+      operation: "createDesignerRuntimeConnectionToken",
+      method: "POST",
+      pathname: `/v1/designer/sessions/${encodeURIComponent(input.sessionId)}/connection-tokens`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not establish Designer runtime connection.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxInstanceConnectionTokenSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new DesignerApiError({
+        operation: "createDesignerRuntimeConnectionToken",
+        status: 500,
+        body: responseBody,
+        message: "Designer runtime connection token response payload is invalid.",
+      });
+    }
+
+    return {
+      instanceId: parsedResponse.data.instanceId,
+      connectionUrl: parsedResponse.data.url,
+      connectionToken: parsedResponse.data.token,
+      connectionExpiresAt: parsedResponse.data.expiresAt,
+    };
+  } catch (error) {
+    throw new DesignerApiError(
+      normalizeHttpApiError({
+        operation: "createDesignerRuntimeConnectionToken",
+        error,
+        fallbackMessage: "Could not establish Designer runtime connection.",
       }),
     );
   }
