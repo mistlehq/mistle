@@ -238,7 +238,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -330,7 +330,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -415,7 +415,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -576,7 +576,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -663,7 +663,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -749,7 +749,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -977,7 +977,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -1089,7 +1089,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -1209,7 +1209,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@2b7a836cbb2b48f4780ae76a7b6fd79d545fb54a # v1.3.0
+        uses: useblacksmith/stickydisk@4c034ba57b706cf0e3b4b0ce098c2a3b1071580c # v1.4.0
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
