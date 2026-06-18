@@ -15,12 +15,13 @@ export type DesignerActionRequestResponse =
 
 export const DesignerActionRequestOperationKinds = {
   PROVIDER_CONFIGURATION_CHANGE: "providerConfigurationChange",
+  SANDBOX_PROFILE_DRAFT_SETUP_SCRIPT_PUT: "sandboxProfileDraftSetupScriptPut",
 } as const;
 
 export type DesignerActionRequestOperationKind =
   (typeof DesignerActionRequestOperationKinds)[keyof typeof DesignerActionRequestOperationKinds];
 
-export type DesignerActionRequestOperation = {
+export type DesignerProviderConfigurationChangeOperation = {
   kind: typeof DesignerActionRequestOperationKinds.PROVIDER_CONFIGURATION_CHANGE;
   provider: string;
   resourceType: string;
@@ -31,6 +32,17 @@ export type DesignerActionRequestOperation = {
     value: string;
   }[];
 };
+
+export type DesignerSandboxProfileDraftSetupScriptPutOperation = {
+  kind: typeof DesignerActionRequestOperationKinds.SANDBOX_PROFILE_DRAFT_SETUP_SCRIPT_PUT;
+  profileId: string;
+  version: number;
+  setupScript: string | null;
+};
+
+export type DesignerActionRequestOperation =
+  | DesignerProviderConfigurationChangeOperation
+  | DesignerSandboxProfileDraftSetupScriptPutOperation;
 
 export const DesignerActionRequestStatuses = {
   APPROVED: "approved",

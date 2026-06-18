@@ -90,6 +90,25 @@ const RuntimeConversationTranscriptWithActionProposal = {
   ],
 } satisfies DesignerRuntimeConversationTranscript;
 
+const RuntimeConversationTranscriptWithSetupScriptActionProposal = {
+  ...RuntimeConversationTranscript,
+  actionProposals: [
+    {
+      id: "dap_profile_setup_script",
+      kind: "designerActionProposal",
+      title: "Update setup script",
+      summary: "Update the draft setup script for the selected sandbox profile.",
+      status: "pending",
+      operation: {
+        kind: "sandboxProfileDraftSetupScriptPut",
+        profileId: "sbp_designer_setup_script",
+        version: 2,
+        setupScript: "pnpm install\npnpm build",
+      },
+    },
+  ],
+} satisfies DesignerRuntimeConversationTranscript;
+
 function renderDesignerSessionPageView(input?: {
   bootstrapErrorMessage?: string | null;
   bootstrapIsPending?: boolean;
@@ -228,6 +247,21 @@ describe("DesignerSessionPageView", () => {
     expect(screen.getByText("pull_request, pull_request_review")).toBeDefined();
     expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Decline" })).toBeDefined();
+  });
+
+  it("renders typed Designer setup script action proposals", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      runtimeConversationTranscript: RuntimeConversationTranscriptWithSetupScriptActionProposal,
+    });
+
+    expect(screen.getByText("Update setup script")).toBeDefined();
+    expect(screen.getByText("Update sandbox profile draft setup script")).toBeDefined();
+    expect(screen.getByText("sbp_designer_setup_script version 2")).toBeDefined();
+    expect(
+      screen.getByText((_, element) => element?.textContent === "pnpm install\npnpm build"),
+    ).toBeDefined();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
   });
 
   it("submits Designer action proposal responses with the selected proposal decision", () => {

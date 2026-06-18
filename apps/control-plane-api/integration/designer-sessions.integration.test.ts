@@ -2,8 +2,15 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
-import { ApiKeyActorKinds, DesignerActionRequestStatuses } from "@mistle/db/control-plane";
+import {
+  ApiKeyActorKinds,
+  DesignerActionRequestStatuses,
+  SandboxProfileVersionStates,
+} from "@mistle/db/control-plane";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
+import { SandboxProvider } from "@mistle/sandbox";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
+import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { generateApiKeySecret } from "../src/api-keys/services/api-key-secret.js";
@@ -21,10 +28,19 @@ import {
 } from "../src/designer/services/designer-action-requests.js";
 import { completeApprovedDesignerActionRequestExecution } from "../src/designer/services/designer-sessions.js";
 import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
+import { sandboxProfileRow, sandboxProfileVersionRow } from "./helpers/sandbox-profiles.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
 });
+
+const DesignerOperationSandboxConfig = {
+  defaultBaseImage: "docker.io/mistle/designer-test:latest",
+  gatewayWsUrl: "ws://127.0.0.1:8080",
+  docker: {
+    enabled: true,
+  },
+};
 
 describe.concurrent("designer sessions integration", () => {
   it("creates, lists, reads, and updates a Designer session in the authenticated organization", async ({
@@ -567,10 +583,10 @@ describe.concurrent("designer sessions integration", () => {
     const completedResponse = await completeApprovedDesignerActionRequestExecution({
       ctx: {
         db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+        sandboxConfig: DesignerOperationSandboxConfig,
       },
       organizationId: session.organizationId,
-      sessionId: designerSessionId,
-      proposalId,
       actionRequest: submitted,
       response: {
         actionProposalResponse: {
@@ -612,6 +628,251 @@ describe.concurrent("designer sessions integration", () => {
       status: DesignerActionRequestStatuses.EXECUTION_UNSUPPORTED,
       runtimeProviderExecutionId: "turn_action_request_response",
       responseSubmittedAt: "2026-06-18 01:03:04+00",
+    });
+  });
+
+  it("executes an approved typed Designer operation for a sandbox profile draft setup script", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-designer-profile-setup-script-operation@example.com",
+    });
+    const designerSessionId = "dsn_profile_setup_script_operation";
+    const proposalId = "dap_profile_setup_script_operation";
+    const profileId = "sbp_designer_setup_script_operation";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: profileId,
+        organizationId: session.organizationId,
+        displayName: "Designer Setup Script Operation",
+        createdAt: "2026-06-18T02:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: profileId,
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "pnpm install",
+        sandboxProvider: SandboxProvider.DOCKER,
+        sandboxConnectionId: null,
+        sandboxVcpuCount: null,
+        sandboxMemoryMb: null,
+        sandboxDiskMb: null,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: designerSessionId,
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_designer_profile_setup_script_operation",
+      initialPrompt: "Update the profile setup script.",
+      runtimeProviderConversationId: "thread_profile_setup_script_operation",
+      initialPromptProviderExecutionId: "turn_profile_setup_script_operation",
+      initialPromptSubmittedAt: "2026-06-18 02:01:00+00",
+      canvasTabs: [],
+    });
+
+    const operation = toDesignerActionRequestOperation({
+      kind: "sandboxProfileDraftSetupScriptPut",
+      profileId,
+      version: 2,
+      setupScript: "pnpm install\npnpm build",
+    });
+    const claimed = await claimDesignerActionRequest(
+      {
+        db: env.controlPlaneDb,
+      },
+      {
+        organizationId: session.organizationId,
+        sessionId: designerSessionId,
+        proposalId,
+        response: "approved",
+        responseIdempotencyKey: "designer-profile-setup-script-operation",
+        requestedByUserId: session.userId,
+        runtimeProviderConversationId: "thread_profile_setup_script_operation",
+        operation,
+      },
+    );
+    const submitted = await markDesignerActionRequestResponseSubmitted(
+      {
+        db: env.controlPlaneDb,
+      },
+      {
+        organizationId: session.organizationId,
+        actionRequestId: claimed.actionRequest.id,
+        runtimeProviderExecutionId: "turn_profile_setup_script_response",
+        responseSubmittedAt: "2026-06-18 02:02:00+00",
+      },
+    );
+
+    const completed = await completeApprovedDesignerActionRequestExecution({
+      ctx: {
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+        sandboxConfig: DesignerOperationSandboxConfig,
+      },
+      organizationId: session.organizationId,
+      actionRequest: submitted,
+      response: {
+        actionProposalResponse: {
+          proposalId,
+          response: "approved",
+          providerConversationId: "thread_profile_setup_script_operation",
+          providerExecutionId: "turn_profile_setup_script_response",
+          submittedAt: "2026-06-18 02:02:00+00",
+        },
+        actionRequest: {
+          id: submitted.id,
+          status: submitted.status,
+          failureCode: submitted.failureCode,
+          failureMessage: submitted.failureMessage,
+        },
+      },
+    });
+    expect(completed.actionRequest).toMatchObject({
+      id: submitted.id,
+      status: DesignerActionRequestStatuses.COMPLETED,
+      failureCode: null,
+      failureMessage: null,
+    });
+
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        setupScript: true,
+      },
+      where: (table, { and: whereAnd, eq: whereEq }) =>
+        whereAnd(whereEq(table.sandboxProfileId, profileId), whereEq(table.version, 2)),
+    });
+    expect(persistedVersion).toEqual({
+      setupScript: "pnpm install\npnpm build",
+    });
+  });
+
+  it("fails an approved Designer setup script operation when the approving user loses profile update access", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-designer-profile-setup-script-operation-forbidden@example.com",
+    });
+    const designerSessionId = "dsn_profile_setup_script_operation_forbidden";
+    const proposalId = "dap_profile_setup_script_operation_forbidden";
+    const profileId = "sbp_designer_setup_script_operation_forbidden";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: profileId,
+        organizationId: session.organizationId,
+        displayName: "Designer Forbidden Setup Script Operation",
+        createdAt: "2026-06-18T02:10:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: profileId,
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "pnpm unchanged",
+        sandboxProvider: SandboxProvider.DOCKER,
+        sandboxConnectionId: null,
+        sandboxVcpuCount: null,
+        sandboxMemoryMb: null,
+        sandboxDiskMb: null,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: designerSessionId,
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_designer_profile_setup_script_operation_forbidden",
+      initialPrompt: "Update the profile setup script.",
+      runtimeProviderConversationId: "thread_profile_setup_script_operation_forbidden",
+      initialPromptProviderExecutionId: "turn_profile_setup_script_operation_forbidden",
+      initialPromptSubmittedAt: "2026-06-18 02:11:00+00",
+      canvasTabs: [],
+    });
+
+    const operation = toDesignerActionRequestOperation({
+      kind: "sandboxProfileDraftSetupScriptPut",
+      profileId,
+      version: 1,
+      setupScript: "pnpm should-not-persist",
+    });
+    const claimed = await claimDesignerActionRequest(
+      {
+        db: env.controlPlaneDb,
+      },
+      {
+        organizationId: session.organizationId,
+        sessionId: designerSessionId,
+        proposalId,
+        response: "approved",
+        responseIdempotencyKey: "designer-profile-setup-script-operation-forbidden",
+        requestedByUserId: session.userId,
+        runtimeProviderConversationId: "thread_profile_setup_script_operation_forbidden",
+        operation,
+      },
+    );
+    const submitted = await markDesignerActionRequestResponseSubmitted(
+      {
+        db: env.controlPlaneDb,
+      },
+      {
+        organizationId: session.organizationId,
+        actionRequestId: claimed.actionRequest.id,
+        runtimeProviderExecutionId: "turn_profile_setup_script_response_forbidden",
+        responseSubmittedAt: "2026-06-18 02:12:00+00",
+      },
+    );
+
+    await env.controlPlaneDb
+      .delete(env.controlPlaneTables.members)
+      .where(
+        and(
+          eq(env.controlPlaneTables.members.organizationId, session.organizationId),
+          eq(env.controlPlaneTables.members.userId, session.userId),
+        ),
+      );
+
+    const completed = await completeApprovedDesignerActionRequestExecution({
+      ctx: {
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+        sandboxConfig: DesignerOperationSandboxConfig,
+      },
+      organizationId: session.organizationId,
+      actionRequest: submitted,
+      response: {
+        actionProposalResponse: {
+          proposalId,
+          response: "approved",
+          providerConversationId: "thread_profile_setup_script_operation_forbidden",
+          providerExecutionId: "turn_profile_setup_script_response_forbidden",
+          submittedAt: "2026-06-18 02:12:00+00",
+        },
+        actionRequest: {
+          id: submitted.id,
+          status: submitted.status,
+          failureCode: submitted.failureCode,
+          failureMessage: submitted.failureMessage,
+        },
+      },
+    });
+    expect(completed.actionRequest).toMatchObject({
+      id: submitted.id,
+      status: DesignerActionRequestStatuses.FAILED,
+      failureCode: "FORBIDDEN",
+      failureMessage: "Forbidden API request.",
+    });
+
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        setupScript: true,
+      },
+      where: (table, { and: whereAnd, eq: whereEq }) =>
+        whereAnd(whereEq(table.sandboxProfileId, profileId), whereEq(table.version, 1)),
+    });
+    expect(persistedVersion).toEqual({
+      setupScript: "pnpm unchanged",
     });
   });
 

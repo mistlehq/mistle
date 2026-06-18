@@ -1,4 +1,5 @@
 import {
+  DesignerActionRequestOperationKinds,
   DesignerActionRequestResponses,
   DesignerActionRequestStatuses,
   type ControlPlaneDatabase,
@@ -25,16 +26,25 @@ type ClaimedDesignerActionRequest = {
 export function toDesignerActionRequestOperation(
   operation: DesignerActionProposal["operation"],
 ): DesignerActionRequestOperation {
+  if (operation.kind === DesignerActionRequestOperationKinds.PROVIDER_CONFIGURATION_CHANGE) {
+    return {
+      kind: operation.kind,
+      provider: operation.provider,
+      resourceType: operation.resourceType,
+      resourceLabel: operation.resourceLabel,
+      action: operation.action,
+      details: operation.details.map((detail) => ({
+        label: detail.label,
+        value: detail.value,
+      })),
+    };
+  }
+
   return {
     kind: operation.kind,
-    provider: operation.provider,
-    resourceType: operation.resourceType,
-    resourceLabel: operation.resourceLabel,
-    action: operation.action,
-    details: operation.details.map((detail) => ({
-      label: detail.label,
-      value: detail.value,
-    })),
+    profileId: operation.profileId,
+    version: operation.version,
+    setupScript: operation.setupScript,
   };
 }
 

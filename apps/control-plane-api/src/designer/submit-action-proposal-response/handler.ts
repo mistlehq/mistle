@@ -16,16 +16,19 @@ const routeHandler = async (
   const body = ctx.req.valid("json");
   const designerActor = requireDesignerOrganizationActor(organizationActor);
   const config = ctx.get("config");
+  const sandboxConfig = ctx.get("sandboxConfig");
   const response = await submitDesignerActionProposalResponse(
     {
       db: ctx.get("db"),
       cache: ctx.get("cache"),
       dataPlaneClient: ctx.get("dataPlaneClient"),
       connectionTokenConfig: ctx.get("connectionTokenConfig"),
-      gatewayWebsocketUrl: ctx.get("sandboxConfig").gatewayWsUrl,
+      gatewayWebsocketUrl: sandboxConfig.gatewayWsUrl,
       integrationsConfig: {
         masterEncryptionKeys: config.integrations.masterEncryptionKeys,
       },
+      integrationRegistry: ctx.get("integrationRegistry"),
+      sandboxConfig,
     },
     {
       organizationId: organizationActor.organizationId,
