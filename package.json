@@ -95,7 +95,7 @@
     "@typescript/native-preview": "latest",
     "knip": "^6.11.0",
     "lefthook": "^2.1.8",
-    "lint-staged": "^16.4.0",
+    "lint-staged": "^17.0.7",
     "oxfmt": "^0.47.0",
     "oxlint": "^1.68.0",
     "oxlint-tsgolint": "^0.23.0",
