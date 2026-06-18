@@ -93,6 +93,10 @@ _Avoid_: Activity history, transcript, audit log
 A runtime request that asks the user to answer one or more structured questions before the agent continues.
 _Avoid_: Approval request when the user is choosing configuration rather than granting permission
 
+**Dashboard control action**:
+A runtime-requested action handled by the dashboard client to control browser-owned workspace state.
+_Avoid_: MCP tool when the action is handled by the browser rather than Mistle resource access
+
 **Designer canvas**:
 The route-backed workspace surface displayed beside **Mistle Designer** chat.
 _Avoid_: Component canvas when the surface embeds ordinary dashboard routes
@@ -622,6 +626,13 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Mistle Designer** should present setup guidance as **Designer recommendations** when the user needs to choose, set up, or review product configuration.
 - **Designer recommendations** should be structured **Mistle Designer session** chat history entries rather than separate recommendation records.
 - **Designer canvas tabs** are persisted as **Mistle Designer session** workspace state.
+- **Designer canvas tabs** do not have a product-defined count limit.
+- A **Designer canvas** should not contain multiple **Designer canvas tabs** with the same route.
+- A **Dashboard control action** may open one **Designer canvas tab** without taking ownership of the whole **Designer canvas** tab list.
+- A **Dashboard control action** that opens a **Designer canvas tab** is not responsible for whether the tab is persisted as **Mistle Designer session** workspace state.
+- A **Dashboard control action** is handled only by the currently active dashboard surface that supports it.
+- A **Dashboard control action** may open only dashboard-internal routes in **Designer canvas tabs**.
+- A **Designer canvas tab** may accept a dashboard-internal route before that route has a supported embedded rendering surface.
 - A **Designer page** is the top-level dashboard entry point for **Mistle Designer sessions**.
 - The **Designer page** presents a composer for starting a new **Mistle Designer session** before the list of past **Mistle Designer sessions**.
 - Submitting the **Designer page** composer creates a **Mistle Designer session** and opens that session's designer workspace.

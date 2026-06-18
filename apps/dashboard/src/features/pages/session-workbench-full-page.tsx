@@ -4,6 +4,7 @@ import type { useSearchParams } from "react-router";
 
 import { isUnavailableResourceError } from "../api/http-api-error.js";
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
+import type { DashboardControlActionSupport } from "../session-agents/dashboard-control-actions.js";
 import {
   RuntimeConversationNavigatorPanel,
   RuntimeConversationNavigatorSheet,
@@ -77,12 +78,16 @@ export type SessionWorkbenchFullPageProps = {
   searchParams: URLSearchParams;
   secondaryPanel: SessionWorkbenchFullPageSecondaryPanel;
   setSearchParams: ReturnType<typeof useSearchParams>[1];
+  dashboardControlActions?: DashboardControlActionSupport;
 };
 
 export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
     requestedRuntimeConversationId: input.requestedRuntimeConversationId,
     sandboxInstanceId: input.sandboxInstanceId,
+    ...(input.dashboardControlActions === undefined
+      ? {}
+      : { dashboardControlActions: input.dashboardControlActions }),
   });
   const [hasEnteredReadyWorkbench, setHasEnteredReadyWorkbench] = useState(false);
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);

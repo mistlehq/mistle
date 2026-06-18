@@ -1365,8 +1365,7 @@
                       },
                       "required": ["id", "title", "href"],
                       "additionalProperties": false
-                    },
-                    "maxItems": 12
+                    }
                   }
                 },
                 "required": ["tabs"],
@@ -1833,8 +1832,7 @@
                       },
                       "required": ["id", "title", "href"],
                       "additionalProperties": false
-                    },
-                    "maxItems": 12
+                    }
                   }
                 },
                 "required": ["tabs"],

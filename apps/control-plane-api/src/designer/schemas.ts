@@ -65,7 +65,7 @@ export const listDesignerSessionsQuerySchema = z
 
 export const putDesignerSessionCanvasTabsBodySchema = z
   .object({
-    tabs: z.array(designerSessionCanvasTabSchema).max(12),
+    tabs: z.array(designerSessionCanvasTabSchema),
   })
   .strict();
 

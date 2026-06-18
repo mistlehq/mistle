@@ -57,6 +57,7 @@ const ListDesignerSessionsResponseSchema = z
   .strict();
 
 export type DesignerSession = z.output<typeof DesignerSessionSchema>;
+export type DesignerSessionCanvasTab = z.output<typeof DesignerSessionCanvasTabSchema>;
 
 export const designerSessionsQueryKey = ["designer", "sessions"] as const;
 export function designerSessionQueryKey(sessionId: string) {
@@ -210,6 +211,50 @@ export async function getDesignerSessionBySandboxInstanceId(input: {
         operation: "getDesignerSessionBySandboxInstanceId",
         error,
         fallbackMessage: "Could not load Designer session.",
+      }),
+    );
+  }
+}
+
+export async function putDesignerSessionCanvasTabs(input: {
+  sessionId: string;
+  tabs: readonly DesignerSessionCanvasTab[];
+  signal?: AbortSignal;
+}): Promise<DesignerSession> {
+  try {
+    const response = await requestControlPlane({
+      operation: "putDesignerSessionCanvasTabs",
+      method: "PUT",
+      pathname: `/v1/designer/sessions/${encodeURIComponent(input.sessionId)}/canvas-tabs`,
+      body: {
+        tabs: input.tabs.map((tab) => ({
+          id: tab.id,
+          title: tab.title,
+          href: tab.href,
+        })),
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not save Designer canvas tabs.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = DesignerSessionSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new DesignerApiError({
+        operation: "putDesignerSessionCanvasTabs",
+        status: 500,
+        body: responseBody,
+        message: "Update Designer canvas tabs response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new DesignerApiError(
+      normalizeHttpApiError({
+        operation: "putDesignerSessionCanvasTabs",
+        error,
+        fallbackMessage: "Could not save Designer canvas tabs.",
       }),
     );
   }

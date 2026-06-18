@@ -106,6 +106,22 @@ function DesignerPageStory(input: {
   );
 }
 
+function DesignerCanvasWorkspaceStory(input: {
+  tabs: DesignerSession["canvasTabs"];
+}): React.JSX.Element {
+  const [tabs, setTabs] = useState(input.tabs);
+  const [activeTabHref, setActiveTabHref] = useState<string | null>(tabs[0]?.href ?? null);
+
+  return (
+    <DesignerCanvasWorkspace
+      activeTabHref={activeTabHref}
+      onActiveTabHrefChange={setActiveTabHref}
+      onTabsChange={setTabs}
+      tabs={tabs}
+    />
+  );
+}
+
 const meta = {
   title: "Dashboard/Designer/Page",
   component: DesignerPageView,
@@ -153,13 +169,13 @@ export const CreateError: Story = {
 export const Canvas: Story = {
   decorators: [withDashboardWorkspaceStory],
   render: function RenderCanvasStory(): React.JSX.Element {
-    return <DesignerCanvasWorkspace tabs={StoryDesignerSessions[0]?.canvasTabs ?? []} />;
+    return <DesignerCanvasWorkspaceStory tabs={StoryDesignerSessions[0]?.canvasTabs ?? []} />;
   },
 };
 
 export const EmptyCanvas: Story = {
   decorators: [withDashboardWorkspaceStory],
   render: function RenderEmptyCanvasStory(): React.JSX.Element {
-    return <DesignerCanvasWorkspace tabs={[]} />;
+    return <DesignerCanvasWorkspaceStory tabs={[]} />;
   },
 };

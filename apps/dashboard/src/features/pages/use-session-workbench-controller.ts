@@ -8,6 +8,7 @@ import { useCallback, useRef } from "react";
 
 import { useClaudeCodeSessionState } from "../session-agents/claude-code/session-state/index.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
+import type { DashboardControlActionSupport } from "../session-agents/dashboard-control-actions.js";
 import { useOpenCodeSessionState } from "../session-agents/opencode/session-state/index.js";
 import { usePiSessionState } from "../session-agents/pi/session-state/index.js";
 import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-runtime-workbench-capabilities.js";
@@ -109,6 +110,7 @@ export type {
 export function useSessionWorkbenchController(input: {
   requestedRuntimeConversationId?: string | null;
   sandboxInstanceId: string | null;
+  dashboardControlActions?: DashboardControlActionSupport;
 }): UseSessionWorkbenchControllerResult {
   const queryClient = useQueryClient();
   const transportManager = useSessionWorkbenchTransport({
@@ -129,6 +131,9 @@ export function useSessionWorkbenchController(input: {
     sessionClientRef,
     rpcClientRef,
     sessionEventUnsubscribersRef,
+    ...(input.dashboardControlActions === undefined
+      ? {}
+      : { dashboardControlActions: input.dashboardControlActions }),
   });
   const openCodeSessionState = useOpenCodeSessionState({
     ensureTransportConnected: transportManager.ensureTransportConnected,

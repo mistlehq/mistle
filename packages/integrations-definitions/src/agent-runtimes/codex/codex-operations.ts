@@ -22,6 +22,14 @@ export const AllCodexThreadSourceKinds = [
   "unknown",
 ] as const;
 
+export type CodexDynamicToolSpec = {
+  namespace?: string;
+  name: string;
+  description: string;
+  inputSchema: unknown;
+  deferLoading?: boolean;
+};
+
 const ThreadResponseSchema = z.looseObject({
   thread: z.looseObject({
     id: z.string().min(1),
@@ -583,19 +591,32 @@ export function buildCodexTurnSteerRequest(input: {
   };
 }
 
-export async function startCodexThread(input: {
-  rpcClient: CodexJsonRpcClient;
+export function buildCodexThreadStartRequest(input: {
   cwd?: string;
+  dynamicTools?: readonly CodexDynamicToolSpec[];
   model?: string;
   sessionStartSource?: "clear" | undefined;
-}): Promise<CodexThreadSessionResult> {
-  const requestParameters = {
+}): Record<string, unknown> {
+  return {
     ...(input.model === undefined ? {} : { model: input.model }),
     ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+    ...(input.dynamicTools === undefined || input.dynamicTools.length === 0
+      ? {}
+      : { dynamicTools: input.dynamicTools }),
     ...(input.sessionStartSource === undefined
       ? {}
       : { sessionStartSource: input.sessionStartSource }),
   };
+}
+
+export async function startCodexThread(input: {
+  rpcClient: CodexJsonRpcClient;
+  cwd?: string;
+  dynamicTools?: readonly CodexDynamicToolSpec[];
+  model?: string;
+  sessionStartSource?: "clear" | undefined;
+}): Promise<CodexThreadSessionResult> {
+  const requestParameters = buildCodexThreadStartRequest(input);
   const response = await input.rpcClient.call("thread/start", requestParameters);
 
   const parsedResponse = parseCodexThreadSessionResponse({

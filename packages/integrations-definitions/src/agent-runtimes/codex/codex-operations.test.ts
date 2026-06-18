@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCodexReviewStartRequest,
+  buildCodexThreadStartRequest,
   buildCodexTurnInputItems,
   buildCodexTurnStartRequest,
   buildCodexTurnSteerRequest,
@@ -10,6 +11,55 @@ import {
   parseCodexThreadSessionResponse,
   resolveOriginalCodexThreadId,
 } from "./codex-operations.js";
+
+describe("buildCodexThreadStartRequest", () => {
+  it("passes dynamic tools through to Codex thread start", () => {
+    expect(
+      buildCodexThreadStartRequest({
+        cwd: "/root",
+        dynamicTools: [
+          {
+            namespace: "dashboard_control",
+            name: "open_designer_canvas_tab",
+            description: "Open a tab.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                href: { type: "string" },
+              },
+            },
+          },
+        ],
+      }),
+    ).toEqual({
+      cwd: "/root",
+      dynamicTools: [
+        {
+          namespace: "dashboard_control",
+          name: "open_designer_canvas_tab",
+          description: "Open a tab.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              href: { type: "string" },
+            },
+          },
+        },
+      ],
+    });
+  });
+
+  it("omits dynamic tools when none are supplied", () => {
+    expect(
+      buildCodexThreadStartRequest({
+        cwd: "/root",
+        dynamicTools: [],
+      }),
+    ).toEqual({
+      cwd: "/root",
+    });
+  });
+});
 
 describe("buildCodexTurnInputItems", () => {
   it("prepends trimmed text ahead of local image items", () => {

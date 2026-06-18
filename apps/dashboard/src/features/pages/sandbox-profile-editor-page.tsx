@@ -876,12 +876,23 @@ type SandboxProfileEditorShellContext = {
   profileId: string;
   profile: SandboxProfile;
   versions: readonly SandboxProfileVersion[];
-  navigate: ReturnType<typeof useNavigate>;
+  navigate: SandboxProfileEditorNavigate;
   invalidateSandboxProfiles: () => Promise<void>;
   invalidateProfileDetail: (profileId: string) => Promise<void>;
   invalidateProfileVersions: (profileId: string) => Promise<void>;
   invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
+};
+
+type SandboxProfileEditorNavigate = (
+  to: string,
+  options?: { replace?: boolean; state?: unknown },
+) => void | Promise<void>;
+
+export type EmbeddedSandboxProfileEditorRoute = {
+  href: string;
+  navigate: SandboxProfileEditorNavigate;
+  profileId: string;
 };
 
 export function resolveSandboxProfileEditorRefetchInterval(input: {
@@ -1043,6 +1054,153 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
   );
 }
 
+export function EmbeddedSandboxProfileEditorPage(input: {
+  embeddedRoute: EmbeddedSandboxProfileEditorRoute;
+}): React.JSX.Element {
+  const queryClient = useQueryClient();
+  const { href, navigate, profileId } = input.embeddedRoute;
+  const profileDetailKey = sandboxProfileDetailQueryKey(profileId);
+  const profileVersionsKey = sandboxProfileVersionsQueryKey(profileId);
+  const resolveEditorRefetchInterval = (): false | number =>
+    resolveSandboxProfileEditorRefetchInterval({
+      profileError: queryClient.getQueryState(profileDetailKey)?.error,
+      profileVersionsError: queryClient.getQueryState(profileVersionsKey)?.error,
+      versions: queryClient.getQueryData<{ versions: readonly SandboxProfileVersion[] }>(
+        profileVersionsKey,
+      )?.versions,
+    });
+
+  const profileQuery = useQuery({
+    queryKey: profileDetailKey,
+    queryFn: async ({ signal }) => getSandboxProfile({ profileId, signal }),
+    refetchInterval: resolveEditorRefetchInterval,
+    retry: false,
+  });
+  const profileVersionsQuery = useQuery({
+    queryKey: profileVersionsKey,
+    queryFn: async ({ signal }) =>
+      listSandboxProfileVersions({
+        profileId,
+        signal,
+      }),
+    refetchInterval: resolveEditorRefetchInterval,
+    retry: false,
+  });
+
+  if (profileQuery.isError && isUnavailableResourceError(profileQuery.error)) {
+    return (
+      <PageFrame width="normal">
+        <UnavailableResourceState />
+      </PageFrame>
+    );
+  }
+
+  if (profileQuery.isPending || profileVersionsQuery.isPending) {
+    return <PageFrame width="normal">{null}</PageFrame>;
+  }
+
+  if (profileQuery.isError || profileQuery.data === undefined) {
+    return (
+      <PageFrame width="normal" title="Edit profile">
+        <Card>
+          <CardContent className="gap-3 flex flex-col pt-4">
+            <Notice title="Could not load profile" variant="alert">
+              {resolveApiErrorMessage({
+                error: profileQuery.error,
+                fallbackMessage: "Could not load sandbox profile.",
+              })}
+            </Notice>
+          </CardContent>
+        </Card>
+      </PageFrame>
+    );
+  }
+
+  if (profileVersionsQuery.isError && isUnavailableResourceError(profileVersionsQuery.error)) {
+    return (
+      <PageFrame width="normal">
+        <UnavailableResourceState />
+      </PageFrame>
+    );
+  }
+
+  if (profileVersionsQuery.isError || profileVersionsQuery.data === undefined) {
+    return (
+      <PageFrame width="normal" title="Edit profile">
+        <Notice title="Could not load profile versions" variant="alert">
+          {resolveApiErrorMessage({
+            error: profileVersionsQuery.error,
+            fallbackMessage: "Could not load sandbox profile versions.",
+          })}
+        </Notice>
+      </PageFrame>
+    );
+  }
+
+  const pathname = new URL(href, "http://designer-canvas.local").pathname;
+  const route =
+    readSandboxProfileEditorRoute({
+      pathname,
+      profileId,
+    }) ??
+    readSandboxProfileEditorRoute({
+      pathname: createSandboxProfileDefaultPath(profileId),
+      profileId,
+    });
+  if (route === null) {
+    throw new Error("Default sandbox profile editor route could not be resolved.");
+  }
+
+  const versions = profileVersionsQuery.data.versions;
+  const routeView = route.view ?? resolveDefaultSandboxProfileEditorView(versions);
+
+  return (
+    <LoadedSandboxProfileEditorPage
+      routeSectionId={route.sectionId}
+      publishSuccessNavigationKey={null}
+      onPublishSuccessNavigationConsumed={() => {}}
+      publishSuccessMessage={false}
+      explicitView={route.view}
+      view={routeView}
+      navigate={navigate}
+      profileId={profileId}
+      profile={profileQuery.data}
+      versions={versions}
+      invalidateSandboxProfiles={async () => {
+        await queryClient.invalidateQueries({
+          queryKey: ["sandbox-profiles"],
+        });
+      }}
+      invalidateProfileDetail={async (invalidateProfileId) => {
+        await queryClient.invalidateQueries({
+          queryKey: sandboxProfileDetailQueryKey(invalidateProfileId),
+        });
+      }}
+      invalidateProfileVersions={async (invalidateProfileId) => {
+        await queryClient.invalidateQueries({
+          queryKey: sandboxProfileVersionsQueryKey(invalidateProfileId),
+        });
+      }}
+      invalidateVersionBindings={async ({ profileId: invalidateProfileId, version }) => {
+        await queryClient.invalidateQueries({
+          queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
+            profileId: invalidateProfileId,
+            version,
+          }),
+        });
+      }}
+      invalidateVersionSetupScript={async ({ profileId: invalidateProfileId, version }) => {
+        await queryClient.invalidateQueries({
+          queryKey: sandboxProfileVersionSetupScriptQueryKey({
+            profileId: invalidateProfileId,
+            version,
+          }),
+        });
+      }}
+    />
+  );
+}
+
 export function SandboxProfileDefaultRedirect(): React.JSX.Element {
   const shellContext = useSandboxProfileEditorShellContext();
 
@@ -1097,7 +1255,7 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
 }
 
 type LoadedSandboxProfileEditorPageInput = {
-  navigate: ReturnType<typeof useNavigate>;
+  navigate: SandboxProfileEditorNavigate;
   routeSectionId: SandboxProfileEditorSectionId;
   publishSuccessNavigationKey: string | null;
   onPublishSuccessNavigationConsumed: () => void;
@@ -1667,7 +1825,7 @@ function LoadedSandboxProfileEditorPage(
 }
 
 function ReadySandboxProfileEditorPage(input: {
-  navigate: ReturnType<typeof useNavigate>;
+  navigate: SandboxProfileEditorNavigate;
   profileId: string;
   profile: SandboxProfile;
   mode: SandboxProfileEditorVersionMode;

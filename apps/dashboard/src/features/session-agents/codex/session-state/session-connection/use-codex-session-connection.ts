@@ -1,5 +1,6 @@
 import type {
   CodexJsonRpcClient,
+  CodexDynamicToolSpec,
   CodexJsonRpcNotification,
   CodexJsonRpcServerRequest,
   AgentStreamClient,
@@ -134,6 +135,7 @@ export function useCodexSessionConnection(input: {
   onTurnCompleted: () => void;
   onServerRequestNotification: (notification: CodexJsonRpcNotification) => void;
   onServerRequestReceived: (request: CodexJsonRpcServerRequest) => void;
+  dashboardControlDynamicTools: readonly CodexDynamicToolSpec[];
   refreshThreadCollections: (input?: {
     rpcClient?: CodexJsonRpcClient;
     generation?: number;
@@ -432,6 +434,7 @@ export function useCodexSessionConnection(input: {
           ? { initialCwd: connectInput.initialCwd }
           : {}),
         rpcClient,
+        dynamicTools: input.dashboardControlDynamicTools,
         targetThreadId: connectInput.targetThreadId,
         availableThreads: threadCollections.availableThreads,
         loadedThreadIds: threadCollections.loadedThreadIds,
@@ -559,6 +562,7 @@ export function useCodexSessionConnection(input: {
       });
       const recoveredThread = await establishCodexThread({
         rpcClient,
+        dynamicTools: input.dashboardControlDynamicTools,
         targetThreadId: recoverInput.targetThreadId,
         availableThreads: threadCollections.availableThreads,
         loadedThreadIds: threadCollections.loadedThreadIds,

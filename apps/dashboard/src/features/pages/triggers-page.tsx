@@ -20,10 +20,18 @@ import { listTriggers } from "../triggers/triggers-service.js";
 
 const TRIGGERS_LIST_LIMIT = 25;
 
-export function TriggersPage(): React.JSX.Element {
-  const [searchParams, setSearchParams] = useSearchParams();
+export type EmbeddedTriggersRoute = {
+  searchParams: URLSearchParams;
+  setSearchParams: (searchParams: URLSearchParams) => void;
+};
+
+export function TriggersPage(input?: { embeddedRoute?: EmbeddedTriggersRoute }): React.JSX.Element {
+  const [routeSearchParams, setRouteSearchParams] = useSearchParams();
+  const searchParams = input?.embeddedRoute?.searchParams ?? routeSearchParams;
+  const setSearchParams = input?.embeddedRoute?.setSearchParams ?? setRouteSearchParams;
   const [activeFilter, setActiveFilter] = useState<TriggerListFilter>("all");
   const [searchValue, setSearchValue] = useState("");
+
   const { after, before } = readKeysetPaginationCursors(searchParams);
   const serverFilters = toTriggerListServerFilters(activeFilter);
   const normalizedSearch = normalizeTriggerListSearch(searchValue);

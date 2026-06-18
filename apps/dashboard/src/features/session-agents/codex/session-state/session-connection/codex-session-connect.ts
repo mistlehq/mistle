@@ -2,6 +2,7 @@ import {
   CodexJsonRpcRequestError,
   resumeCodexThread,
   startCodexThread,
+  type CodexDynamicToolSpec,
   type CodexJsonRpcClient,
   type CodexThreadSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
@@ -93,6 +94,7 @@ export function resolveInitialCodexThreadAction(input: {
 
 export async function establishCodexThread(input: {
   initialCwd?: string | null;
+  dynamicTools?: readonly CodexDynamicToolSpec[];
   rpcClient: CodexJsonRpcClient;
   targetThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
@@ -145,6 +147,7 @@ export async function establishCodexThread(input: {
           ...(input.initialCwd === undefined || input.initialCwd === null
             ? {}
             : { cwd: input.initialCwd }),
+          ...(input.dynamicTools === undefined ? {} : { dynamicTools: input.dynamicTools }),
           rpcClient: input.rpcClient,
         });
         input.ensureCurrentGeneration(input.generation);
@@ -177,6 +180,7 @@ export async function establishCodexThread(input: {
     ...(input.initialCwd === undefined || input.initialCwd === null
       ? {}
       : { cwd: input.initialCwd }),
+    ...(input.dynamicTools === undefined ? {} : { dynamicTools: input.dynamicTools }),
     rpcClient: input.rpcClient,
   });
   input.ensureCurrentGeneration(input.generation);
@@ -193,6 +197,7 @@ export async function establishCodexThread(input: {
 
 export async function establishInitialCodexThread(input: {
   initialCwd?: string | null;
+  dynamicTools?: readonly CodexDynamicToolSpec[];
   rpcClient: CodexJsonRpcClient;
   targetThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
