@@ -228,9 +228,25 @@ describe("compileOpenComputerBinding", () => {
       apiBaseUrl: "https://opencomputer.example.com/api",
     });
 
-    expect(compiled.egressRoutes.map((route) => route.upstream.baseUrl)).toEqual([
-      "https://opencomputer.example.com",
-      "https://api.opencomputer.dev",
+    expect(compiled.egressRoutes).toMatchObject([
+      {
+        match: {
+          hosts: ["opencomputer.example.com"],
+          pathPrefixes: ["/api"],
+        },
+        upstream: {
+          baseUrl: "https://opencomputer.example.com/api",
+        },
+      },
+      {
+        match: {
+          hosts: ["api.opencomputer.dev"],
+          pathPrefixes: ["/"],
+        },
+        upstream: {
+          baseUrl: "https://api.opencomputer.dev",
+        },
+      },
     ]);
     expect(compiled.artifacts[0]?.env).toEqual({
       OPENCOMPUTER_API_KEY: "mistle-placeholder-opencomputer-api-key",

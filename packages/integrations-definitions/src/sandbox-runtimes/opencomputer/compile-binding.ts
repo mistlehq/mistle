@@ -1,4 +1,8 @@
-import type { CompileBindingInput, CompileBindingResult } from "@mistle/integrations-core";
+import {
+  resolveRoutePathPrefixFromBaseUrl,
+  type CompileBindingInput,
+  type CompileBindingResult,
+} from "@mistle/integrations-core";
 
 import {
   OpenComputerSandboxRuntimeCredentialSecretTypes,
@@ -40,25 +44,32 @@ function resolveOpenComputerApiBaseUrl(input: OpenComputerCompileBindingInput): 
   return input.target.config.apiBaseUrl ?? OpenComputerDefaultApiBaseUrl;
 }
 
-function resolveOriginBaseUrl(baseUrl: string): string {
+function resolveRouteBaseUrl(baseUrl: string): string {
   const parsed = new URL(baseUrl);
-  return parsed.origin;
+  const pathPrefix = resolveRoutePathPrefixFromBaseUrl(baseUrl);
+
+  if (pathPrefix === "/") {
+    return parsed.origin;
+  }
+
+  return `${parsed.origin}${pathPrefix}`;
 }
 
 function createOpenComputerEgressRoutes(
   input: OpenComputerCompileBindingInput,
 ): CompileBindingResult["egressRoutes"] {
   const credentialResolver = createCredentialResolver(input);
-  const apiOriginBaseUrl = resolveOriginBaseUrl(resolveOpenComputerApiBaseUrl(input));
-  const sessionsApiOriginBaseUrl = resolveOriginBaseUrl(OpenComputerSessionsApiBaseUrl);
+  const apiRouteBaseUrl = resolveRouteBaseUrl(resolveOpenComputerApiBaseUrl(input));
+  const sessionsApiRouteBaseUrl = resolveRouteBaseUrl(OpenComputerSessionsApiBaseUrl);
   const routes = new Map<string, OpenComputerCompiledRoute>();
 
-  for (const baseUrl of [apiOriginBaseUrl, sessionsApiOriginBaseUrl]) {
+  for (const baseUrl of [apiRouteBaseUrl, sessionsApiRouteBaseUrl]) {
     const host = new URL(baseUrl).host;
-    routes.set(host, {
+    const pathPrefix = resolveRoutePathPrefixFromBaseUrl(baseUrl);
+    routes.set(`${host}${pathPrefix}`, {
       match: {
         hosts: [host],
-        pathPrefixes: ["/"],
+        pathPrefixes: [pathPrefix],
       },
       upstream: {
         baseUrl,
