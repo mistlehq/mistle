@@ -27,7 +27,6 @@ import {
   patchSandboxInstanceTitle,
   type PatchSandboxInstanceTitleResult,
 } from "../sessions/sessions-service.js";
-import { formatDesignerActionProposalResponseSuccessMessage } from "./designer-action-proposal-response-copy.js";
 import { DesignerSessionPageView } from "./designer-session-page-view.js";
 
 const DesignerSessionRuntimeBootstrapPollIntervalMs = 2_000;
@@ -390,12 +389,8 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
         submitActionProposalResponseMutation.error?.message ?? null
       }
       actionProposalResponsePendingId={pendingActionProposalResponseId}
-      actionProposalResponseSuccessMessage={
-        submitActionProposalResponseMutation.data === undefined
-          ? null
-          : formatDesignerActionProposalResponseSuccessMessage(
-              submitActionProposalResponseMutation.data,
-            )
+      submittedActionProposalResponseId={
+        submitActionProposalResponseMutation.data?.actionProposalResponse.proposalId ?? null
       }
       errorMessage={designerSessionQuery.error?.message ?? null}
       onFollowUpDraftChange={(draft) => {

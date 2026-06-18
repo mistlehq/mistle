@@ -78,7 +78,6 @@ type DesignerRuntimeConversationPanels = {
 export type DesignerSessionPageViewProps = {
   actionProposalResponseErrorMessage: string | null;
   actionProposalResponsePendingId: string | null;
-  actionProposalResponseSuccessMessage: string | null;
   bootstrapErrorMessage: string | null;
   bootstrapIsPending: boolean;
   errorMessage: string | null;
@@ -233,9 +232,7 @@ function resolveDesignerSessionStartupState(input: {
 }): SessionStartupState | null {
   const runtimeConversationBootstrap = input.runtimeConversationBootstrap;
   const runtimeConversationIsReady =
-    runtimeConversationBootstrap !== null &&
-    input.runtimeConversationTranscript !== null &&
-    !input.transcriptIsPending;
+    runtimeConversationBootstrap !== null && input.runtimeConversationTranscript !== null;
   const sessionSnapshot =
     runtimeConversationBootstrap !== null && runtimeConversationIsReady
       ? {

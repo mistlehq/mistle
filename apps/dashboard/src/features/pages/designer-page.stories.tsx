@@ -495,14 +495,14 @@ function DesignerActionProposalStory(input: {
   errorMessage?: string | null;
   pendingProposalId?: string | null;
   proposal: DesignerActionProposal;
-  successMessage?: string | null;
+  submittedProposalId?: string | null;
 }): React.JSX.Element {
   return (
     <DesignerWorkspaceStoryFrame initialEntries={[`/designer/${StoryDesignerSpecificSession.id}`]}>
       <DesignerSessionPageView
         actionProposalResponseErrorMessage={input.errorMessage ?? null}
         actionProposalResponsePendingId={input.pendingProposalId ?? null}
-        actionProposalResponseSuccessMessage={input.successMessage ?? null}
+        submittedActionProposalResponseId={input.submittedProposalId ?? null}
         bootstrapErrorMessage={null}
         bootstrapIsPending={false}
         errorMessage={null}
@@ -611,7 +611,7 @@ export const Workspace: Story = {
         <DesignerSessionPageView
           actionProposalResponseErrorMessage={null}
           actionProposalResponsePendingId={null}
-          actionProposalResponseSuccessMessage={null}
+          submittedActionProposalResponseId={null}
           bootstrapErrorMessage={null}
           bootstrapIsPending={false}
           errorMessage={null}
@@ -652,7 +652,7 @@ export const WorkspaceDesignerSpecificUi: Story = {
         <DesignerSessionPageView
           actionProposalResponseErrorMessage={null}
           actionProposalResponsePendingId={null}
-          actionProposalResponseSuccessMessage="Designer saved the launch action request."
+          submittedActionProposalResponseId={null}
           bootstrapErrorMessage={null}
           bootstrapIsPending={false}
           errorMessage={null}
@@ -693,7 +693,7 @@ export const WorkspaceEmptyCanvas: Story = {
         <DesignerSessionPageView
           actionProposalResponseErrorMessage={null}
           actionProposalResponsePendingId={null}
-          actionProposalResponseSuccessMessage="Designer saved the launch action request."
+          submittedActionProposalResponseId={null}
           bootstrapErrorMessage={null}
           bootstrapIsPending={false}
           errorMessage={null}
@@ -842,19 +842,6 @@ export const ActionProposalSubmittingResponse: Story = {
       <DesignerActionProposalStory
         pendingProposalId={StoryProviderConfigurationChangeProposal.id}
         proposal={StoryProviderConfigurationChangeProposal}
-      />
-    );
-  },
-};
-
-export const ActionProposalResponseSuccess: Story = {
-  decorators: [withDashboardWorkspaceStory],
-  name: "Action Proposal State / Response Success",
-  render: function RenderActionProposalResponseSuccessStory(): React.JSX.Element {
-    return (
-      <DesignerActionProposalStory
-        proposal={StoryProviderConfigurationChangeProposal}
-        successMessage="Action proposal response submitted at 2026-04-01T09:03:00.000Z. Execution is not supported for this operation yet."
       />
     );
   },

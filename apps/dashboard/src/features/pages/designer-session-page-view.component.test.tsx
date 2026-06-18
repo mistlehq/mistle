@@ -8,12 +8,10 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import type {
   DesignerActionProposalResponse,
-  DesignerActionProposalResponseResult,
   DesignerRuntimeConversationBootstrap,
   DesignerRuntimeConversationTranscript,
   DesignerSession,
 } from "../designer/designer-service.js";
-import { formatDesignerActionProposalResponseSuccessMessage } from "./designer-action-proposal-response-copy.js";
 import { DesignerSessionPageView } from "./designer-session-page-view.js";
 
 const BaseDesignerSession = {
@@ -249,7 +247,7 @@ function renderDesignerSessionPageView(input?: {
   bootstrapIsPending?: boolean;
   actionProposalResponseErrorMessage?: string | null;
   actionProposalResponsePendingId?: string | null;
-  actionProposalResponseSuccessMessage?: string | null;
+  submittedActionProposalResponseId?: string | null;
   followUpDraft?: string;
   followUpErrorMessage?: string | null;
   followUpIsPending?: boolean;
@@ -279,7 +277,7 @@ function renderDesignerSessionPageView(input?: {
       bootstrapIsPending={input?.bootstrapIsPending ?? false}
       actionProposalResponseErrorMessage={input?.actionProposalResponseErrorMessage ?? null}
       actionProposalResponsePendingId={input?.actionProposalResponsePendingId ?? null}
-      actionProposalResponseSuccessMessage={input?.actionProposalResponseSuccessMessage ?? null}
+      submittedActionProposalResponseId={input?.submittedActionProposalResponseId ?? null}
       errorMessage={null}
       followUpDraft={input?.followUpDraft ?? ""}
       followUpErrorMessage={input?.followUpErrorMessage ?? null}
@@ -316,7 +314,7 @@ function DesignerSessionPageViewActionResponseHarness(): React.JSX.Element {
       <DesignerSessionPageView
         actionProposalResponseErrorMessage={null}
         actionProposalResponsePendingId={null}
-        actionProposalResponseSuccessMessage={null}
+        submittedActionProposalResponseId={null}
         bootstrapErrorMessage={null}
         bootstrapIsPending={false}
         errorMessage={null}
@@ -357,7 +355,7 @@ function DesignerSessionPageViewUserInputResponseHarness(): React.JSX.Element {
       <DesignerSessionPageView
         actionProposalResponseErrorMessage={null}
         actionProposalResponsePendingId={null}
-        actionProposalResponseSuccessMessage={null}
+        submittedActionProposalResponseId={null}
         bootstrapErrorMessage={null}
         bootstrapIsPending={false}
         errorMessage={null}
@@ -430,7 +428,7 @@ function DesignerSessionPageViewTitleHarness(): React.JSX.Element {
       <DesignerSessionPageView
         actionProposalResponseErrorMessage={null}
         actionProposalResponsePendingId={null}
-        actionProposalResponseSuccessMessage={null}
+        submittedActionProposalResponseId={null}
         bootstrapErrorMessage={null}
         bootstrapIsPending={false}
         errorMessage={null}
@@ -656,29 +654,29 @@ describe("DesignerSessionPageView", () => {
     expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
   });
 
-  it("renders hydrated durable action request results for resumed proposals", () => {
+  it("hides completed action proposals from the response panel", () => {
     renderDesignerSessionPageView({
       runtimeConversationBootstrap: RuntimeConversationBootstrap,
       runtimeConversationTranscript: RuntimeConversationTranscriptWithCompletedLaunchActionRequest,
     });
 
     expect(screen.queryByText("Completed")).toBeNull();
-    expect(screen.getByText("Action request")).toBeDefined();
-    expect(screen.getByText("dar_profile_launch")).toBeDefined();
-    expect(screen.getByText("Launched sandbox session sbi_designer_launch.")).toBeDefined();
+    expect(screen.queryByText("Action request")).toBeNull();
+    expect(screen.queryByText("dar_profile_launch")).toBeNull();
+    expect(screen.queryByText("Launched sandbox session sbi_designer_launch.")).toBeNull();
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Decline" })).toBeNull();
   });
 
-  it("renders hydrated durable action request failures for resumed proposals", () => {
+  it("hides failed action proposals from the response panel", () => {
     renderDesignerSessionPageView({
       runtimeConversationBootstrap: RuntimeConversationBootstrap,
       runtimeConversationTranscript: RuntimeConversationTranscriptWithFailedActionRequest,
     });
 
     expect(screen.queryByText("Failed")).toBeNull();
-    expect(screen.getByText("DESIGNER_OPERATION_FAILED")).toBeDefined();
-    expect(screen.getByText("GitHub rejected the webhook configuration.")).toBeDefined();
+    expect(screen.queryByText("DESIGNER_OPERATION_FAILED")).toBeNull();
+    expect(screen.queryByText("GitHub rejected the webhook configuration.")).toBeNull();
     expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Decline" })).toBeNull();
   });
@@ -785,81 +783,19 @@ describe("DesignerSessionPageView", () => {
     );
   });
 
-  it("shows Designer action proposal response submission status", () => {
+  it("hides a submitted Designer action proposal while retaining submission errors", () => {
     renderDesignerSessionPageView({
       actionProposalResponseErrorMessage: "Designer action proposal is not pending.",
-      actionProposalResponseSuccessMessage:
-        "Action proposal response submitted at 2026-04-01T09:03:00.000Z.",
+      submittedActionProposalResponseId: "dap_github_webhook_setup",
       runtimeConversationBootstrap: RuntimeConversationBootstrap,
       runtimeConversationTranscript: RuntimeConversationTranscriptWithActionProposal,
     });
 
+    expect(screen.queryByText("Create GitHub webhook")).toBeNull();
     expect(screen.getByText("Designer action proposal is not pending.")).toBeDefined();
     expect(
-      screen.getByText("Action proposal response submitted at 2026-04-01T09:03:00.000Z."),
-    ).toBeDefined();
-  });
-
-  it("formats completed Designer publish results with persisted snapshot metadata", () => {
-    const result = {
-      actionProposalResponse: {
-        proposalId: "dap_profile_publish",
-        response: "approved",
-        providerConversationId: "thread_designer_test",
-        providerExecutionId: "turn_publish_response",
-        submittedAt: "2026-04-01T09:03:00.000Z",
-      },
-      actionRequest: {
-        id: "dar_profile_publish",
-        status: "completed",
-        failureCode: null,
-        failureMessage: null,
-        operationResult: {
-          kind: "sandboxProfileDraftPublish",
-          profileId: "sbp_designer_publish",
-          version: 3,
-          publishedAt: "2026-04-01T09:03:01.000Z",
-          snapshotAction: {
-            kind: "created",
-            snapshotJobId: "spv_snapshot_job_designer_publish",
-            sandboxInstanceId: "sbi_designer_publish_snapshot",
-          },
-        },
-      },
-    } satisfies DesignerActionProposalResponseResult;
-
-    expect(formatDesignerActionProposalResponseSuccessMessage(result)).toBe(
-      "Action proposal response submitted at 2026-04-01T09:03:00.000Z. Published sbp_designer_publish version 3 and queued snapshot job spv_snapshot_job_designer_publish.",
-    );
-  });
-
-  it("formats completed Designer launch results with the launched sandbox instance", () => {
-    const result = {
-      actionProposalResponse: {
-        proposalId: "dap_profile_launch",
-        response: "approved",
-        providerConversationId: "thread_designer_test",
-        providerExecutionId: "turn_launch_response",
-        submittedAt: "2026-04-01T09:04:00.000Z",
-      },
-      actionRequest: {
-        id: "dar_profile_launch",
-        status: "completed",
-        failureCode: null,
-        failureMessage: null,
-        operationResult: {
-          kind: "sandboxProfileVersionLaunch",
-          profileId: "sbp_designer_launch",
-          version: 4,
-          sandboxInstanceId: "sbi_designer_launch",
-          workflowRunId: "workflow_designer_launch",
-        },
-      },
-    } satisfies DesignerActionProposalResponseResult;
-
-    expect(formatDesignerActionProposalResponseSuccessMessage(result)).toBe(
-      "Action proposal response submitted at 2026-04-01T09:04:00.000Z. Launched sandbox session sbi_designer_launch.",
-    );
+      screen.queryByText("Action proposal response submitted at 2026-04-01T09:03:00.000Z."),
+    ).toBeNull();
   });
 
   it("shows transcript load errors while retaining the saved prompt preview", () => {
@@ -885,6 +821,19 @@ describe("DesignerSessionPageView", () => {
     expect(
       screen.getByText("Could not refresh Designer runtime conversation transcript."),
     ).toBeDefined();
+  });
+
+  it("keeps the conversation visible during background transcript refreshes", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      runtimeConversationTranscript: RuntimeConversationTranscript,
+      transcriptIsPending: true,
+    });
+
+    expect(screen.getByText("I can help design that workflow.")).toBeDefined();
+    expect(screen.getByText("Loading provider transcript...")).toBeDefined();
+    expect(screen.queryByText("Running setup")).toBeNull();
+    expect(screen.queryByText("Connecting chat")).toBeNull();
   });
 
   it("shows runtime follow-up submission errors without hiding the conversation", () => {
