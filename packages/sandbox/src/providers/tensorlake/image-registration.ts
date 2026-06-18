@@ -1,49 +1,57 @@
-import { importSandboxImage } from "tensorlake";
+import { createSandboxImage } from "tensorlake";
+
+import type { SandboxSdkImageBaseImageSource } from "../../types.js";
+import { createTensorlakeSandboxBaseImage } from "./base-image-definition.js";
 
 const TensorlakeApiKeyEnv = "TENSORLAKE_API_KEY";
 
 export type RegisterTensorlakeSandboxBaseImageInput = {
   readonly apiKey: string;
-  readonly registeredName: string;
-  readonly sourceImageRef: string;
+  readonly contextPath: string;
+  readonly source: Omit<SandboxSdkImageBaseImageSource, "contextPath" | "kind">;
 };
 
 export async function registerTensorlakeSandboxBaseImage(
   input: RegisterTensorlakeSandboxBaseImageInput,
 ): Promise<void> {
   await withTensorlakeApiKey(input.apiKey, async () => {
-    const importLogs = createTensorlakeImportLogCollector();
+    const buildLogs = createTensorlakeBuildLogCollector();
 
     try {
-      await importSandboxImage(
-        input.sourceImageRef,
+      await createSandboxImage(
+        createTensorlakeSandboxBaseImage({
+          baseImageRef: input.source.baseImageRef,
+          name: input.source.imageId,
+          ...(input.source.sandboxd === undefined ? {} : { sandboxd: input.source.sandboxd }),
+        }),
         {
-          registeredName: input.registeredName,
+          registeredName: input.source.imageId,
+          contextDir: input.contextPath,
         },
-        { emit: importLogs.emit },
+        { emit: buildLogs.emit },
       );
     } catch (error) {
-      throw formatTensorlakeImportFailure(error, importLogs.entries());
+      throw formatTensorlakeBuildFailure(error, buildLogs.entries());
     }
   });
 }
 
-type TensorlakeImportLogEntry = {
+type TensorlakeBuildLogEntry = {
   readonly label: string;
   readonly message: string;
 };
 
-type TensorlakeImportLogCollector = {
+type TensorlakeBuildLogCollector = {
   readonly emit: (event: Record<string, unknown>) => void;
-  readonly entries: () => readonly TensorlakeImportLogEntry[];
+  readonly entries: () => readonly TensorlakeBuildLogEntry[];
 };
 
-function createTensorlakeImportLogCollector(): TensorlakeImportLogCollector {
-  const entries: TensorlakeImportLogEntry[] = [];
+function createTensorlakeBuildLogCollector(): TensorlakeBuildLogCollector {
+  const entries: TensorlakeBuildLogEntry[] = [];
 
   return {
     emit: (event) => {
-      const entry = parseTensorlakeImportLogEntry(event);
+      const entry = parseTensorlakeBuildLogEntry(event);
       if (entry === null) {
         return;
       }
@@ -55,9 +63,9 @@ function createTensorlakeImportLogCollector(): TensorlakeImportLogCollector {
   };
 }
 
-function parseTensorlakeImportLogEntry(
+function parseTensorlakeBuildLogEntry(
   event: Record<string, unknown>,
-): TensorlakeImportLogEntry | null {
+): TensorlakeBuildLogEntry | null {
   if (typeof event.message !== "string") {
     return null;
   }
@@ -77,25 +85,25 @@ function parseTensorlakeImportLogEntry(
   return { label, message };
 }
 
-export function formatTensorlakeImportFailure(
+export function formatTensorlakeBuildFailure(
   error: unknown,
-  entries: readonly TensorlakeImportLogEntry[],
+  entries: readonly TensorlakeBuildLogEntry[],
 ): Error {
   const baseMessage =
     error instanceof Error
       ? error.message
-      : `Tensorlake sandbox image import failed: ${String(error)}`;
+      : `Tensorlake sandbox image build failed: ${String(error)}`;
 
-  const logMessage = formatTensorlakeImportLogs(entries);
+  const logMessage = formatTensorlakeBuildLogs(entries);
   const message =
     logMessage.length === 0
       ? baseMessage
-      : `${baseMessage}\n\nTensorlake sandbox image import output:\n${logMessage}`;
+      : `${baseMessage}\n\nTensorlake sandbox image build output:\n${logMessage}`;
 
   return new Error(message, { cause: error });
 }
 
-function formatTensorlakeImportLogs(entries: readonly TensorlakeImportLogEntry[]): string {
+function formatTensorlakeBuildLogs(entries: readonly TensorlakeBuildLogEntry[]): string {
   return entries.map((entry) => `${entry.label}:\n${entry.message}`).join("\n");
 }
 
