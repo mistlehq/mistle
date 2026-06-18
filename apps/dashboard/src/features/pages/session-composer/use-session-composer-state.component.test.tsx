@@ -509,10 +509,18 @@ describe("useSessionComposerState", () => {
                 },
                 submitAs: "typedRuntimeCommand",
               },
+              {
+                id: "claude-code.slash.db:migrate",
+                name: "db:migrate",
+                availability: {
+                  duringActiveTurn: "enabled",
+                },
+                submitAs: "typedRuntimeCommand",
+              },
             ],
           },
         ]}
-        composerText="/goal ship the command"
+        composerText="/db:migrate production"
         executeTypedRuntimeCommand={(command) => {
           submittedRuntimeCommands.push(command);
           return true;
@@ -525,8 +533,8 @@ describe("useSessionComposerState", () => {
 
     expect(submittedRuntimeCommands).toEqual([
       {
-        commandId: "codex.goal",
-        text: "/goal ship the command",
+        commandId: "claude-code.slash.db:migrate",
+        text: "/db:migrate production",
       },
     ]);
     expect(screen.getByTestId("submitted-prompt").textContent).toBe("");

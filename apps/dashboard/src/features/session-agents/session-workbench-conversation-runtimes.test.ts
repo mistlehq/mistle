@@ -775,9 +775,14 @@ describe("buildClaudeCodeConversationRuntime", () => {
       commandId: "claude-code.slash.fix-issue",
       text: "/fix-issue 123 high",
     });
+    const acceptedNamespaced = runtime.composerRuntimeInput.executeTypedRuntimeCommand?.({
+      commandId: "claude-code.slash.db:migrate",
+      text: "/db:migrate production",
+    });
 
     expect(accepted).toBe(true);
-    expect(startedPrompts).toEqual(["/fix-issue 123 high"]);
+    expect(acceptedNamespaced).toBe(true);
+    expect(startedPrompts).toEqual(["/fix-issue 123 high", "/db:migrate production"]);
   });
 
   it("rejects Claude Code slash commands while the session is busy", () => {
