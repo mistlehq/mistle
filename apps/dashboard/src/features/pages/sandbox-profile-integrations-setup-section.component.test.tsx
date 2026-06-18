@@ -141,23 +141,13 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(runtime.getByText("Jira Production")).toBeDefined();
   });
 
-  it("lets users add Tensorlake as a sandbox tool integration", async () => {
-    const addedRows: Array<{
-      kind: SandboxIntegrationBindingKind;
-      connectionId: string;
-      config: Record<string, unknown>;
-    }> = [];
-
+  it("does not include sandbox providers in the add integration or tool dialog", () => {
     render(
       <TestSandboxProfileIntegrationsSetupSection
         overrides={{
-          availableConnections: [StoryTensorlakeConnection],
-          availableTargets: [StoryTensorlakeTarget],
+          availableConnections: [StoryTensorlakeConnection, StoryJiraConnection],
+          availableTargets: [StoryTensorlakeTarget, StoryJiraTarget],
           integrationRows: [],
-          onAddIntegrationBindingRow: async (row) => {
-            addedRows.push(row);
-            return true;
-          },
         }}
       />,
     );
@@ -165,20 +155,8 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add integration or tool" }));
 
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText("Tensorlake")).toBeDefined();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Add" }));
-
-    await waitFor(() => {
-      expect(addedRows).toEqual([
-        {
-          kind: "sandbox",
-          connectionId: StoryTensorlakeConnection.id,
-          config: {
-            tools: [],
-          },
-        },
-      ]);
-    });
+    expect(within(dialog).queryByText("Tensorlake")).toBeNull();
+    expect(within(dialog).getByText("Jira")).toBeDefined();
   });
 
   it("keeps saved pull request activity routing visible after the GitHub git connection is removed", () => {
@@ -1006,6 +984,39 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     const setupLink = within(dialog).getByRole("link", { name: "Setup integration" });
     expect(setupLink.getAttribute("href")).toBe("/integrations/target-datadog/add");
     expect(setupLink.getAttribute("target")).toBe("_blank");
+  });
+
+  it("filters the add integration or tool dialog with the shared integrations search field", () => {
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryJiraConnection],
+          availableTargets: [StoryDatadogTarget, StoryJiraTarget],
+          integrationRows: [],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add integration or tool" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Add integration or tool" });
+    expect(within(dialog).getByText("Datadog")).toBeDefined();
+    expect(within(dialog).getByText("Jira")).toBeDefined();
+
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Search integrations" }), {
+      target: { value: "jira" },
+    });
+
+    expect(within(dialog).queryByText("Datadog")).toBeNull();
+    expect(within(dialog).getByText("Jira")).toBeDefined();
+
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Search integrations" }), {
+      target: { value: "not-a-provider" },
+    });
+
+    expect(within(dialog).queryByText("Datadog")).toBeNull();
+    expect(within(dialog).queryByText("Jira")).toBeNull();
+    expect(within(dialog).getByText('No integrations match "not-a-provider".')).toBeDefined();
   });
 
   it("keeps stale connector bindings visible so they can be removed", () => {

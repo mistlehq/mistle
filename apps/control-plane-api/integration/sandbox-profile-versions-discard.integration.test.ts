@@ -153,6 +153,73 @@ describe.concurrent("sandbox profile versions discard integration", () => {
     expect(refreshSchedule?.deletedAt).not.toBeNull();
   });
 
+  it("discards a draft sourced from a published version when no active version exists", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email:
+        "integration-new-sandbox-profile-version-discard-published-source-no-active@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_discard_published_source_no_active_001",
+        organizationId: session.organizationId,
+        displayName: "Discard Published Source No Active Profile",
+        activeVersion: null,
+        createdAt: "2026-04-24T00:30:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_discard_published_source_no_active_001",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: "2026-04-24T00:31:00.000Z",
+      }),
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_discard_published_source_no_active_001",
+        version: 2,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: "2026-04-24T00:32:00.000Z",
+      }),
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_discard_published_source_no_active_001",
+        version: 3,
+        state: SandboxProfileVersionStates.DRAFT,
+      }),
+    ]);
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_discard_published_source_no_active_001/versions/3/discard",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(DiscardSandboxProfileVersionDraftResponseSchema.parse(await response.json())).toEqual({
+      discardedVersion: 3,
+      hasDraft: false,
+    });
+
+    const profile = await env.controlPlaneDb.query.sandboxProfiles.findFirst({
+      where: (table, { eq }) => eq(table.id, "sbp_version_discard_published_source_no_active_001"),
+    });
+    const discardedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.sandboxProfileId, "sbp_version_discard_published_source_no_active_001"),
+          eq(table.version, 3),
+        ),
+    });
+
+    expect(profile?.activeVersion).toBeNull();
+    expect(discardedVersion).toBeUndefined();
+  });
+
   it("rejects discarding a published version", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-discard-published@example.com",
