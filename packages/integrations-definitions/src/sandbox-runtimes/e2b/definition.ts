@@ -1,10 +1,11 @@
 import {
   IntegrationConnectionMethodIds,
   IntegrationKinds,
-  type CompileBindingResult,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 
+import { resolveE2BBindingConfigForm } from "./binding-config-form.js";
+import { compileE2BBinding } from "./compile-binding.js";
 import {
   E2BSandboxRuntimeCredentialSecretTypes,
   E2BSandboxRuntimeCredentialSlotKeys,
@@ -28,12 +29,6 @@ type E2BSandboxRuntimeIntegrationDefinition = IntegrationDefinition<
   E2BSandboxRuntimeConnectionConfig
 >;
 
-const EmptyCompileBindingResult: CompileBindingResult = {
-  egressRoutes: [],
-  artifacts: [],
-  runtimeClients: [],
-};
-
 export const E2BSandboxRuntimeDefinition: E2BSandboxRuntimeIntegrationDefinition = {
   familyId: E2BSandboxRuntimeFamilyId,
   variantId: E2BSandboxRuntimeVariantId,
@@ -49,6 +44,7 @@ export const E2BSandboxRuntimeDefinition: E2BSandboxRuntimeIntegrationDefinition
   targetConfigSchema: E2BSandboxRuntimeTargetConfigSchema,
   targetSecretSchema: E2BSandboxRuntimeTargetSecretSchema,
   bindingConfigSchema: E2BSandboxRuntimeBindingConfigSchema,
+  bindingConfigForm: resolveE2BBindingConfigForm,
   connectionMethods: [
     {
       id: IntegrationConnectionMethodIds.API_KEY,
@@ -67,5 +63,5 @@ export const E2BSandboxRuntimeDefinition: E2BSandboxRuntimeIntegrationDefinition
       configSchema: E2BSandboxRuntimeConnectionConfigSchema,
     },
   ],
-  compileBinding: () => EmptyCompileBindingResult,
+  compileBinding: compileE2BBinding,
 };
