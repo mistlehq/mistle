@@ -99,13 +99,20 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain("{ effort: input.reasoningEffort }");
   });
 
-  it("enables Mistle-selected Claude Code skills through SDK query options", () => {
+  it("enables Mistle-selected and repo-local Claude Code skills through SDK query options", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain("process.env.MISTLE_CLAUDE_CODE_SKILLS");
     expect(ClaudeCodeRuntimeServerBundle).toContain(
       "MISTLE_CLAUDE_CODE_SKILLS must be a JSON array of skill names.",
     );
     expect(ClaudeCodeRuntimeServerBundle).not.toContain("settingSources");
-    expect(ClaudeCodeRuntimeServerBundle).toContain("skills: selectedClaudeCodeSkills");
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      'const claudeCodeProjectSkillsDirectory = ".claude/skills";',
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain('const claudeCodeSkillFileName = "SKILL.md";');
+    expect(ClaudeCodeRuntimeServerBundle).toContain("selectedClaudeCodeSkills.length === 0");
+    expect(ClaudeCodeRuntimeServerBundle).toContain("skillAllowlist.length === 0");
+    expect(ClaudeCodeRuntimeServerBundle).toContain("skills: skillAllowlist");
+    expect(ClaudeCodeRuntimeServerBundle).toContain("if (projectSkillsRoot !== userSkillsRoot)");
   });
 
   it("surfaces Claude Code SDK permission requests through runtime RPC state", () => {
