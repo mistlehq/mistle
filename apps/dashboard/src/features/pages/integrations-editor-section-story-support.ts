@@ -10,6 +10,7 @@ import {
   WasenderApiToolIds,
   WhapiToolIds,
 } from "@mistle/integrations-definitions";
+import { listBrowserIntegrationDefinitions } from "@mistle/integrations-definitions/browser";
 import { QueryClient } from "@tanstack/react-query";
 
 import { createGithubRepositoryResources } from "../forms/integration-resource-picker-story-support.js";
@@ -487,6 +488,32 @@ export const StoryIntegrationTargets = [
   StoryWhapiTarget,
   StorySlackTarget,
 ] as const;
+
+export function createExhaustiveStoryIntegrationTargets(): readonly IntegrationTargetSummary[] {
+  const storyTargetKeys = new Set(
+    StoryIntegrationTargets.map((target) => `${target.familyId}/${target.variantId}`),
+  );
+  const registryTargets = listBrowserIntegrationDefinitions()
+    .filter((definition) => !storyTargetKeys.has(`${definition.familyId}/${definition.variantId}`))
+    .map((definition): IntegrationTargetSummary => {
+      return {
+        targetKey: definition.variantId,
+        displayName: definition.displayName,
+        ...(definition.logoKey === undefined ? {} : { logoKey: definition.logoKey }),
+        familyId: definition.familyId,
+        variantId: definition.variantId,
+        config: {},
+        targetHealth: {
+          configStatus: "valid",
+        },
+      };
+    });
+
+  return [...StoryIntegrationTargets, ...registryTargets].sort((left, right) =>
+    left.displayName.localeCompare(right.displayName),
+  );
+}
+
 export const StoryIntegrationConnections = [
   StoryOpenAiConnection,
   StoryAnthropicConnection,

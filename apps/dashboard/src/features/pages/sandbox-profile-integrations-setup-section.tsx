@@ -45,6 +45,7 @@ import {
   type ResponsiveFieldListColumn,
   ResponsiveFieldListRow,
 } from "../shared/responsive-field-list.js";
+import { ToolbarSearchInput } from "../shared/toolbar-search-input.js";
 import {
   SandboxProfileAssociatedResourceRoutingFieldGroup,
   type SandboxProfileAssociatedResourceRoutingDraftState,
@@ -608,33 +609,19 @@ function resolveKindChoices(input: {
   return choices;
 }
 
-function targetExposesAddableSandboxTools(target: IntegrationTargetSummary): boolean {
-  const definition = IntegrationRegistry.getDefinition({
-    familyId: target.familyId,
-    variantId: target.variantId,
+function filterIntegrationChoices(input: {
+  choices: readonly IntegrationChoice[];
+  searchValue: string;
+}): readonly IntegrationChoice[] {
+  const normalizedSearchValue = input.searchValue.trim().toLowerCase();
+  if (normalizedSearchValue.length === 0) {
+    return input.choices;
+  }
+
+  return input.choices.filter((choice) => {
+    const haystack = [choice.title, choice.id].join(" ").toLowerCase();
+    return haystack.includes(normalizedSearchValue);
   });
-
-  return definition?.kind === "sandbox" && definition.bindingConfigForm !== undefined;
-}
-
-function resolveAddableIntegrationChoices(input: {
-  availableConnections: readonly IntegrationConnectionSummary[];
-  availableTargets: readonly IntegrationTargetSummary[];
-}): IntegrationChoice[] {
-  return [
-    ...resolveKindChoices({
-      kind: "connector",
-      availableConnections: input.availableConnections,
-      availableTargets: input.availableTargets,
-      includeDisconnectedTargets: true,
-    }),
-    ...resolveKindChoices({
-      kind: "sandbox",
-      availableConnections: input.availableConnections,
-      availableTargets: input.availableTargets.filter(targetExposesAddableSandboxTools),
-      includeDisconnectedTargets: true,
-    }),
-  ];
 }
 
 function targetAllowsAgentRuntime(input: {
@@ -879,6 +866,7 @@ export function SandboxProfileIntegrationsSetupSection(
   input: SandboxProfileIntegrationsSetupSectionProps,
 ): React.JSX.Element {
   const [isAddConnectorsDialogOpen, setIsAddConnectorsDialogOpen] = useState(false);
+  const [addConnectorSearchValue, setAddConnectorSearchValue] = useState("");
   const [gitAssociatedResourceRoutingDraftState, setGitAssociatedResourceRoutingDraftState] =
     useState<SandboxProfileAssociatedResourceRoutingDraftState>(
       IdleAssociatedResourceRoutingDraftState,
@@ -899,9 +887,11 @@ export function SandboxProfileIntegrationsSetupSection(
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
   });
-  const addableIntegrationChoices = resolveAddableIntegrationChoices({
+  const addableIntegrationChoices = resolveKindChoices({
+    kind: "connector",
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
+    includeDisconnectedTargets: true,
   });
 
   function publishAssociatedResourceRoutingDraftState(inputValue: {
@@ -1003,6 +993,11 @@ export function SandboxProfileIntegrationsSetupSection(
   const addConnectorChoices = addableIntegrationChoices.filter(
     (choice) => !selectedConnectorTargetKeys.has(choice.id),
   );
+  const visibleAddConnectorChoices = filterIntegrationChoices({
+    choices: addConnectorChoices,
+    searchValue: addConnectorSearchValue,
+  });
+  const normalizedAddConnectorSearchValue = addConnectorSearchValue.trim();
   const agentIssues = agentRows.map((row) =>
     resolveBindingIssue({
       row,
@@ -1669,23 +1664,42 @@ export function SandboxProfileIntegrationsSetupSection(
       <Dialog
         onOpenChange={(nextOpen) => {
           setIsAddConnectorsDialogOpen(nextOpen);
+          if (!nextOpen) {
+            setAddConnectorSearchValue("");
+          }
         }}
         open={isAddConnectorsDialogOpen}
       >
-        <DialogContent className="sm:max-w-4xl">
+        <DialogContent className="max-h-[calc(100svh-2rem)] grid-rows-[auto_minmax(0,1fr)] sm:max-w-4xl">
           <DialogHeader variant="sectioned">
             <DialogTitle>Add integration or tool</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {addConnectorChoices.map((choice) => (
-              <AddIntegrationTile
-                choice={choice}
-                key={choice.id}
-                onAdd={(selectedChoice) => {
-                  void addConnector(selectedChoice);
-                }}
-              />
-            ))}
+          <div className="flex min-h-0 flex-col gap-3">
+            <ToolbarSearchInput
+              ariaLabel="Search integrations"
+              onValueChange={setAddConnectorSearchValue}
+              placeholder="Search integrations"
+              value={addConnectorSearchValue}
+            />
+            {visibleAddConnectorChoices.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                No integrations match "{normalizedAddConnectorSearchValue}".
+              </p>
+            ) : (
+              <div className="min-h-0 overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  {visibleAddConnectorChoices.map((choice) => (
+                    <AddIntegrationTile
+                      choice={choice}
+                      key={choice.id}
+                      onAdd={(selectedChoice) => {
+                        void addConnector(selectedChoice);
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
