@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "storybook": "storybook dev -p 6006 --ci",
+    "storybook": "ulimit -n 65536 && storybook dev -p 6006 --ci",
     "build-storybook": "storybook build",
     "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsgo --noEmit --project ./tsconfig.json",
