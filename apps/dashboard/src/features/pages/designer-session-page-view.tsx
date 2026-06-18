@@ -12,6 +12,7 @@ import type {
   DesignerSession,
 } from "../designer/designer-service.js";
 import { hydrateCodexChatEntriesFromThreadReadTurns } from "../session-agents/codex/session-state/index.js";
+import { ServerRequestsPanel } from "../session-agents/server-requests/index.js";
 import { formatDesignerActionRequestOperationResult } from "./designer-action-proposal-response-copy.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 
@@ -32,10 +33,14 @@ export type DesignerSessionPageViewProps = {
   ) => void;
   onFollowUpDraftChange: (draft: string) => void;
   onFollowUpSubmit: () => void;
+  onUserInputRequestResponseSubmit: (requestId: string | number, result: unknown) => void;
   runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
   runtimeConversationTranscript: DesignerRuntimeConversationTranscript | null;
   transcriptErrorMessage: string | null;
   transcriptIsPending: boolean;
+  userInputRequestResponseErrorMessage: string | null;
+  userInputRequestResponseIsPending: boolean;
+  userInputRequestResponsePendingId: string | number | null;
   session: DesignerSession | null;
   sessionId: string;
 };
@@ -190,11 +195,15 @@ function RuntimeConversationPreview(input: {
   ) => void;
   onFollowUpDraftChange: (draft: string) => void;
   onFollowUpSubmit: () => void;
+  onUserInputRequestResponseSubmit: (requestId: string | number, result: unknown) => void;
   runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
   runtimeConversationTranscript: DesignerRuntimeConversationTranscript | null;
   session: DesignerSession | null;
   transcriptErrorMessage: string | null;
   transcriptIsPending: boolean;
+  userInputRequestResponseErrorMessage: string | null;
+  userInputRequestResponseIsPending: boolean;
+  userInputRequestResponsePendingId: string | number | null;
 }): React.JSX.Element | null {
   const initialPrompt = input.session?.initialPrompt ?? null;
   if (initialPrompt === null) {
@@ -255,6 +264,26 @@ function RuntimeConversationPreview(input: {
           pendingProposalId={input.actionProposalResponsePendingId}
           proposals={input.runtimeConversationTranscript?.actionProposals ?? []}
           successMessage={input.actionProposalResponseSuccessMessage}
+        />
+        <ServerRequestsPanel
+          entries={(input.runtimeConversationTranscript?.userInputRequests ?? []).map((entry) => {
+            const isPendingResponse =
+              input.userInputRequestResponsePendingId !== null &&
+              String(entry.requestId) === String(input.userInputRequestResponsePendingId);
+
+            return {
+              ...entry,
+              responseErrorMessage: isPendingResponse
+                ? input.userInputRequestResponseErrorMessage
+                : entry.responseErrorMessage,
+              status:
+                input.userInputRequestResponseIsPending && isPendingResponse
+                  ? "responding"
+                  : entry.status,
+            };
+          })}
+          isRespondingToServerRequest={input.userInputRequestResponseIsPending}
+          onRespondToServerRequest={input.onUserInputRequestResponseSubmit}
         />
         <div className="mt-3">
           <ChatComposer
@@ -601,11 +630,15 @@ export function DesignerSessionPageView(input: DesignerSessionPageViewProps): Re
               onActionProposalResponseSubmit={input.onActionProposalResponseSubmit}
               onFollowUpDraftChange={input.onFollowUpDraftChange}
               onFollowUpSubmit={input.onFollowUpSubmit}
+              onUserInputRequestResponseSubmit={input.onUserInputRequestResponseSubmit}
               runtimeConversationBootstrap={input.runtimeConversationBootstrap}
               runtimeConversationTranscript={input.runtimeConversationTranscript}
               session={input.session}
               transcriptErrorMessage={input.transcriptErrorMessage}
               transcriptIsPending={input.transcriptIsPending}
+              userInputRequestResponseErrorMessage={input.userInputRequestResponseErrorMessage}
+              userInputRequestResponseIsPending={input.userInputRequestResponseIsPending}
+              userInputRequestResponsePendingId={input.userInputRequestResponsePendingId}
             />
           </div>
         </div>

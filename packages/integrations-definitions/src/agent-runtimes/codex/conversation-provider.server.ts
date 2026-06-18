@@ -954,6 +954,9 @@ async function initializeProviderConnection(
       notify: async (notificationInput) => {
         await rpcClient.notify(notificationInput.method, notificationInput.params);
       },
+      respondToServerRequest: async (responseInput) => {
+        await rpcClient.respond(responseInput.requestId, responseInput.result);
+      },
       close: async () => {
         rpcClient.dispose();
         await connection.close();
@@ -1270,6 +1273,30 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
     },
     steerExecution: steerCodexExecution,
     submitAssociatedResourceDelivery: submitCodexAssociatedResourceDelivery,
+    respondToServerRequest: async (input) => {
+      if (input.connection.respondToServerRequest === undefined) {
+        throw new ConversationProviderError({
+          code: ConversationProviderErrorCodes.PROVIDER_START_EXECUTION_FAILED,
+          message: "Codex connection does not support server request responses.",
+        });
+      }
+
+      try {
+        await input.connection.respondToServerRequest({
+          requestId: input.requestId,
+          result: input.result,
+        });
+      } catch (error) {
+        throw new ConversationProviderError({
+          code: ConversationProviderErrorCodes.PROVIDER_START_EXECUTION_FAILED,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Codex server request response failed with non-error exception.",
+          cause: error,
+        });
+      }
+    },
     interruptExecution: async (input) => {
       try {
         await input.connection.request({

@@ -78,6 +78,27 @@ export const submitDesignerActionProposalResponseBodySchema = z
   })
   .strict();
 
+const designerUserInputRequestIdSchema = z.union([z.string().min(1), z.number()]);
+
+export const designerUserInputRequestIdParamsSchema = designerSessionIdParamsSchema
+  .extend({
+    requestId: z.string().min(1).max(255),
+  })
+  .strict();
+
+const designerUserInputRequestAnswerSchema = z
+  .object({
+    id: z.string().min(1).max(128),
+    value: z.string().trim().min(1).max(10_000),
+  })
+  .strict();
+
+export const submitDesignerUserInputRequestResponseBodySchema = z
+  .object({
+    answers: z.array(designerUserInputRequestAnswerSchema).min(1).max(3),
+  })
+  .strict();
+
 export const designerSessionSchema = z
   .object({
     id: z.string().min(1),
@@ -199,6 +220,34 @@ const designerRuntimeConversationTranscriptTurnSchema = z
   })
   .strict();
 
+const designerUserInputRequestOptionSchema = z
+  .object({
+    label: z.string().min(1).max(240),
+    description: z.string().min(1).max(2_000).nullable(),
+    isOther: z.boolean(),
+  })
+  .strict();
+
+const designerUserInputRequestQuestionSchema = z
+  .object({
+    header: z.string().min(1).max(120).nullable(),
+    id: z.string().min(1).max(128),
+    options: z.array(designerUserInputRequestOptionSchema).max(12),
+    question: z.string().min(1).max(2_000),
+  })
+  .strict();
+
+export const designerUserInputRequestSchema = z
+  .object({
+    requestId: designerUserInputRequestIdSchema,
+    method: z.literal("tool/requestUserInput"),
+    kind: z.literal("tool-user-input"),
+    questions: z.array(designerUserInputRequestQuestionSchema).min(1).max(3),
+    status: z.enum(["pending", "responding"]),
+    responseErrorMessage: z.string().min(1).nullable(),
+  })
+  .strict();
+
 const designerActionProposalDetailSchema = z
   .object({
     label: z.string().min(1).max(120),
@@ -304,6 +353,7 @@ const designerRuntimeConversationTranscriptSchema = z
     preview: z.string().nullable(),
     turns: z.array(designerRuntimeConversationTranscriptTurnSchema),
     actionProposals: z.array(designerActionProposalSchema),
+    userInputRequests: z.array(designerUserInputRequestSchema),
   })
   .strict();
 
@@ -333,6 +383,17 @@ export const submitDesignerActionProposalResponseResponseSchema = z
     actionRequest: designerActionRequestSchema,
   })
   .strict();
+export const submitDesignerUserInputRequestResponseResponseSchema = z
+  .object({
+    userInputRequestResponse: z
+      .object({
+        requestId: designerUserInputRequestIdSchema,
+        providerConversationId: z.string().min(1),
+        submittedAt: z.string().min(1),
+      })
+      .strict(),
+  })
+  .strict();
 export const getDesignerRuntimeConversationTranscriptResponseSchema = z
   .object({
     runtimeConversationTranscript: designerRuntimeConversationTranscriptSchema,
@@ -344,6 +405,7 @@ export type DesignerActionProposal = z.infer<typeof designerActionProposalSchema
 export type DesignerProviderActionProposal = z.infer<typeof designerProviderActionProposalSchema>;
 export type DesignerActionRequestState = z.infer<typeof designerActionRequestSchema>;
 export type DesignerActionProposalResponse = z.infer<typeof designerActionProposalResponseSchema>;
+export type DesignerUserInputRequest = z.infer<typeof designerUserInputRequestSchema>;
 export type CreateDesignerSessionBody = z.infer<typeof createDesignerSessionBodySchema>;
 export type PutDesignerSessionCanvasTabsBody = z.infer<
   typeof putDesignerSessionCanvasTabsBodySchema
@@ -354,6 +416,9 @@ export type SubmitDesignerRuntimeFollowUpBody = z.infer<
 export type SubmitDesignerActionProposalResponseBody = z.infer<
   typeof submitDesignerActionProposalResponseBodySchema
 >;
+export type SubmitDesignerUserInputRequestResponseBody = z.infer<
+  typeof submitDesignerUserInputRequestResponseBodySchema
+>;
 export type BootstrapDesignerRuntimeConversationResponse = z.infer<
   typeof bootstrapDesignerRuntimeConversationResponseSchema
 >;
@@ -362,6 +427,9 @@ export type SubmitDesignerRuntimeFollowUpResponse = z.infer<
 >;
 export type SubmitDesignerActionProposalResponseResponse = z.infer<
   typeof submitDesignerActionProposalResponseResponseSchema
+>;
+export type SubmitDesignerUserInputRequestResponseResponse = z.infer<
+  typeof submitDesignerUserInputRequestResponseResponseSchema
 >;
 export type GetDesignerRuntimeConversationTranscriptResponse = z.infer<
   typeof getDesignerRuntimeConversationTranscriptResponseSchema

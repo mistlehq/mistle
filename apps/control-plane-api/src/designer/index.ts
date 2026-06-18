@@ -13,4 +13,5 @@ export {
   putDesignerSessionCanvasTabsResponseSchema as PutDesignerSessionCanvasTabsResponseSchema,
   submitDesignerActionProposalResponseResponseSchema as SubmitDesignerActionProposalResponseResponseSchema,
   submitDesignerRuntimeFollowUpResponseSchema as SubmitDesignerRuntimeFollowUpResponseSchema,
+  submitDesignerUserInputRequestResponseResponseSchema as SubmitDesignerUserInputRequestResponseResponseSchema,
 } from "./schemas.js";

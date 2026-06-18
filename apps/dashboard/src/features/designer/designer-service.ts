@@ -166,6 +166,36 @@ const DesignerRuntimeConversationTranscriptTurnSchema = z
   })
   .strict();
 
+const DesignerUserInputRequestIdSchema = z.union([z.string().min(1), z.number()]);
+
+const DesignerUserInputRequestOptionSchema = z
+  .object({
+    label: z.string().min(1),
+    description: z.string().min(1).nullable(),
+    isOther: z.boolean(),
+  })
+  .strict();
+
+const DesignerUserInputRequestQuestionSchema = z
+  .object({
+    header: z.string().min(1).nullable(),
+    id: z.string().min(1),
+    options: z.array(DesignerUserInputRequestOptionSchema),
+    question: z.string().min(1),
+  })
+  .strict();
+
+const DesignerUserInputRequestSchema = z
+  .object({
+    requestId: DesignerUserInputRequestIdSchema,
+    method: z.literal("tool/requestUserInput"),
+    kind: z.literal("tool-user-input"),
+    questions: z.array(DesignerUserInputRequestQuestionSchema),
+    status: z.enum(["pending", "responding"]),
+    responseErrorMessage: z.string().min(1).nullable(),
+  })
+  .strict();
+
 const DesignerActionProposalDetailSchema = z
   .object({
     label: z.string().min(1),
@@ -245,8 +275,34 @@ const GetDesignerRuntimeConversationTranscriptResponseSchema = z
         preview: z.string().nullable(),
         turns: z.array(DesignerRuntimeConversationTranscriptTurnSchema),
         actionProposals: z.array(DesignerActionProposalSchema),
+        userInputRequests: z.array(DesignerUserInputRequestSchema),
       })
       .strict(),
+  })
+  .strict();
+
+const SubmitDesignerUserInputRequestResponseResponseSchema = z
+  .object({
+    userInputRequestResponse: z
+      .object({
+        requestId: DesignerUserInputRequestIdSchema,
+        providerConversationId: z.string().min(1),
+        submittedAt: z.string().min(1),
+      })
+      .strict(),
+  })
+  .strict();
+
+const SubmitDesignerUserInputRequestResponseBodySchema = z
+  .object({
+    answers: z.array(
+      z
+        .object({
+          id: z.string().min(1),
+          value: z.string().trim().min(1),
+        })
+        .strict(),
+    ),
   })
   .strict();
 
@@ -260,6 +316,9 @@ export type DesignerRuntimeFollowUpSubmission = z.output<
 export type DesignerActionProposalResponse = z.output<typeof DesignerActionProposalResponseSchema>;
 export type DesignerActionProposalResponseResult = z.output<
   typeof SubmitDesignerActionProposalResponseResponseSchema
+>;
+export type DesignerUserInputRequestResponseResult = z.output<
+  typeof SubmitDesignerUserInputRequestResponseResponseSchema
 >;
 export type DesignerRuntimeConversationTranscript = z.output<
   typeof GetDesignerRuntimeConversationTranscriptResponseSchema
@@ -507,6 +566,47 @@ export async function submitDesignerActionProposalResponse(input: {
         operation: "submitDesignerActionProposalResponse",
         error,
         fallbackMessage: "Could not submit Designer action proposal response.",
+      }),
+    );
+  }
+}
+
+export async function submitDesignerUserInputRequestResponse(input: {
+  sessionId: string;
+  requestId: string | number;
+  result: unknown;
+  signal?: AbortSignal;
+}): Promise<DesignerUserInputRequestResponseResult> {
+  try {
+    const requestBody = SubmitDesignerUserInputRequestResponseBodySchema.parse(input.result);
+    const response = await requestControlPlane({
+      operation: "submitDesignerUserInputRequestResponse",
+      method: "POST",
+      pathname: `/v1/designer/sessions/${encodeURIComponent(input.sessionId)}/runtime-conversation/user-input-requests/${encodeURIComponent(String(input.requestId))}/responses`,
+      body: requestBody,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not submit Designer user input response.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse =
+      SubmitDesignerUserInputRequestResponseResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new DesignerApiError({
+        operation: "submitDesignerUserInputRequestResponse",
+        status: 500,
+        body: responseBody,
+        message: "Designer user input response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new DesignerApiError(
+      normalizeHttpApiError({
+        operation: "submitDesignerUserInputRequestResponse",
+        error,
+        fallbackMessage: "Could not submit Designer user input response.",
       }),
     );
   }

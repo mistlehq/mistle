@@ -17,6 +17,7 @@ import {
   getDesignerSession,
   submitDesignerActionProposalResponse,
   submitDesignerRuntimeFollowUp,
+  submitDesignerUserInputRequestResponse,
   type DesignerActionProposalResponse,
   type DesignerRuntimeConversationTranscript,
   type DesignerSession,
@@ -244,6 +245,27 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
       });
     },
   });
+  const submitUserInputRequestResponseMutation = useMutation({
+    mutationFn: async (input: { sessionId: string; requestId: string | number; result: unknown }) =>
+      submitDesignerUserInputRequestResponse({
+        sessionId: input.sessionId,
+        requestId: input.requestId,
+        result: input.result,
+      }),
+    onSuccess: (_submission, variables) => {
+      if (variables.sessionId !== sessionId) {
+        return;
+      }
+
+      void invalidateDesignerSessionQuery({
+        queryClient,
+        sessionId: variables.sessionId,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [...designerRuntimeConversationTranscriptQueryKey, variables.sessionId],
+      });
+    },
+  });
   const runtimeConversationTranscriptQuery = useQuery({
     queryKey: [...designerRuntimeConversationTranscriptQueryKey, sessionId],
     queryFn: async ({ signal }) =>
@@ -265,6 +287,11 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
     submitActionProposalResponseMutation.isPending &&
     submitActionProposalResponseMutation.variables !== undefined
       ? submitActionProposalResponseMutation.variables.proposalId
+      : null;
+  const pendingUserInputRequestResponseId =
+    submitUserInputRequestResponseMutation.isPending &&
+    submitUserInputRequestResponseMutation.variables !== undefined
+      ? submitUserInputRequestResponseMutation.variables.requestId
       : null;
 
   return (
@@ -350,6 +377,31 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
           idempotencyKey: crypto.randomUUID(),
         });
       }}
+      onUserInputRequestResponseSubmit={(requestId, result) => {
+        if (
+          runtimeConversationBootstrapQuery.data === undefined ||
+          submitUserInputRequestResponseMutation.isPending
+        ) {
+          return;
+        }
+
+        if (!submitFollowUpMutation.isPending) {
+          submitFollowUpMutation.reset();
+        }
+        if (!submitActionProposalResponseMutation.isPending) {
+          submitActionProposalResponseMutation.reset();
+        }
+        submitUserInputRequestResponseMutation.mutate({
+          sessionId,
+          requestId,
+          result,
+        });
+      }}
+      userInputRequestResponseErrorMessage={
+        submitUserInputRequestResponseMutation.error?.message ?? null
+      }
+      userInputRequestResponseIsPending={submitUserInputRequestResponseMutation.isPending}
+      userInputRequestResponsePendingId={pendingUserInputRequestResponseId}
       session={session}
       sessionId={sessionId}
     />

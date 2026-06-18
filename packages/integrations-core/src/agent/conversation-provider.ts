@@ -14,6 +14,10 @@ export type AgentConversationNotification = {
 export type AgentConversationConnection = {
   request(this: void, input: AgentConversationRequest): Promise<unknown>;
   notify?(this: void, input: AgentConversationNotification): Promise<void>;
+  respondToServerRequest?(
+    this: void,
+    input: { requestId: string | number; result: unknown },
+  ): Promise<void>;
   close(this: void): Promise<void>;
 };
 
@@ -161,6 +165,13 @@ export type AgentConversationInterruptExecutionInput = {
   providerExecutionId: string;
 };
 
+export type AgentConversationRespondToServerRequestInput = {
+  connection: AgentConversationConnection;
+  providerConversationId: string;
+  requestId: string | number;
+  result: unknown;
+};
+
 export type AgentConversationProvider = {
   connect(this: void, input: AgentConversationConnectInput): Promise<AgentConversationConnection>;
   inspectConversation(
@@ -204,5 +215,9 @@ export type AgentConversationProvider = {
     this: void,
     input: AgentConversationSubmitAssociatedResourceDeliveryInput,
   ): Promise<AgentConversationSubmitAssociatedResourceDeliveryResult>;
+  respondToServerRequest?(
+    this: void,
+    input: AgentConversationRespondToServerRequestInput,
+  ): Promise<void>;
   interruptExecution(this: void, input: AgentConversationInterruptExecutionInput): Promise<void>;
 };

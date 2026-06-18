@@ -59,12 +59,15 @@ import type {
   CreateDesignerSessionBody,
   DesignerProviderActionProposal,
   DesignerSessionResponse,
+  DesignerUserInputRequest,
   GetDesignerRuntimeConversationTranscriptResponse,
   PutDesignerSessionCanvasTabsBody,
   SubmitDesignerActionProposalResponseBody,
   SubmitDesignerActionProposalResponseResponse,
   SubmitDesignerRuntimeFollowUpBody,
   SubmitDesignerRuntimeFollowUpResponse,
+  SubmitDesignerUserInputRequestResponseBody,
+  SubmitDesignerUserInputRequestResponseResponse,
 } from "../schemas.js";
 import {
   createDesignerActionProposalResponsePrompt,
@@ -84,6 +87,7 @@ import {
   executeApprovedDesignerOperation,
   type DesignerOperationExecutionContext,
 } from "./designer-operation-handlers.js";
+import { splitDesignerUserInputRequestsFromTranscriptTurns } from "./designer-user-input-requests.js";
 
 type DesignerSessionActor = {
   kind: SandboxInstanceStarterKind;
@@ -1163,11 +1167,14 @@ export async function getDesignerRuntimeConversationTranscript(
       connection,
       providerConversationId: designerSession.runtimeProviderConversationId,
     });
-    const splitTranscript = splitDesignerActionProposalsFromTranscriptTurns(transcript.turns);
+    const splitActionProposals = splitDesignerActionProposalsFromTranscriptTurns(transcript.turns);
+    const splitUserInputRequests = splitDesignerUserInputRequestsFromTranscriptTurns(
+      splitActionProposals.turns,
+    );
     const actionRequests = await readDesignerActionRequestsForProposals(ctx, {
       organizationId: input.organizationId,
       sessionId: designerSession.id,
-      proposalIds: splitTranscript.actionProposals.map((proposal) => proposal.id),
+      proposalIds: splitActionProposals.actionProposals.map((proposal) => proposal.id),
     });
 
     return {
@@ -1175,10 +1182,162 @@ export async function getDesignerRuntimeConversationTranscript(
         providerConversationId: transcript.providerConversationId,
         name: transcript.name,
         preview: transcript.preview,
-        turns: splitTranscript.turns,
+        turns: splitUserInputRequests.turns,
         actionProposals: hydrateDesignerActionProposalsWithActionRequests({
-          proposals: splitTranscript.actionProposals,
+          proposals: splitActionProposals.actionProposals,
           actionRequests,
+        }),
+        userInputRequests: splitUserInputRequests.userInputRequests,
+      },
+    };
+  } finally {
+    await connection.close();
+  }
+}
+
+export async function submitDesignerUserInputRequestResponse(
+  ctx: Omit<DesignerRuntimeConversationContext, "db"> & { db: ControlPlaneDatabase },
+  input: {
+    organizationId: string;
+    sessionId: string;
+    actingUserId: string;
+    requestId: string;
+    body: SubmitDesignerUserInputRequestResponseBody;
+  },
+): Promise<SubmitDesignerUserInputRequestResponseResponse> {
+  const designerSession = await readReadyRuntimeConversationDesignerSession(ctx, input);
+  const connectionToken = await mintDesignerRuntimeConnectionToken(ctx, {
+    organizationId: input.organizationId,
+    sandboxInstanceId: designerSession.sandboxInstanceId,
+    actingUserId: input.actingUserId,
+  });
+
+  return ctx.db.transaction(async (tx) => {
+    const lockAcquired = await acquireDesignerRuntimeSubmissionLock(tx, {
+      sessionId: input.sessionId,
+    });
+    if (!lockAcquired) {
+      throw new DesignerConflictError(
+        DesignerConflictCodes.DESIGNER_RUNTIME_CONVERSATION_BUSY,
+        `Designer session '${input.sessionId}' runtime conversation is still processing a previous turn.`,
+      );
+    }
+
+    return submitDesignerUserInputRequestResponseWithLock(
+      {
+        ...ctx,
+        db: tx,
+      },
+      {
+        organizationId: input.organizationId,
+        sessionId: input.sessionId,
+        requestId: input.requestId,
+        body: input.body,
+        connectionUrl: connectionToken.url,
+      },
+    );
+  });
+}
+
+function assertDesignerUserInputRequestResponseMatchesRequest(input: {
+  request: DesignerUserInputRequest;
+  body: SubmitDesignerUserInputRequestResponseBody;
+}): void {
+  const expectedQuestionIds = new Set(input.request.questions.map((question) => question.id));
+  const actualAnswerIds = new Set(input.body.answers.map((answer) => answer.id));
+  const hasExactAnswerIds =
+    expectedQuestionIds.size === input.body.answers.length &&
+    expectedQuestionIds.size === actualAnswerIds.size &&
+    input.body.answers.every((answer) => expectedQuestionIds.has(answer.id));
+
+  if (!hasExactAnswerIds) {
+    throw new DesignerBadRequestError(
+      DesignerBadRequestCodes.DESIGNER_USER_INPUT_REQUEST_RESPONSE_INVALID,
+      `Designer user input request '${String(input.request.requestId)}' requires exactly one answer for each requested question.`,
+    );
+  }
+}
+
+async function submitDesignerUserInputRequestResponseWithLock(
+  ctx: LockedDesignerRuntimeConversationContext,
+  input: {
+    organizationId: string;
+    sessionId: string;
+    requestId: string;
+    body: SubmitDesignerUserInputRequestResponseBody;
+    connectionUrl: string;
+  },
+): Promise<SubmitDesignerUserInputRequestResponseResponse> {
+  const designerSession = await readReadyRuntimeConversationDesignerSession(ctx, input);
+  const providerConversationId = designerSession.runtimeProviderConversationId;
+  const provider = resolveAgentConversationProvider(DesignerRuntimeId);
+  if (provider.readConversationTranscript === undefined) {
+    throw new Error(
+      `Agent runtime '${DesignerRuntimeId}' does not support runtime conversation transcript reads.`,
+    );
+  }
+  if (provider.respondToServerRequest === undefined) {
+    throw new Error(
+      `Agent runtime '${DesignerRuntimeId}' does not support server request responses.`,
+    );
+  }
+
+  const connection = await provider.connect({
+    connectionUrl: input.connectionUrl,
+  });
+
+  try {
+    await provider.resumeConversation({
+      connection,
+      providerConversationId,
+    });
+
+    const runtimeConversation = await provider.inspectConversation({
+      connection,
+      providerConversationId,
+    });
+    if (runtimeConversation.status !== AgentConversationStatuses.ACTIVE) {
+      throw new DesignerConflictError(
+        DesignerConflictCodes.DESIGNER_RUNTIME_CONVERSATION_BUSY,
+        `Designer session '${input.sessionId}' runtime conversation is not waiting for user input.`,
+      );
+    }
+
+    const transcript = await provider.readConversationTranscript({
+      connection,
+      providerConversationId,
+    });
+    const splitUserInputRequests = splitDesignerUserInputRequestsFromTranscriptTurns(
+      transcript.turns,
+    );
+    const request = splitUserInputRequests.userInputRequests.find(
+      (candidate) => String(candidate.requestId) === input.requestId,
+    );
+    if (request === undefined || request.status !== "pending") {
+      throw new DesignerConflictError(
+        DesignerConflictCodes.DESIGNER_USER_INPUT_REQUEST_NOT_PENDING,
+        `Designer user input request '${input.requestId}' is not pending.`,
+      );
+    }
+    assertDesignerUserInputRequestResponseMatchesRequest({
+      request,
+      body: input.body,
+    });
+
+    await provider.respondToServerRequest({
+      connection,
+      providerConversationId,
+      requestId: request.requestId,
+      result: input.body,
+    });
+
+    return {
+      userInputRequestResponse: {
+        requestId: request.requestId,
+        providerConversationId,
+        submittedAt: await markRuntimeSubmissionSubmitted(ctx, {
+          organizationId: input.organizationId,
+          sessionId: designerSession.id,
         }),
       },
     };

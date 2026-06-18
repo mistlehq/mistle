@@ -11,6 +11,7 @@ import * as listDesignerSessions from "./list-designer-sessions/index.js";
 import * as putDesignerSessionCanvasTabs from "./put-designer-session-canvas-tabs/index.js";
 import * as submitActionProposalResponse from "./submit-action-proposal-response/index.js";
 import * as submitRuntimeFollowUp from "./submit-runtime-follow-up/index.js";
+import * as submitUserInputRequestResponse from "./submit-user-input-request-response/index.js";
 
 export function createDesignerRoutes(): AppRoutes<typeof DESIGNER_ROUTE_BASE_PATH> {
   const routes = new OpenAPIHono<AppContextBindings>({
@@ -21,6 +22,7 @@ export function createDesignerRoutes(): AppRoutes<typeof DESIGNER_ROUTE_BASE_PAT
   routes.openapi(bootstrapRuntimeConversation.route, bootstrapRuntimeConversation.handler);
   routes.openapi(getRuntimeConversationTranscript.route, getRuntimeConversationTranscript.handler);
   routes.openapi(submitActionProposalResponse.route, submitActionProposalResponse.handler);
+  routes.openapi(submitUserInputRequestResponse.route, submitUserInputRequestResponse.handler);
   routes.openapi(submitRuntimeFollowUp.route, submitRuntimeFollowUp.handler);
   routes.openapi(listDesignerSessions.route, listDesignerSessions.handler);
   routes.openapi(getDesignerSession.route, getDesignerSession.handler);

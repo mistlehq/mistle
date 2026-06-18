@@ -390,6 +390,26 @@ describe.concurrent("designer sessions integration", () => {
       },
     );
     expect(rejectedActionProposalResponse.status).toBe(403);
+
+    const rejectedUserInputRequestResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/designer/sessions/${encodeURIComponent(created.id)}/runtime-conversation/user-input-requests/${encodeURIComponent("request_api_key_rejection")}/responses`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKeySecret.token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          answers: [
+            {
+              id: "repository",
+              value: "mistle/app",
+            },
+          ],
+        }),
+      },
+    );
+    expect(rejectedUserInputRequestResponse.status).toBe(403);
   });
 
   it("rejects Designer runtime follow-ups before the runtime conversation is ready", async ({

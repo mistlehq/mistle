@@ -64,6 +64,7 @@ const RuntimeConversationTranscript = {
     },
   ],
   actionProposals: [],
+  userInputRequests: [],
 } satisfies DesignerRuntimeConversationTranscript;
 
 const RuntimeConversationTranscriptWithActionProposal = {
@@ -234,6 +235,9 @@ function renderDesignerSessionPageView(input?: {
   session?: DesignerSession | null;
   transcriptErrorMessage?: string | null;
   transcriptIsPending?: boolean;
+  userInputRequestResponseErrorMessage?: string | null;
+  userInputRequestResponseIsPending?: boolean;
+  userInputRequestResponsePendingId?: string | number | null;
 }): void {
   render(
     <DesignerSessionPageView
@@ -250,12 +254,16 @@ function renderDesignerSessionPageView(input?: {
       onActionProposalResponseSubmit={() => {}}
       onFollowUpDraftChange={() => {}}
       onFollowUpSubmit={() => {}}
+      onUserInputRequestResponseSubmit={() => {}}
       runtimeConversationBootstrap={input?.runtimeConversationBootstrap ?? null}
       runtimeConversationTranscript={input?.runtimeConversationTranscript ?? null}
       session={input?.session ?? BaseDesignerSession}
       sessionId="dsn_test"
       transcriptErrorMessage={input?.transcriptErrorMessage ?? null}
       transcriptIsPending={input?.transcriptIsPending ?? false}
+      userInputRequestResponseErrorMessage={input?.userInputRequestResponseErrorMessage ?? null}
+      userInputRequestResponseIsPending={input?.userInputRequestResponseIsPending ?? false}
+      userInputRequestResponsePendingId={input?.userInputRequestResponsePendingId ?? null}
     />,
   );
 }
@@ -284,14 +292,90 @@ function DesignerSessionPageViewActionResponseHarness(): React.JSX.Element {
         }}
         onFollowUpDraftChange={() => {}}
         onFollowUpSubmit={() => {}}
+        onUserInputRequestResponseSubmit={() => {}}
         runtimeConversationBootstrap={RuntimeConversationBootstrap}
         runtimeConversationTranscript={RuntimeConversationTranscriptWithActionProposal}
         session={BaseDesignerSession}
         sessionId="dsn_test"
         transcriptErrorMessage={null}
         transcriptIsPending={false}
+        userInputRequestResponseErrorMessage={null}
+        userInputRequestResponseIsPending={false}
+        userInputRequestResponsePendingId={null}
       />
       <output aria-label="Submitted action proposal response">{submitted}</output>
+    </>
+  );
+}
+
+function DesignerSessionPageViewUserInputResponseHarness(): React.JSX.Element {
+  const [submitted, setSubmitted] = useState("none");
+
+  return (
+    <>
+      <DesignerSessionPageView
+        actionProposalResponseErrorMessage={null}
+        actionProposalResponsePendingId={null}
+        actionProposalResponseSuccessMessage={null}
+        bootstrapErrorMessage={null}
+        bootstrapIsPending={false}
+        errorMessage={null}
+        followUpDraft=""
+        followUpErrorMessage={null}
+        followUpIsPending={false}
+        followUpSuccessMessage={null}
+        onActionProposalResponseSubmit={() => {}}
+        onFollowUpDraftChange={() => {}}
+        onFollowUpSubmit={() => {}}
+        onUserInputRequestResponseSubmit={(requestId: string | number, result: unknown) => {
+          setSubmitted(
+            JSON.stringify({
+              requestId,
+              result,
+            }),
+          );
+        }}
+        runtimeConversationBootstrap={RuntimeConversationBootstrap}
+        runtimeConversationTranscript={{
+          ...RuntimeConversationTranscript,
+          userInputRequests: [
+            {
+              requestId: 7,
+              method: "tool/requestUserInput",
+              kind: "tool-user-input",
+              questions: [
+                {
+                  header: "Provider",
+                  id: "repository",
+                  question: "Which repository should Designer configure?",
+                  options: [
+                    {
+                      label: "mistle/app",
+                      description: "Production app repository",
+                      isOther: false,
+                    },
+                    {
+                      label: "Other",
+                      description: null,
+                      isOther: true,
+                    },
+                  ],
+                },
+              ],
+              status: "pending",
+              responseErrorMessage: null,
+            },
+          ],
+        }}
+        session={BaseDesignerSession}
+        sessionId="dsn_test"
+        transcriptErrorMessage={null}
+        transcriptIsPending={false}
+        userInputRequestResponseErrorMessage={null}
+        userInputRequestResponseIsPending={false}
+        userInputRequestResponsePendingId={null}
+      />
+      <output aria-label="Submitted user input response">{submitted}</output>
     </>
   );
 }
@@ -438,6 +522,84 @@ describe("DesignerSessionPageView", () => {
 
     expect(screen.getByLabelText("Submitted action proposal response").textContent).toBe(
       "dap_github_webhook_setup:approved",
+    );
+  });
+
+  it("submits Designer user input request responses with collected answers", () => {
+    render(<DesignerSessionPageViewUserInputResponseHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "mistle/app" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit responses" }));
+
+    expect(screen.getByLabelText("Submitted user input response").textContent).toBe(
+      '{"requestId":7,"result":{"answers":[{"id":"repository","value":"mistle/app"}]}}',
+    );
+  });
+
+  it("scopes Designer user input response status to the submitted request", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      runtimeConversationTranscript: {
+        ...RuntimeConversationTranscript,
+        userInputRequests: [
+          {
+            requestId: "request_repository",
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [
+              {
+                header: null,
+                id: "repository",
+                question: "Which repository should Designer configure?",
+                options: [
+                  {
+                    label: "mistle/app",
+                    description: null,
+                    isOther: false,
+                  },
+                ],
+              },
+            ],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+          {
+            requestId: "request_channel",
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [
+              {
+                header: null,
+                id: "channel",
+                question: "Which Slack channel should Designer use?",
+                options: [
+                  {
+                    label: "#support",
+                    description: null,
+                    isOther: false,
+                  },
+                ],
+              },
+            ],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ],
+      },
+      userInputRequestResponseErrorMessage: "Could not submit Designer user input response.",
+      userInputRequestResponseIsPending: true,
+      userInputRequestResponsePendingId: "request_repository",
+    });
+
+    expect(screen.getByText("Could not submit Designer user input response.")).toBeDefined();
+    expect(screen.getByText("Which Slack channel should Designer use?")).toBeDefined();
+    expect(screen.getAllByRole("button", { name: "Submit responses" })[0]).toHaveProperty(
+      "disabled",
+      true,
+    );
+    expect(screen.getAllByRole("button", { name: "Submit responses" })[1]).toHaveProperty(
+      "disabled",
+      true,
     );
   });
 

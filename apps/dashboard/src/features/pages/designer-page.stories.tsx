@@ -168,6 +168,7 @@ export const Workspace: Story = {
           onActionProposalResponseSubmit={() => {}}
           onFollowUpDraftChange={() => {}}
           onFollowUpSubmit={() => {}}
+          onUserInputRequestResponseSubmit={() => {}}
           runtimeConversationBootstrap={{
             providerConversationId: "thread_designer_triage",
             providerExecutionId: "turn_designer_triage_initial_prompt",
@@ -178,6 +179,9 @@ export const Workspace: Story = {
           sessionId="dsn_triage"
           transcriptErrorMessage={null}
           transcriptIsPending={false}
+          userInputRequestResponseErrorMessage={null}
+          userInputRequestResponseIsPending={false}
+          userInputRequestResponsePendingId={null}
         />
       </MemoryRouter>
     );
