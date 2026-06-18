@@ -26,6 +26,7 @@ import { compileInstalledCodexRuntime } from "@mistle/integrations-definitions/a
 import { and, desc, eq, sql } from "drizzle-orm";
 import { typeid } from "typeid-js";
 
+import { resolveSandboxInstanceRuntimeContext } from "../../sandbox-instances/services/runtime-context.js";
 import {
   resolveMistleMcpEgressRoutes,
   resolveMistleMcpServers,
@@ -405,11 +406,17 @@ function mapDesignerSession(
     id: designerSession.id,
     organizationId: designerSession.organizationId,
     sandboxInstanceId: designerSession.sandboxInstanceId,
+    sandboxProfileId: sandboxInstance?.sandboxProfileId ?? DESIGNER_RUNTIME_PROFILE_ID,
+    sandboxProfileVersion:
+      sandboxInstance?.sandboxProfileVersion ?? DESIGNER_RUNTIME_PROFILE_VERSION,
     title: sandboxInstance?.title ?? null,
     status: sandboxInstance?.status ?? null,
     connectable: sandboxInstance?.connectable ?? false,
     failureCode: sandboxInstance?.failureCode ?? null,
     failureMessage: sandboxInstance?.failureMessage ?? null,
+    runtimeContext: resolveSandboxInstanceRuntimeContext({
+      runtimePlan: sandboxInstance?.runtimePlan ?? null,
+    }),
     startupOperation: sandboxInstance?.startupOperation ?? null,
     initialPrompt: designerSession.initialPrompt,
     canvasTabs: [...designerSession.canvasTabs],

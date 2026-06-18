@@ -16,6 +16,7 @@ import {
   type DashboardControlActionSupport,
   type DesignerCanvasTabOpenInput,
 } from "../session-agents/dashboard-control-actions.js";
+import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
@@ -69,6 +70,28 @@ function upsertDesignerCanvasTab(input: {
       href: input.requestedTab.href,
     },
   ];
+}
+
+function mapDesignerSessionToSandboxStatus(
+  designerSession: DesignerSession,
+): SandboxInstanceStatusResult {
+  if (designerSession.status === null) {
+    throw new Error(`Designer session '${designerSession.id}' is missing sandbox status.`);
+  }
+
+  return {
+    id: designerSession.sandboxInstanceId,
+    sandboxProfileId: designerSession.sandboxProfileId,
+    sandboxProfileVersion: designerSession.sandboxProfileVersion,
+    title: designerSession.title,
+    status: designerSession.status,
+    connectable: designerSession.connectable,
+    failureCode: designerSession.failureCode,
+    failureMessage: designerSession.failureMessage,
+    runtimeContext: designerSession.runtimeContext,
+    triggerConversation: null,
+    startupOperation: designerSession.startupOperation,
+  };
 }
 
 function useDesignerCanvasTabs(designerSession: DesignerSession): {
@@ -220,6 +243,17 @@ function LoadedDesignerSessionPage(input: {
 }): React.JSX.Element {
   const { activeTabHref, canvasTabs, dashboardControlActions, setActiveTabHref, updateCanvasTabs } =
     useDesignerCanvasTabs(input.designerSession);
+  const readDesignerSandboxStatus = useCallback(
+    async ({ signal }: { sandboxInstanceId: string; signal?: AbortSignal }) => {
+      const designerSession = await getDesignerSession({
+        sessionId: input.designerSession.id,
+        ...(signal === undefined ? {} : { signal }),
+      });
+
+      return mapDesignerSessionToSandboxStatus(designerSession);
+    },
+    [input.designerSession.id],
+  );
 
   return (
     <SessionWorkbenchFullPage
@@ -235,6 +269,7 @@ function LoadedDesignerSessionPage(input: {
       leadingControl={<DesignerSessionSidebarTrigger />}
       requestedRuntimeConversationId={input.requestedRuntimeConversationId}
       sandboxInstanceId={input.designerSession.sandboxInstanceId}
+      sandboxStatusReader={readDesignerSandboxStatus}
       searchParams={input.searchParams}
       dashboardControlActions={dashboardControlActions}
       secondaryPanel={{

@@ -4,6 +4,7 @@ import {
   TriggerConversationStatuses,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
+import type { SandboxInstancePurpose } from "@mistle/db/data-plane";
 
 import { SandboxInstancesNotFoundCodes, SandboxInstancesNotFoundError } from "../errors.js";
 import { resolveSandboxInstanceRuntimeContext } from "./runtime-context.js";
@@ -98,11 +99,16 @@ export async function getInstance(
     db: ControlPlaneDatabase;
     dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">;
   },
-  input: { organizationId: string; instanceId: string },
+  input: {
+    organizationId: string;
+    instanceId: string;
+    allowedPurposes?: readonly SandboxInstancePurpose[];
+  },
 ): Promise<SandboxInstanceStatus> {
   const sandboxInstance = await dataPlaneClient.getSandboxInstance({
     organizationId: input.organizationId,
     instanceId: input.instanceId,
+    ...(input.allowedPurposes === undefined ? {} : { allowedPurposes: input.allowedPurposes }),
   });
 
   if (sandboxInstance === null) {

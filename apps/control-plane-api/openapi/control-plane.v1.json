@@ -712,6 +712,14 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
                     "title": {
                       "type": ["string", "null"],
                       "minLength": 1
@@ -742,6 +750,25 @@
                     "failureMessage": {
                       "type": ["string", "null"],
                       "minLength": 1
+                    },
+                    "runtimeContext": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "agentRuntimeId": {
+                          "type": ["string", "null"],
+                          "enum": ["claude-code", "codex", "opencode", "pi", null]
+                        },
+                        "launchCwd": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "primaryRepositoryRoot": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
+                      "additionalProperties": false
                     },
                     "startupOperation": {
                       "type": ["object", "null"],
@@ -800,11 +827,14 @@
                     "id",
                     "organizationId",
                     "sandboxInstanceId",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
                     "title",
                     "status",
                     "connectable",
                     "failureCode",
                     "failureMessage",
+                    "runtimeContext",
                     "startupOperation",
                     "initialPrompt",
                     "canvasTabs",
@@ -954,6 +984,14 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "sandboxProfileId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sandboxProfileVersion": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
                           "title": {
                             "type": ["string", "null"],
                             "minLength": 1
@@ -984,6 +1022,25 @@
                           "failureMessage": {
                             "type": ["string", "null"],
                             "minLength": 1
+                          },
+                          "runtimeContext": {
+                            "type": ["object", "null"],
+                            "properties": {
+                              "agentRuntimeId": {
+                                "type": ["string", "null"],
+                                "enum": ["claude-code", "codex", "opencode", "pi", null]
+                              },
+                              "launchCwd": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
+                              "primaryRepositoryRoot": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
+                            "additionalProperties": false
                           },
                           "startupOperation": {
                             "type": ["object", "null"],
@@ -1042,11 +1099,14 @@
                           "id",
                           "organizationId",
                           "sandboxInstanceId",
+                          "sandboxProfileId",
+                          "sandboxProfileVersion",
                           "title",
                           "status",
                           "connectable",
                           "failureCode",
                           "failureMessage",
+                          "runtimeContext",
                           "startupOperation",
                           "initialPrompt",
                           "canvasTabs",
@@ -1156,6 +1216,14 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
                     "title": {
                       "type": ["string", "null"],
                       "minLength": 1
@@ -1186,6 +1254,25 @@
                     "failureMessage": {
                       "type": ["string", "null"],
                       "minLength": 1
+                    },
+                    "runtimeContext": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "agentRuntimeId": {
+                          "type": ["string", "null"],
+                          "enum": ["claude-code", "codex", "opencode", "pi", null]
+                        },
+                        "launchCwd": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "primaryRepositoryRoot": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
+                      "additionalProperties": false
                     },
                     "startupOperation": {
                       "type": ["object", "null"],
@@ -1244,11 +1331,14 @@
                     "id",
                     "organizationId",
                     "sandboxInstanceId",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
                     "title",
                     "status",
                     "connectable",
                     "failureCode",
                     "failureMessage",
+                    "runtimeContext",
                     "startupOperation",
                     "initialPrompt",
                     "canvasTabs",
@@ -1414,6 +1504,14 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
                     "title": {
                       "type": ["string", "null"],
                       "minLength": 1
@@ -1444,6 +1542,25 @@
                     "failureMessage": {
                       "type": ["string", "null"],
                       "minLength": 1
+                    },
+                    "runtimeContext": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "agentRuntimeId": {
+                          "type": ["string", "null"],
+                          "enum": ["claude-code", "codex", "opencode", "pi", null]
+                        },
+                        "launchCwd": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "primaryRepositoryRoot": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
+                      "additionalProperties": false
                     },
                     "startupOperation": {
                       "type": ["object", "null"],
@@ -1502,11 +1619,14 @@
                     "id",
                     "organizationId",
                     "sandboxInstanceId",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
                     "title",
                     "status",
                     "connectable",
                     "failureCode",
                     "failureMessage",
+                    "runtimeContext",
                     "startupOperation",
                     "initialPrompt",
                     "canvasTabs",
@@ -1633,6 +1753,14 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
                     "title": {
                       "type": ["string", "null"],
                       "minLength": 1
@@ -1663,6 +1791,25 @@
                     "failureMessage": {
                       "type": ["string", "null"],
                       "minLength": 1
+                    },
+                    "runtimeContext": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "agentRuntimeId": {
+                          "type": ["string", "null"],
+                          "enum": ["claude-code", "codex", "opencode", "pi", null]
+                        },
+                        "launchCwd": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "primaryRepositoryRoot": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
+                      "additionalProperties": false
                     },
                     "startupOperation": {
                       "type": ["object", "null"],
@@ -1721,11 +1868,14 @@
                     "id",
                     "organizationId",
                     "sandboxInstanceId",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
                     "title",
                     "status",
                     "connectable",
                     "failureCode",
                     "failureMessage",
+                    "runtimeContext",
                     "startupOperation",
                     "initialPrompt",
                     "canvasTabs",
@@ -1891,6 +2041,14 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
                     "title": {
                       "type": ["string", "null"],
                       "minLength": 1
@@ -1921,6 +2079,25 @@
                     "failureMessage": {
                       "type": ["string", "null"],
                       "minLength": 1
+                    },
+                    "runtimeContext": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "agentRuntimeId": {
+                          "type": ["string", "null"],
+                          "enum": ["claude-code", "codex", "opencode", "pi", null]
+                        },
+                        "launchCwd": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "primaryRepositoryRoot": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
+                      "additionalProperties": false
                     },
                     "startupOperation": {
                       "type": ["object", "null"],
@@ -1979,11 +2156,14 @@
                     "id",
                     "organizationId",
                     "sandboxInstanceId",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
                     "title",
                     "status",
                     "connectable",
                     "failureCode",
                     "failureMessage",
+                    "runtimeContext",
                     "startupOperation",
                     "initialPrompt",
                     "canvasTabs",

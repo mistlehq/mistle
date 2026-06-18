@@ -1,6 +1,11 @@
-import type { DataPlaneDatabase, DataPlaneTables } from "@mistle/db/data-plane";
+import {
+  SandboxInstancePurposes,
+  type SandboxInstancePurpose,
+  type DataPlaneDatabase,
+  type DataPlaneTables,
+} from "@mistle/db/data-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
-import { and, asc, eq, gt } from "drizzle-orm";
+import { and, asc, eq, gt, inArray } from "drizzle-orm";
 
 import type { SandboxOperationEventsResponse } from "../schemas.js";
 
@@ -13,18 +18,27 @@ type ListSandboxOperationEventsInput = {
   sandboxInstanceId: string;
   organizationId: string;
   operationId: string;
+  allowedPurposes?: readonly SandboxInstancePurpose[];
   afterSequence?: number;
   limit?: number;
 };
 
 const DefaultLimit = 200;
 const SandboxInstanceNotFoundErrorCode = "NOT_FOUND";
+const DefaultReadableSandboxInstancePurposes: readonly SandboxInstancePurpose[] = [
+  SandboxInstancePurposes.SESSION,
+  SandboxInstancePurposes.SNAPSHOT,
+  SandboxInstancePurposes.SETUP_ASSISTANT,
+  SandboxInstancePurposes.SETUP_CHECK,
+  SandboxInstancePurposes.SKILLS_DISCOVERY,
+];
 
 export async function listSandboxOperationEvents(
   ctx: ListSandboxOperationEventsContext,
   input: ListSandboxOperationEventsInput,
 ): Promise<SandboxOperationEventsResponse> {
   const { sandboxInstances, sandboxOperationEvents } = ctx.tables;
+  const allowedPurposes = input.allowedPurposes ?? DefaultReadableSandboxInstancePurposes;
   const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
     columns: {
       id: true,
@@ -33,6 +47,7 @@ export async function listSandboxOperationEvents(
       whereAnd(
         whereEq(table.id, input.sandboxInstanceId),
         whereEq(table.organizationId, input.organizationId),
+        inArray(table.purpose, allowedPurposes),
       ),
   });
 

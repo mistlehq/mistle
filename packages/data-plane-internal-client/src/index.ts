@@ -299,6 +299,7 @@ export type ListSandboxOperationEventsInput = {
   sandboxInstanceId: string;
   organizationId: string;
   operationId: string;
+  allowedPurposes?: readonly SandboxInstancePurpose[];
   afterSequence?: number;
   limit?: number;
 };
@@ -1103,6 +1104,9 @@ export function createDataPlaneSandboxInstancesClient(
           query: {
             organizationId: listInput.organizationId,
             operationId: listInput.operationId,
+            ...(listInput.allowedPurposes === undefined
+              ? {}
+              : { allowedPurposes: listInput.allowedPurposes.join(",") }),
             ...(listInput.afterSequence === undefined
               ? {}
               : { afterSequence: String(listInput.afterSequence) }),

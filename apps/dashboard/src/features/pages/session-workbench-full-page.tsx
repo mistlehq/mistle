@@ -49,6 +49,7 @@ import {
 } from "./session-workbench-page-view.js";
 import { SessionRepositoryNoneValue } from "./use-session-primary-repository-state.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
+import type { SessionWorkbenchSandboxStatusReader } from "./use-session-workbench-lifecycle-state.js";
 import { useSessionWorkbenchRuntimeConversationNavigation } from "./use-session-workbench-runtime-conversation-navigation.js";
 
 type SessionWorkbenchFullPageSecondaryPanel =
@@ -75,6 +76,7 @@ export type SessionWorkbenchFullPageProps = {
   leadingControl: React.ReactNode;
   requestedRuntimeConversationId: string | null;
   sandboxInstanceId: string | null;
+  sandboxStatusReader?: SessionWorkbenchSandboxStatusReader;
   searchParams: URLSearchParams;
   secondaryPanel: SessionWorkbenchFullPageSecondaryPanel;
   setSearchParams: ReturnType<typeof useSearchParams>[1];
@@ -88,6 +90,9 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
     ...(input.dashboardControlActions === undefined
       ? {}
       : { dashboardControlActions: input.dashboardControlActions }),
+    ...(input.sandboxStatusReader === undefined
+      ? {}
+      : { sandboxStatusReader: input.sandboxStatusReader }),
   });
   const [hasEnteredReadyWorkbench, setHasEnteredReadyWorkbench] = useState(false);
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);

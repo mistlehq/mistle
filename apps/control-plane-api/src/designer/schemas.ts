@@ -51,6 +51,14 @@ const designerSessionStartupOperationSchema = z
   })
   .strict();
 
+const designerSessionRuntimeContextSchema = z
+  .object({
+    agentRuntimeId: z.enum(["claude-code", "codex", "opencode", "pi"]).nullable(),
+    launchCwd: z.string().min(1).nullable(),
+    primaryRepositoryRoot: z.string().min(1).nullable(),
+  })
+  .strict();
+
 export const designerSessionIdParamsSchema = z
   .object({
     sessionId: z
@@ -97,11 +105,14 @@ export const designerSessionSchema = z
     id: z.string().min(1),
     organizationId: z.string().min(1),
     sandboxInstanceId: z.string().min(1),
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileVersion: z.number().int().min(1),
     title: z.string().min(1).nullable(),
     status: designerSessionSandboxStatusSchema.nullable(),
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+    runtimeContext: designerSessionRuntimeContextSchema.nullable(),
     startupOperation: designerSessionStartupOperationSchema.nullable(),
     initialPrompt: z.string().min(1).nullable(),
     canvasTabs: z.array(designerSessionCanvasTabSchema),

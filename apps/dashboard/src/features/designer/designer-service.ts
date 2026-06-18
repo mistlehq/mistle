@@ -5,6 +5,8 @@ import { normalizeHttpApiError } from "../api/http-api-error.js";
 import { requestControlPlane } from "../api/request-control-plane.js";
 import { DesignerApiError } from "./designer-api-errors.js";
 
+const AgentRuntimeIdSchema = z.enum(["claude-code", "codex", "opencode", "pi"]);
+
 const DesignerSessionCanvasTabSchema = z
   .object({
     id: z.string().min(1),
@@ -25,6 +27,8 @@ const DesignerSessionSchema = z
     id: z.string().min(1),
     organizationId: z.string().min(1),
     sandboxInstanceId: z.string().min(1),
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileVersion: z.number().int().min(1),
     title: z.string().min(1).nullable(),
     status: z
       .enum([
@@ -43,6 +47,14 @@ const DesignerSessionSchema = z
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+    runtimeContext: z
+      .object({
+        agentRuntimeId: AgentRuntimeIdSchema.nullable(),
+        launchCwd: z.string().min(1).nullable(),
+        primaryRepositoryRoot: z.string().min(1).nullable(),
+      })
+      .strict()
+      .nullable(),
     startupOperation: DesignerSessionStartupOperationSchema.nullable(),
     initialPrompt: z.string().min(1).nullable(),
     canvasTabs: z.array(DesignerSessionCanvasTabSchema),

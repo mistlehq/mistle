@@ -1,5 +1,14 @@
 import { z } from "@hono/zod-openapi";
 
+const SandboxInstanceReadablePurposeSchema = z.enum([
+  "session",
+  "designer",
+  "snapshot",
+  "setup_assistant",
+  "setup_check",
+  "skills_discovery",
+]);
+
 export const ListSandboxOperationEventsParamsSchema = z
   .object({
     id: z.string().min(1),
@@ -10,6 +19,12 @@ export const ListSandboxOperationEventsQuerySchema = z
   .object({
     organizationId: z.string().min(1),
     operationId: z.string().min(1),
+    allowedPurposes: z
+      .string()
+      .min(1)
+      .transform((value) => value.split(",").filter((purpose) => purpose.length > 0))
+      .pipe(z.array(SandboxInstanceReadablePurposeSchema).min(1))
+      .optional(),
     afterSequence: z
       .preprocess((rawValue) => {
         if (rawValue === undefined) {

@@ -1,3 +1,4 @@
+import { SandboxInstancePurposes } from "@mistle/db/data-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import type { McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 
@@ -205,6 +206,10 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
         {
           organizationId: context.organizationActor.organizationId,
           instanceId,
+          ...(context.organizationActor.kind === "mcp_capability" &&
+          context.organizationActor.capability.kind === "designer"
+            ? { allowedPurposes: [SandboxInstancePurposes.DESIGNER] }
+            : {}),
         },
       );
       requireMcpSandboxInstanceProfileScope(context.organizationActor, {
@@ -262,6 +267,10 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
         {
           organizationId: context.organizationActor.organizationId,
           instanceId,
+          ...(context.organizationActor.kind === "mcp_capability" &&
+          context.organizationActor.capability.kind === "designer"
+            ? { allowedPurposes: [SandboxInstancePurposes.DESIGNER] }
+            : {}),
         },
       );
       requireMcpSandboxInstanceProfileScope(context.organizationActor, {
@@ -301,6 +310,10 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
         {
           organizationId: context.organizationActor.organizationId,
           instanceId,
+          ...(context.organizationActor.kind === "mcp_capability" &&
+          context.organizationActor.capability.kind === "designer"
+            ? { allowedPurposes: [SandboxInstancePurposes.DESIGNER] }
+            : {}),
         },
       );
       requireMcpSandboxInstanceProfileScope(context.organizationActor, {
@@ -319,6 +332,10 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
           organizationId: context.organizationActor.organizationId,
           sandboxInstanceId: instanceId,
           operationId,
+          ...(context.organizationActor.kind === "mcp_capability" &&
+          context.organizationActor.capability.kind === "designer"
+            ? { allowedPurposes: [SandboxInstancePurposes.DESIGNER] }
+            : {}),
           ...(afterSequence === undefined ? {} : { afterSequence }),
           limit: limit ?? DefaultSandboxOperationEventsLimit,
         },

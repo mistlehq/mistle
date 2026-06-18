@@ -7,11 +7,25 @@ import type { DesignerSession } from "../designer/designer-service.js";
 import { DesignerPageView } from "./designer-page-view.js";
 import { DesignerCanvasWorkspace } from "./designer-session-page-view.js";
 
+const StoryDesignerRuntimeFields: Pick<
+  DesignerSession,
+  "runtimeContext" | "sandboxProfileId" | "sandboxProfileVersion"
+> = {
+  sandboxProfileId: "designer",
+  sandboxProfileVersion: 1,
+  runtimeContext: {
+    agentRuntimeId: "codex",
+    launchCwd: "/workspace",
+    primaryRepositoryRoot: null,
+  },
+};
+
 const StoryDesignerSessions: readonly DesignerSession[] = [
   {
     id: "dsn_triage",
     organizationId: "org_story",
     sandboxInstanceId: "sbi_designer_triage",
+    ...StoryDesignerRuntimeFields,
     title: "Design triage agent",
     status: "running",
     connectable: true,
@@ -38,6 +52,7 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
     id: "dsn_billing_reconciliation",
     organizationId: "org_story",
     sandboxInstanceId: "sbi_designer_billing_reconciliation",
+    ...StoryDesignerRuntimeFields,
     title:
       "Design a billing reconciliation agent for Linear escalations and GitHub incident follow-up",
     status: "starting",
@@ -57,6 +72,7 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
     id: "dsn_docs_sidebar",
     organizationId: "org_story",
     sandboxInstanceId: "sbi_designer_docs_sidebar",
+    ...StoryDesignerRuntimeFields,
     title:
       "Compare the current sidebar truncation behavior with the sessions table so designer conversations stay compact",
     status: "stopped",
@@ -73,6 +89,7 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
     id: "dsn_failed_webhook",
     organizationId: "org_story",
     sandboxInstanceId: "sbi_designer_failed_webhook",
+    ...StoryDesignerRuntimeFields,
     title: null,
     status: "failed",
     connectable: false,

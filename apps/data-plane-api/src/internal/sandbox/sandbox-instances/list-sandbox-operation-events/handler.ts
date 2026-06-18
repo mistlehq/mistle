@@ -20,6 +20,7 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
       sandboxInstanceId: params.id,
       organizationId: query.organizationId,
       operationId: query.operationId,
+      ...(query.allowedPurposes === undefined ? {} : { allowedPurposes: query.allowedPurposes }),
       ...(query.afterSequence === undefined ? {} : { afterSequence: query.afterSequence }),
       ...(query.limit === undefined ? {} : { limit: query.limit }),
     },

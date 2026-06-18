@@ -1027,11 +1027,13 @@ describe.concurrent("MCP profile tools integration", () => {
     await insertSandboxInstance(env, {
       organizationId: session.organizationId,
       sandboxInstanceId: "sbi_mcp_designer_feedback_scoped",
+      purpose: SandboxInstancePurposes.DESIGNER,
       status: SandboxInstanceStatuses.FAILED,
     });
     await insertSandboxInstance(env, {
       organizationId: session.organizationId,
       sandboxInstanceId: "sbi_mcp_designer_feedback_other",
+      purpose: SandboxInstancePurposes.DESIGNER,
       status: SandboxInstanceStatuses.FAILED,
     });
     await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxOperationEvents).values([
@@ -1913,6 +1915,7 @@ async function insertSandboxInstance(
     sandboxInstanceId: string;
     sandboxProfileId?: string;
     sandboxProfileVersion?: number;
+    purpose?: SandboxInstanceRow["purpose"];
     status?: SandboxInstanceRow["status"];
   },
 ): Promise<void> {
@@ -1927,7 +1930,7 @@ async function insertSandboxInstance(
     startedByKind: "api_key",
     startedById: "apk_mcp_feedback",
     source: SandboxInstanceSources.DASHBOARD,
-    purpose: SandboxInstancePurposes.SETUP_CHECK,
+    purpose: input.purpose ?? SandboxInstancePurposes.SETUP_CHECK,
     failureCode: input.status === SandboxInstanceStatuses.FAILED ? "SETUP_SCRIPT_FAILED" : null,
     failureMessage:
       input.status === SandboxInstanceStatuses.FAILED ? "Setup script exited with code 1." : null,

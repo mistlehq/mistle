@@ -7,6 +7,7 @@ import {
   type DataPlaneTables,
   type SandboxInstanceStatus,
   type SandboxInstanceProvider,
+  type SandboxInstancePurpose,
 } from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import {
@@ -39,12 +40,12 @@ type GetSandboxInstanceContext = {
   runtimeStateReader: AppRuntimeResources["runtimeStateReader"];
 };
 
-const DefaultReadableSandboxInstancePurposes = [
+const DefaultReadableSandboxInstancePurposes: readonly SandboxInstancePurpose[] = [
   SandboxInstancePurposes.SESSION,
   SandboxInstancePurposes.SETUP_ASSISTANT,
   SandboxInstancePurposes.SETUP_CHECK,
   SandboxInstancePurposes.SKILLS_DISCOVERY,
-] as const;
+];
 
 type SandboxInstanceRuntimeSelection = {
   organizationId: string;

@@ -41,7 +41,10 @@ import {
   type SessionConversationPaneState,
 } from "./use-session-workbench-conversation-runtime.js";
 import { useSessionWorkbenchHandoffControl } from "./use-session-workbench-handoff-control.js";
-import { useSessionWorkbenchLifecycleState } from "./use-session-workbench-lifecycle-state.js";
+import {
+  useSessionWorkbenchLifecycleState,
+  type SessionWorkbenchSandboxStatusReader,
+} from "./use-session-workbench-lifecycle-state.js";
 import { useSessionWorkbenchRepositoryControl } from "./use-session-workbench-repository-control.js";
 import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
 
@@ -110,6 +113,7 @@ export type {
 export function useSessionWorkbenchController(input: {
   requestedRuntimeConversationId?: string | null;
   sandboxInstanceId: string | null;
+  sandboxStatusReader?: SessionWorkbenchSandboxStatusReader;
   dashboardControlActions?: DashboardControlActionSupport;
 }): UseSessionWorkbenchControllerResult {
   const queryClient = useQueryClient();
@@ -156,6 +160,9 @@ export function useSessionWorkbenchController(input: {
   });
   const workbenchLifecycleState = useSessionWorkbenchLifecycleState({
     sandboxInstanceId: input.sandboxInstanceId,
+    ...(input.sandboxStatusReader === undefined
+      ? {}
+      : { sandboxStatusReader: input.sandboxStatusReader }),
     mainPanelTransitionState: handoff.transitionState,
     requestedRuntimeConversationId: input.requestedRuntimeConversationId ?? null,
     resetSessionTransport,
