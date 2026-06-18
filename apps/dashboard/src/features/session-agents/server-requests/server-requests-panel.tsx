@@ -211,6 +211,31 @@ export function ServerRequestsPanel({
           );
         }
 
+        if (entry.kind === "claude-code-permission") {
+          return (
+            <div className="space-y-3 rounded-xl border p-4" key={requestKey}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-medium text-sm">Claude Code permission</p>
+                <p className="text-muted-foreground text-xs">{entry.method}</p>
+              </div>
+              <p className="text-sm leading-6 whitespace-pre-wrap">{entry.toolName}</p>
+              <pre className="bg-muted max-h-80 overflow-auto rounded-md p-3 text-xs leading-5 whitespace-pre-wrap">
+                {entry.toolInputJson}
+              </pre>
+              <ApprovalDecisionButtons
+                appearance="panel"
+                availableDecisions={entry.availableDecisions}
+                disabled={isRespondingToServerRequest}
+                onRespondToServerRequest={onRespondToServerRequest}
+                requestId={entry.requestId}
+              />
+              {entry.responseErrorMessage === null ? null : (
+                <p className="text-destructive text-sm">{entry.responseErrorMessage}</p>
+              )}
+            </div>
+          );
+        }
+
         return assertUnsupportedServerRequestEntry(entry);
       })}
     </div>

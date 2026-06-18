@@ -81,8 +81,17 @@ export type UseClaudeCodeSessionStateResult = {
     hydrateChatFromSessionOrThrow: () => Promise<void>;
     interruptQuery: () => Promise<void>;
     isInterruptingTurn: boolean;
+    isRespondingToPermission: boolean;
     isStartingTurn: boolean;
     isSteeringTurn: boolean;
+    respondToPermission: (input: {
+      answers?: readonly {
+        id: string;
+        value: string;
+      }[];
+      decision?: "once" | "reject";
+      requestId: string;
+    }) => Promise<void>;
     sendPrompt: (input: { submittedPrompt: string }) => Promise<void>;
     steerTurn: (input: { submittedPrompt: string }) => Promise<void>;
   };
@@ -306,6 +315,7 @@ export function useClaudeCodeSessionState(input: {
   const [isStartingTurn, setIsStartingTurn] = useState(false);
   const [isSteeringTurn, setIsSteeringTurn] = useState(false);
   const [isInterruptingTurn, setIsInterruptingTurn] = useState(false);
+  const [isRespondingToPermission, setIsRespondingToPermission] = useState(false);
   const [availableSessions, setAvailableSessions] = useState<
     readonly ClaudeCodeSessionNavigatorSummary[]
   >([]);
@@ -655,6 +665,40 @@ export function useClaudeCodeSessionState(input: {
     }
   }, [chatState.pendingQueryId, sessionSnapshot?.activeSessionId]);
 
+  const respondToPermission = useCallback(
+    async (permissionInput: {
+      answers?: readonly {
+        id: string;
+        value: string;
+      }[];
+      decision?: "once" | "reject";
+      requestId: string;
+    }): Promise<void> => {
+      const client = clientRef.current;
+      const sessionId = sessionSnapshot?.activeSessionId ?? null;
+      if (client === null || sessionId === null) {
+        throw new Error("Connect Claude Code before responding to a permission request.");
+      }
+      setIsRespondingToPermission(true);
+      try {
+        await client.respondToPermission({
+          sessionId,
+          requestId: permissionInput.requestId,
+          ...(permissionInput.decision === undefined ? {} : { decision: permissionInput.decision }),
+          ...(permissionInput.answers === undefined ? {} : { answers: permissionInput.answers }),
+        });
+        const session = await client.readSession({ sessionId });
+        if (isCurrentSessionResponse({ client, sessionId })) {
+          applyHydratedSession(session.session);
+        }
+        setSessionErrorMessage(null);
+      } finally {
+        setIsRespondingToPermission(false);
+      }
+    },
+    [applyHydratedSession, isCurrentSessionResponse, sessionSnapshot?.activeSessionId],
+  );
+
   const setSessionConfig = useCallback(
     async (configInput: { model: string; modelReasoningEffort: string | null }): Promise<void> => {
       const client = clientRef.current;
@@ -858,8 +902,10 @@ export function useClaudeCodeSessionState(input: {
       hydrateChatFromSessionOrThrow,
       interruptQuery,
       isInterruptingTurn,
+      isRespondingToPermission,
       isStartingTurn,
       isSteeringTurn,
+      respondToPermission,
       sendPrompt,
       steerTurn,
     },

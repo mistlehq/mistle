@@ -60,8 +60,21 @@ export type OpenCodePermissionApprovalRequestEntry = {
   responseErrorMessage: string | null;
 };
 
+export type ClaudeCodePermissionApprovalRequestEntry = {
+  requestId: string;
+  method: "claude-code/permission/requestApproval";
+  kind: "claude-code-permission";
+  sessionId: string;
+  toolInputJson: string;
+  toolName: string;
+  availableDecisions: readonly string[];
+  status: "pending" | "responding";
+  responseErrorMessage: string | null;
+};
+
 export type ServerRequestEntry =
   | CommandApprovalRequestEntry
   | FileChangeApprovalRequestEntry
   | ToolRequestUserInputEntry
-  | OpenCodePermissionApprovalRequestEntry;
+  | OpenCodePermissionApprovalRequestEntry
+  | ClaudeCodePermissionApprovalRequestEntry;

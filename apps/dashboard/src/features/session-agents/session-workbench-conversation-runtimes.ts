@@ -14,7 +14,11 @@ import type {
 } from "../pages/session-composer/index.js";
 import { hasComposerCommand } from "../pages/session-composer/session-composer-trigger-detection.js";
 import type { SessionTerminalContentInset } from "../pages/session-terminal-surface.js";
-import type { UseClaudeCodeSessionStateResult } from "./claude-code/session-state/index.js";
+import {
+  mapClaudeCodePermissionsToServerRequests,
+  resolveClaudeCodePermissionResponse,
+  type UseClaudeCodeSessionStateResult,
+} from "./claude-code/session-state/index.js";
 import type { UseCodexSessionStateResult } from "./codex/session-state/index.js";
 import {
   mapOpenCodeChatStateForConversation,
@@ -373,13 +377,41 @@ export function buildClaudeCodeConversationRuntime(input: {
 }): SessionWorkbenchRuntimeAdapter {
   const capabilities = SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE;
   const isTurnRunning = input.chat.chatState.status === "busy";
+  const activeSessionId = input.sessionSnapshot?.activeSessionId ?? null;
+  const pendingPermissionRequests =
+    input.chat.chatState.sessionId === activeSessionId
+      ? mapClaudeCodePermissionsToServerRequests(input.chat.chatState.pendingPermissions)
+      : [];
+  const respondToServerRequest = (requestId: string | number, result: unknown): void => {
+    let response: ReturnType<typeof resolveClaudeCodePermissionResponse>;
+    try {
+      response = resolveClaudeCodePermissionResponse(result);
+    } catch (error) {
+      input.sessionMessage.reportSessionErrorMessage(
+        error instanceof Error ? error.message : "Could not respond to Claude Code permission.",
+      );
+      return;
+    }
+
+    void input.chat
+      .respondToPermission({
+        requestId: String(requestId),
+        ...(response.decision === undefined ? {} : { decision: response.decision }),
+        ...(response.answers === undefined ? {} : { answers: response.answers }),
+      })
+      .catch((error: unknown) => {
+        input.sessionMessage.reportSessionErrorMessage(
+          error instanceof Error ? error.message : "Could not respond to Claude Code permission.",
+        );
+      });
+  };
 
   return {
     displayName: capabilities.displayName,
     cliTerminalContentInset: capabilities.cliTerminalContentInset,
     conversation: {
-      activeConversationId: input.sessionSnapshot?.activeSessionId ?? null,
-      attachmentTargetId: input.sessionSnapshot?.activeSessionId ?? null,
+      activeConversationId: activeSessionId,
+      attachmentTargetId: activeSessionId,
       chatState: mapClaudeCodeChatStateForConversation(input.chat.chatState),
     },
     composerRuntimeInput: {
@@ -433,13 +465,9 @@ export function buildClaudeCodeConversationRuntime(input: {
       modelSelection: capabilities.composerModelSelection,
     },
     serverRequestsState: {
-      isRespondingToServerRequest: false,
-      pendingServerRequests: [],
-      respondToServerRequest: () => {
-        input.sessionMessage.reportSessionErrorMessage(
-          "Claude Code has no pending server request.",
-        );
-      },
+      isRespondingToServerRequest: input.chat.isRespondingToPermission,
+      pendingServerRequests: pendingPermissionRequests,
+      respondToServerRequest,
     },
   };
 }
