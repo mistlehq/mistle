@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MemoryRouter } from "react-router";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { PageFrame } from "../shared/page-frame.js";
 import { createAvailableCardsOverview } from "./organization-integrations-settings-page-story-support.js";
 import {
   OrganizationIntegrationsSettingsPageView,
@@ -32,6 +33,12 @@ const ConnectedCards: readonly OrganizationIntegrationsSettingsPageCard[] = [
 ] as const;
 
 const AvailableCards = createAvailableCardsOverview();
+const ManyAvailableCards = Array.from({ length: 4 }, (_, groupIndex) =>
+  AvailableCards.map((card) => ({
+    ...card,
+    targetKey: `${card.targetKey}-overflow-${groupIndex + 1}`,
+  })),
+).flat();
 
 const meta = {
   title: "Dashboard/Integrations/Overview",
@@ -74,4 +81,31 @@ export const Empty: Story = {
     availableCards: [],
     connectedCards: [],
   },
+};
+
+export const ManyIntegrationsInAppShellViewport: Story = {
+  args: {
+    availableCards: ManyAvailableCards,
+    connectedCards: [],
+  },
+  parameters: {
+    layout: "fullscreen",
+  },
+  decorators: [
+    (Story) => (
+      <div className="h-svh overflow-hidden bg-background">
+        <div className="min-w-0 flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="min-w-0 min-h-0 flex-1">
+            <PageFrame
+              description="Manage the integrations and tools available to your organization."
+              title="Integrations"
+              width="normal"
+            >
+              <Story />
+            </PageFrame>
+          </div>
+        </div>
+      </div>
+    ),
+  ],
 };

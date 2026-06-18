@@ -9,6 +9,29 @@ describe("validateTensorlakeSandboxConfig", () => {
     });
   });
 
+  it("accepts a release sandboxd artifact source for missing-image registration", () => {
+    expect(
+      validateTensorlakeSandboxConfig({
+        apiKey: "test-api-key",
+        sandboxd: {
+          kind: "release",
+          artifact: {
+            version: "1.2.3",
+            url: "https://github.com/mistlehq/mistle/releases/download/v1.2.3/sandboxd-x86_64-unknown-linux-gnu.tar.gz",
+            sha256: "a".repeat(64),
+          },
+        },
+      }),
+    ).toMatchObject({
+      sandboxd: {
+        kind: "release",
+        artifact: {
+          version: "1.2.3",
+        },
+      },
+    });
+  });
+
   it("rejects extra provider-level sandbox creation options", () => {
     const config = {
       apiKey: "test-api-key",

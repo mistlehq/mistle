@@ -137,6 +137,7 @@ function createSandboxProfileVersionFixture(input: {
 type SandboxProfileEditorTestVersionState =
   | "draft"
   | "draft-with-published"
+  | "draft-with-published-no-active"
   | "published"
   | "published-with-draft"
   | "published-pending-with-draft"
@@ -398,6 +399,17 @@ function createSandboxProfileVersionsForTest(input: {
           state: "draft",
         }),
       ];
+    case "draft-with-published-no-active":
+      return [
+        createVersion({
+          version: input.version - 1,
+          state: "published",
+          usable: false,
+        }),
+        createVersion({
+          state: "draft",
+        }),
+      ];
     case "published-with-draft":
       return [
         createVersion({
@@ -526,6 +538,7 @@ function resolveSandboxProfileEditorTestRouteView(input: {
     case "published":
     case "published-with-draft":
     case "draft-with-published":
+    case "draft-with-published-no-active":
     case "published-pending-with-draft":
     case "published-pending-with-older-active":
     case "published-failed-with-older-active":
@@ -983,6 +996,7 @@ function ProfileActionsDialogHarness(input: {
         activeVersion: 1,
         hasDraft: false,
         draftVersion: null,
+        canDiscardDraft: false,
       }}
       onConfirmDeleteProfile={() => {}}
       onConfirmDuplicateProfile={() => {}}
@@ -1047,6 +1061,7 @@ function DraftActionsHarness(input: {
         version: 2,
         activeVersion: 1,
         hasDraft: true,
+        canDiscardDraft: true,
       }}
       onConfirmDeleteProfile={() => {}}
       onDeleteProfileDialogOpenChange={() => {}}
@@ -1219,6 +1234,7 @@ describe("SandboxProfileEditorPage", () => {
         activeVersion: 1,
         hasDraft: true,
         draftVersion: 2,
+        canDiscardDraft: true,
       },
     });
   });
@@ -1244,6 +1260,52 @@ describe("SandboxProfileEditorPage", () => {
         version: 1,
         activeVersion: null,
         hasDraft: true,
+        canDiscardDraft: false,
+      },
+    });
+  });
+
+  it("allows discarding a draft sourced from failed published versions when no active version exists", () => {
+    const result = resolveSandboxProfileEditorVersionMode({
+      activeVersion: null,
+      view: "draft",
+      versions: [
+        createSandboxProfileVersionFixture({
+          sandboxProfileId: "sbp_test",
+          version: 1,
+          state: "published",
+          isActive: false,
+          usable: false,
+          latestSnapshotJob: createFailedSnapshotJobFixture(),
+        }),
+        createSandboxProfileVersionFixture({
+          sandboxProfileId: "sbp_test",
+          version: 2,
+          state: "published",
+          isActive: false,
+          usable: false,
+          latestSnapshotJob: {
+            ...createFailedSnapshotJobFixture(),
+            id: "ssj_failed_initial_materialization_v2",
+          },
+        }),
+        createSandboxProfileVersionFixture({
+          sandboxProfileId: "sbp_test",
+          version: 3,
+          state: "draft",
+          isActive: false,
+        }),
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      mode: {
+        kind: "draft",
+        version: 3,
+        activeVersion: null,
+        hasDraft: true,
+        canDiscardDraft: true,
       },
     });
   });
@@ -1436,6 +1498,7 @@ describe("SandboxProfileEditorPage", () => {
         activeVersion: null,
         hasDraft: false,
         draftVersion: null,
+        canDiscardDraft: false,
       },
     });
   });
@@ -1473,6 +1536,7 @@ describe("SandboxProfileEditorPage", () => {
         activeVersion: 1,
         hasDraft: false,
         draftVersion: null,
+        canDiscardDraft: false,
       },
     });
   });
@@ -1505,6 +1569,7 @@ describe("SandboxProfileEditorPage", () => {
         activeVersion: 1,
         hasDraft: true,
         draftVersion: 2,
+        canDiscardDraft: true,
       },
     });
   });
@@ -3914,6 +3979,27 @@ describe("SandboxProfileEditorPage", () => {
       "title",
       "Make a change to the sandbox profile draft before publishing.",
     );
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Save draft" })).toBeNull();
+  });
+
+  it("shows cancel for a no-change draft with a published source but no active version", () => {
+    renderSandboxProfileEditor({
+      view: "draft",
+      versionState: "draft-with-published-no-active",
+      publishability: {
+        publishable: false,
+        issues: [
+          {
+            code: "NO_PUBLISH_WORTHY_CHANGE",
+            message: "Make a change to the sandbox profile draft before publishing.",
+          },
+        ],
+      },
+    });
+
+    const publishButton = screen.getByRole("button", { name: "Publish" });
+    expect(publishButton).toHaveProperty("disabled", true);
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "Save draft" })).toBeNull();
   });

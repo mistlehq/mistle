@@ -32,7 +32,7 @@
     "e2b": "^2.27.0",
     "freestyle": "0.1.63",
     "modal": "0.7.6",
-    "tensorlake": "0.5.47",
+    "tensorlake": "0.5.31",
     "zod": "^4.4.3"
   },
   "devDependencies": {
