@@ -1,5 +1,10 @@
 import type { ResolvedIntegrationMcpServer } from "@mistle/integrations-core";
 
+export type MistleManagedInstructionBlock = {
+  blockId: string;
+  content: string;
+};
+
 export function renderMistleManagedSandboxContext(input: {
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): string {
@@ -29,10 +34,17 @@ export function renderMistleManagedSandboxContext(input: {
 export function renderMistleManagedSandboxContextBlock(input: {
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): string {
+  return renderMistleManagedInstructionBlock({
+    blockId: "mistle-sandbox-context",
+    content: renderMistleManagedSandboxContext(input),
+  });
+}
+
+export function renderMistleManagedInstructionBlock(input: MistleManagedInstructionBlock): string {
   return [
-    "<!-- MISTLE-MANAGED:START mistle-sandbox-context -->",
-    renderMistleManagedSandboxContext(input),
-    "<!-- MISTLE-MANAGED:END mistle-sandbox-context -->",
+    `<!-- MISTLE-MANAGED:START ${input.blockId} -->`,
+    input.content,
+    `<!-- MISTLE-MANAGED:END ${input.blockId} -->`,
   ].join("\n");
 }
 

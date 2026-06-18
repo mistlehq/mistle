@@ -14,6 +14,8 @@ import {
   OpenAiChatGptResponsesApiBaseUrl,
 } from "../../openai/variants/openai-default/target-config-schema.js";
 import {
+  type MistleManagedInstructionBlock,
+  renderMistleManagedInstructionBlock,
   renderMistleManagedSandboxContext,
   renderMistleManagedSandboxContextBlock,
 } from "../shared/managed-instructions.js";
@@ -53,6 +55,9 @@ const ArtifactCommandTimeoutMs = 120_000;
 const RuntimeClientProcessReadinessTimeoutMs = 60_000;
 const RuntimeClientProcessStopTimeoutMs = 10_000;
 const RuntimeClientProcessStopGracePeriodMs = 2_000;
+type CompileCodexRuntimeInput = CompileAgentRuntimeInput<Record<string, never>> & {
+  managedInstructionBlocks?: ReadonlyArray<MistleManagedInstructionBlock>;
+};
 type CodexProviderMetadata = {
   responsesApiBaseUrl: string;
   chatgptBaseUrl?: string;
@@ -105,9 +110,23 @@ function renderCodexSetupConfigMergeFragment(): string {
 }
 
 function renderCodexGlobalAgentsMd(input: {
+  managedInstructionBlocks?: ReadonlyArray<MistleManagedInstructionBlock>;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): string {
-  return `${renderMistleManagedSandboxContext({ mcpServers: input.mcpServers })}\n`;
+  return `${[
+    renderMistleManagedSandboxContext({ mcpServers: input.mcpServers }),
+    ...(input.managedInstructionBlocks ?? []).map(renderMistleManagedInstructionBlock),
+  ].join("\n\n")}\n`;
+}
+
+function renderCodexGlobalAgentsMergeContent(input: {
+  managedInstructionBlocks?: ReadonlyArray<MistleManagedInstructionBlock>;
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
+}): string {
+  return [
+    renderMistleManagedSandboxContextBlock({ mcpServers: input.mcpServers }),
+    ...(input.managedInstructionBlocks ?? []).map(renderMistleManagedInstructionBlock),
+  ].join("\n\n");
 }
 
 function resolveCodexProviderMetadataFromEgressRoutes(input: {
@@ -139,6 +158,7 @@ function resolveCodexProviderMetadataFromEgressRoutes(input: {
 }
 
 function buildCodexSetupFiles(input: {
+  managedInstructionBlocks?: ReadonlyArray<MistleManagedInstructionBlock>;
   mergeSetupFiles?: boolean;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
   providerMetadata?: CodexProviderMetadata;
@@ -163,14 +183,25 @@ function buildCodexSetupFiles(input: {
       writeMode: input.mergeSetupFiles === true ? "merge" : "if-absent",
       content:
         input.mergeSetupFiles === true
-          ? renderMistleManagedSandboxContextBlock({ mcpServers: input.mcpServers })
-          : renderCodexGlobalAgentsMd({ mcpServers: input.mcpServers }),
+          ? renderCodexGlobalAgentsMergeContent({
+              ...(input.managedInstructionBlocks === undefined
+                ? {}
+                : { managedInstructionBlocks: input.managedInstructionBlocks }),
+              mcpServers: input.mcpServers,
+            })
+          : renderCodexGlobalAgentsMd({
+              ...(input.managedInstructionBlocks === undefined
+                ? {}
+                : { managedInstructionBlocks: input.managedInstructionBlocks }),
+              mcpServers: input.mcpServers,
+            }),
     },
   ];
 }
 
 function buildCodexSetupFilesFromEgressRoutes(input: {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+  managedInstructionBlocks?: ReadonlyArray<MistleManagedInstructionBlock>;
   mergeSetupFiles?: boolean;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): ReadonlyArray<RuntimeClientSetupFile> {
@@ -179,6 +210,9 @@ function buildCodexSetupFilesFromEgressRoutes(input: {
   });
 
   return buildCodexSetupFiles({
+    ...(input.managedInstructionBlocks === undefined
+      ? {}
+      : { managedInstructionBlocks: input.managedInstructionBlocks }),
     ...(input.mergeSetupFiles === undefined ? {} : { mergeSetupFiles: input.mergeSetupFiles }),
     mcpServers: input.mcpServers,
     ...(providerMetadata === undefined ? {} : { providerMetadata }),
@@ -229,9 +263,7 @@ function buildCodexRuntimeClients(input: {
   ];
 }
 
-export function compileCodexRuntime(
-  input: CompileAgentRuntimeInput<Record<string, never>>,
-): CompileAgentRuntimeResult {
+export function compileCodexRuntime(input: CompileCodexRuntimeInput): CompileAgentRuntimeResult {
   const codexCliInstallPath = input.refs.artifactBinPath("codex");
 
   return {
@@ -275,6 +307,9 @@ export function compileCodexRuntime(
         codexCliInstallPath,
         setupFiles: buildCodexSetupFilesFromEgressRoutes({
           egressRoutes,
+          ...(input.managedInstructionBlocks === undefined
+            ? {}
+            : { managedInstructionBlocks: input.managedInstructionBlocks }),
           ...(input.mergeRuntimeSetupFiles === undefined
             ? {}
             : { mergeSetupFiles: input.mergeRuntimeSetupFiles }),
@@ -288,6 +323,7 @@ export function compileCodexRuntime(
 export function compileInstalledCodexRuntime(input: {
   codexCliPath: string;
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+  managedInstructionBlocks?: ReadonlyArray<MistleManagedInstructionBlock>;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): CompileAgentRuntimeResult {
   return {
@@ -296,6 +332,9 @@ export function compileInstalledCodexRuntime(input: {
       codexCliInstallPath: input.codexCliPath,
       setupFiles: buildCodexSetupFilesFromEgressRoutes({
         egressRoutes: input.egressRoutes,
+        ...(input.managedInstructionBlocks === undefined
+          ? {}
+          : { managedInstructionBlocks: input.managedInstructionBlocks }),
         mcpServers: input.mcpServers,
       }),
     }),

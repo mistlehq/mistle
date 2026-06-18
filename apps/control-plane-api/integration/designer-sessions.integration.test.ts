@@ -58,6 +58,18 @@ describe.concurrent("designer sessions integration", () => {
       .flatMap((client) => client.setup.files)
       .find((file) => file.fileId === "codex_config");
     expect(codexConfig?.content).toContain('base_url = "https://api.openai.com/v1"');
+    expect(codexConfig?.content).toContain("[mcp_servers.mistle_docs]");
+    expect(codexConfig?.content).toContain('url = "https://docs.mistle.dev/mcp"');
+    const codexAgents = queuedWorkflowInput.runtimePlan.runtimeClients
+      .flatMap((client) => client.setup.files)
+      .find((file) => file.fileId === "codex_global_agents");
+    expect(codexAgents?.content).toContain("Mistle-managed sandbox context:");
+    expect(codexAgents?.content).toContain("<!-- MISTLE-MANAGED:START mistle-designer-context -->");
+    expect(codexAgents?.content).toContain("# Mistle Designer");
+    expect(codexAgents?.content).toContain(
+      "Do not publish sandbox profile versions, start sandbox sessions, create provider-side resources, or mutate external provider configuration unless there is an explicit approved Designer action for that operation.",
+    );
+    expect(codexAgents?.content).toContain("Search Mistle docs with the `mistle_docs` MCP server");
 
     const listResponse = await env.controlPlaneApi.http.fetch("/v1/designer/sessions", {
       headers: {

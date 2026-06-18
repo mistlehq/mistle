@@ -290,6 +290,7 @@ describe("compileCodexRuntime", () => {
       "`MISTLE_SANDBOX_INSTANCE_ID`, `MISTLE_SANDBOX_PROFILE_ID`, and `MISTLE_SANDBOX_PROFILE_VERSION` identify this sandbox",
     );
     expect(agentsFile.content).not.toContain("Mistle MCP tools are available");
+    expect(agentsFile.content).not.toContain("Mistle Designer");
     expect(agentsFile.content).not.toContain("User-provided additional instructions:");
     expect(compiled.agentRuntimes).toEqual([
       {
@@ -342,6 +343,45 @@ describe("compileCodexRuntime", () => {
         },
       },
     ]);
+  });
+
+  it("adds optional managed instruction blocks to Codex global AGENTS.md", () => {
+    const compiled = compileCodexRuntime({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      runtimeId: "codex",
+      runtimeConfig: {},
+      managedInstructionBlocks: [
+        {
+          blockId: "mistle-designer-context",
+          content: "# Mistle Designer\n\nUse Designer-specific product workflows.",
+        },
+      ],
+      mcpServers: [],
+      refs: {
+        sandboxPaths: {
+          userHomeDir: "/root",
+          workspaceDir: "/root",
+          runtimeDataDir: "/var/lib/mistle",
+          runtimeArtifactDir: "/var/lib/mistle/artifacts",
+          runtimeArtifactBinDir: "/usr/local/bin",
+        },
+        artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
+      },
+    });
+    const runtimeClients = renderRuntimeClients({
+      compiled,
+      egressRoutes: [],
+    });
+    const agentsFile = runtimeClients[0]?.setup.files.find(
+      (file) => file.fileId === "codex_global_agents",
+    );
+
+    expect(agentsFile?.content).toContain("Mistle-managed sandbox context:");
+    expect(agentsFile?.content).toContain("<!-- MISTLE-MANAGED:START mistle-designer-context -->");
+    expect(agentsFile?.content).toContain("# Mistle Designer");
+    expect(agentsFile?.content).toContain("<!-- MISTLE-MANAGED:END mistle-designer-context -->");
   });
 
   it("uses the same agent runtime descriptor for installed Codex runtimes", () => {
