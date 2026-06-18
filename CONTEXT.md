@@ -77,6 +77,10 @@ _Avoid_: Provider configuration change when the change has not been approved or 
 A user's approve or decline decision for a pending **Designer action proposal**.
 _Avoid_: Provider configuration change when the response has not caused an external provider mutation
 
+**Designer action request**:
+A durable **Mistle Designer session** record that owns one user-reviewed **Designer action proposal response**, its operation kind, idempotency, and execution status.
+_Avoid_: Provider write when no explicit operation handler has executed
+
 **User input request**:
 A runtime request that asks the user to answer one or more structured questions before the agent continues.
 _Avoid_: Approval request when the user is choosing configuration rather than granting permission
@@ -613,6 +617,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Mistle Designer** may make **Provider configuration changes** only after explicit user approval.
 - **Mistle Designer** may request approval for an itemized batch of **Provider configuration changes**.
 - A **Designer action proposal response** records user intent for one pending **Designer action proposal**; provider writes still require an explicit supported operation path.
+- A **Designer action request** is the durable owner for an approved or declined **Designer action proposal** before any operation handler can execute side effects.
 - First-pass **Mistle Designer sessions** do not require detailed durable activity history for **Provider configuration changes**.
 - Publishing the first **Sandbox profile version** is publish-worthy when no **Source sandbox profile version** exists.
 - Publishing the first **Sandbox profile version** does not require a **Source sandbox profile version**.

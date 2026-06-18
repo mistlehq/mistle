@@ -2,7 +2,7 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
-import { ApiKeyActorKinds } from "@mistle/db/control-plane";
+import { ApiKeyActorKinds, DesignerActionRequestStatuses } from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
@@ -13,6 +13,13 @@ import {
   DesignerSessionSchema,
   ListDesignerSessionsResponseSchema,
 } from "../src/designer/index.js";
+import {
+  claimDesignerActionRequest,
+  markDesignerActionRequestResponseSubmitted,
+  readDesignerActionRequestForResponse,
+  toDesignerActionRequestOperation,
+} from "../src/designer/services/designer-action-requests.js";
+import { completeApprovedDesignerActionRequestExecution } from "../src/designer/services/designer-sessions.js";
 import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
 
 const it = createIntegrationTest({
@@ -433,6 +440,179 @@ describe.concurrent("designer sessions integration", () => {
       },
     );
     expect(response.status).toBe(400);
+  });
+
+  it("persists Designer action request ownership with proposal response idempotency", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-designer-action-request-idempotency@example.com",
+    });
+    const designerSessionId = "dsn_action_request_idempotency";
+    const proposalId = "dap_action_request_idempotency";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: designerSessionId,
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_designer_action_request_idempotency",
+      initialPrompt: "Build a support triage agent.",
+      runtimeProviderConversationId: "thread_action_request_idempotency",
+      initialPromptProviderExecutionId: "turn_action_request_idempotency",
+      initialPromptSubmittedAt: "2026-06-18 01:02:03+00",
+      canvasTabs: [],
+    });
+
+    const operation = toDesignerActionRequestOperation({
+      kind: "providerConfigurationChange",
+      provider: "github",
+      resourceType: "label",
+      resourceLabel: "mistlehq/mistle",
+      action: "Create label",
+      details: [
+        {
+          label: "Label",
+          value: "ai-triage",
+        },
+      ],
+    });
+    const claimed = await claimDesignerActionRequest(
+      {
+        db: env.controlPlaneDb,
+      },
+      {
+        organizationId: session.organizationId,
+        sessionId: designerSessionId,
+        proposalId,
+        response: "approved",
+        responseIdempotencyKey: "designer-action-request-idempotency",
+        requestedByUserId: session.userId,
+        runtimeProviderConversationId: "thread_action_request_idempotency",
+        operation,
+      },
+    );
+    expect(claimed.created).toBe(true);
+    expect(claimed.actionRequest).toMatchObject({
+      organizationId: session.organizationId,
+      designerSessionId,
+      proposalId,
+      response: "approved",
+      responseIdempotencyKey: "designer-action-request-idempotency",
+      requestedByUserId: session.userId,
+      runtimeProviderConversationId: "thread_action_request_idempotency",
+      operationKind: "providerConfigurationChange",
+      operation,
+      status: DesignerActionRequestStatuses.APPROVED,
+    });
+
+    const repeated = await claimDesignerActionRequest(
+      {
+        db: env.controlPlaneDb,
+      },
+      {
+        organizationId: session.organizationId,
+        sessionId: designerSessionId,
+        proposalId,
+        response: "approved",
+        responseIdempotencyKey: "designer-action-request-idempotency",
+        requestedByUserId: session.userId,
+        runtimeProviderConversationId: "thread_action_request_idempotency",
+        operation,
+      },
+    );
+    expect(repeated).toMatchObject({
+      created: false,
+      actionRequest: {
+        id: claimed.actionRequest.id,
+      },
+    });
+
+    await expect(
+      claimDesignerActionRequest(
+        {
+          db: env.controlPlaneDb,
+        },
+        {
+          organizationId: session.organizationId,
+          sessionId: designerSessionId,
+          proposalId,
+          response: "declined",
+          responseIdempotencyKey: "designer-action-request-conflicting-response",
+          requestedByUserId: session.userId,
+          runtimeProviderConversationId: "thread_action_request_idempotency",
+          operation,
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: "DESIGNER_ACTION_PROPOSAL_NOT_PENDING",
+    });
+
+    const submitted = await markDesignerActionRequestResponseSubmitted(
+      {
+        db: env.controlPlaneDb,
+      },
+      {
+        organizationId: session.organizationId,
+        actionRequestId: claimed.actionRequest.id,
+        runtimeProviderExecutionId: "turn_action_request_response",
+        responseSubmittedAt: "2026-06-18 01:03:04+00",
+      },
+    );
+    expect(submitted).toMatchObject({
+      id: claimed.actionRequest.id,
+      runtimeProviderExecutionId: "turn_action_request_response",
+      responseSubmittedAt: "2026-06-18 01:03:04+00",
+      status: DesignerActionRequestStatuses.APPROVED,
+    });
+
+    const completedResponse = await completeApprovedDesignerActionRequestExecution({
+      ctx: {
+        db: env.controlPlaneDb,
+      },
+      organizationId: session.organizationId,
+      sessionId: designerSessionId,
+      proposalId,
+      actionRequest: submitted,
+      response: {
+        actionProposalResponse: {
+          proposalId,
+          response: "approved",
+          providerConversationId: "thread_action_request_idempotency",
+          providerExecutionId: "turn_action_request_response",
+          submittedAt: "2026-06-18 01:03:04+00",
+        },
+        actionRequest: {
+          id: submitted.id,
+          status: submitted.status,
+          failureCode: submitted.failureCode,
+          failureMessage: submitted.failureMessage,
+        },
+      },
+    });
+    expect(completedResponse.actionRequest).toMatchObject({
+      id: submitted.id,
+      status: DesignerActionRequestStatuses.EXECUTION_UNSUPPORTED,
+      failureCode: "DESIGNER_OPERATION_HANDLER_UNSUPPORTED",
+    });
+
+    await expect(
+      readDesignerActionRequestForResponse(
+        {
+          db: env.controlPlaneDb,
+        },
+        {
+          organizationId: session.organizationId,
+          sessionId: designerSessionId,
+          proposalId,
+          response: "approved",
+          responseIdempotencyKey: "designer-action-request-idempotency",
+        },
+      ),
+    ).resolves.toMatchObject({
+      id: claimed.actionRequest.id,
+      status: DesignerActionRequestStatuses.EXECUTION_UNSUPPORTED,
+      runtimeProviderExecutionId: "turn_action_request_response",
+      responseSubmittedAt: "2026-06-18 01:03:04+00",
+    });
   });
 
   it("returns a persisted completed Designer runtime conversation bootstrap on repeated requests", async ({

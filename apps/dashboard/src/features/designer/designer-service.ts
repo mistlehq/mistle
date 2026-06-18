@@ -86,6 +86,21 @@ const SubmitDesignerActionProposalResponseResponseSchema = z
         submittedAt: z.string().min(1),
       })
       .strict(),
+    actionRequest: z
+      .object({
+        id: z.string().min(1),
+        status: z.enum([
+          "approved",
+          "declined",
+          "executing",
+          "execution_unsupported",
+          "completed",
+          "failed",
+        ]),
+        failureCode: z.string().min(1).nullable(),
+        failureMessage: z.string().min(1).nullable(),
+      })
+      .strict(),
   })
   .strict();
 
@@ -146,9 +161,9 @@ export type DesignerRuntimeFollowUpSubmission = z.output<
   typeof SubmitDesignerRuntimeFollowUpResponseSchema
 >["runtimeFollowUp"];
 export type DesignerActionProposalResponse = z.output<typeof DesignerActionProposalResponseSchema>;
-export type DesignerActionProposalResponseSubmission = z.output<
+export type DesignerActionProposalResponseResult = z.output<
   typeof SubmitDesignerActionProposalResponseResponseSchema
->["actionProposalResponse"];
+>;
 export type DesignerRuntimeConversationTranscript = z.output<
   typeof GetDesignerRuntimeConversationTranscriptResponseSchema
 >["runtimeConversationTranscript"];
@@ -362,7 +377,7 @@ export async function submitDesignerActionProposalResponse(input: {
   response: DesignerActionProposalResponse;
   idempotencyKey: string;
   signal?: AbortSignal;
-}): Promise<DesignerActionProposalResponseSubmission> {
+}): Promise<DesignerActionProposalResponseResult> {
   try {
     const response = await requestControlPlane({
       operation: "submitDesignerActionProposalResponse",
@@ -388,7 +403,7 @@ export async function submitDesignerActionProposalResponse(input: {
       });
     }
 
-    return parsedResponse.data.actionProposalResponse;
+    return parsedResponse.data;
   } catch (error) {
     throw new DesignerApiError(
       normalizeHttpApiError({

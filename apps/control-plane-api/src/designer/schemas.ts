@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+import { DesignerActionRequestStatuses } from "@mistle/db/control-plane";
 import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 
 const designerSessionCanvasTabSchema = z
@@ -117,6 +118,24 @@ const designerActionProposalResponseSubmissionSchema = z
   })
   .strict();
 
+const designerActionRequestStatusSchema = z.enum([
+  DesignerActionRequestStatuses.APPROVED,
+  DesignerActionRequestStatuses.DECLINED,
+  DesignerActionRequestStatuses.EXECUTING,
+  DesignerActionRequestStatuses.EXECUTION_UNSUPPORTED,
+  DesignerActionRequestStatuses.COMPLETED,
+  DesignerActionRequestStatuses.FAILED,
+]);
+
+const designerActionRequestSchema = z
+  .object({
+    id: z.string().min(1),
+    status: designerActionRequestStatusSchema,
+    failureCode: z.string().min(1).nullable(),
+    failureMessage: z.string().min(1).nullable(),
+  })
+  .strict();
+
 const designerRuntimeConversationTranscriptTurnSchema = z
   .object({
     id: z.string().min(1),
@@ -185,6 +204,7 @@ export const submitDesignerRuntimeFollowUpResponseSchema = z
 export const submitDesignerActionProposalResponseResponseSchema = z
   .object({
     actionProposalResponse: designerActionProposalResponseSubmissionSchema,
+    actionRequest: designerActionRequestSchema,
   })
   .strict();
 export const getDesignerRuntimeConversationTranscriptResponseSchema = z

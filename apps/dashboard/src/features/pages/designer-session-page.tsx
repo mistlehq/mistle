@@ -18,6 +18,7 @@ import {
   submitDesignerActionProposalResponse,
   submitDesignerRuntimeFollowUp,
   type DesignerActionProposalResponse,
+  type DesignerActionProposalResponseResult,
   type DesignerRuntimeConversationTranscript,
   type DesignerSession,
 } from "../designer/designer-service.js";
@@ -231,7 +232,9 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
         return;
       }
 
-      setLatestRuntimeSubmissionProviderExecutionId(submission.providerExecutionId);
+      setLatestRuntimeSubmissionProviderExecutionId(
+        submission.actionProposalResponse.providerExecutionId,
+      );
       void invalidateDesignerSessionQuery({
         queryClient,
         sessionId: variables.sessionId,
@@ -295,7 +298,9 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
       actionProposalResponseSuccessMessage={
         submitActionProposalResponseMutation.data === undefined
           ? null
-          : `Action proposal response submitted at ${submitActionProposalResponseMutation.data.submittedAt}.`
+          : formatDesignerActionProposalResponseSuccessMessage(
+              submitActionProposalResponseMutation.data,
+            )
       }
       errorMessage={designerSessionQuery.error?.message ?? null}
       onFollowUpDraftChange={(draft) => {
@@ -349,4 +354,25 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
       sessionId={sessionId}
     />
   );
+}
+
+function formatDesignerActionProposalResponseSuccessMessage(
+  result: DesignerActionProposalResponseResult,
+): string {
+  const submittedAt = result.actionProposalResponse.submittedAt;
+  if (result.actionRequest.status === "executing") {
+    return `Action proposal response submitted at ${submittedAt}. Execution is in progress.`;
+  }
+
+  if (result.actionRequest.status === "execution_unsupported") {
+    return `Action proposal response submitted at ${submittedAt}. Execution is not supported for this operation yet.`;
+  }
+
+  if (result.actionRequest.status === "failed") {
+    return result.actionRequest.failureMessage === null
+      ? `Action proposal response submitted at ${submittedAt}, but execution failed.`
+      : `Action proposal response submitted at ${submittedAt}, but execution failed: ${result.actionRequest.failureMessage}`;
+  }
+
+  return `Action proposal response submitted at ${submittedAt}.`;
 }

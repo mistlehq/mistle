@@ -1624,6 +1624,19 @@ export interface paths {
                 response: "approved" | "declined";
                 submittedAt: string;
               };
+              actionRequest: {
+                failureCode: string | null;
+                failureMessage: string | null;
+                id: string;
+                /** @enum {string} */
+                status:
+                  | "approved"
+                  | "declined"
+                  | "executing"
+                  | "execution_unsupported"
+                  | "completed"
+                  | "failed";
+              };
             };
           };
         };

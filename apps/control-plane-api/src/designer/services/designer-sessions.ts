@@ -8,6 +8,9 @@ import type {
 import {
   type ControlPlaneDatabase,
   getControlPlaneDatabaseSchema,
+  type DesignerActionRequest,
+  DesignerActionRequestResponses,
+  DesignerActionRequestStatuses,
   type DesignerSession,
 } from "@mistle/db/control-plane";
 import { SandboxInstancePurposes, type SandboxInstanceStarterKind } from "@mistle/db/data-plane";
@@ -53,6 +56,7 @@ import {
 import type {
   BootstrapDesignerRuntimeConversationResponse,
   CreateDesignerSessionBody,
+  DesignerActionProposal,
   DesignerSessionResponse,
   GetDesignerRuntimeConversationTranscriptResponse,
   PutDesignerSessionCanvasTabsBody,
@@ -65,6 +69,15 @@ import {
   createDesignerActionProposalResponsePrompt,
   splitDesignerActionProposalsFromTranscriptTurns,
 } from "./designer-action-proposals.js";
+import {
+  claimDesignerActionRequest,
+  claimDesignerActionRequestExecution,
+  markDesignerActionRequestResponseSubmitted,
+  readDesignerActionRequestForResponse,
+  toDesignerActionRequestOperation,
+  updateDesignerActionRequestExecutionStatus,
+} from "./designer-action-requests.js";
+import { executeApprovedDesignerOperation } from "./designer-operation-handlers.js";
 
 type DesignerSessionActor = {
   kind: SandboxInstanceStarterKind;
@@ -237,6 +250,81 @@ function mapRuntimeConversationBootstrapResult(
       providerExecutionId: result.providerExecutionId,
       initialPromptSubmittedAt: result.initialPromptSubmittedAt,
     },
+  };
+}
+
+function mapDesignerActionRequest(
+  actionRequest: Pick<DesignerActionRequest, "failureCode" | "failureMessage" | "id" | "status">,
+): SubmitDesignerActionProposalResponseResponse["actionRequest"] {
+  return {
+    id: actionRequest.id,
+    status: actionRequest.status,
+    failureCode: actionRequest.failureCode,
+    failureMessage: actionRequest.failureMessage,
+  };
+}
+
+function mapSubmittedDesignerActionProposalResponse(input: {
+  proposalId: string;
+  response: SubmitDesignerActionProposalResponseBody["response"];
+  actionRequest: DesignerActionRequest & { responseSubmittedAt: string };
+}): SubmitDesignerActionProposalResponseResponse {
+  return {
+    actionProposalResponse: {
+      proposalId: input.proposalId,
+      response: input.response,
+      providerConversationId: input.actionRequest.runtimeProviderConversationId,
+      providerExecutionId: input.actionRequest.runtimeProviderExecutionId,
+      submittedAt: input.actionRequest.responseSubmittedAt,
+    },
+    actionRequest: mapDesignerActionRequest(input.actionRequest),
+  };
+}
+
+export async function completeApprovedDesignerActionRequestExecution(input: {
+  ctx: { db: ControlPlaneDatabase };
+  organizationId: string;
+  sessionId: string;
+  proposalId: string;
+  actionRequest: DesignerActionRequest;
+  response: SubmitDesignerActionProposalResponseResponse;
+}): Promise<SubmitDesignerActionProposalResponseResponse> {
+  if (
+    input.actionRequest.response !== DesignerActionRequestResponses.APPROVED ||
+    input.actionRequest.status !== DesignerActionRequestStatuses.APPROVED
+  ) {
+    return input.response;
+  }
+
+  const claimedActionRequest = await claimDesignerActionRequestExecution(input.ctx, {
+    organizationId: input.organizationId,
+    actionRequestId: input.actionRequest.id,
+  });
+  if (claimedActionRequest.status !== DesignerActionRequestStatuses.EXECUTING) {
+    return {
+      ...input.response,
+      actionRequest: mapDesignerActionRequest(claimedActionRequest),
+    };
+  }
+
+  const executionResult = await executeApprovedDesignerOperation({
+    actionRequestId: claimedActionRequest.id,
+    organizationId: input.organizationId,
+    sessionId: input.sessionId,
+    proposalId: input.proposalId,
+    operation: claimedActionRequest.operation,
+  });
+  const actionRequest = await updateDesignerActionRequestExecutionStatus(input.ctx, {
+    organizationId: input.organizationId,
+    actionRequestId: claimedActionRequest.id,
+    status: executionResult.status,
+    failureCode: executionResult.failureCode,
+    failureMessage: executionResult.failureMessage,
+  });
+
+  return {
+    ...input.response,
+    actionRequest: mapDesignerActionRequest(actionRequest),
   };
 }
 
@@ -896,6 +984,33 @@ export async function submitDesignerActionProposalResponse(
   },
 ): Promise<SubmitDesignerActionProposalResponseResponse> {
   const designerSession = await readReadyRuntimeConversationDesignerSession(ctx, input);
+  const existingActionRequest = await readDesignerActionRequestForResponse(ctx, {
+    organizationId: input.organizationId,
+    sessionId: input.sessionId,
+    proposalId: input.proposalId,
+    response: input.body.response,
+    responseIdempotencyKey: input.body.idempotencyKey,
+  });
+
+  if (existingActionRequest !== null && existingActionRequest.responseSubmittedAt !== null) {
+    const response = mapSubmittedDesignerActionProposalResponse({
+      proposalId: input.proposalId,
+      response: input.body.response,
+      actionRequest: {
+        ...existingActionRequest,
+        responseSubmittedAt: existingActionRequest.responseSubmittedAt,
+      },
+    });
+
+    return completeApprovedDesignerActionRequestExecution({
+      ctx,
+      organizationId: input.organizationId,
+      sessionId: input.sessionId,
+      proposalId: input.proposalId,
+      actionRequest: existingActionRequest,
+      response,
+    });
+  }
 
   const connectionToken = await mintDesignerRuntimeConnectionToken(ctx, {
     organizationId: input.organizationId,
@@ -903,7 +1018,7 @@ export async function submitDesignerActionProposalResponse(
     actingUserId: input.actingUserId,
   });
 
-  return ctx.db.transaction(async (tx) => {
+  const submittedResponse = await ctx.db.transaction(async (tx) => {
     const lockAcquired = await acquireDesignerRuntimeSubmissionLock(tx, {
       sessionId: input.sessionId,
     });
@@ -914,7 +1029,70 @@ export async function submitDesignerActionProposalResponse(
       );
     }
 
-    return submitDesignerActionProposalResponseWithLock(
+    const lockedExistingActionRequest = await readDesignerActionRequestForResponse(
+      {
+        db: tx,
+      },
+      {
+        organizationId: input.organizationId,
+        sessionId: input.sessionId,
+        proposalId: input.proposalId,
+        response: input.body.response,
+        responseIdempotencyKey: input.body.idempotencyKey,
+      },
+    );
+
+    if (lockedExistingActionRequest !== null) {
+      if (lockedExistingActionRequest.responseSubmittedAt !== null) {
+        return {
+          actionRequest: lockedExistingActionRequest,
+          response: mapSubmittedDesignerActionProposalResponse({
+            proposalId: input.proposalId,
+            response: input.body.response,
+            actionRequest: {
+              ...lockedExistingActionRequest,
+              responseSubmittedAt: lockedExistingActionRequest.responseSubmittedAt,
+            },
+          }),
+        };
+      }
+
+      const response = await submitDesignerActionProposalResponseTurn(
+        {
+          ...ctx,
+          db: tx,
+        },
+        {
+          organizationId: input.organizationId,
+          sessionId: input.sessionId,
+          proposalId: input.proposalId,
+          body: input.body,
+          connectionUrl: connectionToken.url,
+          actionRequest: lockedExistingActionRequest,
+        },
+      );
+
+      return {
+        actionRequest: lockedExistingActionRequest,
+        response,
+      };
+    }
+
+    const claimed = await claimDesignerActionProposalResponseWithLock(
+      {
+        ...ctx,
+        db: tx,
+      },
+      {
+        organizationId: input.organizationId,
+        sessionId: input.sessionId,
+        actingUserId: input.actingUserId,
+        proposalId: input.proposalId,
+        body: input.body,
+        connectionUrl: connectionToken.url,
+      },
+    );
+    const response = await submitDesignerActionProposalResponseTurn(
       {
         ...ctx,
         db: tx,
@@ -925,8 +1103,23 @@ export async function submitDesignerActionProposalResponse(
         proposalId: input.proposalId,
         body: input.body,
         connectionUrl: connectionToken.url,
+        actionRequest: claimed,
       },
     );
+
+    return {
+      actionRequest: claimed,
+      response,
+    };
+  });
+
+  return completeApprovedDesignerActionRequestExecution({
+    ctx,
+    organizationId: input.organizationId,
+    sessionId: input.sessionId,
+    proposalId: input.proposalId,
+    actionRequest: submittedResponse.actionRequest,
+    response: submittedResponse.response,
   });
 }
 
@@ -1010,7 +1203,65 @@ async function submitDesignerRuntimeFollowUpWithLock(
   };
 }
 
-async function submitDesignerActionProposalResponseWithLock(
+async function claimDesignerActionProposalResponseWithLock(
+  ctx: LockedDesignerRuntimeConversationContext,
+  input: {
+    organizationId: string;
+    sessionId: string;
+    actingUserId: string;
+    proposalId: string;
+    body: SubmitDesignerActionProposalResponseBody;
+    connectionUrl: string;
+  },
+): Promise<DesignerActionRequest> {
+  const designerSession = await readReadyRuntimeConversationDesignerSession(ctx, input);
+  const providerConversationId = designerSession.runtimeProviderConversationId;
+  const provider = resolveAgentConversationProvider(DesignerRuntimeId);
+  const connection = await provider.connect({
+    connectionUrl: input.connectionUrl,
+  });
+
+  try {
+    await provider.resumeConversation({
+      connection,
+      providerConversationId,
+    });
+
+    const runtimeConversation = await provider.inspectConversation({
+      connection,
+      providerConversationId,
+    });
+    if (runtimeConversation.status === AgentConversationStatuses.ACTIVE) {
+      throw new DesignerConflictError(
+        DesignerConflictCodes.DESIGNER_RUNTIME_CONVERSATION_BUSY,
+        `Designer session '${input.sessionId}' runtime conversation is still processing a previous turn.`,
+      );
+    }
+
+    const proposal = await assertPendingDesignerActionProposal({
+      provider,
+      connection,
+      providerConversationId,
+      proposalId: input.proposalId,
+    });
+    const claimedActionRequest = await claimDesignerActionRequest(ctx, {
+      organizationId: input.organizationId,
+      sessionId: input.sessionId,
+      proposalId: input.proposalId,
+      response: input.body.response,
+      responseIdempotencyKey: input.body.idempotencyKey,
+      requestedByUserId: input.actingUserId,
+      runtimeProviderConversationId: providerConversationId,
+      operation: toDesignerActionRequestOperation(proposal.operation),
+    });
+
+    return claimedActionRequest.actionRequest;
+  } finally {
+    await connection.close();
+  }
+}
+
+async function submitDesignerActionProposalResponseTurn(
   ctx: LockedDesignerRuntimeConversationContext,
   input: {
     organizationId: string;
@@ -1018,6 +1269,7 @@ async function submitDesignerActionProposalResponseWithLock(
     proposalId: string;
     body: SubmitDesignerActionProposalResponseBody;
     connectionUrl: string;
+    actionRequest: DesignerActionRequest;
   },
 ): Promise<SubmitDesignerActionProposalResponseResponse> {
   const responsePrompt = createDesignerActionProposalResponsePrompt({
@@ -1038,14 +1290,12 @@ async function submitDesignerActionProposalResponseWithLock(
         providerConversationId,
         sandboxInstanceId: designerSession.sandboxInstanceId,
       }),
-    validateBeforeStartExecution: async ({ provider, connection, providerConversationId }) => {
-      await assertPendingDesignerActionProposal({
-        provider,
-        connection,
-        providerConversationId,
-        proposalId: input.proposalId,
-      });
-    },
+  });
+  const submittedActionRequest = await markDesignerActionRequestResponseSubmitted(ctx, {
+    organizationId: input.organizationId,
+    actionRequestId: input.actionRequest.id,
+    runtimeProviderExecutionId: submission.providerExecutionId,
+    responseSubmittedAt: submission.submittedAt,
   });
 
   return {
@@ -1054,6 +1304,7 @@ async function submitDesignerActionProposalResponseWithLock(
       response: input.body.response,
       ...submission,
     },
+    actionRequest: mapDesignerActionRequest(submittedActionRequest),
   };
 }
 
@@ -1068,11 +1319,6 @@ async function submitDesignerRuntimeConversationInputWithLock(
       designerSession: DesignerSession,
       providerConversationId: string,
     ) => AgentConversationIdempotencyMetadata;
-    validateBeforeStartExecution?: (input: {
-      provider: AgentConversationProvider;
-      connection: AgentConversationConnection;
-      providerConversationId: string;
-    }) => Promise<void>;
   },
 ): Promise<{
   providerConversationId: string;
@@ -1103,14 +1349,6 @@ async function submitDesignerRuntimeConversationInputWithLock(
       );
     }
 
-    if (input.validateBeforeStartExecution !== undefined) {
-      await input.validateBeforeStartExecution({
-        provider,
-        connection,
-        providerConversationId,
-      });
-    }
-
     const submittedTurn = await provider.startExecution({
       connection,
       providerConversationId,
@@ -1136,7 +1374,7 @@ async function assertPendingDesignerActionProposal(input: {
   connection: AgentConversationConnection;
   providerConversationId: string;
   proposalId: string;
-}): Promise<void> {
+}): Promise<DesignerActionProposal> {
   if (input.provider.readConversationTranscript === undefined) {
     throw new Error(
       `Agent runtime '${DesignerRuntimeId}' does not support runtime conversation transcript reads.`,
@@ -1165,6 +1403,8 @@ async function assertPendingDesignerActionProposal(input: {
       `Designer action proposal '${input.proposalId}' is not pending.`,
     );
   }
+
+  return proposal;
 }
 
 async function readReadyRuntimeConversationDesignerSession(
