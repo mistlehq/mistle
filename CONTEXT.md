@@ -120,6 +120,10 @@ _Avoid_: Cloned automation, enabled copy
 A provider event that can be selected as the event source for a **Trigger**.
 _Avoid_: Webhook event when naming product-facing trigger-builder concepts
 
+**Trigger event condition**:
+One way a **Trigger** can match a provider event, consisting of a **Trigger event** and the **Trigger event parameter rules** that must match with it.
+_Avoid_: Matching clause, repeated event, event card when naming the domain concept
+
 **Associated resource event routing**:
 A **Sandbox profile version** runtime-plan behavior that selects which provider events on associated **Routable provider resources** should produce **Association deliveries**.
 _Avoid_: Trigger when no Trigger conversation is created, hardcoded association routing
@@ -135,6 +139,14 @@ _Avoid_: Parameter layout, control group
 **Trigger event parameter rule**:
 A match rule applied to a **Trigger event parameter** when deciding whether a **Trigger event** matches a **Trigger**.
 _Avoid_: Exclusion when the rule is one match mode among several
+
+**Multi-value trigger event parameter rule**:
+A **Trigger event parameter rule** that matches when a **Trigger event parameter** has any one of several configured values.
+_Avoid_: Repeated event condition when only the parameter values differ
+
+**Multi-value trigger event parameter**:
+A **Trigger event parameter** that is allowed to use a **Multi-value trigger event parameter rule**.
+_Avoid_: Multi-select control when naming the provider event field rather than the UI
 
 **Association event parameter rule**:
 A match rule applied to an **Association-backed provider event** when deciding whether **Associated resource event routing** should produce an **Association delivery**.
@@ -183,6 +195,10 @@ _Avoid_: Slack channel, Slack message, Slack thread when the thread may have bee
 **Slack thread**:
 A Slack conversation thread identified by its channel and root message.
 _Avoid_: Slack channel, Slack message when the intended routing scope is the full thread
+
+**Slack channel trigger parameter**:
+A **Multi-value trigger event parameter** that matches the Slack channel carrying a Slack **Trigger event**.
+_Avoid_: App mention channel when the parameter applies to Slack events beyond app mentions
 
 **Routable provider resource key**:
 The provider-derived identity used to match provider events to a **Routable provider resource**.
@@ -533,6 +549,23 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Sandbox profile duplicate** should preserve the source profile's configuration references unless a reference is no longer valid.
 - A **Sandbox profile duplicate** does not carry source **Snapshot** job history.
 - A session, trigger, or other profile-backed object may have a **Referenced sandbox profile version** that differs from the profile's latest published **Sandbox profile version**.
+- A **Trigger** may have multiple **Trigger event conditions**.
+- A webhook **Trigger** must have at least one **Trigger event condition**.
+- Scheduled **Triggers** do not have **Trigger event conditions**.
+- A **Trigger event condition** belongs to exactly one **Trigger**.
+- A **Trigger event condition** has exactly one **Trigger event**.
+- An existing **Trigger** with multiple selected **Trigger events** is equivalent to one **Trigger event condition** per selected **Trigger event**.
+- A **Trigger event condition** matches only when all of its **Trigger event parameter rules** match.
+- A **Multi-value trigger event parameter rule** matches when any one of its configured values matches.
+- Only a **Multi-value trigger event parameter** may use a **Multi-value trigger event parameter rule**.
+- A **Trigger event condition** without a match expression matches every provider event of its **Trigger event** type.
+- A **Trigger event condition** may use an advanced match expression that is not fully represented by visible trigger-builder controls.
+- A **Trigger event condition** decides whether a provider event matches; conversation grouping, **Rendered trigger input**, and agent instructions belong to the **Trigger**.
+- A migrated **Trigger event condition** preserves the matching behavior of the selected **Trigger event** and event-scoped match expression it replaces.
+- A provider event that matches multiple **Trigger event conditions** for the same **Trigger** produces at most one **Trigger** run.
+- A **Trigger** may contain redundant **Trigger event conditions**; redundancy does not create extra **Trigger** runs.
+- The authored order of **Trigger event conditions** is preserved for display and editing but does not affect matching.
+- A provider event that matches multiple **Triggers** may produce one **Trigger** run for each matching **Trigger**.
 - **Associated resource event routing** belongs to a **Referenced sandbox profile version** and is part of the runtime behavior for sessions started from that version.
 - Changing **Associated resource event routing** requires the **Sandbox profile version** publish and **Snapshot** lifecycle rather than changing already-running **Sandbox sessions**.
 - First-pass **Associated resource event routing** selects provider event types for associated resources; the **Provider resource association** supplies the resource match.
@@ -886,6 +919,10 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - "empty state" could mean first-use creation guidance, filtered no-results copy, or unavailable dependency copy — resolved: for collection pages, use it to mean the zero-object state before the first item exists.
 - "search filtering" could mean client-side filtering of visible rows or a **Filtered collection view** — resolved: collection pages should use a **Filtered collection view** when the result count spans more than the currently loaded page.
 - "webhook event" was used for both provider-delivered records and selectable product-facing events in the trigger builder — resolved: use **Trigger event** in product-facing trigger-builder copy and keep webhook event for integration/runtime concepts.
+- Trigger-builder UI copy may use "event" for the provider event named on a condition card, but adding another rule bundle should be described as adding a condition.
+- Hard migration to **Trigger event conditions** means trigger write paths should reject legacy event-type plus event-scoped-filter trigger writes after cutover.
+- **Associated resource event routing** may still use event-type plus event-scoped-filter shapes; the **Trigger event condition** migration is scoped to configured **Triggers**.
+- Multi-value **Trigger event parameter rules** should be represented as one any-of-values match for the parameter rather than as repeated **Trigger event conditions**.
 - "automation" was used for both the user-facing configured behavior and the internal runtime model — resolved: use **Trigger** as the canonical term across product, API, persistence, and workflow language.
 - Dashboard URLs are user-facing language — resolved: use **Trigger** naming for dashboard routes.
 - Dashboard route parameters are user-facing route language — resolved: use `triggerId`.

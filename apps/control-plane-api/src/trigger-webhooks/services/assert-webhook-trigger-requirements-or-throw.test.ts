@@ -144,10 +144,10 @@ describe("assertWebhookTriggerRequirementsOrThrow", () => {
     expectInvalidWebhookTriggerRequirementsError(error);
   });
 
-  it("validates all advertised triggers when eventTypes is null", () => {
+  it("validates only explicitly selected triggers", () => {
     expect(() =>
       assertWebhookTriggerRequirementsOrThrow({
-        eventTypes: null,
+        eventTypes: ["github.issues.opened"],
         providerMetadata: {
           [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
             events: ["issues"],
@@ -183,7 +183,7 @@ describe("assertWebhookTriggerRequirementsOrThrow", () => {
           },
         ],
       }),
-    ).toThrow(BadRequestError);
+    ).not.toThrow();
   });
 });
 

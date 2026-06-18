@@ -136,7 +136,7 @@ describe.concurrent("trigger webhooks validation integration", () => {
     expect(body.code).toBe("INVALID_PRIMARY_REPOSITORY");
   });
 
-  it("rejects non-event-scoped payload filters on create", async ({ env }) => {
+  it("rejects invalid condition payload filters on create", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-trigger-webhooks-invalid-filter-create@example.com",
     });
@@ -162,23 +162,26 @@ describe.concurrent("trigger webhooks validation integration", () => {
           sandboxProfileId: "sbp_trigger_webhook_invalid_filter_create",
           sandboxProfileVersion: 1,
         }),
-        payloadFilter: {
-          op: "eq",
-          path: ["action"],
-          value: "created",
-        },
+        eventConditions: [
+          {
+            eventType: GitHubIssueCommentCreatedEventType,
+            payloadFilter: {
+              op: "not_a_real_operator",
+              path: ["action"],
+              value: "created",
+            },
+          },
+        ],
       }),
     });
 
     expect(response.status).toBe(400);
     const body = ValidationErrorResponseSchema.parse(await response.json());
     expect(body.code).toBe("VALIDATION_ERROR");
-    expect(body.message).toContain("Invalid payloadFilter");
+    expect(body.message).toContain("Invalid eventConditions payloadFilter");
   });
 
-  it("rejects payload filters for events outside the selected event set on update", async ({
-    env,
-  }) => {
+  it("rejects invalid condition payload filters on update", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-trigger-webhooks-invalid-filter-update@example.com",
     });
@@ -209,14 +212,16 @@ describe.concurrent("trigger webhooks validation integration", () => {
           cookie: session.cookie,
         },
         body: JSON.stringify({
-          eventTypes: [GitHubIssueCommentCreatedEventType],
-          payloadFilter: {
-            "github.pull_request.opened": {
-              op: "eq",
-              path: ["action"],
-              value: "opened",
+          eventConditions: [
+            {
+              eventType: GitHubIssueCommentCreatedEventType,
+              payloadFilter: {
+                op: "not_a_real_operator",
+                path: ["action"],
+                value: "opened",
+              },
             },
-          },
+          ],
         }),
       },
     );
@@ -224,6 +229,6 @@ describe.concurrent("trigger webhooks validation integration", () => {
     expect(response.status).toBe(400);
     const body = UpdateTriggerWebhookBadRequestResponseSchema.parse(await response.json());
     expect(body.code).toBe("VALIDATION_ERROR");
-    expect(body.message).toContain("not selected");
+    expect(body.message).toContain("Invalid eventConditions payloadFilter");
   });
 });

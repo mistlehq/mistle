@@ -41,6 +41,7 @@ type ResolvedWebhookEventParameter =
       kind: "resource-select";
       resourceKind: string;
       payloadPath: string[];
+      multiValue?: boolean;
       negatedMatchRequiresExists?: boolean;
       prefix?: string;
       placeholder?: string;
@@ -574,6 +575,7 @@ function cloneWebhookEventParameter(
       kind: parameter.kind,
       resourceKind: parameter.resourceKind,
       payloadPath: [...parameter.payloadPath],
+      ...(parameter.multiValue === undefined ? {} : { multiValue: parameter.multiValue }),
       ...(parameter.negatedMatchRequiresExists === undefined
         ? {}
         : { negatedMatchRequiresExists: parameter.negatedMatchRequiresExists }),

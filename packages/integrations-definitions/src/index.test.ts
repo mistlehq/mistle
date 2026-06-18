@@ -930,10 +930,12 @@ describe("integrations-definitions index", () => {
               kind: "resource-select",
               resourceKind: "bot",
               payloadPath: ["sender", "login"],
+              multiValue: true,
             }),
             expect.objectContaining({
               id: "requestedReviewer",
               payloadPath: ["requested_reviewer", "login"],
+              multiValue: true,
               negatedMatchRequiresExists: true,
             }),
             expect.objectContaining({
@@ -941,6 +943,7 @@ describe("integrations-definitions index", () => {
               kind: "resource-select",
               resourceKind: "team",
               payloadPath: ["requested_team", "slug"],
+              multiValue: true,
               negatedMatchRequiresExists: true,
             }),
             expect.objectContaining({
@@ -948,6 +951,7 @@ describe("integrations-definitions index", () => {
               kind: "resource-select",
               resourceKind: "bot",
               payloadPath: ["requested_reviewer", "login"],
+              multiValue: true,
               negatedMatchRequiresExists: true,
             }),
           ]),
@@ -999,10 +1003,12 @@ describe("integrations-definitions index", () => {
               kind: "resource-select",
               resourceKind: "bot",
               payloadPath: ["sender", "login"],
+              multiValue: true,
             }),
             expect.objectContaining({
               id: "requestedReviewer",
               payloadPath: ["requested_reviewer", "login"],
+              multiValue: true,
               negatedMatchRequiresExists: true,
             }),
             expect.objectContaining({
@@ -1010,6 +1016,7 @@ describe("integrations-definitions index", () => {
               kind: "resource-select",
               resourceKind: "team",
               payloadPath: ["requested_team", "slug"],
+              multiValue: true,
               negatedMatchRequiresExists: true,
             }),
             expect.objectContaining({
@@ -1017,6 +1024,7 @@ describe("integrations-definitions index", () => {
               kind: "resource-select",
               resourceKind: "bot",
               payloadPath: ["requested_reviewer", "login"],
+              multiValue: true,
               negatedMatchRequiresExists: true,
             }),
           ]),
@@ -1065,6 +1073,18 @@ describe("integrations-definitions index", () => {
         }),
       ]),
     );
+    let githubCloudResourceSelectParameterCount = 0;
+    const githubCloudResourceSelectParameterMultiValueFlags: boolean[] = [];
+    for (const eventDefinition of githubCloudDefinition?.supportedWebhookEvents ?? []) {
+      for (const parameter of eventDefinition.parameters ?? []) {
+        if (parameter.kind === "resource-select") {
+          githubCloudResourceSelectParameterCount += 1;
+          githubCloudResourceSelectParameterMultiValueFlags.push(parameter.multiValue === true);
+        }
+      }
+    }
+    expect(githubCloudResourceSelectParameterCount).toBeGreaterThan(0);
+    expect(githubCloudResourceSelectParameterMultiValueFlags.every(Boolean)).toBe(true);
     expect(githubCloudDefinition?.credentialResolvers).toBeUndefined();
     expect(githubEnterpriseServerDefinition).toMatchObject({
       familyId: "github",

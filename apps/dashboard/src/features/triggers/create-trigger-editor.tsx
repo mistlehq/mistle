@@ -55,6 +55,7 @@ import { DefaultWebhookTriggerMessageTemplate } from "./webhook-trigger-input-te
 import {
   buildWebhookTriggerEventOptions,
   buildWebhookTriggerPrimaryRepositoryOptions,
+  resolveWebhookTriggerEventOptionIdFromConditionId,
   WebhookTriggerWorkspaceRootRepositoryOptionValue,
   withSelectedSandboxProfileOptionVersion,
 } from "./webhook-trigger-option-builders.js";
@@ -255,7 +256,8 @@ function applyEventIdsChange(input: {
     eventIds: input.eventIds,
     eventParameterRules: Object.fromEntries(
       input.eventIds.map((triggerId) => {
-        const eventOption = input.eventOptions.find((option) => option.id === triggerId);
+        const eventOptionId = resolveWebhookTriggerEventOptionIdFromConditionId(triggerId);
+        const eventOption = input.eventOptions.find((option) => option.id === eventOptionId);
         const templateParameterRules =
           eventOption === undefined
             ? undefined

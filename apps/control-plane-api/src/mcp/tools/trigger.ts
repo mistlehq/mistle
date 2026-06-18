@@ -235,7 +235,7 @@ export function registerTriggerTools(server: McpServer, context: MistleMcpServer
           name,
           ...(enabled === undefined ? {} : { enabled }),
           integrationWebhookSourceId,
-          eventTypes,
+          eventConditions: eventTypes.map((eventType) => ({ eventType })),
           inputTemplate: userMessage,
           ...(instructions === undefined ? {} : { instructions }),
           conversationKeyTemplate,
@@ -359,8 +359,7 @@ export function registerTriggerTools(server: McpServer, context: MistleMcpServer
         {
           organizationId: context.organizationActor.organizationId,
           triggerId,
-          eventTypes,
-          payloadFilter: null,
+          eventConditions: eventTypes.map((eventType) => ({ eventType })),
         },
       );
 

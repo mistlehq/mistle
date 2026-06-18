@@ -99,6 +99,7 @@ const SlackChannelParameter: IntegrationWebhookEventParameterDefinition = {
   kind: "resource-select",
   resourceKind: "channel",
   payloadPath: ["event", "channel"],
+  multiValue: true,
   prefix: "in",
 };
 

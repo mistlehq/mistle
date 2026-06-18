@@ -13,8 +13,9 @@ import { assertWebhookSourceReferenceOrThrow } from "./assert-webhook-source-ref
 import { assertWebhookTriggerRequirementsOrThrow } from "./assert-webhook-trigger-requirements-or-throw.js";
 import { loadWebhookTriggerAggregateOrThrow } from "./load-webhook-trigger-aggregate-or-throw.js";
 import {
-  assertEventScopedWebhookPayloadFilterOrThrow,
-  normalizeWebhookPayloadFilter,
+  normalizeWebhookTriggerEventConditions,
+  type NormalizedWebhookTriggerEventCondition,
+  type WebhookTriggerEventConditionInput,
 } from "./webhook-payload-filter.js";
 
 export type UpdateWebhookTriggerInput = {
@@ -23,8 +24,7 @@ export type UpdateWebhookTriggerInput = {
   name?: string | undefined;
   enabled?: boolean | undefined;
   integrationWebhookSourceId?: string | undefined;
-  eventTypes?: string[] | null | undefined;
-  payloadFilter?: Record<string, unknown> | null | undefined;
+  eventConditions?: WebhookTriggerEventConditionInput[] | undefined;
   inputTemplate?: string | undefined;
   instructions?: string | null | undefined;
   conversationKeyTemplate?: string | undefined;
@@ -36,6 +36,10 @@ export type UpdateWebhookTriggerInput = {
         primaryRepositoryId?: string | null | undefined;
       }
     | undefined;
+};
+
+type UpdateWebhookTriggerConfigInput = Omit<UpdateWebhookTriggerInput, "eventConditions"> & {
+  eventConditions?: NormalizedWebhookTriggerEventCondition[] | undefined;
 };
 
 export async function updateTriggerWebhook(
@@ -55,10 +59,13 @@ export async function updateTriggerWebhook(
 
   const integrationWebhookSourceId =
     input.integrationWebhookSourceId ?? existingTrigger.integrationWebhookSourceId;
-  const eventTypes = input.eventTypes === undefined ? existingTrigger.eventTypes : input.eventTypes;
-  const normalizedPayloadFilter = normalizeWebhookPayloadFilter(input.payloadFilter);
-  const payloadFilter =
-    normalizedPayloadFilter === undefined ? existingTrigger.payloadFilter : normalizedPayloadFilter;
+  const inputEventConditions =
+    input.eventConditions === undefined
+      ? undefined
+      : normalizeWebhookTriggerEventConditions(input.eventConditions);
+  const eventConditions =
+    inputEventConditions ?? normalizeWebhookTriggerEventConditions(existingTrigger.eventConditions);
+  const eventTypes = eventConditions.map((condition) => condition.eventType);
   const sandboxProfileId =
     input.target?.sandboxProfileId ?? existingTrigger.target.sandboxProfileId;
   const sandboxProfileVersion =
@@ -81,10 +88,6 @@ export async function updateTriggerWebhook(
     eventTypes,
     providerMetadata: resolvedWebhookSource.providerMetadata,
     supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
-  });
-  assertEventScopedWebhookPayloadFilterOrThrow({
-    eventTypes,
-    payloadFilter,
   });
   await assertSandboxProfileReferenceOrThrow(
     { db: ctx.db },
@@ -115,7 +118,7 @@ export async function updateTriggerWebhook(
     await updateTriggerBaseRow(tx, input);
     await updateWebhookConfigRow(tx, {
       ...input,
-      payloadFilter: normalizedPayloadFilter,
+      eventConditions: inputEventConditions,
     });
     await updateTriggerTargetRow(
       tx,
@@ -166,7 +169,7 @@ async function updateTriggerBaseRow(
 
 async function updateWebhookConfigRow(
   tx: ControlPlaneTransaction,
-  input: UpdateWebhookTriggerInput,
+  input: UpdateWebhookTriggerConfigInput,
 ): Promise<void> {
   const tables = getControlPlaneDatabaseSchema(tx);
 
@@ -176,12 +179,8 @@ async function updateWebhookConfigRow(
     nextValues.integrationWebhookSourceId = input.integrationWebhookSourceId;
   }
 
-  if (input.eventTypes !== undefined) {
-    nextValues.eventTypes = input.eventTypes;
-  }
-
-  if (input.payloadFilter !== undefined) {
-    nextValues.payloadFilter = input.payloadFilter;
+  if (input.eventConditions !== undefined) {
+    nextValues.eventConditions = input.eventConditions;
   }
 
   if (input.inputTemplate !== undefined) {

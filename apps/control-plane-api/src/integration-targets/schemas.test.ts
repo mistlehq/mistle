@@ -38,6 +38,7 @@ describe("IntegrationTargetSchema", () => {
               kind: "resource-select",
               resourceKind: "user",
               payloadPath: ["requested_reviewer", "login"],
+              multiValue: true,
               negatedMatchRequiresExists: true,
             },
             {
@@ -90,6 +91,14 @@ describe("IntegrationTargetSchema", () => {
         ],
       },
     ]);
+    expect(parsed.supportedWebhookEvents?.[0]?.parameters?.[0]).toEqual(
+      expect.objectContaining({
+        id: "requestedReviewer",
+        kind: "resource-select",
+        multiValue: true,
+        negatedMatchRequiresExists: true,
+      }),
+    );
   });
 
   it("parses device-authorization connection methods", () => {

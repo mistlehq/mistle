@@ -8,7 +8,7 @@ import type { IntegrationWebhookEventDefinition } from "@mistle/integrations-cor
 import { TriggerWebhooksBadRequestCodes } from "../constants.js";
 
 export function assertWebhookTriggerRequirementsOrThrow(input: {
-  eventTypes: readonly string[] | null;
+  eventTypes: readonly string[];
   providerMetadata: Readonly<Record<string, unknown>>;
   supportedWebhookEvents: readonly IntegrationWebhookEventDefinition[];
 }): void {
@@ -16,7 +16,7 @@ export function assertWebhookTriggerRequirementsOrThrow(input: {
   const supportedEventTypes = new Set(
     input.supportedWebhookEvents.map((eventDefinition) => eventDefinition.eventType),
   );
-  const unsupportedEventType = input.eventTypes?.find(
+  const unsupportedEventType = input.eventTypes.find(
     (eventType) => !supportedEventTypes.has(eventType),
   );
   if (unsupportedEventType !== undefined) {
@@ -26,14 +26,11 @@ export function assertWebhookTriggerRequirementsOrThrow(input: {
     );
   }
 
-  const selectedEvents =
-    input.eventTypes === null
-      ? input.supportedWebhookEvents
-      : input.eventTypes.flatMap((eventType) =>
-          input.supportedWebhookEvents.filter(
-            (eventDefinition) => eventDefinition.eventType === eventType,
-          ),
-        );
+  const selectedEvents = input.eventTypes.flatMap((eventType) =>
+    input.supportedWebhookEvents.filter(
+      (eventDefinition) => eventDefinition.eventType === eventType,
+    ),
+  );
 
   for (const eventDefinition of selectedEvents) {
     if (

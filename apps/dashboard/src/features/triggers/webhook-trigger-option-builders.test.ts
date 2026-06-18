@@ -6,6 +6,7 @@ import type { WebhookTriggerPayloadReference } from "./webhook-trigger-event-typ
 import {
   buildWebhookTriggerEventOptions,
   buildWebhookTriggerSandboxProfileOptions,
+  createWebhookTriggerEventConditionId,
   createWebhookTriggerEventId,
   resolveEligibleProfileTriggerConnectionIds,
 } from "./webhook-trigger-option-builders.js";
@@ -575,6 +576,71 @@ describe("buildWebhookTriggerEventOptions", () => {
         selectedEventIds: [],
       }).map((option) => option.eventType),
     ).toEqual(["linear.issue.created"]);
+  });
+
+  it("does not add unavailable entries for supported selected condition ids", () => {
+    const issueCommentEventOptionId = createWebhookTriggerEventId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.issue_comment.created",
+    });
+    const selectedConditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: issueCommentEventOptionId,
+      index: 0,
+    });
+
+    expect(
+      buildWebhookTriggerEventOptions({
+        connections: [
+          {
+            id: GitHubConnectionId,
+            targetKey: "github-cloud",
+            displayName: "GitHub Engineering",
+            status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        webhookSources: [
+          {
+            id: GitHubWebhookSourceId,
+            targetKey: "github-cloud",
+            integrationConnectionId: GitHubConnectionId,
+            displayName: "GitHub App webhook",
+            endpointKey: "ep_github",
+            callbackUrl:
+              "https://control-plane.example.com/p/integration/webhooks/github-cloud/ep_github",
+            status: "active",
+            providerMetadata: {},
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        targets: [
+          {
+            targetKey: "github-cloud",
+            familyId: "github",
+            variantId: "github-cloud",
+            kind: "git",
+            enabled: true,
+            config: {},
+            displayName: "GitHub",
+            description: "GitHub Cloud",
+            supportedWebhookEvents: [
+              {
+                eventType: "github.issue_comment.created",
+                providerEventType: "issue_comment",
+                displayName: "Issue comment created",
+                category: "Issues",
+              },
+            ],
+            targetHealth: {
+              configStatus: "valid",
+            },
+          },
+        ],
+        selectedEventIds: [selectedConditionId],
+      }).filter((option) => option.availability === "missing_integration"),
+    ).toEqual([]);
   });
 });
 

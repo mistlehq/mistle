@@ -684,14 +684,16 @@ async function seedWebhookTriggerUsage(
   await env.controlPlaneDb.insert(env.controlPlaneTables.webhookTriggers).values({
     triggerId: input.triggerId,
     integrationWebhookSourceId: sourceId,
-    eventTypes: ["issue_comment.created"],
-    payloadFilter: {
-      "issue_comment.created": {
-        op: "eq",
-        path: ["action"],
-        value: "created",
+    eventConditions: [
+      {
+        eventType: "issue_comment.created",
+        payloadFilter: {
+          op: "eq",
+          path: ["action"],
+          value: "created",
+        },
       },
-    },
+    ],
     inputTemplate: "Handle payload",
     conversationKeyTemplate: "conversation",
     idempotencyKeyTemplate: "dedupe",

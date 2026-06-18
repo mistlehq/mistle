@@ -76,6 +76,7 @@ const IntegrationWebhookEventParameterDefinitionSchema = z.union([
       kind: z.literal("resource-select"),
       resourceKind: z.string().min(1),
       payloadPath: z.array(z.string().min(1)).min(1),
+      multiValue: z.boolean().optional(),
       negatedMatchRequiresExists: z.boolean().optional(),
       prefix: z.string().min(1).optional(),
       placeholder: z.string().min(1).optional(),

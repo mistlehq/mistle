@@ -142,14 +142,16 @@ describe.concurrent("integration connections list integration", () => {
       triggerName: "GitHub webhook trigger",
       connectionId: "icn_integration_new_list_002",
       targetKey: "openai_connections_list",
-      eventTypes: ["response.created"],
-      payloadFilter: {
-        "response.created": {
-          op: "eq",
-          path: ["type"],
-          value: "response.created",
+      eventConditions: [
+        {
+          eventType: "response.created",
+          payloadFilter: {
+            op: "eq",
+            path: ["type"],
+            value: "response.created",
+          },
         },
-      },
+      ],
     });
 
     const firstPage = await listConnections({
@@ -597,8 +599,10 @@ async function seedWebhookTriggerUsage(
     triggerName: string;
     connectionId: string;
     targetKey: string;
-    eventTypes: string[];
-    payloadFilter: Record<string, unknown>;
+    eventConditions: {
+      eventType: string;
+      payloadFilter?: Record<string, unknown>;
+    }[];
   },
 ): Promise<void> {
   await env.controlPlaneDb.insert(env.controlPlaneTables.triggers).values({
@@ -619,8 +623,7 @@ async function seedWebhookTriggerUsage(
   await env.controlPlaneDb.insert(env.controlPlaneTables.webhookTriggers).values({
     triggerId: input.triggerId,
     integrationWebhookSourceId: `iws_${input.triggerId}`,
-    eventTypes: input.eventTypes,
-    payloadFilter: input.payloadFilter,
+    eventConditions: input.eventConditions,
     inputTemplate: "Handle payload",
     conversationKeyTemplate: "conversation",
     idempotencyKeyTemplate: "dedupe",

@@ -61,13 +61,16 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       connectionConfig: {},
       eventType: "github.issue_comment.created",
       providerEventType: "issue_comment",
-      payloadFilter: {
-        "github.issue_comment.created": {
-          op: "contains_token",
-          path: ["comment", "body"],
-          value: "@mistlebot",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          payloadFilter: {
+            op: "contains_token",
+            path: ["comment", "body"],
+            value: "@mistlebot",
+          },
         },
-      },
+      ],
       payload: {
         installation: {
           id: 12345,
@@ -116,6 +119,79 @@ describe.concurrent("control-plane worker integration webhook event handling", (
     });
   });
 
+  it("queues one trigger run when multiple same-event conditions match", async ({ env }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("same_event_conditions"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          payloadFilter: {
+            op: "contains_token",
+            path: ["comment", "body"],
+            value: "@mistlebot",
+          },
+        },
+        {
+          eventType: "github.issue_comment.created",
+          payloadFilter: {
+            op: "eq",
+            path: ["sender", "login"],
+            value: "octocat",
+          },
+        },
+      ],
+      payload: {
+        installation: {
+          id: 12345,
+        },
+        delivery: {
+          id: "delivery_same_event_conditions_payload",
+        },
+        comment: {
+          body: "please run @mistlebot",
+        },
+        sender: {
+          login: "octocat",
+        },
+      },
+      externalEventId: "evt_same_event_conditions",
+      externalDeliveryId: "delivery_same_event_conditions",
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent.triggerRunIds).toHaveLength(1);
+
+    const queuedRuns = await env.controlPlaneDb.query.triggerRuns.findMany({
+      where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+    });
+    expect(queuedRuns).toHaveLength(1);
+    expect(queuedRuns[0]).toMatchObject({
+      triggerId: scope.triggerId,
+      triggerTargetId: scope.triggerTargetId,
+      status: TriggerRunStatuses.QUEUED,
+    });
+  });
+
   it("queues trigger runs and provider resource association deliveries for the same webhook event", async ({
     env,
   }) => {
@@ -131,13 +207,16 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       connectionConfig: {},
       eventType: "github.issue_comment.created",
       providerEventType: "issue_comment",
-      payloadFilter: {
-        "github.issue_comment.created": {
-          op: "contains_token",
-          path: ["comment", "body"],
-          value: "@mistlebot",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          payloadFilter: {
+            op: "contains_token",
+            path: ["comment", "body"],
+            value: "@mistlebot",
+          },
         },
-      },
+      ],
       payload: {
         installation: {
           id: 12345,
@@ -537,13 +616,16 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       connectionConfig: {},
       eventType: "github.issue_comment.created",
       providerEventType: "issue_comment",
-      payloadFilter: {
-        "github.issue_comment.created": {
-          op: "contains_token",
-          path: ["comment", "body"],
-          value: "@mistlebot",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          payloadFilter: {
+            op: "contains_token",
+            path: ["comment", "body"],
+            value: "@mistlebot",
+          },
         },
-      },
+      ],
       payload: {
         installation: {
           id: 12345,
@@ -646,13 +728,16 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       connectionConfig: {},
       eventType: "github.issue_comment.created",
       providerEventType: "issue_comment",
-      payloadFilter: {
-        "github.issue_comment.created": {
-          op: "contains_token",
-          path: ["comment", "body"],
-          value: "@mistlebot",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          payloadFilter: {
+            op: "contains_token",
+            path: ["comment", "body"],
+            value: "@mistlebot",
+          },
         },
-      },
+      ],
       payload: {
         installation: {
           id: 12345,
@@ -760,13 +845,16 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       connectionConfig: {},
       eventType: "github.issue_comment.created",
       providerEventType: "issue_comment",
-      payloadFilter: {
-        "github.issue_comment.created": {
-          op: "contains_token",
-          path: ["comment", "body"],
-          value: "@mistlebot",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          payloadFilter: {
+            op: "contains_token",
+            path: ["comment", "body"],
+            value: "@mistlebot",
+          },
         },
-      },
+      ],
       payload: {
         installation: {
           id: 12345,
@@ -867,13 +955,16 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       },
       eventType: "github.issue_comment.created",
       providerEventType: "issue_comment",
-      payloadFilter: {
-        "github.issue_comment.created": {
-          op: "contains_token",
-          path: ["comment", "body"],
-          value: "@mistlebot",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          payloadFilter: {
+            op: "contains_token",
+            path: ["comment", "body"],
+            value: "@mistlebot",
+          },
         },
-      },
+      ],
       payload: {
         installation: {
           id: 12345,
@@ -1127,13 +1218,16 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       connectionConfig: {},
       eventType: "github.issue_comment.created",
       providerEventType: "issue_comment",
-      payloadFilter: {
-        "github.issue_comment.created": {
-          op: "contains_token",
-          path: ["comment", "body"],
-          value: "@mistlebot",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          payloadFilter: {
+            op: "contains_token",
+            path: ["comment", "body"],
+            value: "@mistlebot",
+          },
         },
-      },
+      ],
       payload: {
         comment: {
           body: "nothing to match",
@@ -1190,13 +1284,16 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       connectionConfig: {},
       eventType: "github.issue_comment.created",
       providerEventType: "issue_comment",
-      payloadFilter: {
-        "github.issue_comment.created": {
-          op: "contains_token",
-          path: ["comment", "body"],
-          value: "@mistlebot",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          payloadFilter: {
+            op: "contains_token",
+            path: ["comment", "body"],
+            value: "@mistlebot",
+          },
         },
-      },
+      ],
       payload: {
         comment: {
           body: "nothing to match",
@@ -1261,8 +1358,11 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       },
       eventType: "slack:message_deleted",
       providerEventType: "message_deleted",
-      triggerEventTypes: ["slack:message"],
-      payloadFilter: null,
+      eventConditions: [
+        {
+          eventType: "slack:message",
+        },
+      ],
       payload: {
         event: {
           channel: "C123",
@@ -1414,8 +1514,10 @@ type SeedWebhookEventScopeInput = {
   connectionConfig: Record<string, unknown>;
   eventType: string;
   providerEventType: string;
-  triggerEventTypes?: ReadonlyArray<string>;
-  payloadFilter?: Record<string, unknown> | null;
+  eventConditions?: {
+    eventType: string;
+    payloadFilter?: Record<string, unknown>;
+  }[];
   payload: Record<string, unknown>;
   externalEventId: string;
   externalDeliveryId: string | null;
@@ -1482,6 +1584,8 @@ async function seedWebhookEventScope(
     });
 
   if (input.createTrigger !== false) {
+    const eventConditions = input.eventConditions ?? [{ eventType: input.eventType }];
+
     await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.sandboxProfiles).values({
       id: sandboxProfileId,
       organizationId,
@@ -1505,8 +1609,7 @@ async function seedWebhookEventScope(
     await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.webhookTriggers).values({
       triggerId,
       integrationWebhookSourceId: webhookSourceId,
-      eventTypes: [...(input.triggerEventTypes ?? [input.eventType])],
-      payloadFilter: input.payloadFilter ?? null,
+      eventConditions,
       inputTemplate: "Handle webhook event",
       conversationKeyTemplate: "github/{{payload.installation.id}}",
       idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",

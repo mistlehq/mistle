@@ -3,6 +3,7 @@ import {
   ScheduleKinds,
   ScheduleTargetTypes,
   getControlPlaneDatabaseSchema,
+  type WebhookTriggerEventCondition,
 } from "@mistle/db/control-plane";
 import type { TriggerKind, ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
@@ -169,16 +170,17 @@ function buildWebhookEventSearchClause(input: {
   return and(
     eq(input.tables.triggers.kind, TriggerKinds.WEBHOOK),
     or(
-      ilike(sql`${input.tables.webhookTriggers.eventTypes}::text`, input.searchPattern),
-      input.search === "all" || "all events".includes(input.search)
-        ? isNull(input.tables.webhookTriggers.eventTypes)
-        : undefined,
+      ilike(sql`${input.tables.webhookTriggers.eventConditions}::text`, input.searchPattern),
       matchingEventTypes.length === 0
         ? undefined
-        : sql`${input.tables.webhookTriggers.eventTypes}::jsonb ?| array[${sql.join(
-            matchingEventTypes.map((eventType) => sql`${eventType}`),
-            sql`, `,
-          )}]`,
+        : or(
+            ...matchingEventTypes.map(
+              (eventType) =>
+                sql`${input.tables.webhookTriggers.eventConditions}::jsonb @> ${JSON.stringify([
+                  { eventType },
+                ])}::jsonb`,
+            ),
+          ),
     ),
   );
 }
@@ -220,7 +222,7 @@ function buildTriggerSearchClause(input: {
 }
 
 function resolveTriggerListEvents(input: {
-  eventTypes: string[] | null;
+  eventConditions: WebhookTriggerEventCondition[];
   supportedWebhookEvents?: {
     eventType: string;
     displayName: string;
@@ -234,21 +236,12 @@ function resolveTriggerListEvents(input: {
     ]),
   );
 
-  if (input.eventTypes === null || input.eventTypes.length === 0) {
-    return [
-      {
-        label: "All events",
-        ...(input.logoKey === undefined ? {} : { logoKey: input.logoKey }),
-      },
-    ];
-  }
-
-  return input.eventTypes.map((eventType) => {
-    const eventDefinition = supportedEventMap.get(eventType);
+  return input.eventConditions.map((condition) => {
+    const eventDefinition = supportedEventMap.get(condition.eventType);
 
     if (eventDefinition === undefined) {
       return {
-        label: eventType,
+        label: condition.eventType,
         unavailable: true,
       };
     }
@@ -261,17 +254,8 @@ function resolveTriggerListEvents(input: {
 }
 
 function resolveUnavailableTriggerListEvents(input: {
-  eventTypes: string[] | null;
+  eventTypes: string[];
 }): TriggerListWebhookEvent[] {
-  if (input.eventTypes === null || input.eventTypes.length === 0) {
-    return [
-      {
-        label: "All events",
-        unavailable: true,
-      },
-    ];
-  }
-
   return input.eventTypes.map((eventType) => ({
     label: eventType,
     unavailable: true,
@@ -299,7 +283,7 @@ type WebhookTriggerListPageRow = {
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
-  eventTypes: string[] | null;
+  eventConditions: WebhookTriggerEventCondition[];
   integrationWebhookSourceId: string;
   resolvedIntegrationWebhookSourceId: string | null;
   resolvedIntegrationConnectionId: string | null;
@@ -314,6 +298,7 @@ type WebhookTriggerListPageRow = {
 };
 
 function createWebhookTriggerListPageItem(row: WebhookTriggerListPageRow): TriggerListPageItem {
+  const eventTypes = row.eventConditions.map((condition) => condition.eventType);
   const target = createListTarget({
     sandboxProfileId: row.sandboxProfileId,
     sandboxProfileDisplayName: row.sandboxProfileDisplayName,
@@ -337,7 +322,7 @@ function createWebhookTriggerListPageItem(row: WebhookTriggerListPageRow): Trigg
       source: {
         kind: "webhook",
         events: resolveUnavailableTriggerListEvents({
-          eventTypes: row.eventTypes,
+          eventTypes,
         }),
       },
       updatedAt: row.updatedAt,
@@ -360,7 +345,7 @@ function createWebhookTriggerListPageItem(row: WebhookTriggerListPageRow): Trigg
       source: {
         kind: "webhook",
         events: resolveUnavailableTriggerListEvents({
-          eventTypes: row.eventTypes,
+          eventTypes,
         }),
       },
       updatedAt: row.updatedAt,
@@ -383,7 +368,7 @@ function createWebhookTriggerListPageItem(row: WebhookTriggerListPageRow): Trigg
       source: {
         kind: "webhook",
         events: resolveUnavailableTriggerListEvents({
-          eventTypes: row.eventTypes,
+          eventTypes,
         }),
       },
       updatedAt: row.updatedAt,
@@ -406,7 +391,7 @@ function createWebhookTriggerListPageItem(row: WebhookTriggerListPageRow): Trigg
       source: {
         kind: "webhook",
         events: resolveUnavailableTriggerListEvents({
-          eventTypes: row.eventTypes,
+          eventTypes,
         }),
       },
       updatedAt: row.updatedAt,
@@ -434,7 +419,7 @@ function createWebhookTriggerListPageItem(row: WebhookTriggerListPageRow): Trigg
       source: {
         kind: "webhook",
         events: resolveUnavailableTriggerListEvents({
-          eventTypes: row.eventTypes,
+          eventTypes,
         }),
       },
       updatedAt: row.updatedAt,
@@ -458,7 +443,7 @@ function createWebhookTriggerListPageItem(row: WebhookTriggerListPageRow): Trigg
     source: {
       kind: "webhook",
       events: resolveTriggerListEvents({
-        eventTypes: row.eventTypes,
+        eventConditions: row.eventConditions,
         ...(targetMetadata.supportedWebhookEvents === undefined
           ? {}
           : {
@@ -534,7 +519,7 @@ async function loadWebhookTriggerListPageItems(input: {
       enabled: tables.triggers.enabled,
       createdAt: tables.triggers.createdAt,
       updatedAt: tables.triggers.updatedAt,
-      eventTypes: tables.webhookTriggers.eventTypes,
+      eventConditions: tables.webhookTriggers.eventConditions,
       integrationWebhookSourceId: tables.webhookTriggers.integrationWebhookSourceId,
       resolvedIntegrationWebhookSourceId: tables.integrationWebhookSources.id,
       resolvedIntegrationConnectionId: tables.integrationConnections.id,

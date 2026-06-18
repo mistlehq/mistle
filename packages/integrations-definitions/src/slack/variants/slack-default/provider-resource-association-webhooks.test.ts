@@ -33,6 +33,7 @@ describe("SlackAssociatedResourceEventsCapability", () => {
             resourceKind: "channel",
             payloadPath: ["event", "channel"],
             prefix: "in",
+            multiValue: true,
           },
         ],
       },

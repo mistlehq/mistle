@@ -32,6 +32,7 @@ describe("GitHub associated resource webhook observation", () => {
             kind: "resource-select",
             resourceKind: "repository",
             payloadPath: ["repository", "full_name"],
+            multiValue: true,
             prefix: "in",
           },
           {
@@ -40,6 +41,7 @@ describe("GitHub associated resource webhook observation", () => {
             kind: "resource-select",
             resourceKind: "user",
             payloadPath: ["sender", "login"],
+            multiValue: true,
             prefix: "by",
             placeholder: "Any user",
           },
@@ -49,6 +51,7 @@ describe("GitHub associated resource webhook observation", () => {
             kind: "resource-select",
             resourceKind: "bot",
             payloadPath: ["sender", "login"],
+            multiValue: true,
             prefix: "by bot",
             placeholder: "Any bot",
           },

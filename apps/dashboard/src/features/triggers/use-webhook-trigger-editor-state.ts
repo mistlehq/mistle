@@ -33,6 +33,7 @@ import type {
 import {
   buildWebhookTriggerPrimaryRepositoryOptions,
   buildWebhookTriggerEventOptions,
+  createWebhookTriggerEventConditionId,
   createWebhookTriggerEventId,
   resolveEligibleProfileTriggerConnectionIds,
   WebhookTriggerWorkspaceRootRepositoryOptionValue,
@@ -307,10 +308,13 @@ export function resolveWebhookTriggerEditInitialValues(input: {
   trigger: WebhookTrigger;
   directoryData: DirectoryData;
 }): WebhookTriggerFormValues {
-  const triggerEventIds = (input.trigger.eventTypes ?? []).map((eventType) =>
-    createWebhookTriggerEventId({
-      webhookSourceId: input.trigger.integrationWebhookSourceId,
-      eventType,
+  const triggerEventIds = input.trigger.eventConditions.map((condition, index) =>
+    createWebhookTriggerEventConditionId({
+      eventOptionId: createWebhookTriggerEventId({
+        webhookSourceId: input.trigger.integrationWebhookSourceId,
+        eventType: condition.eventType,
+      }),
+      index,
     }),
   );
   const preservedConnectionId =

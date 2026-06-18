@@ -2372,17 +2372,24 @@
                     "type": "string",
                     "minLength": 1
                   },
-                  "eventTypes": {
-                    "type": ["array", "null"],
+                  "eventConditions": {
+                    "type": "array",
                     "items": {
-                      "type": "string",
-                      "minLength": 1
+                      "type": "object",
+                      "properties": {
+                        "eventType": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "payloadFilter": {
+                          "type": ["object", "null"],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": ["eventType"],
+                      "additionalProperties": false
                     },
                     "minItems": 1
-                  },
-                  "payloadFilter": {
-                    "type": ["object", "null"],
-                    "additionalProperties": {}
                   },
                   "inputTemplate": {
                     "type": "string",
@@ -2423,6 +2430,7 @@
                 "required": [
                   "name",
                   "integrationWebhookSourceId",
+                  "eventConditions",
                   "inputTemplate",
                   "conversationKeyTemplate",
                   "target"
@@ -2459,16 +2467,24 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "eventTypes": {
-                      "type": ["array", "null"],
+                    "eventConditions": {
+                      "type": "array",
                       "items": {
-                        "type": "string",
-                        "minLength": 1
-                      }
-                    },
-                    "payloadFilter": {
-                      "type": ["object", "null"],
-                      "additionalProperties": {}
+                        "type": "object",
+                        "properties": {
+                          "eventType": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "payloadFilter": {
+                            "type": ["object", "null"],
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": ["eventType"],
+                        "additionalProperties": false
+                      },
+                      "minItems": 1
                     },
                     "inputTemplate": {
                       "type": "string",
@@ -2529,8 +2545,7 @@
                     "name",
                     "enabled",
                     "integrationWebhookSourceId",
-                    "eventTypes",
-                    "payloadFilter",
+                    "eventConditions",
                     "inputTemplate",
                     "instructions",
                     "conversationKeyTemplate",
@@ -2681,16 +2696,24 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "eventTypes": {
-                      "type": ["array", "null"],
+                    "eventConditions": {
+                      "type": "array",
                       "items": {
-                        "type": "string",
-                        "minLength": 1
-                      }
-                    },
-                    "payloadFilter": {
-                      "type": ["object", "null"],
-                      "additionalProperties": {}
+                        "type": "object",
+                        "properties": {
+                          "eventType": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "payloadFilter": {
+                            "type": ["object", "null"],
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": ["eventType"],
+                        "additionalProperties": false
+                      },
+                      "minItems": 1
                     },
                     "inputTemplate": {
                       "type": "string",
@@ -2751,8 +2774,7 @@
                     "name",
                     "enabled",
                     "integrationWebhookSourceId",
-                    "eventTypes",
-                    "payloadFilter",
+                    "eventConditions",
                     "inputTemplate",
                     "instructions",
                     "conversationKeyTemplate",
@@ -2888,17 +2910,24 @@
                     "type": "string",
                     "minLength": 1
                   },
-                  "eventTypes": {
-                    "type": ["array", "null"],
+                  "eventConditions": {
+                    "type": "array",
                     "items": {
-                      "type": "string",
-                      "minLength": 1
+                      "type": "object",
+                      "properties": {
+                        "eventType": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "payloadFilter": {
+                          "type": ["object", "null"],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": ["eventType"],
+                      "additionalProperties": false
                     },
                     "minItems": 1
-                  },
-                  "payloadFilter": {
-                    "type": ["object", "null"],
-                    "additionalProperties": {}
                   },
                   "inputTemplate": {
                     "type": "string",
@@ -2967,16 +2996,24 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "eventTypes": {
-                      "type": ["array", "null"],
+                    "eventConditions": {
+                      "type": "array",
                       "items": {
-                        "type": "string",
-                        "minLength": 1
-                      }
-                    },
-                    "payloadFilter": {
-                      "type": ["object", "null"],
-                      "additionalProperties": {}
+                        "type": "object",
+                        "properties": {
+                          "eventType": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "payloadFilter": {
+                            "type": ["object", "null"],
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": ["eventType"],
+                        "additionalProperties": false
+                      },
+                      "minItems": 1
                     },
                     "inputTemplate": {
                       "type": "string",
@@ -3037,8 +3074,7 @@
                     "name",
                     "enabled",
                     "integrationWebhookSourceId",
-                    "eventTypes",
-                    "payloadFilter",
+                    "eventConditions",
                     "inputTemplate",
                     "instructions",
                     "conversationKeyTemplate",
@@ -11229,6 +11265,9 @@
                                             },
                                             "minItems": 1
                                           },
+                                          "multiValue": {
+                                            "type": "boolean"
+                                          },
                                           "negatedMatchRequiresExists": {
                                             "type": "boolean"
                                           },
@@ -11467,6 +11506,9 @@
                                               "minLength": 1
                                             },
                                             "minItems": 1
+                                          },
+                                          "multiValue": {
+                                            "type": "boolean"
                                           },
                                           "negatedMatchRequiresExists": {
                                             "type": "boolean"

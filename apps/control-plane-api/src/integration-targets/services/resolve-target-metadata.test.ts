@@ -20,19 +20,23 @@ describe("resolveTargetMetadata", () => {
               id: "botActor",
               resourceKind: "bot",
               payloadPath: ["sender", "login"],
+              multiValue: true,
             }),
             expect.objectContaining({
               id: "requestedReviewer",
+              multiValue: true,
               negatedMatchRequiresExists: true,
             }),
             expect.objectContaining({
               id: "requestedTeam",
+              multiValue: true,
               negatedMatchRequiresExists: true,
             }),
             expect.objectContaining({
               id: "requestedBot",
               resourceKind: "bot",
               payloadPath: ["requested_reviewer", "login"],
+              multiValue: true,
               negatedMatchRequiresExists: true,
             }),
           ]),
@@ -95,10 +99,12 @@ describe("resolveTargetMetadata", () => {
             expect.objectContaining({
               id: "repository",
               payloadPath: ["repository", "full_name"],
+              multiValue: true,
             }),
             expect.objectContaining({
               id: "commenter",
               payloadPath: ["sender", "login"],
+              multiValue: true,
             }),
             expect.objectContaining({
               id: "invocationToken",

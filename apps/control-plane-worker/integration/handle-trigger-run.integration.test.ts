@@ -862,8 +862,7 @@ async function seedTriggerRun(input: SeedTriggerRunInput): Promise<SeededTrigger
   await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.webhookTriggers).values({
     triggerId,
     integrationWebhookSourceId: webhookSourceId,
-    eventTypes: [input.eventType],
-    payloadFilter: null,
+    eventConditions: [{ eventType: input.eventType }],
     inputTemplate: input.inputTemplate,
     instructions: input.instructions,
     conversationKeyTemplate: input.conversationKeyTemplate,

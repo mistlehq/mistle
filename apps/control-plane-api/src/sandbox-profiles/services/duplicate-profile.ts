@@ -622,7 +622,7 @@ async function copyWebhookTrigger(
     },
   );
   assertWebhookTriggerRequirementsOrThrow({
-    eventTypes: webhookTrigger.eventTypes,
+    eventTypes: webhookTrigger.eventConditions.map((condition) => condition.eventType),
     providerMetadata: resolvedWebhookSource.providerMetadata,
     supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
   });
@@ -667,8 +667,7 @@ async function copyWebhookTrigger(
   await tx.insert(tables.webhookTriggers).values({
     triggerId: createdTrigger.id,
     integrationWebhookSourceId: webhookTrigger.integrationWebhookSourceId,
-    eventTypes: webhookTrigger.eventTypes,
-    payloadFilter: webhookTrigger.payloadFilter,
+    eventConditions: webhookTrigger.eventConditions,
     inputTemplate: webhookTrigger.inputTemplate,
     instructions: webhookTrigger.instructions,
     conversationKeyTemplate: webhookTrigger.conversationKeyTemplate,

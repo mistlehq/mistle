@@ -167,14 +167,16 @@ export async function seedPersistedWebhookTrigger(
   await env.controlPlaneDb.insert(env.controlPlaneTables.webhookTriggers).values({
     triggerId: input.triggerId,
     integrationWebhookSourceId: input.webhookSourceId,
-    eventTypes: [GitHubIssueCommentCreatedEventType],
-    payloadFilter: {
-      [GitHubIssueCommentCreatedEventType]: {
-        op: "eq",
-        path: ["action"],
-        value: "created",
+    eventConditions: [
+      {
+        eventType: GitHubIssueCommentCreatedEventType,
+        payloadFilter: {
+          op: "eq",
+          path: ["action"],
+          value: "created",
+        },
       },
-    },
+    ],
     inputTemplate: "Handle payload",
     instructions: "Prefer deterministic reproduction steps.",
     conversationKeyTemplate: "{{payload.issue.node_id}}",
@@ -204,14 +206,16 @@ export function createWebhookTriggerRequestBody(input: {
     name: input.name,
     enabled: true,
     integrationWebhookSourceId: input.integrationWebhookSourceId,
-    eventTypes: [GitHubIssueCommentCreatedEventType],
-    payloadFilter: {
-      [GitHubIssueCommentCreatedEventType]: {
-        op: "eq",
-        path: ["action"],
-        value: "created",
+    eventConditions: [
+      {
+        eventType: GitHubIssueCommentCreatedEventType,
+        payloadFilter: {
+          op: "eq",
+          path: ["action"],
+          value: "created",
+        },
       },
-    },
+    ],
     inputTemplate: "Handle {{payload.comment.body}}",
     instructions: "Prefer concise triage summaries.",
     conversationKeyTemplate: "{{payload.issue.node_id}}",

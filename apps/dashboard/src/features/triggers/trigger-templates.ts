@@ -6,6 +6,7 @@ import type {
   WebhookTriggerEventParameterRulesByEventType,
 } from "./webhook-trigger-event-types.js";
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
+import { createWebhookTriggerEventConditionId } from "./webhook-trigger-option-builders.js";
 
 type WebhookTriggerTemplate = {
   id: string;
@@ -63,7 +64,12 @@ export function resolveTriggerTemplateEventOptionIds(input: {
       if (matchingOption === undefined) {
         throw new Error(`Expected matching trigger option for '${eventType}'.`);
       }
-      eventIds.push(matchingOption.id);
+      eventIds.push(
+        createWebhookTriggerEventConditionId({
+          eventOptionId: matchingOption.id,
+          index: eventIds.length,
+        }),
+      );
     }
 
     if (eventIds.length === input.template.eventTypes.length) {

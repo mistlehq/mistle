@@ -365,6 +365,7 @@ export const StorySlackEventOptions: readonly WebhookTriggerEventOption[] = [
         resourceKind: "channel",
         payloadPath: ["event", "channel"],
         prefix: "in",
+        multiValue: true,
       },
     ],
   },

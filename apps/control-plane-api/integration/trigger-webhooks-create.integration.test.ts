@@ -56,14 +56,16 @@ describe.concurrent("trigger webhooks create integration", () => {
     expect(body.name).toBe("GitHub Issue Comments");
     expect(body.enabled).toBe(true);
     expect(body.integrationWebhookSourceId).toBe("iws_trigger_webhook_create");
-    expect(body.eventTypes).toEqual([GitHubIssueCommentCreatedEventType]);
-    expect(body.payloadFilter).toEqual({
-      [GitHubIssueCommentCreatedEventType]: {
-        op: "eq",
-        path: ["action"],
-        value: "created",
+    expect(body.eventConditions).toEqual([
+      {
+        eventType: GitHubIssueCommentCreatedEventType,
+        payloadFilter: {
+          op: "eq",
+          path: ["action"],
+          value: "created",
+        },
       },
-    });
+    ]);
     expect(body.target.sandboxProfileId).toBe("sbp_trigger_webhook_create");
     expect(body.target.sandboxProfileVersion).toBe(3);
     expect(body.target.primaryRepositoryId).toBeNull();
