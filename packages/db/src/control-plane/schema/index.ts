@@ -1,5 +1,17 @@
 export { accounts } from "./accounts.js";
 export {
+  designerActionRequests,
+  DesignerActionRequestOperationKinds,
+  DesignerActionRequestResponses,
+  DesignerActionRequestStatuses,
+  type DesignerActionRequest,
+  type DesignerActionRequestOperation,
+  type DesignerActionRequestOperationKind,
+  type DesignerActionRequestResponse,
+  type DesignerActionRequestStatus,
+  type InsertDesignerActionRequest,
+} from "./designer-action-requests.js";
+export {
   designerSessions,
   type DesignerSession,
   type DesignerSessionCanvasTab,

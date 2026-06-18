@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
@@ -13,7 +14,27 @@ const INTERNAL_OPENAPI_SPEC_FILE_URL = new URL(
 );
 
 function serializeDocument(document: unknown): string {
-  return `${JSON.stringify(document, null, 2)}\n`;
+  const rawDocument = `${JSON.stringify(document, null, 2)}\n`;
+  const result = spawnSync("pnpm", ["exec", "oxfmt", "--stdin-filepath", "openapi.json"], {
+    encoding: "utf8",
+    input: rawDocument,
+    maxBuffer: 20 * 1024 * 1024,
+    stdio: "pipe",
+  });
+
+  if (result.error !== undefined) {
+    throw result.error;
+  }
+
+  if ((result.status ?? 1) !== 0) {
+    throw new Error(
+      ["OpenAPI spec formatting failed.", result.stderr.trim(), result.stdout.trim()]
+        .filter((line) => line.length > 0)
+        .join("\n"),
+    );
+  }
+
+  return result.stdout;
 }
 
 export function getOpenApiSpecFilePath(): string {
