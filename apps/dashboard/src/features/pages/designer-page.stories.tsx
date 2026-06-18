@@ -109,14 +109,16 @@ function DesignerPageStory(input: {
 function DesignerCanvasWorkspaceStory(input: {
   tabs: DesignerSession["canvasTabs"];
 }): React.JSX.Element {
-  const [tabs, setTabs] = useState(input.tabs);
+  const [tabs, setTabs] = useState([...input.tabs]);
   const [activeTabHref, setActiveTabHref] = useState<string | null>(tabs[0]?.href ?? null);
 
   return (
     <DesignerCanvasWorkspace
       activeTabHref={activeTabHref}
       onActiveTabHrefChange={setActiveTabHref}
-      onTabsChange={setTabs}
+      onTabsChange={(nextTabs) => {
+        setTabs([...nextTabs]);
+      }}
       tabs={tabs}
     />
   );
