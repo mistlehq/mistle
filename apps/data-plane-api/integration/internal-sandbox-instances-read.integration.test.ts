@@ -237,7 +237,9 @@ it("returns setup-check-purpose sandbox instances by id", async ({ env }) => {
   });
 });
 
-it("returns designer-purpose sandbox instances from the default get route", async ({ env }) => {
+it("does not return designer-purpose sandbox instances from the default get route", async ({
+  env,
+}) => {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
     sandboxInstanceRow({
       id: "sbi_integration_new_get_designer_default",
@@ -255,18 +257,7 @@ it("returns designer-purpose sandbox instances from the default get route", asyn
       organizationId: "org_integration_new_get_designer_default",
       instanceId: "sbi_integration_new_get_designer_default",
     }),
-  ).resolves.toEqual({
-    id: "sbi_integration_new_get_designer_default",
-    title: "Design triage agent",
-    status: "pending",
-    connectable: false,
-    failureCode: null,
-    failureMessage: null,
-    runtimePlan: null,
-    sandboxProfileId: "designer",
-    sandboxProfileVersion: 1,
-    startupOperation: null,
-  });
+  ).resolves.toBeNull();
 });
 
 it("returns designer-purpose sandbox instances when designer purpose is explicitly allowed", async ({
