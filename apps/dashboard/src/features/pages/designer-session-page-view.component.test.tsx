@@ -485,8 +485,8 @@ describe("DesignerSessionPageView", () => {
     expect(conversationRegion.className).toContain("mr-2");
   });
 
-  it("renders a draggable split between the Designer conversation and canvas with minimum sizes", () => {
-    renderDesignerSessionPageView({
+  it("renders the shared workbench split between the Designer conversation and canvas", () => {
+    const { container } = renderDesignerSessionPageView({
       session: {
         ...BaseDesignerSession,
         canvasTabs: [
@@ -499,14 +499,11 @@ describe("DesignerSessionPageView", () => {
       },
     });
 
-    const resizeHandle = screen.getByRole("separator");
+    const resizeHandle = screen.getByTestId("session-workbench-secondary-handle");
 
-    expect(resizeHandle.className).toContain("aria-orientation-vertical:!w-3");
-    expect(resizeHandle.className).toContain("bg-background");
-    expect(resizeHandle.className).not.toContain("-mx-1");
-    expect(resizeHandle.className).toContain("before:inset-y-0");
-    expect(resizeHandle.className).toContain("before:w-px");
-    expect(resizeHandle.className).toContain("before:bg-border");
+    expect(resizeHandle.className).toContain("w-px");
+    expect(resizeHandle.className).not.toContain("aria-orientation-vertical:!w-3");
+    expect(container.querySelector(".border-r")).toBeNull();
     expect(screen.getByText("/integrations")).toBeDefined();
   });
 

@@ -1,4 +1,4 @@
-import { Badge, ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@mistle/ui";
+import { Badge } from "@mistle/ui";
 
 import "dockview/dist/styles/dockview.css";
 import "./session-terminal-workspace.css";
@@ -33,6 +33,7 @@ import {
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 import { SessionStartupStatus, type SessionStartupState } from "./session-startup-status.js";
+import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 import { resolveInitialEntryStartupState } from "./use-session-workbench-lifecycle-state.js";
 
 type DesignerCanvasTab = DesignerSession["canvasTabs"][number];
@@ -42,9 +43,6 @@ type DesignerCanvasDockviewParams = {
 };
 
 type DesignerCanvasDockviewPanelProps = IDockviewPanelProps<DesignerCanvasDockviewParams>;
-
-const DesignerConversationPanelId = "designer-session-conversation-panel";
-const DesignerCanvasPanelId = "designer-session-canvas-panel";
 
 export type DesignerSessionPageViewProps = {
   actionProposalResponseErrorMessage: string | null;
@@ -596,94 +594,93 @@ export function DesignerSessionPageView(input: DesignerSessionPageViewProps): Re
     transcriptIsPending: input.transcriptIsPending,
   });
 
-  return (
-    <ResizablePanelGroup
-      className="h-svh min-h-0 overflow-hidden bg-background"
-      id="designer-session-workspace-panel-group"
-      orientation="horizontal"
-    >
-      <ResizablePanel
-        className="min-w-0 overflow-hidden"
-        defaultSize="44rem"
-        id={DesignerConversationPanelId}
-        minSize="22rem"
-      >
-        <aside className="flex h-full min-h-0 flex-col border-r">
-          <ConversationWorkspaceHeader
-            actions={
-              <span
-                aria-label={statusUi.label}
-                className={[
-                  "inline-block size-2.5 rounded-full border",
-                  statusUi.indicatorClassName,
-                ].join(" ")}
-                role="status"
-                title={statusUi.label}
-              />
-            }
-            title={
-              <AutoSaveTitleHeading
-                ariaLabel="Designer session title"
-                disabled={input.session === null}
-                emptyDisplayText="Untitled"
-                inputClassName="truncate"
-                maxWidthClassName="max-w-[28rem] flex-1"
-                onSave={input.onTitleSave}
-                requiredLabel="Designer session title"
-                size="sm"
-                value={input.session?.title ?? null}
-              />
-            }
+  const conversationPanel = (
+    <aside className="flex h-full min-h-0 flex-col">
+      <ConversationWorkspaceHeader
+        actions={
+          <span
+            aria-label={statusUi.label}
+            className={[
+              "inline-block size-2.5 rounded-full border",
+              statusUi.indicatorClassName,
+            ].join(" ")}
+            role="status"
+            title={statusUi.label}
           />
-          <div className="flex min-h-0 flex-1 flex-col">
-            <ErrorNotice message={input.errorMessage} />
-            {startupState === null ? (
-              <RuntimeConversationPreview
-                actionProposalResponseErrorMessage={input.actionProposalResponseErrorMessage}
-                actionProposalResponsePendingId={input.actionProposalResponsePendingId}
-                actionProposalResponseSuccessMessage={input.actionProposalResponseSuccessMessage}
-                followUpDraft={input.followUpDraft}
-                followUpErrorMessage={input.followUpErrorMessage}
-                followUpIsPending={input.followUpIsPending}
-                followUpSuccessMessage={input.followUpSuccessMessage}
-                onActionProposalResponseSubmit={input.onActionProposalResponseSubmit}
-                onFollowUpDraftChange={input.onFollowUpDraftChange}
-                onFollowUpSubmit={input.onFollowUpSubmit}
-                onUserInputRequestResponseSubmit={input.onUserInputRequestResponseSubmit}
-                runtimeConversationBootstrap={input.runtimeConversationBootstrap}
-                runtimeConversationTranscript={input.runtimeConversationTranscript}
-                session={input.session}
-                transcriptErrorMessage={input.transcriptErrorMessage}
-                transcriptIsPending={input.transcriptIsPending}
-                userInputRequestResponseErrorMessage={input.userInputRequestResponseErrorMessage}
-                userInputRequestResponseIsPending={input.userInputRequestResponseIsPending}
-                userInputRequestResponsePendingId={input.userInputRequestResponsePendingId}
-              />
-            ) : (
-              <DesignerSessionStartupPanel
-                sandboxInstanceId={input.session?.sandboxInstanceId ?? null}
-                startupOperation={input.session?.startupOperation ?? null}
-                startupState={startupState}
-              />
-            )}
-          </div>
-        </aside>
-      </ResizablePanel>
-      <ResizableHandle
-        className="relative shrink-0 bg-background aria-orientation-vertical:!w-3 aria-orientation-vertical:cursor-col-resize before:absolute before:inset-y-0 before:left-1/2 before:z-10 before:w-px before:-translate-x-1/2 before:bg-border hover:before:bg-muted-foreground/60"
-        id="designer-session-workspace-resize-handle"
+        }
+        title={
+          <AutoSaveTitleHeading
+            ariaLabel="Designer session title"
+            disabled={input.session === null}
+            emptyDisplayText="Untitled"
+            inputClassName="truncate"
+            maxWidthClassName="max-w-[28rem] flex-1"
+            onSave={input.onTitleSave}
+            requiredLabel="Designer session title"
+            size="sm"
+            value={input.session?.title ?? null}
+          />
+        }
       />
-      <ResizablePanel
-        className="min-w-0 overflow-hidden"
-        id={DesignerCanvasPanelId}
-        minSize="20rem"
-      >
-        <div className="h-full min-h-0 min-w-0 overflow-hidden bg-background">
-          <main className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-            <DesignerCanvasWorkspace tabs={canvasTabs} />
-          </main>
-        </div>
-      </ResizablePanel>
-    </ResizablePanelGroup>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <ErrorNotice message={input.errorMessage} />
+        {startupState === null ? (
+          <RuntimeConversationPreview
+            actionProposalResponseErrorMessage={input.actionProposalResponseErrorMessage}
+            actionProposalResponsePendingId={input.actionProposalResponsePendingId}
+            actionProposalResponseSuccessMessage={input.actionProposalResponseSuccessMessage}
+            followUpDraft={input.followUpDraft}
+            followUpErrorMessage={input.followUpErrorMessage}
+            followUpIsPending={input.followUpIsPending}
+            followUpSuccessMessage={input.followUpSuccessMessage}
+            onActionProposalResponseSubmit={input.onActionProposalResponseSubmit}
+            onFollowUpDraftChange={input.onFollowUpDraftChange}
+            onFollowUpSubmit={input.onFollowUpSubmit}
+            onUserInputRequestResponseSubmit={input.onUserInputRequestResponseSubmit}
+            runtimeConversationBootstrap={input.runtimeConversationBootstrap}
+            runtimeConversationTranscript={input.runtimeConversationTranscript}
+            session={input.session}
+            transcriptErrorMessage={input.transcriptErrorMessage}
+            transcriptIsPending={input.transcriptIsPending}
+            userInputRequestResponseErrorMessage={input.userInputRequestResponseErrorMessage}
+            userInputRequestResponseIsPending={input.userInputRequestResponseIsPending}
+            userInputRequestResponsePendingId={input.userInputRequestResponsePendingId}
+          />
+        ) : (
+          <DesignerSessionStartupPanel
+            sandboxInstanceId={input.session?.sandboxInstanceId ?? null}
+            startupOperation={input.session?.startupOperation ?? null}
+            startupState={startupState}
+          />
+        )}
+      </div>
+    </aside>
+  );
+
+  const canvasPanel = (
+    <div className="h-full min-h-0 min-w-0 overflow-hidden bg-background">
+      <main className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+        <DesignerCanvasWorkspace tabs={canvasTabs} />
+      </main>
+    </div>
+  );
+
+  return (
+    <div className="h-svh min-h-0 overflow-hidden bg-background">
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={null}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible
+        mainContent={conversationPanel}
+        mainContentLayout={{ scroll: "contained", width: "full" }}
+        primaryBottomPanel={null}
+        primaryPanelMinSize="22rem"
+        sandboxInstanceId={input.sessionId}
+        secondaryPanel={canvasPanel}
+        secondaryPanelLayoutKey="designer-canvas"
+        secondaryPanelMinSize="20rem"
+      />
+    </div>
   );
 }

@@ -43,6 +43,7 @@ type SessionWorkbenchPageViewProps = {
   secondaryPanelDefaultSize?: string;
   secondaryPanelLayoutKey?: string;
   secondaryPanelMinSize?: string;
+  primaryPanelMinSize?: string;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
   isPrimaryBottomPanelVisible?: boolean;
@@ -67,6 +68,7 @@ export function SessionWorkbenchPageView({
   secondaryPanelDefaultSize,
   secondaryPanelLayoutKey = "default",
   secondaryPanelMinSize = "20%",
+  primaryPanelMinSize = "25%",
   mainContent,
   primaryBottomPanel,
   isPrimaryBottomPanelVisible,
@@ -241,7 +243,7 @@ export function SessionWorkbenchPageView({
         <ResizablePanel
           defaultSize={secondaryPanelDefaultSize === undefined ? undefined : "80%"}
           id={PrimaryPanelId}
-          minSize="25%"
+          minSize={primaryPanelMinSize}
         >
           {workspaceWithBottomPanel}
         </ResizablePanel>
