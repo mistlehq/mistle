@@ -10,11 +10,13 @@ import type { IntegrationConnectionSetupRoute } from "./integration-connection-s
 
 type IntegrationConnectionSetupPaneComponent = (input: {
   connection: IntegrationConnection;
+  organizationName?: string | undefined;
   setupRoute: IntegrationConnectionSetupRoute;
 }) => React.JSX.Element;
 
 function renderProviderAppSetupPane(input: {
   connection: IntegrationConnection;
+  organizationName?: string | undefined;
   setupRoute: IntegrationConnectionSetupRoute;
 }): React.JSX.Element {
   return (
@@ -25,6 +27,7 @@ function renderProviderAppSetupPane(input: {
         setupRoute: input.setupRoute,
       })}
       methodId={input.setupRoute.methodId}
+      organizationName={input.organizationName}
       routeSegment={input.setupRoute.routeSegment}
       setupStartForm={resolveIntegrationSetupStartFormOrThrow({
         connection: input.connection,
@@ -56,6 +59,7 @@ function handleUnsupportedIntegrationSetupPaneKind(_kind: never): never {
 
 export function renderIntegrationConnectionSetupPane(input: {
   connection: IntegrationConnection;
+  organizationName?: string | undefined;
   setupRoute: IntegrationConnectionSetupRoute;
 }): React.JSX.Element {
   const SetupPane = resolveSetupPane({
@@ -67,6 +71,7 @@ export function renderIntegrationConnectionSetupPane(input: {
     <SetupPane
       connection={input.connection}
       key={input.connection.id}
+      organizationName={input.organizationName}
       setupRoute={input.setupRoute}
     />
   );

@@ -88,6 +88,7 @@ function renderProviderAppSetupPane(input?: {
   connection?: IntegrationConnection;
   initialEntry?: string;
   methodId?: string;
+  organizationName?: string | null;
   routeSegment?: string;
   webhookCallbackUrl?: string;
   webhookSource?: IntegrationWebhookSource | null;
@@ -120,6 +121,8 @@ function renderProviderAppSetupPane(input?: {
   } satisfies IntegrationWebhookSource;
   const webhookSource =
     input?.webhookSource === undefined ? defaultWebhookSource : input.webhookSource;
+  const organizationName =
+    input?.organizationName === null ? undefined : (input?.organizationName ?? "Acme, Inc.");
   queryClient.setQueryData(
     ["integration-webhook-sources", connection.id],
     webhookSource === null ? [] : [webhookSource],
@@ -143,6 +146,7 @@ function renderProviderAppSetupPane(input?: {
             },
           })}
           methodId={methodId}
+          organizationName={organizationName}
           routeSegment={routeSegment}
           setupStartForm={resolveIntegrationSetupStartFormOrThrow({
             connection,
@@ -338,6 +342,7 @@ describe("ProviderAppSetupPane", () => {
     expect(getTextControlById("integration-setup-start-form-organizationSlug")).toBeTruthy();
     expect(screen.getByRole("heading", { level: 3, name: "GitHub App Manifest" })).toBeTruthy();
     await waitFor(() => {
+      expect(rendered.container.textContent).toContain('"name": "Acme, Inc. Mistle Agent"');
       expect(rendered.container.textContent).toContain("organization_administration");
       expect(rendered.container.textContent).toContain('"members"');
       expect(rendered.container.textContent).toContain('"organization"');
@@ -351,6 +356,40 @@ describe("ProviderAppSetupPane", () => {
     expect(screen.queryByText("GitHub organization")).toBeNull();
     await waitFor(() => {
       expect(screen.getByText("Create app in GitHub").hasAttribute("disabled")).toBe(false);
+    });
+  });
+
+  it("uses a short coded GitHub App manifest name when the organization name is unavailable", async () => {
+    const rendered = renderProviderAppSetupPane({
+      connection: createGitHubConnection(),
+      methodId: "github-app-installation",
+      organizationName: null,
+      routeSegment: "github-app",
+    });
+
+    expect(screen.getByRole("heading", { level: 3, name: "GitHub App Manifest" })).toBeTruthy();
+    expect(screen.queryByText("Loading organization...")).toBeNull();
+    expect(
+      screen.queryByText("Organization name is required to create a GitHub App manifest."),
+    ).toBeNull();
+    await waitFor(() => {
+      expect(rendered.container.textContent).toContain('"name": "Mistle Agent GU24"');
+      expect(rendered.container.textContent).not.toContain("Connection pp_setup");
+    });
+  });
+
+  it("truncates long Mistle organization names before adding the GitHub App manifest suffix", async () => {
+    const rendered = renderProviderAppSetupPane({
+      connection: createGitHubConnection(),
+      methodId: "github-app-installation",
+      organizationName: "International Product Engineering Group",
+      routeSegment: "github-app",
+    });
+
+    await waitFor(() => {
+      expect(rendered.container.textContent).toContain(
+        '"name": "International Product Mistle Agent"',
+      );
     });
   });
 

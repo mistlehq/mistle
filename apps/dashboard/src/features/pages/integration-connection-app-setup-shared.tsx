@@ -51,6 +51,8 @@ function noop(): void {
 }
 
 export function useSetupManifestDraft(input: {
+  appName?: string | undefined;
+  enabled?: boolean | undefined;
   manifestDraftBuilder: IntegrationSetupAppManifestDraftBuilder;
   webhookCallbackState: ManifestWebhookCallbackState;
 }): {
@@ -60,12 +62,15 @@ export function useSetupManifestDraft(input: {
   const [manifestValue, setManifestValue] = useState("");
   const [hasEditedManifest, setHasEditedManifest] = useState(false);
   const webhookCallbackUrl =
-    input.webhookCallbackState.kind === "ready" ? input.webhookCallbackState.value : null;
+    input.enabled !== false && input.webhookCallbackState.kind === "ready"
+      ? input.webhookCallbackState.value
+      : null;
   const resolvedManifestValue =
     webhookCallbackUrl === null || hasEditedManifest
       ? manifestValue
       : createManifestJsonDraft(
           input.manifestDraftBuilder({
+            appName: input.appName,
             controlPlaneBaseUrl: resolveManifestDraftControlPlaneBaseUrl({
               webhookCallbackUrl,
             }),

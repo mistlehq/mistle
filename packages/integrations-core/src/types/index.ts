@@ -577,6 +577,7 @@ export const IntegrationFormConnectionMethodCreateBehaviors: {
 };
 
 export type IntegrationFormConnectionMethodSetupManifestDraftInput = {
+  appName?: string | undefined;
   controlPlaneBaseUrl: string;
   webhookCallbackUrl: string;
 };

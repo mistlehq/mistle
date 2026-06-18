@@ -58,6 +58,9 @@ import type { IntegrationSetupAppManifestDraftBuilder } from "./integration-conn
 import { resolveConfiguredSetupSecretFieldKeys } from "./integration-connection-setup-secret-fields.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
+const GitHubManifestDraftAppNameMaxLength = 34;
+const GitHubManifestDraftAppNameSuffix = "Mistle Agent";
+
 function resolveConfiguredSecretFieldKeys(input: {
   connection: IntegrationConnection;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
@@ -129,6 +132,61 @@ function ManifestCreatedState(): React.JSX.Element {
       />
     </div>
   );
+}
+
+function resolveManifestDraftOrganizationName(input: {
+  organizationName: string | undefined;
+}): string | undefined {
+  const trimmedOrganizationName = input.organizationName?.trim();
+  if (trimmedOrganizationName !== undefined && trimmedOrganizationName.length > 0) {
+    return trimmedOrganizationName;
+  }
+
+  return undefined;
+}
+
+function resolveManifestDraftAppName(input: {
+  connectionId: string;
+  methodId: string;
+  organizationName: string | undefined;
+}): string | undefined {
+  if (input.methodId !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION) {
+    return undefined;
+  }
+
+  const organizationName = resolveManifestDraftOrganizationName({
+    organizationName: input.organizationName,
+  });
+  if (organizationName !== undefined) {
+    return buildGitHubOrganizationManifestDraftAppName(organizationName);
+  }
+
+  // Product-approved fallback: keep GitHub manifest creation non-blocking when
+  // the organization summary is unavailable, without using the globally generic
+  // "Mistle Agent" app name.
+  return `${GitHubManifestDraftAppNameSuffix} ${deriveManifestDraftShortCode(input.connectionId)}`;
+}
+
+function buildGitHubOrganizationManifestDraftAppName(organizationName: string): string {
+  const suffixSeparatorLength = 1;
+  const maxOrganizationNameLength =
+    GitHubManifestDraftAppNameMaxLength -
+    GitHubManifestDraftAppNameSuffix.length -
+    suffixSeparatorLength;
+  const truncatedOrganizationName = Array.from(organizationName)
+    .slice(0, maxOrganizationNameLength)
+    .join("");
+  return `${truncatedOrganizationName} ${GitHubManifestDraftAppNameSuffix}`;
+}
+
+function deriveManifestDraftShortCode(value: string): string {
+  const codeSpace = 36 ** 4;
+  let hash = 0;
+  for (const character of value) {
+    hash = (hash * 33 + character.charCodeAt(0)) % codeSpace;
+  }
+
+  return hash.toString(36).toUpperCase().padStart(4, "0");
 }
 
 function submitProviderAppSetupFormPost(input: {
@@ -292,6 +350,7 @@ export function ProviderAppSetupPane(input: {
   connection: IntegrationConnection;
   manifestDraftBuilder: IntegrationSetupAppManifestDraftBuilder;
   methodId: string;
+  organizationName?: string | undefined;
   routeSegment: string;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
   setupStartForm: IntegrationFormConnectionMethodSetupStartForm;
@@ -329,11 +388,19 @@ export function ProviderAppSetupPane(input: {
       providerAppSetup: input.providerAppSetup,
     }),
   );
+  const canBuildManifestDraft = !isManifestCreatedReturn && setupMode === "manifest";
+  const manifestDraftAppName = resolveManifestDraftAppName({
+    connectionId: input.connection.id,
+    methodId: input.methodId,
+    organizationName: input.organizationName,
+  });
   const webhookCallbackState = useManifestWebhookCallbackState({
     enabled: true,
     connectionId: input.connection.id,
   });
   const manifestDraft = useSetupManifestDraft({
+    appName: manifestDraftAppName,
+    enabled: canBuildManifestDraft,
     manifestDraftBuilder: input.manifestDraftBuilder,
     webhookCallbackState,
   });
@@ -594,11 +661,6 @@ export function ProviderAppSetupPane(input: {
     }
   }
 
-  const manifestValidation = validateManifestJsonObject(manifestDraft.manifestValue);
-  const canCreateManifest =
-    manifestValidation.status === "valid" &&
-    webhookCallbackState.kind === "ready" &&
-    setupStartFormState.requiredFieldsComplete;
   const requiredDraftComplete = isProviderAppRequiredDraftComplete({
     configuredSecretFieldKeys,
     draft: existingAppDraft,
@@ -638,6 +700,13 @@ export function ProviderAppSetupPane(input: {
       />
     );
   }
+
+  const manifestValidation = validateManifestJsonObject(manifestDraft.manifestValue);
+  const canCreateManifest =
+    canBuildManifestDraft &&
+    manifestValidation.status === "valid" &&
+    webhookCallbackState.kind === "ready" &&
+    setupStartFormState.requiredFieldsComplete;
 
   return (
     <FormPageStack>

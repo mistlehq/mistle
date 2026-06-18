@@ -20,6 +20,7 @@ describe("renderIntegrationConnectionSetupPane", () => {
       isValidElement(
         renderIntegrationConnectionSetupPane({
           connection: Connection,
+          organizationName: "Acme, Inc.",
           setupRoute: {
             methodId: "github-app-installation",
             routeSegment: "github-app",
@@ -33,6 +34,7 @@ describe("renderIntegrationConnectionSetupPane", () => {
     expect(() =>
       renderIntegrationConnectionSetupPane({
         connection: Connection,
+        organizationName: "Acme, Inc.",
         setupRoute: {
           methodId: "unsupported-method",
           routeSegment: "unsupported",

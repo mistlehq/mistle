@@ -31,7 +31,7 @@ function createGitHubAppManifestConversionFixture(input?: { clientSecret?: strin
 describe("GitHubAppManifestTemplate", () => {
   it("includes the default GitHub App permissions and event subscriptions", () => {
     expect(GitHubAppManifestTemplate).toMatchObject({
-      name: "Mistle GitHub App",
+      name: "Mistle Agent",
       hook_attributes: {
         active: true,
         url: "https://mistle.example.com/api/integrations/github/webhook",
@@ -266,13 +266,14 @@ describe("buildGitHubAppManifest", () => {
 describe("buildGitHubAppManifestDraft", () => {
   it("builds the default GitHub app manifest with real Mistle callback URLs", () => {
     const manifest = buildGitHubAppManifestDraft({
+      appName: "Acme, Inc. Mistle Agent",
       controlPlaneBaseUrl: "https://control-plane.example.com",
       webhookCallbackUrl:
         "https://control-plane.example.com/p/integration/webhooks/github-default/eps_123",
     });
 
     expect(manifest).toMatchObject({
-      name: "Mistle GitHub App",
+      name: "Acme, Inc. Mistle Agent",
       hook_attributes: {
         active: true,
         url: "https://control-plane.example.com/p/integration/webhooks/github-default/eps_123",
@@ -291,6 +292,70 @@ describe("buildGitHubAppManifestDraft", () => {
       callback_urls: ["https://mistle.example.com/api/integrations/github/install/callback"],
       setup_url: "https://mistle.example.com/api/integrations/github/setup",
     });
+  });
+
+  it("trims the manifest app name", () => {
+    expect(
+      buildGitHubAppManifestDraft({
+        appName: "  ACME Labs Mistle Agent  ",
+        controlPlaneBaseUrl: "https://control-plane.example.com",
+        webhookCallbackUrl:
+          "https://control-plane.example.com/p/integration/webhooks/github-default/eps_123",
+      }),
+    ).toMatchObject({
+      name: "ACME Labs Mistle Agent",
+    });
+  });
+
+  it("preserves quotes and punctuation from the manifest app name", () => {
+    expect(
+      buildGitHubAppManifestDraft({
+        appName: `Jonathan's "R&D" Lab Mistle Agent`,
+        controlPlaneBaseUrl: "https://control-plane.example.com",
+        webhookCallbackUrl:
+          "https://control-plane.example.com/p/integration/webhooks/github-default/eps_123",
+      }),
+    ).toMatchObject({
+      name: `Jonathan's "R&D" Lab Mistle Agent`,
+    });
+  });
+
+  it("truncates long app names so the manifest fits GitHub's limit", () => {
+    const manifest = buildGitHubAppManifestDraft({
+      appName: "International Product Engineering Group Mistle Agent",
+      controlPlaneBaseUrl: "https://control-plane.example.com",
+      webhookCallbackUrl:
+        "https://control-plane.example.com/p/integration/webhooks/github-default/eps_123",
+    });
+
+    expect(manifest).toMatchObject({
+      name: "International Product Engineering",
+    });
+    expect(String(manifest["name"]).length).toBeLessThanOrEqual(34);
+  });
+
+  it("uses an explicit app name when one is provided", () => {
+    expect(
+      buildGitHubAppManifestDraft({
+        appName: "Mistle Agent GU24",
+        controlPlaneBaseUrl: "https://control-plane.example.com",
+        webhookCallbackUrl:
+          "https://control-plane.example.com/p/integration/webhooks/github-default/eps_123",
+      }),
+    ).toMatchObject({
+      name: "Mistle Agent GU24",
+    });
+  });
+
+  it("fails fast when the app name is unavailable", () => {
+    expect(() =>
+      buildGitHubAppManifestDraft({
+        controlPlaneBaseUrl: "https://control-plane.example.com",
+        appName: " ",
+        webhookCallbackUrl:
+          "https://control-plane.example.com/p/integration/webhooks/github-default/eps_123",
+      }),
+    ).toThrow("GitHub App manifest draft requires a nonblank app name.");
   });
 });
 
