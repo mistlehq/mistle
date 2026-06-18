@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 
 import {
   type DesignerActionRequestOperation,
+  type DesignerActionRequestOperationResult,
   DesignerActionRequestOperationKinds,
   DesignerActionRequestStatuses,
-  type DesignerActionRequestStatus,
 } from "@mistle/db/control-plane";
 
 import { requireOrganizationPermission } from "../../auth/services/organization-authorization.js";
@@ -32,11 +32,21 @@ type DesignerOperationHandlerInput = {
   operation: DesignerActionRequestOperation;
 };
 
-type DesignerOperationHandlerResult = {
-  status: DesignerActionRequestStatus;
-  failureCode: string | null;
-  failureMessage: string | null;
-};
+type DesignerOperationHandlerResult =
+  | {
+      status: typeof DesignerActionRequestStatuses.COMPLETED;
+      failureCode: null;
+      failureMessage: null;
+      operationResult: DesignerActionRequestOperationResult;
+    }
+  | {
+      status:
+        | typeof DesignerActionRequestStatuses.EXECUTION_UNSUPPORTED
+        | typeof DesignerActionRequestStatuses.FAILED;
+      failureCode: string;
+      failureMessage: string;
+      operationResult: null;
+    };
 
 type DesignerOperationHandler = (
   ctx: DesignerOperationExecutionContext,
@@ -91,6 +101,7 @@ export async function executeApprovedDesignerOperation(
       status: DesignerActionRequestStatuses.EXECUTION_UNSUPPORTED,
       failureCode: "DESIGNER_OPERATION_HANDLER_UNSUPPORTED",
       failureMessage: `Designer operation kind '${input.operation.kind}' does not have an execution handler.`,
+      operationResult: null,
     };
   }
 
@@ -101,6 +112,7 @@ export async function executeApprovedDesignerOperation(
       status: DesignerActionRequestStatuses.FAILED,
       failureCode: getDesignerOperationFailureCode(error),
       failureMessage: getDesignerOperationFailureMessage(error),
+      operationResult: null,
     };
   }
 }
@@ -143,6 +155,11 @@ async function executeSandboxProfileDraftSetupScriptPutOperation(
     status: DesignerActionRequestStatuses.COMPLETED,
     failureCode: null,
     failureMessage: null,
+    operationResult: {
+      kind: input.operation.kind,
+      profileId: input.operation.profileId,
+      version: input.operation.version,
+    },
   };
 }
 
@@ -163,7 +180,7 @@ async function executeSandboxProfileDraftPublishOperation(
     permission: OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
   });
 
-  await publishProfileVersion(
+  const published = await publishProfileVersion(
     {
       db: ctx.db,
       dataPlaneClient: ctx.dataPlaneClient,
@@ -179,11 +196,34 @@ async function executeSandboxProfileDraftPublishOperation(
       profileVersion: input.operation.version,
     },
   );
+  if (published.version.publishedAt === null) {
+    throw new Error(
+      `Published sandbox profile '${input.operation.profileId}' version '${String(input.operation.version)}' is missing published_at.`,
+    );
+  }
 
   return {
     status: DesignerActionRequestStatuses.COMPLETED,
     failureCode: null,
     failureMessage: null,
+    operationResult: {
+      kind: input.operation.kind,
+      profileId: input.operation.profileId,
+      version: input.operation.version,
+      publishedAt: published.version.publishedAt,
+      snapshotAction:
+        published.snapshotAction.kind === "created"
+          ? {
+              kind: "created",
+              snapshotJobId: published.snapshotAction.job.id,
+              sandboxInstanceId: published.snapshotAction.job.sandboxInstanceId,
+            }
+          : {
+              kind: "reused",
+              snapshotImageProvider: published.snapshotAction.snapshotImageProvider,
+              snapshotImageId: published.snapshotAction.snapshotImageId,
+            },
+    },
   };
 }
 
@@ -204,7 +244,7 @@ async function executeSandboxProfileVersionLaunchOperation(
     permission: OrganizationPermissions.SANDBOX_SESSION_CREATE,
   });
 
-  await startProfileInstance(
+  const launched = await startProfileInstance(
     {
       db: ctx.db,
       cache: ctx.cache,
@@ -239,5 +279,12 @@ async function executeSandboxProfileVersionLaunchOperation(
     status: DesignerActionRequestStatuses.COMPLETED,
     failureCode: null,
     failureMessage: null,
+    operationResult: {
+      kind: input.operation.kind,
+      profileId: input.operation.profileId,
+      version: input.operation.version,
+      sandboxInstanceId: launched.sandboxInstanceId,
+      workflowRunId: launched.workflowRunId,
+    },
   };
 }

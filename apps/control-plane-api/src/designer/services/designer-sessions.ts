@@ -259,13 +259,17 @@ function mapRuntimeConversationBootstrapResult(
 }
 
 function mapDesignerActionRequest(
-  actionRequest: Pick<DesignerActionRequest, "failureCode" | "failureMessage" | "id" | "status">,
+  actionRequest: Pick<
+    DesignerActionRequest,
+    "failureCode" | "failureMessage" | "id" | "operationResult" | "status"
+  >,
 ): SubmitDesignerActionProposalResponseResponse["actionRequest"] {
   return {
     id: actionRequest.id,
     status: actionRequest.status,
     failureCode: actionRequest.failureCode,
     failureMessage: actionRequest.failureMessage,
+    operationResult: actionRequest.operationResult,
   };
 }
 
@@ -322,6 +326,7 @@ export async function completeApprovedDesignerActionRequestExecution(input: {
     status: executionResult.status,
     failureCode: executionResult.failureCode,
     failureMessage: executionResult.failureMessage,
+    operationResult: executionResult.operationResult,
   });
 
   return {
