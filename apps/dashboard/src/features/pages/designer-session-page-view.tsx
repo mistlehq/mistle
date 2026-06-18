@@ -549,6 +549,14 @@ function buildDesignerCanvasHref(input: {
   return search.length === 0 ? input.pathname : `${input.pathname}?${search}`;
 }
 
+function decodeDesignerCanvasPathSegment(pathSegment: string): string | null {
+  try {
+    return decodeURIComponent(pathSegment);
+  } catch {
+    return null;
+  }
+}
+
 function resolveDesignerCanvasEmbeddedRoute(href: string): DesignerCanvasEmbeddedRoute {
   const url = new URL(href, DesignerCanvasUrlOrigin);
   const pathSegments = url.pathname.split("/").filter((segment) => segment.length > 0);
@@ -576,7 +584,13 @@ function resolveDesignerCanvasEmbeddedRoute(href: string): DesignerCanvasEmbedde
     return { kind: "unsupported" };
   }
 
-  const targetKey = pathSegments.length === 1 ? null : decodeURIComponent(pathSegments[1] ?? "");
+  const encodedTargetKey = pathSegments[1];
+  const targetKey =
+    encodedTargetKey === undefined ? null : decodeDesignerCanvasPathSegment(encodedTargetKey);
+  if (targetKey === null && encodedTargetKey !== undefined) {
+    return { kind: "unsupported" };
+  }
+
   if (targetKey === "") {
     return { kind: "unsupported" };
   }

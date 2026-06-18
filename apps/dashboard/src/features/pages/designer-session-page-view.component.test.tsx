@@ -138,6 +138,22 @@ describe("DesignerCanvasWorkspace", () => {
     });
   });
 
+  it("renders malformed integration tab hrefs as unsupported canvas routes", async () => {
+    renderDesignerCanvasWorkspace({
+      tabs: [
+        {
+          id: "malformed-integration",
+          title: "Malformed integration",
+          href: "/integrations/%E0%A4%A",
+        },
+      ],
+    });
+
+    expect(
+      await screen.findByText("This route is not available in the Designer canvas."),
+    ).toBeDefined();
+  });
+
   it("keeps internal links inside the active Designer canvas tab", async () => {
     const nextTabs: DesignerCanvasWorkspaceProps["tabs"][] = [];
     renderDesignerCanvasWorkspace({
