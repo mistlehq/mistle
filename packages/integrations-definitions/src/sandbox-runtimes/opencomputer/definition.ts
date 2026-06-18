@@ -1,10 +1,11 @@
 import {
   IntegrationConnectionMethodIds,
   IntegrationKinds,
-  type CompileBindingResult,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 
+import { resolveOpenComputerBindingConfigForm } from "./binding-config-form.js";
+import { compileOpenComputerBinding } from "./compile-binding.js";
 import {
   OpenComputerSandboxRuntimeCredentialSecretTypes,
   OpenComputerSandboxRuntimeCredentialSlotKeys,
@@ -28,12 +29,6 @@ type OpenComputerSandboxRuntimeIntegrationDefinition = IntegrationDefinition<
   OpenComputerSandboxRuntimeConnectionConfig
 >;
 
-const EmptyCompileBindingResult: CompileBindingResult = {
-  egressRoutes: [],
-  artifacts: [],
-  runtimeClients: [],
-};
-
 export const OpenComputerSandboxRuntimeDefinition: OpenComputerSandboxRuntimeIntegrationDefinition =
   {
     familyId: OpenComputerSandboxRuntimeFamilyId,
@@ -50,6 +45,7 @@ export const OpenComputerSandboxRuntimeDefinition: OpenComputerSandboxRuntimeInt
     targetConfigSchema: OpenComputerSandboxRuntimeTargetConfigSchema,
     targetSecretSchema: OpenComputerSandboxRuntimeTargetSecretSchema,
     bindingConfigSchema: OpenComputerSandboxRuntimeBindingConfigSchema,
+    bindingConfigForm: resolveOpenComputerBindingConfigForm,
     connectionMethods: [
       {
         id: IntegrationConnectionMethodIds.API_KEY,
@@ -68,5 +64,5 @@ export const OpenComputerSandboxRuntimeDefinition: OpenComputerSandboxRuntimeInt
         configSchema: OpenComputerSandboxRuntimeConnectionConfigSchema,
       },
     ],
-    compileBinding: () => EmptyCompileBindingResult,
+    compileBinding: compileOpenComputerBinding,
   };

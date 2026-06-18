@@ -9,3 +9,7 @@ export const OpenComputerSandboxRuntimeCredentialSecretTypes = {
 export const OpenComputerSandboxRuntimeCredentialSlotKeys = {
   API_KEY: `${OpenComputerSandboxRuntimeFamilyId}.${OpenComputerSandboxRuntimeVariantId}.api-key.api-key`,
 } as const;
+
+export const OpenComputerToolIds = {
+  OPENCOMPUTER_CLI: "opencomputer-cli",
+} as const;
