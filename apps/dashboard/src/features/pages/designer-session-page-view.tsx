@@ -12,6 +12,7 @@ import type {
   DesignerSession,
 } from "../designer/designer-service.js";
 import { hydrateCodexChatEntriesFromThreadReadTurns } from "../session-agents/codex/session-state/index.js";
+import { formatDesignerActionRequestOperationResult } from "./designer-action-proposal-response-copy.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 
 export type DesignerSessionPageViewProps = {
@@ -341,6 +342,9 @@ function DesignerActionProposals(input: {
               ),
             )}
           </dl>
+          {proposal.actionRequest === null ? null : (
+            <DesignerActionProposalDurableState actionRequest={proposal.actionRequest} />
+          )}
           {proposal.status === "pending" ? (
             <div className="mt-3 flex flex-wrap gap-2">
               <button
@@ -371,6 +375,44 @@ function DesignerActionProposals(input: {
       {input.successMessage === null ? null : (
         <p className="text-xs text-muted-foreground">{input.successMessage}</p>
       )}
+    </div>
+  );
+}
+
+function DesignerActionProposalDurableState(input: {
+  actionRequest: NonNullable<DesignerActionProposal["actionRequest"]>;
+}): React.JSX.Element {
+  const resultLabel = formatDesignerActionRequestOperationResult(
+    input.actionRequest.operationResult,
+  );
+
+  return (
+    <div className="mt-3 rounded-md border bg-background/70 p-3">
+      <p className="text-xs font-medium text-muted-foreground">Action request</p>
+      <dl className="mt-2 grid gap-2 text-xs">
+        <div>
+          <dt className="text-muted-foreground">Request</dt>
+          <dd className="mt-0.5 break-all font-mono">{input.actionRequest.id}</dd>
+        </div>
+        {resultLabel === null ? null : (
+          <div>
+            <dt className="text-muted-foreground">Result</dt>
+            <dd className="mt-0.5">{resultLabel}</dd>
+          </div>
+        )}
+        {input.actionRequest.failureCode === null ? null : (
+          <div>
+            <dt className="text-muted-foreground">Failure code</dt>
+            <dd className="mt-0.5 break-all font-mono">{input.actionRequest.failureCode}</dd>
+          </div>
+        )}
+        {input.actionRequest.failureMessage === null ? null : (
+          <div>
+            <dt className="text-muted-foreground">Failure</dt>
+            <dd className="mt-0.5">{input.actionRequest.failureMessage}</dd>
+          </div>
+        )}
+      </dl>
     </div>
   );
 }
@@ -449,15 +491,22 @@ function getDesignerActionProposalOperationRows(
 }
 
 function formatDesignerActionProposalStatus(status: DesignerActionProposal["status"]): string {
-  if (status === "pending") {
-    return "Review required";
+  switch (status) {
+    case "pending":
+      return "Review required";
+    case "approved":
+      return "Approved";
+    case "declined":
+      return "Declined";
+    case "executing":
+      return "Executing";
+    case "execution_unsupported":
+      return "Unsupported";
+    case "completed":
+      return "Completed";
+    case "failed":
+      return "Failed";
   }
-
-  if (status === "approved") {
-    return "Approved";
-  }
-
-  return "Declined";
 }
 
 function resolveRuntimeConversationPromptState(input: {

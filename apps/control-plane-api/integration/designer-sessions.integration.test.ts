@@ -35,6 +35,7 @@ import {
 import {
   claimDesignerActionRequest,
   markDesignerActionRequestResponseSubmitted,
+  readDesignerActionRequestsForProposals,
   readDesignerActionRequestForResponse,
   toDesignerActionRequestOperation,
 } from "../src/designer/services/designer-action-requests.js";
@@ -668,6 +669,25 @@ describe.concurrent("designer sessions integration", () => {
       responseSubmittedAt: "2026-06-18 01:03:04+00",
       operationResult: null,
     });
+
+    await expect(
+      readDesignerActionRequestsForProposals(
+        {
+          db: env.controlPlaneDb,
+        },
+        {
+          organizationId: session.organizationId,
+          sessionId: designerSessionId,
+          proposalIds: [proposalId, "dap_missing_action_request"],
+        },
+      ),
+    ).resolves.toMatchObject([
+      {
+        id: claimed.actionRequest.id,
+        proposalId,
+        status: DesignerActionRequestStatuses.EXECUTION_UNSUPPORTED,
+      },
+    ]);
   });
 
   it("executes an approved typed Designer operation for a sandbox profile draft setup script", async ({

@@ -1348,10 +1348,6 @@
                                 "minLength": 1,
                                 "maxLength": 2000
                               },
-                              "status": {
-                                "type": "string",
-                                "enum": ["pending", "approved", "declined"]
-                              },
                               "operation": {
                                 "oneOf": [
                                   {
@@ -1488,9 +1484,203 @@
                                     "additionalProperties": false
                                   }
                                 ]
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "approved",
+                                  "declined",
+                                  "executing",
+                                  "execution_unsupported",
+                                  "completed",
+                                  "failed"
+                                ]
+                              },
+                              "actionRequest": {
+                                "type": ["object", "null"],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "approved",
+                                      "declined",
+                                      "executing",
+                                      "execution_unsupported",
+                                      "completed",
+                                      "failed"
+                                    ]
+                                  },
+                                  "failureCode": {
+                                    "type": ["string", "null"],
+                                    "minLength": 1
+                                  },
+                                  "failureMessage": {
+                                    "type": ["string", "null"],
+                                    "minLength": 1
+                                  },
+                                  "operationResult": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["sandboxProfileDraftPublish"]
+                                          },
+                                          "profileId": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "version": {
+                                            "type": "integer",
+                                            "minimum": 1
+                                          },
+                                          "publishedAt": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "snapshotAction": {
+                                            "oneOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["created"]
+                                                  },
+                                                  "snapshotJobId": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  },
+                                                  "sandboxInstanceId": {
+                                                    "type": ["string", "null"],
+                                                    "minLength": 1
+                                                  }
+                                                },
+                                                "required": [
+                                                  "kind",
+                                                  "snapshotJobId",
+                                                  "sandboxInstanceId"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["reused"]
+                                                  },
+                                                  "snapshotImageProvider": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  },
+                                                  "snapshotImageId": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  }
+                                                },
+                                                "required": [
+                                                  "kind",
+                                                  "snapshotImageProvider",
+                                                  "snapshotImageId"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "profileId",
+                                          "version",
+                                          "publishedAt",
+                                          "snapshotAction"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["sandboxProfileDraftSetupScriptPut"]
+                                          },
+                                          "profileId": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "version": {
+                                            "type": "integer",
+                                            "minimum": 1
+                                          }
+                                        },
+                                        "required": ["kind", "profileId", "version"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["sandboxProfileVersionLaunch"]
+                                          },
+                                          "profileId": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "version": {
+                                            "type": "integer",
+                                            "minimum": 1
+                                          },
+                                          "sandboxInstanceId": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "workflowRunId": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "profileId",
+                                          "version",
+                                          "sandboxInstanceId",
+                                          "workflowRunId"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "status",
+                                  "failureCode",
+                                  "failureMessage",
+                                  "operationResult"
+                                ],
+                                "additionalProperties": false
                               }
                             },
-                            "required": ["id", "kind", "title", "summary", "status", "operation"],
+                            "required": [
+                              "id",
+                              "kind",
+                              "title",
+                              "summary",
+                              "operation",
+                              "status",
+                              "actionRequest"
+                            ],
                             "additionalProperties": false
                           }
                         }

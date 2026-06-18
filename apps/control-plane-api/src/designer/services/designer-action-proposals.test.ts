@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { DesignerActionProposal } from "../schemas.js";
+import type { DesignerProviderActionProposal } from "../schemas.js";
 import {
   createDesignerActionProposalResponsePrompt,
+  hydrateDesignerActionProposalsWithActionRequests,
   splitDesignerActionProposalsFromTranscriptTurns,
 } from "./designer-action-proposals.js";
 
@@ -25,13 +26,13 @@ const DesignerActionProposalItem = {
       },
     ],
   },
-} satisfies DesignerActionProposal;
+} satisfies DesignerProviderActionProposal;
 
 const ApprovedDesignerActionProposalItem = {
   ...DesignerActionProposalItem,
   status: "approved",
   summary: "The webhook was approved.",
-} satisfies DesignerActionProposal;
+} satisfies DesignerProviderActionProposal;
 
 const SandboxProfileDraftSetupScriptProposalItem = {
   id: "dap_profile_setup_script",
@@ -45,7 +46,7 @@ const SandboxProfileDraftSetupScriptProposalItem = {
     version: 2,
     setupScript: "pnpm install\npnpm build",
   },
-} satisfies DesignerActionProposal;
+} satisfies DesignerProviderActionProposal;
 
 const SandboxProfileVersionLaunchProposalItem = {
   id: "dap_profile_launch",
@@ -60,7 +61,7 @@ const SandboxProfileVersionLaunchProposalItem = {
     primaryRepositoryId: null,
     idempotencyKey: "designer-launch-001",
   },
-} satisfies DesignerActionProposal;
+} satisfies DesignerProviderActionProposal;
 
 describe("Designer action proposals", () => {
   it("extracts strictly shaped proposal items once and keeps them out of chat transcript items", () => {
@@ -128,6 +129,48 @@ describe("Designer action proposals", () => {
         },
       ]).actionProposals,
     ).toEqual([SandboxProfileVersionLaunchProposalItem]);
+  });
+
+  it("hydrates matching durable action request execution state onto transcript proposals", () => {
+    expect(
+      hydrateDesignerActionProposalsWithActionRequests({
+        proposals: [DesignerActionProposalItem, SandboxProfileDraftSetupScriptProposalItem],
+        actionRequests: [
+          {
+            proposalId: "dap_profile_setup_script",
+            id: "dar_profile_setup_script",
+            status: "completed",
+            failureCode: null,
+            failureMessage: null,
+            operationResult: {
+              kind: "sandboxProfileDraftSetupScriptPut",
+              profileId: "sbp_designer_setup_script",
+              version: 2,
+            },
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        ...DesignerActionProposalItem,
+        actionRequest: null,
+      },
+      {
+        ...SandboxProfileDraftSetupScriptProposalItem,
+        status: "completed",
+        actionRequest: {
+          id: "dar_profile_setup_script",
+          status: "completed",
+          failureCode: null,
+          failureMessage: null,
+          operationResult: {
+            kind: "sandboxProfileDraftSetupScriptPut",
+            profileId: "sbp_designer_setup_script",
+            version: 2,
+          },
+        },
+      },
+    ]);
   });
 
   it("formats action proposal responses as bounded Designer conversation input", () => {
