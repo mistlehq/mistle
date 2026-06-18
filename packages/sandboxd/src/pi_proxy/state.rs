@@ -25,6 +25,7 @@ const PI_RPC_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
 pub(super) struct PiProxyState {
     pub(super) config: PiProxyConfig,
     pub(super) child: Mutex<Option<PiRpcChild>>,
+    pub(super) output_receiver: Mutex<Option<Receiver<PiRpcOutput>>>,
     pub(super) command_lock: Mutex<()>,
     pub(super) event_subscribers: Mutex<Vec<Sender<String>>>,
     pub(super) keepalive_manager: Arc<Mutex<KeepaliveManager>>,
@@ -44,6 +45,41 @@ impl PiProxyState {
 
     pub(super) fn send_pi_command(&self, command: Value) -> Result<Value, PiProxyError> {
         self.send_pi_command_with_events(command, None)
+    }
+
+    pub(super) fn send_pi_input(&self, command: Value) -> Result<(), PiProxyError> {
+        let line = format!("{command}\n");
+        self.write_pi_stdin_line(&line)
+    }
+
+    fn write_pi_stdin_line(&self, line: &str) -> Result<(), PiProxyError> {
+        let mut guard = self
+            .child
+            .lock()
+            .map_err(|_| PiProxyError::InvalidRequest("Pi child lock was poisoned".to_string()))?;
+        let child = guard.as_mut().ok_or_else(|| {
+            PiProxyError::InvalidRequest("Pi RPC process is not running".to_string())
+        })?;
+        if let Err(error) = child.stdin.write_all(line.as_bytes()) {
+            self.mark_pi_rpc_process_restarting(error.to_string());
+            return Err(PiProxyError::WritePi(error));
+        }
+        if let Err(error) = child.stdin.flush() {
+            self.mark_pi_rpc_process_restarting(error.to_string());
+            return Err(PiProxyError::WritePi(error));
+        }
+        Ok(())
+    }
+
+    pub(super) fn clear_output_receiver(&self) -> Result<(), PiProxyError> {
+        let _ = self
+            .output_receiver
+            .lock()
+            .map_err(|_| {
+                PiProxyError::InvalidRequest("Pi output receiver lock was poisoned".to_string())
+            })?
+            .take();
+        Ok(())
     }
 
     pub(super) fn send_pi_command_with_captured_events(
@@ -66,22 +102,7 @@ impl PiProxyState {
         command["id"] = Value::String(id.clone());
         let line = format!("{command}\n");
         let deadline = Instant::now() + PI_RPC_RESPONSE_TIMEOUT;
-        {
-            let mut guard = self.child.lock().map_err(|_| {
-                PiProxyError::InvalidRequest("Pi child lock was poisoned".to_string())
-            })?;
-            let child = guard.as_mut().ok_or_else(|| {
-                PiProxyError::InvalidRequest("Pi RPC process is not running".to_string())
-            })?;
-            if let Err(error) = child.stdin.write_all(line.as_bytes()) {
-                self.mark_pi_rpc_process_restarting(error.to_string());
-                return Err(PiProxyError::WritePi(error));
-            }
-            if let Err(error) = child.stdin.flush() {
-                self.mark_pi_rpc_process_restarting(error.to_string());
-                return Err(PiProxyError::WritePi(error));
-            }
-        }
+        self.write_pi_stdin_line(&line)?;
 
         loop {
             let remaining = deadline.saturating_duration_since(Instant::now());
@@ -89,13 +110,15 @@ impl PiProxyState {
                 return Err(PiProxyError::PiResponseTimeout(id));
             }
             let output = {
-                let guard = self.child.lock().map_err(|_| {
-                    PiProxyError::InvalidRequest("Pi child lock was poisoned".to_string())
+                let receiver_guard = self.output_receiver.lock().map_err(|_| {
+                    PiProxyError::InvalidRequest("Pi output receiver lock was poisoned".to_string())
                 })?;
-                let child = guard.as_ref().ok_or_else(|| {
-                    PiProxyError::InvalidRequest("Pi RPC process is not running".to_string())
+                let receiver = receiver_guard.as_ref().ok_or_else(|| {
+                    PiProxyError::InvalidRequest(
+                        "Pi RPC output receiver is not running".to_string(),
+                    )
                 })?;
-                child.receiver.recv_timeout(remaining)
+                receiver.recv_timeout(remaining)
             };
             match output {
                 Ok(PiRpcOutput::Line(value)) => {

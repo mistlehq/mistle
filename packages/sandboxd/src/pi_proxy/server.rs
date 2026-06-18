@@ -5,9 +5,9 @@
 //! other runtime adapters.
 
 use std::net::{SocketAddr, TcpListener};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{Receiver, TryRecvError};
+use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -53,6 +53,9 @@ pub(super) fn run_pi_proxy_listener(
     while !shutdown_requested.load(Ordering::Relaxed) {
         match listener.accept() {
             Ok((stream, _address)) => {
+                stream
+                    .set_nonblocking(false)
+                    .map_err(PiProxyError::ConfigureListener)?;
                 let session_state = state.clone();
                 thread::spawn(move || {
                     let _ = handle_pi_proxy_client(stream, session_state);
@@ -78,8 +81,11 @@ fn handle_pi_proxy_client(
         .set_read_timeout(Some(PI_PROXY_CLIENT_READ_TIMEOUT))
         .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
     let event_receiver = state.subscribe_pi_events();
+    let (response_sender, response_receiver) = channel::<String>();
+    let regular_request_lock = Arc::new(Mutex::new(()));
     loop {
-        send_queued_pi_events(&mut websocket, &event_receiver)?;
+        send_queued_websocket_text_messages(&mut websocket, &event_receiver)?;
+        send_queued_websocket_text_messages(&mut websocket, &response_receiver)?;
         let message = match websocket.read() {
             Ok(message) => message,
             Err(tungstenite::Error::ConnectionClosed) => return Ok(()),
@@ -94,11 +100,12 @@ fn handle_pi_proxy_client(
         };
         match message {
             Message::Text(payload) => {
-                for response in handle_json_rpc_request(&state, &payload) {
-                    websocket
-                        .send(Message::Text(response.into()))
-                        .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
-                }
+                spawn_json_rpc_request_handler(
+                    state.clone(),
+                    response_sender.clone(),
+                    regular_request_lock.clone(),
+                    payload,
+                );
             }
             Message::Ping(payload) => {
                 websocket
@@ -116,14 +123,54 @@ fn handle_pi_proxy_client(
     }
 }
 
-fn send_queued_pi_events(
+fn spawn_json_rpc_request_handler(
+    state: Arc<PiProxyState>,
+    response_sender: Sender<String>,
+    regular_request_lock: Arc<Mutex<()>>,
+    payload: tungstenite::Utf8Bytes,
+) {
+    thread::spawn(move || {
+        if is_pi_extension_ui_response_request(&payload) {
+            send_json_rpc_responses(&state, &response_sender, &payload);
+        } else {
+            let Ok(_guard) = regular_request_lock.lock() else {
+                return;
+            };
+            send_json_rpc_responses(&state, &response_sender, &payload);
+        }
+    });
+}
+
+fn is_pi_extension_ui_response_request(payload: &str) -> bool {
+    match serde_json::from_str::<serde_json::Value>(payload) {
+        Ok(value) => {
+            value.get("method").and_then(serde_json::Value::as_str)
+                == Some("pi/respondToExtensionUI")
+        }
+        Err(_) => false,
+    }
+}
+
+fn send_json_rpc_responses(
+    state: &Arc<PiProxyState>,
+    response_sender: &Sender<String>,
+    payload: &str,
+) {
+    for response in handle_json_rpc_request(state, payload) {
+        if response_sender.send(response).is_err() {
+            return;
+        }
+    }
+}
+
+fn send_queued_websocket_text_messages(
     websocket: &mut tungstenite::WebSocket<std::net::TcpStream>,
-    event_receiver: &Receiver<String>,
+    receiver: &Receiver<String>,
 ) -> Result<(), PiProxyError> {
     loop {
-        match event_receiver.try_recv() {
-            Ok(notification) => websocket
-                .send(Message::Text(notification.into()))
+        match receiver.try_recv() {
+            Ok(message) => websocket
+                .send(Message::Text(message.into()))
                 .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?,
             Err(TryRecvError::Empty) => return Ok(()),
             Err(TryRecvError::Disconnected) => return Ok(()),

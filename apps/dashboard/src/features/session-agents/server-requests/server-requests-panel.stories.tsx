@@ -96,6 +96,16 @@ const MixedServerRequestEntries: readonly ServerRequestEntry[] = [
     status: "pending",
     responseErrorMessage: null,
   },
+  {
+    requestId: "pi-confirm-request-1",
+    method: "pi/extensionUi/confirm",
+    kind: "pi-extension-ui-confirm",
+    title: "Run command?",
+    message: "Allow Pi to run pnpm test?",
+    availableDecisions: ["confirm", "cancel"],
+    status: "pending",
+    responseErrorMessage: null,
+  },
 ];
 
 function createMixedServerRequestEntriesWithResponseErrors(): readonly ServerRequestEntry[] {

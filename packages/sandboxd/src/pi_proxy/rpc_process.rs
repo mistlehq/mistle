@@ -9,7 +9,7 @@ use std::io::{BufRead, BufReader};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc::{self, Sender};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -24,7 +24,6 @@ const PI_RPC_MONITOR_POLL_INTERVAL: Duration = Duration::from_millis(250);
 pub(super) struct PiRpcChild {
     pub(super) child: Child,
     pub(super) stdin: ChildStdin,
-    pub(super) receiver: Receiver<PiRpcOutput>,
     reader_thread: JoinHandle<()>,
     cwd: Option<String>,
 }
@@ -84,6 +83,7 @@ impl PiProxyState {
             return Ok(());
         }
         if let Some(child) = guard.take() {
+            self.clear_output_receiver()?;
             terminate_pi_rpc_child(child);
             self.set_active(false);
             self.mark_pi_rpc_process_stopped();
@@ -140,10 +140,12 @@ impl PiProxyState {
         *guard = Some(PiRpcChild {
             child,
             stdin,
-            receiver,
             reader_thread,
             cwd: cwd.map(ToString::to_string),
         });
+        *self.output_receiver.lock().map_err(|_| {
+            PiProxyError::InvalidRequest("Pi output receiver lock was poisoned".to_string())
+        })? = Some(receiver);
         self.mark_pi_rpc_process_healthy(pid);
         Ok(())
     }
@@ -168,6 +170,7 @@ impl PiProxyState {
             let Some(child) = guard.take() else {
                 return Ok(());
             };
+            self.clear_output_receiver()?;
             terminate_pi_rpc_child(child);
             (cwd, exit_description)
         };
@@ -187,6 +190,7 @@ impl PiProxyState {
         let Some(child) = child else {
             return Ok(());
         };
+        self.clear_output_receiver()?;
         terminate_pi_rpc_child(child);
         self.set_active(false);
         self.mark_pi_rpc_process_stopped();

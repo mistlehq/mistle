@@ -40,6 +40,8 @@ export type ToolRequestUserInputEntry = {
     options: readonly {
       label: string;
       description: string | null;
+      defaultValue?: string | null;
+      inputKind?: "textarea";
       isOther: boolean;
     }[];
     question: string;
@@ -72,9 +74,21 @@ export type ClaudeCodePermissionApprovalRequestEntry = {
   responseErrorMessage: string | null;
 };
 
+export type PiExtensionUIConfirmRequestEntry = {
+  requestId: string;
+  method: "pi/extensionUi/confirm";
+  kind: "pi-extension-ui-confirm";
+  title: string;
+  message: string;
+  availableDecisions: readonly string[];
+  status: "pending" | "responding";
+  responseErrorMessage: string | null;
+};
+
 export type ServerRequestEntry =
   | CommandApprovalRequestEntry
   | FileChangeApprovalRequestEntry
   | ToolRequestUserInputEntry
   | OpenCodePermissionApprovalRequestEntry
-  | ClaudeCodePermissionApprovalRequestEntry;
+  | ClaudeCodePermissionApprovalRequestEntry
+  | PiExtensionUIConfirmRequestEntry;

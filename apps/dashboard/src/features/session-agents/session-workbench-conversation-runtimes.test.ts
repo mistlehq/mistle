@@ -13,6 +13,9 @@ type CodexRuntimeInput = Parameters<typeof buildCodexConversationRuntime>[0];
 type ClaudeCodeRuntimeInput = Parameters<typeof buildClaudeCodeConversationRuntime>[0];
 type OpenCodeRuntimeInput = Parameters<typeof buildOpenCodeConversationRuntime>[0];
 type PiRuntimeInput = Parameters<typeof buildPiConversationRuntime>[0];
+type PiExtensionUIResponseInput = Parameters<
+  PiRuntimeInput["chat"]["respondToExtensionUIRequest"]
+>[0];
 
 const ReadyBootstrap: CodexRuntimeInput["bootstrap"] = {
   phase: { status: "ready" },
@@ -308,8 +311,10 @@ function createPiRuntimeInput(input: {
   contextUsage?: PiRuntimeInput["contextUsage"];
   executedPromptCommands?: string[];
   isBusy?: boolean;
+  pendingExtensionUIRequests?: PiRuntimeInput["chat"]["pendingExtensionUIRequests"];
   queuedPrompts?: string[];
   reportedMessages: string[];
+  respondedExtensionUIRequests?: PiExtensionUIResponseInput[];
   steeredPrompts: string[];
 }): PiRuntimeInput {
   return {
@@ -342,8 +347,13 @@ function createPiRuntimeInput(input: {
         return;
       },
       isInterruptingTurn: false,
+      isRespondingToExtensionUIRequest: false,
       isStartingTurn: false,
       isSteeringTurn: false,
+      pendingExtensionUIRequests: input.pendingExtensionUIRequests ?? [],
+      respondToExtensionUIRequest: async (responseInput) => {
+        input.respondedExtensionUIRequests?.push(responseInput);
+      },
       sendPrompt: async (turnInput) => {
         input.executedPromptCommands?.push(turnInput.submittedPrompt);
       },
@@ -1026,6 +1036,51 @@ describe("buildPiConversationRuntime", () => {
 
     expect(accepted).toBe(true);
     expect(executedPromptCommands).toEqual(["/sync-linear"]);
+  });
+
+  it("exposes and responds to pending Pi extension UI confirmations", () => {
+    const respondedExtensionUIRequests: PiExtensionUIResponseInput[] = [];
+    const runtime = buildPiConversationRuntime(
+      createPiRuntimeInput({
+        isBusy: false,
+        pendingExtensionUIRequests: [
+          {
+            type: "extension_ui_request",
+            id: "ui_confirm_1",
+            method: "confirm",
+            title: "Run command?",
+            message: "Allow Pi to run pnpm test?",
+          },
+        ],
+        reportedMessages: [],
+        respondedExtensionUIRequests,
+        steeredPrompts: [],
+      }),
+    );
+
+    expect(runtime.serverRequestsState.pendingServerRequests).toEqual([
+      {
+        requestId: "ui_confirm_1",
+        method: "pi/extensionUi/confirm",
+        kind: "pi-extension-ui-confirm",
+        title: "Run command?",
+        message: "Allow Pi to run pnpm test?",
+        availableDecisions: ["confirm", "cancel"],
+        status: "pending",
+        responseErrorMessage: null,
+      },
+    ]);
+
+    runtime.serverRequestsState.respondToServerRequest("ui_confirm_1", {
+      decision: "confirm",
+    });
+
+    expect(respondedExtensionUIRequests).toEqual([
+      {
+        requestId: "ui_confirm_1",
+        confirmed: true,
+      },
+    ]);
   });
 
   it("rejects typed commands outside the Pi command namespace", () => {
