@@ -8,7 +8,7 @@ import {
 } from "./composer-capabilities.js";
 
 describe("Claude Code composer capabilities", () => {
-  it("maps allowlisted Claude Code slash commands into typed runtime composer commands", () => {
+  it("maps supported and custom Claude Code slash commands into typed runtime composer commands", () => {
     expect(
       mapClaudeCodeSlashCommandsToComposerCapabilities([
         {
@@ -28,8 +28,16 @@ describe("Claude Code composer capabilities", () => {
           description: "Review current changes",
         },
         {
-          name: "model",
-          description: null,
+          name: "deploy",
+          description: "Deploy the app",
+        },
+        {
+          name: "fix-issue",
+          description: "Fix a GitHub issue",
+        },
+        {
+          name: "db:migrate",
+          description: "Run database migrations",
         },
       ]),
     ).toEqual([
@@ -74,15 +82,61 @@ describe("Claude Code composer capabilities", () => {
             },
             submitAs: "typedRuntimeCommand",
           },
+          {
+            id: "claude-code.slash.deploy",
+            name: "deploy",
+            description: "Deploy the app",
+            availability: {
+              duringActiveTurn: "disabled",
+            },
+            submitAs: "typedRuntimeCommand",
+          },
+          {
+            id: "claude-code.slash.fix-issue",
+            name: "fix-issue",
+            description: "Fix a GitHub issue",
+            availability: {
+              duringActiveTurn: "disabled",
+            },
+            submitAs: "typedRuntimeCommand",
+          },
+          {
+            id: "claude-code.slash.db:migrate",
+            name: "db:migrate",
+            description: "Run database migrations",
+            availability: {
+              duringActiveTurn: "disabled",
+            },
+            submitAs: "typedRuntimeCommand",
+          },
         ],
       },
     ]);
   });
 
-  it("omits irrelevant and qualified Claude Code slash commands from composer", () => {
+  it("omits built-in management and interactive Claude Code slash commands from composer", () => {
     expect(shouldExposeClaudeCodeSlashCommand({ name: "compact" })).toBe(true);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "deploy" })).toBe(true);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "fix-issue" })).toBe(true);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "db:migrate" })).toBe(true);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "add-dir" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "cd" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "config" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "diff" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "exit" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "export" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "init" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "login" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "logout" })).toBe(false);
     expect(shouldExposeClaudeCodeSlashCommand({ name: "model" })).toBe(false);
-    expect(shouldExposeClaudeCodeSlashCommand({ name: "apps/web:deploy" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "permissions" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "debug" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "mcp__github__issue" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "resume" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "rewind" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "terminal-setup" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "upgrade" })).toBe(false);
+    expect(shouldExposeClaudeCodeSlashCommand({ name: "web-setup" })).toBe(false);
 
     expect(
       mapClaudeCodeSlashCommandsToComposerCapabilities([
@@ -91,8 +145,16 @@ describe("Claude Code composer capabilities", () => {
           description: "Switch model",
         },
         {
-          name: "apps/web:deploy",
-          description: "Deploy the web app",
+          name: "cd",
+          description: "Change directory",
+        },
+        {
+          name: "debug",
+          description: "Debug failures",
+        },
+        {
+          name: "mcp__github__issue",
+          description: "Run a GitHub MCP prompt",
         },
       ]),
     ).toEqual([]);

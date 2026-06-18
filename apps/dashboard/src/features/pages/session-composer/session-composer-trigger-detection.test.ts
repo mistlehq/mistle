@@ -370,6 +370,7 @@ describe("readLeadingSlashCommandName", () => {
   it("reads slash command names only from the literal composer start", () => {
     expect(readLeadingSlashCommandName("/review")).toBe("review");
     expect(readLeadingSlashCommandName("/review check auth")).toBe("review");
+    expect(readLeadingSlashCommandName("/db:migrate production")).toBe("db:migrate");
     expect(readLeadingSlashCommandName(" /review")).toBeNull();
     expect(readLeadingSlashCommandName("\n/review")).toBeNull();
     expect(readLeadingSlashCommandName("Use /review")).toBeNull();
