@@ -22,6 +22,8 @@ const StoryButtonControl = {
 function renderHeaderActions(
   overrides?: Partial<HeaderActionsProps>,
   input?: {
+    hideCliControl?: boolean;
+    hideDiffControl?: boolean;
     viewportWidth?: number;
   },
 ): void {
@@ -29,16 +31,24 @@ function renderHeaderActions(
 
   render(
     <SessionWorkbenchHeaderActions
-      cliControl={{
-        ...StoryButtonControl,
-        ariaLabel: "TUI",
-        title: "Open Codex TUI",
-      }}
-      diffControl={{
-        ...StoryButtonControl,
-        ariaLabel: "Open changes",
-        title: "Open changes",
-      }}
+      {...(input?.hideCliControl === true
+        ? {}
+        : {
+            cliControl: {
+              ...StoryButtonControl,
+              ariaLabel: "TUI",
+              title: "Open Codex TUI",
+            },
+          })}
+      {...(input?.hideDiffControl === true
+        ? {}
+        : {
+            diffControl: {
+              ...StoryButtonControl,
+              ariaLabel: "Open changes",
+              title: "Open changes",
+            },
+          })}
       status={{
         indicatorClassName: "border-emerald-700 bg-emerald-600",
         kind: "connected",
@@ -229,6 +239,30 @@ describe("SessionWorkbenchHeaderActions", () => {
     expect(screen.queryByText("Tools")).toBeNull();
     expect(screen.getByRole("menuitem", { name: "TUI" })).toBeDefined();
     expect(screen.getByRole("menuitem", { name: "Changes" })).toBeDefined();
+    expect(screen.getByRole("menuitem", { name: "Terminal" })).toBeDefined();
+  });
+
+  it("omits hidden designer header controls from desktop and mobile tools", () => {
+    renderHeaderActions(
+      {
+        status: {
+          indicatorClassName: "border-emerald-700 bg-emerald-600",
+          kind: "connected",
+          label: "Connected",
+        },
+      },
+      { hideCliControl: true, hideDiffControl: true, viewportWidth: 500 },
+    );
+
+    expect(screen.queryByRole("combobox", { name: "Primary repository" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "TUI" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open changes" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open session tools" }));
+
+    expect(screen.queryByRole("menuitem", { name: "TUI" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Changes" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Processes" })).toBeNull();
     expect(screen.getByRole("menuitem", { name: "Terminal" })).toBeDefined();
   });
 

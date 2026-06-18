@@ -72,6 +72,12 @@ export function DesignerSessionPage(): React.JSX.Element {
       key={`${designerSession.id}:${designerSession.sandboxInstanceId}`}
       documentTitleFallback="Designer"
       frameTitle="Designer"
+      headerControls={{
+        cli: false,
+        diff: false,
+        portAccess: false,
+        repository: false,
+      }}
       leadingControl={<DesignerSessionSidebarTrigger />}
       requestedRuntimeConversationId={requestedRuntimeConversationId}
       sandboxInstanceId={designerSession.sandboxInstanceId}

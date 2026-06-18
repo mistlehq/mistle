@@ -65,6 +65,12 @@ type SessionWorkbenchFullPageSecondaryPanel =
 export type SessionWorkbenchFullPageProps = {
   documentTitleFallback: string;
   frameTitle: string;
+  headerControls?: {
+    cli?: boolean;
+    diff?: boolean;
+    portAccess?: boolean;
+    repository?: boolean;
+  };
   leadingControl: React.ReactNode;
   requestedRuntimeConversationId: string | null;
   sandboxInstanceId: string | null;
@@ -147,6 +153,11 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
   const cliButtonTitle = workbench.primaryPanelState.isCliToggleActive
     ? "Return to chat"
     : (workbench.primaryPanelState.disabledReason ?? `Open ${cliRuntimeDisplayName} TUI`);
+  const headerControls = input.headerControls;
+  const shouldShowCliControl = headerControls?.cli ?? true;
+  const shouldShowDiffControl = headerControls?.diff ?? true;
+  const shouldShowPortAccessControl = headerControls?.portAccess ?? true;
+  const shouldShowRepositoryControl = headerControls?.repository ?? true;
   const headerStatusKind = workbench.workbenchStatus.kind;
   const headerStatusUi = resolveSandboxStatusBadgeUi(workbench.sandboxLifecycleStatus);
   const headerStatusLabel = headerStatusKind === "error" ? "Error" : headerStatusUi.label;
@@ -176,54 +187,66 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
   const headerActions = useMemo(
     () => (
       <SessionWorkbenchHeaderActions
-        cliControl={{
-          ariaLabel: cliButtonLabel,
-          className: workbench.primaryPanelState.isCliToggleActive
-            ? "bg-muted text-foreground shadow-none hover:bg-muted/80"
-            : "bg-transparent text-foreground shadow-none hover:bg-muted/60",
-          disabled:
-            !workbench.primaryPanelState.canEnterCli &&
-            !workbench.primaryPanelState.isCliToggleActive,
-          onClick: () => {
-            if (workbench.primaryPanelState.isCliToggleActive) {
-              void workbench.primaryPanelState.exitCliMode();
-              return;
-            }
+        {...(!shouldShowCliControl
+          ? {}
+          : {
+              cliControl: {
+                ariaLabel: cliButtonLabel,
+                className: workbench.primaryPanelState.isCliToggleActive
+                  ? "bg-muted text-foreground shadow-none hover:bg-muted/80"
+                  : "bg-transparent text-foreground shadow-none hover:bg-muted/60",
+                disabled:
+                  !workbench.primaryPanelState.canEnterCli &&
+                  !workbench.primaryPanelState.isCliToggleActive,
+                onClick: () => {
+                  if (workbench.primaryPanelState.isCliToggleActive) {
+                    void workbench.primaryPanelState.exitCliMode();
+                    return;
+                  }
 
-            void workbench.primaryPanelState.enterCliMode();
-          },
-          pressed: workbench.primaryPanelState.isCliToggleActive,
-          title: cliButtonTitle,
-        }}
-        diffControl={{
-          ariaLabel: isDiffPanelActive ? "Changes" : "Open changes",
-          className: isDiffPanelActive
-            ? "bg-muted text-foreground shadow-none hover:bg-muted/80"
-            : "bg-transparent text-foreground shadow-none hover:bg-muted/60",
-          disabled: input.secondaryPanel.kind === "custom" || isDiffOpenDisabled,
-          onClick: () => {
-            if (input.secondaryPanel.kind === "custom") {
-              return;
-            }
-            closeConversationNavigatorPanel();
-            if (workbench.diffPanelState.isVisible) {
-              workbench.diffPanelState.closePanel();
-              return;
-            }
+                  void workbench.primaryPanelState.enterCliMode();
+                },
+                pressed: workbench.primaryPanelState.isCliToggleActive,
+                title: cliButtonTitle,
+              },
+            })}
+        {...(!shouldShowDiffControl
+          ? {}
+          : {
+              diffControl: {
+                ariaLabel: isDiffPanelActive ? "Changes" : "Open changes",
+                className: isDiffPanelActive
+                  ? "bg-muted text-foreground shadow-none hover:bg-muted/80"
+                  : "bg-transparent text-foreground shadow-none hover:bg-muted/60",
+                disabled: input.secondaryPanel.kind === "custom" || isDiffOpenDisabled,
+                onClick: () => {
+                  if (input.secondaryPanel.kind === "custom") {
+                    return;
+                  }
+                  closeConversationNavigatorPanel();
+                  if (workbench.diffPanelState.isVisible) {
+                    workbench.diffPanelState.closePanel();
+                    return;
+                  }
 
-            workbench.diffPanelState.openPanel();
-          },
-          pressed: isDiffPanelActive,
-          title: diffButtonTitle,
-        }}
-        mobilePortAccessControl={{
-          disabled: workbench.portAccessState.buttonDisabledReason !== null,
-          onOpen: () => {
-            workbench.portAccessState.setPanelOpen(true);
-          },
-          surface: <SessionPortAccessSheet state={workbench.portAccessState} />,
-          title: workbench.portAccessState.buttonDisabledReason ?? "Show running processes",
-        }}
+                  workbench.diffPanelState.openPanel();
+                },
+                pressed: isDiffPanelActive,
+                title: diffButtonTitle,
+              },
+            })}
+        {...(!shouldShowPortAccessControl
+          ? {}
+          : {
+              mobilePortAccessControl: {
+                disabled: workbench.portAccessState.buttonDisabledReason !== null,
+                onOpen: () => {
+                  workbench.portAccessState.setPanelOpen(true);
+                },
+                surface: <SessionPortAccessSheet state={workbench.portAccessState} />,
+                title: workbench.portAccessState.buttonDisabledReason ?? "Show running processes",
+              },
+            })}
         {...(conversationNavigation.runtimeConversationNavigatorProps === null
           ? {}
           : {
@@ -242,44 +265,53 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
                 title: "Show conversations",
               },
             })}
-        portAccessControl={<SessionPortAccessPopover state={workbench.portAccessState} />}
-        repositoryControl={{
-          ariaLabel: "Primary repository",
-          disabled:
-            !workbench.connectionReadiness.canConnect ||
-            (workbench.primaryRepositoryState.isInitialLoading &&
-              workbench.primaryRepositoryState.options.length === 1) ||
-            workbench.primaryRepositoryControlState.disabledReason !== null,
-          ...(primaryRepositoryErrorMessage === null
-            ? {}
-            : { errorMessage: primaryRepositoryErrorMessage }),
-          isRefreshing: workbench.primaryRepositoryState.isRefreshing,
-          onOpenChange: (open) => {
-            if (!open) {
-              return;
-            }
+        {...(!shouldShowPortAccessControl
+          ? {}
+          : {
+              portAccessControl: <SessionPortAccessPopover state={workbench.portAccessState} />,
+            })}
+        {...(!shouldShowRepositoryControl
+          ? {}
+          : {
+              repositoryControl: {
+                ariaLabel: "Primary repository",
+                disabled:
+                  !workbench.connectionReadiness.canConnect ||
+                  (workbench.primaryRepositoryState.isInitialLoading &&
+                    workbench.primaryRepositoryState.options.length === 1) ||
+                  workbench.primaryRepositoryControlState.disabledReason !== null,
+                ...(primaryRepositoryErrorMessage === null
+                  ? {}
+                  : { errorMessage: primaryRepositoryErrorMessage }),
+                isRefreshing: workbench.primaryRepositoryState.isRefreshing,
+                onOpenChange: (open) => {
+                  if (!open) {
+                    return;
+                  }
 
-            void workbench.primaryRepositoryState.refreshRepositories();
-          },
-          onValueChange: (nextValue) => {
-            void workbench.primaryRepositoryControlState.switchPrimaryRepository(
-              nextValue === SessionRepositoryNoneValue ? null : nextValue,
-            );
-          },
-          options: workbench.primaryRepositoryState.options,
-          selectedValue:
-            workbench.primaryRepositoryState.selectedRepositoryPath ?? SessionRepositoryNoneValue,
-          title:
-            primaryRepositoryErrorMessage ??
-            (!workbench.connectionReadiness.canConnect
-              ? (workbench.stoppedSessionMessage ??
-                "Primary repository is available only when the sandbox is running.")
-              : workbench.primaryRepositoryState.isInitialLoading
-                ? "Loading repositories from the active sandbox."
-                : workbench.primaryRepositoryState.isRefreshing
-                  ? "Refreshing repositories from the active sandbox."
-                  : "Primary repository"),
-        }}
+                  void workbench.primaryRepositoryState.refreshRepositories();
+                },
+                onValueChange: (nextValue) => {
+                  void workbench.primaryRepositoryControlState.switchPrimaryRepository(
+                    nextValue === SessionRepositoryNoneValue ? null : nextValue,
+                  );
+                },
+                options: workbench.primaryRepositoryState.options,
+                selectedValue:
+                  workbench.primaryRepositoryState.selectedRepositoryPath ??
+                  SessionRepositoryNoneValue,
+                title:
+                  primaryRepositoryErrorMessage ??
+                  (!workbench.connectionReadiness.canConnect
+                    ? (workbench.stoppedSessionMessage ??
+                      "Primary repository is available only when the sandbox is running.")
+                    : workbench.primaryRepositoryState.isInitialLoading
+                      ? "Loading repositories from the active sandbox."
+                      : workbench.primaryRepositoryState.isRefreshing
+                        ? "Refreshing repositories from the active sandbox."
+                        : "Primary repository"),
+              },
+            })}
         status={
           headerStatusKind === "error"
             ? {
@@ -338,6 +370,10 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
       isConversationNavigatorPanelVisible,
       isMobileConversationNavigatorOpen,
       input.secondaryPanel,
+      shouldShowCliControl,
+      shouldShowDiffControl,
+      shouldShowPortAccessControl,
+      shouldShowRepositoryControl,
       toggleConversationNavigatorPanel,
       terminalButtonLabel,
       terminalButtonTitle,
