@@ -47,6 +47,7 @@ import {
 } from "./use-session-workbench-lifecycle-state.js";
 import { useSessionWorkbenchRepositoryControl } from "./use-session-workbench-repository-control.js";
 import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
+import type { SessionWorkbenchConnectionTokenMinter } from "./use-session-workbench-transport.js";
 
 type SessionWorkbenchState = {
   terminalCwd: string;
@@ -114,10 +115,14 @@ export function useSessionWorkbenchController(input: {
   requestedRuntimeConversationId?: string | null;
   sandboxInstanceId: string | null;
   sandboxStatusReader?: SessionWorkbenchSandboxStatusReader;
+  mintConnectionToken?: SessionWorkbenchConnectionTokenMinter;
   dashboardControlActions?: DashboardControlActionSupport;
 }): UseSessionWorkbenchControllerResult {
   const queryClient = useQueryClient();
   const transportManager = useSessionWorkbenchTransport({
+    ...(input.mintConnectionToken === undefined
+      ? {}
+      : { mintConnectionToken: input.mintConnectionToken }),
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const resetSessionTransport = useCallback((): void => {

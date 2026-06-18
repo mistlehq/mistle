@@ -16,7 +16,7 @@ type SessionWorkbenchConnectionToken = {
   connectionUrl: string;
 };
 
-type SessionWorkbenchConnectionTokenMinter = (input: {
+export type SessionWorkbenchConnectionTokenMinter = (input: {
   instanceId: string;
 }) => Promise<SessionWorkbenchConnectionToken>;
 

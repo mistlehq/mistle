@@ -51,6 +51,7 @@ import { SessionRepositoryNoneValue } from "./use-session-primary-repository-sta
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 import type { SessionWorkbenchSandboxStatusReader } from "./use-session-workbench-lifecycle-state.js";
 import { useSessionWorkbenchRuntimeConversationNavigation } from "./use-session-workbench-runtime-conversation-navigation.js";
+import type { SessionWorkbenchConnectionTokenMinter } from "./use-session-workbench-transport.js";
 
 type SessionWorkbenchFullPageSecondaryPanel =
   | {
@@ -76,6 +77,7 @@ export type SessionWorkbenchFullPageProps = {
   leadingControl: React.ReactNode;
   requestedRuntimeConversationId: string | null;
   sandboxInstanceId: string | null;
+  mintConnectionToken?: SessionWorkbenchConnectionTokenMinter;
   sandboxStatusReader?: SessionWorkbenchSandboxStatusReader;
   searchParams: URLSearchParams;
   secondaryPanel: SessionWorkbenchFullPageSecondaryPanel;
@@ -90,6 +92,9 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
     ...(input.dashboardControlActions === undefined
       ? {}
       : { dashboardControlActions: input.dashboardControlActions }),
+    ...(input.mintConnectionToken === undefined
+      ? {}
+      : { mintConnectionToken: input.mintConnectionToken }),
     ...(input.sandboxStatusReader === undefined
       ? {}
       : { sandboxStatusReader: input.sandboxStatusReader }),

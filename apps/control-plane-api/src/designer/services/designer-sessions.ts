@@ -26,13 +26,19 @@ import { compileInstalledCodexRuntime } from "@mistle/integrations-definitions/a
 import { and, desc, eq, sql } from "drizzle-orm";
 import { typeid } from "typeid-js";
 
+import { SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS } from "../../sandbox-instances/constants.js";
+import { mintConnectionTokenForInstance } from "../../sandbox-instances/services/mint-connection-token-for-instance.js";
 import { resolveSandboxInstanceRuntimeContext } from "../../sandbox-instances/services/runtime-context.js";
 import {
   resolveMistleMcpEgressRoutes,
   resolveMistleMcpServers,
 } from "../../sandbox-profiles/services/compile-sandbox-runtime-plan.js";
 import { createWorkflowSandboxRuntime } from "../../sandbox-profiles/services/profile-version-runtime-config.js";
-import type { ControlPlaneApiMcpConfig, ControlPlaneApiSandboxRuntimeConfig } from "../../types.js";
+import type {
+  ControlPlaneApiConnectionTokenConfig,
+  ControlPlaneApiMcpConfig,
+  ControlPlaneApiSandboxRuntimeConfig,
+} from "../../types.js";
 import {
   DESIGNER_RUNTIME_PROFILE_ID,
   DESIGNER_RUNTIME_PROFILE_VERSION,
@@ -60,6 +66,13 @@ type DesignerSessionServiceContext = {
   >;
   mcpConfig: ControlPlaneApiMcpConfig;
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
+};
+
+type DesignerSessionConnectionTokenContext = Pick<
+  DesignerSessionServiceContext,
+  "dataPlaneClient" | "db" | "sandboxConfig"
+> & {
+  connectionTokenConfig: ControlPlaneApiConnectionTokenConfig;
 };
 
 type DesignerSessionSelector =
@@ -752,4 +765,34 @@ export async function putDesignerSessionCanvasTabsBySandboxInstanceId(
     organizationId: input.organizationId,
     designerSession: updatedDesignerSession,
   });
+}
+
+export async function mintDesignerSessionConnectionToken(
+  ctx: DesignerSessionConnectionTokenContext,
+  input: {
+    organizationId: string;
+    sessionId: string;
+  },
+) {
+  const designerSession = await getDesignerSession(ctx, input);
+
+  return mintConnectionTokenForInstance(
+    {
+      dataPlaneClient: ctx.dataPlaneClient,
+      defaultConnectionToken: {
+        gatewayWebsocketUrl: ctx.sandboxConfig.gatewayWsUrl,
+        tokenTtlSeconds: SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS,
+        tokenConfig: {
+          connectionTokenSecret: ctx.connectionTokenConfig.secret,
+          tokenIssuer: ctx.connectionTokenConfig.issuer,
+          tokenAudience: ctx.connectionTokenConfig.audience,
+        },
+      },
+    },
+    {
+      organizationId: input.organizationId,
+      instanceId: designerSession.sandboxInstanceId,
+      allowedPurposes: [SandboxInstancePurposes.DESIGNER],
+    },
+  );
 }

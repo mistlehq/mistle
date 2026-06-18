@@ -12,6 +12,7 @@ import {
   DesignerSessionSchema,
   ListDesignerSessionsResponseSchema,
 } from "../src/designer/index.js";
+import { SandboxInstancesConflictResponseSchema } from "../src/sandbox-instances/index.js";
 import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
 
 const it = createIntegrationTest({
@@ -129,6 +130,35 @@ describe.concurrent("designer sessions integration", () => {
       sandboxInstanceId: created.sandboxInstanceId,
       canvasTabs: [],
     });
+
+    const genericConnectionTokenResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/sandbox/instances/${encodeURIComponent(created.sandboxInstanceId)}/connection-tokens`,
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+    expect(genericConnectionTokenResponse.status).toBe(404);
+
+    const designerConnectionTokenResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/designer/sessions/${encodeURIComponent(created.id)}/connection-token`,
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+    expect(designerConnectionTokenResponse.status).toBe(409);
+    const designerConnectionTokenConflict = SandboxInstancesConflictResponseSchema.parse(
+      await designerConnectionTokenResponse.json(),
+    );
+    expect(designerConnectionTokenConflict.code).toBe("INSTANCE_NOT_RESUMABLE");
+    expect(designerConnectionTokenConflict.message).toContain(
+      `Sandbox instance '${created.sandboxInstanceId}' is 'pending' and is not connectable.`,
+    );
 
     const updateResponse = await env.controlPlaneApi.http.fetch(
       `/v1/designer/sessions/${encodeURIComponent(created.id)}/canvas-tabs`,

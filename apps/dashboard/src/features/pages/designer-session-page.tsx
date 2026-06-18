@@ -6,6 +6,7 @@ import { useParams, useSearchParams } from "react-router";
 import {
   designerSessionQueryKey,
   getDesignerSession,
+  mintDesignerSessionConnectionToken,
   putDesignerSessionCanvasTabs,
   type DesignerSession,
   type DesignerSessionCanvasTab,
@@ -254,6 +255,18 @@ function LoadedDesignerSessionPage(input: {
     },
     [input.designerSession.id],
   );
+  const mintConnectionToken = useCallback(
+    async ({ instanceId }: { instanceId: string }) => {
+      if (instanceId !== input.designerSession.sandboxInstanceId) {
+        throw new Error("Designer session sandbox instance changed.");
+      }
+
+      return await mintDesignerSessionConnectionToken({
+        sessionId: input.designerSession.id,
+      });
+    },
+    [input.designerSession.id, input.designerSession.sandboxInstanceId],
+  );
 
   return (
     <SessionWorkbenchFullPage
@@ -269,6 +282,7 @@ function LoadedDesignerSessionPage(input: {
       leadingControl={<DesignerSessionSidebarTrigger />}
       requestedRuntimeConversationId={input.requestedRuntimeConversationId}
       sandboxInstanceId={input.designerSession.sandboxInstanceId}
+      mintConnectionToken={mintConnectionToken}
       sandboxStatusReader={readDesignerSandboxStatus}
       searchParams={input.searchParams}
       dashboardControlActions={dashboardControlActions}

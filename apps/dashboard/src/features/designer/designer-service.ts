@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { normalizeHttpApiError } from "../api/http-api-error.js";
 import { requestControlPlane } from "../api/request-control-plane.js";
+import type { MintSandboxConnectionTokenResult } from "../sessions/sessions-service.js";
 import { DesignerApiError } from "./designer-api-errors.js";
 
 const AgentRuntimeIdSchema = z.enum(["claude-code", "codex", "opencode", "pi"]);
@@ -66,6 +67,15 @@ const DesignerSessionSchema = z
 const ListDesignerSessionsResponseSchema = z
   .object({
     items: z.array(DesignerSessionSchema),
+  })
+  .strict();
+
+const DesignerSessionConnectionTokenSchema = z
+  .object({
+    instanceId: z.string().min(1),
+    url: z.url(),
+    token: z.string().min(1),
+    expiresAt: z.string().min(1),
   })
   .strict();
 
@@ -226,6 +236,47 @@ export async function getDesignerSessionBySandboxInstanceId(input: {
         operation: "getDesignerSessionBySandboxInstanceId",
         error,
         fallbackMessage: "Could not load Designer session.",
+      }),
+    );
+  }
+}
+
+export async function mintDesignerSessionConnectionToken(input: {
+  sessionId: string;
+  signal?: AbortSignal;
+}): Promise<MintSandboxConnectionTokenResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "mintDesignerSessionConnectionToken",
+      method: "POST",
+      pathname: `/v1/designer/sessions/${encodeURIComponent(input.sessionId)}/connection-token`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not establish Designer session connection.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = DesignerSessionConnectionTokenSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new DesignerApiError({
+        operation: "mintDesignerSessionConnectionToken",
+        status: 500,
+        body: responseBody,
+        message: "Designer session connection token response payload is invalid.",
+      });
+    }
+
+    return {
+      instanceId: parsedResponse.data.instanceId,
+      connectionUrl: parsedResponse.data.url,
+      connectionToken: parsedResponse.data.token,
+      connectionExpiresAt: parsedResponse.data.expiresAt,
+    };
+  } catch (error) {
+    throw new DesignerApiError(
+      normalizeHttpApiError({
+        operation: "mintDesignerSessionConnectionToken",
+        error,
+        fallbackMessage: "Could not establish Designer session connection.",
       }),
     );
   }

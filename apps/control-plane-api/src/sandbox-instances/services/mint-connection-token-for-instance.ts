@@ -1,4 +1,5 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
+import type { SandboxInstancePurpose } from "@mistle/db/data-plane";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 
 import { mintConnectionToken } from "./mint-connection-token.js";
@@ -17,6 +18,7 @@ export async function mintConnectionTokenForInstance(
   input: {
     organizationId: string;
     instanceId: string;
+    allowedPurposes?: readonly SandboxInstancePurpose[];
   },
 ) {
   return mintConnectionToken(

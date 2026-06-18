@@ -3,6 +3,7 @@ import { OpenApiValidationHook } from "@mistle/http/errors.js";
 
 import type { AppContextBindings, AppRoutes } from "../types.js";
 import { DESIGNER_ROUTE_BASE_PATH } from "./constants.js";
+import * as createDesignerSessionConnectionToken from "./create-designer-session-connection-token/index.js";
 import * as createDesignerSession from "./create-designer-session/index.js";
 import * as getDesignerSessionBySandboxInstance from "./get-designer-session-by-sandbox-instance/index.js";
 import * as getDesignerSession from "./get-designer-session/index.js";
@@ -16,6 +17,10 @@ export function createDesignerRoutes(): AppRoutes<typeof DESIGNER_ROUTE_BASE_PAT
   });
 
   routes.openapi(createDesignerSession.route, createDesignerSession.handler);
+  routes.openapi(
+    createDesignerSessionConnectionToken.route,
+    createDesignerSessionConnectionToken.handler,
+  );
   routes.openapi(listDesignerSessions.route, listDesignerSessions.handler);
   routes.openapi(
     getDesignerSessionBySandboxInstance.route,
