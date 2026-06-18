@@ -1,4 +1,4 @@
-import { isInternalServiceTokenValid } from "@mistle/http";
+import { isInternalServiceTokenValid } from "@mistle/http/internal-auth.js";
 import type { Clock } from "@mistle/time";
 
 import type { ActiveBootstrapSessionStore } from "../../runtime-state/active-bootstrap-session-store.js";

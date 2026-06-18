@@ -1,6 +1,10 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 
-const TokenEncoder = new TextEncoder();
+const InternalServiceTokenHashDomain = "mistle-internal-service-token\0";
+
+function hashInternalServiceToken(token: string): Buffer {
+  return createHash("sha256").update(InternalServiceTokenHashDomain).update(token, "utf8").digest();
+}
 
 export function isInternalServiceTokenValid(input: {
   providedToken: string | undefined;
@@ -10,11 +14,8 @@ export function isInternalServiceTokenValid(input: {
     return false;
   }
 
-  const providedTokenBytes = TokenEncoder.encode(input.providedToken);
-  const expectedTokenBytes = TokenEncoder.encode(input.expectedToken);
-  if (providedTokenBytes.byteLength !== expectedTokenBytes.byteLength) {
-    return false;
-  }
-
-  return timingSafeEqual(providedTokenBytes, expectedTokenBytes);
+  return timingSafeEqual(
+    hashInternalServiceToken(input.providedToken),
+    hashInternalServiceToken(input.expectedToken),
+  );
 }

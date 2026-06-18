@@ -1,4 +1,4 @@
-import { isInternalServiceTokenValid } from "@mistle/http";
+import { isInternalServiceTokenValid } from "@mistle/http/internal-auth.js";
 import type { MiddlewareHandler } from "hono";
 
 import type { AppContextBindings } from "../types.js";

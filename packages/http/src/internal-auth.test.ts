@@ -12,7 +12,7 @@ describe("isInternalServiceTokenValid", () => {
     ).toBe(true);
   });
 
-  it("rejects missing, mismatched, and different-length tokens", () => {
+  it("rejects missing, mismatched, different-length, and unicode-equivalent-looking tokens", () => {
     expect(
       isInternalServiceTokenValid({
         providedToken: undefined,
@@ -28,6 +28,12 @@ describe("isInternalServiceTokenValid", () => {
     expect(
       isInternalServiceTokenValid({
         providedToken: "service-tokem",
+        expectedToken: "service-token",
+      }),
+    ).toBe(false);
+    expect(
+      isInternalServiceTokenValid({
+        providedToken: "servic\u{00e9}-token",
         expectedToken: "service-token",
       }),
     ).toBe(false);

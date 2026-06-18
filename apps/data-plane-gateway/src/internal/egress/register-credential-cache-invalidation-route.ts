@@ -1,4 +1,4 @@
-import { isInternalServiceTokenValid } from "@mistle/http";
+import { isInternalServiceTokenValid } from "@mistle/http/internal-auth.js";
 import { z } from "zod";
 
 import type { CredentialCache } from "../../egress/credential-cache.js";

@@ -27,6 +27,13 @@
       "node": "./dist/errors.js",
       "import": "./dist/errors.js",
       "default": "./dist/errors.js"
+    },
+    "./internal-auth.js": {
+      "types": "./src/internal-auth.ts",
+      "workspace-src": "./src/internal-auth.ts",
+      "node": "./dist/internal-auth.js",
+      "import": "./dist/internal-auth.js",
+      "default": "./dist/internal-auth.js"
     }
   },
   "scripts": {
