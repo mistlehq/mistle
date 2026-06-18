@@ -5,9 +5,31 @@ const designerSessionCanvasTabSchema = z
   .object({
     id: z.string().min(1).max(128),
     title: z.string().min(1).max(120),
-    href: z.string().min(1).max(2_048),
+    href: z
+      .string()
+      .min(1)
+      .max(2_048)
+      .refine((href) => isDashboardInternalAbsolutePath(href), {
+        message: "href must be a dashboard-internal absolute path.",
+      }),
   })
   .strict();
+
+function isDashboardInternalAbsolutePath(href: string): boolean {
+  if (!href.startsWith("/") || href.startsWith("//")) {
+    return false;
+  }
+
+  try {
+    const parsedUrl = new URL(href, "https://dashboard.mistle.local");
+    return (
+      parsedUrl.origin === "https://dashboard.mistle.local" &&
+      `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}` === href
+    );
+  } catch {
+    return false;
+  }
+}
 
 const designerSessionSandboxStatusSchema = z.enum([
   SandboxInstanceStatuses.PENDING,

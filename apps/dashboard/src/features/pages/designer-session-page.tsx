@@ -83,6 +83,14 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
   );
   const [activeTabHref, setActiveTabHref] = useState<string | null>(null);
   const [isLocallyDirty, setIsLocallyDirty] = useState(false);
+  const [loadedSessionId, setLoadedSessionId] = useState(() => designerSession.id);
+
+  if (loadedSessionId !== designerSession.id) {
+    setLoadedSessionId(designerSession.id);
+    setCanvasTabs(designerSession.canvasTabs);
+    setActiveTabHref(null);
+    setIsLocallyDirty(false);
+  }
 
   useEffect(() => {
     if (isLocallyDirty) {
@@ -90,7 +98,7 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
     }
 
     setCanvasTabs(designerSession.canvasTabs);
-  }, [designerSession.canvasTabs, isLocallyDirty]);
+  }, [designerSession.canvasTabs, isLocallyDirty, loadedSessionId]);
 
   const persistCanvasTabs = useCallback(
     (tabs: readonly DesignerSessionCanvasTab[]): void => {

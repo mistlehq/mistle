@@ -204,6 +204,48 @@ describe.concurrent("designer sessions integration", () => {
     expect(createResponse.status).toBe(400);
   });
 
+  it("rejects Designer canvas tabs with non-dashboard-internal hrefs", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-designer-session-canvas-href-validation@example.com",
+    });
+
+    const createResponse = await env.controlPlaneApi.http.fetch("/v1/designer/sessions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        idempotencyKey: "designer-session-canvas-href-validation",
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const created = DesignerSessionSchema.parse(await createResponse.json());
+
+    for (const href of ["http://[", "https://example.com/integrations", "//example.com"]) {
+      const updateResponse = await env.controlPlaneApi.http.fetch(
+        `/v1/designer/sessions/${encodeURIComponent(created.id)}/canvas-tabs`,
+        {
+          method: "PUT",
+          headers: {
+            "content-type": "application/json",
+            cookie: session.cookie,
+          },
+          body: JSON.stringify({
+            tabs: [
+              {
+                id: "invalid",
+                title: "Invalid",
+                href,
+              },
+            ],
+          }),
+        },
+      );
+      expect(updateResponse.status).toBe(400);
+    }
+  });
+
   it("does not expose Designer sessions across organizations", async ({ env }) => {
     const firstOrgSession = await env.auth.createSession({
       email: "integration-new-designer-session-org-a@example.com",
