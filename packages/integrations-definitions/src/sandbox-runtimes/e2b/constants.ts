@@ -9,3 +9,7 @@ export const E2BSandboxRuntimeCredentialSecretTypes = {
 export const E2BSandboxRuntimeCredentialSlotKeys = {
   API_KEY: `${E2BSandboxRuntimeFamilyId}.${E2BSandboxRuntimeVariantId}.api-key.api-key`,
 } as const;
+
+export const E2BToolIds = {
+  E2B_CLI: "e2b-cli",
+} as const;
