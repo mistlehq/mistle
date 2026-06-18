@@ -1896,6 +1896,12 @@ export interface paths {
                       }
                     | {
                         /** @enum {string} */
+                        kind: "sandboxProfileDraftPublish";
+                        profileId: string;
+                        version: number;
+                      }
+                    | {
+                        /** @enum {string} */
                         kind: "sandboxProfileDraftSetupScriptPut";
                         profileId: string;
                         setupScript: string | null;

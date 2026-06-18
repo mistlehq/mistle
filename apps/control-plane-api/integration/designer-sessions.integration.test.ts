@@ -3,13 +3,23 @@
  */
 
 import {
+  createDataPlaneSandboxInstancesClient,
+  type DataPlaneSandboxInstancesClient,
+} from "@mistle/data-plane-internal-client";
+import {
   ApiKeyActorKinds,
   DesignerActionRequestStatuses,
+  IntegrationBindingKinds,
+  IntegrationConnectionStatuses,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import { SandboxProvider } from "@mistle/sandbox";
-import { createIntegrationTest } from "@mistle/test-harness/integration";
+import {
+  createIntegrationTest,
+  TestEnvironmentIdHeader,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
 import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
@@ -27,8 +37,19 @@ import {
   toDesignerActionRequestOperation,
 } from "../src/designer/services/designer-action-requests.js";
 import { completeApprovedDesignerActionRequestExecution } from "../src/designer/services/designer-sessions.js";
-import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
-import { sandboxProfileRow, sandboxProfileVersionRow } from "./helpers/sandbox-profiles.js";
+import {
+  waitForQueuedMaterializeWorkflowInput,
+  waitForQueuedStartWorkflowInput,
+} from "./helpers/data-plane-workflows.js";
+import {
+  integrationConnectionRow,
+  integrationTargetRow,
+  sandboxProfileRow,
+  sandboxProfileVersionIntegrationBindingRow,
+  sandboxProfileVersionRow,
+} from "./helpers/sandbox-profiles.js";
+
+const InternalServiceToken = "integration-new-internal-service-token";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
@@ -39,6 +60,23 @@ const DesignerOperationSandboxConfig = {
   gatewayWsUrl: "ws://127.0.0.1:8080",
   docker: {
     enabled: true,
+  },
+};
+
+const DesignerOperationIntegrationsConfig = {
+  activeMasterEncryptionKeyVersion: 1,
+  masterEncryptionKeys: {
+    "1": "integration-new-master-key-testing",
+  },
+};
+
+const DesignerOperationMcpConfig = {
+  url: "http://127.0.0.1:3000/mcp",
+  trustForwardedHeaders: true,
+  auth: {
+    secret: "integration-new-mcp-auth-secret",
+    issuer: "integration-new-control-plane-api",
+    audience: "integration-new-mistle-mcp",
   },
 };
 
@@ -580,12 +618,7 @@ describe.concurrent("designer sessions integration", () => {
       status: DesignerActionRequestStatuses.APPROVED,
     });
 
-    const completedResponse = await completeApprovedDesignerActionRequestExecution({
-      ctx: {
-        db: env.controlPlaneDb,
-        integrationRegistry: createIntegrationRegistry(),
-        sandboxConfig: DesignerOperationSandboxConfig,
-      },
+    const completedResponse = await completeDesignerActionRequestExecution(env, {
       organizationId: session.organizationId,
       actionRequest: submitted,
       response: {
@@ -706,12 +739,7 @@ describe.concurrent("designer sessions integration", () => {
       },
     );
 
-    const completed = await completeApprovedDesignerActionRequestExecution({
-      ctx: {
-        db: env.controlPlaneDb,
-        integrationRegistry: createIntegrationRegistry(),
-        sandboxConfig: DesignerOperationSandboxConfig,
-      },
+    const completed = await completeDesignerActionRequestExecution(env, {
       organizationId: session.organizationId,
       actionRequest: submitted,
       response: {
@@ -833,12 +861,7 @@ describe.concurrent("designer sessions integration", () => {
         ),
       );
 
-    const completed = await completeApprovedDesignerActionRequestExecution({
-      ctx: {
-        db: env.controlPlaneDb,
-        integrationRegistry: createIntegrationRegistry(),
-        sandboxConfig: DesignerOperationSandboxConfig,
-      },
+    const completed = await completeDesignerActionRequestExecution(env, {
       organizationId: session.organizationId,
       actionRequest: submitted,
       response: {
@@ -874,6 +897,191 @@ describe.concurrent("designer sessions integration", () => {
     expect(persistedVersion).toEqual({
       setupScript: "pnpm unchanged",
     });
+  });
+
+  it("executes an approved typed Designer operation to publish a sandbox profile draft", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-designer-profile-publish-operation@example.com",
+    });
+    const designerSessionId = "dsn_profile_publish_operation";
+    const proposalId = "dap_profile_publish_operation";
+    const profileId = "sbp_designer_publish_operation";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-designer-publish-operation",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_designer_publish_operation",
+        organizationId: session.organizationId,
+        targetKey: "openai-designer-publish-operation",
+        displayName: "Designer Publish Operation Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: profileId,
+        organizationId: session.organizationId,
+        displayName: "Designer Publish Operation",
+        activeVersion: 1,
+        createdAt: "2026-06-18T02:20:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      sandboxProfileVersionRow({
+        sandboxProfileId: profileId,
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: "2026-06-18T02:21:00.000Z",
+      }),
+      sandboxProfileVersionRow({
+        sandboxProfileId: profileId,
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    ]);
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_designer_publish_operation_agent",
+          sandboxProfileId: profileId,
+          sandboxProfileVersion: 2,
+          connectionId: "icn_designer_publish_operation",
+          kind: IntegrationBindingKinds.AGENT,
+        }),
+      );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: designerSessionId,
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_designer_profile_publish_operation",
+      initialPrompt: "Publish the draft profile.",
+      runtimeProviderConversationId: "thread_profile_publish_operation",
+      initialPromptProviderExecutionId: "turn_profile_publish_operation",
+      initialPromptSubmittedAt: "2026-06-18 02:22:00+00",
+      canvasTabs: [],
+    });
+
+    const operation = toDesignerActionRequestOperation({
+      kind: "sandboxProfileDraftPublish",
+      profileId,
+      version: 2,
+    });
+    const claimed = await claimDesignerActionRequest(
+      {
+        db: env.controlPlaneDb,
+      },
+      {
+        organizationId: session.organizationId,
+        sessionId: designerSessionId,
+        proposalId,
+        response: "approved",
+        responseIdempotencyKey: "designer-profile-publish-operation",
+        requestedByUserId: session.userId,
+        runtimeProviderConversationId: "thread_profile_publish_operation",
+        operation,
+      },
+    );
+    const submitted = await markDesignerActionRequestResponseSubmitted(
+      {
+        db: env.controlPlaneDb,
+      },
+      {
+        organizationId: session.organizationId,
+        actionRequestId: claimed.actionRequest.id,
+        runtimeProviderExecutionId: "turn_profile_publish_response",
+        responseSubmittedAt: "2026-06-18 02:23:00+00",
+      },
+    );
+
+    const response = {
+      actionProposalResponse: {
+        proposalId,
+        response: submitted.response,
+        providerConversationId: "thread_profile_publish_operation",
+        providerExecutionId: "turn_profile_publish_response",
+        submittedAt: "2026-06-18 02:23:00+00",
+      },
+      actionRequest: {
+        id: submitted.id,
+        status: submitted.status,
+        failureCode: submitted.failureCode,
+        failureMessage: submitted.failureMessage,
+      },
+    };
+    const completed = await completeDesignerActionRequestExecution(env, {
+      organizationId: session.organizationId,
+      actionRequest: submitted,
+      response,
+    });
+    expect(completed.actionRequest).toMatchObject({
+      id: submitted.id,
+      status: DesignerActionRequestStatuses.COMPLETED,
+      failureCode: null,
+      failureMessage: null,
+    });
+
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        state: true,
+        publishedAt: true,
+      },
+      where: (table, { and: whereAnd, eq: whereEq }) =>
+        whereAnd(whereEq(table.sandboxProfileId, profileId), whereEq(table.version, 2)),
+    });
+    expect(persistedVersion?.state).toBe(SandboxProfileVersionStates.PUBLISHED);
+    expect(persistedVersion?.publishedAt).not.toBeNull();
+
+    const snapshotJobs = await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findMany({
+      where: (table, { and: whereAnd, eq: whereEq }) =>
+        whereAnd(
+          whereEq(table.sandboxProfileId, profileId),
+          whereEq(table.sandboxProfileVersion, 2),
+        ),
+    });
+    expect(snapshotJobs).toHaveLength(1);
+    const [snapshotJob] = snapshotJobs;
+    if (snapshotJob === undefined || snapshotJob.sandboxInstanceId === null) {
+      throw new Error("Expected Designer publish operation to create a snapshot job.");
+    }
+    const queuedWorkflowInput = await waitForQueuedMaterializeWorkflowInput({
+      env,
+      snapshotJobId: snapshotJob.id,
+    });
+    expect(queuedWorkflowInput).toMatchObject({
+      snapshotJobId: snapshotJob.id,
+      sandboxInstanceId: snapshotJob.sandboxInstanceId,
+      sandboxProfileId: profileId,
+      sandboxProfileVersion: 2,
+      snapshotPreparationScriptKind: "setup",
+    });
+
+    const repeated = await completeDesignerActionRequestExecution(env, {
+      organizationId: session.organizationId,
+      actionRequest: submitted,
+      response,
+    });
+    expect(repeated.actionRequest).toMatchObject({
+      id: submitted.id,
+      status: DesignerActionRequestStatuses.COMPLETED,
+    });
+    const repeatedSnapshotJobs =
+      await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findMany({
+        where: (table, { and: whereAnd, eq: whereEq }) =>
+          whereAnd(
+            whereEq(table.sandboxProfileId, profileId),
+            whereEq(table.sandboxProfileVersion, 2),
+          ),
+      });
+    expect(repeatedSnapshotJobs.map((job) => job.id)).toEqual([snapshotJob.id]);
   });
 
   it("returns a persisted completed Designer runtime conversation bootstrap on repeated requests", async ({
@@ -932,3 +1140,29 @@ describe.concurrent("designer sessions integration", () => {
     });
   });
 });
+
+function clientFor(env: IntegrationTestEnvironment): DataPlaneSandboxInstancesClient {
+  return createDataPlaneSandboxInstancesClient({
+    baseUrl: env.dataPlaneApi.hostBaseUrl,
+    serviceToken: InternalServiceToken,
+    testEnvironmentId: env.id,
+    testEnvironmentIdHeader: TestEnvironmentIdHeader,
+  });
+}
+
+function completeDesignerActionRequestExecution(
+  env: IntegrationTestEnvironment,
+  input: Omit<Parameters<typeof completeApprovedDesignerActionRequestExecution>[0], "ctx">,
+) {
+  return completeApprovedDesignerActionRequestExecution({
+    ctx: {
+      db: env.controlPlaneDb,
+      dataPlaneClient: clientFor(env),
+      integrationsConfig: DesignerOperationIntegrationsConfig,
+      integrationRegistry: createIntegrationRegistry(),
+      mcpConfig: DesignerOperationMcpConfig,
+      sandboxConfig: DesignerOperationSandboxConfig,
+    },
+    ...input,
+  });
+}

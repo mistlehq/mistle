@@ -24,10 +24,9 @@ const routeHandler = async (
       dataPlaneClient: ctx.get("dataPlaneClient"),
       connectionTokenConfig: ctx.get("connectionTokenConfig"),
       gatewayWebsocketUrl: sandboxConfig.gatewayWsUrl,
-      integrationsConfig: {
-        masterEncryptionKeys: config.integrations.masterEncryptionKeys,
-      },
+      integrationsConfig: config.integrations,
       integrationRegistry: ctx.get("integrationRegistry"),
+      mcpConfig: config.mcp,
       sandboxConfig,
     },
     {

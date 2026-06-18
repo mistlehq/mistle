@@ -179,6 +179,19 @@ const designerSandboxProfileDraftSetupScriptPutOperationSchema = z
   })
   .strict();
 
+const designerSandboxProfileDraftPublishOperationSchema = z
+  .object({
+    kind: z.literal(DesignerActionRequestOperationKinds.SANDBOX_PROFILE_DRAFT_PUBLISH),
+    profileId: z
+      .string()
+      .min(1)
+      .regex(/^sbp_[a-zA-Z0-9_-]+$/, {
+        message: "`profileId` must be a sandbox profile id.",
+      }),
+    version: z.number().int().min(1),
+  })
+  .strict();
+
 export const designerActionProposalSchema = z
   .object({
     id: z.string().min(1).max(255),
@@ -188,6 +201,7 @@ export const designerActionProposalSchema = z
     status: z.enum(["pending", "approved", "declined"]),
     operation: z.discriminatedUnion("kind", [
       designerProviderConfigurationChangeOperationSchema,
+      designerSandboxProfileDraftPublishOperationSchema,
       designerSandboxProfileDraftSetupScriptPutOperationSchema,
     ]),
   })
