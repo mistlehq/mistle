@@ -47,6 +47,21 @@ const SandboxProfileDraftSetupScriptProposalItem = {
   },
 } satisfies DesignerActionProposal;
 
+const SandboxProfileVersionLaunchProposalItem = {
+  id: "dap_profile_launch",
+  kind: "designerActionProposal",
+  title: "Launch sandbox session",
+  summary: "Start an ordinary sandbox session from the selected sandbox profile version.",
+  status: "pending",
+  operation: {
+    kind: "sandboxProfileVersionLaunch",
+    profileId: "sbp_designer_launch",
+    version: 2,
+    primaryRepositoryId: null,
+    idempotencyKey: "designer-launch-001",
+  },
+} satisfies DesignerActionProposal;
+
 describe("Designer action proposals", () => {
   it("extracts strictly shaped proposal items once and keeps them out of chat transcript items", () => {
     const chatItem = {
@@ -101,6 +116,18 @@ describe("Designer action proposals", () => {
         },
       ]).actionProposals,
     ).toEqual([SandboxProfileDraftSetupScriptProposalItem]);
+  });
+
+  it("accepts a typed sandbox profile version launch operation with an idempotency key", () => {
+    expect(
+      splitDesignerActionProposalsFromTranscriptTurns([
+        {
+          id: "turn_launch",
+          status: "completed",
+          items: [SandboxProfileVersionLaunchProposalItem],
+        },
+      ]).actionProposals,
+    ).toEqual([SandboxProfileVersionLaunchProposalItem]);
   });
 
   it("formats action proposal responses as bounded Designer conversation input", () => {

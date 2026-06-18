@@ -1906,6 +1906,14 @@ export interface paths {
                         profileId: string;
                         setupScript: string | null;
                         version: number;
+                      }
+                    | {
+                        idempotencyKey: string;
+                        /** @enum {string} */
+                        kind: "sandboxProfileVersionLaunch";
+                        primaryRepositoryId?: string | null;
+                        profileId: string;
+                        version: number;
                       };
                   /** @enum {string} */
                   status: "pending" | "approved" | "declined";

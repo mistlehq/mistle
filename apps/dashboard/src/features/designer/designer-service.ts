@@ -147,6 +147,16 @@ const DesignerSandboxProfileDraftPublishOperationSchema = z
   })
   .strict();
 
+const DesignerSandboxProfileVersionLaunchOperationSchema = z
+  .object({
+    kind: z.literal("sandboxProfileVersionLaunch"),
+    profileId: z.string().min(1),
+    version: z.number().int().min(1),
+    primaryRepositoryId: z.string().min(1).nullable().optional(),
+    idempotencyKey: z.string().min(1),
+  })
+  .strict();
+
 const DesignerActionProposalSchema = z
   .object({
     id: z.string().min(1),
@@ -158,6 +168,7 @@ const DesignerActionProposalSchema = z
       DesignerProviderConfigurationChangeOperationSchema,
       DesignerSandboxProfileDraftPublishOperationSchema,
       DesignerSandboxProfileDraftSetupScriptPutOperationSchema,
+      DesignerSandboxProfileVersionLaunchOperationSchema,
     ]),
   })
   .strict();

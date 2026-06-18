@@ -1457,6 +1457,35 @@
                                     },
                                     "required": ["kind", "profileId", "version", "setupScript"],
                                     "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["sandboxProfileVersionLaunch"]
+                                      },
+                                      "profileId": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+                                      },
+                                      "version": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                      },
+                                      "primaryRepositoryId": {
+                                        "type": ["string", "null"],
+                                        "minLength": 1
+                                      },
+                                      "idempotencyKey": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 255
+                                      }
+                                    },
+                                    "required": ["kind", "profileId", "version", "idempotencyKey"],
+                                    "additionalProperties": false
                                   }
                                 ]
                               }
