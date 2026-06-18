@@ -271,6 +271,11 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
     gateway_relay: {
       backend: "memory",
     },
+    platform_credentials: {
+      openai: {
+        api_key: "replace-with-platform-openai-api-key",
+      },
+    },
     object_store: {
       assets: {
         bucket_name: "mistle-assets",
@@ -301,6 +306,11 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
     sandbox: {
       default_base_image: getLocalDevDockerRegistrySandboxBaseImageRef(),
       publish_base_domain: "mistle.localhost",
+      designer: {
+        base_image: getLocalDevDockerRegistrySandboxBaseImageRef(),
+        codex_cli_path: "codex",
+        sandbox_provider: "docker",
+      },
       tokens: {
         connect: {
           secret: createSecret(),

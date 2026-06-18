@@ -13,6 +13,13 @@ const DesignerSessionCanvasTabSchema = z
   })
   .strict();
 
+const DesignerSessionStartupOperationSchema = z
+  .object({
+    operationId: z.string().min(1),
+    operationKind: z.enum(["start", "resume"]),
+  })
+  .strict();
+
 const DesignerSessionSchema = z
   .object({
     id: z.string().min(1),
@@ -37,6 +44,7 @@ const DesignerSessionSchema = z
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+    startupOperation: DesignerSessionStartupOperationSchema.nullable(),
     canvasTabs: z.array(DesignerSessionCanvasTabSchema),
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),

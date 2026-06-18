@@ -6,9 +6,29 @@ import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import type { DesignerSession } from "../designer/designer-service.js";
 import { DesignerPageView } from "./designer-page-view.js";
 
-function ControlledDesignerPageView(input: { initialPrompt?: string }): React.JSX.Element {
+const SampleDesignerSession = {
+  id: "dsn_triage",
+  organizationId: "org_test",
+  sandboxInstanceId: "sbi_designer_triage",
+  initialPrompt: "Build a triaging agent for Linear bugs.",
+  title: "Design triage agent",
+  status: "running",
+  connectable: true,
+  failureCode: null,
+  failureMessage: null,
+  startupOperation: null,
+  canvasTabs: [],
+  createdAt: "2026-04-01T09:00:00.000Z",
+  updatedAt: "2026-04-01T09:00:00.000Z",
+} satisfies DesignerSession;
+
+function ControlledDesignerPageView(input: {
+  initialPrompt?: string;
+  sessions?: readonly DesignerSession[];
+}): React.JSX.Element {
   const [prompt, setPrompt] = useState(input.initialPrompt ?? "");
 
   return (
@@ -19,7 +39,7 @@ function ControlledDesignerPageView(input: { initialPrompt?: string }): React.JS
         onPromptChange={setPrompt}
         onSubmit={() => {}}
         prompt={prompt}
-        sessions={[]}
+        sessions={input.sessions ?? []}
         sessionsErrorMessage={null}
       />
     </MemoryRouter>
@@ -63,6 +83,8 @@ describe("DesignerPageView", () => {
       "Build a triaging agent for incoming GitHub issues and Linear bugs.",
     );
     expect(startButton).toHaveProperty("disabled", true);
+    expect(screen.queryByText("What do you want to build?")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Past sessions" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Add files" })).toBeNull();
     expect(screen.queryByLabelText("Model switcher")).toBeNull();
     expect(screen.queryByLabelText("Reasoning switcher")).toBeNull();
@@ -74,5 +96,14 @@ describe("DesignerPageView", () => {
       "disabled",
       false,
     );
+  });
+
+  it("omits the implied sandbox profile column from past sessions", () => {
+    render(<ControlledDesignerPageView sessions={[SampleDesignerSession]} />);
+
+    expect(screen.getByRole("columnheader", { name: "Sessions" })).toBeDefined();
+    expect(screen.getByRole("columnheader", { name: "Started by" })).toBeDefined();
+    expect(screen.queryByRole("columnheader", { name: "Sandbox profile" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Design triage agent" })).toBeDefined();
   });
 });

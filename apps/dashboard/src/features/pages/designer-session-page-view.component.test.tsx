@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import type {
   DesignerActionProposalResponse,
@@ -24,6 +25,7 @@ const BaseDesignerSession = {
   connectable: true,
   failureCode: null,
   failureMessage: null,
+  startupOperation: null,
   canvasTabs: [],
   createdAt: "2026-04-01T09:00:00.000Z",
   updatedAt: "2026-04-01T09:00:00.000Z",
@@ -220,6 +222,18 @@ const RuntimeConversationTranscriptWithFailedActionRequest = {
   ],
 } satisfies DesignerRuntimeConversationTranscript;
 
+function renderWithQueryClient(ui: React.JSX.Element): ReturnType<typeof render> {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
+
 function renderDesignerSessionPageView(input?: {
   bootstrapErrorMessage?: string | null;
   bootstrapIsPending?: boolean;
@@ -233,13 +247,22 @@ function renderDesignerSessionPageView(input?: {
   runtimeConversationBootstrap?: DesignerRuntimeConversationBootstrap | null;
   runtimeConversationTranscript?: DesignerRuntimeConversationTranscript | null;
   session?: DesignerSession | null;
+  onTitleSave?: (title: string) => Promise<void> | void;
   transcriptErrorMessage?: string | null;
   transcriptIsPending?: boolean;
   userInputRequestResponseErrorMessage?: string | null;
   userInputRequestResponseIsPending?: boolean;
   userInputRequestResponsePendingId?: string | number | null;
-}): void {
-  render(
+}): ReturnType<typeof render> {
+  const runtimeConversationBootstrap = input?.runtimeConversationBootstrap ?? null;
+  const runtimeConversationTranscript =
+    input !== undefined && "runtimeConversationTranscript" in input
+      ? (input.runtimeConversationTranscript ?? null)
+      : runtimeConversationBootstrap === null
+        ? null
+        : RuntimeConversationTranscript;
+
+  return renderWithQueryClient(
     <DesignerSessionPageView
       bootstrapErrorMessage={input?.bootstrapErrorMessage ?? null}
       bootstrapIsPending={input?.bootstrapIsPending ?? false}
@@ -254,9 +277,10 @@ function renderDesignerSessionPageView(input?: {
       onActionProposalResponseSubmit={() => {}}
       onFollowUpDraftChange={() => {}}
       onFollowUpSubmit={() => {}}
+      onTitleSave={input?.onTitleSave ?? (() => {})}
       onUserInputRequestResponseSubmit={() => {}}
-      runtimeConversationBootstrap={input?.runtimeConversationBootstrap ?? null}
-      runtimeConversationTranscript={input?.runtimeConversationTranscript ?? null}
+      runtimeConversationBootstrap={runtimeConversationBootstrap}
+      runtimeConversationTranscript={runtimeConversationTranscript}
       session={input?.session ?? BaseDesignerSession}
       sessionId="dsn_test"
       transcriptErrorMessage={input?.transcriptErrorMessage ?? null}
@@ -292,6 +316,7 @@ function DesignerSessionPageViewActionResponseHarness(): React.JSX.Element {
         }}
         onFollowUpDraftChange={() => {}}
         onFollowUpSubmit={() => {}}
+        onTitleSave={() => {}}
         onUserInputRequestResponseSubmit={() => {}}
         runtimeConversationBootstrap={RuntimeConversationBootstrap}
         runtimeConversationTranscript={RuntimeConversationTranscriptWithActionProposal}
@@ -327,6 +352,7 @@ function DesignerSessionPageViewUserInputResponseHarness(): React.JSX.Element {
         onActionProposalResponseSubmit={() => {}}
         onFollowUpDraftChange={() => {}}
         onFollowUpSubmit={() => {}}
+        onTitleSave={() => {}}
         onUserInputRequestResponseSubmit={(requestId: string | number, result: unknown) => {
           setSubmitted(
             JSON.stringify({
@@ -380,20 +406,121 @@ function DesignerSessionPageViewUserInputResponseHarness(): React.JSX.Element {
   );
 }
 
+function DesignerSessionPageViewTitleHarness(): React.JSX.Element {
+  const [submittedTitle, setSubmittedTitle] = useState("none");
+
+  return (
+    <>
+      <DesignerSessionPageView
+        actionProposalResponseErrorMessage={null}
+        actionProposalResponsePendingId={null}
+        actionProposalResponseSuccessMessage={null}
+        bootstrapErrorMessage={null}
+        bootstrapIsPending={false}
+        errorMessage={null}
+        followUpDraft=""
+        followUpErrorMessage={null}
+        followUpIsPending={false}
+        followUpSuccessMessage={null}
+        onActionProposalResponseSubmit={() => {}}
+        onFollowUpDraftChange={() => {}}
+        onFollowUpSubmit={() => {}}
+        onTitleSave={(title) => {
+          setSubmittedTitle(title);
+        }}
+        onUserInputRequestResponseSubmit={() => {}}
+        runtimeConversationBootstrap={RuntimeConversationBootstrap}
+        runtimeConversationTranscript={RuntimeConversationTranscript}
+        session={BaseDesignerSession}
+        sessionId="dsn_test"
+        transcriptErrorMessage={null}
+        transcriptIsPending={false}
+        userInputRequestResponseErrorMessage={null}
+        userInputRequestResponseIsPending={false}
+        userInputRequestResponsePendingId={null}
+      />
+      <output aria-label="Submitted Designer session title">{submittedTitle}</output>
+    </>
+  );
+}
+
 describe("DesignerSessionPageView", () => {
-  it("shows the initial prompt and completed runtime bootstrap identity", () => {
+  beforeAll(() => {
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      configurable: true,
+      value: class ResizeObserver {
+        disconnect(): void {}
+        observe(): void {}
+        unobserve(): void {}
+      },
+      writable: true,
+    });
+  });
+
+  it("shows the session title, status indicator, and initial prompt", () => {
     renderDesignerSessionPageView({
       runtimeConversationBootstrap: RuntimeConversationBootstrap,
     });
 
+    expect(screen.getByRole("textbox", { name: "Designer session title" })).toHaveProperty(
+      "value",
+      "Design triage agent",
+    );
+    expect(screen.getByRole("status", { name: "Running" })).toBeDefined();
     expect(screen.getByText("Build a triaging agent for Linear bugs.")).toBeDefined();
-    expect(screen.getByText("Runtime conversation ready")).toBeDefined();
-    expect(screen.getByText("Runtime conversation")).toBeDefined();
-    expect(screen.getByText("Initial prompt submitted")).toBeDefined();
-    expect(screen.getByText("Submitted at 2026-04-01T09:01:00.000Z.")).toBeDefined();
-    expect(screen.getByText("thread_designer_test")).toBeDefined();
-    expect(screen.getAllByText("turn_designer_initial_prompt")).toHaveLength(2);
     expect(screen.getByLabelText("Submit follow-up")).toBeDefined();
+    expect(screen.queryByText("Designer")).toBeNull();
+    expect(screen.queryByText("dsn_test")).toBeNull();
+    expect(screen.queryByText("Runtime ready")).toBeNull();
+  });
+
+  it("insets the Designer conversation scrollbar from the canvas split", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+    });
+
+    const conversationRegion = screen.getByRole("region", { name: "Designer conversation" });
+
+    expect(conversationRegion.getAttribute("style")).toBe("scrollbar-gutter: stable;");
+    expect(conversationRegion.className).toContain("mr-2");
+  });
+
+  it("renders a draggable split between the Designer conversation and canvas with minimum sizes", () => {
+    renderDesignerSessionPageView({
+      session: {
+        ...BaseDesignerSession,
+        canvasTabs: [
+          {
+            id: "integrations",
+            title: "Integrations",
+            href: "/integrations",
+          },
+        ],
+      },
+    });
+
+    const resizeHandle = screen.getByRole("separator");
+
+    expect(resizeHandle.className).toContain("aria-orientation-vertical:!w-3");
+    expect(resizeHandle.className).toContain("bg-background");
+    expect(resizeHandle.className).not.toContain("-mx-1");
+    expect(resizeHandle.className).toContain("before:inset-y-0");
+    expect(resizeHandle.className).toContain("before:w-px");
+    expect(resizeHandle.className).toContain("before:bg-border");
+    expect(screen.getByText("/integrations")).toBeDefined();
+  });
+
+  it("submits Designer title edits from the shared inline title control", async () => {
+    render(<DesignerSessionPageViewTitleHarness />);
+
+    const titleInput = screen.getByRole("textbox", { name: "Designer session title" });
+    fireEvent.change(titleInput, { target: { value: "Design GitHub triage" } });
+    fireEvent.blur(titleInput);
+
+    expect(await screen.findByText("Design GitHub triage")).toBeDefined();
+    expect(screen.getByLabelText("Submitted Designer session title").textContent).toBe(
+      "Design GitHub triage",
+    );
   });
 
   it("enables follow-up submission only after runtime bootstrap is ready", () => {
@@ -436,9 +563,13 @@ describe("DesignerSessionPageView", () => {
     expect(
       screen.getByText("Create a webhook on the selected repository for pull request events."),
     ).toBeDefined();
-    expect(screen.getByText("GitHub create webhook")).toBeDefined();
-    expect(screen.getByText("repository webhook: mistle/agent-runtime")).toBeDefined();
     expect(screen.getByText("pull_request, pull_request_review")).toBeDefined();
+    expect(screen.queryByText("GitHub create webhook")).toBeNull();
+    expect(screen.queryByText("repository webhook: mistle/agent-runtime")).toBeNull();
+    const actionButtons = screen
+      .getAllByRole("button")
+      .filter((button) => button.textContent === "Decline" || button.textContent === "Approve");
+    expect(actionButtons.map((button) => button.textContent)).toEqual(["Decline", "Approve"]);
     expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Decline" })).toBeDefined();
   });
@@ -450,11 +581,11 @@ describe("DesignerSessionPageView", () => {
     });
 
     expect(screen.getByText("Update setup script")).toBeDefined();
-    expect(screen.getByText("Update sandbox profile draft setup script")).toBeDefined();
-    expect(screen.getByText("sbp_designer_setup_script version 2")).toBeDefined();
     expect(
       screen.getByText((_, element) => element?.textContent === "pnpm install\npnpm build"),
     ).toBeDefined();
+    expect(screen.queryByText("Update sandbox profile draft setup script")).toBeNull();
+    expect(screen.queryByText("sbp_designer_setup_script version 2")).toBeNull();
     expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
   });
 
@@ -465,8 +596,8 @@ describe("DesignerSessionPageView", () => {
     });
 
     expect(screen.getByText("Publish draft profile")).toBeDefined();
-    expect(screen.getByText("Publish sandbox profile draft")).toBeDefined();
-    expect(screen.getByText("sbp_designer_publish version 3")).toBeDefined();
+    expect(screen.queryByText("Publish sandbox profile draft")).toBeNull();
+    expect(screen.queryByText("sbp_designer_publish version 3")).toBeNull();
     expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
   });
 
@@ -476,15 +607,15 @@ describe("DesignerSessionPageView", () => {
       runtimeConversationTranscript: RuntimeConversationTranscriptWithLaunchActionProposal,
     });
 
-    expect(screen.getAllByText("Launch sandbox session")).toHaveLength(2);
+    expect(screen.getByText("Launch sandbox session")).toBeDefined();
     expect(
       screen.getByText(
         "Start an ordinary sandbox session from the selected sandbox profile version.",
       ),
     ).toBeDefined();
-    expect(screen.getByText("sbp_designer_launch version 4")).toBeDefined();
-    expect(screen.getByText("Workspace root")).toBeDefined();
-    expect(screen.getByText("designer-launch-001")).toBeDefined();
+    expect(screen.queryByText("sbp_designer_launch version 4")).toBeNull();
+    expect(screen.queryByText("Workspace root")).toBeNull();
+    expect(screen.queryByText("designer-launch-001")).toBeNull();
     expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
   });
 
@@ -731,29 +862,43 @@ describe("DesignerSessionPageView", () => {
     ).toBeDefined();
   });
 
-  it("shows the initial prompt as waiting before runtime bootstrap completes", () => {
-    renderDesignerSessionPageView();
-
-    expect(screen.getByText("Runtime conversation")).toBeDefined();
-    expect(screen.getByText("Initial prompt")).toBeDefined();
-    expect(screen.getByText("Waiting to submit to the Designer runtime.")).toBeDefined();
-    expect(screen.getByLabelText("Submit follow-up")).toHaveProperty("disabled", true);
-  });
-
-  it("shows runtime bootstrap progress before the conversation is ready", () => {
+  it("shows the shared connecting chat startup state before runtime bootstrap completes", () => {
     renderDesignerSessionPageView({
-      bootstrapIsPending: true,
+      session: {
+        ...BaseDesignerSession,
+        startupOperation: {
+          operationId: "owfr_designer_startup",
+          operationKind: "start",
+        },
+      },
     });
 
-    expect(screen.getByText("Preparing runtime conversation")).toBeDefined();
-    expect(screen.getByText("Initial prompt submitting")).toBeDefined();
-    expect(screen.getByText("Submitting to the Designer runtime.")).toBeDefined();
-    expect(
-      screen.getByText("Submitting the initial prompt to the Designer runtime."),
-    ).toBeDefined();
+    expect(screen.getByText("Connecting chat")).toBeDefined();
+    expect(screen.getByText("No lifecycle events yet.")).toBeDefined();
+    expect(screen.queryByLabelText("Submit follow-up")).toBeNull();
+    expect(screen.queryByText("Build a triaging agent for Linear bugs.")).toBeNull();
   });
 
-  it("shows a waiting state while the Designer sandbox is not ready yet", () => {
+  it("shows shared sandbox startup progress while runtime bootstrap is pending", () => {
+    renderDesignerSessionPageView({
+      bootstrapIsPending: true,
+      session: {
+        ...BaseDesignerSession,
+        status: "starting",
+        connectable: false,
+        startupOperation: {
+          operationId: "owfr_designer_startup",
+          operationKind: "start",
+        },
+      },
+    });
+
+    expect(screen.getByText("Running setup")).toBeDefined();
+    expect(screen.getByText("No lifecycle events yet.")).toBeDefined();
+    expect(screen.queryByText("Preparing runtime conversation")).toBeNull();
+  });
+
+  it("shows shared stopping startup progress while the Designer sandbox is stopping", () => {
     renderDesignerSessionPageView({
       session: {
         ...BaseDesignerSession,
@@ -762,13 +907,12 @@ describe("DesignerSessionPageView", () => {
       },
     });
 
-    expect(screen.getByText("Waiting for runtime")).toBeDefined();
-    expect(
-      screen.getByText("Runtime bootstrap will start when the Designer sandbox is ready."),
-    ).toBeDefined();
+    expect(screen.getByRole("status", { name: "Stopping" })).toBeDefined();
+    expect(screen.getByText("Stopping sandbox")).toBeDefined();
+    expect(screen.queryByText("Waiting for runtime")).toBeNull();
   });
 
-  it("shows pending bootstrap copy for a stopped Designer sandbox", () => {
+  it("shows only the session status indicator for a stopped Designer sandbox", () => {
     renderDesignerSessionPageView({
       session: {
         ...BaseDesignerSession,
@@ -777,13 +921,12 @@ describe("DesignerSessionPageView", () => {
       },
     });
 
-    expect(screen.getByText("Runtime bootstrap pending")).toBeDefined();
-    expect(
-      screen.getByText("Runtime bootstrap will start when the session is ready."),
-    ).toBeDefined();
+    expect(screen.getByRole("status", { name: "Stopped" })).toBeDefined();
+    expect(screen.getByText("Build a triaging agent for Linear bugs.")).toBeDefined();
+    expect(screen.queryByText("Runtime bootstrap pending")).toBeNull();
   });
 
-  it("shows why bootstrap is unavailable for a failed Designer sandbox", () => {
+  it("shows only the failed session status indicator for a failed Designer sandbox", () => {
     renderDesignerSessionPageView({
       session: {
         ...BaseDesignerSession,
@@ -793,22 +936,21 @@ describe("DesignerSessionPageView", () => {
       },
     });
 
-    expect(screen.getByText("Runtime unavailable")).toBeDefined();
-    expect(screen.getAllByText("Could not start the Designer sandbox runtime.")).toHaveLength(2);
-    expect(screen.getByText("Initial prompt not submitted")).toBeDefined();
+    expect(screen.getByRole("status", { name: "Failed" })).toBeDefined();
+    expect(screen.getByText("Build a triaging agent for Linear bugs.")).toBeDefined();
+    expect(screen.queryByText("Runtime unavailable")).toBeNull();
+    expect(screen.queryByText("Could not start the Designer sandbox runtime.")).toBeNull();
   });
 
-  it("shows bootstrap endpoint errors without hiding the saved prompt", () => {
+  it("does not show runtime bootstrap endpoint errors as session header content", () => {
     renderDesignerSessionPageView({
       bootstrapErrorMessage: "Designer sandbox is not ready for runtime conversation bootstrap.",
     });
 
-    expect(screen.getByText("Build a triaging agent for Linear bugs.")).toBeDefined();
-    expect(screen.getByText("Runtime bootstrap failed")).toBeDefined();
-    expect(screen.getByText("Initial prompt status unknown")).toBeDefined();
-    expect(screen.getByText("Runtime bootstrap failed while submitting the prompt.")).toBeDefined();
+    expect(screen.getByText("Connecting chat")).toBeDefined();
     expect(
-      screen.getByText("Designer sandbox is not ready for runtime conversation bootstrap."),
-    ).toBeDefined();
+      screen.queryByText("Designer sandbox is not ready for runtime conversation bootstrap."),
+    ).toBeNull();
+    expect(screen.queryByText("Runtime bootstrap failed")).toBeNull();
   });
 });

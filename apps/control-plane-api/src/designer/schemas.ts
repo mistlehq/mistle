@@ -26,6 +26,13 @@ const designerSessionSandboxStatusSchema = z.enum([
   SandboxInstanceStatuses.FAILED,
 ]);
 
+const designerSessionStartupOperationSchema = z
+  .object({
+    operationId: z.string().min(1),
+    operationKind: z.enum(["start", "resume"]),
+  })
+  .strict();
+
 export const designerSessionIdParamsSchema = z
   .object({
     sessionId: z
@@ -110,6 +117,7 @@ export const designerSessionSchema = z
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+    startupOperation: designerSessionStartupOperationSchema.nullable(),
     canvasTabs: z.array(designerSessionCanvasTabSchema),
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),

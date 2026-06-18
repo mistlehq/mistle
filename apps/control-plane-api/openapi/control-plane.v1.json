@@ -747,6 +747,21 @@
                       "type": ["string", "null"],
                       "minLength": 1
                     },
+                    "startupOperation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "operationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operationKind": {
+                          "type": "string",
+                          "enum": ["start", "resume"]
+                        }
+                      },
+                      "required": ["operationId", "operationKind"],
+                      "additionalProperties": false
+                    },
                     "canvasTabs": {
                       "type": "array",
                       "items": {
@@ -791,6 +806,7 @@
                     "connectable",
                     "failureCode",
                     "failureMessage",
+                    "startupOperation",
                     "canvasTabs",
                     "createdAt",
                     "updatedAt"
@@ -973,6 +989,21 @@
                             "type": ["string", "null"],
                             "minLength": 1
                           },
+                          "startupOperation": {
+                            "type": ["object", "null"],
+                            "properties": {
+                              "operationId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "operationKind": {
+                                "type": "string",
+                                "enum": ["start", "resume"]
+                              }
+                            },
+                            "required": ["operationId", "operationKind"],
+                            "additionalProperties": false
+                          },
                           "canvasTabs": {
                             "type": "array",
                             "items": {
@@ -1017,6 +1048,7 @@
                           "connectable",
                           "failureCode",
                           "failureMessage",
+                          "startupOperation",
                           "canvasTabs",
                           "createdAt",
                           "updatedAt"
@@ -2816,6 +2848,21 @@
                       "type": ["string", "null"],
                       "minLength": 1
                     },
+                    "startupOperation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "operationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operationKind": {
+                          "type": "string",
+                          "enum": ["start", "resume"]
+                        }
+                      },
+                      "required": ["operationId", "operationKind"],
+                      "additionalProperties": false
+                    },
                     "canvasTabs": {
                       "type": "array",
                       "items": {
@@ -2860,6 +2907,7 @@
                     "connectable",
                     "failureCode",
                     "failureMessage",
+                    "startupOperation",
                     "canvasTabs",
                     "createdAt",
                     "updatedAt"
@@ -3059,6 +3107,21 @@
                       "type": ["string", "null"],
                       "minLength": 1
                     },
+                    "startupOperation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "operationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operationKind": {
+                          "type": "string",
+                          "enum": ["start", "resume"]
+                        }
+                      },
+                      "required": ["operationId", "operationKind"],
+                      "additionalProperties": false
+                    },
                     "canvasTabs": {
                       "type": "array",
                       "items": {
@@ -3103,6 +3166,7 @@
                     "connectable",
                     "failureCode",
                     "failureMessage",
+                    "startupOperation",
                     "canvasTabs",
                     "createdAt",
                     "updatedAt"

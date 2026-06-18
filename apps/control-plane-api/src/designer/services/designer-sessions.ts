@@ -412,6 +412,7 @@ function mapDesignerSession(
     connectable: sandboxInstance?.connectable ?? false,
     failureCode: sandboxInstance?.failureCode ?? null,
     failureMessage: sandboxInstance?.failureMessage ?? null,
+    startupOperation: sandboxInstance?.startupOperation ?? null,
     canvasTabs: [...designerSession.canvasTabs],
     createdAt: designerSession.createdAt,
     updatedAt: designerSession.updatedAt,

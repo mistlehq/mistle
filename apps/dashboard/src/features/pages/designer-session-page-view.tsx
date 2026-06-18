@@ -1,9 +1,19 @@
-import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
-import { Badge } from "@mistle/ui";
+import { Badge, ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@mistle/ui";
+
+import "dockview/dist/styles/dockview.css";
+import "./session-terminal-workspace.css";
+import {
+  DockviewReact,
+  type DockviewApi,
+  type DockviewWillShowOverlayLocationEvent,
+  type DockviewWillDropEvent,
+  type IDockviewPanelProps,
+} from "dockview";
+import type { FunctionComponent } from "react";
 
 import { ErrorNotice } from "../auth/error-notice.js";
-import { ChatComposer } from "../chat/components/chat-composer.js";
-import { ChatThread } from "../chat/components/chat-thread.js";
+import type { ChatEntry } from "../chat/chat-types.js";
+import type { ChatComposerStatusMessage } from "../chat/components/chat-composer.js";
 import type {
   DesignerActionProposal,
   DesignerActionProposalResponse,
@@ -12,9 +22,29 @@ import type {
   DesignerSession,
 } from "../designer/designer-service.js";
 import { hydrateCodexChatEntriesFromThreadReadTurns } from "../session-agents/codex/session-state/index.js";
-import { ServerRequestsPanel } from "../session-agents/server-requests/index.js";
+import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
+import { ConversationWorkspaceHeader } from "../shared/conversation-workspace-frame.js";
 import { formatDesignerActionRequestOperationResult } from "./designer-action-proposal-response-copy.js";
+import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
+import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
+import {
+  SessionConversationBottomPanel,
+  SessionConversationMainContent,
+} from "./session-conversation-pane.js";
+import { SessionStartupStatus, type SessionStartupState } from "./session-startup-status.js";
+import { resolveInitialEntryStartupState } from "./use-session-workbench-lifecycle-state.js";
+
+type DesignerCanvasTab = DesignerSession["canvasTabs"][number];
+
+type DesignerCanvasDockviewParams = {
+  href: string;
+};
+
+type DesignerCanvasDockviewPanelProps = IDockviewPanelProps<DesignerCanvasDockviewParams>;
+
+const DesignerConversationPanelId = "designer-session-conversation-panel";
+const DesignerCanvasPanelId = "designer-session-canvas-panel";
 
 export type DesignerSessionPageViewProps = {
   actionProposalResponseErrorMessage: string | null;
@@ -33,6 +63,7 @@ export type DesignerSessionPageViewProps = {
   ) => void;
   onFollowUpDraftChange: (draft: string) => void;
   onFollowUpSubmit: () => void;
+  onTitleSave: (title: string) => Promise<void> | void;
   onUserInputRequestResponseSubmit: (requestId: string | number, result: unknown) => void;
   runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
   runtimeConversationTranscript: DesignerRuntimeConversationTranscript | null;
@@ -45,143 +76,7 @@ export type DesignerSessionPageViewProps = {
   sessionId: string;
 };
 
-type RuntimeBootstrapStateProps = Pick<
-  DesignerSessionPageViewProps,
-  "bootstrapErrorMessage" | "bootstrapIsPending" | "runtimeConversationBootstrap" | "session"
->;
-
-const StartingDesignerSessionStatuses = new Set<string>([
-  SandboxInstanceStatuses.PENDING,
-  SandboxInstanceStatuses.STARTING,
-  SandboxInstanceStatuses.STARTED,
-  SandboxInstanceStatuses.INITIALIZING,
-  SandboxInstanceStatuses.DEGRADED,
-  SandboxInstanceStatuses.RECONNECTING,
-  SandboxInstanceStatuses.STOPPING,
-]);
-
-function resolveRuntimeBootstrapStatus(input: RuntimeBootstrapStateProps): {
-  label: string;
-  detail: string;
-  tone: "default" | "muted" | "error";
-} {
-  if (input.bootstrapErrorMessage !== null) {
-    return {
-      label: "Runtime bootstrap failed",
-      detail: input.bootstrapErrorMessage,
-      tone: "error",
-    };
-  }
-
-  if (input.runtimeConversationBootstrap !== null) {
-    return {
-      label: "Runtime conversation ready",
-      detail: `Initial prompt submitted at ${input.runtimeConversationBootstrap.initialPromptSubmittedAt}.`,
-      tone: "default",
-    };
-  }
-
-  if (input.bootstrapIsPending) {
-    return {
-      label: "Preparing runtime conversation",
-      detail: "Submitting the initial prompt to the Designer runtime.",
-      tone: "muted",
-    };
-  }
-
-  if (input.session === null) {
-    return {
-      label: "Loading Designer session",
-      detail: "Runtime bootstrap starts after the session is available.",
-      tone: "muted",
-    };
-  }
-
-  if (input.session.initialPrompt === null) {
-    return {
-      label: "Initial prompt unavailable",
-      detail: "Runtime bootstrap needs a saved initial prompt.",
-      tone: "muted",
-    };
-  }
-
-  if (
-    !input.session.connectable &&
-    input.session.status !== null &&
-    StartingDesignerSessionStatuses.has(input.session.status)
-  ) {
-    return {
-      label: "Waiting for runtime",
-      detail: "Runtime bootstrap will start when the Designer sandbox is ready.",
-      tone: "muted",
-    };
-  }
-
-  if (input.session.status === null) {
-    return {
-      label: "Runtime unavailable",
-      detail: input.session.failureMessage ?? "The Designer sandbox is not connectable.",
-      tone: "muted",
-    };
-  }
-
-  if (input.session.status === SandboxInstanceStatuses.FAILED) {
-    return {
-      label: "Runtime unavailable",
-      detail: input.session.failureMessage ?? `The Designer sandbox is ${input.session.status}.`,
-      tone: "muted",
-    };
-  }
-
-  return {
-    label: "Runtime bootstrap pending",
-    detail: "Runtime bootstrap will start when the session is ready.",
-    tone: "muted",
-  };
-}
-
-function RuntimeBootstrapState(input: RuntimeBootstrapStateProps): React.JSX.Element {
-  const status = resolveRuntimeBootstrapStatus(input);
-  const className =
-    status.tone === "error"
-      ? "rounded-lg border border-destructive/30 bg-destructive/10 p-3"
-      : "rounded-lg border bg-muted/20 p-3";
-
-  return (
-    <div className={className}>
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-medium text-muted-foreground">Runtime bootstrap</p>
-        {input.runtimeConversationBootstrap === null ? null : (
-          <Badge variant="secondary">ready</Badge>
-        )}
-      </div>
-      <p className="mt-1 text-sm font-medium">{status.label}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{status.detail}</p>
-      {input.runtimeConversationBootstrap === null ? null : (
-        <dl className="mt-3 grid gap-2 text-xs">
-          <div>
-            <dt className="text-muted-foreground">Provider conversation</dt>
-            <dd className="mt-0.5 break-all font-mono">
-              {input.runtimeConversationBootstrap.providerConversationId}
-            </dd>
-          </div>
-          {input.runtimeConversationBootstrap.providerExecutionId === null ? null : (
-            <div>
-              <dt className="text-muted-foreground">Initial prompt execution</dt>
-              <dd className="mt-0.5 break-all font-mono">
-                {input.runtimeConversationBootstrap.providerExecutionId}
-              </dd>
-            </div>
-          )}
-        </dl>
-      )}
-    </div>
-  );
-}
-
 function RuntimeConversationPreview(input: {
-  bootstrapErrorMessage: string | null;
-  bootstrapIsPending: boolean;
   followUpDraft: string;
   followUpErrorMessage: string | null;
   followUpIsPending: boolean;
@@ -210,54 +105,58 @@ function RuntimeConversationPreview(input: {
     return null;
   }
 
-  const promptState = resolveRuntimeConversationPromptState(input);
   const canSubmitFollowUp =
     input.runtimeConversationBootstrap !== null &&
     input.followUpDraft.trim().length > 0 &&
     !input.followUpIsPending;
-  const chatEntries =
-    input.runtimeConversationTranscript === null
-      ? []
-      : hydrateCodexChatEntriesFromThreadReadTurns(input.runtimeConversationTranscript.turns);
+  const chatEntries = resolveDesignerChatEntries({
+    initialPrompt,
+    runtimeConversationBootstrap: input.runtimeConversationBootstrap,
+    runtimeConversationTranscript: input.runtimeConversationTranscript,
+  });
+  const serverRequestPanelEntries = (
+    input.runtimeConversationTranscript?.userInputRequests ?? []
+  ).map((entry) => {
+    const isPendingResponse =
+      input.userInputRequestResponsePendingId !== null &&
+      String(entry.requestId) === String(input.userInputRequestResponsePendingId);
+
+    return {
+      ...entry,
+      responseErrorMessage: isPendingResponse
+        ? input.userInputRequestResponseErrorMessage
+        : entry.responseErrorMessage,
+      status:
+        input.userInputRequestResponseIsPending && isPendingResponse ? "responding" : entry.status,
+    };
+  });
+  const statusMessage = resolveDesignerComposerStatusMessage({
+    followUpErrorMessage: input.followUpErrorMessage,
+    followUpSuccessMessage: input.followUpSuccessMessage,
+    transcriptErrorMessage: input.transcriptErrorMessage,
+    transcriptIsPending: input.transcriptIsPending,
+  });
 
   return (
-    <section className="rounded-lg border bg-background">
-      <div className="border-b px-3 py-2">
-        <p className="text-xs font-medium text-muted-foreground">Runtime conversation</p>
-      </div>
-      <div className="p-3">
-        {chatEntries.length > 0 ? (
-          <div className="max-h-[calc(100svh-20rem)] overflow-y-auto pr-1">
-            <ChatThread
-              entries={chatEntries}
-              formatInitialUserMessageAsTriggerInput
-              isRespondingToServerRequest={false}
-              onRespondToServerRequest={ignoreDesignerServerRequest}
-              pendingServerRequests={[]}
-            />
-          </div>
-        ) : (
-          <div className="rounded-md bg-muted/40 p-3">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-medium text-muted-foreground">You</p>
-              <Badge variant="secondary">{promptState.label}</Badge>
-            </div>
-            <p className="mt-1 whitespace-pre-wrap text-sm">{initialPrompt}</p>
-            <p className="mt-2 text-xs text-muted-foreground">{promptState.detail}</p>
-            {input.runtimeConversationBootstrap?.providerExecutionId === undefined ||
-            input.runtimeConversationBootstrap.providerExecutionId === null ? null : (
-              <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                {input.runtimeConversationBootstrap.providerExecutionId}
-              </p>
-            )}
-            {input.transcriptIsPending ? (
-              <p className="mt-2 text-xs text-muted-foreground">Loading provider transcript...</p>
-            ) : null}
-          </div>
-        )}
-        {input.transcriptErrorMessage === null ? null : (
-          <p className="mt-2 text-xs text-destructive">{input.transcriptErrorMessage}</p>
-        )}
+    <>
+      <div
+        aria-label="Designer conversation"
+        className="mr-2 min-h-0 flex-1 overflow-y-auto px-4 py-4"
+        role="region"
+        style={{ scrollbarGutter: "stable" }}
+      >
+        <SessionConversationMainContent
+          activeTurnId={null}
+          autoScrollToBottomOnInitialLoad
+          chatEntries={chatEntries}
+          formatInitialUserMessageAsTriggerInput
+          isRespondingToServerRequest={input.userInputRequestResponseIsPending}
+          isTurnInProgress={input.followUpIsPending || input.transcriptIsPending}
+          onRespondToServerRequest={input.onUserInputRequestResponseSubmit}
+          pendingTurnId={null}
+          scrollBehavior="follow-streaming-at-bottom"
+          serverRequestPanelEntries={serverRequestPanelEntries}
+        />
         <DesignerActionProposals
           errorMessage={input.actionProposalResponseErrorMessage}
           onSubmitResponse={input.onActionProposalResponseSubmit}
@@ -265,78 +164,170 @@ function RuntimeConversationPreview(input: {
           proposals={input.runtimeConversationTranscript?.actionProposals ?? []}
           successMessage={input.actionProposalResponseSuccessMessage}
         />
-        <ServerRequestsPanel
-          entries={(input.runtimeConversationTranscript?.userInputRequests ?? []).map((entry) => {
-            const isPendingResponse =
-              input.userInputRequestResponsePendingId !== null &&
-              String(entry.requestId) === String(input.userInputRequestResponsePendingId);
-
-            return {
-              ...entry,
-              responseErrorMessage: isPendingResponse
-                ? input.userInputRequestResponseErrorMessage
-                : entry.responseErrorMessage,
-              status:
-                input.userInputRequestResponseIsPending && isPendingResponse
-                  ? "responding"
-                  : entry.status,
-            };
-          })}
-          isRespondingToServerRequest={input.userInputRequestResponseIsPending}
-          onRespondToServerRequest={input.onUserInputRequestResponseSubmit}
-        />
-        <div className="mt-3">
-          <ChatComposer
-            canUploadAttachments={false}
-            composerCapabilities={[]}
-            composerDraft={createComposerDraft(input.followUpDraft)}
-            configControlsDisabled
-            contextUsage={null}
-            gitBranchLabel={null}
-            isSubmitPending={input.followUpIsPending}
-            isUploadingAttachments={false}
-            modelOptions={[]}
-            onClearPendingDiffComments={ignoreDesignerComposerAction}
-            onComposerDraftChange={(draft) => {
+      </div>
+      <div className="bg-background px-4 py-3">
+        <SessionConversationBottomPanel
+          chatEntries={chatEntries}
+          composerViewModel={{
+            canUploadAttachments: false,
+            composerCapabilities: [],
+            composerDraft: createComposerDraft(input.followUpDraft),
+            configControlsDisabled: true,
+            contextUsage: null,
+            gitBranchLabel: null,
+            isSubmitPending: input.followUpIsPending,
+            isUploadingAttachments: false,
+            modelOptions: [],
+            onClearPendingDiffComments: ignoreDesignerComposerAction,
+            onComposerDraftChange: (draft) => {
               input.onFollowUpDraftChange(draft.text);
-            }}
-            onModelChange={ignoreDesignerComposerAction}
-            onPendingFilesAdded={ignoreDesignerComposerAction}
-            onReasoningEffortChange={ignoreDesignerComposerAction}
-            onRemovePendingAttachment={ignoreDesignerComposerAction}
-            onRuntimeCommandSubmit={ignoreDesignerComposerAction}
-            onSubmit={input.onFollowUpSubmit}
-            pendingAttachments={[]}
-            pendingDiffCommentSummary={null}
-            placeholderText="Ask Designer to continue refining this setup."
-            pullRequest={null}
-            reasoningEffortOptions={[]}
-            selectedModel={null}
-            selectedReasoningEffort={null}
-            showAttachmentControl={false}
-            showConfigControls={false}
-            showReasoningControl={false}
-            submitDisabled={!canSubmitFollowUp}
-            submitDisabledReason={
+            },
+            onModelChange: ignoreDesignerComposerAction,
+            onPendingFilesAdded: ignoreDesignerComposerAction,
+            onReasoningEffortChange: ignoreDesignerComposerAction,
+            onRemovePendingAttachment: ignoreDesignerComposerAction,
+            onRuntimeCommandSubmit: ignoreDesignerComposerAction,
+            onSubmit: input.onFollowUpSubmit,
+            pendingAttachments: [],
+            pendingDiffCommentSummary: null,
+            placeholderText: "Ask Designer to continue refining this setup.",
+            pullRequest: null,
+            reasoningEffortOptions: [],
+            selectedModel: null,
+            selectedReasoningEffort: null,
+            showAttachmentControl: false,
+            showConfigControls: false,
+            showReasoningControl: false,
+            submitDisabled: !canSubmitFollowUp,
+            submitDisabledReason:
               input.runtimeConversationBootstrap === null
                 ? "Runtime conversation must be ready before follow-up submission."
-                : "Write a follow-up first."
-            }
-            submitLabel={input.followUpIsPending ? "Submitting follow-up" : "Submit follow-up"}
-            submitMode="start"
-          />
-          <ErrorNotice message={input.followUpErrorMessage} />
-          {input.followUpSuccessMessage === null ? null : (
-            <p className="mt-2 text-xs text-muted-foreground">{input.followUpSuccessMessage}</p>
-          )}
-        </div>
+                : "Write a follow-up first.",
+            submitLabel: input.followUpIsPending ? "Submitting follow-up" : "Submit follow-up",
+            submitMode: "start",
+          }}
+          isRespondingToServerRequest={input.userInputRequestResponseIsPending}
+          onRespondToServerRequest={input.onUserInputRequestResponseSubmit}
+          serverRequestPanelEntries={serverRequestPanelEntries}
+          statusMessage={statusMessage}
+          showWorkingIndicator={input.followUpIsPending || input.transcriptIsPending}
+        />
       </div>
-    </section>
+    </>
   );
 }
 
 function ignoreDesignerComposerAction(): void {}
-function ignoreDesignerServerRequest(): void {}
+
+function resolveDesignerSessionStartupState(input: {
+  runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
+  runtimeConversationTranscript: DesignerRuntimeConversationTranscript | null;
+  session: DesignerSession | null;
+  transcriptIsPending: boolean;
+}): SessionStartupState | null {
+  const runtimeConversationBootstrap = input.runtimeConversationBootstrap;
+  const runtimeConversationIsReady =
+    runtimeConversationBootstrap !== null &&
+    input.runtimeConversationTranscript !== null &&
+    !input.transcriptIsPending;
+  const sessionSnapshot =
+    runtimeConversationBootstrap !== null && runtimeConversationIsReady
+      ? {
+          connectedAtIso: runtimeConversationBootstrap.initialPromptSubmittedAt,
+        }
+      : null;
+
+  return resolveInitialEntryStartupState({
+    mainPanelTransitionState: runtimeConversationIsReady ? "stable_chat" : "restoring_chat",
+    sandboxLifecycleStatus: input.session?.status ?? null,
+    sandboxStatusReadState: input.session === null ? "loading" : "ready",
+    sessionSnapshot,
+  });
+}
+
+function DesignerSessionStartupPanel(input: {
+  sandboxInstanceId: string | null;
+  startupOperation: DesignerSession["startupOperation"] | null;
+  startupState: SessionStartupState;
+}): React.JSX.Element {
+  return (
+    <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-4 px-4 py-6">
+      <SessionStartupStatus state={input.startupState} />
+      <SandboxOperationProgress
+        displayMode="timeline"
+        emptyMessage="Waiting for session startup events."
+        operationId={input.startupOperation?.operationId ?? null}
+        sandboxInstanceId={input.sandboxInstanceId}
+        showBorder
+        showLoadError={false}
+      />
+    </div>
+  );
+}
+
+function resolveDesignerChatEntries(input: {
+  initialPrompt: string;
+  runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
+  runtimeConversationTranscript: DesignerRuntimeConversationTranscript | null;
+}): readonly ChatEntry[] {
+  const transcriptEntries =
+    input.runtimeConversationTranscript === null
+      ? []
+      : hydrateCodexChatEntriesFromThreadReadTurns(input.runtimeConversationTranscript.turns);
+  if (transcriptEntries.length > 0) {
+    return transcriptEntries;
+  }
+
+  return [
+    {
+      id: "designer-initial-prompt",
+      turnId: input.runtimeConversationBootstrap?.providerExecutionId ?? "designer-initial-prompt",
+      kind: "user-message",
+      label: "You",
+      text: input.initialPrompt,
+      status: "completed",
+    },
+  ];
+}
+
+function resolveDesignerComposerStatusMessage(input: {
+  followUpErrorMessage: string | null;
+  followUpSuccessMessage: string | null;
+  transcriptErrorMessage: string | null;
+  transcriptIsPending: boolean;
+}): ChatComposerStatusMessage | null {
+  if (input.followUpErrorMessage !== null) {
+    return {
+      message: input.followUpErrorMessage,
+      variant: "alert",
+    };
+  }
+
+  if (input.transcriptErrorMessage !== null) {
+    return {
+      message: input.transcriptErrorMessage,
+      variant: "alert",
+    };
+  }
+
+  if (input.followUpSuccessMessage !== null) {
+    return {
+      message: input.followUpSuccessMessage,
+      variant: "default",
+      presentation: "notice",
+    };
+  }
+
+  if (input.transcriptIsPending) {
+    return {
+      message: "Loading provider transcript...",
+      variant: "default",
+      presentation: "loading",
+    };
+  }
+
+  return null;
+}
 
 function DesignerActionProposals(input: {
   errorMessage: string | null;
@@ -352,54 +343,60 @@ function DesignerActionProposals(input: {
   return (
     <div className="mt-3 space-y-2">
       <p className="text-xs font-medium text-muted-foreground">Action proposals</p>
-      {input.proposals.map((proposal) => (
-        <article className="rounded-lg border bg-muted/20 p-3" key={proposal.id}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="font-medium text-sm">{proposal.title}</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">{proposal.summary}</p>
+      {input.proposals.map((proposal) => {
+        const reviewRows = getDesignerActionProposalReviewRows(proposal.operation);
+
+        return (
+          <article className="rounded-lg border bg-muted/20 p-3" key={proposal.id}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-medium text-sm">{proposal.title}</p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">{proposal.summary}</p>
+              </div>
+              <Badge variant="secondary">
+                {formatDesignerActionProposalStatus(proposal.status)}
+              </Badge>
             </div>
-            <Badge variant="secondary">{formatDesignerActionProposalStatus(proposal.status)}</Badge>
-          </div>
-          <dl className="mt-3 grid gap-2 text-xs">
-            {getDesignerActionProposalOperationRows(proposal.operation).map(
-              (detail, detailIndex) => (
-                <div key={`${proposal.id}:${String(detailIndex)}:${detail.label}`}>
-                  <dt className="text-muted-foreground">{detail.label}</dt>
-                  <dd className="mt-0.5 whitespace-pre-wrap">{detail.value}</dd>
-                </div>
-              ),
+            {reviewRows.length === 0 ? null : (
+              <dl className="mt-3 grid gap-2 text-xs">
+                {reviewRows.map((detail, detailIndex) => (
+                  <div key={`${proposal.id}:${String(detailIndex)}:${detail.label}`}>
+                    <dt className="text-muted-foreground">{detail.label}</dt>
+                    <dd className="mt-0.5 whitespace-pre-wrap">{detail.value}</dd>
+                  </div>
+                ))}
+              </dl>
             )}
-          </dl>
-          {proposal.actionRequest === null ? null : (
-            <DesignerActionProposalDurableState actionRequest={proposal.actionRequest} />
-          )}
-          {proposal.status === "pending" ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={input.pendingProposalId !== null}
-                onClick={() => {
-                  input.onSubmitResponse(proposal.id, "approved");
-                }}
-                type="button"
-              >
-                {input.pendingProposalId === proposal.id ? "Submitting" : "Approve"}
-              </button>
-              <button
-                className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={input.pendingProposalId !== null}
-                onClick={() => {
-                  input.onSubmitResponse(proposal.id, "declined");
-                }}
-                type="button"
-              >
-                {input.pendingProposalId === proposal.id ? "Submitting" : "Decline"}
-              </button>
-            </div>
-          ) : null}
-        </article>
-      ))}
+            {proposal.actionRequest === null ? null : (
+              <DesignerActionProposalDurableState actionRequest={proposal.actionRequest} />
+            )}
+            {proposal.status === "pending" ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={input.pendingProposalId !== null}
+                  onClick={() => {
+                    input.onSubmitResponse(proposal.id, "declined");
+                  }}
+                  type="button"
+                >
+                  {input.pendingProposalId === proposal.id ? "Submitting" : "Decline"}
+                </button>
+                <button
+                  className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={input.pendingProposalId !== null}
+                  onClick={() => {
+                    input.onSubmitResponse(proposal.id, "approved");
+                  }}
+                  type="button"
+                >
+                  {input.pendingProposalId === proposal.id ? "Submitting" : "Approve"}
+                </button>
+              </div>
+            ) : null}
+          </article>
+        );
+      })}
       <ErrorNotice message={input.errorMessage} />
       {input.successMessage === null ? null : (
         <p className="text-xs text-muted-foreground">{input.successMessage}</p>
@@ -446,76 +443,36 @@ function DesignerActionProposalDurableState(input: {
   );
 }
 
-function getDesignerActionProposalOperationRows(
+function getDesignerActionProposalReviewRows(
   operation: DesignerActionProposal["operation"],
 ): { label: string; value: string }[] {
   switch (operation.kind) {
-    case "providerConfigurationChange": {
-      const resource =
-        operation.resourceLabel === null
-          ? operation.resourceType
-          : `${operation.resourceType}: ${operation.resourceLabel}`;
-
-      return [
-        {
-          label: "Operation",
-          value: `${operation.provider} ${operation.action}`,
-        },
-        {
-          label: "Resource",
-          value: resource,
-        },
-        ...operation.details.map((detail) => ({
-          label: detail.label,
-          value: detail.value,
-        })),
-      ];
-    }
+    case "providerConfigurationChange":
+      return operation.details.map((detail) => ({
+        label: detail.label,
+        value: detail.value,
+      }));
     case "sandboxProfileDraftPublish":
-      return [
-        {
-          label: "Operation",
-          value: "Publish sandbox profile draft",
-        },
-        {
-          label: "Resource",
-          value: `${operation.profileId} version ${String(operation.version)}`,
-        },
-      ];
+      return [];
     case "sandboxProfileDraftSetupScriptPut":
       return [
-        {
-          label: "Operation",
-          value: "Update sandbox profile draft setup script",
-        },
-        {
-          label: "Resource",
-          value: `${operation.profileId} version ${String(operation.version)}`,
-        },
         {
           label: "Setup script",
           value: operation.setupScript ?? "Clear setup script",
         },
       ];
-    case "sandboxProfileVersionLaunch":
-      return [
-        {
-          label: "Operation",
-          value: "Launch sandbox session",
-        },
-        {
-          label: "Resource",
-          value: `${operation.profileId} version ${String(operation.version)}`,
-        },
-        {
-          label: "Primary repository",
-          value: operation.primaryRepositoryId ?? "Workspace root",
-        },
-        {
-          label: "Idempotency key",
-          value: operation.idempotencyKey,
-        },
-      ];
+    case "sandboxProfileVersionLaunch": {
+      const primaryRepositoryId = operation.primaryRepositoryId;
+
+      return primaryRepositoryId === null || primaryRepositoryId === undefined
+        ? []
+        : [
+            {
+              label: "Primary repository",
+              value: primaryRepositoryId,
+            },
+          ];
+    }
   }
 }
 
@@ -538,129 +495,195 @@ function formatDesignerActionProposalStatus(status: DesignerActionProposal["stat
   }
 }
 
-function resolveRuntimeConversationPromptState(input: {
-  bootstrapErrorMessage: string | null;
-  bootstrapIsPending: boolean;
-  runtimeConversationBootstrap: DesignerRuntimeConversationBootstrap | null;
-  session: DesignerSession | null;
-}): {
-  label: string;
-  detail: string;
-} {
-  if (input.runtimeConversationBootstrap !== null) {
-    return {
-      label: "Initial prompt submitted",
-      detail: `Submitted at ${input.runtimeConversationBootstrap.initialPromptSubmittedAt}.`,
-    };
+function readRequiredDesignerCanvasHref(parameters: unknown): string {
+  if (typeof parameters !== "object" || parameters === null || Array.isArray(parameters)) {
+    throw new Error("Designer canvas panel parameters must include href.");
   }
 
-  if (input.bootstrapErrorMessage !== null) {
-    return {
-      label: "Initial prompt status unknown",
-      detail: "Runtime bootstrap failed while submitting the prompt.",
-    };
+  const href = Reflect.get(parameters, "href");
+  if (typeof href !== "string" || href.length === 0) {
+    throw new Error("Designer canvas panel href must be a non-empty string.");
   }
 
-  if (input.bootstrapIsPending) {
-    return {
-      label: "Initial prompt submitting",
-      detail: "Submitting to the Designer runtime.",
-    };
+  return href;
+}
+
+function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): React.JSX.Element {
+  const href = readRequiredDesignerCanvasHref(input.params);
+
+  return (
+    <div className="flex h-full min-h-0 items-center justify-center bg-background p-4 text-sm text-muted-foreground">
+      <span className="max-w-full truncate font-mono">{href}</span>
+    </div>
+  );
+}
+
+const DesignerCanvasDockviewComponents = {
+  canvas: DesignerCanvasDockviewPanel,
+} satisfies Record<string, FunctionComponent<DesignerCanvasDockviewPanelProps>>;
+
+function preventDesignerCanvasLayoutDrop(event: DockviewWillDropEvent): void {
+  if (event.kind === "tab" || event.kind === "header_space") {
+    return;
   }
 
-  if (input.session === null) {
-    return {
-      label: "Initial prompt",
-      detail: "Waiting to submit to the Designer runtime.",
-    };
+  event.preventDefault();
+}
+
+function preventDesignerCanvasLayoutOverlay(event: DockviewWillShowOverlayLocationEvent): void {
+  if (event.kind === "tab" || event.kind === "header_space") {
+    return;
   }
 
-  if (input.session.status === null || input.session.status === SandboxInstanceStatuses.FAILED) {
-    return {
-      label: "Initial prompt not submitted",
-      detail: input.session.failureMessage ?? "Designer runtime is unavailable.",
-    };
+  event.preventDefault();
+}
+
+function buildDesignerCanvasWorkspaceKey(tabs: readonly DesignerCanvasTab[]): string {
+  if (tabs.length === 0) {
+    return "empty";
   }
 
-  if (!input.session.connectable && !StartingDesignerSessionStatuses.has(input.session.status)) {
-    return {
-      label: "Initial prompt not submitted",
-      detail: "Designer runtime is not connectable.",
-    };
+  return tabs.map((tab) => tab.id).join(":");
+}
+
+function DesignerCanvasWorkspace(input: { tabs: readonly DesignerCanvasTab[] }): React.JSX.Element {
+  if (input.tabs.length === 0) {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center bg-background p-4 text-sm text-muted-foreground">
+        Canvas
+      </div>
+    );
   }
 
-  return {
-    label: "Initial prompt",
-    detail: "Waiting to submit to the Designer runtime.",
-  };
+  return (
+    <div
+      className="session-terminal-dockview dockview-theme-light min-h-0 min-w-0 flex-1 overflow-hidden"
+      key={buildDesignerCanvasWorkspaceKey(input.tabs)}
+    >
+      <DockviewReact
+        className="h-full"
+        components={DesignerCanvasDockviewComponents}
+        disableFloatingGroups
+        dndEdges={false}
+        onReady={(event: { api: DockviewApi }) => {
+          event.api.onWillShowOverlay(preventDesignerCanvasLayoutOverlay);
+
+          for (const tab of input.tabs) {
+            event.api.addPanel({
+              id: tab.id,
+              title: tab.title,
+              component: "canvas",
+              params: {
+                href: tab.href,
+              },
+              renderer: "always",
+            });
+          }
+        }}
+        onWillDrop={preventDesignerCanvasLayoutDrop}
+      />
+    </div>
+  );
 }
 
 export function DesignerSessionPageView(input: DesignerSessionPageViewProps): React.JSX.Element {
+  const statusUi = resolveSandboxStatusBadgeUi(input.session?.status ?? null);
+  const canvasTabs = input.session?.canvasTabs ?? [];
+  const startupState = resolveDesignerSessionStartupState({
+    runtimeConversationBootstrap: input.runtimeConversationBootstrap,
+    runtimeConversationTranscript: input.runtimeConversationTranscript,
+    session: input.session,
+    transcriptIsPending: input.transcriptIsPending,
+  });
+
   return (
-    <div className="grid min-h-svh grid-cols-[minmax(20rem,28rem)_1fr] bg-background">
-      <aside className="flex min-h-0 flex-col border-r">
-        <div className="border-b p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="truncate text-base font-medium">Designer</h1>
-            {input.session?.status === undefined ? null : (
-              <Badge variant="secondary">{input.session.status ?? "unavailable"}</Badge>
+    <ResizablePanelGroup
+      className="h-svh min-h-0 overflow-hidden bg-background"
+      id="designer-session-workspace-panel-group"
+      orientation="horizontal"
+    >
+      <ResizablePanel
+        className="min-w-0 overflow-hidden"
+        defaultSize="44rem"
+        id={DesignerConversationPanelId}
+        minSize="22rem"
+      >
+        <aside className="flex h-full min-h-0 flex-col border-r">
+          <ConversationWorkspaceHeader
+            actions={
+              <span
+                aria-label={statusUi.label}
+                className={[
+                  "inline-block size-2.5 rounded-full border",
+                  statusUi.indicatorClassName,
+                ].join(" ")}
+                role="status"
+                title={statusUi.label}
+              />
+            }
+            title={
+              <AutoSaveTitleHeading
+                ariaLabel="Designer session title"
+                disabled={input.session === null}
+                emptyDisplayText="Untitled"
+                inputClassName="truncate"
+                maxWidthClassName="max-w-[28rem] flex-1"
+                onSave={input.onTitleSave}
+                requiredLabel="Designer session title"
+                size="sm"
+                value={input.session?.title ?? null}
+              />
+            }
+          />
+          <div className="flex min-h-0 flex-1 flex-col">
+            <ErrorNotice message={input.errorMessage} />
+            {startupState === null ? (
+              <RuntimeConversationPreview
+                actionProposalResponseErrorMessage={input.actionProposalResponseErrorMessage}
+                actionProposalResponsePendingId={input.actionProposalResponsePendingId}
+                actionProposalResponseSuccessMessage={input.actionProposalResponseSuccessMessage}
+                followUpDraft={input.followUpDraft}
+                followUpErrorMessage={input.followUpErrorMessage}
+                followUpIsPending={input.followUpIsPending}
+                followUpSuccessMessage={input.followUpSuccessMessage}
+                onActionProposalResponseSubmit={input.onActionProposalResponseSubmit}
+                onFollowUpDraftChange={input.onFollowUpDraftChange}
+                onFollowUpSubmit={input.onFollowUpSubmit}
+                onUserInputRequestResponseSubmit={input.onUserInputRequestResponseSubmit}
+                runtimeConversationBootstrap={input.runtimeConversationBootstrap}
+                runtimeConversationTranscript={input.runtimeConversationTranscript}
+                session={input.session}
+                transcriptErrorMessage={input.transcriptErrorMessage}
+                transcriptIsPending={input.transcriptIsPending}
+                userInputRequestResponseErrorMessage={input.userInputRequestResponseErrorMessage}
+                userInputRequestResponseIsPending={input.userInputRequestResponseIsPending}
+                userInputRequestResponsePendingId={input.userInputRequestResponsePendingId}
+              />
+            ) : (
+              <DesignerSessionStartupPanel
+                sandboxInstanceId={input.session?.sandboxInstanceId ?? null}
+                startupOperation={input.session?.startupOperation ?? null}
+                startupState={startupState}
+              />
             )}
           </div>
-          <p className="mt-1 truncate text-sm text-muted-foreground">{input.sessionId}</p>
+        </aside>
+      </ResizablePanel>
+      <ResizableHandle
+        className="relative shrink-0 bg-background aria-orientation-vertical:!w-3 aria-orientation-vertical:cursor-col-resize before:absolute before:inset-y-0 before:left-1/2 before:z-10 before:w-px before:-translate-x-1/2 before:bg-border hover:before:bg-muted-foreground/60"
+        id="designer-session-workspace-resize-handle"
+      />
+      <ResizablePanel
+        className="min-w-0 overflow-hidden"
+        id={DesignerCanvasPanelId}
+        minSize="20rem"
+      >
+        <div className="h-full min-h-0 min-w-0 overflow-hidden bg-background">
+          <main className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+            <DesignerCanvasWorkspace tabs={canvasTabs} />
+          </main>
         </div>
-        <div className="min-h-0 flex-1 p-4">
-          <ErrorNotice message={input.errorMessage} />
-          <div className="grid content-start gap-3">
-            <RuntimeBootstrapState
-              bootstrapErrorMessage={input.bootstrapErrorMessage}
-              bootstrapIsPending={input.bootstrapIsPending}
-              runtimeConversationBootstrap={input.runtimeConversationBootstrap}
-              session={input.session}
-            />
-            <RuntimeConversationPreview
-              actionProposalResponseErrorMessage={input.actionProposalResponseErrorMessage}
-              actionProposalResponsePendingId={input.actionProposalResponsePendingId}
-              actionProposalResponseSuccessMessage={input.actionProposalResponseSuccessMessage}
-              bootstrapErrorMessage={input.bootstrapErrorMessage}
-              bootstrapIsPending={input.bootstrapIsPending}
-              followUpDraft={input.followUpDraft}
-              followUpErrorMessage={input.followUpErrorMessage}
-              followUpIsPending={input.followUpIsPending}
-              followUpSuccessMessage={input.followUpSuccessMessage}
-              onActionProposalResponseSubmit={input.onActionProposalResponseSubmit}
-              onFollowUpDraftChange={input.onFollowUpDraftChange}
-              onFollowUpSubmit={input.onFollowUpSubmit}
-              onUserInputRequestResponseSubmit={input.onUserInputRequestResponseSubmit}
-              runtimeConversationBootstrap={input.runtimeConversationBootstrap}
-              runtimeConversationTranscript={input.runtimeConversationTranscript}
-              session={input.session}
-              transcriptErrorMessage={input.transcriptErrorMessage}
-              transcriptIsPending={input.transcriptIsPending}
-              userInputRequestResponseErrorMessage={input.userInputRequestResponseErrorMessage}
-              userInputRequestResponseIsPending={input.userInputRequestResponseIsPending}
-              userInputRequestResponsePendingId={input.userInputRequestResponsePendingId}
-            />
-          </div>
-        </div>
-      </aside>
-      <main className="flex min-w-0 flex-col">
-        <div className="flex min-h-14 items-center gap-2 border-b px-4">
-          {(input.session?.canvasTabs ?? []).length === 0 ? (
-            <span className="text-sm text-muted-foreground">Canvas</span>
-          ) : (
-            input.session?.canvasTabs.map((tab) => (
-              <span className="rounded-md bg-muted px-2 py-1 text-sm" key={tab.id}>
-                {tab.title}
-              </span>
-            ))
-          )}
-        </div>
-        <div className="min-h-0 flex-1 p-4">
-          <div className="flex h-full items-center justify-center rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
-            Canvas
-          </div>
-        </div>
-      </main>
-    </div>
+      </ResizablePanel>
+    </ResizablePanelGroup>
   );
 }

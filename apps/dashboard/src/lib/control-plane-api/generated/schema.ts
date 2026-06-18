@@ -1053,6 +1053,11 @@ export interface paths {
                 initialPrompt: string | null;
                 organizationId: string;
                 sandboxInstanceId: string;
+                startupOperation: {
+                  operationId: string;
+                  /** @enum {string} */
+                  operationKind: "start" | "resume";
+                } | null;
                 /** @enum {string|null} */
                 status:
                   | "pending"
@@ -1146,6 +1151,11 @@ export interface paths {
               initialPrompt: string | null;
               organizationId: string;
               sandboxInstanceId: string;
+              startupOperation: {
+                operationId: string;
+                /** @enum {string} */
+                operationKind: "start" | "resume";
+              } | null;
               /** @enum {string|null} */
               status:
                 | "pending"
@@ -1264,6 +1274,11 @@ export interface paths {
               initialPrompt: string | null;
               organizationId: string;
               sandboxInstanceId: string;
+              startupOperation: {
+                operationId: string;
+                /** @enum {string} */
+                operationKind: "start" | "resume";
+              } | null;
               /** @enum {string|null} */
               status:
                 | "pending"
@@ -1389,6 +1404,11 @@ export interface paths {
               initialPrompt: string | null;
               organizationId: string;
               sandboxInstanceId: string;
+              startupOperation: {
+                operationId: string;
+                /** @enum {string} */
+                operationKind: "start" | "resume";
+              } | null;
               /** @enum {string|null} */
               status:
                 | "pending"

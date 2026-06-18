@@ -22,6 +22,11 @@ import {
   type DesignerRuntimeConversationTranscript,
   type DesignerSession,
 } from "../designer/designer-service.js";
+import { applyPatchedSessionTitleToCache } from "../sessions/session-header-title-model.js";
+import {
+  patchSandboxInstanceTitle,
+  type PatchSandboxInstanceTitleResult,
+} from "../sessions/sessions-service.js";
 import { formatDesignerActionProposalResponseSuccessMessage } from "./designer-action-proposal-response-copy.js";
 import { DesignerSessionPageView } from "./designer-session-page-view.js";
 
@@ -119,6 +124,51 @@ async function invalidateDesignerSessionQuery(input: {
 }): Promise<void> {
   await input.queryClient.invalidateQueries({
     queryKey: [...designerSessionsQueryKey, input.sessionId],
+  });
+}
+
+function applyPatchedDesignerSessionTitleToCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  input: {
+    patchedTitle: PatchSandboxInstanceTitleResult;
+    sessionId: string;
+  },
+): void {
+  queryClient.setQueryData<DesignerSession>(
+    [...designerSessionsQueryKey, input.sessionId],
+    (currentSession) => {
+      if (currentSession === undefined) {
+        return undefined;
+      }
+
+      if (currentSession.sandboxInstanceId !== input.patchedTitle.id) {
+        return currentSession;
+      }
+
+      return {
+        ...currentSession,
+        title: input.patchedTitle.title,
+        updatedAt: input.patchedTitle.updatedAt,
+      };
+    },
+  );
+
+  queryClient.setQueryData<readonly DesignerSession[]>(designerSessionsQueryKey, (currentList) => {
+    if (currentList === undefined) {
+      return undefined;
+    }
+
+    return currentList.map((designerSession) => {
+      if (designerSession.sandboxInstanceId !== input.patchedTitle.id) {
+        return designerSession;
+      }
+
+      return {
+        ...designerSession,
+        title: input.patchedTitle.title,
+        updatedAt: input.patchedTitle.updatedAt,
+      };
+    });
   });
 }
 
@@ -266,6 +316,24 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
       });
     },
   });
+  const patchTitleMutation = useMutation({
+    mutationFn: async (input: { sandboxInstanceId: string; title: string }) =>
+      patchSandboxInstanceTitle({
+        instanceId: input.sandboxInstanceId,
+        title: input.title,
+      }),
+    onSuccess: (patchedTitle, variables) => {
+      if (session === null || variables.sandboxInstanceId !== session.sandboxInstanceId) {
+        return;
+      }
+
+      applyPatchedSessionTitleToCache(queryClient, patchedTitle);
+      applyPatchedDesignerSessionTitleToCache(queryClient, {
+        patchedTitle,
+        sessionId,
+      });
+    },
+  });
   const runtimeConversationTranscriptQuery = useQuery({
     queryKey: [...designerRuntimeConversationTranscriptQueryKey, sessionId],
     queryFn: async ({ signal }) =>
@@ -375,6 +443,16 @@ function DesignerSessionPageContent(input: { sessionId: string }): React.JSX.Ele
           proposalId,
           response,
           idempotencyKey: crypto.randomUUID(),
+        });
+      }}
+      onTitleSave={async (title) => {
+        if (session === null) {
+          return;
+        }
+
+        await patchTitleMutation.mutateAsync({
+          sandboxInstanceId: session.sandboxInstanceId,
+          title,
         });
       }}
       onUserInputRequestResponseSubmit={(requestId, result) => {
