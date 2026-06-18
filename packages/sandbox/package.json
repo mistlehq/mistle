@@ -29,7 +29,7 @@
     "@opencomputer/sdk": "0.6.2",
     "@opentelemetry/api": "^1.9.1",
     "dockerode": "^5.0.0",
-    "e2b": "^2.27.0",
+    "e2b": "^2.29.0",
     "freestyle": "0.1.63",
     "modal": "0.7.6",
     "tensorlake": "0.5.31",
