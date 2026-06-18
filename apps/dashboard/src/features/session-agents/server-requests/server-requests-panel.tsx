@@ -2,9 +2,9 @@ import { Button, Input, Textarea } from "@mistle/ui";
 import { useState } from "react";
 
 import {
-  AboveComposerActionPanel,
-  AboveComposerActionPanelStack,
-} from "../../shared/above-composer-action-panel.js";
+  ComposerActionPanel,
+  ComposerActionPanelStack,
+} from "../../shared/composer-action-panel.js";
 import { ApprovalDecisionButtons } from "./approval-decision-buttons.js";
 import type { ServerRequestEntry } from "./server-request-entries.js";
 
@@ -48,13 +48,13 @@ export function ServerRequestsPanel({
 
   return (
     <div role="region" aria-label="Pending server requests">
-      <AboveComposerActionPanelStack>
+      <ComposerActionPanelStack>
         {entries.map((entry) => {
           const requestKey = createRequestKey(entry.requestId);
 
           if (entry.kind === "command-approval") {
             return (
-              <AboveComposerActionPanel
+              <ComposerActionPanel
                 actions={
                   <ApprovalDecisionButtons
                     appearance="panel"
@@ -95,7 +95,7 @@ export function ServerRequestsPanel({
 
           if (entry.kind === "file-change-approval") {
             return (
-              <AboveComposerActionPanel
+              <ComposerActionPanel
                 actions={
                   <ApprovalDecisionButtons
                     appearance="panel"
@@ -127,7 +127,7 @@ export function ServerRequestsPanel({
 
           if (entry.kind === "tool-user-input") {
             return (
-              <AboveComposerActionPanel
+              <ComposerActionPanel
                 actions={
                   <Button
                     disabled={
@@ -252,7 +252,7 @@ export function ServerRequestsPanel({
 
           if (entry.kind === "opencode-permission") {
             return (
-              <AboveComposerActionPanel
+              <ComposerActionPanel
                 actions={
                   <ApprovalDecisionButtons
                     appearance="panel"
@@ -341,7 +341,7 @@ export function ServerRequestsPanel({
 
           return assertUnsupportedServerRequestEntry(entry);
         })}
-      </AboveComposerActionPanelStack>
+      </ComposerActionPanelStack>
     </div>
   );
 }

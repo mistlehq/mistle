@@ -323,27 +323,6 @@
       "when": 1781795820989,
       "tag": "0045_hard-migrate-webhook-trigger-event-conditions",
       "breakpoints": true
-    },
-    {
-      "idx": 47,
-      "version": "7",
-      "when": 1781719000160,
-      "tag": "0047_add-designer-runtime-conversation-bootstrap",
-      "breakpoints": true
-    },
-    {
-      "idx": 48,
-      "version": "7",
-      "when": 1781738628330,
-      "tag": "0048_add-designer-action-requests",
-      "breakpoints": true
-    },
-    {
-      "idx": 49,
-      "version": "7",
-      "when": 1781750782942,
-      "tag": "0049_add-designer-action-request-operation-result",
-      "breakpoints": true
     }
   ]
 }

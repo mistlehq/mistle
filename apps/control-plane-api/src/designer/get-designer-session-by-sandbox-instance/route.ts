@@ -1,37 +1,25 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
+import { notFoundResponseSchema } from "../get-designer-session/schema.js";
 import {
-  bootstrapDesignerRuntimeConversationResponseSchema,
-  designerSessionIdParamsSchema,
+  designerSandboxInstanceIdParamsSchema,
+  getDesignerSessionResponseSchema,
 } from "../schemas.js";
-import {
-  badRequestResponseSchema,
-  conflictResponseSchema,
-  notFoundResponseSchema,
-} from "./schema.js";
 
 export const route = createRoute({
-  method: "post",
-  path: "/sessions/{sessionId}/runtime-conversation",
+  method: "get",
+  path: "/sandbox-instances/{instanceId}",
   tags: ["Designer"],
   request: {
-    params: designerSessionIdParamsSchema,
+    params: designerSandboxInstanceIdParamsSchema,
   },
   responses: {
     200: {
-      description: "Create or resume the Designer runtime conversation.",
+      description: "Get Designer UI metadata for a sandbox instance.",
       content: {
         "application/json": {
-          schema: bootstrapDesignerRuntimeConversationResponseSchema,
-        },
-      },
-    },
-    400: {
-      description: "Invalid request.",
-      content: {
-        "application/json": {
-          schema: badRequestResponseSchema,
+          schema: getDesignerSessionResponseSchema,
         },
       },
     },
@@ -52,18 +40,10 @@ export const route = createRoute({
       },
     },
     404: {
-      description: "Designer session not found.",
+      description: "Designer session was not found.",
       content: {
         "application/json": {
           schema: notFoundResponseSchema,
-        },
-      },
-    },
-    409: {
-      description: "Designer sandbox is not ready for runtime conversation bootstrap.",
-      content: {
-        "application/json": {
-          schema: conflictResponseSchema,
         },
       },
     },

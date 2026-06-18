@@ -23,13 +23,6 @@ export function defineDesignerSessions(schema: PgSchema) {
         .notNull()
         .references(() => organizations.id, { onDelete: "cascade" }),
       sandboxInstanceId: text("sandbox_instance_id").notNull(),
-      initialPrompt: text("initial_prompt"),
-      runtimeProviderConversationId: text("runtime_provider_conversation_id"),
-      initialPromptProviderExecutionId: text("initial_prompt_provider_execution_id"),
-      initialPromptSubmittedAt: timestamp("initial_prompt_submitted_at", {
-        withTimezone: true,
-        mode: "string",
-      }),
       canvasTabs: jsonb("canvas_tabs").$type<DesignerSessionCanvasTabs>().notNull().default([]),
       createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
         .notNull()

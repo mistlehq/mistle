@@ -13,7 +13,6 @@ const SampleDesignerSession = {
   id: "dsn_triage",
   organizationId: "org_test",
   sandboxInstanceId: "sbi_designer_triage",
-  initialPrompt: "Build a triaging agent for Linear bugs.",
   title: "Design triage agent",
   status: "running",
   connectable: true,
@@ -26,10 +25,10 @@ const SampleDesignerSession = {
 } satisfies DesignerSession;
 
 function ControlledDesignerPageView(input: {
-  initialPrompt?: string;
+  initialDraft?: string;
   sessions?: readonly DesignerSession[];
 }): React.JSX.Element {
-  const [prompt, setPrompt] = useState(input.initialPrompt ?? "");
+  const [prompt, setPrompt] = useState(input.initialDraft ?? "");
 
   return (
     <MemoryRouter>
@@ -104,6 +103,8 @@ describe("DesignerPageView", () => {
     expect(screen.getByRole("columnheader", { name: "Sessions" })).toBeDefined();
     expect(screen.getByRole("columnheader", { name: "Started by" })).toBeDefined();
     expect(screen.queryByRole("columnheader", { name: "Sandbox profile" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Design triage agent" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Design triage agent" }).getAttribute("href")).toBe(
+      "/designer/dsn_triage",
+    );
   });
 });

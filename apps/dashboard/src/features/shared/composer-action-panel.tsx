@@ -1,27 +1,25 @@
 import type React from "react";
 
-export type AboveComposerActionDetail = {
+export type ComposerActionDetail = {
   label: string;
   value: React.ReactNode;
 };
 
-export type AboveComposerActionPanelProps = {
+export type ComposerActionPanelProps = {
   actions: React.ReactNode;
   details: React.ReactNode;
   title: string;
 };
 
-export type AboveComposerActionPanelStackProps = {
+export type ComposerActionPanelStackProps = {
   children: React.ReactNode;
 };
 
-export function AboveComposerActionPanelStack(
-  input: AboveComposerActionPanelStackProps,
-): React.JSX.Element {
+export function ComposerActionPanelStack(input: ComposerActionPanelStackProps): React.JSX.Element {
   return <div className="mb-4 max-h-72 space-y-2 overflow-y-auto px-1 pr-2">{input.children}</div>;
 }
 
-export function AboveComposerActionPanel(input: AboveComposerActionPanelProps): React.JSX.Element {
+export function ComposerActionPanel(input: ComposerActionPanelProps): React.JSX.Element {
   return (
     <article className="rounded-xl border bg-background p-4 shadow-sm">
       <div className="space-y-3">
@@ -33,8 +31,8 @@ export function AboveComposerActionPanel(input: AboveComposerActionPanelProps): 
   );
 }
 
-export function AboveComposerActionDetailList(input: {
-  details: readonly AboveComposerActionDetail[];
+export function ComposerActionDetailList(input: {
+  details: readonly ComposerActionDetail[];
 }): React.JSX.Element | null {
   if (input.details.length === 0) {
     return null;

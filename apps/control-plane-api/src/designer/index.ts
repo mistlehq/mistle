@@ -3,15 +3,10 @@ export { createDesignerRoutes } from "./routes.js";
 export {
   createDesignerSessionBodySchema as CreateDesignerSessionBodySchema,
   createDesignerSessionResponseSchema as CreateDesignerSessionResponseSchema,
-  bootstrapDesignerRuntimeConversationResponseSchema as BootstrapDesignerRuntimeConversationResponseSchema,
   designerSessionSchema as DesignerSessionSchema,
-  getDesignerRuntimeConversationTranscriptResponseSchema as GetDesignerRuntimeConversationTranscriptResponseSchema,
   getDesignerSessionResponseSchema as GetDesignerSessionResponseSchema,
   listDesignerSessionsQuerySchema as ListDesignerSessionsQuerySchema,
   listDesignerSessionsResponseSchema as ListDesignerSessionsResponseSchema,
   putDesignerSessionCanvasTabsBodySchema as PutDesignerSessionCanvasTabsBodySchema,
   putDesignerSessionCanvasTabsResponseSchema as PutDesignerSessionCanvasTabsResponseSchema,
-  submitDesignerActionProposalResponseResponseSchema as SubmitDesignerActionProposalResponseResponseSchema,
-  submitDesignerRuntimeFollowUpResponseSchema as SubmitDesignerRuntimeFollowUpResponseSchema,
-  submitDesignerUserInputRequestResponseResponseSchema as SubmitDesignerUserInputRequestResponseResponseSchema,
 } from "./schemas.js";

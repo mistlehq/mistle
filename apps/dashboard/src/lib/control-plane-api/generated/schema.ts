@@ -1014,6 +1014,252 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/designer/sandbox-instances/{instanceId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          instanceId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Get Designer UI metadata for a sandbox instance. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              canvasTabs: {
+                href: string;
+                id: string;
+                title: string;
+              }[];
+              connectable: boolean;
+              createdAt: string;
+              failureCode: string | null;
+              failureMessage: string | null;
+              id: string;
+              organizationId: string;
+              sandboxInstanceId: string;
+              startupOperation: {
+                operationId: string;
+                /** @enum {string} */
+                operationKind: "start" | "resume";
+              } | null;
+              /** @enum {string|null} */
+              status:
+                | "pending"
+                | "starting"
+                | "started"
+                | "initializing"
+                | "running"
+                | "degraded"
+                | "reconnecting"
+                | "stopping"
+                | "stopped"
+                | "failed"
+                | null;
+              title: string | null;
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Designer session was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "DESIGNER_SESSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/designer/sandbox-instances/{instanceId}/canvas-tabs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          instanceId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            tabs: {
+              href: string;
+              id: string;
+              title: string;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Update Designer canvas tabs for a sandbox instance. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              canvasTabs: {
+                href: string;
+                id: string;
+                title: string;
+              }[];
+              connectable: boolean;
+              createdAt: string;
+              failureCode: string | null;
+              failureMessage: string | null;
+              id: string;
+              organizationId: string;
+              sandboxInstanceId: string;
+              startupOperation: {
+                operationId: string;
+                /** @enum {string} */
+                operationKind: "start" | "resume";
+              } | null;
+              /** @enum {string|null} */
+              status:
+                | "pending"
+                | "starting"
+                | "started"
+                | "initializing"
+                | "running"
+                | "degraded"
+                | "reconnecting"
+                | "stopping"
+                | "stopped"
+                | "failed"
+                | null;
+              title: string | null;
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Designer session was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "DESIGNER_SESSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/designer/sessions": {
     parameters: {
       query?: never;
@@ -1050,7 +1296,6 @@ export interface paths {
                 failureCode: string | null;
                 failureMessage: string | null;
                 id: string;
-                initialPrompt: string | null;
                 organizationId: string;
                 sandboxInstanceId: string;
                 startupOperation: {
@@ -1125,8 +1370,7 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
-            idempotencyKey?: string;
-            prompt: string;
+            idempotencyKey: string;
           };
         };
       };
@@ -1148,7 +1392,6 @@ export interface paths {
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
-              initialPrompt: string | null;
               organizationId: string;
               sandboxInstanceId: string;
               startupOperation: {
@@ -1271,7 +1514,6 @@ export interface paths {
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
-              initialPrompt: string | null;
               organizationId: string;
               sandboxInstanceId: string;
               startupOperation: {
@@ -1401,7 +1643,6 @@ export interface paths {
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
-              initialPrompt: string | null;
               organizationId: string;
               sandboxInstanceId: string;
               startupOperation: {
@@ -1478,795 +1719,6 @@ export interface paths {
       };
     };
     post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/designer/sessions/{sessionId}/runtime-conversation": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          sessionId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Create or resume the Designer runtime conversation. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              runtimeConversation: {
-                initialPromptSubmittedAt: string;
-                providerConversationId: string;
-                providerExecutionId: string | null;
-              };
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "DESIGNER_INITIAL_PROMPT_MISSING";
-              message: string;
-            };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Designer session not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "DESIGNER_SESSION_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-        /** @description Designer sandbox is not ready for runtime conversation bootstrap. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              code: string;
-              message: string;
-            };
-          };
-        };
-        /** @description Internal server error. */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/plain": string;
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/designer/sessions/{sessionId}/runtime-conversation/action-proposals/{proposalId}/responses": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          proposalId: string;
-          sessionId: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          "application/json": {
-            idempotencyKey: string;
-            /** @enum {string} */
-            response: "approved" | "declined";
-          };
-        };
-      };
-      responses: {
-        /** @description Submit a Designer action proposal response to the runtime conversation. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              actionProposalResponse: {
-                proposalId: string;
-                providerConversationId: string;
-                providerExecutionId: string | null;
-                /** @enum {string} */
-                response: "approved" | "declined";
-                submittedAt: string;
-              };
-              actionRequest: {
-                failureCode: string | null;
-                failureMessage: string | null;
-                id: string;
-                operationResult:
-                  | {
-                      /** @enum {string} */
-                      kind: "sandboxProfileDraftPublish";
-                      profileId: string;
-                      publishedAt: string;
-                      snapshotAction:
-                        | {
-                            /** @enum {string} */
-                            kind: "created";
-                            sandboxInstanceId: string | null;
-                            snapshotJobId: string;
-                          }
-                        | {
-                            /** @enum {string} */
-                            kind: "reused";
-                            snapshotImageId: string;
-                            snapshotImageProvider: string;
-                          };
-                      version: number;
-                    }
-                  | {
-                      /** @enum {string} */
-                      kind: "sandboxProfileDraftSetupScriptPut";
-                      profileId: string;
-                      version: number;
-                    }
-                  | {
-                      /** @enum {string} */
-                      kind: "sandboxProfileVersionLaunch";
-                      profileId: string;
-                      sandboxInstanceId: string;
-                      version: number;
-                      workflowRunId: string;
-                    }
-                  | null;
-                /** @enum {string} */
-                status:
-                  | "approved"
-                  | "declined"
-                  | "executing"
-                  | "execution_unsupported"
-                  | "completed"
-                  | "failed";
-              };
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Designer session or action proposal not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "DESIGNER_ACTION_PROPOSAL_NOT_FOUND" | "DESIGNER_SESSION_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-        /** @description Designer runtime conversation is not ready, is busy, or the action proposal is no longer pending. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code:
-                | "DESIGNER_ACTION_PROPOSAL_NOT_PENDING"
-                | "DESIGNER_RUNTIME_CONVERSATION_NOT_READY"
-                | "DESIGNER_RUNTIME_CONVERSATION_BUSY";
-              message: string;
-            };
-          };
-        };
-        /** @description Internal server error. */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/plain": string;
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/designer/sessions/{sessionId}/runtime-conversation/follow-ups": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          sessionId: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          "application/json": {
-            idempotencyKey: string;
-            prompt: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Submit a follow-up prompt to the Designer runtime conversation. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              runtimeFollowUp: {
-                providerConversationId: string;
-                providerExecutionId: string | null;
-                submittedAt: string;
-              };
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Designer session not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "DESIGNER_SESSION_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-        /** @description Designer runtime conversation is not ready or is still processing another turn. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code:
-                | "DESIGNER_RUNTIME_CONVERSATION_NOT_READY"
-                | "DESIGNER_RUNTIME_CONVERSATION_BUSY";
-              message: string;
-            };
-          };
-        };
-        /** @description Internal server error. */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/plain": string;
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/designer/sessions/{sessionId}/runtime-conversation/transcript": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          sessionId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Read the current Designer runtime conversation transcript from the provider. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              runtimeConversationTranscript: {
-                actionProposals: {
-                  actionRequest: {
-                    failureCode: string | null;
-                    failureMessage: string | null;
-                    id: string;
-                    operationResult:
-                      | {
-                          /** @enum {string} */
-                          kind: "sandboxProfileDraftPublish";
-                          profileId: string;
-                          publishedAt: string;
-                          snapshotAction:
-                            | {
-                                /** @enum {string} */
-                                kind: "created";
-                                sandboxInstanceId: string | null;
-                                snapshotJobId: string;
-                              }
-                            | {
-                                /** @enum {string} */
-                                kind: "reused";
-                                snapshotImageId: string;
-                                snapshotImageProvider: string;
-                              };
-                          version: number;
-                        }
-                      | {
-                          /** @enum {string} */
-                          kind: "sandboxProfileDraftSetupScriptPut";
-                          profileId: string;
-                          version: number;
-                        }
-                      | {
-                          /** @enum {string} */
-                          kind: "sandboxProfileVersionLaunch";
-                          profileId: string;
-                          sandboxInstanceId: string;
-                          version: number;
-                          workflowRunId: string;
-                        }
-                      | null;
-                    /** @enum {string} */
-                    status:
-                      | "approved"
-                      | "declined"
-                      | "executing"
-                      | "execution_unsupported"
-                      | "completed"
-                      | "failed";
-                  } | null;
-                  id: string;
-                  /** @enum {string} */
-                  kind: "designerActionProposal";
-                  operation:
-                    | {
-                        action: string;
-                        details: {
-                          label: string;
-                          value: string;
-                        }[];
-                        /** @enum {string} */
-                        kind: "providerConfigurationChange";
-                        provider: string;
-                        resourceLabel: string | null;
-                        resourceType: string;
-                      }
-                    | {
-                        /** @enum {string} */
-                        kind: "sandboxProfileDraftPublish";
-                        profileId: string;
-                        version: number;
-                      }
-                    | {
-                        /** @enum {string} */
-                        kind: "sandboxProfileDraftSetupScriptPut";
-                        profileId: string;
-                        setupScript: string | null;
-                        version: number;
-                      }
-                    | {
-                        idempotencyKey: string;
-                        /** @enum {string} */
-                        kind: "sandboxProfileVersionLaunch";
-                        primaryRepositoryId?: string | null;
-                        profileId: string;
-                        version: number;
-                      };
-                  /** @enum {string} */
-                  status:
-                    | "pending"
-                    | "approved"
-                    | "declined"
-                    | "executing"
-                    | "execution_unsupported"
-                    | "completed"
-                    | "failed";
-                  summary: string;
-                  title: string;
-                }[];
-                name: string | null;
-                preview: string | null;
-                providerConversationId: string;
-                turns: {
-                  id: string;
-                  items: unknown[];
-                  status: string | null;
-                }[];
-                userInputRequests: {
-                  /** @enum {string} */
-                  kind: "tool-user-input";
-                  /** @enum {string} */
-                  method: "tool/requestUserInput";
-                  questions: {
-                    header: string | null;
-                    id: string;
-                    options: {
-                      description: string | null;
-                      isOther: boolean;
-                      label: string;
-                    }[];
-                    question: string;
-                  }[];
-                  requestId: string | number;
-                  responseErrorMessage: string | null;
-                  /** @enum {string} */
-                  status: "pending" | "responding";
-                }[];
-              };
-            };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Designer session not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "DESIGNER_SESSION_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-        /** @description Designer runtime conversation is not ready for transcript reads. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code:
-                | "DESIGNER_RUNTIME_CONVERSATION_NOT_READY"
-                | "DESIGNER_RUNTIME_CONVERSATION_BUSY";
-              message: string;
-            };
-          };
-        };
-        /** @description Internal server error. */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/plain": string;
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/designer/sessions/{sessionId}/runtime-conversation/user-input-requests/{requestId}/responses": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          requestId: string;
-          sessionId: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          "application/json": {
-            answers: {
-              id: string;
-              value: string;
-            }[];
-          };
-        };
-      };
-      responses: {
-        /** @description Submit a Designer user input request response to the runtime conversation. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              userInputRequestResponse: {
-                providerConversationId: string;
-                requestId: string | number;
-                submittedAt: string;
-              };
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "DESIGNER_USER_INPUT_REQUEST_RESPONSE_INVALID";
-                  message: string;
-                };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Designer session not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "DESIGNER_SESSION_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-        /** @description Designer runtime conversation is not ready, is busy, or request is not pending. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code:
-                | "DESIGNER_RUNTIME_CONVERSATION_NOT_READY"
-                | "DESIGNER_RUNTIME_CONVERSATION_BUSY"
-                | "DESIGNER_USER_INPUT_REQUEST_NOT_PENDING";
-              message: string;
-            };
-          };
-        };
-        /** @description Internal server error. */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/plain": string;
-          };
-        };
-      };
-    };
     delete?: never;
     options?: never;
     head?: never;

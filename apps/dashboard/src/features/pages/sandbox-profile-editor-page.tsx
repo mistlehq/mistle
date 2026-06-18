@@ -205,6 +205,7 @@ import {
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 import type { PendingSessionDiffComment } from "./session-diff-comment.js";
+import { filterUnmatchedSessionServerRequests } from "./session-server-request-filter.js";
 import { SessionStartupStatus, type SessionStartupState } from "./session-startup-status.js";
 import {
   SessionTerminalWorkspace,
@@ -2785,21 +2786,10 @@ function SetupScriptAssistantPanel(input: {
   const headerStatusKind = workbench.workbenchStatus.kind;
   const headerStatusLabel =
     headerStatusKind === "error" ? "Error" : (workbench.sandboxLifecycleStatus ?? "Starting");
-  const unmatchedServerRequests = conversationPane.serverRequestsState.pendingServerRequests.filter(
-    (entry) => {
-      if (entry.kind !== "command-approval" && entry.kind !== "file-change-approval") {
-        return true;
-      }
-
-      return !conversationPane.chatState.entries.some((chatEntry) => {
-        if (chatEntry.kind !== "semantic-group") {
-          return false;
-        }
-
-        return chatEntry.items.some((item) => item.id === entry.requestId);
-      });
-    },
-  );
+  const unmatchedServerRequests = filterUnmatchedSessionServerRequests({
+    chatEntries: conversationPane.chatState.entries,
+    pendingServerRequests: conversationPane.serverRequestsState.pendingServerRequests,
+  });
 
   function handleClearPendingDiffComments(): void {
     setPendingDiffComments([]);

@@ -18,14 +18,15 @@ export function DesignerPage(): React.JSX.Element {
     queryFn: async ({ signal }) => listDesignerSessions({ signal }),
   });
   const createMutation = useMutation({
-    mutationFn: async (nextPrompt: string) => createDesignerSession({ prompt: nextPrompt }),
+    mutationFn: async () =>
+      createDesignerSession({
+        idempotencyKey: crypto.randomUUID(),
+      }),
     onSuccess: (session) => {
       void queryClient.invalidateQueries({ queryKey: designerSessionsQueryKey });
       void navigate(`/designer/${encodeURIComponent(session.id)}`);
     },
   });
-
-  const trimmedPrompt = prompt.trim();
 
   return (
     <DesignerPageView
@@ -33,7 +34,7 @@ export function DesignerPage(): React.JSX.Element {
       isCreating={createMutation.isPending}
       onPromptChange={setPrompt}
       onSubmit={() => {
-        createMutation.mutate(trimmedPrompt);
+        createMutation.mutate();
       }}
       prompt={prompt}
       sessions={designerSessionsQuery.data ?? []}

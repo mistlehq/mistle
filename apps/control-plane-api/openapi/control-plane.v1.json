@@ -675,18 +675,13 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "prompt": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 20000
-                  },
                   "idempotencyKey": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255
                   }
                 },
-                "required": ["prompt"],
+                "required": ["idempotencyKey"],
                 "additionalProperties": false
               }
             }
@@ -710,10 +705,6 @@
                     },
                     "sandboxInstanceId": {
                       "type": "string",
-                      "minLength": 1
-                    },
-                    "initialPrompt": {
-                      "type": ["string", "null"],
                       "minLength": 1
                     },
                     "title": {
@@ -800,7 +791,6 @@
                     "id",
                     "organizationId",
                     "sandboxInstanceId",
-                    "initialPrompt",
                     "title",
                     "status",
                     "connectable",
@@ -954,10 +944,6 @@
                             "type": "string",
                             "minLength": 1
                           },
-                          "initialPrompt": {
-                            "type": ["string", "null"],
-                            "minLength": 1
-                          },
                           "title": {
                             "type": ["string", "null"],
                             "minLength": 1
@@ -1042,7 +1028,6 @@
                           "id",
                           "organizationId",
                           "sandboxInstanceId",
-                          "initialPrompt",
                           "title",
                           "status",
                           "connectable",
@@ -1121,184 +1106,7 @@
         }
       }
     },
-    "/v1/designer/sessions/{sessionId}/runtime-conversation": {
-      "post": {
-        "tags": ["Designer"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "^dsn_[a-zA-Z0-9_-]+$"
-            },
-            "required": true,
-            "name": "sessionId",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Create or resume the Designer runtime conversation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "runtimeConversation": {
-                      "type": "object",
-                      "properties": {
-                        "providerConversationId": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "providerExecutionId": {
-                          "type": ["string", "null"],
-                          "minLength": 1
-                        },
-                        "initialPromptSubmittedAt": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": [
-                        "providerConversationId",
-                        "providerExecutionId",
-                        "initialPromptSubmittedAt"
-                      ],
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": ["runtimeConversation"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["DESIGNER_INITIAL_PROMPT_MISSING"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Active organization is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["FORBIDDEN"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Designer session not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["DESIGNER_SESSION_NOT_FOUND"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Designer sandbox is not ready for runtime conversation bootstrap.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/designer/sessions/{sessionId}/runtime-conversation/transcript": {
+    "/v1/designer/sandbox-instances/{instanceId}": {
       "get": {
         "tags": ["Designer"],
         "parameters": [
@@ -1306,1496 +1114,16 @@
             "schema": {
               "type": "string",
               "minLength": 1,
-              "pattern": "^dsn_[a-zA-Z0-9_-]+$"
+              "pattern": "^sbi_[a-zA-Z0-9_-]+$"
             },
             "required": true,
-            "name": "sessionId",
+            "name": "instanceId",
             "in": "path"
           }
         ],
         "responses": {
           "200": {
-            "description": "Read the current Designer runtime conversation transcript from the provider.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "runtimeConversationTranscript": {
-                      "type": "object",
-                      "properties": {
-                        "providerConversationId": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "name": {
-                          "type": ["string", "null"]
-                        },
-                        "preview": {
-                          "type": ["string", "null"]
-                        },
-                        "turns": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "status": {
-                                "type": ["string", "null"],
-                                "minLength": 1
-                              },
-                              "items": {
-                                "type": "array",
-                                "items": {}
-                              }
-                            },
-                            "required": ["id", "status", "items"],
-                            "additionalProperties": false
-                          }
-                        },
-                        "actionProposals": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 255
-                              },
-                              "kind": {
-                                "type": "string",
-                                "enum": ["designerActionProposal"]
-                              },
-                              "title": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 160
-                              },
-                              "summary": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 2000
-                              },
-                              "operation": {
-                                "oneOf": [
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "type": "string",
-                                        "enum": ["providerConfigurationChange"]
-                                      },
-                                      "provider": {
-                                        "type": "string",
-                                        "minLength": 1,
-                                        "maxLength": 120
-                                      },
-                                      "resourceType": {
-                                        "type": "string",
-                                        "minLength": 1,
-                                        "maxLength": 120
-                                      },
-                                      "resourceLabel": {
-                                        "type": ["string", "null"],
-                                        "minLength": 1,
-                                        "maxLength": 240
-                                      },
-                                      "action": {
-                                        "type": "string",
-                                        "minLength": 1,
-                                        "maxLength": 160
-                                      },
-                                      "details": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "object",
-                                          "properties": {
-                                            "label": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 120
-                                            },
-                                            "value": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 2000
-                                            }
-                                          },
-                                          "required": ["label", "value"],
-                                          "additionalProperties": false
-                                        },
-                                        "maxItems": 20
-                                      }
-                                    },
-                                    "required": [
-                                      "kind",
-                                      "provider",
-                                      "resourceType",
-                                      "resourceLabel",
-                                      "action",
-                                      "details"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "type": "string",
-                                        "enum": ["sandboxProfileDraftPublish"]
-                                      },
-                                      "profileId": {
-                                        "type": "string",
-                                        "minLength": 1,
-                                        "pattern": "^sbp_[a-zA-Z0-9_-]+$"
-                                      },
-                                      "version": {
-                                        "type": "integer",
-                                        "minimum": 1
-                                      }
-                                    },
-                                    "required": ["kind", "profileId", "version"],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "type": "string",
-                                        "enum": ["sandboxProfileDraftSetupScriptPut"]
-                                      },
-                                      "profileId": {
-                                        "type": "string",
-                                        "minLength": 1,
-                                        "pattern": "^sbp_[a-zA-Z0-9_-]+$"
-                                      },
-                                      "version": {
-                                        "type": "integer",
-                                        "minimum": 1
-                                      },
-                                      "setupScript": {
-                                        "type": ["string", "null"],
-                                        "minLength": 1,
-                                        "maxLength": 200000
-                                      }
-                                    },
-                                    "required": ["kind", "profileId", "version", "setupScript"],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "type": "string",
-                                        "enum": ["sandboxProfileVersionLaunch"]
-                                      },
-                                      "profileId": {
-                                        "type": "string",
-                                        "minLength": 1,
-                                        "pattern": "^sbp_[a-zA-Z0-9_-]+$"
-                                      },
-                                      "version": {
-                                        "type": "integer",
-                                        "minimum": 1
-                                      },
-                                      "primaryRepositoryId": {
-                                        "type": ["string", "null"],
-                                        "minLength": 1
-                                      },
-                                      "idempotencyKey": {
-                                        "type": "string",
-                                        "minLength": 1,
-                                        "maxLength": 255
-                                      }
-                                    },
-                                    "required": ["kind", "profileId", "version", "idempotencyKey"],
-                                    "additionalProperties": false
-                                  }
-                                ]
-                              },
-                              "status": {
-                                "type": "string",
-                                "enum": [
-                                  "pending",
-                                  "approved",
-                                  "declined",
-                                  "executing",
-                                  "execution_unsupported",
-                                  "completed",
-                                  "failed"
-                                ]
-                              },
-                              "actionRequest": {
-                                "type": ["object", "null"],
-                                "properties": {
-                                  "id": {
-                                    "type": "string",
-                                    "minLength": 1
-                                  },
-                                  "status": {
-                                    "type": "string",
-                                    "enum": [
-                                      "approved",
-                                      "declined",
-                                      "executing",
-                                      "execution_unsupported",
-                                      "completed",
-                                      "failed"
-                                    ]
-                                  },
-                                  "failureCode": {
-                                    "type": ["string", "null"],
-                                    "minLength": 1
-                                  },
-                                  "failureMessage": {
-                                    "type": ["string", "null"],
-                                    "minLength": 1
-                                  },
-                                  "operationResult": {
-                                    "oneOf": [
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["sandboxProfileDraftPublish"]
-                                          },
-                                          "profileId": {
-                                            "type": "string",
-                                            "minLength": 1
-                                          },
-                                          "version": {
-                                            "type": "integer",
-                                            "minimum": 1
-                                          },
-                                          "publishedAt": {
-                                            "type": "string",
-                                            "minLength": 1
-                                          },
-                                          "snapshotAction": {
-                                            "oneOf": [
-                                              {
-                                                "type": "object",
-                                                "properties": {
-                                                  "kind": {
-                                                    "type": "string",
-                                                    "enum": ["created"]
-                                                  },
-                                                  "snapshotJobId": {
-                                                    "type": "string",
-                                                    "minLength": 1
-                                                  },
-                                                  "sandboxInstanceId": {
-                                                    "type": ["string", "null"],
-                                                    "minLength": 1
-                                                  }
-                                                },
-                                                "required": [
-                                                  "kind",
-                                                  "snapshotJobId",
-                                                  "sandboxInstanceId"
-                                                ],
-                                                "additionalProperties": false
-                                              },
-                                              {
-                                                "type": "object",
-                                                "properties": {
-                                                  "kind": {
-                                                    "type": "string",
-                                                    "enum": ["reused"]
-                                                  },
-                                                  "snapshotImageProvider": {
-                                                    "type": "string",
-                                                    "minLength": 1
-                                                  },
-                                                  "snapshotImageId": {
-                                                    "type": "string",
-                                                    "minLength": 1
-                                                  }
-                                                },
-                                                "required": [
-                                                  "kind",
-                                                  "snapshotImageProvider",
-                                                  "snapshotImageId"
-                                                ],
-                                                "additionalProperties": false
-                                              }
-                                            ]
-                                          }
-                                        },
-                                        "required": [
-                                          "kind",
-                                          "profileId",
-                                          "version",
-                                          "publishedAt",
-                                          "snapshotAction"
-                                        ],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["sandboxProfileDraftSetupScriptPut"]
-                                          },
-                                          "profileId": {
-                                            "type": "string",
-                                            "minLength": 1
-                                          },
-                                          "version": {
-                                            "type": "integer",
-                                            "minimum": 1
-                                          }
-                                        },
-                                        "required": ["kind", "profileId", "version"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["sandboxProfileVersionLaunch"]
-                                          },
-                                          "profileId": {
-                                            "type": "string",
-                                            "minLength": 1
-                                          },
-                                          "version": {
-                                            "type": "integer",
-                                            "minimum": 1
-                                          },
-                                          "sandboxInstanceId": {
-                                            "type": "string",
-                                            "minLength": 1
-                                          },
-                                          "workflowRunId": {
-                                            "type": "string",
-                                            "minLength": 1
-                                          }
-                                        },
-                                        "required": [
-                                          "kind",
-                                          "profileId",
-                                          "version",
-                                          "sandboxInstanceId",
-                                          "workflowRunId"
-                                        ],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
-                                    ]
-                                  }
-                                },
-                                "required": [
-                                  "id",
-                                  "status",
-                                  "failureCode",
-                                  "failureMessage",
-                                  "operationResult"
-                                ],
-                                "additionalProperties": false
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "kind",
-                              "title",
-                              "summary",
-                              "operation",
-                              "status",
-                              "actionRequest"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "userInputRequests": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "requestId": {
-                                "anyOf": [
-                                  {
-                                    "type": "string",
-                                    "minLength": 1
-                                  },
-                                  {
-                                    "type": "number"
-                                  }
-                                ]
-                              },
-                              "method": {
-                                "type": "string",
-                                "enum": ["tool/requestUserInput"]
-                              },
-                              "kind": {
-                                "type": "string",
-                                "enum": ["tool-user-input"]
-                              },
-                              "questions": {
-                                "type": "array",
-                                "items": {
-                                  "type": "object",
-                                  "properties": {
-                                    "header": {
-                                      "type": ["string", "null"],
-                                      "minLength": 1,
-                                      "maxLength": 120
-                                    },
-                                    "id": {
-                                      "type": "string",
-                                      "minLength": 1,
-                                      "maxLength": 128
-                                    },
-                                    "options": {
-                                      "type": "array",
-                                      "items": {
-                                        "type": "object",
-                                        "properties": {
-                                          "label": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 240
-                                          },
-                                          "description": {
-                                            "type": ["string", "null"],
-                                            "minLength": 1,
-                                            "maxLength": 2000
-                                          },
-                                          "isOther": {
-                                            "type": "boolean"
-                                          }
-                                        },
-                                        "required": ["label", "description", "isOther"],
-                                        "additionalProperties": false
-                                      },
-                                      "maxItems": 12
-                                    },
-                                    "question": {
-                                      "type": "string",
-                                      "minLength": 1,
-                                      "maxLength": 2000
-                                    }
-                                  },
-                                  "required": ["header", "id", "options", "question"],
-                                  "additionalProperties": false
-                                },
-                                "minItems": 1,
-                                "maxItems": 3
-                              },
-                              "status": {
-                                "type": "string",
-                                "enum": ["pending", "responding"]
-                              },
-                              "responseErrorMessage": {
-                                "type": ["string", "null"],
-                                "minLength": 1
-                              }
-                            },
-                            "required": [
-                              "requestId",
-                              "method",
-                              "kind",
-                              "questions",
-                              "status",
-                              "responseErrorMessage"
-                            ],
-                            "additionalProperties": false
-                          }
-                        }
-                      },
-                      "required": [
-                        "providerConversationId",
-                        "name",
-                        "preview",
-                        "turns",
-                        "actionProposals",
-                        "userInputRequests"
-                      ],
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": ["runtimeConversationTranscript"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Active organization is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["FORBIDDEN"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Designer session not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["DESIGNER_SESSION_NOT_FOUND"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Designer runtime conversation is not ready for transcript reads.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "DESIGNER_RUNTIME_CONVERSATION_NOT_READY",
-                        "DESIGNER_RUNTIME_CONVERSATION_BUSY"
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/designer/sessions/{sessionId}/runtime-conversation/action-proposals/{proposalId}/responses": {
-      "post": {
-        "tags": ["Designer"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "^dsn_[a-zA-Z0-9_-]+$"
-            },
-            "required": true,
-            "name": "sessionId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 255
-            },
-            "required": true,
-            "name": "proposalId",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "response": {
-                    "type": "string",
-                    "enum": ["approved", "declined"]
-                  },
-                  "idempotencyKey": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255
-                  }
-                },
-                "required": ["response", "idempotencyKey"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Submit a Designer action proposal response to the runtime conversation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "actionProposalResponse": {
-                      "type": "object",
-                      "properties": {
-                        "proposalId": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 255
-                        },
-                        "response": {
-                          "type": "string",
-                          "enum": ["approved", "declined"]
-                        },
-                        "providerConversationId": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "providerExecutionId": {
-                          "type": ["string", "null"],
-                          "minLength": 1
-                        },
-                        "submittedAt": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": [
-                        "proposalId",
-                        "response",
-                        "providerConversationId",
-                        "providerExecutionId",
-                        "submittedAt"
-                      ],
-                      "additionalProperties": false
-                    },
-                    "actionRequest": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "approved",
-                            "declined",
-                            "executing",
-                            "execution_unsupported",
-                            "completed",
-                            "failed"
-                          ]
-                        },
-                        "failureCode": {
-                          "type": ["string", "null"],
-                          "minLength": 1
-                        },
-                        "failureMessage": {
-                          "type": ["string", "null"],
-                          "minLength": 1
-                        },
-                        "operationResult": {
-                          "oneOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "enum": ["sandboxProfileDraftPublish"]
-                                },
-                                "profileId": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "version": {
-                                  "type": "integer",
-                                  "minimum": 1
-                                },
-                                "publishedAt": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "snapshotAction": {
-                                  "oneOf": [
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "kind": {
-                                          "type": "string",
-                                          "enum": ["created"]
-                                        },
-                                        "snapshotJobId": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "sandboxInstanceId": {
-                                          "type": ["string", "null"],
-                                          "minLength": 1
-                                        }
-                                      },
-                                      "required": ["kind", "snapshotJobId", "sandboxInstanceId"],
-                                      "additionalProperties": false
-                                    },
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "kind": {
-                                          "type": "string",
-                                          "enum": ["reused"]
-                                        },
-                                        "snapshotImageProvider": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "snapshotImageId": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        }
-                                      },
-                                      "required": [
-                                        "kind",
-                                        "snapshotImageProvider",
-                                        "snapshotImageId"
-                                      ],
-                                      "additionalProperties": false
-                                    }
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "kind",
-                                "profileId",
-                                "version",
-                                "publishedAt",
-                                "snapshotAction"
-                              ],
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "object",
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "enum": ["sandboxProfileDraftSetupScriptPut"]
-                                },
-                                "profileId": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "version": {
-                                  "type": "integer",
-                                  "minimum": 1
-                                }
-                              },
-                              "required": ["kind", "profileId", "version"],
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "object",
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "enum": ["sandboxProfileVersionLaunch"]
-                                },
-                                "profileId": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "version": {
-                                  "type": "integer",
-                                  "minimum": 1
-                                },
-                                "sandboxInstanceId": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "workflowRunId": {
-                                  "type": "string",
-                                  "minLength": 1
-                                }
-                              },
-                              "required": [
-                                "kind",
-                                "profileId",
-                                "version",
-                                "sandboxInstanceId",
-                                "workflowRunId"
-                              ],
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "status",
-                        "failureCode",
-                        "failureMessage",
-                        "operationResult"
-                      ],
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": ["actionProposalResponse", "actionRequest"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["VALIDATION_ERROR"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Active organization is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["FORBIDDEN"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Designer session or action proposal not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["DESIGNER_ACTION_PROPOSAL_NOT_FOUND", "DESIGNER_SESSION_NOT_FOUND"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Designer runtime conversation is not ready, is busy, or the action proposal is no longer pending.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "DESIGNER_ACTION_PROPOSAL_NOT_PENDING",
-                        "DESIGNER_RUNTIME_CONVERSATION_NOT_READY",
-                        "DESIGNER_RUNTIME_CONVERSATION_BUSY"
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/designer/sessions/{sessionId}/runtime-conversation/user-input-requests/{requestId}/responses": {
-      "post": {
-        "tags": ["Designer"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "^dsn_[a-zA-Z0-9_-]+$"
-            },
-            "required": true,
-            "name": "sessionId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 255
-            },
-            "required": true,
-            "name": "requestId",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "answers": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 128
-                        },
-                        "value": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 10000
-                        }
-                      },
-                      "required": ["id", "value"],
-                      "additionalProperties": false
-                    },
-                    "minItems": 1,
-                    "maxItems": 3
-                  }
-                },
-                "required": ["answers"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Submit a Designer user input request response to the runtime conversation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "userInputRequestResponse": {
-                      "type": "object",
-                      "properties": {
-                        "requestId": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            {
-                              "type": "number"
-                            }
-                          ]
-                        },
-                        "providerConversationId": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "submittedAt": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["requestId", "providerConversationId", "submittedAt"],
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": ["userInputRequestResponse"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": ["VALIDATION_ERROR"]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["code", "message"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": ["DESIGNER_USER_INPUT_REQUEST_RESPONSE_INVALID"]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["code", "message"],
-                      "additionalProperties": false
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Active organization is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["FORBIDDEN"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Designer session not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["DESIGNER_SESSION_NOT_FOUND"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Designer runtime conversation is not ready, is busy, or request is not pending.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "DESIGNER_RUNTIME_CONVERSATION_NOT_READY",
-                        "DESIGNER_RUNTIME_CONVERSATION_BUSY",
-                        "DESIGNER_USER_INPUT_REQUEST_NOT_PENDING"
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/designer/sessions/{sessionId}/runtime-conversation/follow-ups": {
-      "post": {
-        "tags": ["Designer"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "^dsn_[a-zA-Z0-9_-]+$"
-            },
-            "required": true,
-            "name": "sessionId",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "prompt": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 20000
-                  },
-                  "idempotencyKey": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255
-                  }
-                },
-                "required": ["prompt", "idempotencyKey"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Submit a follow-up prompt to the Designer runtime conversation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "runtimeFollowUp": {
-                      "type": "object",
-                      "properties": {
-                        "providerConversationId": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "providerExecutionId": {
-                          "type": ["string", "null"],
-                          "minLength": 1
-                        },
-                        "submittedAt": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["providerConversationId", "providerExecutionId", "submittedAt"],
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": ["runtimeFollowUp"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["VALIDATION_ERROR"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Active organization is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["FORBIDDEN"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Designer session not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["DESIGNER_SESSION_NOT_FOUND"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Designer runtime conversation is not ready or is still processing another turn.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "DESIGNER_RUNTIME_CONVERSATION_NOT_READY",
-                        "DESIGNER_RUNTIME_CONVERSATION_BUSY"
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/designer/sessions/{sessionId}": {
-      "get": {
-        "tags": ["Designer"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "^dsn_[a-zA-Z0-9_-]+$"
-            },
-            "required": true,
-            "name": "sessionId",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Get a Designer session.",
+            "description": "Get Designer UI metadata for a sandbox instance.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2811,10 +1139,6 @@
                     },
                     "sandboxInstanceId": {
                       "type": "string",
-                      "minLength": 1
-                    },
-                    "initialPrompt": {
-                      "type": ["string", "null"],
                       "minLength": 1
                     },
                     "title": {
@@ -2901,7 +1225,474 @@
                     "id",
                     "organizationId",
                     "sandboxInstanceId",
-                    "initialPrompt",
+                    "title",
+                    "status",
+                    "connectable",
+                    "failureCode",
+                    "failureMessage",
+                    "startupOperation",
+                    "canvasTabs",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Designer session was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["DESIGNER_SESSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/designer/sandbox-instances/{instanceId}/canvas-tabs": {
+      "put": {
+        "tags": ["Designer"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbi_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "instanceId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tabs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "href": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2048
+                        }
+                      },
+                      "required": ["id", "title", "href"],
+                      "additionalProperties": false
+                    },
+                    "maxItems": 12
+                  }
+                },
+                "required": ["tabs"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update Designer canvas tabs for a sandbox instance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "organizationId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "title": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": ["string", "null"],
+                      "enum": [
+                        "pending",
+                        "starting",
+                        "started",
+                        "initializing",
+                        "running",
+                        "degraded",
+                        "reconnecting",
+                        "stopping",
+                        "stopped",
+                        "failed",
+                        null
+                      ]
+                    },
+                    "connectable": {
+                      "type": "boolean"
+                    },
+                    "failureCode": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "failureMessage": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "startupOperation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "operationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operationKind": {
+                          "type": "string",
+                          "enum": ["start", "resume"]
+                        }
+                      },
+                      "required": ["operationId", "operationKind"],
+                      "additionalProperties": false
+                    },
+                    "canvasTabs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "href": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2048
+                          }
+                        },
+                        "required": ["id", "title", "href"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organizationId",
+                    "sandboxInstanceId",
+                    "title",
+                    "status",
+                    "connectable",
+                    "failureCode",
+                    "failureMessage",
+                    "startupOperation",
+                    "canvasTabs",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Designer session was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["DESIGNER_SESSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/designer/sessions/{sessionId}": {
+      "get": {
+        "tags": ["Designer"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^dsn_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "sessionId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a Designer session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "organizationId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "title": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": ["string", "null"],
+                      "enum": [
+                        "pending",
+                        "starting",
+                        "started",
+                        "initializing",
+                        "running",
+                        "degraded",
+                        "reconnecting",
+                        "stopping",
+                        "stopped",
+                        "failed",
+                        null
+                      ]
+                    },
+                    "connectable": {
+                      "type": "boolean"
+                    },
+                    "failureCode": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "failureMessage": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "startupOperation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "operationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operationKind": {
+                          "type": "string",
+                          "enum": ["start", "resume"]
+                        }
+                      },
+                      "required": ["operationId", "operationKind"],
+                      "additionalProperties": false
+                    },
+                    "canvasTabs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "href": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2048
+                          }
+                        },
+                        "required": ["id", "title", "href"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organizationId",
+                    "sandboxInstanceId",
                     "title",
                     "status",
                     "connectable",
@@ -3072,10 +1863,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "initialPrompt": {
-                      "type": ["string", "null"],
-                      "minLength": 1
-                    },
                     "title": {
                       "type": ["string", "null"],
                       "minLength": 1
@@ -3160,7 +1947,6 @@
                     "id",
                     "organizationId",
                     "sandboxInstanceId",
-                    "initialPrompt",
                     "title",
                     "status",
                     "connectable",

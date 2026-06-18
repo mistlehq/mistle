@@ -41,6 +41,7 @@ type GetSandboxInstanceContext = {
 
 const DefaultReadableSandboxInstancePurposes = [
   SandboxInstancePurposes.SESSION,
+  SandboxInstancePurposes.DESIGNER,
   SandboxInstancePurposes.SETUP_ASSISTANT,
   SandboxInstancePurposes.SETUP_CHECK,
   SandboxInstancePurposes.SKILLS_DISCOVERY,

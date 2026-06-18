@@ -2,17 +2,13 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { OpenApiValidationHook } from "@mistle/http/errors.js";
 
 import type { AppContextBindings, AppRoutes } from "../types.js";
-import * as bootstrapRuntimeConversation from "./bootstrap-runtime-conversation/index.js";
 import { DESIGNER_ROUTE_BASE_PATH } from "./constants.js";
 import * as createDesignerSession from "./create-designer-session/index.js";
-import * as createRuntimeConnectionToken from "./create-runtime-connection-token/index.js";
+import * as getDesignerSessionBySandboxInstance from "./get-designer-session-by-sandbox-instance/index.js";
 import * as getDesignerSession from "./get-designer-session/index.js";
-import * as getRuntimeConversationTranscript from "./get-runtime-conversation-transcript/index.js";
 import * as listDesignerSessions from "./list-designer-sessions/index.js";
+import * as putDesignerSessionCanvasTabsBySandboxInstance from "./put-designer-session-canvas-tabs-by-sandbox-instance/index.js";
 import * as putDesignerSessionCanvasTabs from "./put-designer-session-canvas-tabs/index.js";
-import * as submitActionProposalResponse from "./submit-action-proposal-response/index.js";
-import * as submitRuntimeFollowUp from "./submit-runtime-follow-up/index.js";
-import * as submitUserInputRequestResponse from "./submit-user-input-request-response/index.js";
 
 export function createDesignerRoutes(): AppRoutes<typeof DESIGNER_ROUTE_BASE_PATH> {
   const routes = new OpenAPIHono<AppContextBindings>({
@@ -20,13 +16,15 @@ export function createDesignerRoutes(): AppRoutes<typeof DESIGNER_ROUTE_BASE_PAT
   });
 
   routes.openapi(createDesignerSession.route, createDesignerSession.handler);
-  routes.openapi(createRuntimeConnectionToken.route, createRuntimeConnectionToken.handler);
-  routes.openapi(bootstrapRuntimeConversation.route, bootstrapRuntimeConversation.handler);
-  routes.openapi(getRuntimeConversationTranscript.route, getRuntimeConversationTranscript.handler);
-  routes.openapi(submitActionProposalResponse.route, submitActionProposalResponse.handler);
-  routes.openapi(submitUserInputRequestResponse.route, submitUserInputRequestResponse.handler);
-  routes.openapi(submitRuntimeFollowUp.route, submitRuntimeFollowUp.handler);
   routes.openapi(listDesignerSessions.route, listDesignerSessions.handler);
+  routes.openapi(
+    getDesignerSessionBySandboxInstance.route,
+    getDesignerSessionBySandboxInstance.handler,
+  );
+  routes.openapi(
+    putDesignerSessionCanvasTabsBySandboxInstance.route,
+    putDesignerSessionCanvasTabsBySandboxInstance.handler,
+  );
   routes.openapi(getDesignerSession.route, getDesignerSession.handler);
   routes.openapi(putDesignerSessionCanvasTabs.route, putDesignerSessionCanvasTabs.handler);
 

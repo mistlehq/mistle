@@ -5,7 +5,7 @@ import { OrganizationPermissions } from "../../auth/services/organization-policy
 import { withRequiredOrganizationActor } from "../../middleware/with-required-organization-actor.js";
 import type { AppContextBindings, AppOrganizationActor } from "../../types.js";
 import { requireDesignerOrganizationActor } from "../authorization.js";
-import { createDesignerRuntimeConnectionToken } from "../services/designer-sessions.js";
+import { putDesignerSessionCanvasTabsBySandboxInstanceId } from "../services/designer-sessions.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -13,27 +13,21 @@ const routeHandler = async (
   organizationActor: AppOrganizationActor,
 ) => {
   const params = ctx.req.valid("param");
-  const designerActor = requireDesignerOrganizationActor(organizationActor);
-  const config = ctx.get("config");
-  const connectionToken = await createDesignerRuntimeConnectionToken(
+  const body = ctx.req.valid("json");
+  requireDesignerOrganizationActor(organizationActor);
+  const designerSession = await putDesignerSessionCanvasTabsBySandboxInstanceId(
     {
       db: ctx.get("db"),
-      cache: ctx.get("cache"),
       dataPlaneClient: ctx.get("dataPlaneClient"),
-      connectionTokenConfig: ctx.get("connectionTokenConfig"),
-      gatewayWebsocketUrl: ctx.get("sandboxConfig").gatewayWsUrl,
-      integrationsConfig: {
-        masterEncryptionKeys: config.integrations.masterEncryptionKeys,
-      },
     },
     {
       organizationId: organizationActor.organizationId,
-      sessionId: params.sessionId,
-      actingUserId: designerActor.userId,
+      sandboxInstanceId: params.instanceId,
+      body,
     },
   );
 
-  return ctx.json(connectionToken, 201);
+  return ctx.json(designerSession, 200);
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(

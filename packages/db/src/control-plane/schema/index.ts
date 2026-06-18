@@ -1,21 +1,5 @@
 export { accounts } from "./accounts.js";
 export {
-  designerActionRequests,
-  DesignerActionRequestOperationKinds,
-  DesignerActionRequestResponses,
-  DesignerActionRequestStatuses,
-  type DesignerActionRequest,
-  type DesignerActionRequestOperation,
-  type DesignerActionRequestOperationKind,
-  type DesignerActionRequestOperationResult,
-  type DesignerActionRequestResponse,
-  type DesignerActionRequestStatus,
-  type DesignerSandboxProfileDraftPublishResult,
-  type DesignerSandboxProfileDraftSetupScriptPutResult,
-  type DesignerSandboxProfileVersionLaunchResult,
-  type InsertDesignerActionRequest,
-} from "./designer-action-requests.js";
-export {
   designerSessions,
   type DesignerSession,
   type DesignerSessionCanvasTab,

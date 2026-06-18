@@ -1,28 +1,34 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
+import { notFoundResponseSchema } from "../get-designer-session/schema.js";
 import {
-  designerSessionIdParamsSchema,
-  getDesignerRuntimeConversationTranscriptResponseSchema,
+  designerSandboxInstanceIdParamsSchema,
+  putDesignerSessionCanvasTabsBodySchema,
+  putDesignerSessionCanvasTabsResponseSchema,
 } from "../schemas.js";
-import {
-  conflictResponseSchema,
-  notFoundResponseSchema,
-} from "../submit-runtime-follow-up/schema.js";
 
 export const route = createRoute({
-  method: "get",
-  path: "/sessions/{sessionId}/runtime-conversation/transcript",
+  method: "put",
+  path: "/sandbox-instances/{instanceId}/canvas-tabs",
   tags: ["Designer"],
   request: {
-    params: designerSessionIdParamsSchema,
+    params: designerSandboxInstanceIdParamsSchema,
+    body: {
+      content: {
+        "application/json": {
+          schema: putDesignerSessionCanvasTabsBodySchema,
+        },
+      },
+      required: true,
+    },
   },
   responses: {
     200: {
-      description: "Read the current Designer runtime conversation transcript from the provider.",
+      description: "Update Designer canvas tabs for a sandbox instance.",
       content: {
         "application/json": {
-          schema: getDesignerRuntimeConversationTranscriptResponseSchema,
+          schema: putDesignerSessionCanvasTabsResponseSchema,
         },
       },
     },
@@ -43,18 +49,10 @@ export const route = createRoute({
       },
     },
     404: {
-      description: "Designer session not found.",
+      description: "Designer session was not found.",
       content: {
         "application/json": {
           schema: notFoundResponseSchema,
-        },
-      },
-    },
-    409: {
-      description: "Designer runtime conversation is not ready for transcript reads.",
-      content: {
-        "application/json": {
-          schema: conflictResponseSchema,
         },
       },
     },
