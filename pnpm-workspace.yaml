@@ -46,7 +46,7 @@ overrides:
   express: "4.20.0"
   fast-uri: "3.1.2"
   fast-xml-builder: "1.2.0"
-  hono: "4.12.23"
+  hono: "4.12.25"
   ip-address: "10.1.1"
   "js-yaml@4.1.0": "4.1.1"
   js-cookie: "3.0.6"

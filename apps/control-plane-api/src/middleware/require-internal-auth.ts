@@ -1,3 +1,4 @@
+import { isInternalServiceTokenValid } from "@mistle/http/internal-auth.js";
 import type { MiddlewareHandler } from "hono";
 
 import type { AppContextBindings } from "../types.js";
@@ -14,8 +15,10 @@ export function createRequireInternalAuthMiddleware(
   return async (ctx, next) => {
     const providedServiceToken = ctx.req.header(input.headerName);
     if (
-      providedServiceToken === undefined ||
-      providedServiceToken !== ctx.get("internalAuthServiceToken")
+      !isInternalServiceTokenValid({
+        providedToken: providedServiceToken,
+        expectedToken: ctx.get("internalAuthServiceToken"),
+      })
     ) {
       return ctx.json(
         {
