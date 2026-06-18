@@ -126,6 +126,23 @@ const DesignerActionRequestOperationResultSchema = z
   ])
   .nullable();
 
+const DesignerActionRequestSchema = z
+  .object({
+    id: z.string().min(1),
+    status: z.enum([
+      "approved",
+      "declined",
+      "executing",
+      "execution_unsupported",
+      "completed",
+      "failed",
+    ]),
+    failureCode: z.string().min(1).nullable(),
+    failureMessage: z.string().min(1).nullable(),
+    operationResult: DesignerActionRequestOperationResultSchema,
+  })
+  .strict();
+
 const SubmitDesignerActionProposalResponseResponseSchema = z
   .object({
     actionProposalResponse: z
@@ -137,22 +154,7 @@ const SubmitDesignerActionProposalResponseResponseSchema = z
         submittedAt: z.string().min(1),
       })
       .strict(),
-    actionRequest: z
-      .object({
-        id: z.string().min(1),
-        status: z.enum([
-          "approved",
-          "declined",
-          "executing",
-          "execution_unsupported",
-          "completed",
-          "failed",
-        ]),
-        failureCode: z.string().min(1).nullable(),
-        failureMessage: z.string().min(1).nullable(),
-        operationResult: DesignerActionRequestOperationResultSchema,
-      })
-      .strict(),
+    actionRequest: DesignerActionRequestSchema,
   })
   .strict();
 
@@ -215,13 +217,22 @@ const DesignerActionProposalSchema = z
     kind: z.literal("designerActionProposal"),
     title: z.string().min(1),
     summary: z.string().min(1),
-    status: z.enum(["pending", "approved", "declined"]),
+    status: z.enum([
+      "pending",
+      "approved",
+      "declined",
+      "executing",
+      "execution_unsupported",
+      "completed",
+      "failed",
+    ]),
     operation: z.discriminatedUnion("kind", [
       DesignerProviderConfigurationChangeOperationSchema,
       DesignerSandboxProfileDraftPublishOperationSchema,
       DesignerSandboxProfileDraftSetupScriptPutOperationSchema,
       DesignerSandboxProfileVersionLaunchOperationSchema,
     ]),
+    actionRequest: DesignerActionRequestSchema.nullable(),
   })
   .strict();
 

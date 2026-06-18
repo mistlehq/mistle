@@ -57,7 +57,7 @@ import {
 import type {
   BootstrapDesignerRuntimeConversationResponse,
   CreateDesignerSessionBody,
-  DesignerActionProposal,
+  DesignerProviderActionProposal,
   DesignerSessionResponse,
   GetDesignerRuntimeConversationTranscriptResponse,
   PutDesignerSessionCanvasTabsBody,
@@ -68,12 +68,14 @@ import type {
 } from "../schemas.js";
 import {
   createDesignerActionProposalResponsePrompt,
+  hydrateDesignerActionProposalsWithActionRequests,
   splitDesignerActionProposalsFromTranscriptTurns,
 } from "./designer-action-proposals.js";
 import {
   claimDesignerActionRequest,
   claimDesignerActionRequestExecution,
   markDesignerActionRequestResponseSubmitted,
+  readDesignerActionRequestsForProposals,
   readDesignerActionRequestForResponse,
   toDesignerActionRequestOperation,
   updateDesignerActionRequestExecutionStatus,
@@ -1162,6 +1164,11 @@ export async function getDesignerRuntimeConversationTranscript(
       providerConversationId: designerSession.runtimeProviderConversationId,
     });
     const splitTranscript = splitDesignerActionProposalsFromTranscriptTurns(transcript.turns);
+    const actionRequests = await readDesignerActionRequestsForProposals(ctx, {
+      organizationId: input.organizationId,
+      sessionId: designerSession.id,
+      proposalIds: splitTranscript.actionProposals.map((proposal) => proposal.id),
+    });
 
     return {
       runtimeConversationTranscript: {
@@ -1169,7 +1176,10 @@ export async function getDesignerRuntimeConversationTranscript(
         name: transcript.name,
         preview: transcript.preview,
         turns: splitTranscript.turns,
-        actionProposals: splitTranscript.actionProposals,
+        actionProposals: hydrateDesignerActionProposalsWithActionRequests({
+          proposals: splitTranscript.actionProposals,
+          actionRequests,
+        }),
       },
     };
   } finally {
@@ -1377,7 +1387,7 @@ async function assertPendingDesignerActionProposal(input: {
   connection: AgentConversationConnection;
   providerConversationId: string;
   proposalId: string;
-}): Promise<DesignerActionProposal> {
+}): Promise<DesignerProviderActionProposal> {
   if (input.provider.readConversationTranscript === undefined) {
     throw new Error(
       `Agent runtime '${DesignerRuntimeId}' does not support runtime conversation transcript reads.`,

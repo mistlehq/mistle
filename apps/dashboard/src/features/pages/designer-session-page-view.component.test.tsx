@@ -75,6 +75,7 @@ const RuntimeConversationTranscriptWithActionProposal = {
       title: "Create GitHub webhook",
       summary: "Create a webhook on the selected repository for pull request events.",
       status: "pending",
+      actionRequest: null,
       operation: {
         kind: "providerConfigurationChange",
         provider: "GitHub",
@@ -101,6 +102,7 @@ const RuntimeConversationTranscriptWithSetupScriptActionProposal = {
       title: "Update setup script",
       summary: "Update the draft setup script for the selected sandbox profile.",
       status: "pending",
+      actionRequest: null,
       operation: {
         kind: "sandboxProfileDraftSetupScriptPut",
         profileId: "sbp_designer_setup_script",
@@ -120,6 +122,7 @@ const RuntimeConversationTranscriptWithPublishActionProposal = {
       title: "Publish draft profile",
       summary: "Publish the selected sandbox profile draft.",
       status: "pending",
+      actionRequest: null,
       operation: {
         kind: "sandboxProfileDraftPublish",
         profileId: "sbp_designer_publish",
@@ -138,12 +141,79 @@ const RuntimeConversationTranscriptWithLaunchActionProposal = {
       title: "Launch sandbox session",
       summary: "Start an ordinary sandbox session from the selected sandbox profile version.",
       status: "pending",
+      actionRequest: null,
       operation: {
         kind: "sandboxProfileVersionLaunch",
         profileId: "sbp_designer_launch",
         version: 4,
         primaryRepositoryId: null,
         idempotencyKey: "designer-launch-001",
+      },
+    },
+  ],
+} satisfies DesignerRuntimeConversationTranscript;
+
+const RuntimeConversationTranscriptWithCompletedLaunchActionRequest = {
+  ...RuntimeConversationTranscript,
+  actionProposals: [
+    {
+      id: "dap_profile_launch",
+      kind: "designerActionProposal",
+      title: "Launch sandbox session",
+      summary: "Start an ordinary sandbox session from the selected sandbox profile version.",
+      status: "completed",
+      actionRequest: {
+        id: "dar_profile_launch",
+        status: "completed",
+        failureCode: null,
+        failureMessage: null,
+        operationResult: {
+          kind: "sandboxProfileVersionLaunch",
+          profileId: "sbp_designer_launch",
+          version: 4,
+          sandboxInstanceId: "sbi_designer_launch",
+          workflowRunId: "workflow_designer_launch",
+        },
+      },
+      operation: {
+        kind: "sandboxProfileVersionLaunch",
+        profileId: "sbp_designer_launch",
+        version: 4,
+        primaryRepositoryId: null,
+        idempotencyKey: "designer-launch-001",
+      },
+    },
+  ],
+} satisfies DesignerRuntimeConversationTranscript;
+
+const RuntimeConversationTranscriptWithFailedActionRequest = {
+  ...RuntimeConversationTranscript,
+  actionProposals: [
+    {
+      id: "dap_github_webhook_setup",
+      kind: "designerActionProposal",
+      title: "Create GitHub webhook",
+      summary: "Create a webhook on the selected repository for pull request events.",
+      status: "failed",
+      actionRequest: {
+        id: "dar_github_webhook_setup",
+        status: "failed",
+        failureCode: "DESIGNER_OPERATION_FAILED",
+        failureMessage: "GitHub rejected the webhook configuration.",
+        operationResult: null,
+      },
+      operation: {
+        kind: "providerConfigurationChange",
+        provider: "GitHub",
+        resourceType: "repository webhook",
+        resourceLabel: "mistle/agent-runtime",
+        action: "create webhook",
+        details: [
+          {
+            label: "Events",
+            value: "pull_request, pull_request_review",
+          },
+        ],
       },
     },
   ],
@@ -332,6 +402,33 @@ describe("DesignerSessionPageView", () => {
     expect(screen.getByText("Workspace root")).toBeDefined();
     expect(screen.getByText("designer-launch-001")).toBeDefined();
     expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
+  });
+
+  it("renders hydrated durable action request results for resumed proposals", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      runtimeConversationTranscript: RuntimeConversationTranscriptWithCompletedLaunchActionRequest,
+    });
+
+    expect(screen.getAllByText("Completed")).toHaveLength(1);
+    expect(screen.getByText("Action request")).toBeDefined();
+    expect(screen.getByText("dar_profile_launch")).toBeDefined();
+    expect(screen.getByText("Launched sandbox session sbi_designer_launch.")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Decline" })).toBeNull();
+  });
+
+  it("renders hydrated durable action request failures for resumed proposals", () => {
+    renderDesignerSessionPageView({
+      runtimeConversationBootstrap: RuntimeConversationBootstrap,
+      runtimeConversationTranscript: RuntimeConversationTranscriptWithFailedActionRequest,
+    });
+
+    expect(screen.getAllByText("Failed")).toHaveLength(1);
+    expect(screen.getByText("DESIGNER_OPERATION_FAILED")).toBeDefined();
+    expect(screen.getByText("GitHub rejected the webhook configuration.")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Decline" })).toBeNull();
   });
 
   it("submits Designer action proposal responses with the selected proposal decision", () => {

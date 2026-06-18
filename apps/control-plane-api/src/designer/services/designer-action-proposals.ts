@@ -1,5 +1,10 @@
-import type { DesignerActionProposal, DesignerActionProposalResponse } from "../schemas.js";
-import { designerActionProposalSchema } from "../schemas.js";
+import type {
+  DesignerActionProposal,
+  DesignerActionProposalResponse,
+  DesignerActionRequestState,
+  DesignerProviderActionProposal,
+} from "../schemas.js";
+import { designerProviderActionProposalSchema } from "../schemas.js";
 
 export type DesignerActionProposalTranscriptTurn = {
   id: string;
@@ -10,13 +15,13 @@ export type DesignerActionProposalTranscriptTurn = {
 export function splitDesignerActionProposalsFromTranscriptTurns(
   turns: readonly { id: string; status: string | null; items: readonly unknown[] }[],
 ): {
-  actionProposals: DesignerActionProposal[];
+  actionProposals: DesignerProviderActionProposal[];
   turns: DesignerActionProposalTranscriptTurn[];
 } {
   const proposalEntriesById = new Map<
     string,
     {
-      proposal: DesignerActionProposal;
+      proposal: DesignerProviderActionProposal;
       lastSeenIndex: number;
     }
   >();
@@ -27,7 +32,7 @@ export function splitDesignerActionProposalsFromTranscriptTurns(
     const filteredItems: unknown[] = [];
 
     for (const item of turn.items) {
-      const proposal = designerActionProposalSchema.safeParse(item);
+      const proposal = designerProviderActionProposalSchema.safeParse(item);
 
       if (!proposal.success) {
         filteredItems.push(item);
@@ -54,6 +59,45 @@ export function splitDesignerActionProposalsFromTranscriptTurns(
       .map((entry) => entry.proposal),
     turns: filteredTurns,
   };
+}
+
+type DesignerActionProposalHydrationActionRequest = DesignerActionRequestState & {
+  proposalId: string;
+};
+
+export function hydrateDesignerActionProposalsWithActionRequests(input: {
+  actionRequests: readonly DesignerActionProposalHydrationActionRequest[];
+  proposals: readonly DesignerProviderActionProposal[];
+}): DesignerActionProposal[] {
+  const actionRequestsByProposalId = new Map<
+    string,
+    DesignerActionProposalHydrationActionRequest
+  >();
+  for (const actionRequest of input.actionRequests) {
+    actionRequestsByProposalId.set(actionRequest.proposalId, actionRequest);
+  }
+
+  return input.proposals.map((proposal) => {
+    const actionRequest = actionRequestsByProposalId.get(proposal.id);
+    if (actionRequest === undefined) {
+      return {
+        ...proposal,
+        actionRequest: null,
+      };
+    }
+
+    return {
+      ...proposal,
+      status: actionRequest.status,
+      actionRequest: {
+        id: actionRequest.id,
+        status: actionRequest.status,
+        failureCode: actionRequest.failureCode,
+        failureMessage: actionRequest.failureMessage,
+        operationResult: actionRequest.operationResult,
+      },
+    };
+  });
 }
 
 export function createDesignerActionProposalResponsePrompt(input: {

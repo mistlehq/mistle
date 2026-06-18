@@ -30,7 +30,7 @@ export function formatDesignerActionProposalResponseSuccessMessage(
   return `Action proposal response submitted at ${submittedAt}.`;
 }
 
-function formatDesignerActionRequestOperationResult(
+export function formatDesignerActionRequestOperationResult(
   result: DesignerActionProposalResponseResult["actionRequest"]["operationResult"],
 ): string | null {
   if (result === null) {

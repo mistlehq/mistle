@@ -10,7 +10,7 @@ import {
   type DesignerActionRequestResponse,
   type DesignerActionRequestStatus,
 } from "@mistle/db/control-plane";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { DesignerConflictCodes } from "../constants.js";
 import { DesignerConflictError } from "../errors.js";
@@ -18,6 +18,11 @@ import type { DesignerActionProposal } from "../schemas.js";
 
 type ControlPlaneTransaction = Parameters<Parameters<ControlPlaneDatabase["transaction"]>[0]>[0];
 type DesignerActionRequestDatabase = ControlPlaneDatabase | ControlPlaneTransaction;
+
+export type DesignerActionRequestProposalHydration = Pick<
+  DesignerActionRequest,
+  "failureCode" | "failureMessage" | "id" | "operationResult" | "proposalId" | "status"
+>;
 
 type ClaimedDesignerActionRequest = {
   actionRequest: DesignerActionRequest;
@@ -179,6 +184,39 @@ export async function readDesignerActionRequestForResponse(
     DesignerConflictCodes.DESIGNER_ACTION_PROPOSAL_NOT_PENDING,
     `Designer action proposal '${input.proposalId}' is not pending.`,
   );
+}
+
+export async function readDesignerActionRequestsForProposals(
+  ctx: { db: DesignerActionRequestDatabase },
+  input: {
+    organizationId: string;
+    sessionId: string;
+    proposalIds: readonly string[];
+  },
+): Promise<DesignerActionRequestProposalHydration[]> {
+  const proposalIds = [...new Set(input.proposalIds)];
+  if (proposalIds.length === 0) {
+    return [];
+  }
+
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+  return ctx.db
+    .select({
+      failureCode: tables.designerActionRequests.failureCode,
+      failureMessage: tables.designerActionRequests.failureMessage,
+      id: tables.designerActionRequests.id,
+      operationResult: tables.designerActionRequests.operationResult,
+      proposalId: tables.designerActionRequests.proposalId,
+      status: tables.designerActionRequests.status,
+    })
+    .from(tables.designerActionRequests)
+    .where(
+      and(
+        eq(tables.designerActionRequests.organizationId, input.organizationId),
+        eq(tables.designerActionRequests.designerSessionId, input.sessionId),
+        inArray(tables.designerActionRequests.proposalId, proposalIds),
+      ),
+    );
 }
 
 export async function updateDesignerActionRequestExecutionStatus(

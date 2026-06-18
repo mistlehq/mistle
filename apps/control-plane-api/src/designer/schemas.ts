@@ -259,19 +259,41 @@ const designerSandboxProfileVersionLaunchOperationSchema = z
   })
   .strict();
 
+const designerActionProposalStatusSchema = z.enum([
+  "pending",
+  DesignerActionRequestStatuses.APPROVED,
+  DesignerActionRequestStatuses.DECLINED,
+  DesignerActionRequestStatuses.EXECUTING,
+  DesignerActionRequestStatuses.EXECUTION_UNSUPPORTED,
+  DesignerActionRequestStatuses.COMPLETED,
+  DesignerActionRequestStatuses.FAILED,
+]);
+
+const designerActionProposalShape = {
+  id: z.string().min(1).max(255),
+  kind: z.literal("designerActionProposal"),
+  title: z.string().min(1).max(160),
+  summary: z.string().min(1).max(2_000),
+  operation: z.discriminatedUnion("kind", [
+    designerProviderConfigurationChangeOperationSchema,
+    designerSandboxProfileDraftPublishOperationSchema,
+    designerSandboxProfileDraftSetupScriptPutOperationSchema,
+    designerSandboxProfileVersionLaunchOperationSchema,
+  ]),
+};
+
+export const designerProviderActionProposalSchema = z
+  .object({
+    ...designerActionProposalShape,
+    status: z.enum(["pending", "approved", "declined"]),
+  })
+  .strict();
+
 export const designerActionProposalSchema = z
   .object({
-    id: z.string().min(1).max(255),
-    kind: z.literal("designerActionProposal"),
-    title: z.string().min(1).max(160),
-    summary: z.string().min(1).max(2_000),
-    status: z.enum(["pending", "approved", "declined"]),
-    operation: z.discriminatedUnion("kind", [
-      designerProviderConfigurationChangeOperationSchema,
-      designerSandboxProfileDraftPublishOperationSchema,
-      designerSandboxProfileDraftSetupScriptPutOperationSchema,
-      designerSandboxProfileVersionLaunchOperationSchema,
-    ]),
+    ...designerActionProposalShape,
+    status: designerActionProposalStatusSchema,
+    actionRequest: designerActionRequestSchema.nullable(),
   })
   .strict();
 
@@ -319,6 +341,8 @@ export const getDesignerRuntimeConversationTranscriptResponseSchema = z
 
 export type DesignerSessionResponse = z.infer<typeof designerSessionSchema>;
 export type DesignerActionProposal = z.infer<typeof designerActionProposalSchema>;
+export type DesignerProviderActionProposal = z.infer<typeof designerProviderActionProposalSchema>;
+export type DesignerActionRequestState = z.infer<typeof designerActionRequestSchema>;
 export type DesignerActionProposalResponse = z.infer<typeof designerActionProposalResponseSchema>;
 export type CreateDesignerSessionBody = z.infer<typeof createDesignerSessionBodySchema>;
 export type PutDesignerSessionCanvasTabsBody = z.infer<

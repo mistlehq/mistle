@@ -1914,6 +1914,55 @@ export interface paths {
             "application/json": {
               runtimeConversationTranscript: {
                 actionProposals: {
+                  actionRequest: {
+                    failureCode: string | null;
+                    failureMessage: string | null;
+                    id: string;
+                    operationResult:
+                      | {
+                          /** @enum {string} */
+                          kind: "sandboxProfileDraftPublish";
+                          profileId: string;
+                          publishedAt: string;
+                          snapshotAction:
+                            | {
+                                /** @enum {string} */
+                                kind: "created";
+                                sandboxInstanceId: string | null;
+                                snapshotJobId: string;
+                              }
+                            | {
+                                /** @enum {string} */
+                                kind: "reused";
+                                snapshotImageId: string;
+                                snapshotImageProvider: string;
+                              };
+                          version: number;
+                        }
+                      | {
+                          /** @enum {string} */
+                          kind: "sandboxProfileDraftSetupScriptPut";
+                          profileId: string;
+                          version: number;
+                        }
+                      | {
+                          /** @enum {string} */
+                          kind: "sandboxProfileVersionLaunch";
+                          profileId: string;
+                          sandboxInstanceId: string;
+                          version: number;
+                          workflowRunId: string;
+                        }
+                      | null;
+                    /** @enum {string} */
+                    status:
+                      | "approved"
+                      | "declined"
+                      | "executing"
+                      | "execution_unsupported"
+                      | "completed"
+                      | "failed";
+                  } | null;
                   id: string;
                   /** @enum {string} */
                   kind: "designerActionProposal";
@@ -1952,7 +2001,14 @@ export interface paths {
                         version: number;
                       };
                   /** @enum {string} */
-                  status: "pending" | "approved" | "declined";
+                  status:
+                    | "pending"
+                    | "approved"
+                    | "declined"
+                    | "executing"
+                    | "execution_unsupported"
+                    | "completed"
+                    | "failed";
                   summary: string;
                   title: string;
                 }[];
