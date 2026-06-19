@@ -85,6 +85,8 @@ type DesignerSessionSelector =
       sandboxInstanceId: string;
     };
 
+type ExistingDesignerSandboxInstance = NonNullable<GetSandboxInstanceResponse>;
+
 const DesignerRuntimeId = "codex";
 const DesignerDocsMcpServerUrl = "https://docs.mistle.dev/mcp";
 const DesignerManagedInstructionBlock = {
@@ -403,34 +405,42 @@ async function getDesignerSandboxInstance(
     organizationId: string;
     sandboxInstanceId: string;
   },
-): Promise<GetSandboxInstanceResponse> {
-  return dataPlaneClient.getSandboxInstance({
+): Promise<ExistingDesignerSandboxInstance> {
+  const sandboxInstance = await dataPlaneClient.getSandboxInstance({
     organizationId: input.organizationId,
     instanceId: input.sandboxInstanceId,
     allowedPurposes: [SandboxInstancePurposes.DESIGNER],
   });
+
+  if (sandboxInstance === null) {
+    throw new DesignerNotFoundError(
+      DesignerNotFoundCodes.DESIGNER_SESSION_NOT_FOUND,
+      `Designer session sandbox instance '${input.sandboxInstanceId}' was not found.`,
+    );
+  }
+
+  return sandboxInstance;
 }
 
 function mapDesignerSession(
   designerSession: DesignerSession,
-  sandboxInstance: GetSandboxInstanceResponse,
+  sandboxInstance: ExistingDesignerSandboxInstance,
 ): DesignerSessionResponse {
   return {
     id: designerSession.id,
     organizationId: designerSession.organizationId,
     sandboxInstanceId: designerSession.sandboxInstanceId,
-    sandboxProfileId: sandboxInstance?.sandboxProfileId ?? DESIGNER_RUNTIME_PROFILE_ID,
-    sandboxProfileVersion:
-      sandboxInstance?.sandboxProfileVersion ?? DESIGNER_RUNTIME_PROFILE_VERSION,
-    title: sandboxInstance?.title ?? null,
-    status: sandboxInstance?.status ?? null,
-    connectable: sandboxInstance?.connectable ?? false,
-    failureCode: sandboxInstance?.failureCode ?? null,
-    failureMessage: sandboxInstance?.failureMessage ?? null,
+    sandboxProfileId: sandboxInstance.sandboxProfileId,
+    sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+    title: sandboxInstance.title,
+    status: sandboxInstance.status,
+    connectable: sandboxInstance.connectable,
+    failureCode: sandboxInstance.failureCode,
+    failureMessage: sandboxInstance.failureMessage,
     runtimeContext: resolveSandboxInstanceRuntimeContext({
-      runtimePlan: sandboxInstance?.runtimePlan ?? null,
+      runtimePlan: sandboxInstance.runtimePlan,
     }),
-    startupOperation: sandboxInstance?.startupOperation ?? null,
+    startupOperation: sandboxInstance.startupOperation,
     initialPrompt: designerSession.initialPrompt,
     canvasTabs: [...designerSession.canvasTabs],
     createdAt: designerSession.createdAt,

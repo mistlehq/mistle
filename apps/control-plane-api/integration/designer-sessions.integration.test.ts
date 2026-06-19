@@ -375,6 +375,36 @@ describe.concurrent("designer sessions integration", () => {
     expect(updateBySandboxInstanceFromOtherOrgResponse.status).toBe(404);
   });
 
+  it("fails explicitly when a Designer session references a missing backing sandbox", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-designer-session-missing-sandbox@example.com",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: "dsn_missing_backing_sandbox",
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_missing_backing_sandbox",
+      initialPrompt: "Build a Designer missing sandbox regression.",
+      canvasTabs: [],
+    });
+
+    const getResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/designer/sessions/dsn_missing_backing_sandbox",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(getResponse.status).toBe(404);
+    expect(await getResponse.json()).toMatchObject({
+      code: "DESIGNER_SESSION_NOT_FOUND",
+      message: "Designer session sandbox instance 'sbi_missing_backing_sandbox' was not found.",
+    });
+  });
+
   it("rejects API key actors on Designer routes", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-designer-session-api-key@example.com",

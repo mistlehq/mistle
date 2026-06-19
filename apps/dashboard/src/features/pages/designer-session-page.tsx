@@ -1,6 +1,6 @@
 import { SidebarTrigger, useSidebar } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import {
@@ -106,23 +106,6 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
     () => designerSession.canvasTabs,
   );
   const [activeTabHref, setActiveTabHref] = useState<string | null>(null);
-  const [isLocallyDirty, setIsLocallyDirty] = useState(false);
-  const [loadedSessionId, setLoadedSessionId] = useState(() => designerSession.id);
-
-  if (loadedSessionId !== designerSession.id) {
-    setLoadedSessionId(designerSession.id);
-    setCanvasTabs(designerSession.canvasTabs);
-    setActiveTabHref(null);
-    setIsLocallyDirty(false);
-  }
-
-  useEffect(() => {
-    if (isLocallyDirty) {
-      return;
-    }
-
-    setCanvasTabs(designerSession.canvasTabs);
-  }, [designerSession.canvasTabs, isLocallyDirty, loadedSessionId]);
 
   const persistCanvasTabs = useCallback(
     (tabs: readonly DesignerSessionCanvasTab[]): void => {
@@ -137,7 +120,6 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
   const updateCanvasTabs = useCallback(
     (tabs: readonly DesignerSessionCanvasTab[]): void => {
       setCanvasTabs(tabs);
-      setIsLocallyDirty(true);
       persistCanvasTabs(tabs);
     },
     [persistCanvasTabs],
@@ -154,7 +136,6 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
         return nextTabs;
       });
       setActiveTabHref(request.input.href);
-      setIsLocallyDirty(true);
     },
     [persistCanvasTabs],
   );
@@ -195,9 +176,7 @@ export function DesignerSessionPage(): React.JSX.Element {
         title="Designer"
         leadingControl={<DesignerSessionSidebarTrigger />}
       >
-        <PageFrame width="normal">
-          <div className="py-10 text-sm text-muted-foreground">Loading Designer session...</div>
-        </PageFrame>
+        <div className="h-full" />
       </ConversationWorkspaceFrame>
     );
   }
@@ -223,7 +202,8 @@ export function DesignerSessionPage(): React.JSX.Element {
   }
 
   return (
-    <LoadedDesignerSessionPage
+    <LoadedDesignerSessionPageStateBoundary
+      key={`${designerSessionQuery.data.id}:${designerSessionQuery.data.sandboxInstanceId}`}
       designerSession={designerSessionQuery.data}
       requestedRuntimeConversationId={requestedRuntimeConversationId}
       searchParams={searchParams}
@@ -232,7 +212,7 @@ export function DesignerSessionPage(): React.JSX.Element {
   );
 }
 
-function LoadedDesignerSessionPage(input: {
+function LoadedDesignerSessionPageStateBoundary(input: {
   designerSession: DesignerSession;
   requestedRuntimeConversationId: string | null;
   searchParams: URLSearchParams;
@@ -240,6 +220,33 @@ function LoadedDesignerSessionPage(input: {
 }): React.JSX.Element {
   const { activeTabHref, canvasTabs, dashboardControlActions, setActiveTabHref, updateCanvasTabs } =
     useDesignerCanvasTabs(input.designerSession);
+
+  return (
+    <LoadedDesignerSessionPage
+      activeTabHref={activeTabHref}
+      canvasTabs={canvasTabs}
+      dashboardControlActions={dashboardControlActions}
+      designerSession={input.designerSession}
+      requestedRuntimeConversationId={input.requestedRuntimeConversationId}
+      searchParams={input.searchParams}
+      setActiveTabHref={setActiveTabHref}
+      setSearchParams={input.setSearchParams}
+      updateCanvasTabs={updateCanvasTabs}
+    />
+  );
+}
+
+function LoadedDesignerSessionPage(input: {
+  activeTabHref: string | null;
+  canvasTabs: readonly DesignerSessionCanvasTab[];
+  dashboardControlActions: DashboardControlActionSupport;
+  designerSession: DesignerSession;
+  requestedRuntimeConversationId: string | null;
+  searchParams: URLSearchParams;
+  setActiveTabHref: (href: string) => void;
+  setSearchParams: ReturnType<typeof useSearchParams>[1];
+  updateCanvasTabs: (tabs: readonly DesignerSessionCanvasTab[]) => void;
+}): React.JSX.Element {
   const readDesignerSandboxStatus = useCallback(
     async ({ sandboxInstanceId, signal }: { sandboxInstanceId: string; signal?: AbortSignal }) => {
       if (sandboxInstanceId !== input.designerSession.sandboxInstanceId) {
@@ -285,7 +292,7 @@ function LoadedDesignerSessionPage(input: {
       mintConnectionToken={mintConnectionToken}
       sandboxStatusReader={readDesignerSandboxStatus}
       searchParams={input.searchParams}
-      dashboardControlActions={dashboardControlActions}
+      dashboardControlActions={input.dashboardControlActions}
       secondaryPanel={{
         kind: "custom",
         diffControlTitle: "Changes are not shown in Designer.",
@@ -295,10 +302,10 @@ function LoadedDesignerSessionPage(input: {
           <div className="h-full min-h-0 min-w-0 overflow-hidden bg-background">
             <main className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
               <DesignerCanvasWorkspace
-                activeTabHref={activeTabHref}
-                onActiveTabHrefChange={setActiveTabHref}
-                onTabsChange={updateCanvasTabs}
-                tabs={canvasTabs}
+                activeTabHref={input.activeTabHref}
+                onActiveTabHrefChange={input.setActiveTabHref}
+                onTabsChange={input.updateCanvasTabs}
+                tabs={input.canvasTabs}
               />
             </main>
           </div>
