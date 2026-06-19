@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import { WebhookTriggerEventPicker } from "./webhook-trigger-event-picker.js";
@@ -27,6 +27,7 @@ import {
   StoryPushDeletedTriggerId,
   StorySlackAppMentionTriggerId,
   StorySlackConnectionId,
+  StorySlackChannelResourcesSyncing,
   StorySlackEventOptions,
   StoryWasenderApiConnectionId,
   StoryWasenderApiEventOptions,
@@ -72,13 +73,17 @@ function StoryHarness(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
   error?: string;
   showGitHubTeamSyncError?: boolean;
+  showSlackChannelSyncing?: boolean;
 }): React.JSX.Element {
   const [queryClient] = useState(() =>
-    createWebhookTriggerStoryQueryClient(
-      input.showGitHubTeamSyncError === true
+    createWebhookTriggerStoryQueryClient({
+      ...(input.showGitHubTeamSyncError === true
         ? { githubTeamResources: StoryGitHubTeamResourcesSyncFailed }
-        : undefined,
-    ),
+        : {}),
+      ...(input.showSlackChannelSyncing === true
+        ? { slackChannelResources: StorySlackChannelResourcesSyncing }
+        : {}),
+    }),
   );
   const [selectedEventIds, setSelectedEventIds] = useState([...input.selectedEventIds]);
   const [eventParameterRules, setEventParameterRules] = useState(input.eventParameterRules ?? {});
@@ -127,6 +132,28 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+async function findVisibleButtonByName(
+  queries: ReturnType<typeof within>,
+  name: string,
+): Promise<HTMLElement> {
+  let visibleButton: HTMLElement | undefined;
+
+  await waitFor(() => {
+    visibleButton = queries
+      .getAllByRole("button", { name })
+      .find((button: HTMLElement) => button.getClientRects().length > 0);
+    if (visibleButton === undefined) {
+      throw new Error(`Expected visible button named '${name}'.`);
+    }
+  });
+
+  if (visibleButton === undefined) {
+    throw new Error(`Expected visible button named '${name}'.`);
+  }
+
+  return visibleButton;
+}
 
 export const Default: Story = {
   args: {
@@ -205,6 +232,50 @@ export const GitHubReviewRequestTeamSyncFailed: Story = {
     },
     eventOptions: StoryGitHubEventOptions,
     showGitHubTeamSyncError: true,
+  },
+};
+
+export const SlackChannelRefreshFooter: Story = {
+  name: "Slack channel refresh footer",
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: StorySlackConnectionId,
+    selectedEventIds: [StorySlackAppMentionConditionId],
+    eventParameterRules: {
+      [StorySlackAppMentionConditionId]: {
+        channel: isAnyOfRule(["C_ENG_001"]),
+      },
+    },
+    eventOptions: StorySlackEventOptions,
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const body = within(canvasElement.ownerDocument.body);
+
+    await userEvent.click(await body.findByDisplayValue("#engineering"));
+    await findVisibleButtonByName(body, "Refresh channels");
+  },
+};
+
+export const SlackChannelRefreshingFooter: Story = {
+  name: "Slack channel refreshing footer",
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: StorySlackConnectionId,
+    selectedEventIds: [StorySlackAppMentionConditionId],
+    eventParameterRules: {
+      [StorySlackAppMentionConditionId]: {
+        channel: isAnyOfRule(["C_ENG_001"]),
+      },
+    },
+    eventOptions: StorySlackEventOptions,
+    showSlackChannelSyncing: true,
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const body = within(canvasElement.ownerDocument.body);
+
+    await userEvent.click(await body.findByDisplayValue("#engineering"));
+    await expect(await findVisibleButtonByName(body, "Refresh channels")).toBeDisabled();
+    await expect(body.getByText("Refreshing channels")).toBeVisible();
   },
 };
 

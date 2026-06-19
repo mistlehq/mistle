@@ -20,14 +20,21 @@ import {
   useComboboxAnchor,
   Notice,
 } from "@mistle/ui";
-import { InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
-import { useQuery } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { ArrowClockwiseIcon, InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type FocusEvent, useId, useRef, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
+import {
+  filterStringComboboxOptions,
+  resolveStringComboboxOption,
+  type StringComboboxOption,
+} from "../forms/string-combobox-options.js";
 import { IntegrationLogo } from "../integrations/integration-logo.js";
-import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
+import {
+  listIntegrationConnectionResources,
+  refreshIntegrationConnectionResources,
+} from "../integrations/integrations-service.js";
 import { isWebhookTriggerEventOptionUnavailable } from "./webhook-trigger-event-option-availability.js";
 import {
   resolveSelectedWebhookTriggerEventOptions,
@@ -46,6 +53,7 @@ import { createWebhookTriggerEventConditionId } from "./webhook-trigger-option-b
 const EventParameterRowClassName = "flex w-full items-center gap-4";
 const EventParameterLabelClassName = "text-muted-foreground shrink-0 text-sm whitespace-nowrap";
 const EventParameterControlClassName = "min-w-0 flex-1";
+const ResourceSyncPollIntervalMs = 3_000;
 
 type WebhookTriggerEventParameter = NonNullable<WebhookTriggerEventOption["parameters"]>[number];
 
@@ -60,6 +68,24 @@ type EnumSelectWebhookTriggerEventParameter = Extract<
   WebhookTriggerEventParameter,
   { kind: "enum-select" }
 >;
+
+type ResourceSelectWebhookTriggerEventParameter = Extract<
+  WebhookTriggerEventParameter,
+  { kind: "resource-select" }
+>;
+
+type ResourceParameterOption = {
+  id: string;
+  handle: string;
+  displayName: string;
+};
+
+function createTriggerParameterResourceQueryKey(input: {
+  connectionId: string;
+  resourceKind: string;
+}): readonly ["trigger-trigger-parameters", string, string] {
+  return ["trigger-trigger-parameters", input.connectionId, input.resourceKind];
+}
 
 export function WebhookTriggerEventPicker(input: {
   hasConnectedIntegrations: boolean;
@@ -481,12 +507,6 @@ export function WebhookTriggerEventPickerAddButton(input: {
   );
 }
 
-type ResourceParameterOption = {
-  id: string;
-  handle: string;
-  displayName: string;
-};
-
 function normalizeResourceParameterOptions(input: {
   items: readonly ResourceParameterOption[];
   selectedValues: readonly string[];
@@ -507,6 +527,52 @@ function normalizeResourceParameterOptions(input: {
     }));
 
   return [...sortedOptions, ...missingSelectedOptions];
+}
+
+function useTriggerParameterResources(input: {
+  connectionId: string;
+  resourceKind: string | undefined;
+  selectedValues: readonly string[];
+}) {
+  const resourceQueryKey = createTriggerParameterResourceQueryKey({
+    connectionId: input.connectionId,
+    resourceKind: input.resourceKind ?? "none",
+  });
+  const resourceQuery = useQuery({
+    queryKey: resourceQueryKey,
+    queryFn: async ({ signal }) => {
+      if (input.resourceKind === undefined) {
+        throw new Error("Resource parameter is missing resource kind.");
+      }
+
+      return listIntegrationConnectionResources({
+        connectionId: input.connectionId,
+        kind: input.resourceKind,
+        signal,
+      });
+    },
+    enabled: input.resourceKind !== undefined && input.connectionId.trim().length > 0,
+    retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.syncState === "syncing" ? ResourceSyncPollIntervalMs : false,
+  });
+  const normalizedResourceOptions = normalizeResourceParameterOptions({
+    items: resourceQuery.data?.items ?? [],
+    selectedValues: input.selectedValues,
+  });
+  const resourceErrorMessage = resolveResourceParameterErrorMessage({
+    isError: resourceQuery.isError,
+    error: resourceQuery.error,
+    syncState: resourceQuery.data?.syncState,
+    lastErrorMessage: resourceQuery.data?.lastErrorMessage,
+  });
+
+  return {
+    normalizedResourceOptions,
+    resourceErrorMessage,
+    resourceQuery,
+    resourceQueryKey,
+  };
 }
 
 function findConfiguredOneOfParameterId(input: {
@@ -641,33 +707,11 @@ function OneOfParameterGroupField(input: {
   const selectedParameter = selectedOption.parameter;
   const selectedRule = input.rules[selectedParameter.id];
   const selectedValue = selectedRule?.value ?? "";
-  const selectedResourceKind =
-    selectedParameter.kind === "resource-select" ? selectedParameter.resourceKind : "none";
-  const resourceQuery = useQuery({
-    queryKey: ["trigger-trigger-parameters", input.connectionId, selectedResourceKind],
-    queryFn: async ({ signal }) => {
-      if (selectedParameter.kind !== "resource-select") {
-        throw new Error("Resource parameter group option is missing resource kind.");
-      }
-
-      return listIntegrationConnectionResources({
-        connectionId: input.connectionId,
-        kind: selectedParameter.resourceKind,
-        signal,
-      });
-    },
-    enabled: selectedParameter.kind === "resource-select" && input.connectionId.trim().length > 0,
-    retry: false,
-  });
-  const normalizedResourceOptions = normalizeResourceParameterOptions({
-    items: resourceQuery.data?.items ?? [],
+  const selectedResources = useTriggerParameterResources({
+    connectionId: input.connectionId,
+    resourceKind:
+      selectedParameter.kind === "resource-select" ? selectedParameter.resourceKind : undefined,
     selectedValues: resolveParameterRuleValues(selectedRule),
-  });
-  const resourceErrorMessage = resolveResourceParameterErrorMessage({
-    isError: resourceQuery.isError,
-    error: resourceQuery.error,
-    syncState: resourceQuery.data?.syncState,
-    lastErrorMessage: resourceQuery.data?.lastErrorMessage,
   });
 
   function clearInactiveRules(parameterId: string): void {
@@ -735,56 +779,63 @@ function OneOfParameterGroupField(input: {
           {selectedParameter.multiValue === true ? (
             <ResourceMultiSelectParameterField
               key={`${input.connectionId}:${resolveParameterRuleValues(selectedRule).join("\u0000")}`}
+              connectionId={input.connectionId}
               disabled={input.disabled}
               onRuleChange={(rule) => {
                 input.onRuleChange(selectedParameter.id, rule);
               }}
               parameter={selectedParameter}
               placeholder={
-                resourceQuery.isPending
+                selectedResources.resourceQuery.isPending
                   ? "Loading..."
-                  : resourceErrorMessage !== null
+                  : selectedResources.resourceErrorMessage !== null
                     ? `Could not load ${selectedParameter.label}s`
-                    : normalizedResourceOptions.length === 0
+                    : selectedResources.normalizedResourceOptions.length === 0
                       ? `No ${selectedParameter.label}s available`
                       : (selectedParameter.placeholder ?? `Any ${selectedParameter.label}`)
               }
               rule={selectedRule}
-              resourceOptions={normalizedResourceOptions}
+              resourceQueryKey={selectedResources.resourceQueryKey}
+              resourceOptions={selectedResources.normalizedResourceOptions}
+              syncState={selectedResources.resourceQuery.data?.syncState}
               showOperator={false}
             />
           ) : (
-            <SingleSelectStringComboboxField
+            <ResourceSelectParameterCombobox
+              connectionId={input.connectionId}
               contentClassName="w-[min(22rem,calc(100vw-2rem))]"
+              disabled={input.disabled}
               inputId={inputId}
               inputLabel={selectedParameter.label}
               inputWrapperClassName="w-full"
-              disabled={input.disabled}
               onChange={(value) => {
                 input.onRuleChange(selectedParameter.id, {
                   operator: resolveEqualityOperator(selectedRule),
                   value: value ?? "",
                 });
               }}
-              options={normalizedResourceOptions.map((option) => ({
-                value: option.handle,
-                label: option.displayName,
-              }))}
+              options={selectedResources.normalizedResourceOptions}
               placeholder={
-                resourceQuery.isPending
+                selectedResources.resourceQuery.isPending
                   ? "Loading..."
-                  : resourceErrorMessage !== null
+                  : selectedResources.resourceErrorMessage !== null
                     ? `Could not load ${selectedParameter.label}s`
-                    : normalizedResourceOptions.length === 0
+                    : selectedResources.normalizedResourceOptions.length === 0
                       ? `No ${selectedParameter.label}s available`
                       : (selectedParameter.placeholder ?? `Any ${selectedParameter.label}`)
               }
-              emptyMessage={resourceErrorMessage ?? `No matching ${selectedParameter.label}s.`}
+              emptyMessage={
+                selectedResources.resourceErrorMessage ?? `No matching ${selectedParameter.label}s.`
+              }
+              parameterLabel={selectedParameter.label}
+              resourceKind={selectedParameter.resourceKind}
+              resourceQueryKey={selectedResources.resourceQueryKey}
+              syncState={selectedResources.resourceQuery.data?.syncState}
               value={selectedValue.length === 0 ? undefined : selectedValue}
             />
           )}
-          {resourceErrorMessage === null ? null : (
-            <Notice variant="alert">{resourceErrorMessage}</Notice>
+          {selectedResources.resourceErrorMessage === null ? null : (
+            <Notice variant="alert">{selectedResources.resourceErrorMessage}</Notice>
           )}
         </div>
       ) : selectedParameter.kind === "string" ? (
@@ -843,33 +894,17 @@ function EventParameterField(input: {
   rule: WebhookTriggerEventParameterRule | undefined;
   onRuleChange: (rule: WebhookTriggerEventParameterRule) => void;
 }): React.JSX.Element | null {
-  const resourceQuery = useQuery({
-    queryKey: [
-      "trigger-trigger-parameters",
-      input.connectionId,
-      input.parameter.kind === "resource-select" ? input.parameter.resourceKind : "none",
-    ],
-    queryFn: async ({ signal }) => {
-      if (
-        input.parameter.kind !== "resource-select" ||
-        input.parameter.resourceKind === undefined
-      ) {
-        throw new Error("Resource parameter is missing resource kind.");
-      }
-
-      return listIntegrationConnectionResources({
-        connectionId: input.connectionId,
-        kind: input.parameter.resourceKind,
-        signal,
-      });
-    },
-    enabled:
-      input.parameter.kind === "resource-select" &&
-      input.parameter.resourceKind !== undefined &&
-      input.connectionId.trim().length > 0,
-    retry: false,
-  });
   const value = input.rule?.value ?? "";
+  const multiValues = resolveParameterRuleValues(input.rule);
+  const resources = useTriggerParameterResources({
+    connectionId: input.connectionId,
+    resourceKind:
+      input.parameter.kind === "resource-select" ? input.parameter.resourceKind : undefined,
+    selectedValues:
+      input.parameter.kind === "resource-select" && input.parameter.multiValue === true
+        ? multiValues
+        : [value],
+  });
 
   if (input.parameter.kind === "string") {
     if (input.parameter.controlVariant === "invocation-token") {
@@ -973,32 +1008,30 @@ function EventParameterField(input: {
     );
   }
 
-  const multiValues = resolveParameterRuleValues(input.rule);
-  const normalizedResourceOptions = normalizeResourceParameterOptions({
-    items: resourceQuery.data?.items ?? [],
-    selectedValues: input.parameter.multiValue === true ? multiValues : [value],
-  });
-  const resolvedSelectedResourceOption = normalizedResourceOptions.find(
+  const resolvedSelectedResourceOption = resources.normalizedResourceOptions.find(
     (option) => option.handle === value,
   );
   const placeholder =
     input.connectionId.trim().length === 0
       ? `Select ${input.parameter.label}`
-      : resourceQuery.isPending
+      : resources.resourceQuery.isPending
         ? "Loading..."
-        : normalizedResourceOptions.length === 0
+        : resources.normalizedResourceOptions.length === 0
           ? `No ${input.parameter.label}s available`
           : `Select ${input.parameter.label}`;
   if (input.parameter.multiValue === true) {
     return (
       <ResourceMultiSelectParameterField
         key={`${input.connectionId}:${multiValues.join("\u0000")}`}
+        connectionId={input.connectionId}
         disabled={input.disabled}
         onRuleChange={input.onRuleChange}
         parameter={input.parameter}
         placeholder={placeholder}
         rule={input.rule}
-        resourceOptions={normalizedResourceOptions}
+        resourceQueryKey={resources.resourceQueryKey}
+        resourceOptions={resources.normalizedResourceOptions}
+        syncState={resources.resourceQuery.data?.syncState}
       />
     );
   }
@@ -1006,17 +1039,21 @@ function EventParameterField(input: {
   return (
     <ResourceSelectParameterField
       key={`${input.connectionId}:${value}:${resolvedSelectedResourceOption?.displayName ?? ""}`}
+      connectionId={input.connectionId}
       disabled={input.disabled}
       onRuleChange={input.onRuleChange}
       parameter={input.parameter}
       placeholder={placeholder}
       rule={input.rule}
-      resourceOptions={normalizedResourceOptions}
+      resourceQueryKey={resources.resourceQueryKey}
+      resourceOptions={resources.normalizedResourceOptions}
+      syncState={resources.resourceQuery.data?.syncState}
     />
   );
 }
 
 function ResourceMultiSelectParameterField(input: {
+  connectionId: string;
   disabled: boolean;
   parameter: Extract<
     NonNullable<WebhookTriggerEventOption["parameters"]>[number],
@@ -1029,6 +1066,8 @@ function ResourceMultiSelectParameterField(input: {
     handle: string;
     displayName: string;
   }>;
+  resourceQueryKey: readonly ["trigger-trigger-parameters", string, string];
+  syncState: string | undefined;
   onRuleChange: (rule: WebhookTriggerEventParameterRule) => void;
   showOperator?: boolean;
 }): React.JSX.Element {
@@ -1097,6 +1136,14 @@ function ResourceMultiSelectParameterField(input: {
                 </ComboboxItem>
               ))}
             </ComboboxList>
+            <ResourceRefreshFooter
+              connectionId={input.connectionId}
+              disabled={input.disabled}
+              parameterLabel={input.parameter.label}
+              resourceKind={input.parameter.resourceKind}
+              resourceQueryKey={input.resourceQueryKey}
+              syncState={input.syncState}
+            />
           </ComboboxContent>
         ) : null}
       </Combobox>
@@ -1215,19 +1262,234 @@ function EqualityOperatorSelect(input: {
   );
 }
 
-function ResourceSelectParameterField(input: {
+function formatRefreshResourceLabel(parameterLabel: string): string {
+  const trimmedLabel = parameterLabel.trim();
+  if (trimmedLabel.length === 0) {
+    return "resources";
+  }
+
+  const lastSpaceIndex = trimmedLabel.lastIndexOf(" ");
+  const labelPrefix = lastSpaceIndex === -1 ? "" : trimmedLabel.slice(0, lastSpaceIndex + 1);
+  const noun = lastSpaceIndex === -1 ? trimmedLabel : trimmedLabel.slice(lastSpaceIndex + 1);
+
+  if (noun.endsWith("y")) {
+    return `${labelPrefix}${noun.slice(0, -1)}ies`;
+  }
+
+  if (noun.endsWith("ch") || noun.endsWith("sh") || noun.endsWith("x") || noun.endsWith("z")) {
+    return `${labelPrefix}${noun}es`;
+  }
+
+  if (noun.endsWith("s")) {
+    return trimmedLabel;
+  }
+
+  return `${labelPrefix}${noun}s`;
+}
+
+function toStringComboboxOptions(
+  resourceOptions: readonly ResourceParameterOption[],
+): StringComboboxOption[] {
+  return resourceOptions.map((option) => ({
+    value: option.handle,
+    label: option.displayName,
+  }));
+}
+
+function ResourceRefreshFooter(input: {
+  connectionId: string;
   disabled: boolean;
-  parameter: Extract<
-    NonNullable<WebhookTriggerEventOption["parameters"]>[number],
-    { kind: "resource-select" }
-  >;
+  parameterLabel: string;
+  resourceKind: string;
+  resourceQueryKey: readonly ["trigger-trigger-parameters", string, string];
+  syncState: string | undefined;
+}): React.JSX.Element {
+  const queryClient = useQueryClient();
+  const resourceLabel = formatRefreshResourceLabel(input.parameterLabel);
+  const refreshLabel = `Refresh ${resourceLabel}`;
+  const refreshMutation = useMutation({
+    mutationFn: async () =>
+      refreshIntegrationConnectionResources({
+        connectionId: input.connectionId,
+        kind: input.resourceKind,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: input.resourceQueryKey,
+      });
+    },
+  });
+
+  const refreshErrorMessage =
+    refreshMutation.error === null || refreshMutation.error === undefined
+      ? null
+      : resolveApiErrorMessage({
+          error: refreshMutation.error,
+          fallbackMessage: `Could not refresh ${resourceLabel}.`,
+        });
+  const refreshIsPending = refreshMutation.isPending || input.syncState === "syncing";
+
+  return (
+    <div className="border-t p-1">
+      <Button
+        aria-label={refreshLabel}
+        className="w-full justify-start gap-2"
+        disabled={input.disabled || refreshIsPending}
+        onMouseDown={(event) => {
+          event.preventDefault();
+        }}
+        onClick={() => {
+          refreshMutation.mutate();
+        }}
+        type="button"
+        variant="ghost"
+      >
+        <ArrowClockwiseIcon
+          aria-hidden
+          className={refreshIsPending ? "size-4 animate-spin" : "size-4"}
+        />
+        {refreshIsPending ? `Refreshing ${resourceLabel}` : refreshLabel}
+      </Button>
+      {refreshErrorMessage === null ? null : (
+        <p className="text-destructive px-2 pt-1 pb-0.5 text-xs">{refreshErrorMessage}</p>
+      )}
+    </div>
+  );
+}
+
+function ResourceSelectParameterCombobox(input: {
+  connectionId: string;
+  contentClassName?: string | undefined;
+  disabled: boolean;
+  emptyMessage: string;
+  inputId: string;
+  inputLabel: string;
+  inputWrapperClassName: string;
+  onChange: (value: string | undefined) => void;
+  options: readonly ResourceParameterOption[];
+  parameterLabel: string;
+  placeholder: string;
+  resourceKind: string;
+  resourceQueryKey: readonly ["trigger-trigger-parameters", string, string];
+  syncState: string | undefined;
+  value: string | undefined;
+}): React.JSX.Element {
+  const selectedValue = typeof input.value === "string" ? input.value : "";
+  const options = toStringComboboxOptions(input.options);
+  const selectedOption = resolveStringComboboxOption(options, selectedValue);
+  const [isOpen, setIsOpen] = useState(false);
+  const [queryText, setQueryText] = useState(selectedOption?.label ?? "");
+  const anchorRef = useComboboxAnchor();
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const disabled = input.disabled;
+  const showClear = selectedValue.length > 0;
+  const filteredOptions = filterStringComboboxOptions(options, queryText);
+
+  function focusIsWithinCombobox(nextFocusedElement: EventTarget | null): boolean {
+    if (!(nextFocusedElement instanceof Node)) {
+      return false;
+    }
+
+    return (
+      anchorRef.current?.contains(nextFocusedElement) === true ||
+      contentRef.current?.contains(nextFocusedElement) === true
+    );
+  }
+
+  function handleComboboxInputBlur(event: FocusEvent<HTMLInputElement>): void {
+    if (focusIsWithinCombobox(event.relatedTarget)) {
+      return;
+    }
+
+    setIsOpen(false);
+  }
+
+  function handleComboboxContentBlur(event: FocusEvent<HTMLDivElement>): void {
+    if (focusIsWithinCombobox(event.relatedTarget)) {
+      return;
+    }
+
+    setIsOpen(false);
+  }
+
+  return (
+    <Combobox<string>
+      autoHighlight
+      disabled={disabled}
+      inputValue={isOpen ? queryText : (selectedOption?.label ?? "")}
+      onInputValueChange={setQueryText}
+      onOpenChange={(open) => {
+        setIsOpen(open);
+        if (open) {
+          setQueryText("");
+        } else {
+          setQueryText("");
+        }
+      }}
+      onValueChange={(value) => {
+        setQueryText("");
+        input.onChange(value ?? undefined);
+      }}
+      open={isOpen}
+      value={selectedValue.length === 0 ? null : selectedValue}
+    >
+      <div className={input.inputWrapperClassName} ref={anchorRef}>
+        <ComboboxInput
+          aria-label={input.inputLabel}
+          className="w-full"
+          disabled={disabled}
+          id={input.inputId}
+          onBlur={handleComboboxInputBlur}
+          onFocus={() => {
+            setQueryText("");
+            setIsOpen(true);
+          }}
+          placeholder={input.placeholder}
+          showClear={showClear}
+        />
+      </div>
+      {isOpen ? (
+        <ComboboxContent
+          anchor={anchorRef}
+          className={input.contentClassName === undefined ? "p-0" : `p-0 ${input.contentClassName}`}
+          onBlur={handleComboboxContentBlur}
+          ref={contentRef}
+        >
+          <ComboboxList>
+            {filteredOptions.map((option) => (
+              <ComboboxItem key={option.value} value={option.value}>
+                <span className="truncate">{option.label}</span>
+              </ComboboxItem>
+            ))}
+            {filteredOptions.length === 0 ? (
+              <div className="text-muted-foreground py-2 text-center text-sm">
+                {input.emptyMessage}
+              </div>
+            ) : null}
+          </ComboboxList>
+          <ResourceRefreshFooter
+            connectionId={input.connectionId}
+            disabled={disabled}
+            parameterLabel={input.parameterLabel}
+            resourceKind={input.resourceKind}
+            resourceQueryKey={input.resourceQueryKey}
+            syncState={input.syncState}
+          />
+        </ComboboxContent>
+      ) : null}
+    </Combobox>
+  );
+}
+
+function ResourceSelectParameterField(input: {
+  connectionId: string;
+  disabled: boolean;
+  parameter: ResourceSelectWebhookTriggerEventParameter;
   rule: WebhookTriggerEventParameterRule | undefined;
   placeholder: string;
-  resourceOptions: Array<{
-    id: string;
-    handle: string;
-    displayName: string;
-  }>;
+  resourceOptions: ResourceParameterOption[];
+  resourceQueryKey: readonly ["trigger-trigger-parameters", string, string];
+  syncState: string | undefined;
   onRuleChange: (rule: WebhookTriggerEventParameterRule) => void;
 }): React.JSX.Element {
   const inputId = useId();
@@ -1246,23 +1508,26 @@ function ResourceSelectParameterField(input: {
           });
         }}
       />
-      <SingleSelectStringComboboxField
+      <ResourceSelectParameterCombobox
+        connectionId={input.connectionId}
         contentClassName="w-[min(22rem,calc(100vw-2rem))]"
+        disabled={input.disabled}
+        emptyMessage={`No matching ${input.parameter.label}s.`}
         inputId={inputId}
         inputLabel={input.parameter.label}
         inputWrapperClassName={EventParameterControlClassName}
-        disabled={input.disabled}
         onChange={(value) => {
           input.onRuleChange({
             operator: resolveEqualityOperator(input.rule),
             value: value ?? "",
           });
         }}
-        options={input.resourceOptions.map((option) => ({
-          value: option.handle,
-          label: option.displayName,
-        }))}
+        options={input.resourceOptions}
+        parameterLabel={input.parameter.label}
         placeholder={value.length === 0 ? `Any ${input.parameter.label}` : input.placeholder}
+        resourceKind={input.parameter.resourceKind}
+        resourceQueryKey={input.resourceQueryKey}
+        syncState={input.syncState}
         value={value.length === 0 ? undefined : value}
       />
     </span>
