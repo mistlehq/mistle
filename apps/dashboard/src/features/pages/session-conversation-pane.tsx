@@ -1,3 +1,4 @@
+import { memo, useCallback, useMemo, useState } from "react";
 import type React from "react";
 
 import type { ChatEntry } from "../chat/chat-types.js";
@@ -15,7 +16,9 @@ import {
 import {
   ComposerStatusBanner,
   SessionComposerActivityRow,
+  createComposerDraft,
   useSessionComposerState,
+  type ComposerDraft,
   type QueuedComposerPromptViewModel,
   type SessionComposerDraftState,
   type SessionComposerStateInput,
@@ -64,7 +67,15 @@ type SessionConversationBottomPanelControllerProps = SessionConversationSharedPa
   showWorkingIndicator?: boolean;
 };
 
-export function SessionConversationMainContent({
+type SessionConversationBottomPanelDraftControllerProps = Omit<
+  SessionConversationBottomPanelControllerProps,
+  "draftState"
+> &
+  Pick<SessionComposerDraftState, "clearPendingDiffComments" | "pendingDiffComments"> & {
+    draftResetKey: string;
+  };
+
+function SessionConversationMainContentView({
   activeTurnId,
   formatInitialUserMessageAsTriggerInput = false,
   isTurnInProgress,
@@ -125,6 +136,9 @@ export function SessionConversationMainContent({
     </div>
   );
 }
+
+export const SessionConversationMainContent = memo(SessionConversationMainContentView);
+SessionConversationMainContent.displayName = "SessionConversationMainContent";
 
 export function SessionConversationBottomPanel({
   serverRequestPanelEntries,
@@ -195,4 +209,51 @@ export function SessionConversationBottomPanelController({
       {...(showWorkingIndicator === undefined ? {} : { showWorkingIndicator })}
     />
   );
+}
+
+export function SessionConversationBottomPanelDraftController({
+  clearPendingDiffComments,
+  draftResetKey,
+  pendingDiffComments,
+  ...controllerProps
+}: SessionConversationBottomPanelDraftControllerProps): React.JSX.Element {
+  return (
+    <SessionConversationBottomPanelDraftOwner
+      key={draftResetKey}
+      clearPendingDiffComments={clearPendingDiffComments}
+      controllerProps={controllerProps}
+      pendingDiffComments={pendingDiffComments}
+    />
+  );
+}
+
+function SessionConversationBottomPanelDraftOwner({
+  clearPendingDiffComments,
+  controllerProps,
+  pendingDiffComments,
+}: {
+  clearPendingDiffComments: SessionComposerDraftState["clearPendingDiffComments"];
+  controllerProps: Omit<SessionConversationBottomPanelControllerProps, "draftState">;
+  pendingDiffComments: SessionComposerDraftState["pendingDiffComments"];
+}): React.JSX.Element {
+  const [composerDraft, setComposerDraft] = useState(() => createComposerDraft(""));
+
+  const handleComposerDraftChange = useCallback(
+    (nextComposerDraft: React.SetStateAction<ComposerDraft>): void => {
+      setComposerDraft(nextComposerDraft);
+    },
+    [],
+  );
+
+  const draftState = useMemo(
+    () => ({
+      composerDraft,
+      pendingDiffComments,
+      clearPendingDiffComments,
+      setComposerDraft: handleComposerDraftChange,
+    }),
+    [clearPendingDiffComments, composerDraft, handleComposerDraftChange, pendingDiffComments],
+  );
+
+  return <SessionConversationBottomPanelController {...controllerProps} draftState={draftState} />;
 }

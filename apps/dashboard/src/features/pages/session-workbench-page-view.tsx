@@ -45,6 +45,7 @@ type SessionWorkbenchPageViewProps = {
   secondaryPanelMinSize?: string;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
+  isPrimaryBottomPanelVisible?: boolean;
   bottomPanel: React.ReactNode;
   isBottomPanelVisible: boolean;
   secondaryPanel: React.ReactNode;
@@ -68,6 +69,7 @@ export function SessionWorkbenchPageView({
   secondaryPanelMinSize = "20%",
   mainContent,
   primaryBottomPanel,
+  isPrimaryBottomPanelVisible,
   bottomPanel,
   isBottomPanelVisible,
   secondaryPanel,
@@ -136,6 +138,7 @@ export function SessionWorkbenchPageView({
 
   const hasPrimaryBottomPanel =
     primaryBottomPanel !== null && primaryBottomPanel !== undefined && primaryBottomPanel !== false;
+  const shouldShowPrimaryBottomPanel = isPrimaryBottomPanelVisible ?? hasPrimaryBottomPanel;
   const mainContentContainerClassName =
     mainContentLayout.width === "full" ? "h-full w-full" : "mx-auto w-full max-w-3xl px-4 pb-4";
   const mainContentRegionClassName =
@@ -160,7 +163,12 @@ export function SessionWorkbenchPageView({
       </div>
 
       {!hasPrimaryBottomPanel ? null : (
-        <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
+        <div
+          className={[
+            "bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm",
+            shouldShowPrimaryBottomPanel ? null : "hidden",
+          ].join(" ")}
+        >
           <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
         </div>
       )}

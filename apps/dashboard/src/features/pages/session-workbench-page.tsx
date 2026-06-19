@@ -4,7 +4,7 @@ import {
   useIsBelowBreakpoint,
   useSidebar,
 } from "@mistle/ui";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import { isUnavailableResourceError } from "../api/http-api-error.js";
@@ -13,6 +13,7 @@ import {
   RuntimeConversationNavigatorPanel,
   RuntimeConversationNavigatorSheet,
 } from "../session-agents/runtime-conversations/runtime-conversation-navigator.js";
+import type { ServerRequestEntry } from "../session-agents/server-requests/index.js";
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
 import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
@@ -26,7 +27,7 @@ import { SessionCliPanel } from "./session-cli-panel.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import {
   SessionConversationBottomPanel,
-  SessionConversationBottomPanelController,
+  SessionConversationBottomPanelDraftController,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 import type {
@@ -50,24 +51,37 @@ import { SessionWorkbenchHeaderActions } from "./session-workbench-header-action
 import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
+  type SessionWorkbenchMainContentLayout,
 } from "./session-workbench-page-view.js";
 import { SessionRepositoryNoneValue } from "./use-session-primary-repository-state.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 import { useSessionWorkbenchRuntimeConversationNavigation } from "./use-session-workbench-runtime-conversation-navigation.js";
 
-export function shouldResetConversationScopedComposerStateForActiveConversationChange(input: {
-  lastActiveConversationId: string | null;
-  nextActiveConversationId: string | null;
-}): boolean {
-  if (input.nextActiveConversationId === null) {
-    return false;
-  }
+const ContainedFullMainContentLayout = {
+  scroll: "contained",
+  width: "full",
+} satisfies SessionWorkbenchMainContentLayout;
 
-  if (input.lastActiveConversationId === null) {
-    return false;
-  }
+const PageChatMainContentLayout = {
+  scroll: "page",
+  width: "chat",
+} satisfies SessionWorkbenchMainContentLayout;
 
-  return input.lastActiveConversationId !== input.nextActiveConversationId;
+export function resolveConversationScopedComposerRenderKey(input: {
+  activeConversationId: string | null;
+  providerConversationId: string | null;
+  requestedRuntimeConversationId: string | null;
+  sandboxInstanceId: string | null;
+  triggerConversation: { providerConversationId: string | null } | null;
+}): string {
+  const conversationScopeId =
+    input.requestedRuntimeConversationId ??
+    input.activeConversationId ??
+    input.triggerConversation?.providerConversationId ??
+    input.providerConversationId ??
+    "no-thread";
+
+  return [input.sandboxInstanceId ?? "missing-session", conversationScopeId].join(":");
 }
 
 export function SessionWorkbenchPage(): React.JSX.Element {
@@ -99,48 +113,8 @@ function SessionWorkbenchPageContent(input: {
   });
   const [hasEnteredReadyWorkbench, setHasEnteredReadyWorkbench] = useState(false);
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const lastEstablishedActiveConversationIdRef = useRef<string | null>(null);
-  const [composerDraft, setComposerDraft] = useState(createComposerDraft(""));
   const [isMobileConversationNavigatorOpen, setMobileConversationNavigatorOpen] = useState(false);
   const isMobileSecondaryPanelLayout = useIsBelowBreakpoint(CssBreakpointVariables.SM);
-  const [pendingDiffComments, setPendingDiffComments] = useState<
-    readonly PendingSessionDiffComment[]
-  >([]);
-  const handleAddPendingDiffComment = useCallback(
-    (comment: PendingSessionDiffCommentInput): void => {
-      setPendingDiffComments((currentComments) => [
-        ...currentComments,
-        {
-          ...comment,
-          id: crypto.randomUUID(),
-          status: comment.status ?? {
-            kind: "current",
-          },
-        },
-      ]);
-    },
-    [],
-  );
-  const handleClearPendingDiffComments = useCallback((): void => {
-    setPendingDiffComments([]);
-  }, []);
-  const handleUpdatePendingDiffComment = useCallback((commentId: string, body: string): void => {
-    setPendingDiffComments((currentComments) =>
-      currentComments.map((comment) =>
-        comment.id !== commentId
-          ? comment
-          : {
-              ...comment,
-              body,
-            },
-      ),
-    );
-  }, []);
-  const handleRemovePendingDiffComment = useCallback((commentId: string): void => {
-    setPendingDiffComments((currentComments) =>
-      currentComments.filter((comment) => comment.id !== commentId),
-    );
-  }, []);
   const terminalWorkspaceRef = useRef<SessionTerminalWorkspaceHandle | null>(null);
   const isTerminalOpenDisabled =
     !workbench.terminalPanelState.isVisible && !workbench.connectionReadiness.canConnect;
@@ -374,27 +348,33 @@ function SessionWorkbenchPageContent(input: {
       workbench.terminalPanelState.openPanel,
     ],
   );
-  const chatItemIds = new Set(
-    conversationPane.chatState.entries.flatMap((entry) => {
-      if (entry.kind === "semantic-group") {
-        return entry.items.map((item) => item.id);
-      }
+  const chatItemIds = useMemo(
+    () =>
+      new Set<string>(
+        conversationPane.chatState.entries.flatMap((entry) => {
+          if (entry.kind === "semantic-group") {
+            return entry.items.map((item) => item.id);
+          }
 
-      if (entry.kind === "command-execution" || entry.kind === "file-change") {
-        return [entry.id];
-      }
+          if (entry.kind === "command-execution" || entry.kind === "file-change") {
+            return [entry.id];
+          }
 
-      return [];
-    }),
+          return [];
+        }),
+      ),
+    [conversationPane.chatState.entries],
   );
-  const unmatchedServerRequests = conversationPane.serverRequestsState.pendingServerRequests.filter(
-    (entry) => {
-      if (entry.kind !== "command-approval" && entry.kind !== "file-change-approval") {
-        return true;
-      }
+  const unmatchedServerRequests = useMemo(
+    () =>
+      conversationPane.serverRequestsState.pendingServerRequests.filter((entry) => {
+        if (entry.kind !== "command-approval" && entry.kind !== "file-change-approval") {
+          return true;
+        }
 
-      return !chatItemIds.has(entry.itemId);
-    },
+        return !chatItemIds.has(entry.itemId);
+      }),
+    [chatItemIds, conversationPane.serverRequestsState.pendingServerRequests],
   );
   const terminalPanelKey = input.sandboxInstanceId ?? "missing-session";
   const diffPanelErrorNotice = !workbench.connectionReadiness.canConnect
@@ -415,40 +395,6 @@ function SessionWorkbenchPageContent(input: {
       : resolveSessionTitleLabel(workbench.sandboxStatusQuery.data.title);
 
   useDocumentTitle(sessionDocumentTitle);
-
-  useEffect(() => {
-    const shouldResetConversationScopedComposerState =
-      shouldResetConversationScopedComposerStateForActiveConversationChange({
-        lastActiveConversationId: lastEstablishedActiveConversationIdRef.current,
-        nextActiveConversationId: conversationPane.activeConversationId,
-      });
-
-    if (conversationPane.activeConversationId !== null) {
-      lastEstablishedActiveConversationIdRef.current = conversationPane.activeConversationId;
-    }
-
-    if (!shouldResetConversationScopedComposerState) {
-      return;
-    }
-
-    setComposerDraft(createComposerDraft(""));
-    setPendingDiffComments([]);
-  }, [conversationPane.activeConversationId]);
-
-  useEffect(() => {
-    if (!workbench.connectionReadiness.canConnect) {
-      return;
-    }
-
-    const parsedPatch = parseSessionDiffPatch(diffPanelPatch);
-    setPendingDiffComments((currentComments) =>
-      reconcilePendingSessionDiffComments({
-        comments: currentComments,
-        currentRepositoryPath: primaryRepositoryPath,
-        fileDiffs: parsedPatch.kind === "parsed" ? parsedPatch.files : [],
-      }),
-    );
-  }, [diffPanelPatch, primaryRepositoryPath, workbench.connectionReadiness.canConnect]);
 
   const alert: SessionWorkbenchAlert | null = workbench.sandboxStatusQuery.isError
     ? {
@@ -487,6 +433,101 @@ function SessionWorkbenchPageContent(input: {
     !hasEnteredReadyWorkbench && alert === null ? workbench.initialEntryStartupState : null;
   const isConversationTurnRunning =
     conversationPane.composerStateInput.turnControl.activeTurnState === "running";
+  const initialBottomScrollResetKey = useMemo(
+    () => [input.sandboxInstanceId, conversationPane.activeConversationId ?? "no-thread"].join(":"),
+    [conversationPane.activeConversationId, input.sandboxInstanceId],
+  );
+  const formatInitialUserMessageAsTriggerInput = shouldFormatInitialUserMessageAsTriggerInput({
+    activeConversationId: conversationPane.activeConversationId,
+    triggerConversation: workbench.sandboxStatusQuery.data?.triggerConversation ?? null,
+  });
+  const mainContentLayout =
+    workbench.primaryPanelState.transitionState === "stable_cli" ||
+    initialEntryStartupState !== null
+      ? ContainedFullMainContentLayout
+      : PageChatMainContentLayout;
+  const primaryPanelMainContent = useMemo(
+    () =>
+      renderPrimaryPanelMainContent({
+        conversation: {
+          activeTurnId: conversationPane.chatState.activeTurnId,
+          isTurnInProgress: isConversationTurnRunning,
+          pendingTurnId: conversationPane.chatState.pendingTurnId,
+          autoScrollToBottomOnInitialLoad: true,
+          initialBottomScrollResetKey,
+          scrollBehavior: "follow-streaming-at-bottom",
+          chatEntries: conversationPane.chatState.entries,
+          formatInitialUserMessageAsTriggerInput,
+          onUserMessageAction: conversationPane.dismissUserMessageAction,
+          isRespondingToServerRequest:
+            conversationPane.serverRequestsState.isRespondingToServerRequest,
+          onRespondToServerRequest: conversationPane.serverRequestsState.respondToServerRequest,
+          scrollContainerRef: conversationScrollContainerRef,
+          serverRequestPanelEntries: unmatchedServerRequests,
+        },
+        cli: {
+          ptyState: workbench.cliPtyState,
+          refitKey: workbench.terminalPanelState.isVisible
+            ? "cli:terminal-open"
+            : "cli:terminal-closed",
+          terminalContentInset: workbench.primaryPanelState.cliTerminalContentInset,
+          terminalThemeMode: workbench.primaryPanelState.cliTerminalThemeMode,
+        },
+        initialEntryStartupState,
+        sandboxInstanceId: input.sandboxInstanceId,
+        startupOperation: workbench.sandboxStatusQuery.data?.startupOperation ?? null,
+        transitionState: workbench.primaryPanelState.transitionState,
+      }),
+    [
+      conversationPane.chatState.activeTurnId,
+      conversationPane.chatState.entries,
+      conversationPane.chatState.pendingTurnId,
+      conversationPane.dismissUserMessageAction,
+      conversationPane.serverRequestsState.isRespondingToServerRequest,
+      conversationPane.serverRequestsState.respondToServerRequest,
+      formatInitialUserMessageAsTriggerInput,
+      initialBottomScrollResetKey,
+      initialEntryStartupState,
+      input.sandboxInstanceId,
+      isConversationTurnRunning,
+      unmatchedServerRequests,
+      workbench.cliPtyState,
+      workbench.primaryPanelState.cliTerminalContentInset,
+      workbench.primaryPanelState.cliTerminalThemeMode,
+      workbench.primaryPanelState.transitionState,
+      workbench.sandboxStatusQuery.data?.startupOperation,
+      workbench.terminalPanelState.isVisible,
+    ],
+  );
+  const conversationScopedComposerRenderKey = resolveConversationScopedComposerRenderKey({
+    activeConversationId: conversationPane.activeConversationId,
+    providerConversationId:
+      conversationPane.runtimeConversationNavigator?.providerConversationId ?? null,
+    requestedRuntimeConversationId: input.requestedRuntimeConversationId,
+    sandboxInstanceId: input.sandboxInstanceId,
+    triggerConversation: workbench.sandboxStatusQuery.data?.triggerConversation ?? null,
+  });
+  const pendingDiffCommentStore = useMemo(
+    () => createPendingSessionDiffCommentStore(),
+    [conversationScopedComposerRenderKey],
+  );
+
+  useEffect(() => {
+    if (!workbench.connectionReadiness.canConnect) {
+      return;
+    }
+
+    const parsedPatch = parseSessionDiffPatch(diffPanelPatch);
+    pendingDiffCommentStore.reconcile({
+      currentRepositoryPath: primaryRepositoryPath,
+      fileDiffs: parsedPatch.kind === "parsed" ? parsedPatch.files : [],
+    });
+  }, [
+    diffPanelPatch,
+    pendingDiffCommentStore,
+    primaryRepositoryPath,
+    workbench.connectionReadiness.canConnect,
+  ]);
 
   if (isUnavailableResourceError(workbench.sandboxStatusQuery.error)) {
     return (
@@ -579,67 +620,27 @@ function SessionWorkbenchPageContent(input: {
           : {})}
         secondaryPanelLayoutKey="right-panel"
         secondaryPanelMinSize="16rem"
-        mainContentLayout={
-          workbench.primaryPanelState.transitionState === "stable_cli" ||
-          initialEntryStartupState !== null
-            ? { scroll: "contained", width: "full" }
-            : { scroll: "page", width: "chat" }
-        }
-        mainContent={renderPrimaryPanelMainContent({
-          conversation: {
-            activeTurnId: conversationPane.chatState.activeTurnId,
-            isTurnInProgress: isConversationTurnRunning,
-            pendingTurnId: conversationPane.chatState.pendingTurnId,
-            autoScrollToBottomOnInitialLoad: true,
-            initialBottomScrollResetKey: [
-              input.sandboxInstanceId,
-              conversationPane.activeConversationId ?? "no-thread",
-            ].join(":"),
-            scrollBehavior: "follow-streaming-at-bottom",
-            chatEntries: conversationPane.chatState.entries,
-            formatInitialUserMessageAsTriggerInput: shouldFormatInitialUserMessageAsTriggerInput({
-              activeConversationId: conversationPane.activeConversationId,
-              triggerConversation: workbench.sandboxStatusQuery.data?.triggerConversation ?? null,
-            }),
-            onUserMessageAction: conversationPane.dismissUserMessageAction,
-            isRespondingToServerRequest:
-              conversationPane.serverRequestsState.isRespondingToServerRequest,
-            onRespondToServerRequest: conversationPane.serverRequestsState.respondToServerRequest,
-            scrollContainerRef: conversationScrollContainerRef,
-            serverRequestPanelEntries: unmatchedServerRequests,
-          },
-          cli: {
-            ptyState: workbench.cliPtyState,
-            refitKey: workbench.terminalPanelState.isVisible
-              ? "cli:terminal-open"
-              : "cli:terminal-closed",
-            terminalContentInset: workbench.primaryPanelState.cliTerminalContentInset,
-            terminalThemeMode: workbench.primaryPanelState.cliTerminalThemeMode,
-          },
-          initialEntryStartupState,
-          sandboxInstanceId: input.sandboxInstanceId,
-          startupOperation: workbench.sandboxStatusQuery.data?.startupOperation ?? null,
-          transitionState: workbench.primaryPanelState.transitionState,
-        })}
+        mainContentLayout={mainContentLayout}
+        mainContent={primaryPanelMainContent}
         mainContentScrollContainerRef={conversationScrollContainerRef}
+        isPrimaryBottomPanelVisible={
+          workbench.primaryPanelState.showsChatComposer && initialEntryStartupState === null
+        }
         primaryBottomPanel={
-          workbench.primaryPanelState.showsChatComposer && initialEntryStartupState === null ? (
-            <SessionConversationBottomPanelController
+          initialEntryStartupState === null ? (
+            <SessionWorkbenchPrimaryBottomPanel
+              key={`composer:${conversationScopedComposerRenderKey}`}
               chatEntries={conversationPane.chatState.entries}
               composerStateInput={conversationPane.composerStateInput}
-              draftState={{
-                composerDraft,
-                pendingDiffComments,
-                clearPendingDiffComments: handleClearPendingDiffComments,
-                setComposerDraft,
-              }}
+              draftResetKey={conversationScopedComposerRenderKey}
+              isConversationTurnRunning={isConversationTurnRunning}
               isRespondingToServerRequest={
                 conversationPane.serverRequestsState.isRespondingToServerRequest
               }
               onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
-              key={input.sandboxInstanceId ?? "missing-session"}
+              pendingDiffCommentStore={pendingDiffCommentStore}
+              sandboxInstanceId={input.sandboxInstanceId}
               serverRequestPanelEntries={unmatchedServerRequests}
-              showWorkingIndicator={isConversationTurnRunning}
             />
           ) : null
         }
@@ -650,19 +651,16 @@ function SessionWorkbenchPageContent(input: {
               {...conversationNavigation.runtimeConversationNavigatorProps}
             />
           ) : (
-            <SessionDiffPanel
+            <SessionWorkbenchDiffPanel
+              key={`diff:${conversationScopedComposerRenderKey}`}
               errorNotice={diffPanelErrorNotice}
               isLoading={
                 workbench.connectionReadiness.canConnect && workbench.diffPanelState.isLoading
               }
-              onAddComment={handleAddPendingDiffComment}
-              onDeleteComment={handleRemovePendingDiffComment}
-              onUpdateComment={handleUpdatePendingDiffComment}
-              pendingComments={pendingDiffComments}
               patch={diffPanelPatch}
+              pendingDiffCommentStore={pendingDiffCommentStore}
               repositoryPath={primaryRepositoryPath}
               summaryLabel={workbench.diffPanelState.compareLabel}
-              title="Current changes"
             />
           )
         }
@@ -670,6 +668,163 @@ function SessionWorkbenchPageContent(input: {
       />
     </ConversationWorkspaceFrame>
   );
+}
+
+function SessionWorkbenchPrimaryBottomPanel(input: {
+  chatEntries: React.ComponentProps<
+    typeof SessionConversationBottomPanelDraftController
+  >["chatEntries"];
+  composerStateInput: React.ComponentProps<
+    typeof SessionConversationBottomPanelDraftController
+  >["composerStateInput"];
+  draftResetKey: string;
+  isConversationTurnRunning: boolean;
+  isRespondingToServerRequest: boolean;
+  onRespondToServerRequest: React.ComponentProps<
+    typeof SessionConversationBottomPanelDraftController
+  >["onRespondToServerRequest"];
+  pendingDiffCommentStore: PendingSessionDiffCommentStore;
+  sandboxInstanceId: string;
+  serverRequestPanelEntries: readonly ServerRequestEntry[];
+}): React.JSX.Element {
+  const pendingDiffComments = useSyncExternalStore(
+    input.pendingDiffCommentStore.subscribe,
+    input.pendingDiffCommentStore.getSnapshot,
+    input.pendingDiffCommentStore.getSnapshot,
+  );
+
+  return (
+    <SessionConversationBottomPanelDraftController
+      chatEntries={input.chatEntries}
+      composerStateInput={input.composerStateInput}
+      clearPendingDiffComments={input.pendingDiffCommentStore.clear}
+      draftResetKey={input.draftResetKey}
+      isRespondingToServerRequest={input.isRespondingToServerRequest}
+      onRespondToServerRequest={input.onRespondToServerRequest}
+      key={input.sandboxInstanceId}
+      pendingDiffComments={pendingDiffComments}
+      serverRequestPanelEntries={input.serverRequestPanelEntries}
+      showWorkingIndicator={input.isConversationTurnRunning}
+    />
+  );
+}
+
+function SessionWorkbenchDiffPanel(input: {
+  errorNotice: Exclude<React.ComponentProps<typeof SessionDiffPanel>["errorNotice"], undefined>;
+  isLoading: boolean;
+  patch: string;
+  pendingDiffCommentStore: PendingSessionDiffCommentStore;
+  repositoryPath: string | null;
+  summaryLabel: string;
+}): React.JSX.Element {
+  const pendingDiffComments = useSyncExternalStore(
+    input.pendingDiffCommentStore.subscribe,
+    input.pendingDiffCommentStore.getSnapshot,
+    input.pendingDiffCommentStore.getSnapshot,
+  );
+
+  return (
+    <SessionDiffPanel
+      errorNotice={input.errorNotice}
+      isLoading={input.isLoading}
+      onAddComment={input.pendingDiffCommentStore.add}
+      onDeleteComment={input.pendingDiffCommentStore.remove}
+      onUpdateComment={input.pendingDiffCommentStore.update}
+      pendingComments={pendingDiffComments}
+      patch={input.patch}
+      repositoryPath={input.repositoryPath}
+      summaryLabel={input.summaryLabel}
+      title="Current changes"
+    />
+  );
+}
+
+type PendingSessionDiffCommentStore = {
+  add(this: void, comment: PendingSessionDiffCommentInput): void;
+  clear(this: void): void;
+  getSnapshot(this: void): readonly PendingSessionDiffComment[];
+  reconcile(
+    this: void,
+    input: {
+      currentRepositoryPath: string | null;
+      fileDiffs: Parameters<typeof reconcilePendingSessionDiffComments>[0]["fileDiffs"];
+    },
+  ): void;
+  remove(this: void, commentId: string): void;
+  subscribe(this: void, listener: () => void): () => void;
+  update(this: void, commentId: string, body: string): void;
+};
+
+function createPendingSessionDiffCommentStore(): PendingSessionDiffCommentStore {
+  let comments: readonly PendingSessionDiffComment[] = [];
+  const listeners = new Set<() => void>();
+
+  function emit(): void {
+    for (const listener of listeners) {
+      listener();
+    }
+  }
+
+  function setComments(nextComments: readonly PendingSessionDiffComment[]): void {
+    if (nextComments === comments) {
+      return;
+    }
+
+    comments = nextComments;
+    emit();
+  }
+
+  return {
+    add(comment) {
+      setComments([
+        ...comments,
+        {
+          ...comment,
+          id: crypto.randomUUID(),
+          status: comment.status ?? {
+            kind: "current",
+          },
+        },
+      ]);
+    },
+    clear() {
+      setComments([]);
+    },
+    getSnapshot() {
+      return comments;
+    },
+    reconcile(input) {
+      setComments(
+        reconcilePendingSessionDiffComments({
+          comments,
+          currentRepositoryPath: input.currentRepositoryPath,
+          fileDiffs: input.fileDiffs,
+        }),
+      );
+    },
+    remove(commentId) {
+      setComments(comments.filter((comment) => comment.id !== commentId));
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+
+      return function unsubscribe(): void {
+        listeners.delete(listener);
+      };
+    },
+    update(commentId, body) {
+      setComments(
+        comments.map((comment) =>
+          comment.id !== commentId
+            ? comment
+            : {
+                ...comment,
+                body,
+              },
+        ),
+      );
+    },
+  };
 }
 
 export function shouldFormatInitialUserMessageAsTriggerInput(input: {

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 
 import type { ChatEntry } from "../chat/chat-types.js";
 import {
@@ -11,6 +11,7 @@ import {
   CodexFixtureChatThreadEntriesWithThinkingGroup,
 } from "../session-agents/codex/fixtures/chat-fixtures.js";
 import {
+  createReadySessionComposerStateInput,
   SessionComposerFixturePropsForLoadingModel,
   SessionComposerFixturePropsForNonImageCapableModel,
   SessionComposerFixtureStatusMessageForLoadingModel,
@@ -29,7 +30,10 @@ import {
   SessionConversationPanePlaygroundDocs,
   SessionConversationPaneLayoutPlayground,
 } from "./session-conversation-pane-playground.js";
-import { SessionConversationMainContent } from "./session-conversation-pane.js";
+import {
+  SessionConversationBottomPanelDraftController,
+  SessionConversationMainContent,
+} from "./session-conversation-pane.js";
 import {
   createStorySessionBottomPanel,
   renderSessionWorkbenchContentStory,
@@ -62,6 +66,116 @@ const InitialLoadAutoScrollEntries = Array.from({ length: 18 }, (_, index): Chat
   ];
 }).flat();
 
+const LongTranscriptServerRequestPanelEntries: React.ComponentProps<
+  typeof SessionConversationMainContent
+>["serverRequestPanelEntries"] = [];
+
+const LongTranscriptPendingDiffComments: React.ComponentProps<
+  typeof SessionConversationBottomPanelDraftController
+>["pendingDiffComments"] = [];
+
+const LongTranscriptComposerStateInput: React.ComponentProps<
+  typeof SessionConversationBottomPanelDraftController
+>["composerStateInput"] = createReadySessionComposerStateInput({
+  repositoryStatus: {
+    branchLabel: "main",
+    pullRequest: null,
+  },
+});
+
+function createLongTranscriptAssistantText(input: {
+  paragraphCount: number;
+  turnNumber: number;
+}): string {
+  return Array.from({ length: input.paragraphCount }, (_, paragraphIndex) => {
+    const paragraphNumber = paragraphIndex + 1;
+    return [
+      `Turn ${String(input.turnNumber)} response paragraph ${String(paragraphNumber)}.`,
+      "This deterministic transcript block exists so the browser has to keep a large completed conversation mounted while the composer remains editable.",
+      "It repeats a realistic amount of prose without storing a huge static fixture in the story file.",
+    ].join(" ");
+  }).join("\n\n");
+}
+
+function createLongTranscriptEntries(input: {
+  assistantParagraphsPerTurn: number;
+  turnCount: number;
+}): readonly ChatEntry[] {
+  return Array.from({ length: input.turnCount }, (_, index): ChatEntry[] => {
+    const turnNumber = index + 1;
+    const paddedTurnNumber = String(turnNumber).padStart(4, "0");
+    const turnId = `long-transcript-turn-${paddedTurnNumber}`;
+
+    return [
+      {
+        id: `${turnId}:user`,
+        turnId,
+        kind: "user-message",
+        status: "completed",
+        text: `Turn ${paddedTurnNumber}: continue the implementation review and preserve the previous context.`,
+      },
+      {
+        id: `${turnId}:assistant`,
+        turnId,
+        kind: "assistant-message",
+        phase: null,
+        status: "completed",
+        text: createLongTranscriptAssistantText({
+          paragraphCount: input.assistantParagraphsPerTurn,
+          turnNumber,
+        }),
+      },
+    ];
+  }).flat();
+}
+
+function LongTranscriptTypingHarness(): React.JSX.Element {
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const entries = useMemo(
+    () =>
+      createLongTranscriptEntries({
+        assistantParagraphsPerTurn: 2,
+        turnCount: 1000,
+      }),
+    [],
+  );
+
+  return renderSessionWorkbenchContentStory({
+    mainContent: (
+      <SessionConversationMainContent
+        activeTurnId={null}
+        autoScrollToBottomOnInitialLoad
+        chatEntries={entries}
+        initialBottomScrollResetKey="long-transcript-typing"
+        isRespondingToServerRequest={false}
+        isTurnInProgress={false}
+        onRespondToServerRequest={
+          SessionConversationPanePlaygroundBaseArgs.onRespondToServerRequest
+        }
+        pendingTurnId={null}
+        scrollBehavior="follow-streaming-at-bottom"
+        scrollContainerRef={scrollContainerRef}
+        serverRequestPanelEntries={LongTranscriptServerRequestPanelEntries}
+      />
+    ),
+    mainContentScrollContainerRef: scrollContainerRef,
+    primaryBottomPanel: (
+      <SessionConversationBottomPanelDraftController
+        chatEntries={entries}
+        clearPendingDiffComments={function clearPendingDiffComments() {}}
+        composerStateInput={LongTranscriptComposerStateInput}
+        draftResetKey="long-transcript-typing"
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={
+          SessionConversationPanePlaygroundBaseArgs.onRespondToServerRequest
+        }
+        pendingDiffComments={LongTranscriptPendingDiffComments}
+        serverRequestPanelEntries={LongTranscriptServerRequestPanelEntries}
+      />
+    ),
+  });
+}
+
 const meta = {
   title: "Dashboard/Sessions/SessionWorkbench/ConversationPane",
   component: SessionConversationMainContent,
@@ -80,6 +194,11 @@ const meta = {
   decorators: [
     function StoryDecorator(Story, context): React.JSX.Element {
       const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+      if (context.parameters["customWorkbenchStory"] === true) {
+        return <Story />;
+      }
+
       const shouldRenderConversationWithScrollRef = context.args.autoScrollToBottomOnInitialLoad;
 
       return renderSessionWorkbenchContentStory({
@@ -222,6 +341,13 @@ export const InitialLoadAutoScroll: Story = {
     initialBottomScrollResetKey: "storybook-initial-load",
     serverRequestPanelEntries: [],
   },
+};
+
+export const LongTranscriptTyping: Story = {
+  parameters: {
+    customWorkbenchStory: true,
+  },
+  render: LongTranscriptTypingHarness,
 };
 
 export const PendingStartWithoutWorkingFooter: Story = {

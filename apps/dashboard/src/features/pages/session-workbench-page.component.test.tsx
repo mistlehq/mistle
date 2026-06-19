@@ -12,8 +12,8 @@ import { HttpApiError } from "../api/http-api-error.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import {
+  resolveConversationScopedComposerRenderKey,
   SessionWorkbenchPage,
-  shouldResetConversationScopedComposerStateForActiveConversationChange,
   shouldFormatInitialUserMessageAsTriggerInput,
 } from "./session-workbench-page.js";
 
@@ -455,21 +455,63 @@ describe("SessionWorkbenchPage", () => {
     ).toBe(false);
   });
 
-  it("preserves conversation-scoped composer state when the initially missing active conversation hydrates", () => {
+  it("uses the requested runtime conversation as the composer scope before active conversation catches up", () => {
     expect(
-      shouldResetConversationScopedComposerStateForActiveConversationChange({
-        lastActiveConversationId: null,
-        nextActiveConversationId: "thread_hydrated",
+      resolveConversationScopedComposerRenderKey({
+        activeConversationId: "conversation_previous",
+        providerConversationId: "conversation_provider",
+        requestedRuntimeConversationId: "conversation_next",
+        sandboxInstanceId: "sbi_test",
+        triggerConversation: {
+          providerConversationId: "conversation_trigger",
+        },
       }),
-    ).toBe(false);
+    ).toBe("sbi_test:conversation_next");
   });
 
-  it("resets conversation-scoped composer state when switching between established active conversations", () => {
+  it("uses established conversation identities as composer scope fallbacks", () => {
     expect(
-      shouldResetConversationScopedComposerStateForActiveConversationChange({
-        lastActiveConversationId: "thread_previous",
-        nextActiveConversationId: "thread_next",
+      resolveConversationScopedComposerRenderKey({
+        activeConversationId: "conversation_active",
+        providerConversationId: "conversation_provider",
+        requestedRuntimeConversationId: null,
+        sandboxInstanceId: "sbi_test",
+        triggerConversation: {
+          providerConversationId: "conversation_trigger",
+        },
       }),
-    ).toBe(true);
+    ).toBe("sbi_test:conversation_active");
+
+    expect(
+      resolveConversationScopedComposerRenderKey({
+        activeConversationId: null,
+        providerConversationId: "conversation_provider",
+        requestedRuntimeConversationId: null,
+        sandboxInstanceId: "sbi_test",
+        triggerConversation: {
+          providerConversationId: "conversation_trigger",
+        },
+      }),
+    ).toBe("sbi_test:conversation_trigger");
+
+    expect(
+      resolveConversationScopedComposerRenderKey({
+        activeConversationId: null,
+        providerConversationId: "conversation_provider",
+        requestedRuntimeConversationId: null,
+        sandboxInstanceId: "sbi_test",
+        triggerConversation: null,
+      }),
+    ).toBe("sbi_test:conversation_provider");
+
+    expect(
+      resolveConversationScopedComposerRenderKey({
+        activeConversationId: null,
+        providerConversationId: null,
+        requestedRuntimeConversationId: null,
+        sandboxInstanceId: null,
+        triggerConversation: null,
+      }),
+    ).toBe("missing-session:no-thread");
   });
 });
