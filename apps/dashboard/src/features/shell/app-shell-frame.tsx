@@ -5,13 +5,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@mistle/ui";
-import {
-  HouseIcon,
-  LightningIcon,
-  PackageIcon,
-  PuzzlePieceIcon,
-  SparkleIcon,
-} from "@phosphor-icons/react";
+import { HouseIcon, LightningIcon, PackageIcon, PuzzlePieceIcon } from "@phosphor-icons/react";
 import { NavLink } from "react-router";
 
 import { ErrorNotice } from "../auth/error-notice.js";
@@ -30,13 +24,6 @@ import { TopLoadingBar } from "./top-loading-bar.js";
 
 function HomeNavIcon(props: { className?: string; "aria-hidden"?: boolean }): React.JSX.Element {
   return <HouseIcon {...props} />;
-}
-
-function DesignerNavIcon(props: {
-  className?: string;
-  "aria-hidden"?: boolean;
-}): React.JSX.Element {
-  return <SparkleIcon {...props} />;
 }
 
 function SandboxProfilesNavIcon(props: {
@@ -186,18 +173,6 @@ function MainSidebarContent(input: {
             >
               <HomeNavIcon aria-hidden className="size-5 shrink-0 md:size-4" />
               <span>Home</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={
-                input.locationPathname === "/designer" ||
-                input.locationPathname.startsWith("/designer/")
-              }
-              render={<NavLink to="/designer" />}
-            >
-              <DesignerNavIcon aria-hidden className="size-5 shrink-0 md:size-4" />
-              <span>Designer</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>

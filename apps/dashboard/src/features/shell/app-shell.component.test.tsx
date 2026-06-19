@@ -1,4 +1,7 @@
+import { SidebarProvider } from "@mistle/ui";
 import { isValidElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { SessionsShellSidebar } from "../navigation/sessions-shell-sidebar.js";
@@ -109,6 +112,49 @@ describe("resolveAppShellFrame", () => {
     }
     expect(frame.sidebarHeaderContent.type).toBe(AppSidebarHeader);
     expect(frame.renderSidebarTrigger).toBe(false);
+  });
+
+  it("hides Designer from the main app sidebar", () => {
+    const locationPathname = "/";
+    const routeState = resolveAppShellRouteState(locationPathname);
+    const frame = resolveAppShellFrame({
+      handleBackToApp: () => {},
+      handleNavigateToSettings: () => {},
+      handleSignOut: () => {},
+      handleSwitchOrganization: () => {},
+      inSessions: routeState.inSessions,
+      inSettings: routeState.inSettings,
+      isSigningOut: false,
+      isSwitchingOrganization: false,
+      locationPathname,
+      organizationOptions: [],
+      organizationSummaryErrorMessage: null,
+      organizationSwitcherErrorMessage: null,
+      organizationImageUrl: null,
+      activeOrganizationId: "org_123",
+      dashboardBuildDriftStatus: CurrentDashboardBuildDriftStatus,
+      organizationName: "Acme",
+      pageMeta: {
+        appShellInsetOwner: "app-shell",
+        appShellViewportMode: "document",
+        sidebarTriggerOwner: "page-frame",
+        title: "Home",
+        headerIcon: null,
+        supportingText: null,
+      },
+      signOutError: null,
+      showSessionsSidebar: false,
+      onShowSessionsSidebarChange: () => {},
+    });
+
+    const sidebarMarkup = renderToStaticMarkup(
+      <MemoryRouter>
+        <SidebarProvider>{frame.sidebarContent}</SidebarProvider>
+      </MemoryRouter>,
+    );
+
+    expect(sidebarMarkup).not.toContain("Designer");
+    expect(sidebarMarkup).toContain("Home");
   });
 
   it("keeps the sidebar trigger available for non-session-detail pages", () => {
