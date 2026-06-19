@@ -1647,6 +1647,7 @@ export interface paths {
       parameters: {
         query: {
           afterSequence?: number;
+          allowedPurposes?: string;
           limit?: number;
           operationId: string;
           organizationId: string;
