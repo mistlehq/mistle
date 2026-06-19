@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -448,10 +449,7 @@ describe("SandboxProfileRuntimeSection", () => {
         availableTargets={[]}
         disabled={false}
         isDraft={true}
-        onCreateApiKey={async () => ({
-          apiKey: MistleApiKey,
-          token: "mstl_apk_test",
-        })}
+        onCreateApiKey={async () => MistleApiKey}
         providers={[DockerProvider]}
         version={createVersion({
           sandboxProvider: "docker",
@@ -483,10 +481,7 @@ describe("SandboxProfileRuntimeSection", () => {
         availableTargets={[]}
         disabled={false}
         isDraft={true}
-        onCreateApiKey={async () => ({
-          apiKey: MistleApiKey,
-          token: "mstl_apk_test",
-        })}
+        onCreateApiKey={async () => MistleApiKey}
         providers={[DockerProvider]}
         version={createVersion({
           sandboxProvider: "docker",
@@ -503,29 +498,39 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByRole("textbox", { name: "Name" })).toBeTruthy();
   });
 
-  it("selects a newly created API key and still shows the one-time token", async () => {
-    render(
-      <SandboxProfileRuntimeSection
-        apiKeys={[]}
-        availableConnections={[]}
-        availableTargets={[]}
-        disabled={false}
-        isDraft={true}
-        onCreateApiKey={async (input) => ({
-          apiKey: {
-            ...MistleApiKey,
-            name: input.name,
-          },
-          token: "mstl_apk_test",
-        })}
-        providers={[DockerProvider]}
-        version={createVersion({
-          sandboxProvider: "docker",
-          sandboxConnectionId: null,
-          sandboxResources: null,
-        })}
-      />,
-    );
+  it("selects a newly created API key and closes the embedded creation dialog", async () => {
+    function RuntimeSectionWithApiKeyCreation(): React.JSX.Element {
+      const [apiKeys, setApiKeys] = useState<readonly ApiKey[]>([]);
+
+      return (
+        <SandboxProfileRuntimeSection
+          apiKeys={apiKeys}
+          availableConnections={[]}
+          availableTargets={[]}
+          disabled={false}
+          isDraft={true}
+          onCreateApiKey={async (input) => {
+            const createdApiKey = {
+              ...MistleApiKey,
+              id: "apk_runtime_section_created",
+              name: input.name,
+              permissions: [...input.permissions],
+            } satisfies ApiKey;
+            setApiKeys((currentApiKeys) => [createdApiKey, ...currentApiKeys]);
+
+            return createdApiKey;
+          }}
+          providers={[DockerProvider]}
+          version={createVersion({
+            sandboxProvider: "docker",
+            sandboxConnectionId: null,
+            sandboxResources: null,
+          })}
+        />
+      );
+    }
+
+    render(<RuntimeSectionWithApiKeyCreation />);
 
     fireEvent.click(screen.getByRole("button", { name: "Create new API key" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Name" }), {
@@ -534,14 +539,13 @@ describe("SandboxProfileRuntimeSection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create API key" }));
 
     await waitFor(() => {
-      expect(screen.getByText("API key created")).toBeTruthy();
+      expect(screen.queryByRole("dialog", { name: "Create new API key" })).toBeNull();
     });
-    expect(
-      screen.getByText(
-        "This key has been selected for Mistle resource access. Copy the token only if you also want to use Sandbox agent key outside this profile editor; it will not be shown again.",
-      ),
-    ).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Copy API key token" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Mistle resources" }).textContent).toContain(
+      "Sandbox agent key",
+    );
+    expect(screen.queryByText("API key created")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copy API key token" })).toBeNull();
   });
 
   it("renders saved Mistle resources in read-only mode", () => {

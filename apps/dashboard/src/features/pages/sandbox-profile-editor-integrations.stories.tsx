@@ -291,6 +291,15 @@ export const MistleMcpNoApiKeys: Story = {
     await expect(within(dialog).getByText("4 selected")).toBeVisible();
     await userEvent.click(within(dialog).getByRole("checkbox", { name: "Select all" }));
     await expect(within(dialog).getByText("12 selected")).toBeVisible();
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Name" }), "Story agent key");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Create API key" }));
+
+    await expect(
+      body.queryByRole("dialog", { name: "Create new API key" }),
+    ).not.toBeInTheDocument();
+    await expect(canvas.getByRole("combobox", { name: "Mistle resources" })).toHaveTextContent(
+      "Story agent key",
+    );
   },
 };
 
