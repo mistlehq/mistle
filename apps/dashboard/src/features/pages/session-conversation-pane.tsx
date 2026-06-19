@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 
 import type { ChatEntry } from "../chat/chat-types.js";
@@ -16,6 +16,7 @@ import {
 import {
   ComposerStatusBanner,
   SessionComposerActivityRow,
+  createComposerDraft,
   useSessionComposerState,
   type QueuedComposerPromptViewModel,
   type SessionComposerDraftState,
@@ -64,6 +65,14 @@ type SessionConversationBottomPanelControllerProps = SessionConversationSharedPa
   composerStateInput: SessionComposerStateInput;
   showWorkingIndicator?: boolean;
 };
+
+type SessionConversationBottomPanelDraftControllerProps = Omit<
+  SessionConversationBottomPanelControllerProps,
+  "draftState"
+> &
+  Pick<SessionComposerDraftState, "clearPendingDiffComments" | "pendingDiffComments"> & {
+    draftResetKey: string;
+  };
 
 function SessionConversationMainContentView({
   activeTurnId,
@@ -199,4 +208,35 @@ export function SessionConversationBottomPanelController({
       {...(showWorkingIndicator === undefined ? {} : { showWorkingIndicator })}
     />
   );
+}
+
+export function SessionConversationBottomPanelDraftController({
+  clearPendingDiffComments,
+  draftResetKey,
+  pendingDiffComments,
+  ...controllerProps
+}: SessionConversationBottomPanelDraftControllerProps): React.JSX.Element {
+  const [composerDraft, setComposerDraft] = useState(createComposerDraft(""));
+  const previousDraftResetKeyRef = useRef(draftResetKey);
+
+  useEffect(() => {
+    if (previousDraftResetKeyRef.current === draftResetKey) {
+      return;
+    }
+
+    previousDraftResetKeyRef.current = draftResetKey;
+    setComposerDraft(createComposerDraft(""));
+  }, [draftResetKey]);
+
+  const draftState = useMemo(
+    () => ({
+      composerDraft,
+      pendingDiffComments,
+      clearPendingDiffComments,
+      setComposerDraft,
+    }),
+    [clearPendingDiffComments, composerDraft, pendingDiffComments],
+  );
+
+  return <SessionConversationBottomPanelController {...controllerProps} draftState={draftState} />;
 }

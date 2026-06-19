@@ -26,7 +26,7 @@ import { SessionCliPanel } from "./session-cli-panel.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import {
   SessionConversationBottomPanel,
-  SessionConversationBottomPanelController,
+  SessionConversationBottomPanelDraftController,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 import type {
@@ -111,7 +111,6 @@ function SessionWorkbenchPageContent(input: {
   const [hasEnteredReadyWorkbench, setHasEnteredReadyWorkbench] = useState(false);
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const lastEstablishedActiveConversationIdRef = useRef<string | null>(null);
-  const [composerDraft, setComposerDraft] = useState(createComposerDraft(""));
   const [isMobileConversationNavigatorOpen, setMobileConversationNavigatorOpen] = useState(false);
   const isMobileSecondaryPanelLayout = useIsBelowBreakpoint(CssBreakpointVariables.SM);
   const [pendingDiffComments, setPendingDiffComments] = useState<
@@ -448,7 +447,6 @@ function SessionWorkbenchPageContent(input: {
       return;
     }
 
-    setComposerDraft(createComposerDraft(""));
     setPendingDiffComments([]);
   }, [conversationPane.activeConversationId]);
 
@@ -667,20 +665,17 @@ function SessionWorkbenchPageContent(input: {
         mainContentScrollContainerRef={conversationScrollContainerRef}
         primaryBottomPanel={
           workbench.primaryPanelState.showsChatComposer && initialEntryStartupState === null ? (
-            <SessionConversationBottomPanelController
+            <SessionConversationBottomPanelDraftController
               chatEntries={conversationPane.chatState.entries}
               composerStateInput={conversationPane.composerStateInput}
-              draftState={{
-                composerDraft,
-                pendingDiffComments,
-                clearPendingDiffComments: handleClearPendingDiffComments,
-                setComposerDraft,
-              }}
+              clearPendingDiffComments={handleClearPendingDiffComments}
+              draftResetKey={initialBottomScrollResetKey}
               isRespondingToServerRequest={
                 conversationPane.serverRequestsState.isRespondingToServerRequest
               }
               onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
               key={input.sandboxInstanceId ?? "missing-session"}
+              pendingDiffComments={pendingDiffComments}
               serverRequestPanelEntries={unmatchedServerRequests}
               showWorkingIndicator={isConversationTurnRunning}
             />

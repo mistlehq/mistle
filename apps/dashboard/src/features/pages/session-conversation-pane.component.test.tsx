@@ -22,6 +22,7 @@ import {
 import {
   SessionConversationBottomPanel,
   SessionConversationBottomPanelController,
+  SessionConversationBottomPanelDraftController,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 
@@ -45,6 +46,86 @@ const UploadedImageFixture: UploadedSandboxFile = {
   sizeBytes: 4,
   path: "/root/.local/attachments/thread_123/upload.png",
 };
+
+function createReadyComposerStateInput(): React.ComponentProps<
+  typeof SessionConversationBottomPanelDraftController
+>["composerStateInput"] {
+  return {
+    bootstrap: {
+      phase: { status: "ready" },
+      composerCapabilities: [],
+      establishedSnapshot: {
+        availableModels: [ComposerModelFixture],
+        configSnapshot: {
+          model: ComposerModelFixture.model,
+          modelReasoningEffort: ComposerModelFixture.defaultReasoningEffort,
+        },
+      },
+    },
+    clearSessionErrorMessage: () => {
+      return;
+    },
+    configControl: {
+      selectedModel: ComposerModelFixture.model,
+      selectedReasoningEffort: ComposerModelFixture.defaultReasoningEffort,
+      hasExplicitModelSelection: true,
+      modelOptions: [
+        {
+          value: ComposerModelFixture.model,
+          label: ComposerModelFixture.displayName,
+        },
+      ],
+      reasoningEffortOptions: [{ value: "medium", label: "Medium" }],
+      canChangeReasoningEffort: true,
+      controlsDisabled: false,
+      isUpdating: false,
+      setModel: () => {
+        return;
+      },
+      setReasoningEffort: () => {
+        return;
+      },
+    },
+    attachmentControl: {
+      canUploadAttachments: true,
+      isUploadingAttachments: false,
+      prepareAttachments: async ({ prompt }) => ({
+        displayAttachments: [],
+        prompt,
+        submittedAttachments: [],
+        uploadedAttachments: [],
+      }),
+    },
+    repositoryStatus: {
+      branchLabel: null,
+      pullRequest: null,
+    },
+    contextUsage: null,
+    modelSelection: {
+      required: true,
+      showControls: true,
+    },
+    sessionErrorMessage: null,
+    turnControl: {
+      activeTurnState: "idle",
+      canSteer: false,
+      canInterrupt: false,
+      isStarting: false,
+      isSteering: false,
+      isInterrupting: false,
+      completedTurnErrorMessage: null,
+      startTurn: async () => {
+        return;
+      },
+      steerTurn: async () => {
+        return;
+      },
+      interruptTurn: () => {
+        return;
+      },
+    },
+  };
+}
 
 function createImageFile(): File {
   return new File([new Uint8Array([1, 2, 3, 4])], "screenshot.png", { type: "image/png" });
@@ -432,6 +513,33 @@ function LongTranscriptComposerHarness(): React.JSX.Element {
   );
 }
 
+function DraftOwnedComposerHarness(): React.JSX.Element {
+  const [draftResetKey, setDraftResetKey] = useState("thread-1");
+
+  return (
+    <div>
+      <button
+        onClick={() => {
+          setDraftResetKey("thread-2");
+        }}
+        type="button"
+      >
+        Switch conversation
+      </button>
+      <SessionConversationBottomPanelDraftController
+        chatEntries={[]}
+        clearPendingDiffComments={function clearPendingDiffComments() {}}
+        composerStateInput={createReadyComposerStateInput()}
+        draftResetKey={draftResetKey}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={function onRespondToServerRequest() {}}
+        pendingDiffComments={[]}
+        serverRequestPanelEntries={[]}
+      />
+    </div>
+  );
+}
+
 function defineElementRect(
   element: HTMLElement,
   input: {
@@ -558,6 +666,19 @@ async function waitForNestedAnimationFrame(): Promise<void> {
 }
 
 describe("SessionConversationBottomPanel", () => {
+  it("keeps composer draft local and clears it when the draft reset key changes", async () => {
+    render(<DraftOwnedComposerHarness />);
+
+    replaceComposerText("draft owned by the composer boundary");
+    expect(readComposerText()).toBe("draft owned by the composer boundary");
+
+    fireEvent.click(screen.getByRole("button", { name: "Switch conversation" }));
+
+    await waitFor(() => {
+      expect(readComposerText()).toBe("");
+    });
+  });
+
   it("keeps a long transcript and scroll position stable while typing in the composer", () => {
     render(<LongTranscriptComposerHarness />);
 
