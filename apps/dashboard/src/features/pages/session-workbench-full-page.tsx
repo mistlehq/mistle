@@ -19,7 +19,6 @@ import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import {
-  SessionConversationBottomPanel,
   SessionConversationBottomPanelController,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
