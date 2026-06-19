@@ -71,10 +71,12 @@ describe("resolveIntegrationSetupAppManifestDraftBuilderOrThrow", () => {
 
     expect(
       buildDraft({
+        appName: "Acme, Inc. Mistle Agent",
         controlPlaneBaseUrl: "https://control-plane.example.com",
         webhookCallbackUrl: "https://control-plane.example.com/webhooks/github",
       }),
     ).toMatchObject({
+      name: "Acme, Inc. Mistle Agent",
       hook_attributes: {
         active: true,
         url: "https://control-plane.example.com/webhooks/github",

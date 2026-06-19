@@ -30,6 +30,7 @@ import {
   type IntegrationConnection,
 } from "../integrations/integrations-service.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
+import { useOrganizationSummary } from "../shell/use-organization-summary.js";
 import { renderIntegrationConnectionSetupPane } from "./integration-connection-setup-pane-registry.js";
 import {
   type IntegrationConnectionSetupRoute,
@@ -267,6 +268,7 @@ export function IntegrationsPage() {
     Record<string, string | undefined>
   >({});
   useRequiredOrganizationId();
+  const organizationSummary = useOrganizationSummary();
   const detailTargetKey = params["targetKey"] ?? null;
   const detailConnectionId = searchParams.get("connectionId");
   const dashboardConfig = getDashboardConfig();
@@ -494,6 +496,9 @@ export function IntegrationsPage() {
         selectedConnectionId={directoryState.activeDetailConnectionId}
         selectedConnectionBody={renderSelectedConnectionSetupBody({
           connection: selectedDetailConnection,
+          organizationName: organizationSummary.query.isSuccess
+            ? organizationSummary.query.data.name
+            : null,
           setupFlow: selectedDetailConnectionSetupFlow,
         })}
         selectedConnectionNotice={renderSelectedConnectionNotice({
@@ -554,8 +559,9 @@ export function IntegrationsPage() {
   );
 }
 
-function renderSelectedConnectionSetupBody(input: {
+export function renderSelectedConnectionSetupBody(input: {
   connection: IntegrationConnection | undefined;
+  organizationName: string | null;
   setupFlow: IntegrationConnectionSetupRoute | null;
 }): React.JSX.Element | undefined {
   if (input.connection === undefined || input.setupFlow === null) {
@@ -564,6 +570,7 @@ function renderSelectedConnectionSetupBody(input: {
 
   return renderIntegrationConnectionSetupPane({
     connection: input.connection,
+    organizationName: input.organizationName ?? undefined,
     setupRoute: input.setupFlow,
   });
 }

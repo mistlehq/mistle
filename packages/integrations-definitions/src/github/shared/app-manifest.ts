@@ -28,6 +28,9 @@ const GitHubAppManifestWebhookTriggerCapabilitiesSchema = z
   })
   .loose();
 
+const GitHubAppNameMaxLength = 34;
+const GitHubAppManifestNameSuffix = "Mistle Agent";
+
 export const GitHubAppManifestOwnerSchema = z.discriminatedUnion("kind", [
   z
     .object({
@@ -72,7 +75,7 @@ export const GitHubOrganizationOnlyAppManifestEvents = [
 ] satisfies readonly string[];
 
 export const GitHubAppManifestTemplate = {
-  name: "Mistle GitHub App",
+  name: GitHubAppManifestNameSuffix,
   url: "https://github.com/mistlehq/mistle",
   description: "Used in Mistle for sandbox agents",
   hook_attributes: {
@@ -229,12 +232,25 @@ export function buildGitHubAppManifest(input: {
 }
 
 export function buildGitHubAppManifestDraft(input: {
+  appName?: string | undefined;
   controlPlaneBaseUrl: string;
   webhookCallbackUrl: string;
 }): Record<string, unknown> {
   return buildGitHubAppManifest({
     controlPlaneBaseUrl: input.controlPlaneBaseUrl,
-    manifest: GitHubAppManifestTemplate,
+    manifest: {
+      ...GitHubAppManifestTemplate,
+      name: resolveGitHubAppManifestDraftName(input.appName),
+    },
     webhookCallbackUrl: input.webhookCallbackUrl,
   });
+}
+
+function resolveGitHubAppManifestDraftName(appName: string | undefined): string {
+  const trimmedAppName = appName?.trim() ?? "";
+  if (trimmedAppName.length === 0) {
+    throw new Error("GitHub App manifest draft requires a nonblank app name.");
+  }
+
+  return Array.from(trimmedAppName).slice(0, GitHubAppNameMaxLength).join("").trimEnd();
 }

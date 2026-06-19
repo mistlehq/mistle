@@ -9,6 +9,7 @@ import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { useOrganizationSummary } from "../shell/use-organization-summary.js";
 import { renderIntegrationConnectionSetupPane } from "./integration-connection-setup-pane-registry.js";
 import { resolveIntegrationConnectionSetupRouteStateOrThrow } from "./integration-connection-setup-state.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
@@ -40,6 +41,7 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
     queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
     retry: false,
   });
+  const organizationSummary = useOrganizationSummary();
 
   if (directoryQuery.isError) {
     return (
@@ -117,6 +119,8 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
       />
     );
   }
+
+  const organizationName = organizationSummary.query.data?.name;
   return (
     <PageFrame
       width="form"
@@ -127,6 +131,7 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
     >
       {renderIntegrationConnectionSetupPane({
         connection,
+        organizationName,
         setupRoute: setupRouteState.setupRoute,
       })}
     </PageFrame>

@@ -1,3 +1,5 @@
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+
 import type { IntegrationConnectionMethod } from "../integrations/integration-connection-editor.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 
@@ -25,6 +27,16 @@ export type IntegrationConnectionSetupRouteState =
   | {
       kind: "complete";
     };
+
+export function requiresIntegrationSetupOrganizationName(input: {
+  isPostManifestCreatedReturn: boolean;
+  setupRoute: IntegrationConnectionSetupRoute;
+}): boolean {
+  return (
+    input.setupRoute.methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION &&
+    !input.isPostManifestCreatedReturn
+  );
+}
 
 export function resolveIncompleteIntegrationConnectionSetupFlow(input: {
   connection: IntegrationConnection;
