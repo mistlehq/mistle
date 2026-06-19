@@ -1,6 +1,6 @@
 import { SidebarTrigger, useSidebar } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import {
@@ -105,6 +105,10 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
   const [canvasTabs, setCanvasTabs] = useState<readonly DesignerSessionCanvasTab[]>(
     () => designerSession.canvasTabs,
   );
+  const latestPersistedCanvasTabsRef = useRef<readonly DesignerSessionCanvasTab[]>(
+    designerSession.canvasTabs,
+  );
+  const canvasTabSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const [activeTabHref, setActiveTabHref] = useState<string | null>(null);
 
   const persistCanvasTabs = useCallback(
@@ -119,23 +123,37 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
 
   const updateCanvasTabs = useCallback(
     (tabs: readonly DesignerSessionCanvasTab[]): void => {
-      setCanvasTabs(tabs);
-      void persistCanvasTabs(tabs);
+      const nextSave = canvasTabSaveQueueRef.current
+        .catch(() => {})
+        .then(async () => {
+          await persistCanvasTabs(tabs);
+          latestPersistedCanvasTabsRef.current = tabs;
+          setCanvasTabs(tabs);
+        });
+      canvasTabSaveQueueRef.current = nextSave;
+      void nextSave.catch(() => {});
     },
     [persistCanvasTabs],
   );
 
   const handleDashboardControlAction = useCallback<DashboardControlActionHandler>(
     async (request) => {
-      const nextTabs = upsertDesignerCanvasTab({
-        currentTabs: canvasTabs,
-        requestedTab: request.input,
-      });
-      await persistCanvasTabs(nextTabs);
-      setCanvasTabs(nextTabs);
-      setActiveTabHref(request.input.href);
+      const nextSave = canvasTabSaveQueueRef.current
+        .catch(() => {})
+        .then(async () => {
+          const nextTabs = upsertDesignerCanvasTab({
+            currentTabs: latestPersistedCanvasTabsRef.current,
+            requestedTab: request.input,
+          });
+          await persistCanvasTabs(nextTabs);
+          latestPersistedCanvasTabsRef.current = nextTabs;
+          setCanvasTabs(nextTabs);
+          setActiveTabHref(request.input.href);
+        });
+      canvasTabSaveQueueRef.current = nextSave;
+      await nextSave;
     },
-    [canvasTabs, persistCanvasTabs],
+    [persistCanvasTabs],
   );
 
   const dashboardControlActions = useMemo<DashboardControlActionSupport>(
@@ -155,7 +173,7 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
   };
 }
 
-export function DesignerSessionPage(): React.JSX.Element {
+export function DesignerSessionPage(): React.JSX.Element | null {
   const sessionId = useDesignerSessionId();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedRuntimeConversationId = searchParams.get("conversationId");
@@ -169,14 +187,7 @@ export function DesignerSessionPage(): React.JSX.Element {
   });
 
   if (designerSessionQuery.isPending) {
-    return (
-      <ConversationWorkspaceFrame
-        title="Designer"
-        leadingControl={<DesignerSessionSidebarTrigger />}
-      >
-        <div className="h-full" />
-      </ConversationWorkspaceFrame>
-    );
+    return null;
   }
 
   if (designerSessionQuery.isError) {

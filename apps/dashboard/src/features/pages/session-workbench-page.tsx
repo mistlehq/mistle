@@ -6,6 +6,21 @@ import { SessionWorkbenchFullPage } from "./session-workbench-full-page.js";
 
 export { shouldFormatInitialUserMessageAsTriggerInput } from "./session-workbench-full-page.js";
 
+export function shouldResetConversationScopedComposerStateForActiveConversationChange(input: {
+  lastActiveConversationId: string | null;
+  nextActiveConversationId: string | null;
+}): boolean {
+  if (input.nextActiveConversationId === null) {
+    return false;
+  }
+
+  if (input.lastActiveConversationId === null) {
+    return false;
+  }
+
+  return input.lastActiveConversationId !== input.nextActiveConversationId;
+}
+
 export function SessionWorkbenchPage(): React.JSX.Element {
   const params = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
