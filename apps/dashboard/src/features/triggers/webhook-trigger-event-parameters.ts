@@ -260,6 +260,37 @@ function isBotResourceParameter(parameter: WebhookTriggerEventParameterOption): 
   return parameter.kind === "resource-select" && parameter.resourceKind === "bot";
 }
 
+function resolvePayloadFilterBotHandleState(
+  filter: PayloadFilterPathNode,
+): "all-bot-handles" | "all-non-bot-handles" | "mixed-or-empty" {
+  if (filter.op === "in") {
+    if (filter.values.length === 0) {
+      return "mixed-or-empty";
+    }
+
+    const botHandleCount = filter.values.filter((value) => isGitHubAppBotHandle(value)).length;
+    if (botHandleCount === filter.values.length) {
+      return "all-bot-handles";
+    }
+    if (botHandleCount === 0) {
+      return "all-non-bot-handles";
+    }
+
+    return "mixed-or-empty";
+  }
+
+  if (
+    filter.op === "eq" ||
+    filter.op === "neq" ||
+    filter.op === "contains" ||
+    filter.op === "contains_token"
+  ) {
+    return isGitHubAppBotHandle(filter.value) ? "all-bot-handles" : "all-non-bot-handles";
+  }
+
+  return "mixed-or-empty";
+}
+
 function resolvePayloadFilterParameter(input: {
   parameters: readonly WebhookTriggerEventParameterOption[];
   filter: PayloadFilterPathNode;
@@ -272,25 +303,30 @@ function resolvePayloadFilterParameter(input: {
     return firstMatchingParameter;
   }
 
-  if (
-    input.filter.op === "eq" ||
-    input.filter.op === "neq" ||
-    input.filter.op === "contains" ||
-    input.filter.op === "contains_token"
-  ) {
-    const matchingBotParameter = matchingParameters.find((parameter) =>
-      isBotResourceParameter(parameter),
-    );
-    if (matchingBotParameter !== undefined && isGitHubAppBotHandle(input.filter.value)) {
+  const matchingBotParameter = matchingParameters.find((parameter) =>
+    isBotResourceParameter(parameter),
+  );
+  const matchingNonBotParameter = matchingParameters.find(
+    (parameter) => !isBotResourceParameter(parameter),
+  );
+  const botHandleState = resolvePayloadFilterBotHandleState(input.filter);
+
+  if (botHandleState !== "mixed-or-empty") {
+    if (matchingBotParameter !== undefined && botHandleState === "all-bot-handles") {
       return matchingBotParameter;
     }
 
-    const matchingNonBotParameter = matchingParameters.find(
-      (parameter) => !isBotResourceParameter(parameter),
-    );
-    if (matchingNonBotParameter !== undefined) {
+    if (matchingNonBotParameter !== undefined && botHandleState === "all-non-bot-handles") {
       return matchingNonBotParameter;
     }
+  }
+
+  if (
+    input.filter.op === "in" &&
+    matchingBotParameter !== undefined &&
+    matchingNonBotParameter !== undefined
+  ) {
+    return undefined;
   }
 
   return firstMatchingParameter;

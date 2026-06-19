@@ -448,6 +448,66 @@ describe("toWebhookTriggerFormValues", () => {
     });
   });
 
+  it("hydrates GitHub bot actor filters out of sender login in-filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.opened",
+              payloadFilter: {
+                op: "in",
+                path: ["sender", "login"],
+                values: ["dependabot[bot]", "renovate[bot]"],
+              },
+            },
+          ],
+        }),
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      eventParameterRules: {
+        [PullRequestConditionId0]: {
+          botActor: isAnyOfRule(["dependabot[bot]", "renovate[bot]"]),
+        },
+      },
+      remainingPayloadFilter: null,
+    });
+  });
+
+  it("preserves mixed GitHub actor in-filters as advanced payload filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.opened",
+              payloadFilter: {
+                op: "in",
+                path: ["sender", "login"],
+                values: ["octocat", "dependabot[bot]"],
+              },
+            },
+          ],
+        }),
+        GitHubEventOptions,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        eventParameterRules: {},
+        remainingPayloadFilter: {
+          [PullRequestConditionId0]: {
+            op: "in",
+            path: ["sender", "login"],
+            values: ["octocat", "dependabot[bot]"],
+          },
+        },
+      }),
+    );
+  });
+
   it("hydrates guarded GitHub requested reviewer exclusion filters", () => {
     expect(
       toWebhookTriggerFormValues(
@@ -508,6 +568,34 @@ describe("toWebhookTriggerFormValues", () => {
           requestedBot: isAnyOfRule(["mistle-agent[bot]"]),
         },
       },
+    });
+  });
+
+  it("hydrates GitHub requested bot filters out of requested reviewer login in-filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.review_requested",
+              payloadFilter: {
+                op: "in",
+                path: ["requested_reviewer", "login"],
+                values: ["mistle-agent[bot]", "mistle-reviewer[bot]"],
+              },
+            },
+          ],
+        }),
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      eventParameterRules: {
+        [PullRequestReviewRequestedConditionId0]: {
+          requestedBot: isAnyOfRule(["mistle-agent[bot]", "mistle-reviewer[bot]"]),
+        },
+      },
+      remainingPayloadFilter: null,
     });
   });
 
