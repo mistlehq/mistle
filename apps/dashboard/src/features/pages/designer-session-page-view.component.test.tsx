@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { DockviewApi } from "dockview";
+import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -50,6 +51,65 @@ function renderDesignerCanvasWorkspace(input: RenderDesignerCanvasWorkspaceInput
             onTabClose={input.onTabClose ?? (() => {})}
             onTabsChange={input.onTabsChange ?? (() => {})}
             tabs={input.tabs}
+          />
+        ),
+      },
+    ],
+    {
+      initialEntries: ["/designer/session_story"],
+    },
+  );
+
+  render(
+    <ResolvedAppearanceProvider resolvedAppearance="light">
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </ResolvedAppearanceProvider>,
+  );
+}
+
+function StatefulDesignerCanvasWorkspace(input: {
+  initialActiveTabHref: string | null;
+  initialTabs: DesignerCanvasWorkspaceProps["tabs"];
+}): React.JSX.Element {
+  const [activeTabHref, setActiveTabHref] = useState(input.initialActiveTabHref);
+  const [tabs, setTabs] = useState(input.initialTabs);
+
+  return (
+    <DesignerCanvasWorkspace
+      activeTabHref={activeTabHref}
+      onActiveTabHrefChange={setActiveTabHref}
+      onTabClose={(tabId) => {
+        setTabs((currentTabs) => currentTabs.filter((tab) => tab.id !== tabId));
+      }}
+      onTabsChange={setTabs}
+      tabs={tabs}
+    />
+  );
+}
+
+function renderStatefulDesignerCanvasWorkspace(input: {
+  activeTabHref: string | null;
+  tabs: DesignerCanvasWorkspaceProps["tabs"];
+}): void {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+  seedAuthenticatedSession(queryClient);
+
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/designer/session_story",
+        element: (
+          <StatefulDesignerCanvasWorkspace
+            initialActiveTabHref={input.activeTabHref}
+            initialTabs={input.tabs}
           />
         ),
       },
@@ -185,7 +245,7 @@ describe("DesignerCanvasWorkspace", () => {
     ]);
   });
 
-  it("renders trigger subroute tab hrefs as unsupported canvas routes", async () => {
+  it("renders trigger create tab hrefs in the Designer canvas", async () => {
     renderDesignerCanvasWorkspace({
       activeTabHref: "/triggers/new",
       tabs: [
@@ -197,9 +257,25 @@ describe("DesignerCanvasWorkspace", () => {
       ],
     });
 
-    expect(
-      await screen.findByText("This route is not available in the Designer canvas."),
-    ).toBeDefined();
+    expect(await screen.findByRole("region", { name: "Create trigger page" })).toBeDefined();
+  });
+
+  it("opens the trigger create route from the embedded triggers list", async () => {
+    renderStatefulDesignerCanvasWorkspace({
+      activeTabHref: "/triggers",
+      tabs: [
+        {
+          id: "triggers",
+          title: "Triggers",
+          href: "/triggers",
+        },
+      ],
+    });
+
+    const createTriggerLink = await screen.findByRole("link", { name: "Create trigger" });
+    fireEvent.click(createTriggerLink);
+
+    expect(await screen.findByRole("region", { name: "Create trigger page" })).toBeDefined();
   });
 
   it("reports the closed Designer canvas tab id when Dockview closes a panel", async () => {

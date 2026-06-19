@@ -375,7 +375,20 @@ export const ControlPlaneApiConfigSchema = z
     commitSign: ControlPlaneApiCommitSignConfigSchema.optional(),
     integrations: ControlPlaneApiIntegrationsConfigSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (
+      value.sandbox.designer !== undefined &&
+      value.platformCredentials?.openai?.apiKey === undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["platformCredentials", "openai", "apiKey"],
+        message:
+          "Platform OpenAI credentials are required when Designer sandbox config is enabled.",
+      });
+    }
+  });
 
 export const ControlPlaneApiMaintenanceConfigSchema = z
   .object({

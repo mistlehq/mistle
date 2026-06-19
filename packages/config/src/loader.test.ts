@@ -358,6 +358,24 @@ describe("loadConfig", () => {
     });
   });
 
+  it("rejects env control-plane API Designer config without platform OpenAI credentials", () => {
+    const env = buildControlPlaneApiServiceEnv();
+    delete env.MISTLE_PLATFORM_OPENAI_API_KEY;
+
+    expect(() =>
+      loadConfig({
+        app: AppIds.CONTROL_PLANE_API,
+        includeGlobal: false,
+        env: {
+          ...env,
+          MISTLE_DESIGNER_SANDBOX_BASE_IMAGE: "registry.example.com/designer:latest",
+          MISTLE_DESIGNER_CODEX_CLI_PATH: "codex",
+          MISTLE_DESIGNER_SANDBOX_PROVIDER: "docker",
+        },
+      }),
+    ).toThrow(/Platform OpenAI credentials are required/u);
+  });
+
   it("loads env data-plane API Docker config when shared E2B env is also present", () => {
     const loadedConfig = loadConfig({
       app: AppIds.DATA_PLANE_API,

@@ -18,6 +18,7 @@ import { sandboxProfileDetailQueryKey } from "../sandbox-profiles/sandbox-profil
 import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
 import { OrganizationIntegrationsSettingsPage } from "./organization-integrations-settings-page.js";
 import { EmbeddedSandboxProfileEditorPage } from "./sandbox-profile-editor-page.js";
+import { TriggerCreatePage } from "./trigger-create-page.js";
 import { TriggersPage } from "./triggers-page.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
@@ -45,6 +46,10 @@ type DesignerCanvasEmbeddedRoute =
     }
   | {
       kind: "triggers";
+      searchParams: URLSearchParams;
+    }
+  | {
+      kind: "trigger-create";
       searchParams: URLSearchParams;
     }
   | {
@@ -354,6 +359,24 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
     );
   }
 
+  if (route.kind === "trigger-create") {
+    return (
+      <DesignerCanvasEmbeddedSurface params={params}>
+        <TriggerCreatePage
+          embeddedRoute={{
+            searchParams: route.searchParams,
+            navigate: (nextHref) => {
+              navigateDesignerCanvasTab({
+                href: nextHref,
+                params,
+              });
+            },
+          }}
+        />
+      </DesignerCanvasEmbeddedSurface>
+    );
+  }
+
   return <UnsupportedDesignerCanvasRoute />;
 }
 
@@ -623,6 +646,13 @@ function resolveDesignerCanvasEmbeddedRoute(href: string): DesignerCanvasEmbedde
   if (pathSegments[0] === "triggers" && pathSegments.length === 1) {
     return {
       kind: "triggers",
+      searchParams: url.searchParams,
+    };
+  }
+
+  if (pathSegments[0] === "triggers" && pathSegments[1] === "new" && pathSegments.length === 2) {
+    return {
+      kind: "trigger-create",
       searchParams: url.searchParams,
     };
   }
