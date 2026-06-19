@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { useSearchParams } from "react-router";
 
 import { isUnavailableResourceError } from "../api/http-api-error.js";
-import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import type { DashboardControlActionSupport } from "../session-agents/dashboard-control-actions.js";
 import {
   RuntimeConversationNavigatorPanel,
@@ -534,30 +533,9 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
           bottomPanel={<></>}
           isBottomPanelVisible={false}
           isSecondaryPanelVisible={false}
-          primaryBottomPanel={
-            <SessionConversationBottomPanel
-              chatEntries={[]}
-              composerViewModel={createEmptyComposerViewModel()}
-              isRespondingToServerRequest={false}
-              onRespondToServerRequest={function onRespondToServerRequest() {}}
-              serverRequestPanelEntries={[]}
-              statusMessage={null}
-            />
-          }
+          primaryBottomPanel={<></>}
           secondaryPanel={<></>}
-          mainContent={
-            <SessionConversationMainContent
-              activeTurnId={null}
-              isTurnInProgress={false}
-              pendingTurnId={null}
-              scrollBehavior="follow-streaming-at-bottom"
-              chatEntries={[]}
-              isRespondingToServerRequest={false}
-              onRespondToServerRequest={function onRespondToServerRequest() {}}
-              scrollContainerRef={conversationScrollContainerRef}
-              serverRequestPanelEntries={[]}
-            />
-          }
+          mainContent={<></>}
           mainContentScrollContainerRef={conversationScrollContainerRef}
           sandboxInstanceId={null}
         />
@@ -700,42 +678,6 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
       />
     </ConversationWorkspaceFrame>
   );
-}
-
-function createEmptyComposerViewModel(): ChatComposerViewModel {
-  return {
-    canUploadAttachments: true,
-    composerCapabilities: [],
-    composerDraft: createComposerDraft(""),
-    configControlsDisabled: true,
-    contextUsage: null,
-    gitBranchLabel: null,
-    isSubmitPending: false,
-    isUploadingAttachments: false,
-    modelOptions: [],
-    onClearPendingDiffComments() {},
-    onComposerDraftChange() {},
-    onModelChange() {},
-    onPendingFilesAdded() {},
-    onReasoningEffortChange() {},
-    onRemovePendingAttachment() {},
-    onRuntimeCommandSubmit() {},
-    onSubmit() {},
-    pendingAttachments: [],
-    pendingDiffCommentSummary: null,
-    placeholderText: "",
-    pullRequest: null,
-    reasoningEffortOptions: [],
-    selectedModel: null,
-    selectedReasoningEffort: null,
-    showAttachmentControl: false,
-    showConfigControls: false,
-    showReasoningControl: false,
-    submitDisabled: true,
-    submitDisabledReason: "Session id is missing.",
-    submitLabel: "Submit",
-    submitMode: "steer",
-  };
 }
 
 export function shouldFormatInitialUserMessageAsTriggerInput(input: {

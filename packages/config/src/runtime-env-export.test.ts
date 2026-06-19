@@ -102,6 +102,18 @@ describe("exportServiceConfigToEnv", () => {
       valueFormat: "json",
     });
     expectEntry(entries, {
+      name: "MISTLE_DESIGNER_SANDBOX_BASE_IMAGE",
+      value: "registry.example.com/mistle/sandbox-base:prod",
+    });
+    expectEntry(entries, {
+      name: "MISTLE_DESIGNER_CODEX_CLI_PATH",
+      value: "codex",
+    });
+    expectEntry(entries, {
+      name: "MISTLE_DESIGNER_SANDBOX_PROVIDER",
+      value: "docker",
+    });
+    expectEntry(entries, {
       name: "MISTLE_SANDBOX_E2B_API_KEY",
       value: "replace-with-e2b-api-key",
     });
@@ -288,6 +300,10 @@ describe("exportServiceConfigToEnv", () => {
     expectEntry(entries, {
       name: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL",
       value: "http://data-plane-api:8082",
+    });
+    expectEntry(entries, {
+      name: "MISTLE_PLATFORM_OPENAI_API_KEY",
+      value: "replace-with-platform-openai-api-key",
     });
   });
 

@@ -620,7 +620,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Mistle Designer resource access** is distinct from **Mistle resource access** configured on a target **Sandbox profile version**.
 - **Mistle Designer resource access** defines technical access authority; approval behavior for mutating actions is a separate **Mistle Designer** interaction policy.
 - **Mistle Designer resource access** is scoped to a **Mistle Designer session** and organization rather than one target **Sandbox profile version**.
-- **Mistle Designer sessions** currently persist the user's initial prompt and workspace state before the full Designer chat runtime is wired in.
+- **Mistle Designer sessions** persist the user's initial prompt, workspace state, and Codex-backed Designer chat runtime state.
 - The target **Sandbox profile version**'s **Agent runtime** remains a user choice even when authored through **Mistle Designer**.
 - **Mistle Designer** may save incomplete draft **Sandbox profile version configuration**, but publishing still requires a publishable target **Agent runtime** configuration.
 - **Mistle Designer** should present setup guidance as **Designer recommendations** when the user needs to choose, set up, or review product configuration.

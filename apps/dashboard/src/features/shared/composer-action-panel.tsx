@@ -1,10 +1,5 @@
 import type React from "react";
 
-export type ComposerActionDetail = {
-  label: string;
-  value: React.ReactNode;
-};
-
 export type ComposerActionPanelProps = {
   actions: React.ReactNode;
   details: React.ReactNode;
@@ -28,24 +23,5 @@ export function ComposerActionPanel(input: ComposerActionPanelProps): React.JSX.
         <div className="flex flex-wrap gap-2">{input.actions}</div>
       </div>
     </article>
-  );
-}
-
-export function ComposerActionDetailList(input: {
-  details: readonly ComposerActionDetail[];
-}): React.JSX.Element | null {
-  if (input.details.length === 0) {
-    return null;
-  }
-
-  return (
-    <dl className="grid gap-3 text-sm">
-      {input.details.map((detail, detailIndex) => (
-        <div key={`${detail.label}:${String(detailIndex)}`}>
-          <dt className="text-muted-foreground">{detail.label}</dt>
-          <dd className="mt-0.5 whitespace-pre-wrap">{detail.value}</dd>
-        </div>
-      ))}
-    </dl>
   );
 }

@@ -86,9 +86,6 @@ export const designerSessionsQueryKey = ["designer", "sessions"] as const;
 export function designerSessionQueryKey(sessionId: string) {
   return ["designer", "sessions", sessionId] as const;
 }
-export function designerSessionBySandboxInstanceQueryKey(sandboxInstanceId: string) {
-  return ["designer", "sandbox-instances", sandboxInstanceId] as const;
-}
 
 export async function listDesignerSessions(input?: {
   signal?: AbortSignal;
@@ -198,42 +195,6 @@ export async function getDesignerSession(input: {
     throw new DesignerApiError(
       normalizeHttpApiError({
         operation: "getDesignerSession",
-        error,
-        fallbackMessage: "Could not load Designer session.",
-      }),
-    );
-  }
-}
-
-export async function getDesignerSessionBySandboxInstanceId(input: {
-  sandboxInstanceId: string;
-  signal?: AbortSignal;
-}): Promise<DesignerSession> {
-  try {
-    const response = await requestControlPlane({
-      operation: "getDesignerSessionBySandboxInstanceId",
-      method: "GET",
-      pathname: `/v1/designer/sandbox-instances/${encodeURIComponent(input.sandboxInstanceId)}`,
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not load Designer session.",
-    });
-
-    const responseBody = await response.json();
-    const parsedResponse = DesignerSessionSchema.safeParse(responseBody);
-    if (!parsedResponse.success) {
-      throw new DesignerApiError({
-        operation: "getDesignerSessionBySandboxInstanceId",
-        status: 500,
-        body: responseBody,
-        message: "Designer session response payload is invalid.",
-      });
-    }
-
-    return parsedResponse.data;
-  } catch (error) {
-    throw new DesignerApiError(
-      normalizeHttpApiError({
-        operation: "getDesignerSessionBySandboxInstanceId",
         error,
         fallbackMessage: "Could not load Designer session.",
       }),

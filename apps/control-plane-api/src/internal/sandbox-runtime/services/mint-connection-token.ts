@@ -6,7 +6,6 @@ import type {
   GetSandboxInstanceResponse,
 } from "@mistle/data-plane-internal-client";
 import { IntegrationBindingKinds, type ControlPlaneDatabase } from "@mistle/db/control-plane";
-import type { SandboxInstancePurpose } from "@mistle/db/data-plane";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import { mintConnectionToken as mintGatewayConnectionToken } from "@mistle/gateway-connection-auth";
 import {
@@ -102,7 +101,6 @@ function createInstanceNotDeliverableError(
 async function getExistingSandboxInstance(
   dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">,
   input: {
-    allowedPurposes?: readonly SandboxInstancePurpose[];
     organizationId: string;
     instanceId: string;
   },
@@ -110,7 +108,6 @@ async function getExistingSandboxInstance(
   const sandboxInstance = await dataPlaneClient.getSandboxInstance({
     organizationId: input.organizationId,
     instanceId: input.instanceId,
-    ...(input.allowedPurposes === undefined ? {} : { allowedPurposes: input.allowedPurposes }),
   });
 
   if (sandboxInstance === null) {
@@ -123,7 +120,6 @@ async function getExistingSandboxInstance(
 async function waitForRunningSandboxInstance(
   dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">,
   input: {
-    allowedPurposes?: readonly SandboxInstancePurpose[];
     organizationId: string;
     instanceId: string;
   },
@@ -208,7 +204,6 @@ export async function mintConnectionToken(
     tokenConfig: ConnectionTokenConfig;
   },
   input: {
-    allowedPurposes?: readonly SandboxInstancePurpose[];
     organizationId: string;
     instanceId: string;
     actingUserId?: string;
@@ -260,9 +255,6 @@ export async function mintConnectionToken(
 
       try {
         let sandboxInstance = await getExistingSandboxInstance(dataPlaneClient, {
-          ...(input.allowedPurposes === undefined
-            ? {}
-            : { allowedPurposes: input.allowedPurposes }),
           organizationId: input.organizationId,
           instanceId: input.instanceId,
         });
@@ -272,9 +264,6 @@ export async function mintConnectionToken(
             break;
           case SandboxDeliveryDispositions.WAIT:
             sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
-              ...(input.allowedPurposes === undefined
-                ? {}
-                : { allowedPurposes: input.allowedPurposes }),
               organizationId: input.organizationId,
               instanceId: input.instanceId,
             });

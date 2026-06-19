@@ -1,12 +1,33 @@
 import { Button, Input } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type React from "react";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
-import {
-  ComposerActionDetailList,
-  ComposerActionPanel,
-  ComposerActionPanelStack,
-} from "./composer-action-panel.js";
+import { ComposerActionPanel, ComposerActionPanelStack } from "./composer-action-panel.js";
+
+type ComposerActionDetail = {
+  label: string;
+  value: React.ReactNode;
+};
+
+function ComposerActionDetailList(input: {
+  details: readonly ComposerActionDetail[];
+}): React.JSX.Element | null {
+  if (input.details.length === 0) {
+    return null;
+  }
+
+  return (
+    <dl className="grid gap-3 text-sm">
+      {input.details.map((detail, detailIndex) => (
+        <div key={`${detail.label}:${String(detailIndex)}`}>
+          <dt className="text-muted-foreground">{detail.label}</dt>
+          <dd className="mt-0.5 whitespace-pre-wrap">{detail.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 function ComposerActionPanelStory(): React.JSX.Element {
   return (

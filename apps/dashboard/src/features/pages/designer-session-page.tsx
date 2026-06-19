@@ -155,10 +155,6 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
       });
       setActiveTabHref(request.input.href);
       setIsLocallyDirty(true);
-
-      return {
-        accepted: true,
-      };
     },
     [persistCanvasTabs],
   );
@@ -245,7 +241,11 @@ function LoadedDesignerSessionPage(input: {
   const { activeTabHref, canvasTabs, dashboardControlActions, setActiveTabHref, updateCanvasTabs } =
     useDesignerCanvasTabs(input.designerSession);
   const readDesignerSandboxStatus = useCallback(
-    async ({ signal }: { sandboxInstanceId: string; signal?: AbortSignal }) => {
+    async ({ sandboxInstanceId, signal }: { sandboxInstanceId: string; signal?: AbortSignal }) => {
+      if (sandboxInstanceId !== input.designerSession.sandboxInstanceId) {
+        throw new Error("Designer session sandbox instance changed.");
+      }
+
       const designerSession = await getDesignerSession({
         sessionId: input.designerSession.id,
         ...(signal === undefined ? {} : { signal }),
@@ -253,7 +253,7 @@ function LoadedDesignerSessionPage(input: {
 
       return mapDesignerSessionToSandboxStatus(designerSession);
     },
-    [input.designerSession.id],
+    [input.designerSession.id, input.designerSession.sandboxInstanceId],
   );
   const mintConnectionToken = useCallback(
     async ({ instanceId }: { instanceId: string }) => {

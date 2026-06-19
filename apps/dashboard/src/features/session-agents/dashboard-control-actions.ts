@@ -7,10 +7,6 @@ export const DashboardControlDynamicToolRequestMethod = "item/tool/call";
 export const DashboardControlDynamicToolNamespace = "dashboard_control";
 export const DesignerCanvasTabOpenDynamicToolName = "open_designer_canvas_tab";
 
-export type DashboardControlActionResult = {
-  accepted: true;
-};
-
 const DesignerCanvasTabOpenInputSchema = z
   .object({
     id: z.string().min(1).max(128),
@@ -62,9 +58,7 @@ export type DashboardControlActionRequest = {
   input: DesignerCanvasTabOpenInput;
 };
 
-export type DashboardControlActionHandler = (
-  request: DashboardControlActionRequest,
-) => DashboardControlActionResult;
+export type DashboardControlActionHandler = (request: DashboardControlActionRequest) => void;
 
 export type DashboardControlActionSupport = {
   supportedActions: readonly string[];

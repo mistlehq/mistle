@@ -45,6 +45,15 @@ const MutatingToolAnnotations: ToolAnnotations = {
 
 const DefaultSandboxOperationEventsLimit = 20;
 
+function resolveMcpSandboxReadPurposeScope(organizationActor: AppOrganizationActor): {
+  allowedPurposes?: readonly [typeof SandboxInstancePurposes.DESIGNER];
+} {
+  return organizationActor.kind === "mcp_capability" &&
+    organizationActor.capability.kind === "designer"
+    ? { allowedPurposes: [SandboxInstancePurposes.DESIGNER] }
+    : {};
+}
+
 export function registerSandboxTools(server: McpServer, context: MistleMcpServerContext): void {
   server.registerTool(
     "profile_setup_script_test_start",
@@ -206,10 +215,7 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
         {
           organizationId: context.organizationActor.organizationId,
           instanceId,
-          ...(context.organizationActor.kind === "mcp_capability" &&
-          context.organizationActor.capability.kind === "designer"
-            ? { allowedPurposes: [SandboxInstancePurposes.DESIGNER] }
-            : {}),
+          ...resolveMcpSandboxReadPurposeScope(context.organizationActor),
         },
       );
       requireMcpSandboxInstanceProfileScope(context.organizationActor, {
@@ -267,10 +273,7 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
         {
           organizationId: context.organizationActor.organizationId,
           instanceId,
-          ...(context.organizationActor.kind === "mcp_capability" &&
-          context.organizationActor.capability.kind === "designer"
-            ? { allowedPurposes: [SandboxInstancePurposes.DESIGNER] }
-            : {}),
+          ...resolveMcpSandboxReadPurposeScope(context.organizationActor),
         },
       );
       requireMcpSandboxInstanceProfileScope(context.organizationActor, {
@@ -310,10 +313,7 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
         {
           organizationId: context.organizationActor.organizationId,
           instanceId,
-          ...(context.organizationActor.kind === "mcp_capability" &&
-          context.organizationActor.capability.kind === "designer"
-            ? { allowedPurposes: [SandboxInstancePurposes.DESIGNER] }
-            : {}),
+          ...resolveMcpSandboxReadPurposeScope(context.organizationActor),
         },
       );
       requireMcpSandboxInstanceProfileScope(context.organizationActor, {
@@ -332,10 +332,7 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
           organizationId: context.organizationActor.organizationId,
           sandboxInstanceId: instanceId,
           operationId,
-          ...(context.organizationActor.kind === "mcp_capability" &&
-          context.organizationActor.capability.kind === "designer"
-            ? { allowedPurposes: [SandboxInstancePurposes.DESIGNER] }
-            : {}),
+          ...resolveMcpSandboxReadPurposeScope(context.organizationActor),
           ...(afterSequence === undefined ? {} : { afterSequence }),
           limit: limit ?? DefaultSandboxOperationEventsLimit,
         },
