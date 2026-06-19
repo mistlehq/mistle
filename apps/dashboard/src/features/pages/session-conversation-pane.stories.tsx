@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 
 import type { ChatEntry } from "../chat/chat-types.js";
 import {
@@ -19,7 +19,6 @@ import {
   SessionComposerFixturePropsWithPendingAttachments,
   CodexFixtureSessionEntriesWithExploringGroup,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
-import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import {
   SessionConversationPanePlaygroundBaseArgs,
   type SessionConversationPaneStoryArgs,
@@ -31,7 +30,7 @@ import {
   SessionConversationPaneLayoutPlayground,
 } from "./session-conversation-pane-playground.js";
 import {
-  SessionConversationBottomPanel,
+  SessionConversationBottomPanelDraftController,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 import {
@@ -65,6 +64,86 @@ const InitialLoadAutoScrollEntries = Array.from({ length: 18 }, (_, index): Chat
     },
   ];
 }).flat();
+
+const LongTranscriptServerRequestPanelEntries: React.ComponentProps<
+  typeof SessionConversationMainContent
+>["serverRequestPanelEntries"] = [];
+
+const LongTranscriptPendingDiffComments: React.ComponentProps<
+  typeof SessionConversationBottomPanelDraftController
+>["pendingDiffComments"] = [];
+
+const LongTranscriptComposerStateInput: React.ComponentProps<
+  typeof SessionConversationBottomPanelDraftController
+>["composerStateInput"] = {
+  bootstrap: {
+    phase: { status: "ready" },
+    composerCapabilities: [],
+    establishedSnapshot: {
+      availableModels: [
+        {
+          id: "model_gpt_54",
+          model: "gpt-5.4",
+          displayName: "GPT-5.4",
+          hidden: false,
+          defaultReasoningEffort: "medium",
+          inputModalities: ["text", "image"],
+          supportsPersonality: true,
+          isDefault: true,
+        },
+      ],
+      configSnapshot: {
+        model: "gpt-5.4",
+        modelReasoningEffort: "medium",
+      },
+    },
+  },
+  clearSessionErrorMessage: function clearSessionErrorMessage() {},
+  configControl: {
+    selectedModel: "gpt-5.4",
+    selectedReasoningEffort: "medium",
+    hasExplicitModelSelection: true,
+    modelOptions: [{ value: "gpt-5.4", label: "GPT-5.4" }],
+    reasoningEffortOptions: [{ value: "medium", label: "Medium" }],
+    canChangeReasoningEffort: true,
+    controlsDisabled: false,
+    isUpdating: false,
+    setModel: function setModel() {},
+    setReasoningEffort: function setReasoningEffort() {},
+  },
+  attachmentControl: {
+    canUploadAttachments: true,
+    isUploadingAttachments: false,
+    prepareAttachments: async ({ prompt }) => ({
+      displayAttachments: [],
+      prompt,
+      submittedAttachments: [],
+      uploadedAttachments: [],
+    }),
+  },
+  repositoryStatus: {
+    branchLabel: "main",
+    pullRequest: null,
+  },
+  contextUsage: null,
+  modelSelection: {
+    required: true,
+    showControls: true,
+  },
+  sessionErrorMessage: null,
+  turnControl: {
+    activeTurnState: "idle",
+    canSteer: false,
+    canInterrupt: false,
+    isStarting: false,
+    isSteering: false,
+    isInterrupting: false,
+    completedTurnErrorMessage: null,
+    startTurn: async () => {},
+    steerTurn: async () => {},
+    interruptTurn: function interruptTurn() {},
+  },
+};
 
 function createLongTranscriptAssistantText(input: {
   paragraphCount: number;
@@ -114,9 +193,6 @@ function createLongTranscriptEntries(input: {
 
 function LongTranscriptTypingHarness(): React.JSX.Element {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const [composerDraft, setComposerDraft] = useState(
-    createComposerDraft("Type here while profiling a long completed transcript."),
-  );
   const entries = useMemo(
     () =>
       createLongTranscriptEntries({
@@ -141,28 +217,22 @@ function LongTranscriptTypingHarness(): React.JSX.Element {
         pendingTurnId={null}
         scrollBehavior="follow-streaming-at-bottom"
         scrollContainerRef={scrollContainerRef}
-        serverRequestPanelEntries={[]}
+        serverRequestPanelEntries={LongTranscriptServerRequestPanelEntries}
       />
     ),
     mainContentScrollContainerRef: scrollContainerRef,
     primaryBottomPanel: (
-      <SessionConversationBottomPanel
+      <SessionConversationBottomPanelDraftController
         chatEntries={entries}
-        composerViewModel={{
-          ...SessionConversationPanePlaygroundBaseArgs.composerViewModel,
-          composerDraft,
-          onComposerDraftChange: setComposerDraft,
-          onSubmit: () => {
-            setComposerDraft(createComposerDraft(""));
-          },
-          submitDisabled: composerDraft.text.trim().length === 0,
-        }}
+        clearPendingDiffComments={function clearPendingDiffComments() {}}
+        composerStateInput={LongTranscriptComposerStateInput}
+        draftResetKey="long-transcript-typing"
         isRespondingToServerRequest={false}
         onRespondToServerRequest={
           SessionConversationPanePlaygroundBaseArgs.onRespondToServerRequest
         }
-        serverRequestPanelEntries={[]}
-        statusMessage={null}
+        pendingDiffComments={LongTranscriptPendingDiffComments}
+        serverRequestPanelEntries={LongTranscriptServerRequestPanelEntries}
       />
     ),
   });
