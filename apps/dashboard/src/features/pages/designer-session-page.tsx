@@ -73,6 +73,19 @@ function upsertDesignerCanvasTab(input: {
   ];
 }
 
+export function mergeDesignerCanvasTabSnapshotIntoLatestTabs(input: {
+  latestTabs: readonly DesignerSessionCanvasTab[];
+  snapshotTabs: readonly DesignerSessionCanvasTab[];
+}): readonly DesignerSessionCanvasTab[] {
+  const snapshotTabById = new Map(input.snapshotTabs.map((tab) => [tab.id, tab]));
+  const latestTabIds = new Set(input.latestTabs.map((tab) => tab.id));
+
+  return [
+    ...input.latestTabs.map((tab) => snapshotTabById.get(tab.id) ?? tab),
+    ...input.snapshotTabs.filter((tab) => !latestTabIds.has(tab.id)),
+  ];
+}
+
 function mapDesignerSessionToSandboxStatus(
   designerSession: DesignerSession,
 ): SandboxInstanceStatusResult {
@@ -126,9 +139,13 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
       const nextSave = canvasTabSaveQueueRef.current
         .catch(() => {})
         .then(async () => {
-          await persistCanvasTabs(tabs);
-          latestPersistedCanvasTabsRef.current = tabs;
-          setCanvasTabs(tabs);
+          const nextTabs = mergeDesignerCanvasTabSnapshotIntoLatestTabs({
+            latestTabs: latestPersistedCanvasTabsRef.current,
+            snapshotTabs: tabs,
+          });
+          await persistCanvasTabs(nextTabs);
+          latestPersistedCanvasTabsRef.current = nextTabs;
+          setCanvasTabs(nextTabs);
         });
       canvasTabSaveQueueRef.current = nextSave;
       void nextSave.catch(() => {});
