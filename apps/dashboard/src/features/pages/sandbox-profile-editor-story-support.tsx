@@ -17,7 +17,7 @@ import type {
 import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/session-fixtures.js";
 import { sandboxOperationEventsQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxOperationEvent } from "../sessions/sessions-types.js";
-import type { ApiKey, CreatedApiKey } from "../settings/api-keys/api-keys-service.js";
+import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
 import {
   createIntegrationsEditorSectionStoryQueryClient,
   seedStoryIntegrationResources,
@@ -1266,7 +1266,7 @@ function SandboxProfileEditorPageStoryView(
   async function handleCreateApiKey(createInput: {
     name: string;
     permissions: readonly string[];
-  }): Promise<CreatedApiKey> {
+  }): Promise<ApiKey> {
     const now = "2026-05-20T10:00:00.000Z";
     const createdApiKey = {
       id: `apk_story_${String(apiKeys.length + 1)}`,
@@ -1281,10 +1281,7 @@ function SandboxProfileEditorPageStoryView(
 
     setApiKeys((currentApiKeys) => [createdApiKey, ...currentApiKeys]);
 
-    return {
-      apiKey: createdApiKey,
-      token: "mstl_apk_story_created_token",
-    };
+    return createdApiKey;
   }
 
   const copyableDuplicateProfileTriggerUsages =

@@ -2,7 +2,6 @@ import { createBrowserDefinitionsBundle } from "@mistle/integrations-definitions
 import {
   Button,
   Checkbox,
-  CopyableValue,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -42,7 +41,7 @@ import {
   ApiKeyPermissionOptions,
   DefaultApiKeyPermissions,
 } from "../settings/api-keys/api-key-permissions.js";
-import type { ApiKey, CreatedApiKey } from "../settings/api-keys/api-keys-service.js";
+import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -125,7 +124,7 @@ export function SandboxProfileRuntimeSection(input: {
   disabled: boolean;
   isDraft: boolean;
   onCreateApiKey?:
-    | ((input: { name: string; permissions: readonly string[] }) => Promise<CreatedApiKey>)
+    | ((input: { name: string; permissions: readonly string[] }) => Promise<ApiKey>)
     | undefined;
   onDraftStateChange?: (state: SandboxProfileRuntimeDraftState) => void;
   providers: readonly SandboxProviderSummary[];
@@ -1018,7 +1017,7 @@ function MistleMcpAccessField(input: {
   horizontal: boolean;
   onApiKeyChange: (value: string | null) => void;
   onCreateApiKey:
-    | ((input: { name: string; permissions: readonly string[] }) => Promise<CreatedApiKey>)
+    | ((input: { name: string; permissions: readonly string[] }) => Promise<ApiKey>)
     | undefined;
   readOnly: boolean;
 }): React.JSX.Element {
@@ -1065,7 +1064,7 @@ function MistleMcpApiKeyField(input: {
   horizontal: boolean;
   onApiKeyChange: (value: string | null) => void;
   onCreateApiKey:
-    | ((input: { name: string; permissions: readonly string[] }) => Promise<CreatedApiKey>)
+    | ((input: { name: string; permissions: readonly string[] }) => Promise<ApiKey>)
     | undefined;
   selectedApiKey: ApiKey | null;
 }): React.JSX.Element {
@@ -1230,7 +1229,7 @@ function CreateApiKeyDialogTrigger(input: {
   disabled: boolean;
   onApiKeyChange: (value: string | null) => void;
   onCreateApiKey:
-    | ((input: { name: string; permissions: readonly string[] }) => Promise<CreatedApiKey>)
+    | ((input: { name: string; permissions: readonly string[] }) => Promise<ApiKey>)
     | undefined;
   onCreateDialogOpenChange: (open: boolean) => void;
 }): React.JSX.Element {
@@ -1277,10 +1276,7 @@ function MistleResourceAccessSummary(input: { apiKey: ApiKey }): React.JSX.Eleme
 
 function CreateApiKeyDialog(input: {
   onApiKeyChange: (value: string | null) => void;
-  onCreateApiKey: (input: {
-    name: string;
-    permissions: readonly string[];
-  }) => Promise<CreatedApiKey>;
+  onCreateApiKey: (input: { name: string; permissions: readonly string[] }) => Promise<ApiKey>;
   onOpenChange: (open: boolean) => void;
   open: boolean;
 }): React.JSX.Element {
@@ -1288,10 +1284,15 @@ function CreateApiKeyDialog(input: {
   const [selectedPermissions, setSelectedPermissions] =
     useState<readonly string[]>(DefaultApiKeyPermissions);
   const [createErrorMessage, setCreateErrorMessage] = useState<string | null>(null);
-  const [createdApiKey, setCreatedApiKey] = useState<CreatedApiKey | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const trimmedName = name.trim();
   const canCreate = trimmedName.length > 0 && selectedPermissions.length > 0 && !isCreating;
+
+  function resetDialogState(): void {
+    setName("");
+    setSelectedPermissions(DefaultApiKeyPermissions);
+    setCreateErrorMessage(null);
+  }
 
   function closeDialog(): void {
     if (isCreating) {
@@ -1299,10 +1300,7 @@ function CreateApiKeyDialog(input: {
     }
 
     input.onOpenChange(false);
-    setName("");
-    setSelectedPermissions(DefaultApiKeyPermissions);
-    setCreateErrorMessage(null);
-    setCreatedApiKey(null);
+    resetDialogState();
   }
 
   async function submitApiKeyCreate(): Promise<void> {
@@ -1313,12 +1311,13 @@ function CreateApiKeyDialog(input: {
     setIsCreating(true);
     setCreateErrorMessage(null);
     try {
-      const created = await input.onCreateApiKey({
+      const createdApiKey = await input.onCreateApiKey({
         name: trimmedName,
         permissions: selectedPermissions,
       });
-      setCreatedApiKey(created);
-      input.onApiKeyChange(created.apiKey.id);
+      input.onApiKeyChange(createdApiKey.id);
+      input.onOpenChange(false);
+      resetDialogState();
     } catch (error) {
       setCreateErrorMessage(
         resolveApiErrorMessage({
@@ -1360,35 +1359,23 @@ function CreateApiKeyDialog(input: {
           </DialogDescription>
         </DialogHeader>
 
-        {createdApiKey === null ? (
-          <CreateApiKeyDialogForm
-            createErrorMessage={createErrorMessage}
-            isCreating={isCreating}
-            name={name}
-            onNameChange={setName}
-            onPermissionChange={setSelectedPermissions}
-            selectedPermissions={selectedPermissions}
-          />
-        ) : (
-          <CreatedApiKeyTokenNotice createdApiKey={createdApiKey} />
-        )}
+        <CreateApiKeyDialogForm
+          createErrorMessage={createErrorMessage}
+          isCreating={isCreating}
+          name={name}
+          onNameChange={setName}
+          onPermissionChange={setSelectedPermissions}
+          selectedPermissions={selectedPermissions}
+        />
 
         <DialogFooter>
-          {createdApiKey === null ? (
-            <>
-              <Button disabled={isCreating} onClick={closeDialog} type="button" variant="outline">
-                Cancel
-              </Button>
-              <Button disabled={!canCreate} type="submit">
-                <PlusIcon aria-hidden />
-                {isCreating ? "Creating..." : "Create API key"}
-              </Button>
-            </>
-          ) : (
-            <Button onClick={closeDialog} type="button">
-              Done
-            </Button>
-          )}
+          <Button disabled={isCreating} onClick={closeDialog} type="button" variant="outline">
+            Cancel
+          </Button>
+          <Button disabled={!canCreate} type="submit">
+            <PlusIcon aria-hidden />
+            {isCreating ? "Creating..." : "Create API key"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1482,28 +1469,6 @@ function CreateApiKeyDialogForm(input: {
         </Field>
       </FieldGroup>
     </div>
-  );
-}
-
-function CreatedApiKeyTokenNotice(input: { createdApiKey: CreatedApiKey }): React.JSX.Element {
-  return (
-    <Notice variant="success">
-      <div className="flex flex-col gap-4">
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="text-base font-medium">API key created</div>
-          <p>
-            This key has been selected for Mistle resource access. Copy the token only if you also
-            want to use {input.createdApiKey.apiKey.name} outside this profile editor; it will not
-            be shown again.
-          </p>
-        </div>
-        <CopyableValue
-          copyAriaLabel="Copy API key token"
-          label="Token"
-          value={input.createdApiKey.token}
-        />
-      </div>
-    </Notice>
   );
 }
 

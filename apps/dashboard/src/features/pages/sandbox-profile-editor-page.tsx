@@ -3279,7 +3279,10 @@ function LoadedSandboxProfileRuntimeSection(input: {
         availableTargets={input.availableTargets}
         disabled={input.disabled}
         isDraft={input.isDraft}
-        onCreateApiKey={(createInput) => createApiKeyMutation.mutateAsync(createInput)}
+        onCreateApiKey={async (createInput) => {
+          const created = await createApiKeyMutation.mutateAsync(createInput);
+          return created.apiKey;
+        }}
         onDraftStateChange={input.onDraftStateChange}
         providers={sandboxProvidersQuery.data.items}
         version={input.version}
