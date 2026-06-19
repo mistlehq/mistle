@@ -1,6 +1,6 @@
 {
-  "id": "5523a127-dccd-413f-9c58-7e497f471cda",
-  "prevId": "996f4ca5-648b-4079-8e04-4e05fe6f446c",
+  "id": "a7404ee3-eb3d-4000-b782-57cb2fea9ee9",
+  "prevId": "a178bbb9-2c3f-4402-aa9d-3227b45549cf",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -8550,17 +8550,11 @@
           "primaryKey": false,
           "notNull": true
         },
-        "event_types": {
-          "name": "event_types",
+        "event_conditions": {
+          "name": "event_conditions",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
-        },
-        "payload_filter": {
-          "name": "payload_filter",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "input_template": {
           "name": "input_template",
@@ -8643,7 +8637,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "webhook_triggers_event_conditions_non_empty_check": {
+          "name": "webhook_triggers_event_conditions_non_empty_check",
+          "value": "jsonb_typeof(\"control_plane\".\"webhook_triggers\".\"event_conditions\") = 'array' and jsonb_array_length(\"control_plane\".\"webhook_triggers\".\"event_conditions\") > 0"
+        }
+      },
       "isRLSEnabled": false
     }
   },

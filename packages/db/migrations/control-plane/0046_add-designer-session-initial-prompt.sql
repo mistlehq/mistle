@@ -1,1 +1,0 @@
-ALTER TABLE "control_plane"."designer_sessions" ADD COLUMN "initial_prompt" text;
