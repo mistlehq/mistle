@@ -55,6 +55,21 @@ import { SessionRepositoryNoneValue } from "./use-session-primary-repository-sta
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 import { useSessionWorkbenchRuntimeConversationNavigation } from "./use-session-workbench-runtime-conversation-navigation.js";
 
+export function shouldResetConversationScopedComposerStateForActiveConversationChange(input: {
+  lastActiveConversationId: string | null;
+  nextActiveConversationId: string | null;
+}): boolean {
+  if (input.nextActiveConversationId === null) {
+    return false;
+  }
+
+  if (input.lastActiveConversationId === null) {
+    return false;
+  }
+
+  return input.lastActiveConversationId !== input.nextActiveConversationId;
+}
+
 export function SessionWorkbenchPage(): React.JSX.Element {
   const params = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -84,7 +99,7 @@ function SessionWorkbenchPageContent(input: {
   });
   const [hasEnteredReadyWorkbench, setHasEnteredReadyWorkbench] = useState(false);
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const previousActiveConversationIdRef = useRef<string | null>(null);
+  const lastEstablishedActiveConversationIdRef = useRef<string | null>(null);
   const [composerDraft, setComposerDraft] = useState(createComposerDraft(""));
   const [isMobileConversationNavigatorOpen, setMobileConversationNavigatorOpen] = useState(false);
   const isMobileSecondaryPanelLayout = useIsBelowBreakpoint(CssBreakpointVariables.SM);
@@ -402,11 +417,20 @@ function SessionWorkbenchPageContent(input: {
   useDocumentTitle(sessionDocumentTitle);
 
   useEffect(() => {
-    if (previousActiveConversationIdRef.current === conversationPane.activeConversationId) {
+    const shouldResetConversationScopedComposerState =
+      shouldResetConversationScopedComposerStateForActiveConversationChange({
+        lastActiveConversationId: lastEstablishedActiveConversationIdRef.current,
+        nextActiveConversationId: conversationPane.activeConversationId,
+      });
+
+    if (conversationPane.activeConversationId !== null) {
+      lastEstablishedActiveConversationIdRef.current = conversationPane.activeConversationId;
+    }
+
+    if (!shouldResetConversationScopedComposerState) {
       return;
     }
 
-    previousActiveConversationIdRef.current = conversationPane.activeConversationId;
     setComposerDraft(createComposerDraft(""));
     setPendingDiffComments([]);
   }, [conversationPane.activeConversationId]);

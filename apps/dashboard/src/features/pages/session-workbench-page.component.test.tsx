@@ -13,6 +13,7 @@ import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.j
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import {
   SessionWorkbenchPage,
+  shouldResetConversationScopedComposerStateForActiveConversationChange,
   shouldFormatInitialUserMessageAsTriggerInput,
 } from "./session-workbench-page.js";
 
@@ -452,5 +453,23 @@ describe("SessionWorkbenchPage", () => {
         triggerConversation: { providerConversationId: null },
       }),
     ).toBe(false);
+  });
+
+  it("preserves conversation-scoped composer state when the initially missing active conversation hydrates", () => {
+    expect(
+      shouldResetConversationScopedComposerStateForActiveConversationChange({
+        lastActiveConversationId: null,
+        nextActiveConversationId: "thread_hydrated",
+      }),
+    ).toBe(false);
+  });
+
+  it("resets conversation-scoped composer state when switching between established active conversations", () => {
+    expect(
+      shouldResetConversationScopedComposerStateForActiveConversationChange({
+        lastActiveConversationId: "thread_previous",
+        nextActiveConversationId: "thread_next",
+      }),
+    ).toBe(true);
   });
 });
