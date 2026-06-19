@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 import type { ServerRequestEntry } from "../../session-agents/server-requests/index.js";
 import { shouldSuppressChatReasoningText } from "../chat-semantic-projection.js";
 import type { ChatEntry, ChatGenericItemEntry, ChatSemanticGroupEntry } from "../chat-types.js";
@@ -97,7 +99,7 @@ function mapGenericItemToSemanticGroup(block: ChatGenericItemEntry): ChatSemanti
   };
 }
 
-export function ChatThread({
+function ChatThreadView({
   entries,
   formatInitialUserMessageAsTriggerInput = false,
   isRespondingToServerRequest,
@@ -277,3 +279,6 @@ export function ChatThread({
     </div>
   );
 }
+
+export const ChatThread = memo(ChatThreadView);
+ChatThread.displayName = "ChatThread";

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type React from "react";
 
 import type { ChatEntry } from "../chat/chat-types.js";
@@ -64,7 +65,7 @@ type SessionConversationBottomPanelControllerProps = SessionConversationSharedPa
   showWorkingIndicator?: boolean;
 };
 
-export function SessionConversationMainContent({
+function SessionConversationMainContentView({
   activeTurnId,
   formatInitialUserMessageAsTriggerInput = false,
   isTurnInProgress,
@@ -125,6 +126,9 @@ export function SessionConversationMainContent({
     </div>
   );
 }
+
+export const SessionConversationMainContent = memo(SessionConversationMainContentView);
+SessionConversationMainContent.displayName = "SessionConversationMainContent";
 
 export function SessionConversationBottomPanel({
   serverRequestPanelEntries,

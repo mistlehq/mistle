@@ -380,6 +380,58 @@ function ConversationScrollHarness(input: {
   );
 }
 
+function createLongTranscriptEntries(): readonly ChatEntry[] {
+  return createCompletedConversationEntries(
+    Array.from({ length: 180 }, (_, index) => {
+      const turnNumber = String(index + 1).padStart(3, "0");
+
+      return {
+        turnId: `long-turn-${turnNumber}`,
+        userText: `Long transcript prompt ${turnNumber}`,
+        assistantText: [
+          `Long transcript assistant response ${turnNumber}.`,
+          "This stable response text keeps the transcript large enough to exercise composer typing without depending on generated fixtures.",
+        ].join(" "),
+      };
+    }),
+  );
+}
+
+function LongTranscriptComposerHarness(): React.JSX.Element {
+  const [composerDraft, setComposerDraft] = useState<ComposerDraft>(createComposerDraft(""));
+  const chatEntries = useMemo(() => createLongTranscriptEntries(), []);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  return (
+    <div data-testid="conversation-scroll-container" ref={scrollContainerRef}>
+      <SessionConversationMainContent
+        activeTurnId={null}
+        chatEntries={chatEntries}
+        isRespondingToServerRequest={false}
+        isTurnInProgress={false}
+        onRespondToServerRequest={function onRespondToServerRequest() {}}
+        pendingTurnId={null}
+        scrollBehavior="none"
+        scrollContainerRef={scrollContainerRef}
+        serverRequestPanelEntries={[]}
+      />
+      <SessionConversationBottomPanel
+        chatEntries={chatEntries}
+        composerViewModel={{
+          ...SessionComposerFixtureProps,
+          composerDraft,
+          onComposerDraftChange: setComposerDraft,
+          submitDisabled: composerDraft.text.trim().length === 0,
+        }}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={function onRespondToServerRequest() {}}
+        serverRequestPanelEntries={[]}
+        statusMessage={null}
+      />
+    </div>
+  );
+}
+
 function defineElementRect(
   element: HTMLElement,
   input: {
@@ -506,6 +558,40 @@ async function waitForNestedAnimationFrame(): Promise<void> {
 }
 
 describe("SessionConversationBottomPanel", () => {
+  it("keeps a long transcript and scroll position stable while typing in the composer", () => {
+    render(<LongTranscriptComposerHarness />);
+
+    const scrollContainerElement = screen.getByTestId("conversation-scroll-container");
+    if (!(scrollContainerElement instanceof HTMLDivElement)) {
+      throw new Error("Expected a div scroll container.");
+    }
+
+    defineScrollContainerMetrics(scrollContainerElement, {
+      clientHeight: 600,
+      scrollHeight: 12_000,
+      scrollTop: 9_200,
+      top: 0,
+    });
+
+    expect(screen.getByText("Long transcript prompt 001")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Long transcript assistant response 180. This stable response text keeps the transcript large enough to exercise composer typing without depending on generated fixtures.",
+      ),
+    ).toBeTruthy();
+
+    replaceComposerText("Typing into a long transcript should stay responsive.");
+
+    expect(readComposerText()).toBe("Typing into a long transcript should stay responsive.");
+    expect(screen.getByText("Long transcript prompt 001")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Long transcript assistant response 180. This stable response text keeps the transcript large enough to exercise composer typing without depending on generated fixtures.",
+      ),
+    ).toBeTruthy();
+    expect(scrollContainerElement.scrollTop).toBe(9_200);
+  });
+
   it("renders the session status message above the composer", () => {
     render(
       <SessionConversationBottomPanel

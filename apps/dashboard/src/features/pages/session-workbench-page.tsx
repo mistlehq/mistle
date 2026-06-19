@@ -50,10 +50,21 @@ import { SessionWorkbenchHeaderActions } from "./session-workbench-header-action
 import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
+  type SessionWorkbenchMainContentLayout,
 } from "./session-workbench-page-view.js";
 import { SessionRepositoryNoneValue } from "./use-session-primary-repository-state.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 import { useSessionWorkbenchRuntimeConversationNavigation } from "./use-session-workbench-runtime-conversation-navigation.js";
+
+const ContainedFullMainContentLayout = {
+  scroll: "contained",
+  width: "full",
+} satisfies SessionWorkbenchMainContentLayout;
+
+const PageChatMainContentLayout = {
+  scroll: "page",
+  width: "chat",
+} satisfies SessionWorkbenchMainContentLayout;
 
 export function shouldResetConversationScopedComposerStateForActiveConversationChange(input: {
   lastActiveConversationId: string | null;
@@ -374,27 +385,33 @@ function SessionWorkbenchPageContent(input: {
       workbench.terminalPanelState.openPanel,
     ],
   );
-  const chatItemIds = new Set(
-    conversationPane.chatState.entries.flatMap((entry) => {
-      if (entry.kind === "semantic-group") {
-        return entry.items.map((item) => item.id);
-      }
+  const chatItemIds = useMemo(
+    () =>
+      new Set<string>(
+        conversationPane.chatState.entries.flatMap((entry) => {
+          if (entry.kind === "semantic-group") {
+            return entry.items.map((item) => item.id);
+          }
 
-      if (entry.kind === "command-execution" || entry.kind === "file-change") {
-        return [entry.id];
-      }
+          if (entry.kind === "command-execution" || entry.kind === "file-change") {
+            return [entry.id];
+          }
 
-      return [];
-    }),
+          return [];
+        }),
+      ),
+    [conversationPane.chatState.entries],
   );
-  const unmatchedServerRequests = conversationPane.serverRequestsState.pendingServerRequests.filter(
-    (entry) => {
-      if (entry.kind !== "command-approval" && entry.kind !== "file-change-approval") {
-        return true;
-      }
+  const unmatchedServerRequests = useMemo(
+    () =>
+      conversationPane.serverRequestsState.pendingServerRequests.filter((entry) => {
+        if (entry.kind !== "command-approval" && entry.kind !== "file-change-approval") {
+          return true;
+        }
 
-      return !chatItemIds.has(entry.itemId);
-    },
+        return !chatItemIds.has(entry.itemId);
+      }),
+    [chatItemIds, conversationPane.serverRequestsState.pendingServerRequests],
   );
   const terminalPanelKey = input.sandboxInstanceId ?? "missing-session";
   const diffPanelErrorNotice = !workbench.connectionReadiness.canConnect
@@ -487,6 +504,72 @@ function SessionWorkbenchPageContent(input: {
     !hasEnteredReadyWorkbench && alert === null ? workbench.initialEntryStartupState : null;
   const isConversationTurnRunning =
     conversationPane.composerStateInput.turnControl.activeTurnState === "running";
+  const initialBottomScrollResetKey = useMemo(
+    () => [input.sandboxInstanceId, conversationPane.activeConversationId ?? "no-thread"].join(":"),
+    [conversationPane.activeConversationId, input.sandboxInstanceId],
+  );
+  const formatInitialUserMessageAsTriggerInput = shouldFormatInitialUserMessageAsTriggerInput({
+    activeConversationId: conversationPane.activeConversationId,
+    triggerConversation: workbench.sandboxStatusQuery.data?.triggerConversation ?? null,
+  });
+  const mainContentLayout =
+    workbench.primaryPanelState.transitionState === "stable_cli" ||
+    initialEntryStartupState !== null
+      ? ContainedFullMainContentLayout
+      : PageChatMainContentLayout;
+  const primaryPanelMainContent = useMemo(
+    () =>
+      renderPrimaryPanelMainContent({
+        conversation: {
+          activeTurnId: conversationPane.chatState.activeTurnId,
+          isTurnInProgress: isConversationTurnRunning,
+          pendingTurnId: conversationPane.chatState.pendingTurnId,
+          autoScrollToBottomOnInitialLoad: true,
+          initialBottomScrollResetKey,
+          scrollBehavior: "follow-streaming-at-bottom",
+          chatEntries: conversationPane.chatState.entries,
+          formatInitialUserMessageAsTriggerInput,
+          onUserMessageAction: conversationPane.dismissUserMessageAction,
+          isRespondingToServerRequest:
+            conversationPane.serverRequestsState.isRespondingToServerRequest,
+          onRespondToServerRequest: conversationPane.serverRequestsState.respondToServerRequest,
+          scrollContainerRef: conversationScrollContainerRef,
+          serverRequestPanelEntries: unmatchedServerRequests,
+        },
+        cli: {
+          ptyState: workbench.cliPtyState,
+          refitKey: workbench.terminalPanelState.isVisible
+            ? "cli:terminal-open"
+            : "cli:terminal-closed",
+          terminalContentInset: workbench.primaryPanelState.cliTerminalContentInset,
+          terminalThemeMode: workbench.primaryPanelState.cliTerminalThemeMode,
+        },
+        initialEntryStartupState,
+        sandboxInstanceId: input.sandboxInstanceId,
+        startupOperation: workbench.sandboxStatusQuery.data?.startupOperation ?? null,
+        transitionState: workbench.primaryPanelState.transitionState,
+      }),
+    [
+      conversationPane.chatState.activeTurnId,
+      conversationPane.chatState.entries,
+      conversationPane.chatState.pendingTurnId,
+      conversationPane.dismissUserMessageAction,
+      conversationPane.serverRequestsState.isRespondingToServerRequest,
+      conversationPane.serverRequestsState.respondToServerRequest,
+      formatInitialUserMessageAsTriggerInput,
+      initialBottomScrollResetKey,
+      initialEntryStartupState,
+      input.sandboxInstanceId,
+      isConversationTurnRunning,
+      unmatchedServerRequests,
+      workbench.cliPtyState,
+      workbench.primaryPanelState.cliTerminalContentInset,
+      workbench.primaryPanelState.cliTerminalThemeMode,
+      workbench.primaryPanelState.transitionState,
+      workbench.sandboxStatusQuery.data?.startupOperation,
+      workbench.terminalPanelState.isVisible,
+    ],
+  );
 
   if (isUnavailableResourceError(workbench.sandboxStatusQuery.error)) {
     return (
@@ -579,48 +662,8 @@ function SessionWorkbenchPageContent(input: {
           : {})}
         secondaryPanelLayoutKey="right-panel"
         secondaryPanelMinSize="16rem"
-        mainContentLayout={
-          workbench.primaryPanelState.transitionState === "stable_cli" ||
-          initialEntryStartupState !== null
-            ? { scroll: "contained", width: "full" }
-            : { scroll: "page", width: "chat" }
-        }
-        mainContent={renderPrimaryPanelMainContent({
-          conversation: {
-            activeTurnId: conversationPane.chatState.activeTurnId,
-            isTurnInProgress: isConversationTurnRunning,
-            pendingTurnId: conversationPane.chatState.pendingTurnId,
-            autoScrollToBottomOnInitialLoad: true,
-            initialBottomScrollResetKey: [
-              input.sandboxInstanceId,
-              conversationPane.activeConversationId ?? "no-thread",
-            ].join(":"),
-            scrollBehavior: "follow-streaming-at-bottom",
-            chatEntries: conversationPane.chatState.entries,
-            formatInitialUserMessageAsTriggerInput: shouldFormatInitialUserMessageAsTriggerInput({
-              activeConversationId: conversationPane.activeConversationId,
-              triggerConversation: workbench.sandboxStatusQuery.data?.triggerConversation ?? null,
-            }),
-            onUserMessageAction: conversationPane.dismissUserMessageAction,
-            isRespondingToServerRequest:
-              conversationPane.serverRequestsState.isRespondingToServerRequest,
-            onRespondToServerRequest: conversationPane.serverRequestsState.respondToServerRequest,
-            scrollContainerRef: conversationScrollContainerRef,
-            serverRequestPanelEntries: unmatchedServerRequests,
-          },
-          cli: {
-            ptyState: workbench.cliPtyState,
-            refitKey: workbench.terminalPanelState.isVisible
-              ? "cli:terminal-open"
-              : "cli:terminal-closed",
-            terminalContentInset: workbench.primaryPanelState.cliTerminalContentInset,
-            terminalThemeMode: workbench.primaryPanelState.cliTerminalThemeMode,
-          },
-          initialEntryStartupState,
-          sandboxInstanceId: input.sandboxInstanceId,
-          startupOperation: workbench.sandboxStatusQuery.data?.startupOperation ?? null,
-          transitionState: workbench.primaryPanelState.transitionState,
-        })}
+        mainContentLayout={mainContentLayout}
+        mainContent={primaryPanelMainContent}
         mainContentScrollContainerRef={conversationScrollContainerRef}
         primaryBottomPanel={
           workbench.primaryPanelState.showsChatComposer && initialEntryStartupState === null ? (
