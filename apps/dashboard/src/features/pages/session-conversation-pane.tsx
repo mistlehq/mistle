@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import type React from "react";
 
 import type { ChatEntry } from "../chat/chat-types.js";
@@ -18,6 +18,7 @@ import {
   SessionComposerActivityRow,
   createComposerDraft,
   useSessionComposerState,
+  type ComposerDraft,
   type QueuedComposerPromptViewModel,
   type SessionComposerDraftState,
   type SessionComposerStateInput,
@@ -216,26 +217,42 @@ export function SessionConversationBottomPanelDraftController({
   pendingDiffComments,
   ...controllerProps
 }: SessionConversationBottomPanelDraftControllerProps): React.JSX.Element {
-  const [composerDraft, setComposerDraft] = useState(createComposerDraft(""));
-  const previousDraftResetKeyRef = useRef(draftResetKey);
+  return (
+    <SessionConversationBottomPanelDraftOwner
+      key={draftResetKey}
+      clearPendingDiffComments={clearPendingDiffComments}
+      controllerProps={controllerProps}
+      pendingDiffComments={pendingDiffComments}
+    />
+  );
+}
 
-  useEffect(() => {
-    if (previousDraftResetKeyRef.current === draftResetKey) {
-      return;
-    }
+function SessionConversationBottomPanelDraftOwner({
+  clearPendingDiffComments,
+  controllerProps,
+  pendingDiffComments,
+}: {
+  clearPendingDiffComments: SessionComposerDraftState["clearPendingDiffComments"];
+  controllerProps: Omit<SessionConversationBottomPanelControllerProps, "draftState">;
+  pendingDiffComments: SessionComposerDraftState["pendingDiffComments"];
+}): React.JSX.Element {
+  const [composerDraft, setComposerDraft] = useState(() => createComposerDraft(""));
 
-    previousDraftResetKeyRef.current = draftResetKey;
-    setComposerDraft(createComposerDraft(""));
-  }, [draftResetKey]);
+  const handleComposerDraftChange = useCallback(
+    (nextComposerDraft: React.SetStateAction<ComposerDraft>): void => {
+      setComposerDraft(nextComposerDraft);
+    },
+    [],
+  );
 
   const draftState = useMemo(
     () => ({
       composerDraft,
       pendingDiffComments,
       clearPendingDiffComments,
-      setComposerDraft,
+      setComposerDraft: handleComposerDraftChange,
     }),
-    [clearPendingDiffComments, composerDraft, pendingDiffComments],
+    [clearPendingDiffComments, composerDraft, handleComposerDraftChange, pendingDiffComments],
   );
 
   return <SessionConversationBottomPanelController {...controllerProps} draftState={draftState} />;

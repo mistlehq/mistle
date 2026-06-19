@@ -3,12 +3,21 @@ import type {
   ChatComposerStatusMessage,
   ChatComposerViewModel,
 } from "../../../chat/components/chat-composer.js";
+import type { SessionComposerStateInput } from "../../../pages/session-composer/index.js";
 import { createComposerDraft } from "../../../pages/session-composer/session-composer-draft.js";
 import type { CodexApprovalRequestEntry } from "../approvals/codex-approval-requests-state.js";
 import { CodexFixtureExploringGroupEntry } from "./chat-fixtures.js";
 
+export const CodexFixtureComposerModel = {
+  model: "gpt-5.4",
+  displayName: "GPT-5.4",
+  defaultReasoningEffort: "medium",
+  inputModalities: ["text", "image"],
+  isDefault: true,
+} satisfies SessionComposerStateInput["bootstrap"]["establishedSnapshot"]["availableModels"][number];
+
 export const CodexFixtureSessionModelOptions = [
-  { value: "gpt-5.4", label: "GPT-5.4" },
+  { value: CodexFixtureComposerModel.model, label: CodexFixtureComposerModel.displayName },
   { value: "gpt-5.3-codex-spark", label: "GPT-5.3 Codex Spark" },
 ] as const;
 
@@ -74,8 +83,8 @@ export const SessionComposerFixtureProps: ChatComposerViewModel = {
     { value: "high", label: "High" },
     { value: "xhigh", label: "Extra high" },
   ],
-  selectedModel: "gpt-5.4",
-  selectedReasoningEffort: "medium",
+  selectedModel: CodexFixtureComposerModel.model,
+  selectedReasoningEffort: CodexFixtureComposerModel.defaultReasoningEffort,
   isSubmitPending: false,
   submitMode: "start",
   submitLabel: "Send",
@@ -96,6 +105,74 @@ export const SessionComposerFixtureProps: ChatComposerViewModel = {
   onClearPendingDiffComments: function onClearPendingDiffComments() {},
   onRemovePendingAttachment: function onRemovePendingAttachment() {},
 };
+
+export function createReadySessionComposerStateInput(input?: {
+  repositoryStatus?: SessionComposerStateInput["repositoryStatus"];
+}): SessionComposerStateInput {
+  return {
+    bootstrap: {
+      phase: { status: "ready" },
+      composerCapabilities: [],
+      establishedSnapshot: {
+        availableModels: [CodexFixtureComposerModel],
+        configSnapshot: {
+          model: CodexFixtureComposerModel.model,
+          modelReasoningEffort: CodexFixtureComposerModel.defaultReasoningEffort,
+        },
+      },
+    },
+    clearSessionErrorMessage: function clearSessionErrorMessage() {},
+    configControl: {
+      selectedModel: CodexFixtureComposerModel.model,
+      selectedReasoningEffort: CodexFixtureComposerModel.defaultReasoningEffort,
+      hasExplicitModelSelection: true,
+      modelOptions: [
+        {
+          value: CodexFixtureComposerModel.model,
+          label: CodexFixtureComposerModel.displayName,
+        },
+      ],
+      reasoningEffortOptions: [{ value: "medium", label: "Medium" }],
+      canChangeReasoningEffort: true,
+      controlsDisabled: false,
+      isUpdating: false,
+      setModel: function setModel() {},
+      setReasoningEffort: function setReasoningEffort() {},
+    },
+    attachmentControl: {
+      canUploadAttachments: true,
+      isUploadingAttachments: false,
+      prepareAttachments: async ({ prompt }) => ({
+        displayAttachments: [],
+        prompt,
+        submittedAttachments: [],
+        uploadedAttachments: [],
+      }),
+    },
+    repositoryStatus: input?.repositoryStatus ?? {
+      branchLabel: null,
+      pullRequest: null,
+    },
+    contextUsage: null,
+    modelSelection: {
+      required: true,
+      showControls: true,
+    },
+    sessionErrorMessage: null,
+    turnControl: {
+      activeTurnState: "idle",
+      canSteer: false,
+      canInterrupt: false,
+      isStarting: false,
+      isSteering: false,
+      isInterrupting: false,
+      completedTurnErrorMessage: null,
+      startTurn: async () => {},
+      steerTurn: async () => {},
+      interruptTurn: function interruptTurn() {},
+    },
+  };
+}
 
 export const SessionComposerFixturePropsWithPendingAttachments: ChatComposerViewModel = {
   ...SessionComposerFixtureProps,

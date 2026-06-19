@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { EditorView } from "@codemirror/view";
-import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import {
   SandboxSessionTransport,
   type UploadedSandboxFile,
@@ -13,7 +12,10 @@ import { useMemo, useRef, useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import type { ChatEntry } from "../chat/chat-types.js";
-import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/session-fixtures.js";
+import {
+  createReadySessionComposerStateInput,
+  SessionComposerFixtureProps,
+} from "../session-agents/codex/fixtures/session-fixtures.js";
 import {
   createComposerDraft,
   useSessionComposerAttachmentControl,
@@ -26,17 +28,6 @@ import {
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 
-const ComposerModelFixture: CodexModelSummary = {
-  id: "model_gpt_54",
-  model: "gpt-5.4",
-  displayName: "GPT-5.4",
-  hidden: false,
-  defaultReasoningEffort: "medium",
-  inputModalities: ["text", "image"],
-  supportsPersonality: true,
-  isDefault: true,
-};
-
 const UploadedImageFixture: UploadedSandboxFile = {
   attachmentId: "att_123",
   kind: "image",
@@ -46,86 +37,6 @@ const UploadedImageFixture: UploadedSandboxFile = {
   sizeBytes: 4,
   path: "/root/.local/attachments/thread_123/upload.png",
 };
-
-function createReadyComposerStateInput(): React.ComponentProps<
-  typeof SessionConversationBottomPanelDraftController
->["composerStateInput"] {
-  return {
-    bootstrap: {
-      phase: { status: "ready" },
-      composerCapabilities: [],
-      establishedSnapshot: {
-        availableModels: [ComposerModelFixture],
-        configSnapshot: {
-          model: ComposerModelFixture.model,
-          modelReasoningEffort: ComposerModelFixture.defaultReasoningEffort,
-        },
-      },
-    },
-    clearSessionErrorMessage: () => {
-      return;
-    },
-    configControl: {
-      selectedModel: ComposerModelFixture.model,
-      selectedReasoningEffort: ComposerModelFixture.defaultReasoningEffort,
-      hasExplicitModelSelection: true,
-      modelOptions: [
-        {
-          value: ComposerModelFixture.model,
-          label: ComposerModelFixture.displayName,
-        },
-      ],
-      reasoningEffortOptions: [{ value: "medium", label: "Medium" }],
-      canChangeReasoningEffort: true,
-      controlsDisabled: false,
-      isUpdating: false,
-      setModel: () => {
-        return;
-      },
-      setReasoningEffort: () => {
-        return;
-      },
-    },
-    attachmentControl: {
-      canUploadAttachments: true,
-      isUploadingAttachments: false,
-      prepareAttachments: async ({ prompt }) => ({
-        displayAttachments: [],
-        prompt,
-        submittedAttachments: [],
-        uploadedAttachments: [],
-      }),
-    },
-    repositoryStatus: {
-      branchLabel: null,
-      pullRequest: null,
-    },
-    contextUsage: null,
-    modelSelection: {
-      required: true,
-      showControls: true,
-    },
-    sessionErrorMessage: null,
-    turnControl: {
-      activeTurnState: "idle",
-      canSteer: false,
-      canInterrupt: false,
-      isStarting: false,
-      isSteering: false,
-      isInterrupting: false,
-      completedTurnErrorMessage: null,
-      startTurn: async () => {
-        return;
-      },
-      steerTurn: async () => {
-        return;
-      },
-      interruptTurn: () => {
-        return;
-      },
-    },
-  };
-}
 
 function createImageFile(): File {
   return new File([new Uint8Array([1, 2, 3, 4])], "screenshot.png", { type: "image/png" });
@@ -232,70 +143,12 @@ function RenderedComposerPaneHarness(input: {
     <SessionConversationBottomPanelController
       chatEntries={[]}
       composerStateInput={{
-        bootstrap: {
-          phase: { status: "ready" },
-          composerCapabilities: [],
-          establishedSnapshot: {
-            availableModels: [ComposerModelFixture],
-            configSnapshot: {
-              model: ComposerModelFixture.model,
-              modelReasoningEffort: ComposerModelFixture.defaultReasoningEffort,
-            },
-          },
-        },
+        ...createReadySessionComposerStateInput(),
         clearSessionErrorMessage: () => {
           setSessionErrorMessage(null);
         },
-        configControl: {
-          selectedModel: ComposerModelFixture.model,
-          selectedReasoningEffort: ComposerModelFixture.defaultReasoningEffort,
-          hasExplicitModelSelection: true,
-          modelOptions: [
-            {
-              value: ComposerModelFixture.model,
-              label: ComposerModelFixture.displayName,
-            },
-          ],
-          reasoningEffortOptions: [{ value: "medium", label: "Medium" }],
-          canChangeReasoningEffort: true,
-          controlsDisabled: false,
-          isUpdating: false,
-          setModel: () => {
-            return;
-          },
-          setReasoningEffort: () => {
-            return;
-          },
-        },
         attachmentControl,
-        repositoryStatus: {
-          branchLabel: null,
-          pullRequest: null,
-        },
-        contextUsage: null,
-        modelSelection: {
-          required: true,
-          showControls: true,
-        },
         sessionErrorMessage,
-        turnControl: {
-          activeTurnState: "idle",
-          canSteer: false,
-          canInterrupt: false,
-          isStarting: false,
-          isSteering: false,
-          isInterrupting: false,
-          completedTurnErrorMessage: null,
-          startTurn: async () => {
-            return;
-          },
-          steerTurn: async () => {
-            return;
-          },
-          interruptTurn: () => {
-            return;
-          },
-        },
       }}
       draftState={{
         composerDraft: createComposerDraft(""),
@@ -318,6 +171,7 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
   const [activeTurnState, setActiveTurnState] = useState<"idle" | "running">("running");
   const [composerDraft, setComposerDraft] = useState<ComposerDraft>(createComposerDraft(""));
   const [startedPrompts, setStartedPrompts] = useState<readonly string[]>([]);
+  const readyComposerStateInput = createReadySessionComposerStateInput();
 
   return (
     <div>
@@ -333,81 +187,18 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
       <SessionConversationBottomPanelController
         chatEntries={[]}
         composerStateInput={{
-          bootstrap: {
-            phase: { status: "ready" },
-            composerCapabilities: [],
-            establishedSnapshot: {
-              availableModels: [ComposerModelFixture],
-              configSnapshot: {
-                model: ComposerModelFixture.model,
-                modelReasoningEffort: ComposerModelFixture.defaultReasoningEffort,
-              },
-            },
-          },
-          clearSessionErrorMessage: () => {
-            return;
-          },
-          configControl: {
-            selectedModel: ComposerModelFixture.model,
-            selectedReasoningEffort: ComposerModelFixture.defaultReasoningEffort,
-            hasExplicitModelSelection: true,
-            modelOptions: [
-              {
-                value: ComposerModelFixture.model,
-                label: ComposerModelFixture.displayName,
-              },
-            ],
-            reasoningEffortOptions: [{ value: "medium", label: "Medium" }],
-            canChangeReasoningEffort: true,
-            controlsDisabled: false,
-            isUpdating: false,
-            setModel: () => {
-              return;
-            },
-            setReasoningEffort: () => {
-              return;
-            },
-          },
-          attachmentControl: {
-            canUploadAttachments: true,
-            isUploadingAttachments: false,
-            prepareAttachments: async ({ prompt }) => ({
-              displayAttachments: [],
-              prompt,
-              submittedAttachments: [],
-              uploadedAttachments: [],
-            }),
-          },
-          repositoryStatus: {
-            branchLabel: null,
-            pullRequest: null,
-          },
-          contextUsage: null,
-          modelSelection: {
-            required: true,
-            showControls: true,
-          },
-          sessionErrorMessage: null,
+          ...readyComposerStateInput,
           turnControl: {
+            ...readyComposerStateInput.turnControl,
             activeTurnState,
             canSteer: activeTurnState === "running",
             canInterrupt: activeTurnState === "running",
-            isStarting: false,
-            isSteering: false,
-            isInterrupting: false,
-            completedTurnErrorMessage: null,
             startTurn: async ({ transcriptPrompt }) => {
               setStartedPrompts((currentStartedPrompts) => [
                 ...currentStartedPrompts,
                 transcriptPrompt ?? "",
               ]);
               setActiveTurnState("running");
-            },
-            steerTurn: async () => {
-              return;
-            },
-            interruptTurn: () => {
-              return;
             },
           },
         }}
@@ -529,7 +320,7 @@ function DraftOwnedComposerHarness(): React.JSX.Element {
       <SessionConversationBottomPanelDraftController
         chatEntries={[]}
         clearPendingDiffComments={function clearPendingDiffComments() {}}
-        composerStateInput={createReadyComposerStateInput()}
+        composerStateInput={createReadySessionComposerStateInput()}
         draftResetKey={draftResetKey}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={function onRespondToServerRequest() {}}

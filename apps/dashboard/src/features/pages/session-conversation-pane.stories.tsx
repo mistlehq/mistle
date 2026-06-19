@@ -11,6 +11,7 @@ import {
   CodexFixtureChatThreadEntriesWithThinkingGroup,
 } from "../session-agents/codex/fixtures/chat-fixtures.js";
 import {
+  createReadySessionComposerStateInput,
   SessionComposerFixturePropsForLoadingModel,
   SessionComposerFixturePropsForNonImageCapableModel,
   SessionComposerFixtureStatusMessageForLoadingModel,
@@ -75,75 +76,12 @@ const LongTranscriptPendingDiffComments: React.ComponentProps<
 
 const LongTranscriptComposerStateInput: React.ComponentProps<
   typeof SessionConversationBottomPanelDraftController
->["composerStateInput"] = {
-  bootstrap: {
-    phase: { status: "ready" },
-    composerCapabilities: [],
-    establishedSnapshot: {
-      availableModels: [
-        {
-          id: "model_gpt_54",
-          model: "gpt-5.4",
-          displayName: "GPT-5.4",
-          hidden: false,
-          defaultReasoningEffort: "medium",
-          inputModalities: ["text", "image"],
-          supportsPersonality: true,
-          isDefault: true,
-        },
-      ],
-      configSnapshot: {
-        model: "gpt-5.4",
-        modelReasoningEffort: "medium",
-      },
-    },
-  },
-  clearSessionErrorMessage: function clearSessionErrorMessage() {},
-  configControl: {
-    selectedModel: "gpt-5.4",
-    selectedReasoningEffort: "medium",
-    hasExplicitModelSelection: true,
-    modelOptions: [{ value: "gpt-5.4", label: "GPT-5.4" }],
-    reasoningEffortOptions: [{ value: "medium", label: "Medium" }],
-    canChangeReasoningEffort: true,
-    controlsDisabled: false,
-    isUpdating: false,
-    setModel: function setModel() {},
-    setReasoningEffort: function setReasoningEffort() {},
-  },
-  attachmentControl: {
-    canUploadAttachments: true,
-    isUploadingAttachments: false,
-    prepareAttachments: async ({ prompt }) => ({
-      displayAttachments: [],
-      prompt,
-      submittedAttachments: [],
-      uploadedAttachments: [],
-    }),
-  },
+>["composerStateInput"] = createReadySessionComposerStateInput({
   repositoryStatus: {
     branchLabel: "main",
     pullRequest: null,
   },
-  contextUsage: null,
-  modelSelection: {
-    required: true,
-    showControls: true,
-  },
-  sessionErrorMessage: null,
-  turnControl: {
-    activeTurnState: "idle",
-    canSteer: false,
-    canInterrupt: false,
-    isStarting: false,
-    isSteering: false,
-    isInterrupting: false,
-    completedTurnErrorMessage: null,
-    startTurn: async () => {},
-    steerTurn: async () => {},
-    interruptTurn: function interruptTurn() {},
-  },
-};
+});
 
 function createLongTranscriptAssistantText(input: {
   paragraphCount: number;
