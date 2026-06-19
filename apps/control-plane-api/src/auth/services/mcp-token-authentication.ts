@@ -38,6 +38,18 @@ export async function authenticateMcpToken(input: {
   }
 
   if (verifiedToken.kind === "designer") {
+    const designerSession = await input.db.query.designerSessions.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.id, verifiedToken.designerSessionId),
+          eq(table.organizationId, verifiedToken.organizationId),
+          eq(table.sandboxInstanceId, verifiedToken.sub),
+        ),
+    });
+    if (designerSession === undefined) {
+      throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized MCP request.");
+    }
+
     return {
       kind: "mcp_capability",
       organizationId: verifiedToken.organizationId,

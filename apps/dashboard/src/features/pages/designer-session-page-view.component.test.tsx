@@ -47,6 +47,7 @@ function renderDesignerCanvasWorkspace(input: RenderDesignerCanvasWorkspaceInput
             activeTabHref={input.activeTabHref ?? null}
             {...(input.onApiReady === undefined ? {} : { onApiReady: input.onApiReady })}
             onActiveTabHrefChange={input.onActiveTabHrefChange ?? (() => {})}
+            onTabClose={input.onTabClose ?? (() => {})}
             onTabsChange={input.onTabsChange ?? (() => {})}
             tabs={input.tabs}
           />
@@ -184,8 +185,8 @@ describe("DesignerCanvasWorkspace", () => {
     ]);
   });
 
-  it("persists Designer canvas tab removal when Dockview closes a panel", async () => {
-    const nextTabs: DesignerCanvasWorkspaceProps["tabs"][] = [];
+  it("reports the closed Designer canvas tab id when Dockview closes a panel", async () => {
+    const closedTabIds: string[] = [];
     let resolveApi: ((api: DockviewApi) => void) | null = null;
     const dockviewApiPromise = new Promise<DockviewApi>((resolve) => {
       resolveApi = resolve;
@@ -196,8 +197,8 @@ describe("DesignerCanvasWorkspace", () => {
       onApiReady: (api) => {
         resolveApi?.(api);
       },
-      onTabsChange: (tabs) => {
-        nextTabs.push(tabs);
+      onTabClose: (tabId) => {
+        closedTabIds.push(tabId);
       },
       tabs: [
         {
@@ -221,13 +222,7 @@ describe("DesignerCanvasWorkspace", () => {
     dockviewApi.removePanel(panel);
 
     await waitFor(() => {
-      expect(nextTabs.at(-1)).toEqual([
-        {
-          id: "triggers",
-          title: "Triggers",
-          href: "/triggers",
-        },
-      ]);
+      expect(closedTabIds).toEqual(["integrations"]);
     });
   });
 });

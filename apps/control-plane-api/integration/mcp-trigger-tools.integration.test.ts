@@ -963,6 +963,14 @@ describe.concurrent("MCP trigger tools integration", () => {
       ttlSeconds: 300,
     });
 
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: "dsn_mcp_designer_trigger_mutation_forbidden",
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_designer_trigger_mutation_forbidden",
+      initialPrompt: null,
+      canvasTabs: [],
+    });
+
     const createResult = await callMcpTool({
       env,
       token: token.token,

@@ -1030,6 +1030,13 @@ describe.concurrent("MCP profile tools integration", () => {
       purpose: SandboxInstancePurposes.DESIGNER,
       status: SandboxInstanceStatuses.FAILED,
     });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: "dsn_mcp_designer_feedback_scope",
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_designer_feedback_scoped",
+      initialPrompt: null,
+      canvasTabs: [],
+    });
     await insertSandboxInstance(env, {
       organizationId: session.organizationId,
       sandboxInstanceId: "sbi_mcp_designer_feedback_other",
@@ -1104,6 +1111,57 @@ describe.concurrent("MCP profile tools integration", () => {
     ]);
   });
 
+  it("rejects designer MCP tokens without a matching Designer session", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-designer-session-auth@example.com",
+    });
+    const missingSessionToken = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "designer",
+        sub: "sbi_mcp_designer_missing_session",
+        organizationId: session.organizationId,
+        designerSessionId: "dsn_mcp_designer_missing_session",
+      },
+      ttlSeconds: 300,
+    });
+    const mismatchedSessionToken = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "designer",
+        sub: "sbi_mcp_designer_mismatched_claim",
+        organizationId: session.organizationId,
+        designerSessionId: "dsn_mcp_designer_mismatched_session",
+      },
+      ttlSeconds: 300,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: "dsn_mcp_designer_mismatched_session",
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_designer_mismatched_actual",
+      initialPrompt: null,
+      canvasTabs: [],
+    });
+
+    const missingSessionResponse = await callMcpJsonRpcResponse({
+      env,
+      token: missingSessionToken.token,
+      id: "mcp-designer-missing-session-test",
+      method: "tools/list",
+      params: {},
+    });
+    const mismatchedSessionResponse = await callMcpJsonRpcResponse({
+      env,
+      token: mismatchedSessionToken.token,
+      id: "mcp-designer-mismatched-session-test",
+      method: "tools/list",
+      params: {},
+    });
+
+    expect(missingSessionResponse.status).toBe(401);
+    expect(mismatchedSessionResponse.status).toBe(401);
+  });
+
   it("prevents designer MCP tokens from starting profile test sandboxes", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-mcp-designer-session-create-forbidden@example.com",
@@ -1120,6 +1178,13 @@ describe.concurrent("MCP profile tools integration", () => {
       ttlSeconds: 300,
     });
 
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: "dsn_mcp_designer_session_create_forbidden",
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_designer_session_create_forbidden",
+      initialPrompt: null,
+      canvasTabs: [],
+    });
     await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
       sandboxProfileRow({
         id: profileId,
@@ -1870,7 +1935,20 @@ async function callMcpJsonRpc(input: {
   method: "tools/call" | "tools/list";
   params: Record<string, unknown>;
 }): Promise<unknown> {
-  const response = await input.env.controlPlaneApi.http.fetch("/mcp", {
+  const response = await callMcpJsonRpcResponse(input);
+
+  expect(response.status).toBe(200);
+  return parseStreamableHttpJsonRpcMessage(await response.text());
+}
+
+async function callMcpJsonRpcResponse(input: {
+  env: IntegrationTestEnvironment;
+  token: string;
+  id: string;
+  method: "tools/call" | "tools/list";
+  params: Record<string, unknown>;
+}) {
+  return input.env.controlPlaneApi.http.fetch("/mcp", {
     method: "POST",
     headers: {
       accept: "application/json, text/event-stream",
@@ -1885,9 +1963,6 @@ async function callMcpJsonRpc(input: {
       params: input.params,
     }),
   });
-
-  expect(response.status).toBe(200);
-  return parseStreamableHttpJsonRpcMessage(await response.text());
 }
 
 function createForwardedHeaderForBaseUrl(baseUrl: string): string {

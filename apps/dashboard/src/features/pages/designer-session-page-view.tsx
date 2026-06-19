@@ -410,10 +410,12 @@ export function DesignerCanvasWorkspace(input: {
   activeTabHref: string | null;
   onApiReady?: (api: DockviewApi) => void;
   onActiveTabHrefChange: (href: string) => void;
+  onTabClose: (tabId: string) => void;
   onTabsChange: (tabs: readonly DesignerCanvasTab[]) => void;
   tabs: readonly DesignerCanvasTab[];
 }): React.JSX.Element {
-  const { activeTabHref, onActiveTabHrefChange, onApiReady, onTabsChange, tabs } = input;
+  const { activeTabHref, onActiveTabHrefChange, onApiReady, onTabClose, onTabsChange, tabs } =
+    input;
   const resolvedAppearance = useResolvedAppearance();
   const [dockviewApi, setDockviewApi] = useState<DockviewApi | null>(null);
   const tabById = useMemo(() => new Map(tabs.map((tab) => [tab.id, tab])), [tabs]);
@@ -471,7 +473,7 @@ export function DesignerCanvasWorkspace(input: {
       }
 
       const nextTabs = tabs.filter((tab) => tab.id !== panel.id);
-      onTabsChange(nextTabs);
+      onTabClose(panel.id);
       if (activeTabHref === removedTab.href) {
         const nextActivePanel = dockviewApi.activePanel;
         const nextActiveTab =
@@ -487,7 +489,7 @@ export function DesignerCanvasWorkspace(input: {
     return () => {
       disposable.dispose();
     };
-  }, [activeTabHref, dockviewApi, onActiveTabHrefChange, onTabsChange, tabs]);
+  }, [activeTabHref, dockviewApi, onActiveTabHrefChange, onTabClose, tabs]);
 
   useEffect(() => {
     if (dockviewApi === null) {

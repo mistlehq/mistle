@@ -86,6 +86,13 @@ export function mergeDesignerCanvasTabSnapshotIntoLatestTabs(input: {
   ];
 }
 
+export function removeDesignerCanvasTabFromLatestTabs(input: {
+  latestTabs: readonly DesignerSessionCanvasTab[];
+  tabId: string;
+}): readonly DesignerSessionCanvasTab[] {
+  return input.latestTabs.filter((tab) => tab.id !== input.tabId);
+}
+
 function mapDesignerSessionToSandboxStatus(
   designerSession: DesignerSession,
 ): SandboxInstanceStatusResult {
@@ -112,6 +119,7 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
   activeTabHref: string | null;
   canvasTabs: readonly DesignerSessionCanvasTab[];
   dashboardControlActions: DashboardControlActionSupport;
+  removeCanvasTab: (tabId: string) => void;
   setActiveTabHref: (href: string) => void;
   updateCanvasTabs: (tabs: readonly DesignerSessionCanvasTab[]) => void;
 } {
@@ -142,6 +150,25 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
           const nextTabs = mergeDesignerCanvasTabSnapshotIntoLatestTabs({
             latestTabs: latestPersistedCanvasTabsRef.current,
             snapshotTabs: tabs,
+          });
+          await persistCanvasTabs(nextTabs);
+          latestPersistedCanvasTabsRef.current = nextTabs;
+          setCanvasTabs(nextTabs);
+        });
+      canvasTabSaveQueueRef.current = nextSave;
+      void nextSave.catch(() => {});
+    },
+    [persistCanvasTabs],
+  );
+
+  const removeCanvasTab = useCallback(
+    (tabId: string): void => {
+      const nextSave = canvasTabSaveQueueRef.current
+        .catch(() => {})
+        .then(async () => {
+          const nextTabs = removeDesignerCanvasTabFromLatestTabs({
+            latestTabs: latestPersistedCanvasTabsRef.current,
+            tabId,
           });
           await persistCanvasTabs(nextTabs);
           latestPersistedCanvasTabsRef.current = nextTabs;
@@ -185,6 +212,7 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
     activeTabHref,
     canvasTabs,
     dashboardControlActions,
+    removeCanvasTab,
     setActiveTabHref,
     updateCanvasTabs,
   };
@@ -244,8 +272,14 @@ function LoadedDesignerSessionPageStateBoundary(input: {
   searchParams: URLSearchParams;
   setSearchParams: ReturnType<typeof useSearchParams>[1];
 }): React.JSX.Element {
-  const { activeTabHref, canvasTabs, dashboardControlActions, setActiveTabHref, updateCanvasTabs } =
-    useDesignerCanvasTabs(input.designerSession);
+  const {
+    activeTabHref,
+    canvasTabs,
+    dashboardControlActions,
+    removeCanvasTab,
+    setActiveTabHref,
+    updateCanvasTabs,
+  } = useDesignerCanvasTabs(input.designerSession);
 
   return (
     <LoadedDesignerSessionPage
@@ -253,6 +287,7 @@ function LoadedDesignerSessionPageStateBoundary(input: {
       canvasTabs={canvasTabs}
       dashboardControlActions={dashboardControlActions}
       designerSession={input.designerSession}
+      removeCanvasTab={removeCanvasTab}
       requestedRuntimeConversationId={input.requestedRuntimeConversationId}
       searchParams={input.searchParams}
       setActiveTabHref={setActiveTabHref}
@@ -267,6 +302,7 @@ function LoadedDesignerSessionPage(input: {
   canvasTabs: readonly DesignerSessionCanvasTab[];
   dashboardControlActions: DashboardControlActionSupport;
   designerSession: DesignerSession;
+  removeCanvasTab: (tabId: string) => void;
   requestedRuntimeConversationId: string | null;
   searchParams: URLSearchParams;
   setActiveTabHref: (href: string) => void;
@@ -330,6 +366,7 @@ function LoadedDesignerSessionPage(input: {
               <DesignerCanvasWorkspace
                 activeTabHref={input.activeTabHref}
                 onActiveTabHrefChange={input.setActiveTabHref}
+                onTabClose={input.removeCanvasTab}
                 onTabsChange={input.updateCanvasTabs}
                 tabs={input.canvasTabs}
               />

@@ -137,6 +137,9 @@ function DesignerCanvasWorkspaceStory(input: {
     <DesignerCanvasWorkspace
       activeTabHref={activeTabHref}
       onActiveTabHrefChange={setActiveTabHref}
+      onTabClose={(tabId) => {
+        setTabs((currentTabs) => currentTabs.filter((tab) => tab.id !== tabId));
+      }}
       onTabsChange={(nextTabs) => {
         setTabs([...nextTabs]);
       }}
