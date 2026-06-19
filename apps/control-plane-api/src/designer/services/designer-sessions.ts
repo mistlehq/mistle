@@ -535,13 +535,22 @@ async function mapDesignerSessionWithCurrentSandbox(
 }
 
 async function updateDesignerSessionCanvasTabsBySelector(
-  ctx: Pick<DesignerSessionServiceContext, "db">,
+  ctx: Pick<DesignerSessionServiceContext, "dataPlaneClient" | "db">,
   input: {
     organizationId: string;
     selector: DesignerSessionSelector;
     body: PutDesignerSessionCanvasTabsBody;
   },
-): Promise<DesignerSession> {
+): Promise<DesignerSessionResponse> {
+  const currentDesignerSession = await readDesignerSessionBySelector(ctx, {
+    organizationId: input.organizationId,
+    selector: input.selector,
+  });
+  const sandboxInstance = await getDesignerSandboxInstance(ctx.dataPlaneClient, {
+    organizationId: input.organizationId,
+    sandboxInstanceId: currentDesignerSession.sandboxInstanceId,
+  });
+
   const tables = getControlPlaneDatabaseSchema(ctx.db);
   const updatedDesignerSessionRows =
     input.selector.kind === "sessionId"
@@ -577,7 +586,7 @@ async function updateDesignerSessionCanvasTabsBySelector(
     throw createDesignerSessionNotFoundError(input.selector);
   }
 
-  return updatedDesignerSession;
+  return mapDesignerSession(updatedDesignerSession, sandboxInstance);
 }
 
 export async function createDesignerSession(
@@ -739,18 +748,13 @@ export async function putDesignerSessionCanvasTabs(
     body: PutDesignerSessionCanvasTabsBody;
   },
 ): Promise<DesignerSessionResponse> {
-  const updatedDesignerSession = await updateDesignerSessionCanvasTabsBySelector(ctx, {
+  return updateDesignerSessionCanvasTabsBySelector(ctx, {
     organizationId: input.organizationId,
     selector: {
       kind: "sessionId",
       sessionId: input.sessionId,
     },
     body: input.body,
-  });
-
-  return mapDesignerSessionWithCurrentSandbox(ctx, {
-    organizationId: input.organizationId,
-    designerSession: updatedDesignerSession,
   });
 }
 
@@ -762,18 +766,13 @@ export async function putDesignerSessionCanvasTabsBySandboxInstanceId(
     body: PutDesignerSessionCanvasTabsBody;
   },
 ): Promise<DesignerSessionResponse> {
-  const updatedDesignerSession = await updateDesignerSessionCanvasTabsBySelector(ctx, {
+  return updateDesignerSessionCanvasTabsBySelector(ctx, {
     organizationId: input.organizationId,
     selector: {
       kind: "sandboxInstanceId",
       sandboxInstanceId: input.sandboxInstanceId,
     },
     body: input.body,
-  });
-
-  return mapDesignerSessionWithCurrentSandbox(ctx, {
-    organizationId: input.organizationId,
-    designerSession: updatedDesignerSession,
   });
 }
 

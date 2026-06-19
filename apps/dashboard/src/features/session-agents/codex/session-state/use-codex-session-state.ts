@@ -46,6 +46,7 @@ import {
   DesignerCanvasTabOpenDynamicToolSpec,
   isDashboardControlDynamicToolCallRequest,
   parseDashboardControlDynamicToolCall,
+  type DashboardControlActionRequest,
   type DashboardControlActionSupport,
 } from "../../dashboard-control-actions.js";
 import {
@@ -201,6 +202,32 @@ function readCompletedTurnId(notification: CodexJsonRpcNotification): string | n
   }
 
   return turn.id;
+}
+
+async function respondToDashboardControlAction(input: {
+  action: DashboardControlActionSupport;
+  parsedRequest: DashboardControlActionRequest;
+  request: CodexJsonRpcServerRequest;
+  rpcClient: CodexJsonRpcClient;
+}): Promise<void> {
+  try {
+    await input.action.handleAction(input.parsedRequest);
+    await input.rpcClient.respond(
+      input.request.id,
+      createDashboardControlDynamicToolCallResponse({
+        success: true,
+        text: "Opened Designer canvas tab.",
+      }),
+    );
+  } catch (error) {
+    await input.rpcClient.respond(
+      input.request.id,
+      createDashboardControlDynamicToolCallResponse({
+        success: false,
+        text: error instanceof Error ? error.message : "Dashboard control action was rejected.",
+      }),
+    );
+  }
 }
 
 type CodexSessionChatState = {
@@ -472,24 +499,12 @@ export function useCodexSessionState(input: {
         return;
       }
 
-      try {
-        input.dashboardControlActions.handleAction(parsedRequest);
-        void rpcClient.respond(
-          request.id,
-          createDashboardControlDynamicToolCallResponse({
-            success: true,
-            text: "Opened Designer canvas tab.",
-          }),
-        );
-      } catch (error) {
-        void rpcClient.respond(
-          request.id,
-          createDashboardControlDynamicToolCallResponse({
-            success: false,
-            text: error instanceof Error ? error.message : "Dashboard control action was rejected.",
-          }),
-        );
-      }
+      void respondToDashboardControlAction({
+        action: input.dashboardControlActions,
+        parsedRequest,
+        request,
+        rpcClient,
+      });
     },
     [handleServerRequestReceived, input.dashboardControlActions, rpcClientRef],
   );

@@ -108,8 +108,8 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
   const [activeTabHref, setActiveTabHref] = useState<string | null>(null);
 
   const persistCanvasTabs = useCallback(
-    (tabs: readonly DesignerSessionCanvasTab[]): void => {
-      void putDesignerSessionCanvasTabs({
+    async (tabs: readonly DesignerSessionCanvasTab[]): Promise<void> => {
+      await putDesignerSessionCanvasTabs({
         sessionId: designerSession.id,
         tabs,
       });
@@ -120,24 +120,22 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
   const updateCanvasTabs = useCallback(
     (tabs: readonly DesignerSessionCanvasTab[]): void => {
       setCanvasTabs(tabs);
-      persistCanvasTabs(tabs);
+      void persistCanvasTabs(tabs);
     },
     [persistCanvasTabs],
   );
 
   const handleDashboardControlAction = useCallback<DashboardControlActionHandler>(
-    (request) => {
-      setCanvasTabs((currentTabs) => {
-        const nextTabs = upsertDesignerCanvasTab({
-          currentTabs,
-          requestedTab: request.input,
-        });
-        persistCanvasTabs(nextTabs);
-        return nextTabs;
+    async (request) => {
+      const nextTabs = upsertDesignerCanvasTab({
+        currentTabs: canvasTabs,
+        requestedTab: request.input,
       });
+      await persistCanvasTabs(nextTabs);
+      setCanvasTabs(nextTabs);
       setActiveTabHref(request.input.href);
     },
-    [persistCanvasTabs],
+    [canvasTabs, persistCanvasTabs],
   );
 
   const dashboardControlActions = useMemo<DashboardControlActionSupport>(

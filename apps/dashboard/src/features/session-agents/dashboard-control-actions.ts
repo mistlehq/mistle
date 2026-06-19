@@ -58,7 +58,9 @@ export type DashboardControlActionRequest = {
   input: DesignerCanvasTabOpenInput;
 };
 
-export type DashboardControlActionHandler = (request: DashboardControlActionRequest) => void;
+export type DashboardControlActionHandler = (
+  request: DashboardControlActionRequest,
+) => Promise<void>;
 
 export type DashboardControlActionSupport = {
   supportedActions: readonly string[];

@@ -403,6 +403,32 @@ describe.concurrent("designer sessions integration", () => {
       code: "DESIGNER_SESSION_NOT_FOUND",
       message: "Designer session sandbox instance 'sbi_missing_backing_sandbox' was not found.",
     });
+
+    const updateResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/designer/sessions/dsn_missing_backing_sandbox/canvas-tabs",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          tabs: [
+            {
+              id: "integrations",
+              title: "Integrations",
+              href: "/integrations",
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(updateResponse.status).toBe(404);
+    const persistedDesignerSession = await env.controlPlaneDb.query.designerSessions.findFirst({
+      where: (table, { eq }) => eq(table.id, "dsn_missing_backing_sandbox"),
+    });
+    expect(persistedDesignerSession?.canvasTabs).toEqual([]);
   });
 
   it("rejects API key actors on Designer routes", async ({ env }) => {
