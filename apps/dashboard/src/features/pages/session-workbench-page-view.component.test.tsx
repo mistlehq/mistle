@@ -79,6 +79,52 @@ describe("SessionWorkbenchPageView", () => {
     expect(screen.getByText("Terminal workspace")).toBeDefined();
   });
 
+  it("keeps the primary bottom panel mounted while hidden", () => {
+    let nextMountId = 1;
+
+    function PrimaryBottomPanelContent(): React.JSX.Element {
+      const [mountId] = useState(() => nextMountId++);
+
+      return <div>Composer mount {mountId}</div>;
+    }
+
+    const { rerender } = render(
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<div>Terminal workspace</div>}
+        isBottomPanelVisible={false}
+        isPrimaryBottomPanelVisible={false}
+        isSecondaryPanelVisible={false}
+        mainContent={<div>Conversation body</div>}
+        primaryBottomPanel={<PrimaryBottomPanelContent />}
+        sandboxInstanceId="sbi_test"
+        secondaryPanel={<div>Secondary</div>}
+      />,
+    );
+
+    const hiddenComposer = screen.getByText("Composer mount 1");
+    expect(hiddenComposer).toBeTruthy();
+    expect(hiddenComposer.closest(".hidden")).toBeTruthy();
+
+    rerender(
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<div>Terminal workspace</div>}
+        isBottomPanelVisible={false}
+        isPrimaryBottomPanelVisible
+        isSecondaryPanelVisible={false}
+        mainContent={<div>Conversation body</div>}
+        primaryBottomPanel={<PrimaryBottomPanelContent />}
+        sandboxInstanceId="sbi_test"
+        secondaryPanel={<div>Secondary</div>}
+      />,
+    );
+
+    const visibleComposer = screen.getByText("Composer mount 1");
+    expect(visibleComposer).toBeTruthy();
+    expect(visibleComposer.closest(".hidden")).toBeNull();
+  });
+
   it("opens the terminal panel with a pixel-based default height", () => {
     const originalOffsetHeight = Object.getOwnPropertyDescriptor(
       HTMLElement.prototype,

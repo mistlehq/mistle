@@ -663,8 +663,11 @@ function SessionWorkbenchPageContent(input: {
         mainContentLayout={mainContentLayout}
         mainContent={primaryPanelMainContent}
         mainContentScrollContainerRef={conversationScrollContainerRef}
+        isPrimaryBottomPanelVisible={
+          workbench.primaryPanelState.showsChatComposer && initialEntryStartupState === null
+        }
         primaryBottomPanel={
-          workbench.primaryPanelState.showsChatComposer && initialEntryStartupState === null ? (
+          initialEntryStartupState === null ? (
             <SessionConversationBottomPanelDraftController
               chatEntries={conversationPane.chatState.entries}
               composerStateInput={conversationPane.composerStateInput}
