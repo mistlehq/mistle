@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type {
   DataPlaneSandboxInstancesClient,
   GetSandboxInstanceResponse,
@@ -24,7 +26,7 @@ import {
 } from "@mistle/integrations-core";
 import { compileInstalledCodexRuntime } from "@mistle/integrations-definitions/agent-runtimes/codex";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { typeid } from "typeid-js";
+import { TypeID } from "typeid-js";
 
 import { SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS } from "../../sandbox-instances/constants.js";
 import { mintConnectionTokenForInstance } from "../../sandbox-instances/services/mint-connection-token-for-instance.js";
@@ -89,6 +91,7 @@ type ExistingDesignerSandboxInstance = NonNullable<GetSandboxInstanceResponse>;
 
 const DesignerRuntimeId = "codex";
 const DesignerDocsMcpServerUrl = "https://docs.mistle.dev/mcp";
+const DesignerSessionIdHashDomain = "mistle.designer_session_id.v1";
 const DesignerManagedInstructionBlock = {
   blockId: "mistle-designer-context",
   content: `
@@ -399,6 +402,23 @@ function createDesignerRuntimePlan(input: {
   });
 }
 
+function createDesignerSessionId(input: {
+  organizationId: string;
+  idempotencyKey: string;
+}): string {
+  const digest = createHash("sha256")
+    .update(
+      JSON.stringify({
+        domain: DesignerSessionIdHashDomain,
+        organizationId: input.organizationId,
+        idempotencyKey: input.idempotencyKey,
+      }),
+    )
+    .digest();
+
+  return TypeID.fromUUIDBytes("dsn", digest.subarray(0, 16)).toString();
+}
+
 async function getDesignerSandboxInstance(
   dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">,
   input: {
@@ -603,7 +623,10 @@ export async function createDesignerSession(
     sandboxConnectionId: designerSandboxConfig.sandboxConnectionId,
     sandboxResources: designerSandboxConfig.sandboxResources,
   });
-  const designerSessionId = typeid("dsn").toString();
+  const designerSessionId = createDesignerSessionId({
+    organizationId: input.organizationId,
+    idempotencyKey: input.body.idempotencyKey,
+  });
   const runtimePlan = createDesignerRuntimePlan({
     codexCliPath: designerSandboxConfig.codexCliPath,
     designerSessionId,

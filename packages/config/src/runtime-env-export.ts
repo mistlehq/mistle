@@ -225,6 +225,10 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON",
     valueFormat: "json",
   },
+  {
+    path: ["platformCredentials", "openai", "apiKey"],
+    envVar: "MISTLE_PLATFORM_OPENAI_API_KEY",
+  },
   { path: ["sandbox", "designer", "baseImage"], envVar: "MISTLE_DESIGNER_SANDBOX_BASE_IMAGE" },
   { path: ["sandbox", "designer", "codexCliPath"], envVar: "MISTLE_DESIGNER_CODEX_CLI_PATH" },
   {

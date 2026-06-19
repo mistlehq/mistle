@@ -102,6 +102,10 @@ describe("exportServiceConfigToEnv", () => {
       valueFormat: "json",
     });
     expectEntry(entries, {
+      name: "MISTLE_PLATFORM_OPENAI_API_KEY",
+      value: "replace-with-platform-openai-api-key",
+    });
+    expectEntry(entries, {
       name: "MISTLE_DESIGNER_SANDBOX_BASE_IMAGE",
       value: "registry.example.com/mistle/sandbox-base:prod",
     });

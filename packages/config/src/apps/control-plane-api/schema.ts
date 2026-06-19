@@ -263,6 +263,27 @@ export const ControlPlaneApiDataPlaneApiConfigSchema = z
   })
   .strict();
 
+export const ControlPlaneApiPlatformCredentialsConfigSchema = z
+  .object({
+    openai: z
+      .object({
+        apiKey: z.string().trim().min(1),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const PartialControlPlaneApiPlatformCredentialsConfigSchema = z
+  .object({
+    openai: z
+      .object({
+        apiKey: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 export const ControlPlaneApiInternalAuthConfigSchema = z
   .object({
     serviceToken: z.string().trim().min(1),
@@ -345,6 +366,7 @@ export const ControlPlaneApiConfigSchema = z
     billing: ControlPlaneApiBillingConfigSchema,
     workflow: ControlPlaneApiWorkflowConfigSchema,
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema,
+    platformCredentials: ControlPlaneApiPlatformCredentialsConfigSchema.optional(),
     internalAuth: ControlPlaneApiInternalAuthConfigSchema,
     connectionToken: ControlPlaneApiConnectionTokenConfigSchema,
     portAccess: ControlPlaneApiPortAccessConfigSchema,
@@ -382,6 +404,7 @@ export const PartialControlPlaneApiConfigSchema = z
     billing: ControlPlaneApiBillingConfigObjectSchema.partial().optional(),
     workflow: ControlPlaneApiWorkflowConfigObjectSchema.partial().optional(),
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema.partial().optional(),
+    platformCredentials: PartialControlPlaneApiPlatformCredentialsConfigSchema.optional(),
     internalAuth: ControlPlaneApiInternalAuthConfigSchema.partial().optional(),
     connectionToken: ControlPlaneApiConnectionTokenConfigSchema.partial().optional(),
     portAccess: ControlPlaneApiPortAccessConfigSchema.partial().optional(),

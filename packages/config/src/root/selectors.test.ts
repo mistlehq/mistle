@@ -461,6 +461,11 @@ describe("selectControlPlaneApiConfig", () => {
         diskMb: 8192,
       },
     });
+    expect(config.platformCredentials).toEqual({
+      openai: {
+        apiKey: "platform-openai-key",
+      },
+    });
   });
 });
 

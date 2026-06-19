@@ -511,6 +511,10 @@ const ControlPlaneApiEnvDescriptors = [
     path: ["workflow", "namespaceId"],
   },
   { envVar: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL", path: ["dataPlaneApi", "baseUrl"] },
+  {
+    envVar: "MISTLE_PLATFORM_OPENAI_API_KEY",
+    path: ["platformCredentials", "openai", "apiKey"],
+  },
   { envVar: "MISTLE_INTERNAL_AUTH_SHARED_TOKEN", path: ["internalAuth", "serviceToken"] },
   {
     envVar: "MISTLE_SANDBOX_TOKENS_CONNECT_SECRET",

@@ -185,6 +185,23 @@ describe("DesignerCanvasWorkspace", () => {
     ]);
   });
 
+  it("renders trigger subroute tab hrefs as unsupported canvas routes", async () => {
+    renderDesignerCanvasWorkspace({
+      activeTabHref: "/triggers/new",
+      tabs: [
+        {
+          id: "create-trigger",
+          title: "Create trigger",
+          href: "/triggers/new",
+        },
+      ],
+    });
+
+    expect(
+      await screen.findByText("This route is not available in the Designer canvas."),
+    ).toBeDefined();
+  });
+
   it("reports the closed Designer canvas tab id when Dockview closes a panel", async () => {
     const closedTabIds: string[] = [];
     let resolveApi: ((api: DockviewApi) => void) | null = null;

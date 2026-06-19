@@ -620,7 +620,7 @@ function resolveDesignerCanvasEmbeddedRoute(href: string): DesignerCanvasEmbedde
     };
   }
 
-  if (pathSegments[0] === "triggers") {
+  if (pathSegments[0] === "triggers" && pathSegments.length === 1) {
     return {
       kind: "triggers",
       searchParams: url.searchParams,

@@ -189,6 +189,14 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
     dataPlaneApi: {
       baseUrl: config.services.data_plane_api.internal_url,
     },
+    platformCredentials:
+      config.platform_credentials?.openai === undefined
+        ? undefined
+        : {
+            openai: {
+              apiKey: config.platform_credentials.openai.api_key,
+            },
+          },
     internalAuth: {
       serviceToken: config.internal_auth.shared_token.token,
     },

@@ -35,6 +35,7 @@ function buildControlPlaneApiServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: "staging",
     MISTLE_SERVICES_CONTROL_PLANE_API_WORKFLOW_DATABASE_POOL_MAX: "2",
     MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: "http://data-plane-api:8082",
+    MISTLE_PLATFORM_OPENAI_API_KEY: "platform-openai-key",
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: "internal-service-token",
     MISTLE_SANDBOX_TOKENS_CONNECT_SECRET: "connect-secret",
     MISTLE_SANDBOX_TOKENS_CONNECT_ISSUER: "mistle",
@@ -302,6 +303,11 @@ describe("loadConfig", () => {
       migrationUrl: "postgresql://direct.example/mistle",
       namespaceId: "staging",
       databasePoolMax: 2,
+    });
+    expect(loadedConfig.app.platformCredentials).toEqual({
+      openai: {
+        apiKey: "platform-openai-key",
+      },
     });
     expect(loadedConfig.app.sandbox.e2b).toEqual({
       enabled: true,

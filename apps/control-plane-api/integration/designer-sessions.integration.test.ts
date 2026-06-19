@@ -4,6 +4,7 @@
 
 import { ApiKeyActorKinds } from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
+import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { generateApiKeySecret } from "../src/api-keys/services/api-key-secret.js";
@@ -245,6 +246,62 @@ describe.concurrent("designer sessions integration", () => {
     });
 
     expect(createResponse.status).toBe(400);
+  });
+
+  it("recovers the Designer session id embedded in an idempotently accepted sandbox start", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-designer-session-idempotent-recovery@example.com",
+    });
+    const idempotencyKey = "designer-session-idempotent-recovery";
+
+    const firstCreateResponse = await env.controlPlaneApi.http.fetch("/v1/designer/sessions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        idempotencyKey,
+        prompt: "Build an idempotent Designer session recovery check.",
+      }),
+    });
+    expect(firstCreateResponse.status).toBe(201);
+    const firstCreated = DesignerSessionSchema.parse(await firstCreateResponse.json());
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: firstCreated.sandboxInstanceId,
+    });
+    const designerMcpRoute = queuedWorkflowInput.runtimePlan.egressRoutes.find(
+      (route) => route.credentialResolver.kind === "mistle_mcp_designer_token",
+    );
+    expect(designerMcpRoute?.credentialResolver).toEqual({
+      kind: "mistle_mcp_designer_token",
+      designerSessionId: firstCreated.id,
+    });
+
+    await env.controlPlaneDb
+      .delete(env.controlPlaneTables.designerSessions)
+      .where(eq(env.controlPlaneTables.designerSessions.id, firstCreated.id));
+
+    const retryCreateResponse = await env.controlPlaneApi.http.fetch("/v1/designer/sessions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        idempotencyKey,
+        prompt: "Build an idempotent Designer session recovery check.",
+      }),
+    });
+    expect(retryCreateResponse.status).toBe(201);
+    const retryCreated = DesignerSessionSchema.parse(await retryCreateResponse.json());
+    expect(retryCreated).toMatchObject({
+      id: firstCreated.id,
+      sandboxInstanceId: firstCreated.sandboxInstanceId,
+    });
   });
 
   it("rejects Designer canvas tabs with non-dashboard-internal hrefs", async ({ env }) => {
