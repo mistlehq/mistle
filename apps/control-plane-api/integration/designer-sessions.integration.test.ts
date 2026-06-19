@@ -81,7 +81,7 @@ describe.concurrent("designer sessions integration", () => {
       "Build a triage agent for GitHub issues and Linear bugs.",
     );
     expect(codexAgents?.content).toContain(
-      "Do not publish sandbox profile versions, start sandbox sessions, create provider-side resources, or mutate external provider configuration unless there is an explicit approved Designer action for that operation.",
+      "Do not publish sandbox profile versions, start sandbox sessions, create provider-side resources, or mutate external provider configuration unless there is an explicit user-approved runtime action for that operation.",
     );
     expect(codexAgents?.content).toContain("Search Mistle docs with the `mistle_docs` MCP server");
 
