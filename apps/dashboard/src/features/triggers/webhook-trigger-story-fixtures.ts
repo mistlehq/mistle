@@ -297,6 +297,11 @@ const StorySlackChannelResources: IntegrationConnectionResources = {
   ],
 };
 
+export const StorySlackChannelResourcesSyncing: IntegrationConnectionResources = {
+  ...StorySlackChannelResources,
+  syncState: "syncing",
+};
+
 export const StoryGitHubEventOptions: readonly WebhookTriggerEventOption[] = [
   createGitHubEventOption({
     eventType: "github.issue_comment.created",
@@ -459,6 +464,7 @@ export const StoryWhapiEventOptions: readonly WebhookTriggerEventOption[] = [
 
 export function createWebhookTriggerStoryQueryClient(input?: {
   githubTeamResources?: IntegrationConnectionResources;
+  slackChannelResources?: IntegrationConnectionResources;
 }): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -491,7 +497,7 @@ export function createWebhookTriggerStoryQueryClient(input?: {
   );
   queryClient.setQueryData(
     ["trigger-trigger-parameters", StorySlackConnectionId, "channel"],
-    StorySlackChannelResources,
+    input?.slackChannelResources ?? StorySlackChannelResources,
   );
 
   return queryClient;

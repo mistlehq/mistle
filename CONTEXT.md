@@ -132,6 +132,10 @@ _Avoid_: Trigger when no Trigger conversation is created, hardcoded association 
 A provider event field that can narrow which **Trigger events** match a **Trigger**.
 _Avoid_: Filter field
 
+**Resource-backed Trigger event parameter**:
+A **Trigger event parameter** whose selectable values come from synced **Integration connection resources**.
+_Avoid_: Trigger resource, resource for trigger
+
 **Trigger event parameter group**:
 A provider-defined set of related **Trigger event parameters** that should be configured as one logical trigger-matching choice.
 _Avoid_: Parameter layout, control group
@@ -659,6 +663,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - First-pass **Trigger event parameter** editing should allow at most one **Trigger event parameter rule** per parameter.
 - A **Trigger event parameter rule** belongs to one selected **Trigger event** even when another selected **Trigger event** exposes a similar parameter.
 - Trigger-builder form state should represent selected **Trigger event parameters** as rules rather than bare values.
+- A **Resource-backed Trigger event parameter** dropdown offers resource refresh without changing the **Trigger event parameter rule**.
 - A **Duplicated trigger** is copied only when its **Referenced sandbox profile version** matches the source profile's active published configuration.
 - A **Duplicated trigger** excludes one-off scheduled **Trigger** configuration.
 - A **Duplicated trigger** must still be valid against current provider and integration capabilities.

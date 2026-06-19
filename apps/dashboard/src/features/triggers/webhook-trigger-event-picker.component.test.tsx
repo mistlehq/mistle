@@ -235,6 +235,32 @@ function renderTriggerPicker(input: {
       previousCursor: null,
     },
   });
+  TestQueryClient.setQueryData(
+    ["trigger-trigger-parameters", input.selectedConnectionId, "branch"],
+    {
+      connectionId: input.selectedConnectionId,
+      familyId: "github",
+      kind: "branch",
+      syncState: "ready",
+      items: [
+        {
+          id: "icr_github_branch_1",
+          familyId: "github",
+          kind: "branch",
+          externalId: "repo_1:main",
+          handle: "main",
+          displayName: "main",
+          status: "accessible",
+          metadata: {},
+        },
+      ],
+      page: {
+        totalResults: 1,
+        nextCursor: null,
+        previousCursor: null,
+      },
+    },
+  );
 
   function StatefulTriggerPicker(): React.JSX.Element {
     const [selectedEventIds, setSelectedEventIds] = useState([...input.selectedEventIds]);
@@ -275,6 +301,73 @@ function renderTriggerPicker(input: {
       )}
     </QueryClientProvider>,
   );
+}
+
+function createSlackChannelResources(): IntegrationConnectionResources {
+  return {
+    connectionId: SlackConnectionId,
+    familyId: "slack",
+    kind: "channel",
+    syncState: "ready",
+    items: [
+      {
+        id: "icr_slack_channel_1",
+        familyId: "slack",
+        kind: "channel",
+        externalId: "C12345678",
+        handle: "C12345678",
+        displayName: "#alerts",
+        status: "accessible",
+        metadata: {},
+      },
+    ],
+  };
+}
+
+function renderSlackChannelTriggerPicker(): ReturnType<typeof render> {
+  TestQueryClient.setQueryData(
+    ["trigger-trigger-parameters", SlackConnectionId, "channel"],
+    createSlackChannelResources(),
+  );
+
+  return render(
+    <QueryClientProvider client={TestQueryClient}>
+      <WebhookTriggerEventPicker
+        error={undefined}
+        eventOptions={[SlackAppMentionEventOption]}
+        hasConnectedIntegrations={true}
+        onEventParameterRuleChange={() => {}}
+        onEventParameterRulesChange={() => {}}
+        onValueChange={() => {}}
+        selectedConnectionId={SlackConnectionId}
+        selectedEventIds={[SlackAppMentionConditionId]}
+        eventParameterRules={{
+          [SlackAppMentionConditionId]: {
+            channel: isAnyOfRule(["C12345678"]),
+          },
+        }}
+      />
+    </QueryClientProvider>,
+  );
+}
+
+function openComboboxByPlaceholder(placeholder: string): HTMLElement {
+  const combobox = screen.getAllByRole("combobox").find((element) => {
+    return element.getAttribute("placeholder") === placeholder;
+  });
+  if (combobox === undefined) {
+    throw new Error(`Expected combobox with placeholder '${placeholder}'.`);
+  }
+
+  const comboboxTrigger = combobox
+    .closest('[data-slot="input-group"]')
+    ?.querySelector('button[data-slot="input-group-button"]');
+  if (comboboxTrigger === undefined || comboboxTrigger === null) {
+    throw new Error(`Expected combobox trigger for placeholder '${placeholder}'.`);
+  }
+
+  fireEvent.click(comboboxTrigger);
+  return combobox;
 }
 
 describe("WebhookTriggerEventPicker", () => {
@@ -527,52 +620,24 @@ describe("WebhookTriggerEventPicker", () => {
   });
 
   it("renders Slack channel selector-backed trigger parameters", async () => {
-    TestQueryClient.setQueryData(["trigger-trigger-parameters", SlackConnectionId, "channel"], {
-      connectionId: SlackConnectionId,
-      familyId: "slack",
-      kind: "channel",
-      syncState: "ready",
-      items: [
-        {
-          id: "icr_slack_channel_1",
-          familyId: "slack",
-          kind: "channel",
-          externalId: "C12345678",
-          handle: "C12345678",
-          displayName: "#alerts",
-          status: "accessible",
-          metadata: {},
-        },
-      ],
-      page: {
-        totalResults: 1,
-        nextCursor: null,
-        previousCursor: null,
-      },
-    });
-    render(
-      <QueryClientProvider client={TestQueryClient}>
-        <WebhookTriggerEventPicker
-          error={undefined}
-          eventOptions={[SlackAppMentionEventOption]}
-          hasConnectedIntegrations={true}
-          onEventParameterRuleChange={() => {}}
-          onEventParameterRulesChange={() => {}}
-          onValueChange={() => {}}
-          selectedConnectionId={SlackConnectionId}
-          selectedEventIds={[SlackAppMentionConditionId]}
-          eventParameterRules={{
-            [SlackAppMentionConditionId]: {
-              channel: isAnyOfRule(["C12345678"]),
-            },
-          }}
-        />
-      </QueryClientProvider>,
-    );
+    renderSlackChannelTriggerPicker();
 
     await waitFor(() => {
       expect(screen.getAllByPlaceholderText("#alerts").length).toBeGreaterThan(0);
     });
+  });
+
+  it("renders a resource refresh footer for Slack channel trigger parameters", async () => {
+    renderSlackChannelTriggerPicker();
+
+    await screen.findByPlaceholderText("#alerts");
+    openComboboxByPlaceholder("#alerts");
+
+    const refreshButton = await screen.findByRole("button", { name: "Refresh channels" });
+    refreshButton.focus();
+
+    expect(screen.getByRole("button", { name: "Refresh channels" })).toBeDefined();
+    expect(document.activeElement).toBe(refreshButton);
   });
 
   it("preserves missing selected resource values as unavailable historical selections", () => {
@@ -706,6 +771,54 @@ describe("WebhookTriggerEventPicker", () => {
     await waitFor(() => {
       expect(screen.getAllByPlaceholderText("Platform (mistle)").length).toBeGreaterThan(0);
     });
+  });
+
+  it("renders a resource refresh footer for one-of resource trigger parameters", async () => {
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedEventIds: [PullRequestReviewRequestedConditionId],
+      eventOptions: [PullRequestReviewRequestedEventOption],
+      eventParameterRules: {
+        [PullRequestReviewRequestedConditionId]: {
+          requestedTeam: isRule("platform"),
+        },
+      },
+    });
+
+    await screen.findAllByPlaceholderText("Platform (mistle)");
+    openComboboxByPlaceholder("Platform (mistle)");
+
+    expect(
+      await screen.findByRole("button", { name: "Refresh requested GitHub teams" }),
+    ).toBeDefined();
+  });
+
+  it("pluralizes resource refresh footer labels for branch trigger parameters", async () => {
+    const triggerId = createWebhookTriggerEventId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.pull_request.opened",
+    });
+    const selectedConditionId = conditionId(triggerId);
+
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedEventIds: [selectedConditionId],
+      eventParameterRules: {
+        [selectedConditionId]: {
+          baseBranch: isRule("main"),
+        },
+      },
+    });
+
+    await screen.findByPlaceholderText("main");
+    openComboboxByPlaceholder("main");
+
+    const malformedBranchPlural = "Refresh base " + "branch" + "s";
+
+    expect(await screen.findByRole("button", { name: "Refresh base branches" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: malformedBranchPlural })).toBeNull();
   });
 
   it("renders GitHub review request bot targets from synced bot resources", async () => {
