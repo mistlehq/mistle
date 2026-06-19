@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { DockviewApi } from "dockview";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -44,6 +45,7 @@ function renderDesignerCanvasWorkspace(input: RenderDesignerCanvasWorkspaceInput
         element: (
           <DesignerCanvasWorkspace
             activeTabHref={input.activeTabHref ?? null}
+            {...(input.onApiReady === undefined ? {} : { onApiReady: input.onApiReady })}
             onActiveTabHrefChange={input.onActiveTabHrefChange ?? (() => {})}
             onTabsChange={input.onTabsChange ?? (() => {})}
             tabs={input.tabs}
@@ -180,5 +182,52 @@ describe("DesignerCanvasWorkspace", () => {
         href: "/triggers/new",
       },
     ]);
+  });
+
+  it("persists Designer canvas tab removal when Dockview closes a panel", async () => {
+    const nextTabs: DesignerCanvasWorkspaceProps["tabs"][] = [];
+    let resolveApi: ((api: DockviewApi) => void) | null = null;
+    const dockviewApiPromise = new Promise<DockviewApi>((resolve) => {
+      resolveApi = resolve;
+    });
+
+    renderDesignerCanvasWorkspace({
+      activeTabHref: "/integrations",
+      onApiReady: (api) => {
+        resolveApi?.(api);
+      },
+      onTabsChange: (tabs) => {
+        nextTabs.push(tabs);
+      },
+      tabs: [
+        {
+          id: "integrations",
+          title: "Integrations",
+          href: "/integrations",
+        },
+        {
+          id: "triggers",
+          title: "Triggers",
+          href: "/triggers",
+        },
+      ],
+    });
+
+    const dockviewApi = await dockviewApiPromise;
+    const panel = dockviewApi.getPanel("integrations");
+    if (panel === undefined) {
+      throw new Error("Expected integrations panel to exist.");
+    }
+    dockviewApi.removePanel(panel);
+
+    await waitFor(() => {
+      expect(nextTabs.at(-1)).toEqual([
+        {
+          id: "triggers",
+          title: "Triggers",
+          href: "/triggers",
+        },
+      ]);
+    });
   });
 });

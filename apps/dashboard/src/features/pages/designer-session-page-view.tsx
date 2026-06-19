@@ -8,7 +8,7 @@ import {
   type DockviewWillShowOverlayLocationEvent,
   type IDockviewPanelProps,
 } from "dockview";
-import { useEffect, useMemo, useRef, type FunctionComponent } from "react";
+import { useEffect, useMemo, useState, type FunctionComponent } from "react";
 
 import { useResolvedAppearance } from "../appearance/appearance-provider.js";
 import type { DesignerSession } from "../designer/designer-service.js";
@@ -408,13 +408,14 @@ function preventDesignerCanvasLayoutOverlay(event: DockviewWillShowOverlayLocati
 
 export function DesignerCanvasWorkspace(input: {
   activeTabHref: string | null;
+  onApiReady?: (api: DockviewApi) => void;
   onActiveTabHrefChange: (href: string) => void;
   onTabsChange: (tabs: readonly DesignerCanvasTab[]) => void;
   tabs: readonly DesignerCanvasTab[];
 }): React.JSX.Element {
-  const { activeTabHref, onActiveTabHrefChange, onTabsChange, tabs } = input;
+  const { activeTabHref, onActiveTabHrefChange, onApiReady, onTabsChange, tabs } = input;
   const resolvedAppearance = useResolvedAppearance();
-  const dockviewApiRef = useRef<DockviewApi | null>(null);
+  const [dockviewApi, setDockviewApi] = useState<DockviewApi | null>(null);
   const tabById = useMemo(() => new Map(tabs.map((tab) => [tab.id, tab])), [tabs]);
   const handleNavigate = useMemo(
     () =>
@@ -446,7 +447,6 @@ export function DesignerCanvasWorkspace(input: {
   );
 
   useEffect(() => {
-    const dockviewApi = dockviewApiRef.current;
     if (dockviewApi === null) {
       return;
     }
@@ -457,7 +457,45 @@ export function DesignerCanvasWorkspace(input: {
       onNavigate: handleNavigate,
       tabs,
     });
-  }, [activeTabHref, handleNavigate, tabs]);
+  }, [activeTabHref, dockviewApi, handleNavigate, tabs]);
+
+  useEffect(() => {
+    if (dockviewApi === null) {
+      return;
+    }
+
+    const disposable = dockviewApi.onDidRemovePanel((panel) => {
+      const removedTab = tabs.find((tab) => tab.id === panel.id);
+      if (removedTab === undefined) {
+        return;
+      }
+
+      const nextTabs = tabs.filter((tab) => tab.id !== panel.id);
+      onTabsChange(nextTabs);
+      if (activeTabHref === removedTab.href) {
+        const nextActivePanel = dockviewApi.activePanel;
+        const nextActiveTab =
+          nextActivePanel === undefined
+            ? nextTabs[0]
+            : nextTabs.find((tab) => tab.id === nextActivePanel.id);
+        if (nextActiveTab !== undefined) {
+          onActiveTabHrefChange(nextActiveTab.href);
+        }
+      }
+    });
+
+    return () => {
+      disposable.dispose();
+    };
+  }, [activeTabHref, dockviewApi, onActiveTabHrefChange, onTabsChange, tabs]);
+
+  useEffect(() => {
+    if (dockviewApi === null) {
+      return;
+    }
+
+    onApiReady?.(dockviewApi);
+  }, [dockviewApi, onApiReady]);
 
   if (tabs.length === 0) {
     return (
@@ -480,7 +518,7 @@ export function DesignerCanvasWorkspace(input: {
         disableFloatingGroups
         dndEdges={false}
         onReady={(event: { api: DockviewApi }) => {
-          dockviewApiRef.current = event.api;
+          setDockviewApi(event.api);
           event.api.onWillShowOverlay(preventDesignerCanvasLayoutOverlay);
 
           syncDesignerCanvasPanels({
@@ -502,6 +540,13 @@ function syncDesignerCanvasPanels(input: {
   onNavigate: (navigation: { id: string; href: string; title: string }) => void;
   tabs: readonly DesignerCanvasTab[];
 }): void {
+  const tabIds = new Set(input.tabs.map((tab) => tab.id));
+  for (const panel of input.dockviewApi.panels) {
+    if (!tabIds.has(panel.id)) {
+      input.dockviewApi.removePanel(panel);
+    }
+  }
+
   for (const tab of input.tabs) {
     const existingPanel = input.dockviewApi.getPanel(tab.id);
     if (existingPanel === undefined) {
