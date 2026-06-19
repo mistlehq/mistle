@@ -16,6 +16,7 @@ export type WebhookTriggerEventParameterOption =
       kind: "resource-select";
       resourceKind: string;
       payloadPath: string[];
+      multiValue?: boolean;
       negatedMatchRequiresExists?: boolean;
       prefix?: string;
       placeholder?: string;
@@ -103,6 +104,7 @@ export type WebhookTriggerEventParameterRuleOperator =
 export type WebhookTriggerEventParameterRule = {
   operator: WebhookTriggerEventParameterRuleOperator;
   value: string;
+  values?: readonly string[];
 };
 
 export type WebhookTriggerEventParameterRuleMap = Record<

@@ -12,7 +12,9 @@ import type {
 } from "./webhook-trigger-form-types.js";
 import { DefaultWebhookTriggerMessageTemplate } from "./webhook-trigger-input-template.js";
 import {
+  createWebhookTriggerEventConditionId,
   createWebhookTriggerEventId,
+  resolveWebhookTriggerEventOptionIdFromConditionId,
   WebhookTriggerWorkspaceRootRepositoryOptionValue,
 } from "./webhook-trigger-option-builders.js";
 import type {
@@ -23,7 +25,6 @@ import type {
 
 type ResolvedSelectedEvents = {
   connectionIds: string[];
-  eventTypes: string[];
   webhookSourceIds: string[];
   webhookSourceId: string | null;
 };
@@ -33,13 +34,20 @@ function resolveSelectedEvents(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
 }): ResolvedSelectedEvents {
   const selectedOptions = input.eventIds
-    .map((triggerId) => input.eventOptions.find((option) => option.id === triggerId))
+    .map((triggerId) => {
+      const eventOptionId = resolveWebhookTriggerEventOptionIdFromConditionId(triggerId);
+      return input.eventOptions.find((option) => option.id === eventOptionId);
+    })
     .filter((option): option is WebhookTriggerEventOption => option !== undefined);
 
   const fallbackSelections = input.eventIds
-    .filter((triggerId) => !selectedOptions.some((option) => option.id === triggerId))
+    .filter((triggerId) => {
+      const eventOptionId = resolveWebhookTriggerEventOptionIdFromConditionId(triggerId);
+      return !selectedOptions.some((option) => option.id === eventOptionId);
+    })
     .map((triggerId) => {
-      const [webhookSourceId = "", ...eventTypeParts] = triggerId.split("::");
+      const eventOptionId = resolveWebhookTriggerEventOptionIdFromConditionId(triggerId);
+      const [webhookSourceId = "", ...eventTypeParts] = eventOptionId.split("::");
       return {
         webhookSourceId,
         eventType: eventTypeParts.join("::"),
@@ -61,25 +69,11 @@ function resolveSelectedEvents(input: {
       ].filter((webhookSourceId) => webhookSourceId.trim().length > 0),
     ),
   ];
-  const eventTypes = [
-    ...selectedOptions.map((option) => option.eventType),
-    ...fallbackSelections
-      .map((selection) => selection.eventType)
-      .filter((eventType) => eventType.length > 0),
-  ];
-
   return {
     connectionIds,
     webhookSourceIds,
-    eventTypes,
     webhookSourceId: webhookSourceIds.length === 1 ? (webhookSourceIds[0] ?? null) : null,
   };
-}
-
-function parseOptionalEventTypes(value: readonly string[]): string[] | null {
-  const items = value.filter((item) => item.trim().length > 0);
-
-  return items.length === 0 ? null : items;
 }
 
 export function toWebhookTriggerFormValues(
@@ -101,16 +95,28 @@ export function toWebhookTriggerFormValues(
     };
   }
 
-  const selectedEventIds = (trigger.eventTypes ?? []).map((eventType) =>
-    createWebhookTriggerEventId({
-      webhookSourceId: trigger.integrationWebhookSourceId,
-      eventType,
+  const selectedEventIds = trigger.eventConditions.map((condition, index) =>
+    createWebhookTriggerEventConditionId({
+      eventOptionId: createWebhookTriggerEventId({
+        webhookSourceId: trigger.integrationWebhookSourceId,
+        eventType: condition.eventType,
+      }),
+      index,
     }),
   );
   const extractedEventParameterRules = extractWebhookTriggerEventParameterRules({
     eventOptions,
     selectedEventIds,
-    payloadFilter: trigger.payloadFilter,
+    payloadFilter: Object.fromEntries(
+      trigger.eventConditions.flatMap((condition, index) => {
+        const conditionId = selectedEventIds[index];
+        if (conditionId === undefined || condition.payloadFilter === undefined) {
+          return [];
+        }
+
+        return [[conditionId, condition.payloadFilter]];
+      }),
+    ),
   });
 
   return {
@@ -210,6 +216,36 @@ function toPayloadFilterValue(input: {
   });
 }
 
+function assertConditionPayloadFilter(
+  payloadFilter: unknown,
+): asserts payloadFilter is Record<string, unknown> {
+  if (payloadFilter === null || typeof payloadFilter !== "object" || Array.isArray(payloadFilter)) {
+    throw new Error("Webhook trigger condition payload filter must be an object.");
+  }
+}
+
+function toEventConditionsValue(input: {
+  values: WebhookTriggerFormValues;
+  eventOptions: readonly WebhookTriggerEventOption[];
+}): CreateWebhookTriggerInput["eventConditions"] {
+  const payloadFiltersByConditionId = toPayloadFilterValue(input) ?? {};
+
+  return input.values.eventIds.map((conditionId) => {
+    const eventOptionId = resolveWebhookTriggerEventOptionIdFromConditionId(conditionId);
+    const eventOption = input.eventOptions.find((option) => option.id === eventOptionId);
+    const eventType = eventOption?.eventType ?? eventOptionId.split("::").slice(1).join("::");
+    const payloadFilter = payloadFiltersByConditionId[conditionId];
+    if (payloadFilter !== undefined) {
+      assertConditionPayloadFilter(payloadFilter);
+    }
+
+    return {
+      eventType,
+      ...(payloadFilter === undefined ? {} : { payloadFilter }),
+    };
+  });
+}
+
 function toPrimaryRepositoryId(value: string): string | null {
   const trimmedValue = value.trim();
 
@@ -228,7 +264,6 @@ function resolveTriggerSubmissionShape(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
 }): {
   integrationWebhookSourceId: string;
-  eventTypes: string[] | null;
 } {
   const resolvedEvents = resolveSelectedEvents({
     eventIds: input.values.eventIds,
@@ -251,7 +286,6 @@ function resolveTriggerSubmissionShape(input: {
 
   return {
     integrationWebhookSourceId: resolvedEvents.webhookSourceId,
-    eventTypes: parseOptionalEventTypes(resolvedEvents.eventTypes),
   };
 }
 
@@ -272,8 +306,7 @@ export function toCreateWebhookTriggerPayload(
     instructions: values.instructions.trim().length === 0 ? null : values.instructions.trim(),
     conversationKeyTemplate: values.conversationKeyTemplate,
     idempotencyKeyTemplate: null,
-    eventTypes: resolvedSubmissionShape.eventTypes,
-    payloadFilter: toPayloadFilterValue({ values, eventOptions }),
+    eventConditions: toEventConditionsValue({ values, eventOptions }),
     target: {
       sandboxProfileId: values.sandboxProfileId,
       primaryRepositoryId: toPrimaryRepositoryId(values.primaryRepositoryId),
@@ -298,8 +331,7 @@ export function toUpdateWebhookTriggerPayload(
     instructions: values.instructions.trim().length === 0 ? null : values.instructions.trim(),
     conversationKeyTemplate: values.conversationKeyTemplate,
     idempotencyKeyTemplate: null,
-    eventTypes: resolvedSubmissionShape.eventTypes,
-    payloadFilter: toPayloadFilterValue({ values, eventOptions }),
+    eventConditions: toEventConditionsValue({ values, eventOptions }),
     target: {
       sandboxProfileId: values.sandboxProfileId,
       primaryRepositoryId: toPrimaryRepositoryId(values.primaryRepositoryId),

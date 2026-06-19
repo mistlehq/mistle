@@ -5,7 +5,10 @@ import {
   resolveSelectedWebhookTriggerEventOptions,
   resolveWebhookTriggerEventPickerState,
 } from "./webhook-trigger-event-picker-state.js";
-import { createWebhookTriggerEventId } from "./webhook-trigger-option-builders.js";
+import {
+  createWebhookTriggerEventConditionId,
+  createWebhookTriggerEventId,
+} from "./webhook-trigger-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
   createGithubPullRequestOpenedEventOption,
@@ -22,6 +25,10 @@ const WebhookEventOptions = [
   }),
 ] as const;
 
+function conditionId(eventOptionId: string, index = 0): string {
+  return createWebhookTriggerEventConditionId({ eventOptionId, index });
+}
+
 describe("webhook trigger trigger picker state", () => {
   it("groups available triggers by integration connection label", () => {
     expect(groupWebhookTriggerEventOptions(WebhookEventOptions)).toEqual([
@@ -33,25 +40,47 @@ describe("webhook trigger trigger picker state", () => {
     ]);
   });
 
-  it("preserves missing selected triggers as synthetic unavailable entries", () => {
+  it("preserves missing selected conditions as synthetic unavailable entries", () => {
+    const eventOptionId = createWebhookTriggerEventId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.push.deleted",
+    });
+    const selectedConditionId = conditionId(eventOptionId);
+
     expect(
       resolveSelectedWebhookTriggerEventOptions({
         eventOptions: WebhookEventOptions,
-        selectedEventIds: [
-          createWebhookTriggerEventId({
-            webhookSourceId: GitHubWebhookSourceId,
-            eventType: "github.push.deleted",
-          }),
-        ],
+        selectedEventIds: [selectedConditionId],
       }),
     ).toEqual([
       expect.objectContaining({
-        id: createWebhookTriggerEventId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.push.deleted",
-        }),
+        id: selectedConditionId,
         availability: "missing_integration",
         eventType: "github.push.deleted",
+      }),
+    ]);
+  });
+
+  it("preserves unavailable selected condition metadata", () => {
+    const selectedConditionId = conditionId(WebhookEventOptions[0].id);
+
+    expect(
+      resolveSelectedWebhookTriggerEventOptions({
+        eventOptions: [
+          {
+            ...WebhookEventOptions[0],
+            id: selectedConditionId,
+            availability: "wrong_profile",
+            description: "Event is unavailable for the selected sandbox profile.",
+          },
+        ],
+        selectedEventIds: [selectedConditionId],
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        id: selectedConditionId,
+        availability: "wrong_profile",
+        description: "Event is unavailable for the selected sandbox profile.",
       }),
     ]);
   });
@@ -98,18 +127,18 @@ describe("webhook trigger trigger picker state", () => {
     });
   });
 
-  it("does not show setup guidance after all selectable trigger events are selected", () => {
+  it("keeps selectable trigger events available after all event types have selected conditions", () => {
     expect(
       resolveWebhookTriggerEventPickerState({
         eventOptions: WebhookEventOptions,
         hasConnectedIntegrations: true,
-        selectedEventIds: WebhookEventOptions.map((option) => option.id),
+        selectedEventIds: WebhookEventOptions.map((option, index) => conditionId(option.id, index)),
       }),
     ).toMatchObject({
-      availableEventOptions: [],
-      disabled: true,
+      availableEventOptions: [...WebhookEventOptions],
+      disabled: false,
       helperMessage: null,
-      inputPlaceholder: "No events available",
+      inputPlaceholder: "Add condition",
       shouldShowNoAvailableTriggerEventsNotice: false,
     });
   });

@@ -9,6 +9,13 @@ export const TriggerWebhookTargetSchema = z
   })
   .strict();
 
+export const TriggerWebhookEventConditionSchema = z
+  .object({
+    eventType: z.string().min(1),
+    payloadFilter: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .strict();
+
 export const TriggerWebhookSchema = z
   .object({
     id: z.string().min(1),
@@ -16,8 +23,7 @@ export const TriggerWebhookSchema = z
     name: z.string().min(1),
     enabled: z.boolean(),
     integrationWebhookSourceId: z.string().min(1),
-    eventTypes: z.array(z.string().min(1)).nullable(),
-    payloadFilter: z.record(z.string(), z.unknown()).nullable(),
+    eventConditions: z.array(TriggerWebhookEventConditionSchema).min(1),
     inputTemplate: z.string().min(1),
     instructions: z.string().min(1).nullable(),
     conversationKeyTemplate: z.string().min(1),

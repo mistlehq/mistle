@@ -81,6 +81,8 @@ describe("control-plane migrations integration", () => {
     const schemaName = "control_plane_trigger_rename";
     const migrationTrackingSchemaName = "control_plane_trigger_rename_meta";
     const previousMigrationsFolder = await createControlPlaneMigrationsFolderBeforeTriggerRename();
+    const beforeEventConditionsMigrationsFolder =
+      await createControlPlaneMigrationsFolderBeforeEventConditions();
     const migrationInput = {
       connectionString: databaseStack.directUrl,
       schemaName,
@@ -95,6 +97,12 @@ describe("control-plane migrations integration", () => {
     try {
       await runControlPlaneMigrations(migrationInput);
       await seedLegacyTriggerRenameRows({ pool, schemaName });
+
+      await runControlPlaneMigrations({
+        ...migrationInput,
+        migrationsFolder: beforeEventConditionsMigrationsFolder,
+      });
+      await seedRenamedWebhookTriggerLegacyEvents({ pool, schemaName });
 
       await runControlPlaneMigrations({
         ...migrationInput,
@@ -202,6 +210,90 @@ describe("control-plane migrations integration", () => {
       );
       await pool.end();
       await rm(previousMigrationsFolder, { recursive: true, force: true });
+      await rm(beforeEventConditionsMigrationsFolder, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it("backfills webhook trigger event conditions from legacy event types and payload filters", async ({
+    databaseStack,
+  }) => {
+    const schemaName = "control_plane_event_conditions";
+    const migrationTrackingSchemaName = "control_plane_event_conditions_meta";
+    const previousMigrationsFolder =
+      await createControlPlaneMigrationsFolderBeforeEventConditions();
+    const migrationInput = {
+      connectionString: databaseStack.directUrl,
+      schemaName,
+      migrationsFolder: previousMigrationsFolder,
+      migrationsSchema: migrationTrackingSchemaName,
+      migrationsTable: MigrationTracking.CONTROL_PLANE.TABLE_NAME,
+    };
+    const pool = new Pool({
+      connectionString: databaseStack.directUrl,
+    });
+
+    try {
+      await runControlPlaneMigrations(migrationInput);
+      await seedLegacyWebhookTriggerEventConditionRows({ pool, schemaName });
+
+      await runControlPlaneMigrations({
+        ...migrationInput,
+        migrationsFolder: CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
+      });
+
+      const migratedRows = await pool.query<{
+        trigger_id: string;
+        event_conditions: unknown;
+      }>(
+        `
+          select trigger_id, event_conditions
+          from control_plane.webhook_triggers
+          where trigger_id in (
+            'atm_event_conditions_filtered',
+            'atm_event_conditions_unfiltered'
+          )
+          order by trigger_id asc
+        `.replaceAll("control_plane.", `${quoteSqlIdentifier(schemaName)}.`),
+      );
+
+      expect(migratedRows.rows).toEqual([
+        {
+          trigger_id: "atm_event_conditions_filtered",
+          event_conditions: [
+            {
+              eventType: "github.issue_comment.created",
+              payloadFilter: {
+                op: "contains_token",
+                path: ["comment", "body"],
+                value: "@mistlebot",
+              },
+            },
+            {
+              eventType: "github.pull_request.opened",
+              payloadFilter: {
+                op: "eq",
+                path: ["action"],
+                value: "opened",
+              },
+            },
+          ],
+        },
+        {
+          trigger_id: "atm_event_conditions_unfiltered",
+          event_conditions: [
+            {
+              eventType: "github.pull_request.closed",
+            },
+          ],
+        },
+      ]);
+    } finally {
+      await pool.query(`drop schema if exists ${quoteSqlIdentifier(schemaName)} cascade`);
+      await pool.query(
+        `drop schema if exists ${quoteSqlIdentifier(migrationTrackingSchemaName)} cascade`,
+      );
+      await pool.end();
+      await rm(previousMigrationsFolder, { recursive: true, force: true });
     }
   }, 60_000);
 });
@@ -223,19 +315,27 @@ const MigrationJournalSchema = z.object({
 });
 
 async function createControlPlaneMigrationsFolderBeforeTriggerRename(): Promise<string> {
+  return createControlPlaneMigrationsFolderBeforeEntry("0032_rename-automation-to-trigger");
+}
+
+async function createControlPlaneMigrationsFolderBeforeEventConditions(): Promise<string> {
+  return createControlPlaneMigrationsFolderBeforeEntry(
+    "0045_hard-migrate-webhook-trigger-event-conditions",
+  );
+}
+
+async function createControlPlaneMigrationsFolderBeforeEntry(entryTag: string): Promise<string> {
   const temporaryDirectory = await mkdtemp(join(tmpdir(), "mistle-control-plane-migrations-"));
   await cp(CONTROL_PLANE_MIGRATIONS_FOLDER_PATH, temporaryDirectory, { recursive: true });
 
   const journalPath = join(temporaryDirectory, "meta", "_journal.json");
   const journal = MigrationJournalSchema.parse(JSON.parse(await readFile(journalPath, "utf8")));
-  const triggerRenameEntryIndex = journal.entries.findIndex(
-    (entry) => entry.tag === "0032_rename-automation-to-trigger",
-  );
-  if (triggerRenameEntryIndex === -1) {
-    throw new Error("Could not find trigger rename migration entry.");
+  const entryIndex = journal.entries.findIndex((entry) => entry.tag === entryTag);
+  if (entryIndex === -1) {
+    throw new Error(`Could not find control-plane migration entry '${entryTag}'.`);
   }
 
-  const removedEntries = journal.entries.slice(triggerRenameEntryIndex);
+  const removedEntries = journal.entries.slice(entryIndex);
   for (const entry of removedEntries) {
     await rm(join(temporaryDirectory, `${entry.tag}.sql`), { force: true });
     await rm(
@@ -248,7 +348,7 @@ async function createControlPlaneMigrationsFolderBeforeTriggerRename(): Promise<
 
   const previousJournal = {
     ...journal,
-    entries: journal.entries.slice(0, triggerRenameEntryIndex),
+    entries: journal.entries.slice(0, entryIndex),
   };
   await writeFile(journalPath, `${JSON.stringify(previousJournal, null, 2)}\n`);
 
@@ -527,6 +627,145 @@ async function seedLegacyTriggerRenameRows(input: {
         'sca_trigger_rename_legacy',
         'schedule:sca_trigger_rename_legacy'
       )
+    `,
+  );
+}
+
+async function seedLegacyWebhookTriggerEventConditionRows(input: {
+  pool: Pool;
+  schemaName: string;
+}): Promise<void> {
+  const { pool } = input;
+  const schemaName = quoteSqlIdentifier(input.schemaName);
+
+  await pool.query(
+    `
+      insert into ${schemaName}.organizations (id, name, slug)
+      values ('org_event_conditions', 'Event Conditions', 'event-conditions')
+    `,
+  );
+  await pool.query(
+    `
+      insert into ${schemaName}.integration_targets
+        (target_key, family_id, variant_id, config)
+      values ('github_default', 'github', 'github-default', '{}'::jsonb)
+    `,
+  );
+  await pool.query(
+    `
+      insert into ${schemaName}.integration_connections
+        (id, organization_id, target_key, display_name)
+      values (
+        'icn_event_conditions',
+        'org_event_conditions',
+        'github_default',
+        'Event Conditions GitHub connection'
+      )
+    `,
+  );
+  await pool.query(
+    `
+      insert into ${schemaName}.integration_webhook_sources
+        (
+          id,
+          organization_id,
+          integration_connection_id,
+          target_key,
+          endpoint_key
+        )
+      values (
+        'iws_event_conditions',
+        'org_event_conditions',
+        'icn_event_conditions',
+        'github_default',
+        'event-conditions'
+      )
+    `,
+  );
+  await pool.query(
+    `
+      insert into ${schemaName}.triggers (id, organization_id, kind, name, enabled)
+      values
+        (
+          'atm_event_conditions_filtered',
+          'org_event_conditions',
+          'webhook',
+          'Filtered webhook trigger',
+          true
+        ),
+        (
+          'atm_event_conditions_unfiltered',
+          'org_event_conditions',
+          'webhook',
+          'Unfiltered webhook trigger',
+          true
+        )
+    `,
+  );
+  await pool.query(
+    `
+      insert into ${schemaName}.webhook_triggers
+        (
+          trigger_id,
+          integration_webhook_source_id,
+          event_types,
+          payload_filter,
+          input_template,
+          conversation_key_template
+        )
+      values
+        (
+          'atm_event_conditions_filtered',
+          'iws_event_conditions',
+          '[
+            "github.issue_comment.created",
+            "github.pull_request.opened"
+          ]'::jsonb,
+          '{
+            "github.issue_comment.created": {
+              "op": "contains_token",
+              "path": ["comment", "body"],
+              "value": "@mistlebot"
+            },
+            "github.pull_request.opened": {
+              "op": "eq",
+              "path": ["action"],
+              "value": "opened"
+            },
+            "github.pull_request.closed": {
+              "op": "eq",
+              "path": ["action"],
+              "value": "closed"
+            }
+          }'::jsonb,
+          'handle filtered webhook',
+          'conversation-filtered'
+        ),
+        (
+          'atm_event_conditions_unfiltered',
+          'iws_event_conditions',
+          '["github.pull_request.closed"]'::jsonb,
+          null,
+          'handle unfiltered webhook',
+          'conversation-unfiltered'
+        )
+    `,
+  );
+}
+
+async function seedRenamedWebhookTriggerLegacyEvents(input: {
+  pool: Pool;
+  schemaName: string;
+}): Promise<void> {
+  const schemaName = quoteSqlIdentifier(input.schemaName);
+
+  await input.pool.query(
+    `
+      update ${schemaName}.webhook_triggers
+      set
+        event_types = '["github.issue_comment.created"]'::jsonb,
+        payload_filter = '{}'::jsonb
+      where trigger_id = 'atm_trigger_rename_legacy'
     `,
   );
 }

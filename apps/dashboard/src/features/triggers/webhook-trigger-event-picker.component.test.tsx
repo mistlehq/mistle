@@ -20,7 +20,10 @@ import type {
   WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
-import { createWebhookTriggerEventId } from "./webhook-trigger-option-builders.js";
+import {
+  createWebhookTriggerEventConditionId,
+  createWebhookTriggerEventId,
+} from "./webhook-trigger-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
   createGithubPullRequestOpenedEventOption,
@@ -55,6 +58,16 @@ const WebhookEventOptions: readonly WebhookTriggerEventOption[] = [
   }),
 ];
 
+function conditionId(eventOptionId: string, index = 0): string {
+  return createWebhookTriggerEventConditionId({ eventOptionId, index });
+}
+
+const SlackAppMentionConditionId = conditionId(SlackAppMentionTriggerId);
+const PullRequestReviewRequestedConditionId = conditionId(PullRequestReviewRequestedTriggerId);
+const PullRequestReviewRequestRemovedConditionId = conditionId(
+  PullRequestReviewRequestRemovedTriggerId,
+);
+
 const PullRequestReviewRequestedEventOption = createGithubPullRequestReviewRequestedEventOption({
   id: PullRequestReviewRequestedTriggerId,
   connectionLabel: GitHubGroupedConnectionLabel,
@@ -69,6 +82,22 @@ function isRule(value: string) {
   return {
     operator: WebhookTriggerEventParameterRuleOperators.IS,
     value,
+  };
+}
+
+function isAnyOfRule(values: readonly string[]) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS,
+    value: "",
+    values: [...values],
+  };
+}
+
+function isNotAnyOfRule(values: readonly string[]) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS_NOT,
+    value: "",
+    values: [...values],
   };
 }
 
@@ -102,6 +131,7 @@ const SlackAppMentionEventOption: WebhookTriggerEventOption = {
       resourceKind: "channel",
       payloadPath: ["event", "channel"],
       prefix: "in",
+      multiValue: true,
     },
   ],
 };
@@ -364,20 +394,20 @@ describe("WebhookTriggerEventPicker", () => {
     expect(integrationsLink.getAttribute("href")).toBe("/integrations");
   });
 
-  it("does not show setup guidance after all available triggers are selected", () => {
+  it("keeps the add-condition input available after all event types have selected conditions", () => {
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: WebhookEventOptions.map((option) => option.id),
+      selectedEventIds: WebhookEventOptions.map((option, index) => conditionId(option.id, index)),
       eventParameterRules: {},
     });
 
-    const input = container.querySelector('input[placeholder="No events available"]');
+    const input = container.querySelector('input[placeholder="Add condition"]');
     if (input === null) {
       throw new Error("Expected trigger input.");
     }
 
-    expect(input.getAttribute("disabled")).toBe("");
+    expect(input.getAttribute("disabled")).toBeNull();
     expect(screen.queryByText(/No trigger events are available yet/)).toBeNull();
   });
 
@@ -475,26 +505,24 @@ describe("WebhookTriggerEventPicker", () => {
   });
 
   it("renders selector-backed trigger parameters", () => {
+    const triggerId = createWebhookTriggerEventId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.pull_request.opened",
+    });
+    const selectedConditionId = conditionId(triggerId);
+
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-      selectedEventIds: [
-        createWebhookTriggerEventId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.pull_request.opened",
-        }),
-      ],
+      selectedEventIds: [selectedConditionId],
       eventParameterRules: {
-        [createWebhookTriggerEventId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.pull_request.opened",
-        })]: {
+        [selectedConditionId]: {
           author: isRule("octocat"),
         },
       },
     });
 
-    expect(screen.getAllByDisplayValue("octocat").length).toBeGreaterThan(0);
+    expect(screen.getAllByPlaceholderText("octocat").length).toBeGreaterThan(0);
     expect(screen.queryByPlaceholderText("Any author")).toBeNull();
   });
 
@@ -532,10 +560,10 @@ describe("WebhookTriggerEventPicker", () => {
           onEventParameterRulesChange={() => {}}
           onValueChange={() => {}}
           selectedConnectionId={SlackConnectionId}
-          selectedEventIds={[SlackAppMentionTriggerId]}
+          selectedEventIds={[SlackAppMentionConditionId]}
           eventParameterRules={{
-            [SlackAppMentionTriggerId]: {
-              channel: isRule("C12345678"),
+            [SlackAppMentionConditionId]: {
+              channel: isAnyOfRule(["C12345678"]),
             },
           }}
         />
@@ -543,31 +571,29 @@ describe("WebhookTriggerEventPicker", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("#alerts").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("#alerts").length).toBeGreaterThan(0);
     });
   });
 
   it("preserves missing selected resource values as unavailable historical selections", () => {
+    const triggerId = createWebhookTriggerEventId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.pull_request.opened",
+    });
+    const selectedConditionId = conditionId(triggerId);
+
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: [
-        createWebhookTriggerEventId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.pull_request.opened",
-        }),
-      ],
+      selectedEventIds: [selectedConditionId],
       eventParameterRules: {
-        [createWebhookTriggerEventId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.pull_request.opened",
-        })]: {
+        [selectedConditionId]: {
           author: isRule("retired-user"),
         },
       },
     });
 
-    expect(screen.getAllByDisplayValue("retired-user (Unavailable)").length).toBeGreaterThan(0);
+    expect(screen.getAllByPlaceholderText("retired-user (Unavailable)").length).toBeGreaterThan(0);
   });
 
   it("renders GitHub actor bot parameters from synced bot resources", async () => {
@@ -575,13 +601,14 @@ describe("WebhookTriggerEventPicker", () => {
       webhookSourceId: GitHubWebhookSourceId,
       eventType: "github.pull_request.opened",
     });
+    const selectedConditionId = conditionId(triggerId);
 
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: [triggerId],
+      selectedEventIds: [selectedConditionId],
       eventParameterRules: {
-        [triggerId]: {
+        [selectedConditionId]: {
           botActor: isRule("dependabot[bot]"),
         },
       },
@@ -590,25 +617,23 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request opened")).toBeDefined();
     expect(screen.getByText("by bot")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("dependabot[bot]").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("dependabot[bot]").length).toBeGreaterThan(0);
     });
   });
 
   it("renders enum-backed trigger parameters", () => {
+    const triggerId = createWebhookTriggerEventId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.issue_comment.created",
+    });
+    const selectedConditionId = conditionId(triggerId);
+
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-      selectedEventIds: [
-        createWebhookTriggerEventId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.issue_comment.created",
-        }),
-      ],
+      selectedEventIds: [selectedConditionId],
       eventParameterRules: {
-        [createWebhookTriggerEventId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.issue_comment.created",
-        })]: {
+        [selectedConditionId]: {
           target: existsRule(),
         },
       },
@@ -626,10 +651,10 @@ describe("WebhookTriggerEventPicker", () => {
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: [PullRequestReviewRequestedTriggerId],
+      selectedEventIds: [PullRequestReviewRequestedConditionId],
       eventOptions: [PullRequestReviewRequestedEventOption],
       eventParameterRules: {
-        [PullRequestReviewRequestedTriggerId]: {
+        [PullRequestReviewRequestedConditionId]: {
           requestedReviewer: isRule("octocat"),
         },
       },
@@ -646,10 +671,10 @@ describe("WebhookTriggerEventPicker", () => {
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: [PullRequestReviewRequestedTriggerId],
+      selectedEventIds: [PullRequestReviewRequestedConditionId],
       eventOptions: [PullRequestReviewRequestedEventOption],
       eventParameterRules: {
-        [PullRequestReviewRequestedTriggerId]: {
+        [PullRequestReviewRequestedConditionId]: {
           requestedTeam: isRule("platform"),
         },
       },
@@ -658,19 +683,39 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request review requested")).toBeDefined();
     expect(screen.getByText("for team")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("Platform (mistle)").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("Platform (mistle)").length).toBeGreaterThan(0);
     });
     expect(container.textContent).not.toContain("Any requested reviewer");
+  });
+
+  it("selects GitHub review request one-of groups from multi-value rules", async () => {
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedEventIds: [PullRequestReviewRequestedConditionId],
+      eventOptions: [PullRequestReviewRequestedEventOption],
+      eventParameterRules: {
+        [PullRequestReviewRequestedConditionId]: {
+          requestedTeam: isAnyOfRule(["platform"]),
+        },
+      },
+    });
+
+    expect(screen.getByText("for team")).toBeDefined();
+    expect(screen.queryByText("for reviewer")).toBeNull();
+    await waitFor(() => {
+      expect(screen.getAllByPlaceholderText("Platform (mistle)").length).toBeGreaterThan(0);
+    });
   });
 
   it("renders GitHub review request bot targets from synced bot resources", async () => {
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: [PullRequestReviewRequestedTriggerId],
+      selectedEventIds: [PullRequestReviewRequestedConditionId],
       eventOptions: [PullRequestReviewRequestedEventOption],
       eventParameterRules: {
-        [PullRequestReviewRequestedTriggerId]: {
+        [PullRequestReviewRequestedConditionId]: {
           requestedBot: isRule("mistle-agent[bot]"),
         },
       },
@@ -679,7 +724,7 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request review requested")).toBeDefined();
     expect(screen.getByText("for bot")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("mistle-agent[bot]").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("mistle-agent[bot]").length).toBeGreaterThan(0);
     });
   });
 
@@ -687,17 +732,17 @@ describe("WebhookTriggerEventPicker", () => {
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: [PullRequestReviewRequestedTriggerId],
+      selectedEventIds: [PullRequestReviewRequestedConditionId],
       eventOptions: [PullRequestReviewRequestedEventOption],
       eventParameterRules: {
-        [PullRequestReviewRequestedTriggerId]: {
+        [PullRequestReviewRequestedConditionId]: {
           requestedTeam: isRule("legacy-team"),
         },
       },
     });
 
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("legacy-team (Unavailable)").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("legacy-team (Unavailable)").length).toBeGreaterThan(0);
     });
   });
 
@@ -705,10 +750,10 @@ describe("WebhookTriggerEventPicker", () => {
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: [PullRequestReviewRequestedTriggerId],
+      selectedEventIds: [PullRequestReviewRequestedConditionId],
       eventOptions: [PullRequestReviewRequestedEventOption],
       eventParameterRules: {
-        [PullRequestReviewRequestedTriggerId]: {
+        [PullRequestReviewRequestedConditionId]: {
           requestedTeam: isRule("platform"),
         },
       },
@@ -725,7 +770,7 @@ describe("WebhookTriggerEventPicker", () => {
 
     expect(screen.getByText("for team")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("platform (Unavailable)").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("platform (Unavailable)").length).toBeGreaterThan(0);
     });
     expect(
       screen.getByText(
@@ -739,10 +784,10 @@ describe("WebhookTriggerEventPicker", () => {
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: [PullRequestReviewRequestRemovedTriggerId],
+      selectedEventIds: [PullRequestReviewRequestRemovedConditionId],
       eventOptions: [PullRequestReviewRequestRemovedEventOption],
       eventParameterRules: {
-        [PullRequestReviewRequestRemovedTriggerId]: {
+        [PullRequestReviewRequestRemovedConditionId]: {
           requestedTeam: isRule("platform"),
         },
       },
@@ -751,7 +796,7 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request review request removed")).toBeDefined();
     expect(screen.getByText("for team")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("Platform (mistle)").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("Platform (mistle)").length).toBeGreaterThan(0);
     });
   });
 
@@ -759,10 +804,10 @@ describe("WebhookTriggerEventPicker", () => {
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: [PullRequestReviewRequestRemovedTriggerId],
+      selectedEventIds: [PullRequestReviewRequestRemovedConditionId],
       eventOptions: [PullRequestReviewRequestRemovedEventOption],
       eventParameterRules: {
-        [PullRequestReviewRequestRemovedTriggerId]: {
+        [PullRequestReviewRequestRemovedConditionId]: {
           requestedBot: isRule("mistle-agent[bot]"),
         },
       },
@@ -771,7 +816,7 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request review request removed")).toBeDefined();
     expect(screen.getByText("for bot")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("mistle-agent[bot]").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("mistle-agent[bot]").length).toBeGreaterThan(0);
     });
   });
 
@@ -808,10 +853,10 @@ describe("WebhookTriggerEventPicker", () => {
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: [PullRequestReviewRequestedTriggerId],
+      selectedEventIds: [PullRequestReviewRequestedConditionId],
       eventOptions: [PullRequestReviewRequestedEventOption],
       eventParameterRules: {
-        [PullRequestReviewRequestedTriggerId]: {
+        [PullRequestReviewRequestedConditionId]: {
           requestedReviewer: {
             operator: WebhookTriggerEventParameterRuleOperators.IS_NOT,
             value: "octocat",
@@ -822,6 +867,117 @@ describe("WebhookTriggerEventPicker", () => {
 
     expect(screen.getByText("for reviewer")).toBeDefined();
     expect(screen.getByText("is not")).toBeDefined();
+  });
+
+  it("preserves exclusion operators when editing multi-value resources", async () => {
+    TestQueryClient.setQueryData(["trigger-trigger-parameters", GitHubConnectionId, "user"], {
+      connectionId: GitHubConnectionId,
+      familyId: "github",
+      kind: "user",
+      syncState: "ready",
+      items: [
+        {
+          id: "icr_github_user_1",
+          familyId: "github",
+          kind: "user",
+          externalId: "1001",
+          handle: "octocat",
+          displayName: "octocat",
+          status: "accessible",
+          metadata: {},
+        },
+        {
+          id: "icr_github_user_2",
+          familyId: "github",
+          kind: "user",
+          externalId: "1002",
+          handle: "hubot",
+          displayName: "hubot",
+          status: "accessible",
+          metadata: {},
+        },
+      ],
+      page: {
+        totalResults: 2,
+        nextCursor: null,
+        previousCursor: null,
+      },
+    });
+
+    function StatefulMultiValueResourceSelection(): React.JSX.Element {
+      const eventOptionId = createWebhookTriggerEventId({
+        webhookSourceId: GitHubWebhookSourceId,
+        eventType: "github.pull_request.opened",
+      });
+      const triggerId = conditionId(eventOptionId);
+      const [eventParameterRules, setEventParameterRules] =
+        useState<WebhookTriggerEventParameterRuleMap>({
+          [triggerId]: {
+            author: isNotAnyOfRule(["octocat"]),
+          },
+        });
+
+      return (
+        <>
+          <output aria-label="event parameter rules">
+            {JSON.stringify(eventParameterRules[triggerId]?.author)}
+          </output>
+          <WebhookTriggerEventPicker
+            error={undefined}
+            eventOptions={WebhookEventOptions}
+            hasConnectedIntegrations={true}
+            onEventParameterRuleChange={({ triggerId: nextTriggerId, parameterId, rule }) => {
+              setEventParameterRules((currentValues) => ({
+                ...currentValues,
+                [nextTriggerId]: {
+                  ...currentValues[nextTriggerId],
+                  [parameterId]: rule,
+                },
+              }));
+            }}
+            onEventParameterRulesChange={({ triggerId: nextTriggerId, rules }) => {
+              setEventParameterRules((currentValues) => ({
+                ...currentValues,
+                [nextTriggerId]: rules,
+              }));
+            }}
+            onValueChange={() => {}}
+            selectedConnectionId={GitHubConnectionId}
+            selectedEventIds={[triggerId]}
+            eventParameterRules={eventParameterRules}
+          />
+        </>
+      );
+    }
+
+    render(
+      <QueryClientProvider client={TestQueryClient}>
+        <StatefulMultiValueResourceSelection />
+      </QueryClientProvider>,
+    );
+
+    const authorCombobox = screen.getAllByRole("combobox").find((element) => {
+      return element.getAttribute("placeholder") === "octocat";
+    });
+    if (authorCombobox === undefined) {
+      throw new Error("Expected selected author combobox.");
+    }
+
+    const authorComboboxTrigger = authorCombobox
+      .closest('[data-slot="input-group"]')
+      ?.querySelector('button[data-slot="input-group-button"]');
+    if (authorComboboxTrigger === undefined || authorComboboxTrigger === null) {
+      throw new Error("Expected selected author combobox trigger.");
+    }
+
+    fireEvent.click(authorComboboxTrigger);
+    fireEvent.click(screen.getByRole("option", { name: "hubot" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("event parameter rules").textContent).toBe(
+        JSON.stringify(isNotAnyOfRule(["octocat", "hubot"])),
+      );
+    });
   });
 
   it("resolves enum equality parameter selections as equality rules", () => {
@@ -851,12 +1007,13 @@ describe("WebhookTriggerEventPicker", () => {
       webhookSourceId: GitHubWebhookSourceId,
       eventType: "github.issue_comment.created",
     });
+    const selectedConditionId = conditionId(triggerId);
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: [triggerId],
+      selectedEventIds: [selectedConditionId],
       eventParameterRules: {
-        [triggerId]: {
+        [selectedConditionId]: {
           invocationToken: containsTokenRule("@mistlebot"),
         },
       },
@@ -871,12 +1028,13 @@ describe("WebhookTriggerEventPicker", () => {
       webhookSourceId: GitHubWebhookSourceId,
       eventType: "github.issue_comment.created",
     });
+    const selectedConditionId = conditionId(triggerId);
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: [triggerId],
+      selectedEventIds: [selectedConditionId],
       eventParameterRules: {
-        [triggerId]: {
+        [selectedConditionId]: {
           invocationToken: containsTokenRule("@review-bot"),
         },
       },
@@ -890,13 +1048,14 @@ describe("WebhookTriggerEventPicker", () => {
       webhookSourceId: GitHubWebhookSourceId,
       eventType: "github.issue_comment.created",
     });
+    const selectedConditionId = conditionId(triggerId);
 
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: [triggerId],
+      selectedEventIds: [selectedConditionId],
       eventParameterRules: {
-        [triggerId]: {
+        [selectedConditionId]: {
           invocationToken: containsTokenRule(""),
         },
       },
@@ -912,15 +1071,15 @@ describe("WebhookTriggerEventPicker", () => {
   });
 
   it("renders unset enum-backed trigger parameters as placeholders", () => {
+    const issueCommentOptionId = createWebhookTriggerEventId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.issue_comment.created",
+    });
+
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-      selectedEventIds: [
-        createWebhookTriggerEventId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.issue_comment.created",
-        }),
-      ],
+      selectedEventIds: [conditionId(issueCommentOptionId)],
       eventParameterRules: {},
     });
 
@@ -932,16 +1091,15 @@ describe("WebhookTriggerEventPicker", () => {
     expect(selectValue.textContent).toBe("Any comment target");
   });
 
-  it("hides already selected triggers from the add-trigger list", () => {
+  it("keeps already selected event types available for additional conditions", () => {
+    const issueCommentOptionId = createWebhookTriggerEventId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.issue_comment.created",
+    });
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
-      selectedEventIds: [
-        createWebhookTriggerEventId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.issue_comment.created",
-        }),
-      ],
+      selectedEventIds: [conditionId(issueCommentOptionId)],
       eventParameterRules: {},
     });
 
@@ -952,7 +1110,7 @@ describe("WebhookTriggerEventPicker", () => {
 
     fireEvent.click(addTriggerButton);
 
-    expect(screen.queryByRole("option", { name: "Issue comment created" })).toBeNull();
+    expect(screen.getByRole("option", { name: "Issue comment created" })).toBeDefined();
     expect(screen.getByRole("option", { name: "Pull request opened" })).toBeDefined();
   });
 
@@ -965,7 +1123,7 @@ describe("WebhookTriggerEventPicker", () => {
       useStatefulSelection: true,
     });
 
-    const addTriggerInput = container.querySelector('input[placeholder="Add event"]');
+    const addTriggerInput = container.querySelector('input[placeholder="Add condition"]');
     if (addTriggerInput === null) {
       throw new Error("Expected add trigger input.");
     }
@@ -989,15 +1147,15 @@ describe("WebhookTriggerEventPicker", () => {
   });
 
   it("adds a second trigger when one is already selected", async () => {
+    const issueCommentOptionId = createWebhookTriggerEventId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.issue_comment.created",
+    });
+
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedEventIds: [
-        createWebhookTriggerEventId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.issue_comment.created",
-        }),
-      ],
+      selectedEventIds: [conditionId(issueCommentOptionId)],
       eventParameterRules: {},
       useStatefulSelection: true,
     });
@@ -1065,10 +1223,11 @@ describe("WebhookTriggerEventPicker", () => {
     );
 
     function StatefulResourceSelection(): React.JSX.Element {
-      const triggerId = createWebhookTriggerEventId({
+      const eventOptionId = createWebhookTriggerEventId({
         webhookSourceId: GitHubWebhookSourceId,
         eventType: "github.pull_request.opened",
       });
+      const triggerId = conditionId(eventOptionId);
       const [eventParameterRules, setEventParameterRules] =
         useState<WebhookTriggerEventParameterRuleMap>({
           [triggerId]: {
@@ -1126,7 +1285,7 @@ describe("WebhookTriggerEventPicker", () => {
 
     const resourceComboboxes = screen
       .getAllByRole("combobox")
-      .filter((element) => element.getAttribute("placeholder") === "Any user");
+      .filter((element) => element.getAttribute("placeholder") === "octocat");
     const resourceCombobox = resourceComboboxes[0];
     if (resourceCombobox === undefined) {
       throw new Error("Expected resource combobox.");
@@ -1138,8 +1297,8 @@ describe("WebhookTriggerEventPicker", () => {
 
     const updatedResourceComboboxes = screen
       .getAllByRole("combobox")
-      .filter((element) => element.getAttribute("placeholder") === "Any user");
-    expect(updatedResourceComboboxes[0]?.getAttribute("value")).toBe("hubot");
+      .filter((element) => element.getAttribute("placeholder") === "hubot");
+    expect(updatedResourceComboboxes.length).toBeGreaterThan(0);
     expect(screen.queryByDisplayValue("unsaved query")).toBeNull();
   });
 });

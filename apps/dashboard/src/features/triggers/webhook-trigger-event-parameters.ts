@@ -4,6 +4,7 @@ import type {
   WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
+import { resolveWebhookTriggerEventOptionIdFromConditionId } from "./webhook-trigger-option-builders.js";
 
 type PayloadFilterNode =
   | {
@@ -16,6 +17,11 @@ type PayloadFilterNode =
       value: string;
     }
   | {
+      op: "in";
+      path: string[];
+      values: string[];
+    }
+  | {
       op: "exists" | "not_exists";
       path: string[];
     };
@@ -25,7 +31,8 @@ function findEventOptionByTriggerId(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
   triggerId: string;
 }): WebhookTriggerEventOption | undefined {
-  return input.eventOptions.find((option) => option.id === input.triggerId);
+  const eventOptionId = resolveWebhookTriggerEventOptionIdFromConditionId(input.triggerId);
+  return input.eventOptions.find((option) => option.id === eventOptionId);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -97,6 +104,18 @@ function parseKnownPayloadFilterNode(value: unknown): PayloadFilterNode | null {
     };
   }
 
+  if (value["op"] === "in") {
+    if (!isStringArray(value["path"]) || !isStringArray(value["values"])) {
+      return null;
+    }
+
+    return {
+      op: "in",
+      path: value["path"],
+      values: value["values"],
+    };
+  }
+
   if (value["op"] === "exists" || value["op"] === "not_exists") {
     if (!isStringArray(value["path"])) {
       return null;
@@ -121,6 +140,28 @@ function buildEqualityNode(input: {
     path: input.path,
     value: input.value,
   };
+}
+
+function buildInNode(input: { path: string[]; values: string[] }): PayloadFilterNode {
+  return {
+    op: "in",
+    path: input.path,
+    values: input.values,
+  };
+}
+
+function resolveConfiguredRuleValues(input: {
+  value: string | undefined;
+  values: readonly string[] | undefined;
+}): string[] {
+  const configuredValues = input.values?.filter((value) => value.trim().length > 0) ?? [];
+  const configuredValue = input.value?.trim() ?? "";
+
+  if (configuredValues.length > 0) {
+    return [...configuredValues];
+  }
+
+  return configuredValue.length === 0 ? [] : [configuredValue];
 }
 
 function buildContainsNode(input: { path: string[]; value: string }): PayloadFilterNode {
@@ -159,13 +200,19 @@ function resolveOneOfGroupParameterIds(eventOption: WebhookTriggerEventOption): 
 
 function resolveActiveOneOfGroupParameterIds(input: {
   eventOption: WebhookTriggerEventOption;
-  rules: Record<string, { value: string } | undefined>;
+  rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
 }): Set<string> {
   const activeParameterIds = new Set<string>();
 
   for (const group of input.eventOption.parameterGroups ?? []) {
     const configuredParameterIds = group.options
-      .filter((option) => (input.rules[option.parameterId]?.value.trim().length ?? 0) > 0)
+      .filter(
+        (option) =>
+          resolveConfiguredRuleValues({
+            value: input.rules[option.parameterId]?.value,
+            values: input.rules[option.parameterId]?.values,
+          }).length > 0,
+      )
       .map((option) => option.parameterId);
 
     if (configuredParameterIds.length > 1) {
@@ -213,6 +260,37 @@ function isBotResourceParameter(parameter: WebhookTriggerEventParameterOption): 
   return parameter.kind === "resource-select" && parameter.resourceKind === "bot";
 }
 
+function resolvePayloadFilterBotHandleState(
+  filter: PayloadFilterPathNode,
+): "all-bot-handles" | "all-non-bot-handles" | "mixed-or-empty" {
+  if (filter.op === "in") {
+    if (filter.values.length === 0) {
+      return "mixed-or-empty";
+    }
+
+    const botHandleCount = filter.values.filter((value) => isGitHubAppBotHandle(value)).length;
+    if (botHandleCount === filter.values.length) {
+      return "all-bot-handles";
+    }
+    if (botHandleCount === 0) {
+      return "all-non-bot-handles";
+    }
+
+    return "mixed-or-empty";
+  }
+
+  if (
+    filter.op === "eq" ||
+    filter.op === "neq" ||
+    filter.op === "contains" ||
+    filter.op === "contains_token"
+  ) {
+    return isGitHubAppBotHandle(filter.value) ? "all-bot-handles" : "all-non-bot-handles";
+  }
+
+  return "mixed-or-empty";
+}
+
 function resolvePayloadFilterParameter(input: {
   parameters: readonly WebhookTriggerEventParameterOption[];
   filter: PayloadFilterPathNode;
@@ -225,25 +303,30 @@ function resolvePayloadFilterParameter(input: {
     return firstMatchingParameter;
   }
 
-  if (
-    input.filter.op === "eq" ||
-    input.filter.op === "neq" ||
-    input.filter.op === "contains" ||
-    input.filter.op === "contains_token"
-  ) {
-    const matchingBotParameter = matchingParameters.find((parameter) =>
-      isBotResourceParameter(parameter),
-    );
-    if (matchingBotParameter !== undefined && isGitHubAppBotHandle(input.filter.value)) {
+  const matchingBotParameter = matchingParameters.find((parameter) =>
+    isBotResourceParameter(parameter),
+  );
+  const matchingNonBotParameter = matchingParameters.find(
+    (parameter) => !isBotResourceParameter(parameter),
+  );
+  const botHandleState = resolvePayloadFilterBotHandleState(input.filter);
+
+  if (botHandleState !== "mixed-or-empty") {
+    if (matchingBotParameter !== undefined && botHandleState === "all-bot-handles") {
       return matchingBotParameter;
     }
 
-    const matchingNonBotParameter = matchingParameters.find(
-      (parameter) => !isBotResourceParameter(parameter),
-    );
-    if (matchingNonBotParameter !== undefined) {
+    if (matchingNonBotParameter !== undefined && botHandleState === "all-non-bot-handles") {
       return matchingNonBotParameter;
     }
+  }
+
+  if (
+    input.filter.op === "in" &&
+    matchingBotParameter !== undefined &&
+    matchingNonBotParameter !== undefined
+  ) {
+    return undefined;
   }
 
   return firstMatchingParameter;
@@ -266,6 +349,41 @@ function flattenAndPayloadFilterNodes(filters: readonly PayloadFilterNode[]): Pa
   return filters.flatMap((filter) =>
     filter.op === "and" ? flattenAndPayloadFilterNodes(filter.filters) : [filter],
   );
+}
+
+function mergeMultiValueResourceRule(input: {
+  conditionRules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
+  parameterId: string;
+  operator: "is" | "is_not";
+  values: readonly string[];
+}): {
+  rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
+  merged: boolean;
+} {
+  const existingRule = input.conditionRules[input.parameterId];
+  if (existingRule !== undefined && existingRule.operator !== input.operator) {
+    return {
+      rules: input.conditionRules,
+      merged: false,
+    };
+  }
+
+  const existingValues = resolveConfiguredRuleValues({
+    value: existingRule?.value,
+    values: existingRule?.values,
+  });
+
+  return {
+    rules: {
+      ...input.conditionRules,
+      [input.parameterId]: {
+        operator: input.operator,
+        value: "",
+        values: [...new Set([...existingValues, ...input.values])],
+      },
+    },
+    merged: true,
+  };
 }
 
 function buildPayloadFilterNodeForTrigger(input: {
@@ -293,6 +411,46 @@ function buildPayloadFilterNodeForTrigger(input: {
 
     const rule = rules[parameter.id];
     const configuredValue = rule?.value.trim() ?? "";
+    const configuredValues = resolveConfiguredRuleValues({
+      value: rule?.value,
+      values: rule?.values,
+    });
+    if (parameter.kind === "resource-select" && parameter.multiValue === true) {
+      if (configuredValues.length === 0) {
+        continue;
+      }
+
+      if (rule?.operator === WebhookTriggerEventParameterRuleOperators.IS_NOT) {
+        if (parameter.negatedMatchRequiresExists === true) {
+          filters.push(
+            buildExistsNode({
+              path: [...parameter.payloadPath],
+              operator: WebhookTriggerEventParameterRuleOperators.EXISTS,
+            }),
+          );
+        }
+
+        filters.push(
+          ...configuredValues.map((value) =>
+            buildEqualityNode({
+              operator: WebhookTriggerEventParameterRuleOperators.IS_NOT,
+              path: [...parameter.payloadPath],
+              value,
+            }),
+          ),
+        );
+        continue;
+      }
+
+      filters.push(
+        buildInNode({
+          path: [...parameter.payloadPath],
+          values: [...configuredValues],
+        }),
+      );
+      continue;
+    }
+
     if (configuredValue.length === 0) {
       continue;
     }
@@ -373,12 +531,12 @@ function buildPayloadFilterNodeForTrigger(input: {
   return mergePayloadFilterNodes(filters);
 }
 
-function buildPayloadFiltersByEventType(input: {
+function buildPayloadFiltersByConditionId(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
   selectedEventIds: readonly string[];
   eventParameterRules: WebhookTriggerEventParameterRuleMap;
 }): Record<string, PayloadFilterNode> {
-  const filtersByEventType = new Map<string, PayloadFilterNode[]>();
+  const filtersByConditionId: Record<string, PayloadFilterNode> = {};
 
   for (const triggerId of input.selectedEventIds) {
     const eventOption = findEventOptionByTriggerId({
@@ -394,24 +552,10 @@ function buildPayloadFiltersByEventType(input: {
       continue;
     }
 
-    const eventFilters = filtersByEventType.get(eventOption.eventType);
-    if (eventFilters === undefined) {
-      filtersByEventType.set(eventOption.eventType, [triggerFilter]);
-      continue;
-    }
-
-    eventFilters.push(triggerFilter);
+    filtersByConditionId[triggerId] = triggerFilter;
   }
 
-  const mergedFiltersByEventType: Record<string, PayloadFilterNode> = {};
-  for (const [eventType, filters] of filtersByEventType.entries()) {
-    const mergedFilter = mergePayloadFilterNodes(filters);
-    if (mergedFilter !== null) {
-      mergedFiltersByEventType[eventType] = mergedFilter;
-    }
-  }
-
-  return mergedFiltersByEventType;
+  return filtersByConditionId;
 }
 
 export function mergeWebhookTriggerPayloadFilter(input: {
@@ -420,47 +564,36 @@ export function mergeWebhookTriggerPayloadFilter(input: {
   eventParameterRules: WebhookTriggerEventParameterRuleMap;
   advancedPayloadFilter: Record<string, unknown> | null;
 }): Record<string, unknown> | null {
-  const eventParameterFiltersByEventType = buildPayloadFiltersByEventType({
+  const eventParameterFiltersByConditionId = buildPayloadFiltersByConditionId({
     eventOptions: input.eventOptions,
     selectedEventIds: input.selectedEventIds,
     eventParameterRules: input.eventParameterRules,
   });
-  const selectedEventTypes = new Set(
-    input.selectedEventIds
-      .map((triggerId) =>
-        findEventOptionByTriggerId({
-          eventOptions: input.eventOptions,
-          triggerId,
-        }),
-      )
-      .map((eventOption) => eventOption?.eventType)
-      .filter((eventType): eventType is string => eventType !== undefined),
-  );
   const mergedPayloadFilter: Record<string, unknown> = {};
-  const eventTypes = new Set([
-    ...Object.keys(eventParameterFiltersByEventType),
-    ...Object.keys(input.advancedPayloadFilter ?? {}).filter((eventType) =>
-      selectedEventTypes.has(eventType),
+  const conditionIds = new Set([
+    ...Object.keys(eventParameterFiltersByConditionId),
+    ...Object.keys(input.advancedPayloadFilter ?? {}).filter((conditionId) =>
+      input.selectedEventIds.includes(conditionId),
     ),
   ]);
 
-  for (const eventType of eventTypes) {
-    const eventParameterFilter = eventParameterFiltersByEventType[eventType];
-    const advancedPayloadFilterForEvent = input.advancedPayloadFilter?.[eventType];
+  for (const conditionId of conditionIds) {
+    const eventParameterFilter = eventParameterFiltersByConditionId[conditionId];
+    const advancedPayloadFilterForEvent = input.advancedPayloadFilter?.[conditionId];
 
     if (eventParameterFilter === undefined) {
       if (advancedPayloadFilterForEvent !== undefined) {
-        mergedPayloadFilter[eventType] = advancedPayloadFilterForEvent;
+        mergedPayloadFilter[conditionId] = advancedPayloadFilterForEvent;
       }
       continue;
     }
 
     if (advancedPayloadFilterForEvent === undefined) {
-      mergedPayloadFilter[eventType] = eventParameterFilter;
+      mergedPayloadFilter[conditionId] = eventParameterFilter;
       continue;
     }
 
-    mergedPayloadFilter[eventType] = {
+    mergedPayloadFilter[conditionId] = {
       op: "and",
       filters: [eventParameterFilter, advancedPayloadFilterForEvent],
     };
@@ -487,23 +620,24 @@ export function extractWebhookTriggerEventParameterRules(input: {
   const eventParameterRules: WebhookTriggerEventParameterRuleMap = {};
   const remainingPayloadFilter: Record<string, unknown> = {};
 
-  for (const [eventType, eventPayloadFilter] of Object.entries(input.payloadFilter)) {
-    const matchingEventIds = input.selectedEventIds.filter((triggerId) => {
-      const eventOption = findEventOptionByTriggerId({
-        eventOptions: input.eventOptions,
-        triggerId,
-      });
-      return eventOption?.eventType === eventType;
-    });
+  for (const [conditionId, eventPayloadFilter] of Object.entries(input.payloadFilter)) {
+    if (!input.selectedEventIds.includes(conditionId)) {
+      remainingPayloadFilter[conditionId] = eventPayloadFilter;
+      continue;
+    }
 
-    if (matchingEventIds.length === 0) {
-      remainingPayloadFilter[eventType] = eventPayloadFilter;
+    const eventOption = findEventOptionByTriggerId({
+      eventOptions: input.eventOptions,
+      triggerId: conditionId,
+    });
+    if (eventOption === undefined) {
+      remainingPayloadFilter[conditionId] = eventPayloadFilter;
       continue;
     }
 
     const parsedPayloadFilter = parseKnownPayloadFilterNode(eventPayloadFilter);
     if (parsedPayloadFilter === null) {
-      remainingPayloadFilter[eventType] = eventPayloadFilter;
+      remainingPayloadFilter[conditionId] = eventPayloadFilter;
       continue;
     }
 
@@ -519,6 +653,7 @@ export function extractWebhookTriggerEventParameterRules(input: {
         filter.op !== "neq" &&
         filter.op !== "contains" &&
         filter.op !== "contains_token" &&
+        filter.op !== "in" &&
         filter.op !== "exists" &&
         filter.op !== "not_exists"
       ) {
@@ -528,78 +663,69 @@ export function extractWebhookTriggerEventParameterRules(input: {
 
       let extracted = false;
 
-      for (const triggerId of matchingEventIds) {
-        const eventOption = findEventOptionByTriggerId({
-          eventOptions: input.eventOptions,
-          triggerId,
-        });
-        if (eventOption === undefined) {
-          continue;
-        }
+      const parameter = resolvePayloadFilterParameter({
+        parameters: eventOption.parameters ?? [],
+        filter,
+      });
+      if (parameter === undefined) {
+        remainingFilters.push(filter);
+        continue;
+      }
 
-        const parameter = resolvePayloadFilterParameter({
-          parameters: eventOption.parameters ?? [],
-          filter,
-        });
-        if (parameter === undefined) {
-          continue;
-        }
+      if (
+        parameter.negatedMatchRequiresExists === true &&
+        filter.op === WebhookTriggerEventParameterRuleOperators.EXISTS &&
+        hasNegatedFilterForPath({
+          filters: rootFilters,
+          path: parameter.payloadPath,
+        })
+      ) {
+        continue;
+      }
 
-        if (
-          parameter.negatedMatchRequiresExists === true &&
-          filter.op === WebhookTriggerEventParameterRuleOperators.EXISTS &&
-          hasNegatedFilterForPath({
-            filters: rootFilters,
-            path: parameter.payloadPath,
-          })
-        ) {
+      if (parameter.kind === "enum-select" && parameter.matchMode === "exists") {
+        if (filter.op === "exists" || filter.op === "not_exists") {
+          eventParameterRules[conditionId] = {
+            ...(eventParameterRules[conditionId] ?? {}),
+            [parameter.id]: {
+              operator: filter.op,
+              value: filter.op,
+            },
+          };
           extracted = true;
-          break;
         }
-
-        if (parameter.kind === "enum-select" && parameter.matchMode === "exists") {
-          if (filter.op === "exists" || filter.op === "not_exists") {
-            eventParameterRules[triggerId] = {
-              ...(eventParameterRules[triggerId] ?? {}),
-              [parameter.id]: {
-                operator: filter.op,
-                value: filter.op,
-              },
-            };
-            extracted = true;
-          }
-          if (extracted) {
-            break;
-          }
-          continue;
+      } else if (
+        parameter.kind === "string" &&
+        (parameter.matchMode === "contains" || parameter.matchMode === "contains_token")
+      ) {
+        if (filter.op === parameter.matchMode) {
+          eventParameterRules[conditionId] = {
+            ...(eventParameterRules[conditionId] ?? {}),
+            [parameter.id]: {
+              operator: filter.op,
+              value: filter.value,
+            },
+          };
+          extracted = true;
         }
-
-        if (
-          parameter.kind === "string" &&
-          (parameter.matchMode === "contains" || parameter.matchMode === "contains_token")
-        ) {
-          if (filter.op === parameter.matchMode) {
-            eventParameterRules[triggerId] = {
-              ...(eventParameterRules[triggerId] ?? {}),
-              [parameter.id]: {
-                operator: filter.op,
-                value: filter.value,
-              },
-            };
-            extracted = true;
-          }
-          if (extracted) {
-            break;
-          }
-          continue;
+      } else if (parameter.kind === "resource-select" && parameter.multiValue === true) {
+        if (filter.op === "in" || filter.op === "eq" || filter.op === "neq") {
+          const operator =
+            filter.op === "neq"
+              ? WebhookTriggerEventParameterRuleOperators.IS_NOT
+              : WebhookTriggerEventParameterRuleOperators.IS;
+          const mergeResult = mergeMultiValueResourceRule({
+            conditionRules: eventParameterRules[conditionId] ?? {},
+            parameterId: parameter.id,
+            operator,
+            values: filter.op === "in" ? filter.values : [filter.value],
+          });
+          eventParameterRules[conditionId] = mergeResult.rules;
+          extracted = mergeResult.merged;
         }
-
-        if (filter.op !== "eq" && filter.op !== "neq") {
-          continue;
-        }
-
-        eventParameterRules[triggerId] = {
-          ...(eventParameterRules[triggerId] ?? {}),
+      } else if (filter.op === "eq" || filter.op === "neq") {
+        eventParameterRules[conditionId] = {
+          ...(eventParameterRules[conditionId] ?? {}),
           [parameter.id]: {
             operator:
               filter.op === "neq"
@@ -609,7 +735,6 @@ export function extractWebhookTriggerEventParameterRules(input: {
           },
         };
         extracted = true;
-        break;
       }
 
       if (!extracted) {
@@ -619,7 +744,7 @@ export function extractWebhookTriggerEventParameterRules(input: {
 
     const remainingEventFilter = mergePayloadFilterNodes(remainingFilters);
     if (remainingEventFilter !== null) {
-      remainingPayloadFilter[eventType] = remainingEventFilter;
+      remainingPayloadFilter[conditionId] = remainingEventFilter;
     }
   }
 

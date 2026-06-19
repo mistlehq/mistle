@@ -399,7 +399,7 @@ describe.concurrent("MCP trigger tools integration", () => {
 
     const persistedWebhook = await env.controlPlaneDb.query.webhookTriggers.findFirst({
       columns: {
-        eventTypes: true,
+        eventConditions: true,
         inputTemplate: true,
         instructions: true,
         conversationKeyTemplate: true,
@@ -408,7 +408,7 @@ describe.concurrent("MCP trigger tools integration", () => {
       where: (table, { eq }) => eq(table.triggerId, trigger.id),
     });
     expect(persistedWebhook).toMatchObject({
-      eventTypes: [GitHubIssueCommentCreatedEventType],
+      eventConditions: [{ eventType: GitHubIssueCommentCreatedEventType }],
       inputTemplate: "Triage {{payload.comment.body}}",
       instructions: "Prefer concise triage summaries.",
       conversationKeyTemplate: "{{payload.issue.node_id}}",
@@ -545,7 +545,7 @@ describe.concurrent("MCP trigger tools integration", () => {
     );
   });
 
-  it("sets webhook trigger events and clears stale payload filters", async ({ env }) => {
+  it("sets webhook trigger events by replacing event conditions", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-mcp-trigger-webhook-events-set@example.com",
     });
@@ -617,13 +617,15 @@ describe.concurrent("MCP trigger tools integration", () => {
 
     const persistedWebhook = await env.controlPlaneDb.query.webhookTriggers.findFirst({
       columns: {
-        eventTypes: true,
-        payloadFilter: true,
+        eventConditions: true,
       },
       where: (table, { eq }) => eq(table.triggerId, "atm_mcp_trigger_webhook_events_set"),
     });
-    expect(persistedWebhook?.eventTypes).toEqual(["github.pull_request.opened"]);
-    expect(persistedWebhook?.payloadFilter).toBeNull();
+    expect(persistedWebhook?.eventConditions).toEqual([
+      {
+        eventType: "github.pull_request.opened",
+      },
+    ]);
   });
 
   it("rejects webhook trigger events that the current webhook source does not support", async ({
@@ -671,11 +673,20 @@ describe.concurrent("MCP trigger tools integration", () => {
     expect(result.isError).toBe(true);
     const persistedWebhook = await env.controlPlaneDb.query.webhookTriggers.findFirst({
       columns: {
-        eventTypes: true,
+        eventConditions: true,
       },
       where: (table, { eq }) => eq(table.triggerId, "atm_mcp_trigger_webhook_events_invalid"),
     });
-    expect(persistedWebhook?.eventTypes).toEqual([GitHubIssueCommentCreatedEventType]);
+    expect(persistedWebhook?.eventConditions).toEqual([
+      {
+        eventType: GitHubIssueCommentCreatedEventType,
+        payloadFilter: {
+          op: "eq",
+          path: ["action"],
+          value: "created",
+        },
+      },
+    ]);
   });
 
   it("updates shared scheduled trigger fields with generic trigger update permission", async ({

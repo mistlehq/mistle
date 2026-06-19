@@ -7,6 +7,7 @@ import { PageFrame } from "../shared/page-frame.js";
 import type { TriggerFormShellStatusMessage } from "./trigger-form-shell.js";
 import { TriggerTypeDisplayField, TriggerTypeSelectField } from "./trigger-type-field.js";
 import type { WebhookTriggerEventPickerDisabledState } from "./webhook-trigger-event-picker-state.js";
+import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import { validateWebhookTriggerFormValues } from "./webhook-trigger-form-helpers.js";
 import {
   WebhookTriggerForm,
@@ -16,6 +17,7 @@ import {
   type WebhookTriggerFormValueKey,
 } from "./webhook-trigger-form.js";
 import { DefaultWebhookTriggerMessageTemplate } from "./webhook-trigger-input-template.js";
+import { createWebhookTriggerEventConditionId } from "./webhook-trigger-option-builders.js";
 import {
   createWebhookTriggerStoryQueryClient,
   isNotRule,
@@ -33,6 +35,25 @@ import {
 } from "./webhook-trigger-story-fixtures.js";
 
 const StripeConnectionId = "conn_stripe_prod";
+const StoryPullRequestOpenedConditionId = conditionId(StoryPullRequestOpenedTriggerId);
+const StoryPullRequestReviewRequestedConditionId = conditionId(
+  StoryPullRequestReviewRequestedTriggerId,
+);
+const StoryIssueCommentCreatedConditionId = conditionId(StoryIssueCommentCreatedTriggerId);
+const StoryPushDeletedConditionId = conditionId(StoryPushDeletedTriggerId);
+const StorySlackAppMentionConditionId = conditionId(StorySlackAppMentionTriggerId);
+
+function conditionId(eventOptionId: string, index = 0): string {
+  return createWebhookTriggerEventConditionId({ eventOptionId, index });
+}
+
+function isAnyOfRule(values: readonly string[]) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS,
+    value: "",
+    values: [...values],
+  };
+}
 
 const ConnectionOptions: readonly WebhookTriggerFormOption[] = [
   {
@@ -110,9 +131,9 @@ const ExistingTriggerValues: WebhookTriggerFormValues = {
   ].join("\n"),
   instructions: "Keep the response concise and include a short risk summary.",
   conversationKeyTemplate: "{{payload.repository.full_name}}:{{payload.ref}}",
-  eventIds: [StoryPullRequestOpenedTriggerId],
+  eventIds: [StoryPullRequestOpenedConditionId],
   eventParameterRules: {
-    [StoryPullRequestOpenedTriggerId]: {
+    [StoryPullRequestOpenedConditionId]: {
       repository: isRule("mistlehq/platform"),
       author: isRule("octocat"),
       baseBranch: isRule("main"),
@@ -134,10 +155,30 @@ export const ExistingSlackTriggerValues: WebhookTriggerFormValues = {
   ].join("\n"),
   instructions: "Reply with the root cause and the next recommended action.",
   conversationKeyTemplate: "slack:channel:{{payload.event.channel}}",
-  eventIds: [StorySlackAppMentionTriggerId],
+  eventIds: [StorySlackAppMentionConditionId],
   eventParameterRules: {
-    [StorySlackAppMentionTriggerId]: {
-      channel: isRule("C_ALERTS_001"),
+    [StorySlackAppMentionConditionId]: {
+      channel: isAnyOfRule(["C_ALERTS_001"]),
+    },
+  },
+};
+
+const ExistingSlackTriggerWithMultipleChannelsValues: WebhookTriggerFormValues = {
+  ...ExistingSlackTriggerValues,
+  eventParameterRules: {
+    [StorySlackAppMentionConditionId]: {
+      channel: isAnyOfRule(["C_ALERTS_001", "C_ENG_001"]),
+    },
+  },
+};
+
+const ExistingGitHubTriggerWithMultipleResourcesValues: WebhookTriggerFormValues = {
+  ...ExistingTriggerValues,
+  eventParameterRules: {
+    [StoryPullRequestOpenedConditionId]: {
+      repository: isAnyOfRule(["mistlehq/platform", "mistlehq/dashboard"]),
+      author: isAnyOfRule(["octocat", "hubot"]),
+      baseBranch: isAnyOfRule(["main", "release"]),
     },
   },
 };
@@ -145,8 +186,8 @@ export const ExistingSlackTriggerValues: WebhookTriggerFormValues = {
 const ExistingSlackTriggerWithArchivedChannelValues: WebhookTriggerFormValues = {
   ...ExistingSlackTriggerValues,
   eventParameterRules: {
-    [StorySlackAppMentionTriggerId]: {
-      channel: isRule("C_ARCHIVED_001"),
+    [StorySlackAppMentionConditionId]: {
+      channel: isAnyOfRule(["C_ARCHIVED_001"]),
     },
   },
 };
@@ -154,7 +195,7 @@ const ExistingSlackTriggerWithArchivedChannelValues: WebhookTriggerFormValues = 
 const ExistingTriggerWithExcludedAuthorValues: WebhookTriggerFormValues = {
   ...ExistingTriggerValues,
   eventParameterRules: {
-    [StoryPullRequestOpenedTriggerId]: {
+    [StoryPullRequestOpenedConditionId]: {
       repository: isRule("mistlehq/platform"),
       author: isNotRule("dependabot"),
       baseBranch: isRule("main"),
@@ -166,7 +207,7 @@ const ExistingTriggerWithBotActorValues: WebhookTriggerFormValues = {
   ...ExistingTriggerValues,
   name: "GitHub bot-authored PR triage",
   eventParameterRules: {
-    [StoryPullRequestOpenedTriggerId]: {
+    [StoryPullRequestOpenedConditionId]: {
       repository: isRule("mistlehq/platform"),
       botActor: isRule("dependabot[bot]"),
       baseBranch: isRule("main"),
@@ -179,9 +220,9 @@ const ExistingReviewRequestTeamTriggerValues: WebhookTriggerFormValues = {
   name: "GitHub team review intake",
   conversationKeyTemplate:
     "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
-  eventIds: [StoryPullRequestReviewRequestedTriggerId],
+  eventIds: [StoryPullRequestReviewRequestedConditionId],
   eventParameterRules: {
-    [StoryPullRequestReviewRequestedTriggerId]: {
+    [StoryPullRequestReviewRequestedConditionId]: {
       requestedTeam: isRule("platform"),
     },
   },
@@ -192,9 +233,9 @@ const ExistingReviewRequestBotTriggerValues: WebhookTriggerFormValues = {
   name: "GitHub bot review intake",
   conversationKeyTemplate:
     "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
-  eventIds: [StoryPullRequestReviewRequestedTriggerId],
+  eventIds: [StoryPullRequestReviewRequestedConditionId],
   eventParameterRules: {
-    [StoryPullRequestReviewRequestedTriggerId]: {
+    [StoryPullRequestReviewRequestedConditionId]: {
       requestedBot: isRule("mistle-reviewer[bot]"),
     },
   },
@@ -334,6 +375,14 @@ export const EditPageWithExcludedAuthor: Story = {
     mode: "edit",
     onDelete: function onDelete() {},
     values: ExistingTriggerWithExcludedAuthorValues,
+  },
+};
+
+export const EditPageWithGitHubMultipleResources: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    values: ExistingGitHubTriggerWithMultipleResourcesValues,
   },
 };
 
@@ -502,7 +551,7 @@ export const UnavailableSavedEvent: Story = {
     onDelete: function onDelete() {},
     values: {
       ...ExistingTriggerValues,
-      eventIds: [StoryPushDeletedTriggerId],
+      eventIds: [StoryPushDeletedConditionId],
       eventParameterRules: {},
     },
     webhookEventOptions: [
@@ -533,7 +582,7 @@ export const WrongProfileSavedEvent: Story = {
     values: {
       ...ExistingTriggerValues,
       sandboxProfileId: "sbp_finance_investigator",
-      eventIds: [StoryIssueCommentCreatedTriggerId],
+      eventIds: [StoryIssueCommentCreatedConditionId],
       eventParameterRules: {},
     },
     webhookEventOptions: [
@@ -551,6 +600,15 @@ export const SlackAppMentionChannelOnly: Story = {
     mode: "edit",
     onDelete: function onDelete() {},
     values: ExistingSlackTriggerValues,
+    webhookEventOptions: SlackWebhookEventOptions,
+  },
+};
+
+export const SlackAppMentionMultipleChannels: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    values: ExistingSlackTriggerWithMultipleChannelsValues,
     webhookEventOptions: SlackWebhookEventOptions,
   },
 };

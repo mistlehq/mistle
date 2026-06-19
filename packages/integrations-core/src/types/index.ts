@@ -2382,6 +2382,7 @@ export type IntegrationWebhookEventParameterDefinition =
       kind: "resource-select";
       resourceKind: string;
       payloadPath: ReadonlyArray<string>;
+      multiValue?: boolean | undefined;
       negatedMatchRequiresExists?: boolean | undefined;
       prefix?: string | undefined;
       placeholder?: string | undefined;

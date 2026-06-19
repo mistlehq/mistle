@@ -12,6 +12,7 @@ import {
 import type { WebhookTriggerFormValues } from "./webhook-trigger-form-types.js";
 import { DefaultWebhookTriggerMessageTemplate } from "./webhook-trigger-input-template.js";
 import {
+  createWebhookTriggerEventConditionId,
   createWebhookTriggerEventId,
   WebhookTriggerWorkspaceRootRepositoryOptionValue,
 } from "./webhook-trigger-option-builders.js";
@@ -43,6 +44,40 @@ const SlackAppMentionTriggerId = createWebhookTriggerEventId({
   webhookSourceId: SlackWebhookSourceId,
   eventType: "slack:app_mention",
 });
+const PushConditionId0 = createWebhookTriggerEventConditionId({
+  eventOptionId: createWebhookTriggerEventId({
+    webhookSourceId: GitHubWebhookSourceId,
+    eventType: "push",
+  }),
+  index: 0,
+});
+const PullRequestConditionId0 = createWebhookTriggerEventConditionId({
+  eventOptionId: PullRequestOpenedTriggerId,
+  index: 0,
+});
+const PullRequestConditionId1 = createWebhookTriggerEventConditionId({
+  eventOptionId: createWebhookTriggerEventId({
+    webhookSourceId: GitHubWebhookSourceId,
+    eventType: "pull_request",
+  }),
+  index: 1,
+});
+const IssueCommentConditionId0 = createWebhookTriggerEventConditionId({
+  eventOptionId: IssueCommentCreatedTriggerId,
+  index: 0,
+});
+const IssueCommentConditionId1 = createWebhookTriggerEventConditionId({
+  eventOptionId: IssueCommentCreatedTriggerId,
+  index: 1,
+});
+const PullRequestReviewRequestedConditionId0 = createWebhookTriggerEventConditionId({
+  eventOptionId: PullRequestReviewRequestedTriggerId,
+  index: 0,
+});
+const SlackAppMentionConditionId0 = createWebhookTriggerEventConditionId({
+  eventOptionId: SlackAppMentionTriggerId,
+  index: 0,
+});
 
 function isRule(value: string) {
   return {
@@ -51,10 +86,26 @@ function isRule(value: string) {
   };
 }
 
+function isAnyOfRule(values: readonly string[]) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS,
+    value: "",
+    values: [...values],
+  };
+}
+
 function isNotRule(value: string) {
   return {
     operator: WebhookTriggerEventParameterRuleOperators.IS_NOT,
     value,
+  };
+}
+
+function isNotAnyOfRule(values: readonly string[]) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS_NOT,
+    value: "",
+    values: [...values],
   };
 }
 
@@ -145,6 +196,7 @@ const SlackAppMentionEventOption: WebhookTriggerEventOption = {
       resourceKind: "channel",
       payloadPath: ["event", "channel"],
       prefix: "in",
+      multiValue: true,
     },
   ],
 };
@@ -159,14 +211,17 @@ const SampleTrigger: WebhookTrigger = {
   instructions: "Use the repository conventions.",
   conversationKeyTemplate: "{{event.repository.id}}",
   idempotencyKeyTemplate: null,
-  eventTypes: ["push", "pull_request"],
-  payloadFilter: {
-    pull_request: {
-      op: "eq",
-      path: ["action"],
-      value: "opened",
+  eventConditions: [
+    { eventType: "push" },
+    {
+      eventType: "pull_request",
+      payloadFilter: {
+        op: "eq",
+        path: ["action"],
+        value: "opened",
+      },
     },
-  },
+  ],
   target: {
     id: "target_123",
     sandboxProfileId: "sbp_repo",
@@ -177,6 +232,20 @@ const SampleTrigger: WebhookTrigger = {
   updatedAt: "2026-03-11T10:05:00.000Z",
 };
 
+function withWebhookTriggerEventConditions(input: {
+  trigger: WebhookTrigger;
+  eventConditions: WebhookTrigger["eventConditions"];
+  integrationWebhookSourceId?: string;
+}): WebhookTrigger {
+  return {
+    ...input.trigger,
+    ...(input.integrationWebhookSourceId === undefined
+      ? {}
+      : { integrationWebhookSourceId: input.integrationWebhookSourceId }),
+    eventConditions: input.eventConditions,
+  };
+}
+
 const BaseFormValues: WebhookTriggerFormValues = {
   name: "Pull request routing",
   sandboxProfileId: "sbp_repo",
@@ -185,7 +254,7 @@ const BaseFormValues: WebhookTriggerFormValues = {
   inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
   instructions: "",
   conversationKeyTemplate: "{{event.id}}",
-  eventIds: [PullRequestOpenedTriggerId],
+  eventIds: [PullRequestConditionId0],
   eventParameterRules: {},
   remainingPayloadFilter: null,
 };
@@ -215,19 +284,10 @@ describe("toWebhookTriggerFormValues", () => {
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
       instructions: "Use the repository conventions.",
       conversationKeyTemplate: "{{event.repository.id}}",
-      eventIds: [
-        createWebhookTriggerEventId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "push",
-        }),
-        createWebhookTriggerEventId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "pull_request",
-        }),
-      ],
+      eventIds: [PushConditionId0, PullRequestConditionId1],
       eventParameterRules: {},
       remainingPayloadFilter: {
-        pull_request: {
+        [PullRequestConditionId1]: {
           op: "eq",
           path: ["action"],
           value: "opened",
@@ -251,41 +311,46 @@ describe("toWebhookTriggerFormValues", () => {
   it("hydrates supported trigger parameters out of payload filters", () => {
     expect(
       toWebhookTriggerFormValues(
-        {
-          ...SampleTrigger,
-          eventTypes: ["github.pull_request.opened", "github.issue_comment.created"],
-          payloadFilter: {
-            "github.pull_request.opened": {
-              op: "and",
-              filters: [
-                {
-                  op: "eq",
-                  path: ["repository", "full_name"],
-                  value: "mistlehq/mistle",
-                },
-                {
-                  op: "eq",
-                  path: ["sender", "login"],
-                  value: "octocat",
-                },
-              ],
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.opened",
+              payloadFilter: {
+                op: "and",
+                filters: [
+                  {
+                    op: "eq",
+                    path: ["repository", "full_name"],
+                    value: "mistlehq/mistle",
+                  },
+                  {
+                    op: "eq",
+                    path: ["sender", "login"],
+                    value: "octocat",
+                  },
+                ],
+              },
             },
-            "github.issue_comment.created": {
-              op: "exists",
-              path: ["issue", "pull_request"],
+            {
+              eventType: "github.issue_comment.created",
+              payloadFilter: {
+                op: "exists",
+                path: ["issue", "pull_request"],
+              },
             },
-          },
-        },
+          ],
+        }),
         GitHubEventOptions,
       ),
     ).toMatchObject({
-      eventIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
+      eventIds: [PullRequestConditionId0, IssueCommentConditionId1],
       eventParameterRules: {
-        [PullRequestOpenedTriggerId]: {
-          repository: isRule("mistlehq/mistle"),
-          author: isRule("octocat"),
+        [PullRequestConditionId0]: {
+          repository: isAnyOfRule(["mistlehq/mistle"]),
+          author: isAnyOfRule(["octocat"]),
         },
-        [IssueCommentCreatedTriggerId]: {
+        [IssueCommentConditionId1]: {
           target: existsRule(),
         },
       },
@@ -295,23 +360,62 @@ describe("toWebhookTriggerFormValues", () => {
   it("hydrates negative equality trigger parameters out of payload filters", () => {
     expect(
       toWebhookTriggerFormValues(
-        {
-          ...SampleTrigger,
-          eventTypes: ["github.pull_request.opened"],
-          payloadFilter: {
-            "github.pull_request.opened": {
-              op: "neq",
-              path: ["sender", "login"],
-              value: "dependabot",
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.opened",
+              payloadFilter: {
+                op: "neq",
+                path: ["sender", "login"],
+                value: "dependabot",
+              },
             },
-          },
-        },
+          ],
+        }),
         GitHubEventOptions,
       ),
     ).toMatchObject({
       eventParameterRules: {
-        [PullRequestOpenedTriggerId]: {
-          author: isNotRule("dependabot"),
+        [PullRequestConditionId0]: {
+          author: isNotAnyOfRule(["dependabot"]),
+        },
+      },
+    });
+  });
+
+  it("hydrates repeated negative multi-value trigger parameters out of payload filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.opened",
+              payloadFilter: {
+                op: "and",
+                filters: [
+                  {
+                    op: "neq",
+                    path: ["sender", "login"],
+                    value: "dependabot",
+                  },
+                  {
+                    op: "neq",
+                    path: ["sender", "login"],
+                    value: "renovate",
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      eventParameterRules: {
+        [PullRequestConditionId0]: {
+          author: isNotAnyOfRule(["dependabot", "renovate"]),
         },
       },
     });
@@ -320,57 +424,121 @@ describe("toWebhookTriggerFormValues", () => {
   it("hydrates GitHub bot actor filters out of sender login payload filters", () => {
     expect(
       toWebhookTriggerFormValues(
-        {
-          ...SampleTrigger,
-          eventTypes: ["github.pull_request.opened"],
-          payloadFilter: {
-            "github.pull_request.opened": {
-              op: "eq",
-              path: ["sender", "login"],
-              value: "dependabot[bot]",
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.opened",
+              payloadFilter: {
+                op: "eq",
+                path: ["sender", "login"],
+                value: "dependabot[bot]",
+              },
             },
-          },
-        },
+          ],
+        }),
         GitHubEventOptions,
       ),
     ).toMatchObject({
       eventParameterRules: {
-        [PullRequestOpenedTriggerId]: {
-          botActor: isRule("dependabot[bot]"),
+        [PullRequestConditionId0]: {
+          botActor: isAnyOfRule(["dependabot[bot]"]),
         },
       },
     });
   });
 
-  it("hydrates guarded GitHub requested reviewer exclusion filters", () => {
+  it("hydrates GitHub bot actor filters out of sender login in-filters", () => {
     expect(
       toWebhookTriggerFormValues(
-        {
-          ...SampleTrigger,
-          eventTypes: ["github.pull_request.review_requested"],
-          payloadFilter: {
-            "github.pull_request.review_requested": {
-              op: "and",
-              filters: [
-                {
-                  op: "exists",
-                  path: ["requested_reviewer", "login"],
-                },
-                {
-                  op: "neq",
-                  path: ["requested_reviewer", "login"],
-                  value: "octocat",
-                },
-              ],
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.opened",
+              payloadFilter: {
+                op: "in",
+                path: ["sender", "login"],
+                values: ["dependabot[bot]", "renovate[bot]"],
+              },
             },
-          },
-        },
+          ],
+        }),
         GitHubEventOptions,
       ),
     ).toMatchObject({
       eventParameterRules: {
-        [PullRequestReviewRequestedTriggerId]: {
-          requestedReviewer: isNotRule("octocat"),
+        [PullRequestConditionId0]: {
+          botActor: isAnyOfRule(["dependabot[bot]", "renovate[bot]"]),
+        },
+      },
+      remainingPayloadFilter: null,
+    });
+  });
+
+  it("preserves mixed GitHub actor in-filters as advanced payload filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.opened",
+              payloadFilter: {
+                op: "in",
+                path: ["sender", "login"],
+                values: ["octocat", "dependabot[bot]"],
+              },
+            },
+          ],
+        }),
+        GitHubEventOptions,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        eventParameterRules: {},
+        remainingPayloadFilter: {
+          [PullRequestConditionId0]: {
+            op: "in",
+            path: ["sender", "login"],
+            values: ["octocat", "dependabot[bot]"],
+          },
+        },
+      }),
+    );
+  });
+
+  it("hydrates guarded GitHub requested reviewer exclusion filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.review_requested",
+              payloadFilter: {
+                op: "and",
+                filters: [
+                  {
+                    op: "exists",
+                    path: ["requested_reviewer", "login"],
+                  },
+                  {
+                    op: "neq",
+                    path: ["requested_reviewer", "login"],
+                    value: "octocat",
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      eventParameterRules: {
+        [PullRequestReviewRequestedConditionId0]: {
+          requestedReviewer: isNotAnyOfRule(["octocat"]),
         },
       },
     });
@@ -379,57 +547,89 @@ describe("toWebhookTriggerFormValues", () => {
   it("hydrates GitHub requested bot filters out of requested reviewer login payload filters", () => {
     expect(
       toWebhookTriggerFormValues(
-        {
-          ...SampleTrigger,
-          eventTypes: ["github.pull_request.review_requested"],
-          payloadFilter: {
-            "github.pull_request.review_requested": {
-              op: "eq",
-              path: ["requested_reviewer", "login"],
-              value: "mistle-agent[bot]",
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.review_requested",
+              payloadFilter: {
+                op: "eq",
+                path: ["requested_reviewer", "login"],
+                value: "mistle-agent[bot]",
+              },
             },
-          },
-        },
+          ],
+        }),
         GitHubEventOptions,
       ),
     ).toMatchObject({
       eventParameterRules: {
-        [PullRequestReviewRequestedTriggerId]: {
-          requestedBot: isRule("mistle-agent[bot]"),
+        [PullRequestReviewRequestedConditionId0]: {
+          requestedBot: isAnyOfRule(["mistle-agent[bot]"]),
         },
       },
+    });
+  });
+
+  it("hydrates GitHub requested bot filters out of requested reviewer login in-filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.review_requested",
+              payloadFilter: {
+                op: "in",
+                path: ["requested_reviewer", "login"],
+                values: ["mistle-agent[bot]", "mistle-reviewer[bot]"],
+              },
+            },
+          ],
+        }),
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      eventParameterRules: {
+        [PullRequestReviewRequestedConditionId0]: {
+          requestedBot: isAnyOfRule(["mistle-agent[bot]", "mistle-reviewer[bot]"]),
+        },
+      },
+      remainingPayloadFilter: null,
     });
   });
 
   it("hydrates guarded GitHub requested bot exclusion filters", () => {
     expect(
       toWebhookTriggerFormValues(
-        {
-          ...SampleTrigger,
-          eventTypes: ["github.pull_request.review_requested"],
-          payloadFilter: {
-            "github.pull_request.review_requested": {
-              op: "and",
-              filters: [
-                {
-                  op: "exists",
-                  path: ["requested_reviewer", "login"],
-                },
-                {
-                  op: "neq",
-                  path: ["requested_reviewer", "login"],
-                  value: "mistle-agent[bot]",
-                },
-              ],
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.review_requested",
+              payloadFilter: {
+                op: "and",
+                filters: [
+                  {
+                    op: "exists",
+                    path: ["requested_reviewer", "login"],
+                  },
+                  {
+                    op: "neq",
+                    path: ["requested_reviewer", "login"],
+                    value: "mistle-agent[bot]",
+                  },
+                ],
+              },
             },
-          },
-        },
+          ],
+        }),
         GitHubEventOptions,
       ),
     ).toMatchObject({
       eventParameterRules: {
-        [PullRequestReviewRequestedTriggerId]: {
-          requestedBot: isNotRule("mistle-agent[bot]"),
+        [PullRequestReviewRequestedConditionId0]: {
+          requestedBot: isNotAnyOfRule(["mistle-agent[bot]"]),
         },
       },
     });
@@ -438,46 +638,48 @@ describe("toWebhookTriggerFormValues", () => {
   it("hydrates guarded reviewer exclusions from payload filters merged with advanced filters", () => {
     expect(
       toWebhookTriggerFormValues(
-        {
-          ...SampleTrigger,
-          eventTypes: ["github.pull_request.review_requested"],
-          payloadFilter: {
-            "github.pull_request.review_requested": {
-              op: "and",
-              filters: [
-                {
-                  op: "and",
-                  filters: [
-                    {
-                      op: "exists",
-                      path: ["requested_reviewer", "login"],
-                    },
-                    {
-                      op: "neq",
-                      path: ["requested_reviewer", "login"],
-                      value: "octocat",
-                    },
-                  ],
-                },
-                {
-                  op: "eq",
-                  path: ["pull_request", "draft"],
-                  value: "false",
-                },
-              ],
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.review_requested",
+              payloadFilter: {
+                op: "and",
+                filters: [
+                  {
+                    op: "and",
+                    filters: [
+                      {
+                        op: "exists",
+                        path: ["requested_reviewer", "login"],
+                      },
+                      {
+                        op: "neq",
+                        path: ["requested_reviewer", "login"],
+                        value: "octocat",
+                      },
+                    ],
+                  },
+                  {
+                    op: "eq",
+                    path: ["pull_request", "draft"],
+                    value: "false",
+                  },
+                ],
+              },
             },
-          },
-        },
+          ],
+        }),
         GitHubEventOptions,
       ),
     ).toMatchObject({
       eventParameterRules: {
-        [PullRequestReviewRequestedTriggerId]: {
-          requestedReviewer: isNotRule("octocat"),
+        [PullRequestReviewRequestedConditionId0]: {
+          requestedReviewer: isNotAnyOfRule(["octocat"]),
         },
       },
       remainingPayloadFilter: {
-        "github.pull_request.review_requested": {
+        [PullRequestReviewRequestedConditionId0]: {
           op: "eq",
           path: ["pull_request", "draft"],
           value: "false",
@@ -489,22 +691,24 @@ describe("toWebhookTriggerFormValues", () => {
   it("preserves standalone GitHub requested reviewer exists filters as advanced payload filters", () => {
     expect(
       toWebhookTriggerFormValues(
-        {
-          ...SampleTrigger,
-          eventTypes: ["github.pull_request.review_requested"],
-          payloadFilter: {
-            "github.pull_request.review_requested": {
-              op: "exists",
-              path: ["requested_reviewer", "login"],
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.review_requested",
+              payloadFilter: {
+                op: "exists",
+                path: ["requested_reviewer", "login"],
+              },
             },
-          },
-        },
+          ],
+        }),
         GitHubEventOptions,
       ),
     ).toMatchObject({
       eventParameterRules: {},
       remainingPayloadFilter: {
-        "github.pull_request.review_requested": {
+        [PullRequestReviewRequestedConditionId0]: {
           op: "exists",
           path: ["requested_reviewer", "login"],
         },
@@ -518,7 +722,7 @@ describe("toWebhookTriggerFormValues", () => {
         {
           ...BaseFormValues,
           remainingPayloadFilter: {
-            "github.pull_request.opened": {
+            [PullRequestConditionId0]: {
               op: "exists",
               path: ["pull_request", "draft"],
             },
@@ -527,12 +731,15 @@ describe("toWebhookTriggerFormValues", () => {
         GitHubEventOptions,
       ),
     ).toMatchObject({
-      payloadFilter: {
-        "github.pull_request.opened": {
-          op: "exists",
-          path: ["pull_request", "draft"],
+      eventConditions: [
+        {
+          eventType: "github.pull_request.opened",
+          payloadFilter: {
+            op: "exists",
+            path: ["pull_request", "draft"],
+          },
         },
-      },
+      ],
     });
   });
 
@@ -541,9 +748,9 @@ describe("toWebhookTriggerFormValues", () => {
       toCreateWebhookTriggerPayload(
         {
           ...BaseFormValues,
-          eventIds: [IssueCommentCreatedTriggerId],
+          eventIds: [IssueCommentConditionId0],
           remainingPayloadFilter: {
-            "github.pull_request.opened": {
+            [PullRequestConditionId0]: {
               op: "exists",
               path: ["pull_request", "draft"],
             },
@@ -552,58 +759,98 @@ describe("toWebhookTriggerFormValues", () => {
         GitHubEventOptions,
       ),
     ).toMatchObject({
-      eventTypes: ["github.issue_comment.created"],
-      payloadFilter: null,
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+        },
+      ],
     });
   });
 
   it("hydrates Slack app mention channel parameters out of payload filters", () => {
     expect(
       toWebhookTriggerFormValues(
-        {
-          ...SampleTrigger,
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
           integrationWebhookSourceId: SlackWebhookSourceId,
-          eventTypes: ["slack:app_mention"],
-          payloadFilter: {
-            "slack:app_mention": {
+          eventConditions: [
+            {
+              eventType: "slack:app_mention",
+              payloadFilter: {
+                op: "eq",
+                path: ["event", "channel"],
+                value: "C12345678",
+              },
+            },
+          ],
+        }),
+        [SlackAppMentionEventOption],
+      ),
+    ).toMatchObject({
+      eventIds: [SlackAppMentionConditionId0],
+      eventParameterRules: {
+        [SlackAppMentionConditionId0]: {
+          channel: isAnyOfRule(["C12345678"]),
+        },
+      },
+    });
+  });
+
+  it("round-trips migrated Slack single-channel filters through the multi-value channel parameter", () => {
+    const formValues = toWebhookTriggerFormValues(
+      withWebhookTriggerEventConditions({
+        trigger: SampleTrigger,
+        integrationWebhookSourceId: SlackWebhookSourceId,
+        eventConditions: [
+          {
+            eventType: "slack:app_mention",
+            payloadFilter: {
               op: "eq",
               path: ["event", "channel"],
               value: "C12345678",
             },
           },
+        ],
+      }),
+      [SlackAppMentionEventOption],
+    );
+
+    expect(toCreateWebhookTriggerPayload(formValues, [SlackAppMentionEventOption])).toMatchObject({
+      eventConditions: [
+        {
+          eventType: "slack:app_mention",
+          payloadFilter: {
+            op: "in",
+            path: ["event", "channel"],
+            values: ["C12345678"],
+          },
         },
-        [SlackAppMentionEventOption],
-      ),
-    ).toMatchObject({
-      eventIds: [SlackAppMentionTriggerId],
-      eventParameterRules: {
-        [SlackAppMentionTriggerId]: {
-          channel: isRule("C12345678"),
-        },
-      },
+      ],
     });
   });
 
   it("hydrates explicit invocation trigger parameters out of contains_token filters", () => {
     expect(
       toWebhookTriggerFormValues(
-        {
-          ...SampleTrigger,
-          eventTypes: ["github.issue_comment.created"],
-          payloadFilter: {
-            "github.issue_comment.created": {
-              op: "contains_token",
-              path: ["comment", "body"],
-              value: "@mistlebot",
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.issue_comment.created",
+              payloadFilter: {
+                op: "contains_token",
+                path: ["comment", "body"],
+                value: "@mistlebot",
+              },
             },
-          },
-        },
+          ],
+        }),
         GitHubEventOptions,
       ),
     ).toMatchObject({
-      eventIds: [IssueCommentCreatedTriggerId],
+      eventIds: [IssueCommentConditionId0],
       eventParameterRules: {
-        [IssueCommentCreatedTriggerId]: {
+        [IssueCommentConditionId0]: {
           invocationToken: containsTokenRule("@mistlebot"),
         },
       },
@@ -676,7 +923,7 @@ describe("validateWebhookTriggerFormValues", () => {
         {
           ...BaseFormValues,
           conversationKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
-          eventIds: [PullRequestOpenedTriggerId],
+          eventIds: [PullRequestConditionId0],
         },
         GitHubEventOptions,
       ),
@@ -690,7 +937,7 @@ describe("validateWebhookTriggerFormValues", () => {
       validateWebhookTriggerFormValues(
         {
           ...BaseFormValues,
-          eventIds: [PullRequestOpenedTriggerId],
+          eventIds: [PullRequestConditionId0],
         },
         [
           createGithubPullRequestOpenedEventOption({
@@ -727,9 +974,9 @@ describe("validateWebhookTriggerFormValues", () => {
         {
           ...BaseFormValues,
           conversationKeyTemplate: GitHubPullRequestConversationKeyTemplate,
-          eventIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
+          eventIds: [PullRequestConditionId0, IssueCommentConditionId1],
           eventParameterRules: {
-            [IssueCommentCreatedTriggerId]: {
+            [IssueCommentConditionId1]: {
               invocationToken: containsTokenRule("pr-review"),
               target: existsRule(),
             },
@@ -748,7 +995,7 @@ describe("trigger payload transforms", () => {
         {
           ...BaseFormValues,
           name: " GitHub pushes to repo triage ",
-          eventIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
+          eventIds: [PullRequestConditionId0, IssueCommentConditionId1],
         },
         GitHubEventOptions,
       ),
@@ -760,8 +1007,14 @@ describe("trigger payload transforms", () => {
       instructions: null,
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
-      eventTypes: ["github.pull_request.opened", "github.issue_comment.created"],
-      payloadFilter: null,
+      eventConditions: [
+        {
+          eventType: "github.pull_request.opened",
+        },
+        {
+          eventType: "github.issue_comment.created",
+        },
+      ],
       target: {
         sandboxProfileId: "sbp_repo",
         primaryRepositoryId: null,
@@ -776,7 +1029,7 @@ describe("trigger payload transforms", () => {
           ...BaseFormValues,
           name: "Stripe payouts incident intake",
           enabled: false,
-          eventIds: [PullRequestOpenedTriggerId],
+          eventIds: [PullRequestConditionId0],
         },
         GitHubEventOptions,
       ),
@@ -788,8 +1041,11 @@ describe("trigger payload transforms", () => {
       instructions: null,
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
-      eventTypes: ["github.pull_request.opened"],
-      payloadFilter: null,
+      eventConditions: [
+        {
+          eventType: "github.pull_request.opened",
+        },
+      ],
       target: {
         sandboxProfileId: "sbp_repo",
         primaryRepositoryId: null,
@@ -837,7 +1093,7 @@ describe("trigger payload transforms", () => {
         {
           ...BaseFormValues,
           eventParameterRules: {
-            [PullRequestOpenedTriggerId]: {
+            [PullRequestConditionId0]: {
               repository: isRule("mistlehq/mistle"),
               author: isRule("octocat"),
             },
@@ -853,24 +1109,26 @@ describe("trigger payload transforms", () => {
       instructions: null,
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
-      eventTypes: ["github.pull_request.opened"],
-      payloadFilter: {
-        "github.pull_request.opened": {
-          op: "and",
-          filters: [
-            {
-              op: "eq",
-              path: ["repository", "full_name"],
-              value: "mistlehq/mistle",
-            },
-            {
-              op: "eq",
-              path: ["sender", "login"],
-              value: "octocat",
-            },
-          ],
+      eventConditions: [
+        {
+          eventType: "github.pull_request.opened",
+          payloadFilter: {
+            op: "and",
+            filters: [
+              {
+                op: "in",
+                path: ["repository", "full_name"],
+                values: ["mistlehq/mistle"],
+              },
+              {
+                op: "in",
+                path: ["sender", "login"],
+                values: ["octocat"],
+              },
+            ],
+          },
         },
-      },
+      ],
       target: {
         sandboxProfileId: "sbp_repo",
         primaryRepositoryId: null,
@@ -884,7 +1142,7 @@ describe("trigger payload transforms", () => {
         {
           ...BaseFormValues,
           eventParameterRules: {
-            [PullRequestOpenedTriggerId]: {
+            [PullRequestConditionId0]: {
               author: isNotRule("dependabot"),
             },
           },
@@ -892,13 +1150,16 @@ describe("trigger payload transforms", () => {
         GitHubEventOptions,
       ),
     ).toMatchObject({
-      payloadFilter: {
-        "github.pull_request.opened": {
-          op: "neq",
-          path: ["sender", "login"],
-          value: "dependabot",
+      eventConditions: [
+        {
+          eventType: "github.pull_request.opened",
+          payloadFilter: {
+            op: "neq",
+            path: ["sender", "login"],
+            value: "dependabot",
+          },
         },
-      },
+      ],
     });
   });
 
@@ -908,7 +1169,7 @@ describe("trigger payload transforms", () => {
         {
           ...BaseFormValues,
           eventParameterRules: {
-            [PullRequestOpenedTriggerId]: {
+            [PullRequestConditionId0]: {
               botActor: isRule("dependabot[bot]"),
             },
           },
@@ -916,13 +1177,16 @@ describe("trigger payload transforms", () => {
         GitHubEventOptions,
       ),
     ).toMatchObject({
-      payloadFilter: {
-        "github.pull_request.opened": {
-          op: "eq",
-          path: ["sender", "login"],
-          value: "dependabot[bot]",
+      eventConditions: [
+        {
+          eventType: "github.pull_request.opened",
+          payloadFilter: {
+            op: "in",
+            path: ["sender", "login"],
+            values: ["dependabot[bot]"],
+          },
         },
-      },
+      ],
     });
   });
 
@@ -931,9 +1195,9 @@ describe("trigger payload transforms", () => {
       toCreateWebhookTriggerPayload(
         {
           ...BaseFormValues,
-          eventIds: [PullRequestReviewRequestedTriggerId],
+          eventIds: [PullRequestReviewRequestedConditionId0],
           eventParameterRules: {
-            [PullRequestReviewRequestedTriggerId]: {
+            [PullRequestReviewRequestedConditionId0]: {
               requestedReviewer: isRule("octocat"),
               requestedTeam: isRule("platform"),
             },
@@ -951,9 +1215,9 @@ describe("trigger payload transforms", () => {
       toCreateWebhookTriggerPayload(
         {
           ...BaseFormValues,
-          eventIds: [PullRequestReviewRequestedTriggerId],
+          eventIds: [PullRequestReviewRequestedConditionId0],
           eventParameterRules: {
-            [PullRequestReviewRequestedTriggerId]: {
+            [PullRequestReviewRequestedConditionId0]: {
               requestedReviewer: isRule("octocat"),
             },
           },
@@ -961,14 +1225,16 @@ describe("trigger payload transforms", () => {
         GitHubEventOptions,
       ),
     ).toMatchObject({
-      eventTypes: ["github.pull_request.review_requested"],
-      payloadFilter: {
-        "github.pull_request.review_requested": {
-          op: "eq",
-          path: ["requested_reviewer", "login"],
-          value: "octocat",
+      eventConditions: [
+        {
+          eventType: "github.pull_request.review_requested",
+          payloadFilter: {
+            op: "in",
+            path: ["requested_reviewer", "login"],
+            values: ["octocat"],
+          },
         },
-      },
+      ],
     });
   });
 
@@ -977,9 +1243,9 @@ describe("trigger payload transforms", () => {
       toCreateWebhookTriggerPayload(
         {
           ...BaseFormValues,
-          eventIds: [PullRequestReviewRequestedTriggerId],
+          eventIds: [PullRequestReviewRequestedConditionId0],
           eventParameterRules: {
-            [PullRequestReviewRequestedTriggerId]: {
+            [PullRequestReviewRequestedConditionId0]: {
               requestedBot: isRule("mistle-agent[bot]"),
             },
           },
@@ -987,13 +1253,16 @@ describe("trigger payload transforms", () => {
         GitHubEventOptions,
       ),
     ).toMatchObject({
-      payloadFilter: {
-        "github.pull_request.review_requested": {
-          op: "eq",
-          path: ["requested_reviewer", "login"],
-          value: "mistle-agent[bot]",
+      eventConditions: [
+        {
+          eventType: "github.pull_request.review_requested",
+          payloadFilter: {
+            op: "in",
+            path: ["requested_reviewer", "login"],
+            values: ["mistle-agent[bot]"],
+          },
         },
-      },
+      ],
     });
   });
 
@@ -1002,9 +1271,9 @@ describe("trigger payload transforms", () => {
       toCreateWebhookTriggerPayload(
         {
           ...BaseFormValues,
-          eventIds: [PullRequestReviewRequestedTriggerId],
+          eventIds: [PullRequestReviewRequestedConditionId0],
           eventParameterRules: {
-            [PullRequestReviewRequestedTriggerId]: {
+            [PullRequestReviewRequestedConditionId0]: {
               requestedReviewer: isNotRule("octocat"),
             },
           },
@@ -1012,22 +1281,67 @@ describe("trigger payload transforms", () => {
         GitHubEventOptions,
       ),
     ).toMatchObject({
-      payloadFilter: {
-        "github.pull_request.review_requested": {
-          op: "and",
-          filters: [
-            {
-              op: "exists",
-              path: ["requested_reviewer", "login"],
-            },
-            {
-              op: "neq",
-              path: ["requested_reviewer", "login"],
-              value: "octocat",
-            },
-          ],
+      eventConditions: [
+        {
+          eventType: "github.pull_request.review_requested",
+          payloadFilter: {
+            op: "and",
+            filters: [
+              {
+                op: "exists",
+                path: ["requested_reviewer", "login"],
+              },
+              {
+                op: "neq",
+                path: ["requested_reviewer", "login"],
+                value: "octocat",
+              },
+            ],
+          },
         },
-      },
+      ],
+    });
+  });
+
+  it("guards multi-value negated GitHub requested reviewer filters against team review requests", () => {
+    expect(
+      toCreateWebhookTriggerPayload(
+        {
+          ...BaseFormValues,
+          eventIds: [PullRequestReviewRequestedConditionId0],
+          eventParameterRules: {
+            [PullRequestReviewRequestedConditionId0]: {
+              requestedReviewer: isNotAnyOfRule(["octocat", "hubot"]),
+            },
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      eventConditions: [
+        {
+          eventType: "github.pull_request.review_requested",
+          payloadFilter: {
+            op: "and",
+            filters: [
+              {
+                op: "exists",
+                path: ["requested_reviewer", "login"],
+              },
+              {
+                op: "neq",
+                path: ["requested_reviewer", "login"],
+                value: "octocat",
+              },
+              {
+                op: "neq",
+                path: ["requested_reviewer", "login"],
+                value: "hubot",
+              },
+            ],
+          },
+        },
+      ],
     });
   });
 
@@ -1037,7 +1351,7 @@ describe("trigger payload transforms", () => {
         {
           ...BaseFormValues,
           eventParameterRules: {
-            [PullRequestOpenedTriggerId]: {
+            [PullRequestConditionId0]: {
               author: isNotRule(""),
             },
           },
@@ -1045,7 +1359,11 @@ describe("trigger payload transforms", () => {
         GitHubEventOptions,
       ),
     ).toMatchObject({
-      payloadFilter: null,
+      eventConditions: [
+        {
+          eventType: "github.pull_request.opened",
+        },
+      ],
     });
   });
 
@@ -1055,10 +1373,10 @@ describe("trigger payload transforms", () => {
         {
           ...BaseFormValues,
           conversationKeyTemplate: "slack:channel:{{payload.event.channel}}",
-          eventIds: [SlackAppMentionTriggerId],
+          eventIds: [SlackAppMentionConditionId0],
           eventParameterRules: {
-            [SlackAppMentionTriggerId]: {
-              channel: isRule("C12345678"),
+            [SlackAppMentionConditionId0]: {
+              channel: isAnyOfRule(["C12345678"]),
             },
           },
         },
@@ -1071,14 +1389,16 @@ describe("trigger payload transforms", () => {
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
       conversationKeyTemplate: "slack:channel:{{payload.event.channel}}",
       idempotencyKeyTemplate: null,
-      eventTypes: ["slack:app_mention"],
-      payloadFilter: {
-        "slack:app_mention": {
-          op: "eq",
-          path: ["event", "channel"],
-          value: "C12345678",
+      eventConditions: [
+        {
+          eventType: "slack:app_mention",
+          payloadFilter: {
+            op: "in",
+            path: ["event", "channel"],
+            values: ["C12345678"],
+          },
         },
-      },
+      ],
       target: {
         sandboxProfileId: "sbp_repo",
         primaryRepositoryId: null,
@@ -1091,9 +1411,9 @@ describe("trigger payload transforms", () => {
       toCreateWebhookTriggerPayload(
         {
           ...BaseFormValues,
-          eventIds: [IssueCommentCreatedTriggerId],
+          eventIds: [IssueCommentConditionId0],
           eventParameterRules: {
-            [IssueCommentCreatedTriggerId]: {
+            [IssueCommentConditionId0]: {
               target: existsRule(),
             },
           },
@@ -1108,13 +1428,15 @@ describe("trigger payload transforms", () => {
       instructions: null,
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
-      eventTypes: ["github.issue_comment.created"],
-      payloadFilter: {
-        "github.issue_comment.created": {
-          op: "exists",
-          path: ["issue", "pull_request"],
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          payloadFilter: {
+            op: "exists",
+            path: ["issue", "pull_request"],
+          },
         },
-      },
+      ],
       target: {
         sandboxProfileId: "sbp_repo",
         primaryRepositoryId: null,
@@ -1127,9 +1449,9 @@ describe("trigger payload transforms", () => {
       toCreateWebhookTriggerPayload(
         {
           ...BaseFormValues,
-          eventIds: [IssueCommentCreatedTriggerId],
+          eventIds: [IssueCommentConditionId0],
           eventParameterRules: {
-            [IssueCommentCreatedTriggerId]: {
+            [IssueCommentConditionId0]: {
               invocationToken: containsTokenRule("@mistlebot"),
             },
           },
@@ -1144,14 +1466,16 @@ describe("trigger payload transforms", () => {
       instructions: null,
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
-      eventTypes: ["github.issue_comment.created"],
-      payloadFilter: {
-        "github.issue_comment.created": {
-          op: "contains_token",
-          path: ["comment", "body"],
-          value: "@mistlebot",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          payloadFilter: {
+            op: "contains_token",
+            path: ["comment", "body"],
+            value: "@mistlebot",
+          },
         },
-      },
+      ],
       target: {
         sandboxProfileId: "sbp_repo",
         primaryRepositoryId: null,

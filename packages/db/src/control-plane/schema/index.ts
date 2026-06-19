@@ -237,6 +237,7 @@ export {
 } from "./provider-resource-association-delivery-processors.js";
 export {
   webhookTriggers,
+  type WebhookTriggerEventCondition,
   type InsertWebhookTrigger,
   type WebhookTrigger,
 } from "./webhook-triggers.js";

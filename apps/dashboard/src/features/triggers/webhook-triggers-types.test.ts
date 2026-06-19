@@ -11,7 +11,16 @@ describe("webhook triggers types", () => {
       conversationKeyTemplate: "{{event.id}}",
       createdAt: "2026-03-11T10:00:00.000Z",
       enabled: true,
-      eventTypes: ["push"],
+      eventConditions: [
+        {
+          eventType: "push",
+          payloadFilter: {
+            op: "eq",
+            path: ["action"],
+            value: "push",
+          },
+        },
+      ],
       id: "trg_123",
       idempotencyKeyTemplate: null,
       inputTemplate: '{"ref": "{{event.ref}}"}',
@@ -19,13 +28,6 @@ describe("webhook triggers types", () => {
       integrationWebhookSourceId: "iws_123",
       kind: "webhook",
       name: "GitHub pushes",
-      payloadFilter: {
-        push: {
-          op: "eq",
-          path: ["action"],
-          value: "push",
-        },
-      },
       target: {
         id: "tgt_123",
         sandboxProfileId: "sbp_123",

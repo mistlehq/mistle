@@ -4498,6 +4498,7 @@ export interface paths {
                         /** @enum {string} */
                         kind: "resource-select";
                         label: string;
+                        multiValue?: boolean;
                         negatedMatchRequiresExists?: boolean;
                         payloadPath: string[];
                         placeholder?: string;
@@ -4565,6 +4566,7 @@ export interface paths {
                         /** @enum {string} */
                         kind: "resource-select";
                         label: string;
+                        multiValue?: boolean;
                         negatedMatchRequiresExists?: boolean;
                         payloadPath: string[];
                         placeholder?: string;
@@ -14289,15 +14291,17 @@ export interface paths {
           "application/json": {
             conversationKeyTemplate: string;
             enabled?: boolean;
-            eventTypes?: string[] | null;
+            eventConditions: {
+              eventType: string;
+              payloadFilter?: {
+                [key: string]: unknown;
+              } | null;
+            }[];
             idempotencyKeyTemplate?: string | null;
             inputTemplate: string;
             instructions?: string | null;
             integrationWebhookSourceId: string;
             name: string;
-            payloadFilter?: {
-              [key: string]: unknown;
-            } | null;
             target: {
               primaryRepositoryId?: string | null;
               sandboxProfileId: string;
@@ -14317,7 +14321,12 @@ export interface paths {
               conversationKeyTemplate: string;
               createdAt: string;
               enabled: boolean;
-              eventTypes: string[] | null;
+              eventConditions: {
+                eventType: string;
+                payloadFilter?: {
+                  [key: string]: unknown;
+                } | null;
+              }[];
               id: string;
               idempotencyKeyTemplate: string | null;
               inputTemplate: string;
@@ -14326,9 +14335,6 @@ export interface paths {
               /** @enum {string} */
               kind: "webhook";
               name: string;
-              payloadFilter: {
-                [key: string]: unknown;
-              } | null;
               target: {
                 id: string;
                 primaryRepositoryId: string | null;
@@ -14426,7 +14432,12 @@ export interface paths {
               conversationKeyTemplate: string;
               createdAt: string;
               enabled: boolean;
-              eventTypes: string[] | null;
+              eventConditions: {
+                eventType: string;
+                payloadFilter?: {
+                  [key: string]: unknown;
+                } | null;
+              }[];
               id: string;
               idempotencyKeyTemplate: string | null;
               inputTemplate: string;
@@ -14435,9 +14446,6 @@ export interface paths {
               /** @enum {string} */
               kind: "webhook";
               name: string;
-              payloadFilter: {
-                [key: string]: unknown;
-              } | null;
               target: {
                 id: string;
                 primaryRepositoryId: string | null;
@@ -14596,15 +14604,17 @@ export interface paths {
           "application/json": {
             conversationKeyTemplate?: string;
             enabled?: boolean;
-            eventTypes?: string[] | null;
+            eventConditions?: {
+              eventType: string;
+              payloadFilter?: {
+                [key: string]: unknown;
+              } | null;
+            }[];
             idempotencyKeyTemplate?: string | null;
             inputTemplate?: string;
             instructions?: string | null;
             integrationWebhookSourceId?: string;
             name?: string;
-            payloadFilter?: {
-              [key: string]: unknown;
-            } | null;
             target?: {
               primaryRepositoryId?: string | null;
               sandboxProfileId?: string;
@@ -14624,7 +14634,12 @@ export interface paths {
               conversationKeyTemplate: string;
               createdAt: string;
               enabled: boolean;
-              eventTypes: string[] | null;
+              eventConditions: {
+                eventType: string;
+                payloadFilter?: {
+                  [key: string]: unknown;
+                } | null;
+              }[];
               id: string;
               idempotencyKeyTemplate: string | null;
               inputTemplate: string;
@@ -14633,9 +14648,6 @@ export interface paths {
               /** @enum {string} */
               kind: "webhook";
               name: string;
-              payloadFilter: {
-                [key: string]: unknown;
-              } | null;
               target: {
                 id: string;
                 primaryRepositoryId: string | null;

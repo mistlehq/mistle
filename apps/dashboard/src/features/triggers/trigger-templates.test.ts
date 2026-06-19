@@ -6,7 +6,10 @@ import {
 } from "./trigger-templates.js";
 import { GitHubPullRequestConversationKeyTemplate } from "./webhook-trigger-conversation-key-options.js";
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
-import { createWebhookTriggerEventId } from "./webhook-trigger-option-builders.js";
+import {
+  createWebhookTriggerEventConditionId,
+  createWebhookTriggerEventId,
+} from "./webhook-trigger-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
   createGithubPullRequestOpenedEventOption,
@@ -93,13 +96,19 @@ describe("trigger templates", () => {
         ],
       }),
     ).toEqual([
-      createWebhookTriggerEventId({
-        webhookSourceId: GitHubWebhookSourceId,
-        eventType: "github.pull_request.opened",
+      createWebhookTriggerEventConditionId({
+        eventOptionId: createWebhookTriggerEventId({
+          webhookSourceId: GitHubWebhookSourceId,
+          eventType: "github.pull_request.opened",
+        }),
+        index: 0,
       }),
-      createWebhookTriggerEventId({
-        webhookSourceId: GitHubWebhookSourceId,
-        eventType: "github.issue_comment.created",
+      createWebhookTriggerEventConditionId({
+        eventOptionId: createWebhookTriggerEventId({
+          webhookSourceId: GitHubWebhookSourceId,
+          eventType: "github.issue_comment.created",
+        }),
+        index: 1,
       }),
     ]);
 

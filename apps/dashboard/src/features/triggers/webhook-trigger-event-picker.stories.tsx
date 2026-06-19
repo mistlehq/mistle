@@ -9,6 +9,8 @@ import type {
   WebhookTriggerEventOption,
   WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
+import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
+import { createWebhookTriggerEventConditionId } from "./webhook-trigger-option-builders.js";
 import {
   containsTokenRule,
   createWebhookTriggerStoryQueryClient,
@@ -38,6 +40,29 @@ import {
   StoryWhapiStatusesPostTriggerId,
   StoryWhapiUsersPostTriggerId,
 } from "./webhook-trigger-story-fixtures.js";
+
+const StoryIssueCommentCreatedConditionId = conditionId(StoryIssueCommentCreatedTriggerId);
+const StoryPullRequestOpenedConditionId = conditionId(StoryPullRequestOpenedTriggerId);
+const StoryPullRequestReviewRequestedConditionId = conditionId(
+  StoryPullRequestReviewRequestedTriggerId,
+);
+const StoryPullRequestReviewCommentCreatedConditionId = conditionId(
+  StoryPullRequestReviewCommentCreatedTriggerId,
+);
+const StoryPushDeletedConditionId = conditionId(StoryPushDeletedTriggerId);
+const StorySlackAppMentionConditionId = conditionId(StorySlackAppMentionTriggerId);
+
+function conditionId(eventOptionId: string, index = 0): string {
+  return createWebhookTriggerEventConditionId({ eventOptionId, index });
+}
+
+function isAnyOfRule(values: readonly string[]) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS,
+    value: "",
+    values: [...values],
+  };
+}
 
 function StoryHarness(input: {
   hasConnectedIntegrations: boolean;
@@ -107,9 +132,9 @@ export const Default: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: StoryGitHubConnectionId,
-    selectedEventIds: [StoryPullRequestReviewCommentCreatedTriggerId],
+    selectedEventIds: [StoryPullRequestReviewCommentCreatedConditionId],
     eventParameterRules: {
-      [StoryPullRequestReviewCommentCreatedTriggerId]: {
+      [StoryPullRequestReviewCommentCreatedConditionId]: {
         invocationToken: containsTokenRule("@mistlebot"),
         commenter: isRule("octocat"),
         baseBranch: isRule("main"),
@@ -124,12 +149,28 @@ export const NegativeEqualityParameters: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: StoryGitHubConnectionId,
-    selectedEventIds: [StoryPullRequestOpenedTriggerId],
+    selectedEventIds: [StoryPullRequestOpenedConditionId],
     eventParameterRules: {
-      [StoryPullRequestOpenedTriggerId]: {
+      [StoryPullRequestOpenedConditionId]: {
         author: isNotRule("dependabot"),
         baseBranch: isRule("main"),
         repository: isRule("mistlehq/platform"),
+      },
+    },
+    eventOptions: StoryGitHubEventOptions,
+  },
+};
+
+export const GitHubMultipleResourceParameters: Story = {
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: StoryGitHubConnectionId,
+    selectedEventIds: [StoryPullRequestOpenedConditionId],
+    eventParameterRules: {
+      [StoryPullRequestOpenedConditionId]: {
+        repository: isAnyOfRule(["mistlehq/platform", "mistlehq/dashboard"]),
+        author: isAnyOfRule(["octocat", "hubot"]),
+        baseBranch: isAnyOfRule(["main", "release"]),
       },
     },
     eventOptions: StoryGitHubEventOptions,
@@ -141,9 +182,9 @@ export const GitHubReviewRequestTeamTarget: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: StoryGitHubConnectionId,
-    selectedEventIds: [StoryPullRequestReviewRequestedTriggerId],
+    selectedEventIds: [StoryPullRequestReviewRequestedConditionId],
     eventParameterRules: {
-      [StoryPullRequestReviewRequestedTriggerId]: {
+      [StoryPullRequestReviewRequestedConditionId]: {
         requestedTeam: isRule("platform"),
       },
     },
@@ -156,9 +197,9 @@ export const GitHubReviewRequestTeamSyncFailed: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: StoryGitHubConnectionId,
-    selectedEventIds: [StoryPullRequestReviewRequestedTriggerId],
+    selectedEventIds: [StoryPullRequestReviewRequestedConditionId],
     eventParameterRules: {
-      [StoryPullRequestReviewRequestedTriggerId]: {
+      [StoryPullRequestReviewRequestedConditionId]: {
         requestedTeam: isRule("platform"),
       },
     },
@@ -198,7 +239,7 @@ export const UnavailableSavedEvent: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: StoryGitHubConnectionId,
-    selectedEventIds: [StoryPushDeletedTriggerId],
+    selectedEventIds: [StoryPushDeletedConditionId],
     eventOptions: [
       ...StoryGitHubEventOptions,
       {
@@ -221,7 +262,7 @@ export const WrongProfileSavedEvent: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: StoryGitHubConnectionId,
-    selectedEventIds: [StoryIssueCommentCreatedTriggerId],
+    selectedEventIds: [StoryIssueCommentCreatedConditionId],
     eventOptions: [
       {
         id: StoryIssueCommentCreatedTriggerId,
@@ -243,10 +284,24 @@ export const SlackAppMentionChannelOnly: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: StorySlackConnectionId,
-    selectedEventIds: [StorySlackAppMentionTriggerId],
+    selectedEventIds: [StorySlackAppMentionConditionId],
     eventParameterRules: {
-      [StorySlackAppMentionTriggerId]: {
-        channel: isRule("C_ALERTS_001"),
+      [StorySlackAppMentionConditionId]: {
+        channel: isAnyOfRule(["C_ALERTS_001"]),
+      },
+    },
+    eventOptions: StorySlackEventOptions,
+  },
+};
+
+export const SlackAppMentionMultipleChannels: Story = {
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: StorySlackConnectionId,
+    selectedEventIds: [StorySlackAppMentionConditionId],
+    eventParameterRules: {
+      [StorySlackAppMentionConditionId]: {
+        channel: isAnyOfRule(["C_ALERTS_001", "C_ENG_001"]),
       },
     },
     eventOptions: StorySlackEventOptions,
@@ -257,10 +312,10 @@ export const SlackUnavailableArchivedChannelSelection: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: StorySlackConnectionId,
-    selectedEventIds: [StorySlackAppMentionTriggerId],
+    selectedEventIds: [StorySlackAppMentionConditionId],
     eventParameterRules: {
-      [StorySlackAppMentionTriggerId]: {
-        channel: isRule("C_ARCHIVED_001"),
+      [StorySlackAppMentionConditionId]: {
+        channel: isAnyOfRule(["C_ARCHIVED_001"]),
       },
     },
     eventOptions: StorySlackEventOptions,
@@ -273,8 +328,8 @@ export const WasenderAPIMessageEvents: Story = {
     hasConnectedIntegrations: true,
     selectedConnectionId: StoryWasenderApiConnectionId,
     selectedEventIds: [
-      StoryWasenderApiMessagesUpsertTriggerId,
-      StoryWasenderApiMessagesReceivedTriggerId,
+      conditionId(StoryWasenderApiMessagesUpsertTriggerId),
+      conditionId(StoryWasenderApiMessagesReceivedTriggerId, 1),
     ],
     eventOptions: StoryWasenderApiEventOptions,
   },
@@ -286,11 +341,11 @@ export const WhapiWhatsAppEvents: Story = {
     hasConnectedIntegrations: true,
     selectedConnectionId: StoryWhapiConnectionId,
     selectedEventIds: [
-      StoryWhapiMessagesPostTriggerId,
-      StoryWhapiMessagesPatchTriggerId,
-      StoryWhapiStatusesPostTriggerId,
-      StoryWhapiChannelPostTriggerId,
-      StoryWhapiUsersPostTriggerId,
+      conditionId(StoryWhapiMessagesPostTriggerId),
+      conditionId(StoryWhapiMessagesPatchTriggerId, 1),
+      conditionId(StoryWhapiStatusesPostTriggerId, 2),
+      conditionId(StoryWhapiChannelPostTriggerId, 3),
+      conditionId(StoryWhapiUsersPostTriggerId, 4),
     ],
     eventOptions: StoryWhapiEventOptions,
   },
@@ -300,9 +355,9 @@ export const AddSecondEvent: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: StoryGitHubConnectionId,
-    selectedEventIds: [StoryIssueCommentCreatedTriggerId],
+    selectedEventIds: [StoryIssueCommentCreatedConditionId],
     eventParameterRules: {
-      [StoryIssueCommentCreatedTriggerId]: {
+      [StoryIssueCommentCreatedConditionId]: {
         invocationToken: containsTokenRule("@mistlebot"),
       },
     },
@@ -310,7 +365,7 @@ export const AddSecondEvent: Story = {
   },
   play: async ({ canvasElement }): Promise<void> => {
     const canvas = within(canvasElement);
-    const addTriggerInput = canvas.getByPlaceholderText("Add event");
+    const addTriggerInput = canvas.getByPlaceholderText("Add condition");
 
     await userEvent.click(addTriggerInput);
     await userEvent.click(await canvas.findByRole("option", { name: "Pull request opened" }));

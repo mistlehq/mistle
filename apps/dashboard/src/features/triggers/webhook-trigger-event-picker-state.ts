@@ -3,6 +3,7 @@ import {
   isWebhookTriggerEventOptionUnavailable,
 } from "./webhook-trigger-event-option-availability.js";
 import type { WebhookTriggerEventOption } from "./webhook-trigger-event-types.js";
+import { resolveWebhookTriggerEventOptionIdFromConditionId } from "./webhook-trigger-option-builders.js";
 
 type GroupedWebhookTriggerEventOptions = {
   connectionLabel: string;
@@ -62,16 +63,23 @@ export function resolveSelectedWebhookTriggerEventOptions(input: {
   selectedEventIds: readonly string[];
 }): readonly WebhookTriggerEventOption[] {
   return input.selectedEventIds.map((triggerId) => {
-    const matchedOption = input.eventOptions.find((candidate) => candidate.id === triggerId);
+    const eventOptionId = resolveWebhookTriggerEventOptionIdFromConditionId(triggerId);
+    const matchedOption = input.eventOptions.find(
+      (candidate) => candidate.id === triggerId || candidate.id === eventOptionId,
+    );
     if (matchedOption !== undefined) {
-      return matchedOption;
+      return {
+        ...matchedOption,
+        id: triggerId,
+      };
     }
 
     return {
       ...createSyntheticWebhookTriggerEventOption({
-        triggerId,
+        triggerId: eventOptionId,
         availability: "missing_integration",
       }),
+      id: triggerId,
     } satisfies WebhookTriggerEventOption;
   });
 }
@@ -94,10 +102,8 @@ export function resolveWebhookTriggerEventPickerState(input: {
     };
   }
 
-  const selectedTriggerIdSet = new Set(input.selectedEventIds);
   const availableEventOptions = input.eventOptions.filter(
-    (option) =>
-      !isWebhookTriggerEventOptionUnavailable(option) && !selectedTriggerIdSet.has(option.id),
+    (option) => !isWebhookTriggerEventOptionUnavailable(option),
   );
   const hasAvailableTriggers = availableEventOptions.length > 0;
 
@@ -107,7 +113,7 @@ export function resolveWebhookTriggerEventPickerState(input: {
     disabled: !input.hasConnectedIntegrations || !hasAvailableTriggers,
     helperMessage: input.hasConnectedIntegrations ? null : "Connect an integration to add events.",
     helperVariant: "default",
-    inputPlaceholder: hasAvailableTriggers ? "Add event" : "No events available",
+    inputPlaceholder: hasAvailableTriggers ? "Add condition" : "No events available",
     shouldShowNoAvailableTriggerEventsNotice:
       input.hasConnectedIntegrations &&
       input.selectedEventIds.length === 0 &&

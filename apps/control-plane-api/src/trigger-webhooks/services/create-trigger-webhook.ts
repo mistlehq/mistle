@@ -13,8 +13,9 @@ import { assertWebhookSourceReferenceOrThrow } from "./assert-webhook-source-ref
 import { assertWebhookTriggerRequirementsOrThrow } from "./assert-webhook-trigger-requirements-or-throw.js";
 import { loadWebhookTriggerAggregateOrThrow } from "./load-webhook-trigger-aggregate-or-throw.js";
 import {
-  assertEventScopedWebhookPayloadFilterOrThrow,
-  normalizeWebhookPayloadFilter,
+  normalizeWebhookTriggerEventConditions,
+  type NormalizedWebhookTriggerEventCondition,
+  type WebhookTriggerEventConditionInput,
 } from "./webhook-payload-filter.js";
 
 export type CreateWebhookTriggerInput = {
@@ -22,8 +23,7 @@ export type CreateWebhookTriggerInput = {
   name: string;
   enabled?: boolean | undefined;
   integrationWebhookSourceId: string;
-  eventTypes?: string[] | null | undefined;
-  payloadFilter?: Record<string, unknown> | null | undefined;
+  eventConditions: WebhookTriggerEventConditionInput[];
   inputTemplate: string;
   instructions?: string | null | undefined;
   conversationKeyTemplate: string;
@@ -35,7 +35,11 @@ export type CreateWebhookTriggerInput = {
   };
 };
 
-type CreateWebhookTriggerPersistenceInput = Omit<CreateWebhookTriggerInput, "target"> & {
+type CreateWebhookTriggerPersistenceInput = Omit<
+  CreateWebhookTriggerInput,
+  "eventConditions" | "target"
+> & {
+  eventConditions: NormalizedWebhookTriggerEventCondition[];
   target: {
     sandboxProfileId: string;
     sandboxProfileVersion: number;
@@ -50,11 +54,8 @@ export async function createTriggerWebhook(
   },
   input: CreateWebhookTriggerInput,
 ) {
-  const normalizedPayloadFilter = normalizeWebhookPayloadFilter(input.payloadFilter);
-  assertEventScopedWebhookPayloadFilterOrThrow({
-    eventTypes: input.eventTypes ?? null,
-    payloadFilter: normalizedPayloadFilter ?? null,
-  });
+  const eventConditions = normalizeWebhookTriggerEventConditions(input.eventConditions);
+  const eventTypes = eventConditions.map((condition) => condition.eventType);
 
   const resolvedWebhookSource = await assertWebhookSourceReferenceOrThrow(
     { db: ctx.db, integrationRegistry: ctx.integrationRegistry },
@@ -64,7 +65,7 @@ export async function createTriggerWebhook(
     },
   );
   assertWebhookTriggerRequirementsOrThrow({
-    eventTypes: input.eventTypes ?? null,
+    eventTypes,
     providerMetadata: resolvedWebhookSource.providerMetadata,
     supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
   });
@@ -96,7 +97,7 @@ export async function createTriggerWebhook(
   return ctx.db.transaction(async (tx) => {
     const trigger = await createTriggerAggregate(tx, {
       ...input,
-      payloadFilter: normalizedPayloadFilter,
+      eventConditions,
       target: {
         sandboxProfileId: input.target.sandboxProfileId,
         sandboxProfileVersion,
@@ -140,8 +141,7 @@ async function createTriggerAggregate(
   await tx.insert(tables.webhookTriggers).values({
     triggerId: insertedTrigger.id,
     integrationWebhookSourceId: input.integrationWebhookSourceId,
-    eventTypes: input.eventTypes ?? null,
-    payloadFilter: input.payloadFilter ?? null,
+    eventConditions: input.eventConditions,
     inputTemplate: input.inputTemplate,
     instructions: input.instructions ?? null,
     conversationKeyTemplate: input.conversationKeyTemplate,

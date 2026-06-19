@@ -1,0 +1,5 @@
+# Hard migrate webhook triggers to event conditions
+
+Webhook triggers need to express multiple alternative rule bundles for the same provider event, such as one Slack app mention condition for one set of channels and another Slack app mention condition for another set. We will hard migrate configured webhook triggers from event-type plus event-scoped payload filter storage to **Trigger event conditions**, preserving existing matching behavior by backfilling one condition per selected trigger event and rejecting legacy trigger write shapes after cutover.
+
+We chose a hard migration over a long-lived compatibility layer so trigger matching has one canonical model after cutover: a webhook **Trigger** matches when any of its **Trigger event conditions** match, and a provider event produces at most one run for a matching **Trigger** even if multiple conditions match. This migration is scoped to configured **Triggers**; associated resource event routing may continue to use event-type plus event-scoped-filter shapes.

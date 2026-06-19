@@ -41,6 +41,7 @@ import type {
   WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
+import { createWebhookTriggerEventConditionId } from "./webhook-trigger-option-builders.js";
 
 const EventParameterRowClassName = "flex w-full items-center gap-4";
 const EventParameterLabelClassName = "text-muted-foreground shrink-0 text-sm whitespace-nowrap";
@@ -251,6 +252,17 @@ function findParameter(
   return parameters.find((parameter) => parameter.id === parameterId);
 }
 
+function resolveParameterRuleValues(rule: WebhookTriggerEventParameterRule | undefined): string[] {
+  const configuredValues = rule?.values?.filter((value) => value.trim().length > 0) ?? [];
+  const configuredValue = rule?.value.trim() ?? "";
+
+  if (configuredValues.length > 0) {
+    return [...configuredValues];
+  }
+
+  return configuredValue.length === 0 ? [] : [configuredValue];
+}
+
 function findParameterGroupForParameter(input: {
   groups: readonly WebhookTriggerEventParameterGroup[];
   parameterId: string;
@@ -363,6 +375,23 @@ export function WebhookTriggerEventPickerAddButton(input: {
   const anchorRef = useComboboxAnchor();
   const triggerPickerId = useId();
 
+  function appendCondition(eventOptionId: string): void {
+    let index = input.selectedEventIds.length;
+    let conditionId = createWebhookTriggerEventConditionId({
+      eventOptionId,
+      index,
+    });
+    while (input.selectedEventIds.includes(conditionId)) {
+      index += 1;
+      conditionId = createWebhookTriggerEventConditionId({
+        eventOptionId,
+        index,
+      });
+    }
+
+    input.onValueChange([...input.selectedEventIds, conditionId]);
+  }
+
   return (
     <Combobox<string, true>
       autoHighlight
@@ -370,11 +399,16 @@ export function WebhookTriggerEventPickerAddButton(input: {
       multiple
       onOpenChange={setIsOpen}
       onValueChange={(value) => {
-        input.onValueChange(value);
+        const selectedEventOptionId = value.find((item) =>
+          input.eventOptions.some((option) => option.id === item),
+        );
+        if (selectedEventOptionId !== undefined) {
+          appendCondition(selectedEventOptionId);
+        }
         setIsOpen(false);
       }}
       open={isOpen}
-      value={[...input.selectedEventIds]}
+      value={[]}
     >
       <div ref={anchorRef}>
         {input.variant === "header" ? (
@@ -389,7 +423,7 @@ export function WebhookTriggerEventPickerAddButton(input: {
             variant="outline"
           >
             <PlusIcon aria-hidden className="size-4" />
-            Add event
+            Add condition
           </Button>
         ) : (
           <div className="relative">
@@ -455,24 +489,24 @@ type ResourceParameterOption = {
 
 function normalizeResourceParameterOptions(input: {
   items: readonly ResourceParameterOption[];
-  value: string;
+  selectedValues: readonly string[];
 }): ResourceParameterOption[] {
   const sortedOptions = [...input.items].sort((left, right) =>
     left.displayName.localeCompare(right.displayName),
   );
-  const selectedOption = sortedOptions.find((option) => option.handle === input.value);
-  if (input.value.trim().length === 0 || selectedOption !== undefined) {
-    return sortedOptions;
-  }
+  const missingSelectedOptions = input.selectedValues
+    .filter(
+      (selectedValue) =>
+        selectedValue.trim().length > 0 &&
+        sortedOptions.every((option) => option.handle !== selectedValue),
+    )
+    .map((selectedValue) => ({
+      id: `missing:${selectedValue}`,
+      handle: selectedValue,
+      displayName: `${selectedValue} (Unavailable)`,
+    }));
 
-  return [
-    ...sortedOptions,
-    {
-      id: `missing:${input.value}`,
-      handle: input.value,
-      displayName: `${input.value} (Unavailable)`,
-    },
-  ];
+  return [...sortedOptions, ...missingSelectedOptions];
 }
 
 function findConfiguredOneOfParameterId(input: {
@@ -481,7 +515,7 @@ function findConfiguredOneOfParameterId(input: {
 }): string {
   const configuredOption = input.options.find((option) => {
     const rule = input.rules[option.parameter.id];
-    return (rule?.value.trim().length ?? 0) > 0;
+    return resolveParameterRuleValues(rule).length > 0;
   });
 
   return configuredOption?.parameter.id ?? input.options[0]?.parameter.id ?? "";
@@ -627,7 +661,7 @@ function OneOfParameterGroupField(input: {
   });
   const normalizedResourceOptions = normalizeResourceParameterOptions({
     items: resourceQuery.data?.items ?? [],
-    value: selectedValue,
+    selectedValues: resolveParameterRuleValues(selectedRule),
   });
   const resourceErrorMessage = resolveResourceParameterErrorMessage({
     isError: resourceQuery.isError,
@@ -688,39 +722,67 @@ function OneOfParameterGroupField(input: {
           input.onRuleChange(selectedParameter.id, {
             operator,
             value: selectedValue,
+            ...(selectedParameter.kind === "resource-select" &&
+            selectedParameter.multiValue === true &&
+            selectedRule?.values !== undefined
+              ? { values: selectedRule.values }
+              : {}),
           });
         }}
       />
       {selectedParameter.kind === "resource-select" ? (
         <div className={`${EventParameterControlClassName} space-y-1.5`}>
-          <SingleSelectStringComboboxField
-            contentClassName="w-[min(22rem,calc(100vw-2rem))]"
-            inputId={inputId}
-            inputLabel={selectedParameter.label}
-            inputWrapperClassName="w-full"
-            disabled={input.disabled}
-            onChange={(value) => {
-              input.onRuleChange(selectedParameter.id, {
-                operator: resolveEqualityOperator(selectedRule),
-                value: value ?? "",
-              });
-            }}
-            options={normalizedResourceOptions.map((option) => ({
-              value: option.handle,
-              label: option.displayName,
-            }))}
-            placeholder={
-              resourceQuery.isPending
-                ? "Loading..."
-                : resourceErrorMessage !== null
-                  ? `Could not load ${selectedParameter.label}s`
-                  : normalizedResourceOptions.length === 0
-                    ? `No ${selectedParameter.label}s available`
-                    : (selectedParameter.placeholder ?? `Any ${selectedParameter.label}`)
-            }
-            emptyMessage={resourceErrorMessage ?? `No matching ${selectedParameter.label}s.`}
-            value={selectedValue.length === 0 ? undefined : selectedValue}
-          />
+          {selectedParameter.multiValue === true ? (
+            <ResourceMultiSelectParameterField
+              key={`${input.connectionId}:${resolveParameterRuleValues(selectedRule).join("\u0000")}`}
+              disabled={input.disabled}
+              onRuleChange={(rule) => {
+                input.onRuleChange(selectedParameter.id, rule);
+              }}
+              parameter={selectedParameter}
+              placeholder={
+                resourceQuery.isPending
+                  ? "Loading..."
+                  : resourceErrorMessage !== null
+                    ? `Could not load ${selectedParameter.label}s`
+                    : normalizedResourceOptions.length === 0
+                      ? `No ${selectedParameter.label}s available`
+                      : (selectedParameter.placeholder ?? `Any ${selectedParameter.label}`)
+              }
+              rule={selectedRule}
+              resourceOptions={normalizedResourceOptions}
+              showOperator={false}
+            />
+          ) : (
+            <SingleSelectStringComboboxField
+              contentClassName="w-[min(22rem,calc(100vw-2rem))]"
+              inputId={inputId}
+              inputLabel={selectedParameter.label}
+              inputWrapperClassName="w-full"
+              disabled={input.disabled}
+              onChange={(value) => {
+                input.onRuleChange(selectedParameter.id, {
+                  operator: resolveEqualityOperator(selectedRule),
+                  value: value ?? "",
+                });
+              }}
+              options={normalizedResourceOptions.map((option) => ({
+                value: option.handle,
+                label: option.displayName,
+              }))}
+              placeholder={
+                resourceQuery.isPending
+                  ? "Loading..."
+                  : resourceErrorMessage !== null
+                    ? `Could not load ${selectedParameter.label}s`
+                    : normalizedResourceOptions.length === 0
+                      ? `No ${selectedParameter.label}s available`
+                      : (selectedParameter.placeholder ?? `Any ${selectedParameter.label}`)
+              }
+              emptyMessage={resourceErrorMessage ?? `No matching ${selectedParameter.label}s.`}
+              value={selectedValue.length === 0 ? undefined : selectedValue}
+            />
+          )}
           {resourceErrorMessage === null ? null : (
             <Notice variant="alert">{resourceErrorMessage}</Notice>
           )}
@@ -911,9 +973,10 @@ function EventParameterField(input: {
     );
   }
 
+  const multiValues = resolveParameterRuleValues(input.rule);
   const normalizedResourceOptions = normalizeResourceParameterOptions({
     items: resourceQuery.data?.items ?? [],
-    value,
+    selectedValues: input.parameter.multiValue === true ? multiValues : [value],
   });
   const resolvedSelectedResourceOption = normalizedResourceOptions.find(
     (option) => option.handle === value,
@@ -926,6 +989,20 @@ function EventParameterField(input: {
         : normalizedResourceOptions.length === 0
           ? `No ${input.parameter.label}s available`
           : `Select ${input.parameter.label}`;
+  if (input.parameter.multiValue === true) {
+    return (
+      <ResourceMultiSelectParameterField
+        key={`${input.connectionId}:${multiValues.join("\u0000")}`}
+        disabled={input.disabled}
+        onRuleChange={input.onRuleChange}
+        parameter={input.parameter}
+        placeholder={placeholder}
+        rule={input.rule}
+        resourceOptions={normalizedResourceOptions}
+      />
+    );
+  }
+
   return (
     <ResourceSelectParameterField
       key={`${input.connectionId}:${value}:${resolvedSelectedResourceOption?.displayName ?? ""}`}
@@ -936,6 +1013,94 @@ function EventParameterField(input: {
       rule={input.rule}
       resourceOptions={normalizedResourceOptions}
     />
+  );
+}
+
+function ResourceMultiSelectParameterField(input: {
+  disabled: boolean;
+  parameter: Extract<
+    NonNullable<WebhookTriggerEventOption["parameters"]>[number],
+    { kind: "resource-select" }
+  >;
+  rule: WebhookTriggerEventParameterRule | undefined;
+  placeholder: string;
+  resourceOptions: Array<{
+    id: string;
+    handle: string;
+    displayName: string;
+  }>;
+  onRuleChange: (rule: WebhookTriggerEventParameterRule) => void;
+  showOperator?: boolean;
+}): React.JSX.Element {
+  const inputId = useId();
+  const anchorRef = useComboboxAnchor();
+  const [isOpen, setIsOpen] = useState(false);
+  const showOperator = input.showOperator ?? true;
+  const selectedValues = resolveParameterRuleValues(input.rule);
+  const selectedLabels = selectedValues
+    .map(
+      (value) =>
+        input.resourceOptions.find((option) => option.handle === value)?.displayName ?? value,
+    )
+    .join(", ");
+
+  return (
+    <span className={EventParameterRowClassName}>
+      {showOperator ? (
+        <EqualityOperatorSelect
+          disabled={input.disabled}
+          parameter={input.parameter}
+          value={resolveEqualityOperator(input.rule)}
+          onValueChange={(operator) => {
+            input.onRuleChange({
+              operator,
+              value: "",
+              values: selectedValues,
+            });
+          }}
+        />
+      ) : null}
+      <Combobox<string, true>
+        disabled={input.disabled}
+        multiple
+        onOpenChange={setIsOpen}
+        onValueChange={(values) => {
+          input.onRuleChange({
+            operator: resolveEqualityOperator(input.rule),
+            value: "",
+            values,
+          });
+        }}
+        open={isOpen}
+        value={selectedValues}
+      >
+        <div className={EventParameterControlClassName} ref={anchorRef}>
+          <ComboboxInput
+            disabled={input.disabled}
+            id={inputId}
+            placeholder={
+              selectedValues.length === 0 ? `Any ${input.parameter.label}` : selectedLabels
+            }
+            showClear={false}
+          />
+        </div>
+        {isOpen ? (
+          <ComboboxContent
+            align="start"
+            anchor={anchorRef}
+            className="w-[min(22rem,calc(100vw-2rem))] p-0"
+          >
+            <ComboboxList className="max-h-72">
+              {input.resourceOptions.map((option) => (
+                <ComboboxItem key={option.id} value={option.handle}>
+                  <span className="truncate">{option.displayName}</span>
+                </ComboboxItem>
+              ))}
+            </ComboboxList>
+          </ComboboxContent>
+        ) : null}
+      </Combobox>
+    </span>
   );
 }
 

@@ -2,6 +2,7 @@ import {
   TriggerKinds,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  type WebhookTriggerEventCondition,
 } from "@mistle/db/control-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 
@@ -12,8 +13,7 @@ export type TriggerWebhookAggregate = {
   createdAt: string;
   updatedAt: string;
   integrationWebhookSourceId: string;
-  eventTypes: string[] | null;
-  payloadFilter: Record<string, unknown> | null;
+  eventConditions: WebhookTriggerEventCondition[];
   inputTemplate: string;
   instructions: string | null;
   conversationKeyTemplate: string;
@@ -72,8 +72,7 @@ export async function loadWebhookTriggerAggregateOrThrow(
     createdAt: trigger.createdAt,
     updatedAt: trigger.updatedAt,
     integrationWebhookSourceId: webhookTrigger.integrationWebhookSourceId,
-    eventTypes: webhookTrigger.eventTypes,
-    payloadFilter: webhookTrigger.payloadFilter,
+    eventConditions: webhookTrigger.eventConditions,
     inputTemplate: webhookTrigger.inputTemplate,
     instructions: webhookTrigger.instructions,
     conversationKeyTemplate: webhookTrigger.conversationKeyTemplate,

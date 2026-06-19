@@ -1,4 +1,8 @@
-import { TriggerKinds, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import {
+  TriggerKinds,
+  type ControlPlaneDatabase,
+  type WebhookTriggerEventCondition,
+} from "@mistle/db/control-plane";
 import { parseWebhookPayloadFilter } from "@mistle/webhooks";
 
 import { evaluateWebhookPayloadFilter } from "../shared/webhook-payload-filter-evaluator.js";
@@ -21,37 +25,29 @@ export type ResolvedWebhookTriggerTarget = {
 function isWebhookTriggerMatched(input: {
   eventType: string;
   payload: Record<string, unknown>;
-  eventTypes: ReadonlyArray<string> | null;
-  payloadFilter: Record<string, unknown> | null;
+  eventConditions: readonly WebhookTriggerEventCondition[];
 }): boolean {
-  const { eventType, payload, eventTypes, payloadFilter } = input;
+  for (const condition of input.eventConditions) {
+    if (condition.eventType !== input.eventType) {
+      continue;
+    }
 
-  if (eventTypes !== null && !eventTypes.includes(eventType)) {
-    return false;
+    if (condition.payloadFilter === undefined || condition.payloadFilter === null) {
+      return true;
+    }
+
+    const filter = parseWebhookPayloadFilter(condition.payloadFilter);
+    if (
+      evaluateWebhookPayloadFilter({
+        filter,
+        payload: input.payload,
+      })
+    ) {
+      return true;
+    }
   }
 
-  if (payloadFilter === null) {
-    return true;
-  }
-
-  const eventScopedPayloadFilter = payloadFilter[eventType];
-  if (eventScopedPayloadFilter === undefined) {
-    return true;
-  }
-
-  if (
-    typeof eventScopedPayloadFilter !== "object" ||
-    eventScopedPayloadFilter === null ||
-    Array.isArray(eventScopedPayloadFilter)
-  ) {
-    throw new Error(`Webhook payload filter for event type '${eventType}' must be an object.`);
-  }
-
-  const filter = parseWebhookPayloadFilter(eventScopedPayloadFilter);
-  return evaluateWebhookPayloadFilter({
-    filter,
-    payload,
-  });
+  return false;
 }
 
 export async function resolveWebhookTriggerTargets(
@@ -88,8 +84,7 @@ export async function resolveWebhookTriggerTargets(
     const matched = isWebhookTriggerMatched({
       eventType: input.eventType,
       payload: input.payload,
-      eventTypes: candidateWebhookTrigger.eventTypes ?? null,
-      payloadFilter: candidateWebhookTrigger.payloadFilter ?? null,
+      eventConditions: candidateWebhookTrigger.eventConditions,
     });
     if (!matched) {
       continue;

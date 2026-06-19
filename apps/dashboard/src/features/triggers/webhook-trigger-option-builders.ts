@@ -75,6 +75,24 @@ export function createWebhookTriggerEventId(input: {
   return `${input.webhookSourceId}::${input.eventType}`;
 }
 
+const WebhookTriggerEventConditionIdSeparator = "::condition:";
+
+export function createWebhookTriggerEventConditionId(input: {
+  eventOptionId: string;
+  index: number;
+}): string {
+  return `${input.eventOptionId}${WebhookTriggerEventConditionIdSeparator}${input.index}`;
+}
+
+export function resolveWebhookTriggerEventOptionIdFromConditionId(conditionId: string): string {
+  const [eventOptionId] = conditionId.split(WebhookTriggerEventConditionIdSeparator);
+  if (eventOptionId === undefined || eventOptionId.length === 0) {
+    throw new Error(`Invalid trigger event condition id '${conditionId}'.`);
+  }
+
+  return eventOptionId;
+}
+
 export function createWebhookTriggerEventOption(input: {
   eventDefinition: IntegrationWebhookEventDefinition;
   webhookSourceId: string;
@@ -138,6 +156,9 @@ export function createWebhookTriggerEventOption(input: {
                   kind: parameter.kind,
                   resourceKind: parameter.resourceKind,
                   payloadPath: [...parameter.payloadPath],
+                  ...(parameter.multiValue === undefined
+                    ? {}
+                    : { multiValue: parameter.multiValue }),
                   ...(parameter.negatedMatchRequiresExists === undefined
                     ? {}
                     : { negatedMatchRequiresExists: parameter.negatedMatchRequiresExists }),
@@ -366,10 +387,12 @@ export function buildWebhookTriggerEventOptions(input: {
   });
 
   const missingEventOptions = input.selectedEventIds
-    .filter(
-      (selectedTriggerId) =>
-        !supportedEventOptions.some((eventOption) => eventOption.id === selectedTriggerId),
-    )
+    .filter((selectedTriggerId) => {
+      const selectedEventOptionId =
+        resolveWebhookTriggerEventOptionIdFromConditionId(selectedTriggerId);
+
+      return !supportedEventOptions.some((eventOption) => eventOption.id === selectedEventOptionId);
+    })
     .map((selectedTriggerId) =>
       buildUnavailableSelectedWebhookTriggerEventOption({
         selectedTriggerId,
@@ -477,7 +500,8 @@ function buildUnavailableSelectedWebhookTriggerEventOption(input: {
   webhookSources: readonly IntegrationWebhookSource[];
   selectableConnectionIds: ReadonlySet<string> | null;
 }): WebhookTriggerEventOption {
-  const [integrationWebhookSourceId = "", ...eventTypeParts] = input.selectedTriggerId.split("::");
+  const eventOptionId = resolveWebhookTriggerEventOptionIdFromConditionId(input.selectedTriggerId);
+  const [integrationWebhookSourceId = "", ...eventTypeParts] = eventOptionId.split("::");
   const eventType = eventTypeParts.join("::");
   const source = input.webhookSources.find(
     (candidate) => candidate.id === integrationWebhookSourceId,
@@ -499,19 +523,22 @@ function buildUnavailableSelectedWebhookTriggerEventOption(input: {
     selectableConnectionIds: input.selectableConnectionIds,
   });
 
-  return createSyntheticWebhookTriggerEventOption({
-    triggerId: input.selectedTriggerId,
-    availability,
-    ...(target === undefined || connection === undefined
-      ? {}
-      : {
-          connectionLabel: formatWebhookTriggerEventGroupLabel({
-            integrationDisplayName: target.displayName,
-            connectionDisplayName: connection.displayName,
+  return {
+    ...createSyntheticWebhookTriggerEventOption({
+      triggerId: eventOptionId,
+      availability,
+      ...(target === undefined || connection === undefined
+        ? {}
+        : {
+            connectionLabel: formatWebhookTriggerEventGroupLabel({
+              integrationDisplayName: target.displayName,
+              connectionDisplayName: connection.displayName,
+            }),
           }),
-        }),
-    ...(eventDefinition === undefined ? {} : { label: eventDefinition.displayName }),
-  });
+      ...(eventDefinition === undefined ? {} : { label: eventDefinition.displayName }),
+    }),
+    id: input.selectedTriggerId,
+  };
 }
 
 function resolveUnavailableSelectedWebhookTriggerEventOptionAvailability(input: {

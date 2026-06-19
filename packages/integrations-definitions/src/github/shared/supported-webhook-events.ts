@@ -132,6 +132,7 @@ const GitHubRepositoryParameter: IntegrationWebhookEventParameterDefinition = {
   kind: "resource-select",
   resourceKind: "repository",
   payloadPath: ["repository", "full_name"],
+  multiValue: true,
   prefix: "in",
 };
 
@@ -141,6 +142,7 @@ const GitHubAuthorParameter: IntegrationWebhookEventParameterDefinition = {
   kind: "resource-select",
   resourceKind: "user",
   payloadPath: ["sender", "login"],
+  multiValue: true,
   prefix: "by",
   placeholder: "Any user",
 };
@@ -151,6 +153,7 @@ const GitHubCommenterParameter: IntegrationWebhookEventParameterDefinition = {
   kind: "resource-select",
   resourceKind: "user",
   payloadPath: ["sender", "login"],
+  multiValue: true,
   prefix: "by",
   placeholder: "Any user",
 };
@@ -161,6 +164,7 @@ const GitHubBotActorParameter: IntegrationWebhookEventParameterDefinition = {
   kind: "resource-select",
   resourceKind: "bot",
   payloadPath: ["sender", "login"],
+  multiValue: true,
   prefix: "by bot",
   placeholder: "Any bot",
 };
@@ -191,6 +195,7 @@ const GitHubBaseBranchParameter: IntegrationWebhookEventParameterDefinition = {
   kind: "resource-select",
   resourceKind: "branch",
   payloadPath: ["pull_request", "base", "ref"],
+  multiValue: true,
   prefix: "to",
   placeholder: "Any base branch",
 };
@@ -201,6 +206,7 @@ const GitHubHeadBranchParameter: IntegrationWebhookEventParameterDefinition = {
   kind: "resource-select",
   resourceKind: "branch",
   payloadPath: ["pull_request", "head", "ref"],
+  multiValue: true,
   prefix: "from",
   placeholder: "Any head branch",
 };
@@ -211,6 +217,7 @@ const GitHubRequestedReviewerParameter: IntegrationWebhookEventParameterDefiniti
   kind: "resource-select",
   resourceKind: "user",
   payloadPath: ["requested_reviewer", "login"],
+  multiValue: true,
   negatedMatchRequiresExists: true,
   prefix: "for",
   placeholder: "Any requested reviewer",
@@ -222,6 +229,7 @@ const GitHubRequestedTeamParameter: IntegrationWebhookEventParameterDefinition =
   kind: "resource-select",
   resourceKind: "team",
   payloadPath: ["requested_team", "slug"],
+  multiValue: true,
   negatedMatchRequiresExists: true,
   prefix: "for team",
   placeholder: "Any GitHub team",
@@ -233,6 +241,7 @@ const GitHubRequestedBotParameter: IntegrationWebhookEventParameterDefinition = 
   kind: "resource-select",
   resourceKind: "bot",
   payloadPath: ["requested_reviewer", "login"],
+  multiValue: true,
   negatedMatchRequiresExists: true,
   prefix: "for bot",
   placeholder: "Any bot",

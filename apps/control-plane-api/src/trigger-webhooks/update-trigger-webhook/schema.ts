@@ -5,14 +5,14 @@ import {
 } from "@mistle/http/errors.js";
 
 import { TriggerWebhooksBadRequestCodes } from "../constants.js";
+import { TriggerWebhookEventConditionSchema } from "../schemas.js";
 
 export const UpdateTriggerWebhookBodySchema = z
   .object({
     name: z.string().min(1).optional(),
     enabled: z.boolean().optional(),
     integrationWebhookSourceId: z.string().min(1).optional(),
-    eventTypes: z.array(z.string().min(1)).min(1).nullable().optional(),
-    payloadFilter: z.record(z.string(), z.unknown()).nullable().optional(),
+    eventConditions: z.array(TriggerWebhookEventConditionSchema).min(1).optional(),
     inputTemplate: z.string().min(1).optional(),
     instructions: z.string().min(1).nullable().optional(),
     conversationKeyTemplate: z.string().min(1).optional(),
@@ -41,8 +41,7 @@ export const UpdateTriggerWebhookBodySchema = z
       value.name !== undefined ||
       value.enabled !== undefined ||
       value.integrationWebhookSourceId !== undefined ||
-      value.eventTypes !== undefined ||
-      value.payloadFilter !== undefined ||
+      value.eventConditions !== undefined ||
       value.inputTemplate !== undefined ||
       value.instructions !== undefined ||
       value.conversationKeyTemplate !== undefined ||
