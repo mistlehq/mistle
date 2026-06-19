@@ -4594,6 +4594,15 @@
           },
           {
             "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "allowedPurposes",
+            "in": "query"
+          },
+          {
+            "schema": {
               "type": "integer",
               "minimum": 0
             },
