@@ -384,6 +384,43 @@ describe("toWebhookTriggerFormValues", () => {
     });
   });
 
+  it("hydrates repeated negative multi-value trigger parameters out of payload filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          eventConditions: [
+            {
+              eventType: "github.pull_request.opened",
+              payloadFilter: {
+                op: "and",
+                filters: [
+                  {
+                    op: "neq",
+                    path: ["sender", "login"],
+                    value: "dependabot",
+                  },
+                  {
+                    op: "neq",
+                    path: ["sender", "login"],
+                    value: "renovate",
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      eventParameterRules: {
+        [PullRequestConditionId0]: {
+          author: isNotAnyOfRule(["dependabot", "renovate"]),
+        },
+      },
+    });
+  });
+
   it("hydrates GitHub bot actor filters out of sender login payload filters", () => {
     expect(
       toWebhookTriggerFormValues(
@@ -1170,6 +1207,48 @@ describe("trigger payload transforms", () => {
                 op: "neq",
                 path: ["requested_reviewer", "login"],
                 value: "octocat",
+              },
+            ],
+          },
+        },
+      ],
+    });
+  });
+
+  it("guards multi-value negated GitHub requested reviewer filters against team review requests", () => {
+    expect(
+      toCreateWebhookTriggerPayload(
+        {
+          ...BaseFormValues,
+          eventIds: [PullRequestReviewRequestedConditionId0],
+          eventParameterRules: {
+            [PullRequestReviewRequestedConditionId0]: {
+              requestedReviewer: isNotAnyOfRule(["octocat", "hubot"]),
+            },
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      eventConditions: [
+        {
+          eventType: "github.pull_request.review_requested",
+          payloadFilter: {
+            op: "and",
+            filters: [
+              {
+                op: "exists",
+                path: ["requested_reviewer", "login"],
+              },
+              {
+                op: "neq",
+                path: ["requested_reviewer", "login"],
+                value: "octocat",
+              },
+              {
+                op: "neq",
+                path: ["requested_reviewer", "login"],
+                value: "hubot",
               },
             ],
           },

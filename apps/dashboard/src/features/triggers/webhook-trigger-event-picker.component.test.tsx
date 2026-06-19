@@ -93,6 +93,14 @@ function isAnyOfRule(values: readonly string[]) {
   };
 }
 
+function isNotAnyOfRule(values: readonly string[]) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS_NOT,
+    value: "",
+    values: [...values],
+  };
+}
+
 function containsTokenRule(value: string) {
   return {
     operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
@@ -514,7 +522,7 @@ describe("WebhookTriggerEventPicker", () => {
       },
     });
 
-    expect(screen.getAllByDisplayValue("octocat").length).toBeGreaterThan(0);
+    expect(screen.getAllByPlaceholderText("octocat").length).toBeGreaterThan(0);
     expect(screen.queryByPlaceholderText("Any author")).toBeNull();
   });
 
@@ -585,7 +593,7 @@ describe("WebhookTriggerEventPicker", () => {
       },
     });
 
-    expect(screen.getAllByDisplayValue("retired-user (Unavailable)").length).toBeGreaterThan(0);
+    expect(screen.getAllByPlaceholderText("retired-user (Unavailable)").length).toBeGreaterThan(0);
   });
 
   it("renders GitHub actor bot parameters from synced bot resources", async () => {
@@ -609,7 +617,7 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request opened")).toBeDefined();
     expect(screen.getByText("by bot")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("dependabot[bot]").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("dependabot[bot]").length).toBeGreaterThan(0);
     });
   });
 
@@ -675,9 +683,29 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request review requested")).toBeDefined();
     expect(screen.getByText("for team")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("Platform (mistle)").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("Platform (mistle)").length).toBeGreaterThan(0);
     });
     expect(container.textContent).not.toContain("Any requested reviewer");
+  });
+
+  it("selects GitHub review request one-of groups from multi-value rules", async () => {
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedEventIds: [PullRequestReviewRequestedConditionId],
+      eventOptions: [PullRequestReviewRequestedEventOption],
+      eventParameterRules: {
+        [PullRequestReviewRequestedConditionId]: {
+          requestedTeam: isAnyOfRule(["platform"]),
+        },
+      },
+    });
+
+    expect(screen.getByText("for team")).toBeDefined();
+    expect(screen.queryByText("for reviewer")).toBeNull();
+    await waitFor(() => {
+      expect(screen.getAllByPlaceholderText("Platform (mistle)").length).toBeGreaterThan(0);
+    });
   });
 
   it("renders GitHub review request bot targets from synced bot resources", async () => {
@@ -696,7 +724,7 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request review requested")).toBeDefined();
     expect(screen.getByText("for bot")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("mistle-agent[bot]").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("mistle-agent[bot]").length).toBeGreaterThan(0);
     });
   });
 
@@ -714,7 +742,7 @@ describe("WebhookTriggerEventPicker", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("legacy-team (Unavailable)").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("legacy-team (Unavailable)").length).toBeGreaterThan(0);
     });
   });
 
@@ -742,7 +770,7 @@ describe("WebhookTriggerEventPicker", () => {
 
     expect(screen.getByText("for team")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("platform (Unavailable)").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("platform (Unavailable)").length).toBeGreaterThan(0);
     });
     expect(
       screen.getByText(
@@ -768,7 +796,7 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request review request removed")).toBeDefined();
     expect(screen.getByText("for team")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("Platform (mistle)").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("Platform (mistle)").length).toBeGreaterThan(0);
     });
   });
 
@@ -788,7 +816,7 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request review request removed")).toBeDefined();
     expect(screen.getByText("for bot")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByDisplayValue("mistle-agent[bot]").length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText("mistle-agent[bot]").length).toBeGreaterThan(0);
     });
   });
 
@@ -839,6 +867,117 @@ describe("WebhookTriggerEventPicker", () => {
 
     expect(screen.getByText("for reviewer")).toBeDefined();
     expect(screen.getByText("is not")).toBeDefined();
+  });
+
+  it("preserves exclusion operators when editing multi-value resources", async () => {
+    TestQueryClient.setQueryData(["trigger-trigger-parameters", GitHubConnectionId, "user"], {
+      connectionId: GitHubConnectionId,
+      familyId: "github",
+      kind: "user",
+      syncState: "ready",
+      items: [
+        {
+          id: "icr_github_user_1",
+          familyId: "github",
+          kind: "user",
+          externalId: "1001",
+          handle: "octocat",
+          displayName: "octocat",
+          status: "accessible",
+          metadata: {},
+        },
+        {
+          id: "icr_github_user_2",
+          familyId: "github",
+          kind: "user",
+          externalId: "1002",
+          handle: "hubot",
+          displayName: "hubot",
+          status: "accessible",
+          metadata: {},
+        },
+      ],
+      page: {
+        totalResults: 2,
+        nextCursor: null,
+        previousCursor: null,
+      },
+    });
+
+    function StatefulMultiValueResourceSelection(): React.JSX.Element {
+      const eventOptionId = createWebhookTriggerEventId({
+        webhookSourceId: GitHubWebhookSourceId,
+        eventType: "github.pull_request.opened",
+      });
+      const triggerId = conditionId(eventOptionId);
+      const [eventParameterRules, setEventParameterRules] =
+        useState<WebhookTriggerEventParameterRuleMap>({
+          [triggerId]: {
+            author: isNotAnyOfRule(["octocat"]),
+          },
+        });
+
+      return (
+        <>
+          <output aria-label="event parameter rules">
+            {JSON.stringify(eventParameterRules[triggerId]?.author)}
+          </output>
+          <WebhookTriggerEventPicker
+            error={undefined}
+            eventOptions={WebhookEventOptions}
+            hasConnectedIntegrations={true}
+            onEventParameterRuleChange={({ triggerId: nextTriggerId, parameterId, rule }) => {
+              setEventParameterRules((currentValues) => ({
+                ...currentValues,
+                [nextTriggerId]: {
+                  ...currentValues[nextTriggerId],
+                  [parameterId]: rule,
+                },
+              }));
+            }}
+            onEventParameterRulesChange={({ triggerId: nextTriggerId, rules }) => {
+              setEventParameterRules((currentValues) => ({
+                ...currentValues,
+                [nextTriggerId]: rules,
+              }));
+            }}
+            onValueChange={() => {}}
+            selectedConnectionId={GitHubConnectionId}
+            selectedEventIds={[triggerId]}
+            eventParameterRules={eventParameterRules}
+          />
+        </>
+      );
+    }
+
+    render(
+      <QueryClientProvider client={TestQueryClient}>
+        <StatefulMultiValueResourceSelection />
+      </QueryClientProvider>,
+    );
+
+    const authorCombobox = screen.getAllByRole("combobox").find((element) => {
+      return element.getAttribute("placeholder") === "octocat";
+    });
+    if (authorCombobox === undefined) {
+      throw new Error("Expected selected author combobox.");
+    }
+
+    const authorComboboxTrigger = authorCombobox
+      .closest('[data-slot="input-group"]')
+      ?.querySelector('button[data-slot="input-group-button"]');
+    if (authorComboboxTrigger === undefined || authorComboboxTrigger === null) {
+      throw new Error("Expected selected author combobox trigger.");
+    }
+
+    fireEvent.click(authorComboboxTrigger);
+    fireEvent.click(screen.getByRole("option", { name: "hubot" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("event parameter rules").textContent).toBe(
+        JSON.stringify(isNotAnyOfRule(["octocat", "hubot"])),
+      );
+    });
   });
 
   it("resolves enum equality parameter selections as equality rules", () => {
@@ -1146,7 +1285,7 @@ describe("WebhookTriggerEventPicker", () => {
 
     const resourceComboboxes = screen
       .getAllByRole("combobox")
-      .filter((element) => element.getAttribute("placeholder") === "Any user");
+      .filter((element) => element.getAttribute("placeholder") === "octocat");
     const resourceCombobox = resourceComboboxes[0];
     if (resourceCombobox === undefined) {
       throw new Error("Expected resource combobox.");
@@ -1158,8 +1297,8 @@ describe("WebhookTriggerEventPicker", () => {
 
     const updatedResourceComboboxes = screen
       .getAllByRole("combobox")
-      .filter((element) => element.getAttribute("placeholder") === "Any user");
-    expect(updatedResourceComboboxes[0]?.getAttribute("value")).toBe("hubot");
+      .filter((element) => element.getAttribute("placeholder") === "hubot");
+    expect(updatedResourceComboboxes.length).toBeGreaterThan(0);
     expect(screen.queryByDisplayValue("unsaved query")).toBeNull();
   });
 });

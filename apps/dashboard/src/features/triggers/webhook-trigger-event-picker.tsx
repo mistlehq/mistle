@@ -515,7 +515,7 @@ function findConfiguredOneOfParameterId(input: {
 }): string {
   const configuredOption = input.options.find((option) => {
     const rule = input.rules[option.parameter.id];
-    return (rule?.value.trim().length ?? 0) > 0;
+    return resolveParameterRuleValues(rule).length > 0;
   });
 
   return configuredOption?.parameter.id ?? input.options[0]?.parameter.id ?? "";
@@ -722,39 +722,67 @@ function OneOfParameterGroupField(input: {
           input.onRuleChange(selectedParameter.id, {
             operator,
             value: selectedValue,
+            ...(selectedParameter.kind === "resource-select" &&
+            selectedParameter.multiValue === true &&
+            selectedRule?.values !== undefined
+              ? { values: selectedRule.values }
+              : {}),
           });
         }}
       />
       {selectedParameter.kind === "resource-select" ? (
         <div className={`${EventParameterControlClassName} space-y-1.5`}>
-          <SingleSelectStringComboboxField
-            contentClassName="w-[min(22rem,calc(100vw-2rem))]"
-            inputId={inputId}
-            inputLabel={selectedParameter.label}
-            inputWrapperClassName="w-full"
-            disabled={input.disabled}
-            onChange={(value) => {
-              input.onRuleChange(selectedParameter.id, {
-                operator: resolveEqualityOperator(selectedRule),
-                value: value ?? "",
-              });
-            }}
-            options={normalizedResourceOptions.map((option) => ({
-              value: option.handle,
-              label: option.displayName,
-            }))}
-            placeholder={
-              resourceQuery.isPending
-                ? "Loading..."
-                : resourceErrorMessage !== null
-                  ? `Could not load ${selectedParameter.label}s`
-                  : normalizedResourceOptions.length === 0
-                    ? `No ${selectedParameter.label}s available`
-                    : (selectedParameter.placeholder ?? `Any ${selectedParameter.label}`)
-            }
-            emptyMessage={resourceErrorMessage ?? `No matching ${selectedParameter.label}s.`}
-            value={selectedValue.length === 0 ? undefined : selectedValue}
-          />
+          {selectedParameter.multiValue === true ? (
+            <ResourceMultiSelectParameterField
+              key={`${input.connectionId}:${resolveParameterRuleValues(selectedRule).join("\u0000")}`}
+              disabled={input.disabled}
+              onRuleChange={(rule) => {
+                input.onRuleChange(selectedParameter.id, rule);
+              }}
+              parameter={selectedParameter}
+              placeholder={
+                resourceQuery.isPending
+                  ? "Loading..."
+                  : resourceErrorMessage !== null
+                    ? `Could not load ${selectedParameter.label}s`
+                    : normalizedResourceOptions.length === 0
+                      ? `No ${selectedParameter.label}s available`
+                      : (selectedParameter.placeholder ?? `Any ${selectedParameter.label}`)
+              }
+              rule={selectedRule}
+              resourceOptions={normalizedResourceOptions}
+              showOperator={false}
+            />
+          ) : (
+            <SingleSelectStringComboboxField
+              contentClassName="w-[min(22rem,calc(100vw-2rem))]"
+              inputId={inputId}
+              inputLabel={selectedParameter.label}
+              inputWrapperClassName="w-full"
+              disabled={input.disabled}
+              onChange={(value) => {
+                input.onRuleChange(selectedParameter.id, {
+                  operator: resolveEqualityOperator(selectedRule),
+                  value: value ?? "",
+                });
+              }}
+              options={normalizedResourceOptions.map((option) => ({
+                value: option.handle,
+                label: option.displayName,
+              }))}
+              placeholder={
+                resourceQuery.isPending
+                  ? "Loading..."
+                  : resourceErrorMessage !== null
+                    ? `Could not load ${selectedParameter.label}s`
+                    : normalizedResourceOptions.length === 0
+                      ? `No ${selectedParameter.label}s available`
+                      : (selectedParameter.placeholder ?? `Any ${selectedParameter.label}`)
+              }
+              emptyMessage={resourceErrorMessage ?? `No matching ${selectedParameter.label}s.`}
+              value={selectedValue.length === 0 ? undefined : selectedValue}
+            />
+          )}
           {resourceErrorMessage === null ? null : (
             <Notice variant="alert">{resourceErrorMessage}</Notice>
           )}
@@ -964,6 +992,7 @@ function EventParameterField(input: {
   if (input.parameter.multiValue === true) {
     return (
       <ResourceMultiSelectParameterField
+        key={`${input.connectionId}:${multiValues.join("\u0000")}`}
         disabled={input.disabled}
         onRuleChange={input.onRuleChange}
         parameter={input.parameter}
@@ -1001,10 +1030,12 @@ function ResourceMultiSelectParameterField(input: {
     displayName: string;
   }>;
   onRuleChange: (rule: WebhookTriggerEventParameterRule) => void;
+  showOperator?: boolean;
 }): React.JSX.Element {
   const inputId = useId();
   const anchorRef = useComboboxAnchor();
   const [isOpen, setIsOpen] = useState(false);
+  const showOperator = input.showOperator ?? true;
   const selectedValues = resolveParameterRuleValues(input.rule);
   const selectedLabels = selectedValues
     .map(
@@ -1015,14 +1046,27 @@ function ResourceMultiSelectParameterField(input: {
 
   return (
     <span className={EventParameterRowClassName}>
-      <span className={EventParameterLabelClassName}>{input.parameter.prefix ?? "in"}</span>
+      {showOperator ? (
+        <EqualityOperatorSelect
+          disabled={input.disabled}
+          parameter={input.parameter}
+          value={resolveEqualityOperator(input.rule)}
+          onValueChange={(operator) => {
+            input.onRuleChange({
+              operator,
+              value: "",
+              values: selectedValues,
+            });
+          }}
+        />
+      ) : null}
       <Combobox<string, true>
         disabled={input.disabled}
         multiple
         onOpenChange={setIsOpen}
         onValueChange={(values) => {
           input.onRuleChange({
-            operator: WebhookTriggerEventParameterRuleOperators.IS,
+            operator: resolveEqualityOperator(input.rule),
             value: "",
             values,
           });

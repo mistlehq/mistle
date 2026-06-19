@@ -315,6 +315,41 @@ function flattenAndPayloadFilterNodes(filters: readonly PayloadFilterNode[]): Pa
   );
 }
 
+function mergeMultiValueResourceRule(input: {
+  conditionRules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
+  parameterId: string;
+  operator: "is" | "is_not";
+  values: readonly string[];
+}): {
+  rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
+  merged: boolean;
+} {
+  const existingRule = input.conditionRules[input.parameterId];
+  if (existingRule !== undefined && existingRule.operator !== input.operator) {
+    return {
+      rules: input.conditionRules,
+      merged: false,
+    };
+  }
+
+  const existingValues = resolveConfiguredRuleValues({
+    value: existingRule?.value,
+    values: existingRule?.values,
+  });
+
+  return {
+    rules: {
+      ...input.conditionRules,
+      [input.parameterId]: {
+        operator: input.operator,
+        value: "",
+        values: [...new Set([...existingValues, ...input.values])],
+      },
+    },
+    merged: true,
+  };
+}
+
 function buildPayloadFilterNodeForTrigger(input: {
   eventOption: WebhookTriggerEventOption | undefined;
   triggerId: string;
@@ -639,18 +674,18 @@ export function extractWebhookTriggerEventParameterRules(input: {
         }
       } else if (parameter.kind === "resource-select" && parameter.multiValue === true) {
         if (filter.op === "in" || filter.op === "eq" || filter.op === "neq") {
-          eventParameterRules[conditionId] = {
-            ...(eventParameterRules[conditionId] ?? {}),
-            [parameter.id]: {
-              operator:
-                filter.op === "neq"
-                  ? WebhookTriggerEventParameterRuleOperators.IS_NOT
-                  : WebhookTriggerEventParameterRuleOperators.IS,
-              value: "",
-              values: filter.op === "in" ? filter.values : [filter.value],
-            },
-          };
-          extracted = true;
+          const operator =
+            filter.op === "neq"
+              ? WebhookTriggerEventParameterRuleOperators.IS_NOT
+              : WebhookTriggerEventParameterRuleOperators.IS;
+          const mergeResult = mergeMultiValueResourceRule({
+            conditionRules: eventParameterRules[conditionId] ?? {},
+            parameterId: parameter.id,
+            operator,
+            values: filter.op === "in" ? filter.values : [filter.value],
+          });
+          eventParameterRules[conditionId] = mergeResult.rules;
+          extracted = mergeResult.merged;
         }
       } else if (filter.op === "eq" || filter.op === "neq") {
         eventParameterRules[conditionId] = {
