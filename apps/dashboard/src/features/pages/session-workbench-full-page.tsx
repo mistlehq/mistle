@@ -596,10 +596,13 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
             isTurnInProgress: isConversationTurnRunning,
             pendingTurnId: conversationPane.chatState.pendingTurnId,
             autoScrollToBottomOnInitialLoad: true,
-            initialBottomScrollResetKey: [
-              input.sandboxInstanceId,
-              conversationPane.activeConversationId ?? "no-thread",
-            ].join(":"),
+            initialBottomScrollResetKey: resolveConversationScopedComposerRenderKey({
+              activeConversationId: conversationPane.activeConversationId,
+              providerConversationId: null,
+              requestedRuntimeConversationId: input.requestedRuntimeConversationId,
+              sandboxInstanceId: input.sandboxInstanceId,
+              triggerConversation: workbench.sandboxStatusQuery.data?.triggerConversation ?? null,
+            }),
             scrollBehavior: "follow-streaming-at-bottom",
             chatEntries: conversationPane.chatState.entries,
             formatInitialUserMessageAsTriggerInput: shouldFormatInitialUserMessageAsTriggerInput({
@@ -688,6 +691,23 @@ export function shouldFormatInitialUserMessageAsTriggerInput(input: {
     input.triggerConversation.providerConversationId !== null &&
     input.triggerConversation.providerConversationId === input.activeConversationId
   );
+}
+
+export function resolveConversationScopedComposerRenderKey(input: {
+  activeConversationId: string | null;
+  providerConversationId: string | null;
+  requestedRuntimeConversationId: string | null;
+  sandboxInstanceId: string | null;
+  triggerConversation: { providerConversationId: string | null } | null;
+}): string {
+  const conversationScopeId =
+    input.requestedRuntimeConversationId ??
+    input.activeConversationId ??
+    input.triggerConversation?.providerConversationId ??
+    input.providerConversationId ??
+    "no-thread";
+
+  return [input.sandboxInstanceId ?? "missing-session", conversationScopeId].join(":");
 }
 
 type PrimaryPanelConversationContent = Pick<
