@@ -665,6 +665,1782 @@
         }
       }
     },
+    "/v1/designer/sessions": {
+      "post": {
+        "tags": ["Designer"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20000
+                  }
+                },
+                "required": ["idempotencyKey", "prompt"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Create a Designer session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "organizationId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "title": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": ["string", "null"],
+                      "enum": [
+                        "pending",
+                        "starting",
+                        "started",
+                        "initializing",
+                        "running",
+                        "degraded",
+                        "reconnecting",
+                        "stopping",
+                        "stopped",
+                        "failed",
+                        null
+                      ]
+                    },
+                    "connectable": {
+                      "type": "boolean"
+                    },
+                    "failureCode": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "failureMessage": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "runtimeContext": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "agentRuntimeId": {
+                          "type": ["string", "null"],
+                          "enum": ["claude-code", "codex", "opencode", "pi", null]
+                        },
+                        "launchCwd": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "primaryRepositoryRoot": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
+                      "additionalProperties": false
+                    },
+                    "startupOperation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "operationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operationKind": {
+                          "type": "string",
+                          "enum": ["start", "resume"]
+                        }
+                      },
+                      "required": ["operationId", "operationKind"],
+                      "additionalProperties": false
+                    },
+                    "initialPrompt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "canvasTabs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "href": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2048
+                          }
+                        },
+                        "required": ["id", "title", "href"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organizationId",
+                    "sandboxInstanceId",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
+                    "title",
+                    "status",
+                    "connectable",
+                    "failureCode",
+                    "failureMessage",
+                    "runtimeContext",
+                    "startupOperation",
+                    "initialPrompt",
+                    "canvasTabs",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["DESIGNER_SANDBOX_RUNTIME_UNAVAILABLE"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Designer"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List Designer sessions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "organizationId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sandboxInstanceId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sandboxProfileId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sandboxProfileVersion": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "title": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
+                          "status": {
+                            "type": ["string", "null"],
+                            "enum": [
+                              "pending",
+                              "starting",
+                              "started",
+                              "initializing",
+                              "running",
+                              "degraded",
+                              "reconnecting",
+                              "stopping",
+                              "stopped",
+                              "failed",
+                              null
+                            ]
+                          },
+                          "connectable": {
+                            "type": "boolean"
+                          },
+                          "failureCode": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
+                          "failureMessage": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
+                          "runtimeContext": {
+                            "type": ["object", "null"],
+                            "properties": {
+                              "agentRuntimeId": {
+                                "type": ["string", "null"],
+                                "enum": ["claude-code", "codex", "opencode", "pi", null]
+                              },
+                              "launchCwd": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
+                              "primaryRepositoryRoot": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
+                            "additionalProperties": false
+                          },
+                          "startupOperation": {
+                            "type": ["object", "null"],
+                            "properties": {
+                              "operationId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "operationKind": {
+                                "type": "string",
+                                "enum": ["start", "resume"]
+                              }
+                            },
+                            "required": ["operationId", "operationKind"],
+                            "additionalProperties": false
+                          },
+                          "initialPrompt": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
+                          "canvasTabs": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128
+                                },
+                                "title": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 120
+                                },
+                                "href": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2048
+                                }
+                              },
+                              "required": ["id", "title", "href"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "organizationId",
+                          "sandboxInstanceId",
+                          "sandboxProfileId",
+                          "sandboxProfileVersion",
+                          "title",
+                          "status",
+                          "connectable",
+                          "failureCode",
+                          "failureMessage",
+                          "runtimeContext",
+                          "startupOperation",
+                          "initialPrompt",
+                          "canvasTabs",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/designer/sessions/{sessionId}/connection-token": {
+      "post": {
+        "tags": ["Designer"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^dsn_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "sessionId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Issue a short-lived connection token for a Designer session sandbox.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "instanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "token": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["instanceId", "url", "token", "expiresAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Designer session or sandbox instance was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["DESIGNER_SESSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Designer session sandbox is not running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "INSTANCE_FAILED",
+                        "INSTANCE_NOT_RESUMABLE",
+                        "INSTANCE_STOP_NOT_SUPPORTED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/designer/sandbox-instances/{instanceId}": {
+      "get": {
+        "tags": ["Designer"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbi_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "instanceId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get Designer UI metadata for a sandbox instance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "organizationId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "title": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": ["string", "null"],
+                      "enum": [
+                        "pending",
+                        "starting",
+                        "started",
+                        "initializing",
+                        "running",
+                        "degraded",
+                        "reconnecting",
+                        "stopping",
+                        "stopped",
+                        "failed",
+                        null
+                      ]
+                    },
+                    "connectable": {
+                      "type": "boolean"
+                    },
+                    "failureCode": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "failureMessage": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "runtimeContext": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "agentRuntimeId": {
+                          "type": ["string", "null"],
+                          "enum": ["claude-code", "codex", "opencode", "pi", null]
+                        },
+                        "launchCwd": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "primaryRepositoryRoot": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
+                      "additionalProperties": false
+                    },
+                    "startupOperation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "operationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operationKind": {
+                          "type": "string",
+                          "enum": ["start", "resume"]
+                        }
+                      },
+                      "required": ["operationId", "operationKind"],
+                      "additionalProperties": false
+                    },
+                    "initialPrompt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "canvasTabs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "href": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2048
+                          }
+                        },
+                        "required": ["id", "title", "href"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organizationId",
+                    "sandboxInstanceId",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
+                    "title",
+                    "status",
+                    "connectable",
+                    "failureCode",
+                    "failureMessage",
+                    "runtimeContext",
+                    "startupOperation",
+                    "initialPrompt",
+                    "canvasTabs",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Designer session was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["DESIGNER_SESSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/designer/sandbox-instances/{instanceId}/canvas-tabs": {
+      "put": {
+        "tags": ["Designer"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbi_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "instanceId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tabs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "href": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2048
+                        }
+                      },
+                      "required": ["id", "title", "href"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["tabs"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update Designer canvas tabs for a sandbox instance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "organizationId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "title": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": ["string", "null"],
+                      "enum": [
+                        "pending",
+                        "starting",
+                        "started",
+                        "initializing",
+                        "running",
+                        "degraded",
+                        "reconnecting",
+                        "stopping",
+                        "stopped",
+                        "failed",
+                        null
+                      ]
+                    },
+                    "connectable": {
+                      "type": "boolean"
+                    },
+                    "failureCode": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "failureMessage": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "runtimeContext": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "agentRuntimeId": {
+                          "type": ["string", "null"],
+                          "enum": ["claude-code", "codex", "opencode", "pi", null]
+                        },
+                        "launchCwd": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "primaryRepositoryRoot": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
+                      "additionalProperties": false
+                    },
+                    "startupOperation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "operationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operationKind": {
+                          "type": "string",
+                          "enum": ["start", "resume"]
+                        }
+                      },
+                      "required": ["operationId", "operationKind"],
+                      "additionalProperties": false
+                    },
+                    "initialPrompt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "canvasTabs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "href": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2048
+                          }
+                        },
+                        "required": ["id", "title", "href"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organizationId",
+                    "sandboxInstanceId",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
+                    "title",
+                    "status",
+                    "connectable",
+                    "failureCode",
+                    "failureMessage",
+                    "runtimeContext",
+                    "startupOperation",
+                    "initialPrompt",
+                    "canvasTabs",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Designer session was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["DESIGNER_SESSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/designer/sessions/{sessionId}": {
+      "get": {
+        "tags": ["Designer"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^dsn_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "sessionId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a Designer session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "organizationId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "title": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": ["string", "null"],
+                      "enum": [
+                        "pending",
+                        "starting",
+                        "started",
+                        "initializing",
+                        "running",
+                        "degraded",
+                        "reconnecting",
+                        "stopping",
+                        "stopped",
+                        "failed",
+                        null
+                      ]
+                    },
+                    "connectable": {
+                      "type": "boolean"
+                    },
+                    "failureCode": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "failureMessage": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "runtimeContext": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "agentRuntimeId": {
+                          "type": ["string", "null"],
+                          "enum": ["claude-code", "codex", "opencode", "pi", null]
+                        },
+                        "launchCwd": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "primaryRepositoryRoot": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
+                      "additionalProperties": false
+                    },
+                    "startupOperation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "operationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operationKind": {
+                          "type": "string",
+                          "enum": ["start", "resume"]
+                        }
+                      },
+                      "required": ["operationId", "operationKind"],
+                      "additionalProperties": false
+                    },
+                    "initialPrompt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "canvasTabs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "href": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2048
+                          }
+                        },
+                        "required": ["id", "title", "href"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organizationId",
+                    "sandboxInstanceId",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
+                    "title",
+                    "status",
+                    "connectable",
+                    "failureCode",
+                    "failureMessage",
+                    "runtimeContext",
+                    "startupOperation",
+                    "initialPrompt",
+                    "canvasTabs",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Designer session was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["DESIGNER_SESSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/designer/sessions/{sessionId}/canvas-tabs": {
+      "put": {
+        "tags": ["Designer"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^dsn_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "sessionId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tabs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "href": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2048
+                        }
+                      },
+                      "required": ["id", "title", "href"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["tabs"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update Designer session canvas tabs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "organizationId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "title": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": ["string", "null"],
+                      "enum": [
+                        "pending",
+                        "starting",
+                        "started",
+                        "initializing",
+                        "running",
+                        "degraded",
+                        "reconnecting",
+                        "stopping",
+                        "stopped",
+                        "failed",
+                        null
+                      ]
+                    },
+                    "connectable": {
+                      "type": "boolean"
+                    },
+                    "failureCode": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "failureMessage": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "runtimeContext": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "agentRuntimeId": {
+                          "type": ["string", "null"],
+                          "enum": ["claude-code", "codex", "opencode", "pi", null]
+                        },
+                        "launchCwd": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "primaryRepositoryRoot": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
+                      "additionalProperties": false
+                    },
+                    "startupOperation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "operationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operationKind": {
+                          "type": "string",
+                          "enum": ["start", "resume"]
+                        }
+                      },
+                      "required": ["operationId", "operationKind"],
+                      "additionalProperties": false
+                    },
+                    "initialPrompt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "canvasTabs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "href": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2048
+                          }
+                        },
+                        "required": ["id", "title", "href"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organizationId",
+                    "sandboxInstanceId",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
+                    "title",
+                    "status",
+                    "connectable",
+                    "failureCode",
+                    "failureMessage",
+                    "runtimeContext",
+                    "startupOperation",
+                    "initialPrompt",
+                    "canvasTabs",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Designer session was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["DESIGNER_SESSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/triggers": {
       "get": {
         "tags": ["Triggers"],

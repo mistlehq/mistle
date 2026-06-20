@@ -26,7 +26,17 @@ export type SetupAssistantMcpTokenClaims = {
   sandboxProfileVersion: number;
 };
 
-export type McpTokenClaims = ApiKeyMcpTokenClaims | SetupAssistantMcpTokenClaims;
+export type DesignerMcpTokenClaims = {
+  kind: "designer";
+  sub: string;
+  organizationId: string;
+  designerSessionId: string;
+};
+
+export type McpTokenClaims =
+  | ApiKeyMcpTokenClaims
+  | SetupAssistantMcpTokenClaims
+  | DesignerMcpTokenClaims;
 
 export type VerifiedMcpToken = McpTokenClaims & {
   expiresAt: Date;
@@ -38,6 +48,7 @@ export const McpTokenErrorCode = {
   SANDBOX_INSTANCE_ID_REQUIRED: "SANDBOX_INSTANCE_ID_REQUIRED",
   ORGANIZATION_ID_REQUIRED: "ORGANIZATION_ID_REQUIRED",
   API_KEY_ID_REQUIRED: "API_KEY_ID_REQUIRED",
+  DESIGNER_SESSION_ID_REQUIRED: "DESIGNER_SESSION_ID_REQUIRED",
   SANDBOX_PROFILE_ID_REQUIRED: "SANDBOX_PROFILE_ID_REQUIRED",
   SANDBOX_PROFILE_VERSION_REQUIRED: "SANDBOX_PROFILE_VERSION_REQUIRED",
   INVALID_TTL_SECONDS: "INVALID_TTL_SECONDS",
@@ -101,6 +112,7 @@ function normalizeClaims(claims: {
   apiKeyId?: string;
   sandboxProfileId?: string;
   sandboxProfileVersion?: unknown;
+  designerSessionId?: string;
 }): McpTokenClaims {
   const normalizedKind = toNonEmptyString(claims.kind);
   if (normalizedKind === undefined) {
@@ -140,6 +152,23 @@ function normalizeClaims(claims: {
       sub: normalizedSandboxInstanceId,
       organizationId: normalizedOrganizationId,
       apiKeyId: normalizedApiKeyId,
+    };
+  }
+
+  if (normalizedKind === "designer") {
+    const normalizedDesignerSessionId = toNonEmptyString(claims.designerSessionId);
+    if (normalizedDesignerSessionId === undefined) {
+      throw new McpTokenError({
+        code: McpTokenErrorCode.DESIGNER_SESSION_ID_REQUIRED,
+        message: "MCP token designerSessionId claim is required.",
+      });
+    }
+
+    return {
+      kind: "designer",
+      sub: normalizedSandboxInstanceId,
+      organizationId: normalizedOrganizationId,
+      designerSessionId: normalizedDesignerSessionId,
     };
   }
 
@@ -232,6 +261,14 @@ function createJwtPayload(claims: McpTokenClaims): Record<string, string | numbe
     };
   }
 
+  if (claims.kind === "designer") {
+    return {
+      kind: claims.kind,
+      organizationId: claims.organizationId,
+      designerSessionId: claims.designerSessionId,
+    };
+  }
+
   return {
     kind: claims.kind,
     organizationId: claims.organizationId,
@@ -280,6 +317,10 @@ export async function verifyMcpToken(input: {
           ? verificationResult.payload.sandboxProfileId
           : "",
       sandboxProfileVersion: verificationResult.payload.sandboxProfileVersion,
+      designerSessionId:
+        typeof verificationResult.payload.designerSessionId === "string"
+          ? verificationResult.payload.designerSessionId
+          : "",
     });
     const expiresAtEpochSeconds = verificationResult.payload.exp;
 

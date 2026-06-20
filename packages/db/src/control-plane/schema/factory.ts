@@ -3,6 +3,7 @@ import { pgSchema } from "drizzle-orm/pg-core";
 import { defineAccounts } from "./accounts.js";
 import { defineApiKeyPermissions } from "./api-key-permissions.js";
 import { defineApiKeys } from "./api-keys.js";
+import { defineDesignerSessions } from "./designer-sessions.js";
 import { defineIdentityLinkRedirectSessions } from "./identity-link-redirect-sessions.js";
 import { defineIntegrationConnectionCredentials } from "./integration-connection-credentials.js";
 import { defineIntegrationConnectionDeviceAuthorizationAttempts } from "./integration-connection-device-authorization-attempts.js";
@@ -73,6 +74,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
   const accounts = defineAccounts(schema);
   const apiKeys = defineApiKeys(schema);
   const apiKeyPermissions = defineApiKeyPermissions(schema);
+  const designerSessions = defineDesignerSessions(schema);
   const triggerConversationDeliveryProcessors = defineTriggerConversationDeliveryProcessors(schema);
   const triggerConversationDeliveryTasks = defineTriggerConversationDeliveryTasks(schema);
   const triggerConversationRoutes = defineTriggerConversationRoutes(schema);
@@ -150,6 +152,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
     accounts,
     apiKeyPermissions,
     apiKeys,
+    designerSessions,
     triggerConversationDeliveryProcessors,
     triggerConversationDeliveryTasks,
     triggerConversationRoutes,

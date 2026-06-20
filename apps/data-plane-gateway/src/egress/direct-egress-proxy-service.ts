@@ -28,6 +28,7 @@ import type { GatewayEgressHttpRequest, RepeatedHeaderValues } from "./gateway-e
 import {
   buildManagedEgressRequest,
   GatewayManagedEgressUnsupportedRouteError,
+  type GatewayPlatformCredentialConfig,
 } from "./managed-egress-request.js";
 import {
   decodeObservedResponseBody,
@@ -122,6 +123,7 @@ type DirectEgressLogFields = {
   routeCredentialConnectionId?: string;
   routeCredentialKind?: string;
   routeCredentialMistleMcpApiKeyId?: string;
+  routeCredentialMistleMcpDesignerSessionId?: string;
   routeCredentialMistleMcpSandboxProfileId?: string;
   routeCredentialMistleMcpSandboxProfileVersion?: number;
   routeCredentialProviderFamily?: string;
@@ -168,6 +170,7 @@ export class DirectEgressProxyService {
     private readonly egressTokenConfig: EgressTokenConfig,
     private readonly integrationRegistry: DirectEgressIntegrationRegistry,
     private readonly mcpTokenConfig: McpTokenConfig,
+    private readonly platformCredentials: GatewayPlatformCredentialConfig | undefined,
     private readonly trustedUpstreamCaCertificates: readonly string[] | undefined,
   ) {}
 
@@ -416,6 +419,9 @@ export class DirectEgressProxyService {
         credentialCache: this.credentialCache,
         mcpTokenConfig: this.mcpTokenConfig,
         organizationId: input.admission.activeRuntimePlan.organizationId,
+        ...(this.platformCredentials === undefined
+          ? {}
+          : { platformCredentials: this.platformCredentials }),
         request: input.admission.request,
         route: input.admission.classification.route,
         sandboxInstanceId: input.admission.token.sub,
@@ -1132,6 +1138,7 @@ function directEgressCredentialResolverLogFields(
   | "routeCredentialConnectionId"
   | "routeCredentialKind"
   | "routeCredentialMistleMcpApiKeyId"
+  | "routeCredentialMistleMcpDesignerSessionId"
   | "routeCredentialMistleMcpSandboxProfileId"
   | "routeCredentialMistleMcpSandboxProfileVersion"
   | "routeCredentialProviderFamily"
@@ -1165,6 +1172,19 @@ function directEgressCredentialResolverLogFields(
     return {
       routeCredentialMistleMcpSandboxProfileId: credentialResolver.sandboxProfileId,
       routeCredentialMistleMcpSandboxProfileVersion: credentialResolver.sandboxProfileVersion,
+      routeCredentialResolverKind: credentialResolver.kind,
+    };
+  }
+
+  if (credentialResolver.kind === "mistle_mcp_designer_token") {
+    return {
+      routeCredentialMistleMcpDesignerSessionId: credentialResolver.designerSessionId,
+      routeCredentialResolverKind: credentialResolver.kind,
+    };
+  }
+
+  if (credentialResolver.kind === "platform_openai_api_key") {
+    return {
       routeCredentialResolverKind: credentialResolver.kind,
     };
   }

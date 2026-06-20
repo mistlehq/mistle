@@ -9,6 +9,7 @@ import {
   type ControlPlaneTables,
   type ScheduleKind,
 } from "@mistle/db/control-plane";
+import { mintMcpToken } from "@mistle/gateway-tunnel-auth";
 import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "@mistle/integrations-core";
 import {
   createIntegrationTest,
@@ -34,6 +35,12 @@ import {
 const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
+
+const McpTokenConfig = {
+  tokenSecret: "integration-new-mcp-auth-secret",
+  tokenIssuer: "integration-new-control-plane-api",
+  tokenAudience: "integration-new-mistle-mcp",
+};
 
 const JsonRpcToolResponseSchema = z
   .object({
@@ -939,6 +946,58 @@ describe.concurrent("MCP trigger tools integration", () => {
     });
 
     expect(result.isError).toBe(true);
+  });
+
+  it("prevents designer MCP tokens from creating or updating triggers", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-designer-trigger-mutation-forbidden@example.com",
+    });
+    const token = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "designer",
+        sub: "sbi_mcp_designer_trigger_mutation_forbidden",
+        organizationId: session.organizationId,
+        designerSessionId: "dsn_mcp_designer_trigger_mutation_forbidden",
+      },
+      ttlSeconds: 300,
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: "dsn_mcp_designer_trigger_mutation_forbidden",
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_designer_trigger_mutation_forbidden",
+      initialPrompt: null,
+      canvasTabs: [],
+    });
+
+    const createResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "create_scheduled_trigger",
+      arguments: {
+        name: "Forbidden Designer scheduled trigger",
+        enabled: true,
+        cronExpression: "15 8 * * *",
+        timezone: "UTC",
+        userMessage: "Run the scheduled maintenance check",
+        target: {
+          sandboxProfileId: "sbp_mcp_designer_trigger_mutation_forbidden",
+        },
+      },
+    });
+    const updateResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "rename_trigger",
+      arguments: {
+        triggerId: "atm_mcp_designer_trigger_mutation_forbidden",
+        name: "Forbidden Designer trigger rename",
+      },
+    });
+
+    expect(createResult.isError).toBe(true);
+    expect(updateResult.isError).toBe(true);
   });
 });
 

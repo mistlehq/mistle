@@ -1,3 +1,4 @@
+import { SandboxInstancePurposes } from "@mistle/db/data-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import type { McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 
@@ -20,9 +21,10 @@ import {
   mcpSandboxOperationEventsListInputSchema,
 } from "../tool-schemas.js";
 import {
-  requireMcpSandboxInstanceScope,
+  requireMcpDesignerSandboxInstanceScope,
   requireMcpSandboxInstanceProfileScope,
   requireMcpSandboxProfileScope,
+  requireMcpSetupAssistantSandboxInstanceScope,
   requireMcpToolPermission,
   structuredResult,
 } from "./shared.js";
@@ -42,6 +44,15 @@ const MutatingToolAnnotations: ToolAnnotations = {
 };
 
 const DefaultSandboxOperationEventsLimit = 20;
+
+function resolveMcpSandboxReadPurposeScope(organizationActor: AppOrganizationActor): {
+  allowedPurposes?: readonly [typeof SandboxInstancePurposes.DESIGNER];
+} {
+  return organizationActor.kind === "mcp_capability" &&
+    organizationActor.capability.kind === "designer"
+    ? { allowedPurposes: [SandboxInstancePurposes.DESIGNER] }
+    : {};
+}
 
 export function registerSandboxTools(server: McpServer, context: MistleMcpServerContext): void {
   server.registerTool(
@@ -204,13 +215,14 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
         {
           organizationId: context.organizationActor.organizationId,
           instanceId,
+          ...resolveMcpSandboxReadPurposeScope(context.organizationActor),
         },
       );
       requireMcpSandboxInstanceProfileScope(context.organizationActor, {
         sandboxProfileId: sandboxInstance.sandboxProfileId,
         sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
       });
-      requireMcpSandboxInstanceScope(context.organizationActor, {
+      requireMcpSetupAssistantSandboxInstanceScope(context.organizationActor, {
         sandboxInstanceId: sandboxInstance.id,
       });
 
@@ -261,11 +273,15 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
         {
           organizationId: context.organizationActor.organizationId,
           instanceId,
+          ...resolveMcpSandboxReadPurposeScope(context.organizationActor),
         },
       );
       requireMcpSandboxInstanceProfileScope(context.organizationActor, {
         sandboxProfileId: sandboxInstance.sandboxProfileId,
         sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+      });
+      requireMcpDesignerSandboxInstanceScope(context.organizationActor, {
+        sandboxInstanceId: sandboxInstance.id,
       });
 
       return structuredResult(sandboxInstance);
@@ -297,11 +313,15 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
         {
           organizationId: context.organizationActor.organizationId,
           instanceId,
+          ...resolveMcpSandboxReadPurposeScope(context.organizationActor),
         },
       );
       requireMcpSandboxInstanceProfileScope(context.organizationActor, {
         sandboxProfileId: sandboxInstance.sandboxProfileId,
         sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+      });
+      requireMcpDesignerSandboxInstanceScope(context.organizationActor, {
+        sandboxInstanceId: sandboxInstance.id,
       });
 
       const operationEvents = await listOperationEvents(
@@ -312,6 +332,7 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
           organizationId: context.organizationActor.organizationId,
           sandboxInstanceId: instanceId,
           operationId,
+          ...resolveMcpSandboxReadPurposeScope(context.organizationActor),
           ...(afterSequence === undefined ? {} : { afterSequence }),
           limit: limit ?? DefaultSandboxOperationEventsLimit,
         },

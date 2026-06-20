@@ -42,6 +42,14 @@ import {
   listSkillMentions,
 } from "../../../pages/session-composer/session-composer-trigger-detection.js";
 import {
+  createDashboardControlDynamicToolCallResponse,
+  DesignerCanvasTabOpenDynamicToolSpec,
+  isDashboardControlDynamicToolCallRequest,
+  parseDashboardControlDynamicToolCall,
+  type DashboardControlActionRequest,
+  type DashboardControlActionSupport,
+} from "../../dashboard-control-actions.js";
+import {
   createInitialCodexApprovalRequestsState,
   reduceCodexApprovalRequestsState,
   type CodexApprovalRequestEntry,
@@ -196,6 +204,32 @@ function readCompletedTurnId(notification: CodexJsonRpcNotification): string | n
   return turn.id;
 }
 
+async function respondToDashboardControlAction(input: {
+  action: DashboardControlActionSupport;
+  parsedRequest: DashboardControlActionRequest;
+  request: CodexJsonRpcServerRequest;
+  rpcClient: CodexJsonRpcClient;
+}): Promise<void> {
+  try {
+    await input.action.handleAction(input.parsedRequest);
+    await input.rpcClient.respond(
+      input.request.id,
+      createDashboardControlDynamicToolCallResponse({
+        success: true,
+        text: "Opened Designer canvas tab.",
+      }),
+    );
+  } catch (error) {
+    await input.rpcClient.respond(
+      input.request.id,
+      createDashboardControlDynamicToolCallResponse({
+        success: false,
+        text: error instanceof Error ? error.message : "Dashboard control action was rejected.",
+      }),
+    );
+  }
+}
+
 type CodexSessionChatState = {
   chatState: CodexChatState;
   isStartingTurn: boolean;
@@ -285,6 +319,7 @@ export function useCodexSessionState(input: {
   sessionClientRef: RefObject<AgentStreamClient | null>;
   rpcClientRef: RefObject<CodexJsonRpcClient | null>;
   sessionEventUnsubscribersRef: RefObject<(() => void)[]>;
+  dashboardControlActions?: DashboardControlActionSupport;
 }): UseCodexSessionStateResult {
   const rpcClientRef = input.rpcClientRef;
   const sessionSnapshotRef = useRef<ConnectedCodexSession | null>(null);
@@ -432,6 +467,48 @@ export function useCodexSessionState(input: {
     });
   }, []);
 
+  const handleServerRequestReceivedWithDashboardControls = useCallback(
+    (request: CodexJsonRpcServerRequest): void => {
+      if (!isDashboardControlDynamicToolCallRequest(request)) {
+        handleServerRequestReceived(request);
+        return;
+      }
+
+      const rpcClient = rpcClientRef.current;
+      if (rpcClient === null) {
+        return;
+      }
+
+      const parsedRequest = parseDashboardControlDynamicToolCall(request.params);
+      if ("contentItems" in parsedRequest) {
+        void rpcClient.respond(request.id, parsedRequest);
+        return;
+      }
+
+      if (
+        input.dashboardControlActions === undefined ||
+        !input.dashboardControlActions.supportedActions.includes(parsedRequest.action)
+      ) {
+        void rpcClient.respond(
+          request.id,
+          createDashboardControlDynamicToolCallResponse({
+            success: false,
+            text: "Dashboard control action is not supported by the current dashboard surface.",
+          }),
+        );
+        return;
+      }
+
+      void respondToDashboardControlAction({
+        action: input.dashboardControlActions,
+        parsedRequest,
+        request,
+        rpcClient,
+      });
+    },
+    [handleServerRequestReceived, input.dashboardControlActions, rpcClientRef],
+  );
+
   const handleSessionNotificationReceived = useCallback(
     (notification: CodexJsonRpcNotification): void => {
       const tokenUsageSnapshot = parseThreadTokenUsageSnapshot(notification);
@@ -459,6 +536,12 @@ export function useCodexSessionState(input: {
     [handleNotificationReceived, recordLoadedGoal, recordNoGoalForThread],
   );
 
+  const dashboardControlDynamicTools = useMemo(
+    () =>
+      input.dashboardControlActions === undefined ? [] : [DesignerCanvasTabOpenDynamicToolSpec],
+    [input.dashboardControlActions],
+  );
+
   const { lifecycle, updateActiveThread } = useCodexSessionConnection({
     connectionGenerationRef,
     ensureCurrentGeneration,
@@ -467,7 +550,8 @@ export function useCodexSessionState(input: {
       setRepositoryStatusRefreshEpoch((currentEpoch) => currentEpoch + 1);
     },
     onServerRequestNotification: handleServerRequestNotification,
-    onServerRequestReceived: handleServerRequestReceived,
+    onServerRequestReceived: handleServerRequestReceivedWithDashboardControls,
+    dashboardControlDynamicTools,
     refreshThreadCollections,
     recordStartedThreadAsOriginalAfterEmptyScan,
     recordThreadAsOriginal,
@@ -652,6 +736,7 @@ export function useCodexSessionState(input: {
 
       const threadStart = await startCodexThread({
         ...(input?.cwd === undefined ? {} : { cwd: input.cwd }),
+        dynamicTools: dashboardControlDynamicTools,
         rpcClient,
       });
       return threadStart;
@@ -1211,6 +1296,7 @@ export function useCodexSessionState(input: {
         const startedThread = await startCodexThread({
           rpcClient,
           cwd: activeThreadCwd,
+          dynamicTools: dashboardControlDynamicTools,
           sessionStartSource: "clear",
         });
         setClearContextImplementationThreadId(startedThread.threadId);

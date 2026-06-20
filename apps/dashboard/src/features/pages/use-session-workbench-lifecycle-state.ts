@@ -43,6 +43,11 @@ type SessionWorkbenchSandboxStatusSnapshot = {
   status: SandboxInstanceStatusResult["status"] | null;
 };
 
+export type SessionWorkbenchSandboxStatusReader = (input: {
+  sandboxInstanceId: string;
+  signal?: AbortSignal;
+}) => Promise<SandboxInstanceStatusResult>;
+
 type SessionSnapshotForWorkbench = {
   activeRuntimeConversationCwd?: string | null;
   activeRuntimeConversationId?: string | null;
@@ -153,8 +158,19 @@ export function resolveSessionSnapshotStatusRefreshKey(input: {
   return `${input.sandboxInstanceId}:${input.sessionSnapshot.connectedAtIso}`;
 }
 
+function readSessionSandboxInstanceStatus(input: {
+  sandboxInstanceId: string;
+  signal?: AbortSignal;
+}): Promise<SandboxInstanceStatusResult> {
+  return getSandboxInstanceStatus({
+    instanceId: input.sandboxInstanceId,
+    ...(input.signal === undefined ? {} : { signal: input.signal }),
+  });
+}
+
 export function useSessionWorkbenchLifecycleState(input: {
   sandboxInstanceId: string | null;
+  sandboxStatusReader?: SessionWorkbenchSandboxStatusReader;
   mainPanelTransitionState: MainPanelTransitionState;
   requestedRuntimeConversationId?: string | null;
   resetSessionTransport: () => void;
@@ -190,8 +206,9 @@ export function useSessionWorkbenchLifecycleState(input: {
         throw new Error("Session id is required.");
       }
 
-      return getSandboxInstanceStatus({
-        instanceId: input.sandboxInstanceId,
+      const sandboxStatusReader = input.sandboxStatusReader ?? readSessionSandboxInstanceStatus;
+      return sandboxStatusReader({
+        sandboxInstanceId: input.sandboxInstanceId,
         signal,
       });
     },

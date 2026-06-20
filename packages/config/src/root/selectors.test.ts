@@ -21,6 +21,7 @@ function createRootConfig(input: {
     client_secret: string;
   };
   kvControlPlane?: Config["kv"]["control_plane"];
+  platformCredentials?: Config["platform_credentials"];
   sandbox?: Partial<Config["sandbox"]>;
   welcomeEmail?: Config["services"]["control_plane_api"]["auth"]["welcome_email"];
 }): Config {
@@ -134,6 +135,9 @@ function createRootConfig(input: {
     gateway_relay: input.gatewayRelay ?? {
       backend: "memory",
     },
+    ...(input.platformCredentials === undefined
+      ? {}
+      : { platform_credentials: input.platformCredentials }),
     object_store: {
       assets: {
         bucket_name: "assets",
@@ -421,6 +425,77 @@ describe("selectControlPlaneApiConfig", () => {
       apiBaseUrl: "https://opencomputer.example.com/api",
     });
   });
+
+  it("projects Designer sandbox runtime config", () => {
+    const config = selectControlPlaneApiConfig(
+      createRootConfig({
+        platformCredentials: {
+          openai: {
+            api_key: "platform-openai-key",
+          },
+        },
+        sandbox: {
+          designer: {
+            base_image: "registry.example.com/designer:latest",
+            codex_cli_path: "/usr/local/bin/codex",
+            sandbox_provider: "docker",
+            sandbox_connection_id: "sbc_designer",
+            sandbox_resources: {
+              vcpu_count: 2,
+              memory_mb: 4096,
+              disk_mb: 8192,
+            },
+          },
+        },
+      }),
+    );
+
+    expect(config.sandbox.designer).toEqual({
+      baseImage: "registry.example.com/designer:latest",
+      codexCliPath: "/usr/local/bin/codex",
+      sandboxProvider: "docker",
+      sandboxConnectionId: "sbc_designer",
+      sandboxResources: {
+        vcpuCount: 2,
+        memoryMb: 4096,
+        diskMb: 8192,
+      },
+    });
+    expect(config.platformCredentials).toEqual({
+      openai: {
+        apiKey: "platform-openai-key",
+      },
+    });
+  });
+});
+
+describe("ConfigSchema", () => {
+  it("requires platform OpenAI credentials when Designer sandbox config is enabled", () => {
+    const result = ConfigSchema.safeParse(
+      createRootConfig({
+        sandbox: {
+          designer: {
+            base_image: "registry.example.com/designer:latest",
+            codex_cli_path: "codex",
+            sandbox_provider: "docker",
+            sandbox_connection_id: null,
+            sandbox_resources: null,
+          },
+        },
+      }),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ["platform_credentials", "openai", "api_key"],
+          message:
+            "Platform OpenAI credentials are required when Designer sandbox config is enabled.",
+        }),
+      ]),
+    );
+  });
 });
 
 describe("selectControlPlaneWorkerConfig", () => {
@@ -575,6 +650,24 @@ describe("selectDataPlaneGatewayConfig", () => {
 
     expect(config.portAccess).toEqual({
       authorizationTimeoutMs: 250,
+    });
+  });
+
+  it("projects platform credentials for gateway managed egress", () => {
+    const config = selectDataPlaneGatewayConfig(
+      createRootConfig({
+        platformCredentials: {
+          openai: {
+            api_key: "platform-openai-key",
+          },
+        },
+      }),
+    );
+
+    expect(config.platformCredentials).toEqual({
+      openai: {
+        apiKey: "platform-openai-key",
+      },
     });
   });
 });

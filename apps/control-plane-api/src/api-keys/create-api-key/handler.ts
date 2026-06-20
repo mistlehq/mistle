@@ -12,6 +12,7 @@ import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import { ApiKeysBadRequestCodes } from "../constants.js";
 import { createApiKey } from "../services/create-api-key.js";
+import { isApiKeyAssignablePermission } from "../services/permissions.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -54,6 +55,13 @@ function parseRequestPermissions(permissions: readonly string[]): OrganizationPe
       throw new BadRequestError(
         ApiKeysBadRequestCodes.INVALID_CREATE_API_KEY_INPUT,
         `Permission '${permission}' is not recognized.`,
+      );
+    }
+
+    if (!isApiKeyAssignablePermission(permission)) {
+      throw new BadRequestError(
+        ApiKeysBadRequestCodes.INVALID_CREATE_API_KEY_INPUT,
+        `Permission '${permission}' is not supported for API keys.`,
       );
     }
 

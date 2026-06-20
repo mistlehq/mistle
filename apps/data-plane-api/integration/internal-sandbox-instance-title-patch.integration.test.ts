@@ -99,6 +99,35 @@ describe.concurrent("internal sandbox instance title patch integration", () => {
     );
   });
 
+  it("patches designer sandbox instance titles through the shared sandbox route", async ({
+    env,
+  }) => {
+    await insertSandboxInstance(env, {
+      id: "sbi_dp_api_title_patch_designer",
+      organizationId: "org_dp_api_title_patch_designer",
+      purpose: SandboxInstancePurposes.DESIGNER,
+      title: null,
+    });
+
+    const response = await patchSandboxTitle({
+      env,
+      sandboxInstanceId: "sbi_dp_api_title_patch_designer",
+      body: {
+        organizationId: "org_dp_api_title_patch_designer",
+        title: "Designed support workflow",
+      },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      id: "sbi_dp_api_title_patch_designer",
+      title: "Designed support workflow",
+    });
+    await expect(readSandboxTitle(env, "sbi_dp_api_title_patch_designer")).resolves.toBe(
+      "Designed support workflow",
+    );
+  });
+
   it("does not patch instances outside the requested organization", async ({ env }) => {
     await insertSandboxInstance(env, {
       id: "sbi_dp_api_title_patch_other_org",
@@ -175,7 +204,10 @@ async function insertSandboxInstance(
   input: {
     id: string;
     organizationId: string;
-    purpose?: typeof SandboxInstancePurposes.SESSION | typeof SandboxInstancePurposes.SETUP_CHECK;
+    purpose?:
+      | typeof SandboxInstancePurposes.SESSION
+      | typeof SandboxInstancePurposes.SETUP_CHECK
+      | typeof SandboxInstancePurposes.DESIGNER;
     title: string | null;
   },
 ): Promise<void> {

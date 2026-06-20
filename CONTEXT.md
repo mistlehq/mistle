@@ -32,6 +32,10 @@ _Avoid_: Template, cache
 The configured starting sandbox image used before profile-specific preparation.
 _Avoid_: Profile image
 
+**Mistle Designer base image**:
+The starting sandbox image used for **Mistle Designer sessions**.
+_Avoid_: Base image when referring to user-configured sandbox profile preparation
+
 **Skills source**:
 A repository that provides selectable skills for a **Sandbox profile version**.
 _Avoid_: Skill repo, skills repository, source repository when the object may be a configured source rather than only a Git repository binding
@@ -51,6 +55,51 @@ _Avoid_: Current draft, local draft
 **Setup Assistant**:
 A guided agent workspace for helping author a **Setup script** or **Snapshot maintenance script** for a **Sandbox profile version**.
 _Avoid_: Setup script test, setup check
+
+**Mistle Designer**:
+A guided agent workspace for turning a desired background agent into recommended integrations, triggers, and sandbox profile configuration.
+_Avoid_: Setup agent, designer agent, Setup Assistant when the task is broader than script authoring
+
+**Mistle Designer session**:
+A sandbox-backed **Mistle Designer** workspace backed one-to-one by a sandbox instance with the `designer` purpose.
+_Avoid_: Sandbox session when referring to the guided setup workspace rather than the configured agent runtime session
+_Code name_: designer
+
+**Designer recommendation**:
+A structured setup recommendation produced by **Mistle Designer** for integrations, triggers, provider configuration resources, or sandbox profile configuration.
+_Avoid_: Chat suggestion when the recommendation has selectable product state
+
+**Runtime approval request**:
+A runtime tool call surfaced to the user for approval before the runtime may perform a side-effecting action.
+_Avoid_: Provider configuration change when the change has not been approved or applied
+
+**Runtime approval response**:
+A user's approve or decline decision for a pending **Runtime approval request**.
+_Avoid_: Provider configuration change when the response has not caused a product or provider mutation
+
+**Approved runtime action**:
+A side-effecting action that may run only after an explicit **Runtime approval response** and a supported operation path.
+_Avoid_: Provider write when no explicit operation handler has executed
+
+**User input request**:
+A runtime request that asks the user to answer one or more structured questions before the agent continues.
+_Avoid_: Approval request when the user is choosing configuration rather than granting permission
+
+**Dashboard control action**:
+A runtime-requested action handled by the dashboard client to control browser-owned workspace state.
+_Avoid_: MCP tool when the action is handled by the browser rather than Mistle resource access
+
+**Designer canvas**:
+The route-backed workspace surface displayed beside **Mistle Designer** chat.
+_Avoid_: Component canvas when the surface embeds ordinary dashboard routes
+
+**Designer canvas tab**:
+A named **Designer canvas** slot with its own route and navigation state.
+_Avoid_: Page tab when the tab belongs to the designer workspace rather than the routed page
+
+**Designer page**:
+The top-level dashboard resource page for starting, listing, and resuming **Mistle Designer sessions**.
+_Avoid_: Sandbox profile page when the user is managing Designer workspaces rather than a specific profile
 
 **Agent runtime connection**:
 An integration connection selected on a **Sandbox profile version** to supply provider access for the selected **Agent runtime**.
@@ -87,6 +136,10 @@ _Avoid_: No-op publish, external dependency refresh
 **Mistle resource access**:
 A **Sandbox profile version** setting that lets an agent runtime use Mistle-owned resources through a selected organization API key.
 _Avoid_: Allow agent toggle, Mistle MCP toggle
+
+**Mistle Designer resource access**:
+A **Mistle Designer session** capability that lets Designer use Mistle-owned resources without selecting an organization API key on a target **Sandbox profile version**.
+_Avoid_: Mistle resource access when the access belongs to Designer rather than the target profile
 
 **Collection landing page**:
 A top-level page that lists existing product objects and offers the primary action for creating the first one.
@@ -191,6 +244,14 @@ _Avoid_: Dynamic resource, resource attachment, conversation mapping
 **Routable provider resource**:
 An external provider resource whose future provider events can continue an agent loop through a **Provider resource association**.
 _Avoid_: Provider object, touched resource
+
+**Provider configuration resource**:
+An external provider object used to configure integrations, triggers, or sandbox profile behavior.
+_Avoid_: Routable provider resource when future event routing is not the concern
+
+**Provider configuration change**:
+A user-approved change to an external provider object made while configuring Mistle behavior.
+_Avoid_: Provider resource refresh when no provider object is modified
 
 **Agent-started Slack thread**:
 A **Slack thread** whose root message was created by an agent.
@@ -536,6 +597,60 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Sandbox profile version** without a **Publish-worthy change** should not be publishable.
 - A saved draft **Sandbox profile version** without a **Publish-worthy change** may be discarded when it has a **Source sandbox profile version**.
 - A saved first draft **Sandbox profile version** is not discarded through the no-change draft cancellation flow.
+- **Mistle Designer** writes durable configuration into real product resources such as draft **Sandbox profile versions**, not a separate design-plan resource.
+- **Mistle Designer** runs in a **Mistle Designer session**, not an ordinary **Sandbox session**.
+- Users may resume existing **Mistle Designer sessions** or start new **Mistle Designer sessions** for existing product resources.
+- First-pass **Mistle Designer sessions** are one-to-one with their designer sandbox instance.
+- Resuming a **Mistle Designer session** reconnects to its existing designer sandbox instance rather than creating a replacement sandbox instance.
+- **Mistle Designer sessions** use a **Mistle Designer base image**.
+- The **Mistle Designer base image** is a distinct image contract from the ordinary sandbox **Base image**, even when both references temporarily resolve to the same underlying image.
+- The **Mistle Designer base image** is deployment configuration, not a user-editable product resource.
+- A **Mistle Designer base image** supplies built-in Designer runtime tooling; a **Runtime plan** activates and configures that tooling for a **Mistle Designer session**.
+- **Mistle Designer session** runtime provider selection is deployment configuration, not target **Sandbox profile version configuration**.
+- **Mistle Designer sessions** are intended to use Mistle-selected agent runtime and model access rather than the user's sandbox profile runtime selection.
+- **Mistle Designer** model access is not an **Agent runtime connection** selected on a target **Sandbox profile version**.
+- **Mistle Designer resource access** is distinct from **Mistle resource access** configured on a target **Sandbox profile version**.
+- **Mistle Designer resource access** defines technical access authority; approval behavior for mutating actions is a separate **Mistle Designer** interaction policy.
+- **Mistle Designer resource access** is scoped to a **Mistle Designer session** and organization rather than one target **Sandbox profile version**.
+- **Mistle Designer sessions** persist the user's initial prompt, workspace state, and Codex-backed Designer chat runtime state.
+- The target **Sandbox profile version**'s **Agent runtime** remains a user choice even when authored through **Mistle Designer**.
+- First-pass **Mistle Designer sessions** reuse the normal sandbox session workbench transport against the designer sandbox instance.
+- Designer-specific control-plane APIs own **Mistle Designer session** metadata, connection-token minting, and **Designer canvas tab** persistence.
+- **Designer canvas tabs** are persisted as **Mistle Designer session** workspace state.
+- **Designer canvas tabs** do not have a product-defined count limit.
+- A **Designer canvas** should not contain multiple **Designer canvas tabs** with the same route.
+- A **Dashboard control action** may open one **Designer canvas tab** without taking ownership of the whole **Designer canvas** tab list.
+- A **Dashboard control action** that opens a **Designer canvas tab** is not responsible for whether the tab is persisted as **Mistle Designer session** workspace state.
+- A **Dashboard control action** is handled only by the currently active dashboard surface that supports it.
+- A **Dashboard control action** may open only dashboard-internal routes in **Designer canvas tabs**.
+- A **Designer canvas tab** may accept a dashboard-internal route before that route has a supported embedded rendering surface.
+- A **Designer page** is the top-level dashboard entry point for **Mistle Designer sessions**.
+- The **Designer page** presents a composer for starting a new **Mistle Designer session** before the list of past **Mistle Designer sessions**.
+- Submitting the **Designer page** composer creates a **Mistle Designer session** and opens that session's designer workspace.
+- **Mistle Designer session** access is controlled by Designer-specific user organization permissions in the first pass, not API-key scopes.
+- A **Designer canvas** may start empty until **Mistle Designer** opens a route-backed tab.
+- **Mistle Designer** may open ordinary dashboard routes in **Designer canvas tabs**.
+- Future **Mistle Designer** work may update a session's runtime setup as selected **Integration connections** become available.
+- **Mistle Designer sessions** may use preinstalled tools from the **Mistle Designer base image** and session-time integration access without rebuilding their sandbox image.
+- Preinstalled provider CLI tooling in a **Mistle Designer base image** does not imply access to the corresponding **Integration connection**.
+- Session-time tool installation in a **Mistle Designer session** is sandbox workspace state produced by the agent, not a change to the **Runtime plan**.
+- Future **Mistle Designer session** access to newly selected **Integration connections** may change without changing the **Runtime plan**.
+- **Mistle Designer session** setup changes do not automatically change the target **Sandbox profile version configuration**.
+- **Mistle Designer** may route a user to an existing integration setup flow rather than creating an **Integration connection** directly.
+- Future **Mistle Designer** work should treat **Integration connection** setup as complete when the relevant control-plane resource state exists.
+- Future **Mistle Designer** work may use **User input requests** to collect structured choices before updating a draft **Sandbox profile version**.
+- Future **Mistle Designer** work may save incomplete draft **Sandbox profile version configuration**, but publishing still requires a publishable target **Agent runtime** configuration.
+- Future **Mistle Designer** work should present setup guidance as **Designer recommendations** when the user needs to choose, set up, or review product configuration.
+- Future **Designer recommendations** should be structured **Mistle Designer session** chat history entries rather than separate recommendation records.
+- Future **Mistle Designer** work may select an existing active **Integration connection** for a draft **Sandbox profile version**.
+- Future **Mistle Designer** work may prefill **Trigger** configuration, but the user saves or enables the **Trigger** through the normal trigger UI.
+- Future **Mistle Designer** work may publish a draft **Sandbox profile version** and start a new **Sandbox session** from the published version.
+- **Mistle Designer** requires explicit user confirmation before publishing a **Sandbox profile version**, starting a **Sandbox session**, or performing provider-side mutations.
+- A **Sandbox session** started by **Mistle Designer** uses the normal **Session workbench**.
+- Future **Mistle Designer** work may read and refresh scoped **Provider configuration resources** needed for the current setup path.
+- Future **Mistle Designer** work may make **Provider configuration changes** only after explicit user approval.
+- **Runtime approval requests** are the generic mechanism for surfacing side-effecting runtime tool calls to the user; product or provider writes still require an explicit supported operation path after approval.
+- First-pass **Mistle Designer sessions** do not require detailed durable activity history for **Provider configuration changes**.
 - Publishing the first **Sandbox profile version** is publish-worthy when no **Source sandbox profile version** exists.
 - Publishing the first **Sandbox profile version** does not require a **Source sandbox profile version**.
 - The latest published **Sandbox profile version** may be inspectable even when no **Sandbox profile version** is active.

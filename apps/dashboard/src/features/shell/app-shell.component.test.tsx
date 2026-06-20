@@ -1,4 +1,7 @@
+import { SidebarProvider } from "@mistle/ui";
 import { isValidElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { SessionsShellSidebar } from "../navigation/sessions-shell-sidebar.js";
@@ -21,10 +24,6 @@ describe("resolveAppShellFrame", () => {
       handleNavigateToSettings: () => {},
       handleSignOut: () => {},
       handleSwitchOrganization: () => {},
-      inDashboardRoot: routeState.inDashboardRoot,
-      inIntegrations: routeState.inIntegrations,
-      inSandboxProfiles: routeState.inSandboxProfiles,
-      inSessionDetail: routeState.inSessionDetail,
       inSessions: routeState.inSessions,
       inSettings: routeState.inSettings,
       isSigningOut: false,
@@ -40,6 +39,7 @@ describe("resolveAppShellFrame", () => {
       pageMeta: {
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
+        sidebarTriggerOwner: "workspace",
         title: "Sessions",
         headerIcon: null,
         supportingText: null,
@@ -76,10 +76,6 @@ describe("resolveAppShellFrame", () => {
       handleNavigateToSettings: () => {},
       handleSignOut: () => {},
       handleSwitchOrganization: () => {},
-      inDashboardRoot: routeState.inDashboardRoot,
-      inIntegrations: routeState.inIntegrations,
-      inSandboxProfiles: routeState.inSandboxProfiles,
-      inSessionDetail: routeState.inSessionDetail,
       inSessions: routeState.inSessions,
       inSettings: routeState.inSettings,
       isSigningOut: false,
@@ -95,6 +91,7 @@ describe("resolveAppShellFrame", () => {
       pageMeta: {
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
+        sidebarTriggerOwner: "workspace",
         title: "Sessions",
         headerIcon: null,
         supportingText: null,
@@ -117,6 +114,49 @@ describe("resolveAppShellFrame", () => {
     expect(frame.renderSidebarTrigger).toBe(false);
   });
 
+  it("hides Designer from the main app sidebar", () => {
+    const locationPathname = "/";
+    const routeState = resolveAppShellRouteState(locationPathname);
+    const frame = resolveAppShellFrame({
+      handleBackToApp: () => {},
+      handleNavigateToSettings: () => {},
+      handleSignOut: () => {},
+      handleSwitchOrganization: () => {},
+      inSessions: routeState.inSessions,
+      inSettings: routeState.inSettings,
+      isSigningOut: false,
+      isSwitchingOrganization: false,
+      locationPathname,
+      organizationOptions: [],
+      organizationSummaryErrorMessage: null,
+      organizationSwitcherErrorMessage: null,
+      organizationImageUrl: null,
+      activeOrganizationId: "org_123",
+      dashboardBuildDriftStatus: CurrentDashboardBuildDriftStatus,
+      organizationName: "Acme",
+      pageMeta: {
+        appShellInsetOwner: "app-shell",
+        appShellViewportMode: "document",
+        sidebarTriggerOwner: "page-frame",
+        title: "Home",
+        headerIcon: null,
+        supportingText: null,
+      },
+      signOutError: null,
+      showSessionsSidebar: false,
+      onShowSessionsSidebarChange: () => {},
+    });
+
+    const sidebarMarkup = renderToStaticMarkup(
+      <MemoryRouter>
+        <SidebarProvider>{frame.sidebarContent}</SidebarProvider>
+      </MemoryRouter>,
+    );
+
+    expect(sidebarMarkup).not.toContain("Designer");
+    expect(sidebarMarkup).toContain("Home");
+  });
+
   it("keeps the sidebar trigger available for non-session-detail pages", () => {
     const locationPathname = "/integrations";
     const routeState = resolveAppShellRouteState(locationPathname);
@@ -125,10 +165,6 @@ describe("resolveAppShellFrame", () => {
       handleNavigateToSettings: () => {},
       handleSignOut: () => {},
       handleSwitchOrganization: () => {},
-      inDashboardRoot: routeState.inDashboardRoot,
-      inIntegrations: routeState.inIntegrations,
-      inSandboxProfiles: routeState.inSandboxProfiles,
-      inSessionDetail: routeState.inSessionDetail,
       inSessions: routeState.inSessions,
       inSettings: routeState.inSettings,
       isSigningOut: false,
@@ -144,6 +180,7 @@ describe("resolveAppShellFrame", () => {
       pageMeta: {
         appShellInsetOwner: "child",
         appShellViewportMode: "document",
+        sidebarTriggerOwner: "page-frame",
         title: "Integrations",
         headerIcon: null,
         supportingText: "",

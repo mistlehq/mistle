@@ -2,6 +2,7 @@ import {
   DataPlaneSandboxInstancesClientError,
   type DataPlaneSandboxInstancesClient,
 } from "@mistle/data-plane-internal-client";
+import type { SandboxInstancePurpose } from "@mistle/db/data-plane";
 
 import { SandboxInstancesNotFoundCodes, SandboxInstancesNotFoundError } from "../errors.js";
 
@@ -13,6 +14,7 @@ type ListOperationEventsInput = {
   organizationId: string;
   sandboxInstanceId: string;
   operationId: string;
+  allowedPurposes?: readonly SandboxInstancePurpose[];
   afterSequence?: number;
   limit?: number;
 };
@@ -26,6 +28,7 @@ export async function listOperationEvents(
       organizationId: input.organizationId,
       sandboxInstanceId: input.sandboxInstanceId,
       operationId: input.operationId,
+      ...(input.allowedPurposes === undefined ? {} : { allowedPurposes: input.allowedPurposes }),
       ...(input.afterSequence === undefined ? {} : { afterSequence: input.afterSequence }),
       ...(input.limit === undefined ? {} : { limit: input.limit }),
     });

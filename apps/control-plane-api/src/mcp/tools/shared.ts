@@ -32,7 +32,10 @@ export function requireMcpSandboxProfileScope(
     version: number;
   },
 ): void {
-  if (organizationActor.kind !== "mcp_capability") {
+  if (
+    organizationActor.kind !== "mcp_capability" ||
+    organizationActor.capability.kind !== "setup_assistant"
+  ) {
     return;
   }
 
@@ -44,6 +47,24 @@ export function requireMcpSandboxProfileScope(
   }
 }
 
+export function requireMcpSandboxProfileIdScope(
+  organizationActor: AppOrganizationActor,
+  input: {
+    profileId: string;
+  },
+): void {
+  if (
+    organizationActor.kind !== "mcp_capability" ||
+    organizationActor.capability.kind !== "setup_assistant"
+  ) {
+    return;
+  }
+
+  if (organizationActor.capability.sandboxProfileId !== input.profileId) {
+    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
+  }
+}
+
 export function requireMcpSandboxInstanceProfileScope(
   organizationActor: AppOrganizationActor,
   input: {
@@ -51,7 +72,10 @@ export function requireMcpSandboxInstanceProfileScope(
     sandboxProfileVersion: number | undefined;
   },
 ): void {
-  if (organizationActor.kind !== "mcp_capability") {
+  if (
+    organizationActor.kind !== "mcp_capability" ||
+    organizationActor.capability.kind !== "setup_assistant"
+  ) {
     return;
   }
 
@@ -63,16 +87,44 @@ export function requireMcpSandboxInstanceProfileScope(
   }
 }
 
-export function requireMcpSandboxInstanceScope(
+export function requireMcpSetupAssistantSandboxInstanceScope(
   organizationActor: AppOrganizationActor,
   input: {
     sandboxInstanceId: string;
   },
 ): void {
-  if (organizationActor.kind !== "mcp_capability") {
+  if (
+    organizationActor.kind !== "mcp_capability" ||
+    organizationActor.capability.kind !== "setup_assistant"
+  ) {
     return;
   }
 
+  requireMatchingMcpSandboxInstanceScope(organizationActor, input);
+}
+
+export function requireMcpDesignerSandboxInstanceScope(
+  organizationActor: AppOrganizationActor,
+  input: {
+    sandboxInstanceId: string;
+  },
+): void {
+  if (
+    organizationActor.kind !== "mcp_capability" ||
+    organizationActor.capability.kind !== "designer"
+  ) {
+    return;
+  }
+
+  requireMatchingMcpSandboxInstanceScope(organizationActor, input);
+}
+
+function requireMatchingMcpSandboxInstanceScope(
+  organizationActor: Extract<AppOrganizationActor, { kind: "mcp_capability" }>,
+  input: {
+    sandboxInstanceId: string;
+  },
+): void {
   if (input.sandboxInstanceId !== organizationActor.capability.sandboxInstanceId) {
     throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
   }

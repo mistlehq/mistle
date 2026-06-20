@@ -569,6 +569,7 @@ export function createDataPlaneGatewayRuntime(
       tokenIssuer: config.app.controlPlaneApi.mcp.auth.issuer,
       tokenAudience: config.app.controlPlaneApi.mcp.auth.audience,
     },
+    config.app.platformCredentials,
     config.app.__dangerouslyTrustDirectEgressTlsCaCertificates,
   );
   const ptyTransportService = new PtyTransportService({

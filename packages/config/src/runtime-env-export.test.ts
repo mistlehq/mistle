@@ -102,6 +102,22 @@ describe("exportServiceConfigToEnv", () => {
       valueFormat: "json",
     });
     expectEntry(entries, {
+      name: "MISTLE_PLATFORM_OPENAI_API_KEY",
+      value: "replace-with-platform-openai-api-key",
+    });
+    expectEntry(entries, {
+      name: "MISTLE_DESIGNER_SANDBOX_BASE_IMAGE",
+      value: "registry.example.com/mistle/sandbox-base:prod",
+    });
+    expectEntry(entries, {
+      name: "MISTLE_DESIGNER_CODEX_CLI_PATH",
+      value: "codex",
+    });
+    expectEntry(entries, {
+      name: "MISTLE_DESIGNER_SANDBOX_PROVIDER",
+      value: "docker",
+    });
+    expectEntry(entries, {
       name: "MISTLE_SANDBOX_E2B_API_KEY",
       value: "replace-with-e2b-api-key",
     });
@@ -141,6 +157,35 @@ describe("exportServiceConfigToEnv", () => {
     expectNoEntry(entries, "MISTLE_KV_CONTROL_PLANE_BACKEND");
     expectNoEntry(entries, "MISTLE_KV_CONTROL_PLANE_URL");
     expectNoEntry(entries, "MISTLE_KV_CONTROL_PLANE_KEY_PREFIX");
+  });
+
+  it("does not export null Designer sandbox connection ids", () => {
+    const loadedConfig = loadConfig({
+      app: AppIds.CONTROL_PLANE_API,
+      configPath: ConfigSamplePath,
+    });
+
+    const entries = exportServiceConfigToEnv({
+      app: AppIds.CONTROL_PLANE_API,
+      config: {
+        ...loadedConfig,
+        app: {
+          ...loadedConfig.app,
+          sandbox: {
+            ...loadedConfig.app.sandbox,
+            designer: {
+              baseImage: "registry.example.com/designer:latest",
+              codexCliPath: "codex",
+              sandboxProvider: "docker",
+              sandboxConnectionId: null,
+              sandboxResources: null,
+            },
+          },
+        },
+      },
+    });
+
+    expectNoEntry(entries, "MISTLE_DESIGNER_SANDBOX_CONNECTION_ID");
   });
 
   it("exports control plane worker config to resource env entries", () => {
@@ -259,6 +304,10 @@ describe("exportServiceConfigToEnv", () => {
     expectEntry(entries, {
       name: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL",
       value: "http://data-plane-api:8082",
+    });
+    expectEntry(entries, {
+      name: "MISTLE_PLATFORM_OPENAI_API_KEY",
+      value: "replace-with-platform-openai-api-key",
     });
   });
 

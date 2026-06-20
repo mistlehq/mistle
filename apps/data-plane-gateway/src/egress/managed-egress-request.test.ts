@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 
 import { Cache, InMemoryCacheAdapter } from "@mistle/cache";
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
+import { verifyMcpToken } from "@mistle/gateway-tunnel-auth";
 import type { CompiledRuntimePlan } from "@mistle/sandbox-runtime-contract";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -207,6 +208,142 @@ describe("buildManagedEgressRequest", () => {
     expect(result.request.headers.get("authorization")).not.toContain("PLACEHOLDER");
     expect(result.request.headers.get("x-amz-security-token")).toBe("mistle-real-session-token");
     expect(result.request.headers.get("x-amz-date")).not.toBe("20260101T000000Z");
+  });
+
+  it("injects the gateway platform OpenAI API key without calling control-plane", async () => {
+    const route: CompiledRuntimePlan["egressRoutes"][number] = {
+      egressRuleId: "egress_rule_openai_platform",
+      bindingId: "platform-openai",
+      familyId: "openai",
+      variantId: "openai-default",
+      match: {
+        hosts: ["api.openai.com"],
+        methods: ["GET", "POST"],
+        pathPrefixes: ["/"],
+      },
+      upstream: {
+        baseUrl: "https://api.openai.com",
+      },
+      authInjection: {
+        type: "bearer",
+        target: "authorization",
+      },
+      credentialResolver: {
+        kind: "platform_openai_api_key",
+      },
+    };
+
+    const result = await buildManagedEgressRequest({
+      body: undefined,
+      controlPlanePublicBaseUrl: "https://control-plane.test",
+      controlPlaneInternalClient: new ControlPlaneInternalClient({
+        baseUrl: "http://127.0.0.1:1",
+        internalAuthServiceToken: "service-token",
+      }),
+      credentialCache: new CredentialCache({
+        cache: new Cache({ adapter: new InMemoryCacheAdapter() }),
+        defaultTtlSeconds: 300,
+        refreshSkewSeconds: 0,
+        now: () => Date.parse("2026-01-01T00:00:00.000Z"),
+      }),
+      mcpTokenConfig: {
+        tokenSecret: "mcp-token-secret",
+        tokenIssuer: "data-plane-gateway",
+        tokenAudience: "mistle-mcp",
+      },
+      organizationId: "org_123",
+      platformCredentials: {
+        openai: {
+          apiKey: "sk-platform-openai",
+        },
+      },
+      request: {
+        authority: "api.openai.com",
+        headers: {},
+        method: "POST",
+        path: "/v1/responses",
+        scheme: "https",
+      },
+      route,
+      sandboxInstanceId: "sbi_123",
+    });
+
+    expect(result.request.headers.get("authorization")).toBe("Bearer sk-platform-openai");
+  });
+
+  it("mints Designer-scoped MCP bearer tokens for Mistle MCP egress", async () => {
+    const route: CompiledRuntimePlan["egressRoutes"][number] = {
+      egressRuleId: "egress_rule_mistle_mcp",
+      bindingId: "platform-mistle-mcp",
+      familyId: "mistle",
+      variantId: "mistle-mcp",
+      match: {
+        hosts: ["api.mistle.test"],
+        methods: ["POST"],
+        pathPrefixes: ["/mcp"],
+      },
+      upstream: {
+        baseUrl: "https://api.mistle.test/mcp",
+      },
+      authInjection: {
+        type: "bearer",
+        target: "authorization",
+      },
+      credentialResolver: {
+        kind: "mistle_mcp_designer_token",
+        designerSessionId: "dsn_123",
+      },
+    };
+
+    const result = await buildManagedEgressRequest({
+      body: undefined,
+      controlPlanePublicBaseUrl: "https://control-plane.test",
+      controlPlaneInternalClient: new ControlPlaneInternalClient({
+        baseUrl: "http://127.0.0.1:1",
+        internalAuthServiceToken: "service-token",
+      }),
+      credentialCache: new CredentialCache({
+        cache: new Cache({ adapter: new InMemoryCacheAdapter() }),
+        defaultTtlSeconds: 300,
+        refreshSkewSeconds: 0,
+        now: () => Date.parse("2026-01-01T00:00:00.000Z"),
+      }),
+      mcpTokenConfig: {
+        tokenSecret: "mcp-token-secret",
+        tokenIssuer: "data-plane-gateway",
+        tokenAudience: "mistle-mcp",
+      },
+      organizationId: "org_123",
+      request: {
+        authority: "api.mistle.test",
+        headers: {},
+        method: "POST",
+        path: "/mcp",
+        scheme: "https",
+      },
+      route,
+      sandboxInstanceId: "sbi_123",
+    });
+
+    const token = result.request.headers.get("authorization")?.replace("Bearer ", "");
+    if (token === undefined) {
+      throw new Error("Expected MCP bearer token.");
+    }
+    const verified = await verifyMcpToken({
+      token,
+      config: {
+        tokenSecret: "mcp-token-secret",
+        tokenIssuer: "data-plane-gateway",
+        tokenAudience: "mistle-mcp",
+      },
+    });
+
+    expect(verified).toMatchObject({
+      kind: "designer",
+      sub: "sbi_123",
+      organizationId: "org_123",
+      designerSessionId: "dsn_123",
+    });
   });
 });
 

@@ -511,6 +511,10 @@ const ControlPlaneApiEnvDescriptors = [
     path: ["workflow", "namespaceId"],
   },
   { envVar: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL", path: ["dataPlaneApi", "baseUrl"] },
+  {
+    envVar: "MISTLE_PLATFORM_OPENAI_API_KEY",
+    path: ["platformCredentials", "openai", "apiKey"],
+  },
   { envVar: "MISTLE_INTERNAL_AUTH_SHARED_TOKEN", path: ["internalAuth", "serviceToken"] },
   {
     envVar: "MISTLE_SANDBOX_TOKENS_CONNECT_SECRET",
@@ -569,6 +573,37 @@ const ControlPlaneApiEnvDescriptors = [
   {
     envVar: "MISTLE_SANDBOX_TOKENS_BOOTSTRAP_AUDIENCE",
     path: ["sandbox", "bootstrap", "tokenAudience"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_SANDBOX_BASE_IMAGE",
+    path: ["sandbox", "designer", "baseImage"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_CODEX_CLI_PATH",
+    path: ["sandbox", "designer", "codexCliPath"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_SANDBOX_PROVIDER",
+    path: ["sandbox", "designer", "sandboxProvider"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_SANDBOX_CONNECTION_ID",
+    path: ["sandbox", "designer", "sandboxConnectionId"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_SANDBOX_VCPU_COUNT",
+    path: ["sandbox", "designer", "sandboxResources", "vcpuCount"],
+    parse: parseNumberEnv,
+  },
+  {
+    envVar: "MISTLE_DESIGNER_SANDBOX_MEMORY_MB",
+    path: ["sandbox", "designer", "sandboxResources", "memoryMb"],
+    parse: parseNumberEnv,
+  },
+  {
+    envVar: "MISTLE_DESIGNER_SANDBOX_DISK_MB",
+    path: ["sandbox", "designer", "sandboxResources", "diskMb"],
+    parse: parseNumberEnv,
   },
   {
     envVar: "MISTLE_SANDBOX_DOCKER_ENABLED",
@@ -795,6 +830,10 @@ const DataPlaneGatewayEnvDescriptors = [
     path: ["controlPlaneApi", "mcp", "auth", "audience"],
   },
   { envVar: "MISTLE_INTERNAL_AUTH_SHARED_TOKEN", path: ["internalAuth", "serviceToken"] },
+  {
+    envVar: "MISTLE_PLATFORM_OPENAI_API_KEY",
+    path: ["platformCredentials", "openai", "apiKey"],
+  },
 ] satisfies readonly EnvDescriptor[];
 
 const DataPlaneWorkerEnvDescriptors = [

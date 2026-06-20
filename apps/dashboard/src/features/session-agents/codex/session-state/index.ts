@@ -1,4 +1,5 @@
 export { buildCodexCliPtyOpenInput } from "./codex-cli-launch.js";
+export { hydrateCodexChatEntriesFromThreadReadTurns } from "./codex-chat-state.js";
 export {
   type ConnectedCodexSession,
   type StartSessionStep,

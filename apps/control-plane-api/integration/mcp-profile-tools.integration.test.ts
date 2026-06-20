@@ -1007,6 +1007,256 @@ describe.concurrent("MCP profile tools integration", () => {
     ]);
   });
 
+  it("keeps designer MCP sandbox feedback reads scoped to the token sandbox instance", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-designer-feedback-scope@example.com",
+    });
+    const token = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "designer",
+        sub: "sbi_mcp_designer_feedback_scoped",
+        organizationId: session.organizationId,
+        designerSessionId: "dsn_mcp_designer_feedback_scope",
+      },
+      ttlSeconds: 300,
+    });
+
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_designer_feedback_scoped",
+      purpose: SandboxInstancePurposes.DESIGNER,
+      status: SandboxInstanceStatuses.FAILED,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: "dsn_mcp_designer_feedback_scope",
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_designer_feedback_scoped",
+      initialPrompt: null,
+      canvasTabs: [],
+    });
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_designer_feedback_other",
+      purpose: SandboxInstancePurposes.DESIGNER,
+      status: SandboxInstanceStatuses.FAILED,
+    });
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxOperationEvents).values([
+      operationEventRow({
+        id: "soe_mcp_designer_feedback_scoped_001",
+        sandboxInstanceId: "sbi_mcp_designer_feedback_scoped",
+        operationId: "op_mcp_designer_feedback_scoped",
+        sequence: 1,
+        phase: "setup_script",
+        status: "failed",
+        message: "designer scoped setup failed",
+      }),
+      operationEventRow({
+        id: "soe_mcp_designer_feedback_other_001",
+        sandboxInstanceId: "sbi_mcp_designer_feedback_other",
+        operationId: "op_mcp_designer_feedback_other",
+        sequence: 1,
+        phase: "setup_script",
+        status: "failed",
+        message: "designer other setup failed",
+      }),
+    ]);
+
+    const scopedInstanceResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "sandbox_instance_get",
+      arguments: {
+        instanceId: "sbi_mcp_designer_feedback_scoped",
+      },
+    });
+    const scopedEventsResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "sandbox_operation_events_list",
+      arguments: {
+        instanceId: "sbi_mcp_designer_feedback_scoped",
+        operationId: "op_mcp_designer_feedback_scoped",
+      },
+    });
+    const otherInstanceResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "sandbox_instance_get",
+      arguments: {
+        instanceId: "sbi_mcp_designer_feedback_other",
+      },
+    });
+    const otherEventsResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "sandbox_operation_events_list",
+      arguments: {
+        instanceId: "sbi_mcp_designer_feedback_other",
+        operationId: "op_mcp_designer_feedback_other",
+      },
+    });
+
+    expect(scopedInstanceResult.isError).toBeUndefined();
+    expect(scopedEventsResult.isError).toBeUndefined();
+    expect(otherInstanceResult.isError).toBe(true);
+    expect(otherEventsResult.isError).toBe(true);
+    const operationEvents = SandboxOperationEventsResponseSchema.parse(
+      scopedEventsResult.structuredContent,
+    );
+    expect(operationEvents.events.map((event) => event.id)).toEqual([
+      "soe_mcp_designer_feedback_scoped_001",
+    ]);
+  });
+
+  it("rejects designer MCP tokens without a matching Designer session", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-designer-session-auth@example.com",
+    });
+    const missingSessionToken = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "designer",
+        sub: "sbi_mcp_designer_missing_session",
+        organizationId: session.organizationId,
+        designerSessionId: "dsn_mcp_designer_missing_session",
+      },
+      ttlSeconds: 300,
+    });
+    const mismatchedSessionToken = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "designer",
+        sub: "sbi_mcp_designer_mismatched_claim",
+        organizationId: session.organizationId,
+        designerSessionId: "dsn_mcp_designer_mismatched_session",
+      },
+      ttlSeconds: 300,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: "dsn_mcp_designer_mismatched_session",
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_designer_mismatched_actual",
+      initialPrompt: null,
+      canvasTabs: [],
+    });
+
+    const missingSessionResponse = await callMcpJsonRpcResponse({
+      env,
+      token: missingSessionToken.token,
+      id: "mcp-designer-missing-session-test",
+      method: "tools/list",
+      params: {},
+    });
+    const mismatchedSessionResponse = await callMcpJsonRpcResponse({
+      env,
+      token: mismatchedSessionToken.token,
+      id: "mcp-designer-mismatched-session-test",
+      method: "tools/list",
+      params: {},
+    });
+
+    expect(missingSessionResponse.status).toBe(401);
+    expect(mismatchedSessionResponse.status).toBe(401);
+  });
+
+  it("prevents designer MCP tokens from starting profile test sandboxes", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-designer-session-create-forbidden@example.com",
+    });
+    const profileId = "sbp_mcp_designer_session_create_forbidden";
+    const token = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "designer",
+        sub: "sbi_mcp_designer_session_create_forbidden",
+        organizationId: session.organizationId,
+        designerSessionId: "dsn_mcp_designer_session_create_forbidden",
+      },
+      ttlSeconds: 300,
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: "dsn_mcp_designer_session_create_forbidden",
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_designer_session_create_forbidden",
+      initialPrompt: null,
+      canvasTabs: [],
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: profileId,
+        organizationId: session.organizationId,
+        displayName: "MCP Designer Session Create Forbidden Profile",
+        createdAt: "2026-05-13T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: profileId,
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo persisted",
+        ...DockerSandboxRuntimeColumns,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-mcp-designer-session-create-forbidden",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_mcp_designer_session_create_forbidden_agent",
+        organizationId: session.organizationId,
+        targetKey: "openai-mcp-designer-session-create-forbidden",
+        displayName: "MCP Designer Session Create Forbidden Agent Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_mcp_designer_session_create_forbidden_agent",
+          sandboxProfileId: profileId,
+          sandboxProfileVersion: 1,
+          connectionId: "icn_mcp_designer_session_create_forbidden_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+      );
+
+    const result = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_setup_script_test_start",
+      arguments: {
+        profileId,
+        version: 1,
+        setupScript: "echo should not start",
+        idempotencyKey: "mcp-designer-session-create-forbidden-001",
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    const startedSandbox = await env.dataPlaneDb.query.sandboxInstances.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, session.organizationId),
+          eq(table.sandboxProfileId, profileId),
+        ),
+    });
+    expect(startedSandbox).toBeUndefined();
+  });
+
   it("authorizes profile tools with a gateway-injected MCP token referencing an API key", async ({
     env,
   }) => {
@@ -1685,7 +1935,20 @@ async function callMcpJsonRpc(input: {
   method: "tools/call" | "tools/list";
   params: Record<string, unknown>;
 }): Promise<unknown> {
-  const response = await input.env.controlPlaneApi.http.fetch("/mcp", {
+  const response = await callMcpJsonRpcResponse(input);
+
+  expect(response.status).toBe(200);
+  return parseStreamableHttpJsonRpcMessage(await response.text());
+}
+
+async function callMcpJsonRpcResponse(input: {
+  env: IntegrationTestEnvironment;
+  token: string;
+  id: string;
+  method: "tools/call" | "tools/list";
+  params: Record<string, unknown>;
+}) {
+  return input.env.controlPlaneApi.http.fetch("/mcp", {
     method: "POST",
     headers: {
       accept: "application/json, text/event-stream",
@@ -1700,9 +1963,6 @@ async function callMcpJsonRpc(input: {
       params: input.params,
     }),
   });
-
-  expect(response.status).toBe(200);
-  return parseStreamableHttpJsonRpcMessage(await response.text());
 }
 
 function createForwardedHeaderForBaseUrl(baseUrl: string): string {
@@ -1730,6 +1990,7 @@ async function insertSandboxInstance(
     sandboxInstanceId: string;
     sandboxProfileId?: string;
     sandboxProfileVersion?: number;
+    purpose?: SandboxInstanceRow["purpose"];
     status?: SandboxInstanceRow["status"];
   },
 ): Promise<void> {
@@ -1744,7 +2005,7 @@ async function insertSandboxInstance(
     startedByKind: "api_key",
     startedById: "apk_mcp_feedback",
     source: SandboxInstanceSources.DASHBOARD,
-    purpose: SandboxInstancePurposes.SETUP_CHECK,
+    purpose: input.purpose ?? SandboxInstancePurposes.SETUP_CHECK,
     failureCode: input.status === SandboxInstanceStatuses.FAILED ? "SETUP_SCRIPT_FAILED" : null,
     failureMessage:
       input.status === SandboxInstanceStatuses.FAILED ? "Setup script exited with code 1." : null,

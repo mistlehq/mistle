@@ -4,7 +4,7 @@ import {
   type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
 import type {
@@ -13,6 +13,10 @@ import type {
 } from "../patch-sandbox-instance-title/schema.js";
 
 const SandboxInstanceNotFoundErrorCode = "NOT_FOUND";
+const TitlePatchableSandboxInstancePurposes = [
+  SandboxInstancePurposes.SESSION,
+  SandboxInstancePurposes.DESIGNER,
+] as const;
 
 type PatchSandboxInstanceTitleContext = {
   db: DataPlaneDatabase;
@@ -35,7 +39,7 @@ export async function patchSandboxInstanceTitle(
       and(
         eq(sandboxInstances.id, input.instanceId),
         eq(sandboxInstances.organizationId, input.organizationId),
-        eq(sandboxInstances.purpose, SandboxInstancePurposes.SESSION),
+        inArray(sandboxInstances.purpose, TitlePatchableSandboxInstancePurposes),
         ...(titlePredicate === undefined ? [] : [titlePredicate]),
       ),
     )
@@ -70,7 +74,7 @@ export async function patchSandboxInstanceTitle(
       whereAnd(
         whereEq(table.id, input.instanceId),
         whereEq(table.organizationId, input.organizationId),
-        whereEq(table.purpose, SandboxInstancePurposes.SESSION),
+        inArray(table.purpose, TitlePatchableSandboxInstancePurposes),
       ),
   });
 

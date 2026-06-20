@@ -201,10 +201,6 @@ export function AppShell(): React.JSX.Element {
     handleSwitchOrganization: (organizationId) => {
       void handleSwitchOrganization(organizationId);
     },
-    inDashboardRoot: routeState.inDashboardRoot,
-    inIntegrations: routeState.inIntegrations,
-    inSandboxProfiles: routeState.inSandboxProfiles,
-    inSessionDetail: routeState.inSessionDetail,
     inSessions: routeState.inSessions,
     inSettings: routeState.inSettings,
     isSigningOut,

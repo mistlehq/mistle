@@ -32,6 +32,10 @@ export type CodexJsonRpcCallOptions = {
   idempotency?: AgentConversationIdempotencyMetadata | undefined;
 };
 
+export type CodexInitializeOptions = {
+  clientInfo?: { name: string; version: string };
+};
+
 type NotificationListener = (notification: CodexJsonRpcNotification) => void;
 type ServerRequestListener = (request: CodexJsonRpcServerRequest) => void;
 
@@ -101,7 +105,7 @@ export class CodexJsonRpcClient {
     this.#rejectAllPendingRequests(new Error("Codex JSON-RPC client disposed."));
   }
 
-  async initialize(input?: { clientInfo?: { name: string; version: string } }): Promise<unknown> {
+  async initialize(input?: CodexInitializeOptions): Promise<unknown> {
     this.#sessionClient.markInitializing();
     const initializeResult = await this.call("initialize", {
       clientInfo: input?.clientInfo ?? CodexDashboardInitializeClientInfo,

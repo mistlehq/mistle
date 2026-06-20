@@ -7,10 +7,27 @@ export type IntegrationConnectionCredentialRoute = EgressCredentialRoute & {
   >;
 };
 
+export type OpenAiApiCredentialRoute = EgressCredentialRoute & {
+  credentialResolver: Extract<
+    EgressCredentialRoute["credentialResolver"],
+    { kind: "integration_connection" | "platform_openai_api_key" }
+  >;
+};
+
 export function isIntegrationConnectionCredentialRoute(
   route: EgressCredentialRoute,
 ): route is IntegrationConnectionCredentialRoute {
   return route.credentialResolver.kind === "integration_connection";
+}
+
+export function isOpenAiApiCredentialRoute(
+  route: EgressCredentialRoute,
+): route is OpenAiApiCredentialRoute {
+  return (
+    (route.credentialResolver.kind === "integration_connection" &&
+      route.credentialResolver.secretType === "api_key") ||
+    route.credentialResolver.kind === "platform_openai_api_key"
+  );
 }
 
 export function routeHasHost(input: { route: EgressCredentialRoute; host: string }): boolean {
@@ -35,8 +52,7 @@ export function isOpenAiApiRoute(route: EgressCredentialRoute): boolean {
     route.familyId === "openai" &&
     routeHasHost({ route, host: "api.openai.com" }) &&
     route.authInjection.type === "bearer" &&
-    isIntegrationConnectionCredentialRoute(route) &&
-    route.credentialResolver.secretType === "api_key"
+    isOpenAiApiCredentialRoute(route)
   );
 }
 

@@ -35,6 +35,7 @@ function buildControlPlaneApiServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: "staging",
     MISTLE_SERVICES_CONTROL_PLANE_API_WORKFLOW_DATABASE_POOL_MAX: "2",
     MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: "http://data-plane-api:8082",
+    MISTLE_PLATFORM_OPENAI_API_KEY: "platform-openai-key",
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: "internal-service-token",
     MISTLE_SANDBOX_TOKENS_CONNECT_SECRET: "connect-secret",
     MISTLE_SANDBOX_TOKENS_CONNECT_ISSUER: "mistle",
@@ -303,6 +304,11 @@ describe("loadConfig", () => {
       namespaceId: "staging",
       databasePoolMax: 2,
     });
+    expect(loadedConfig.app.platformCredentials).toEqual({
+      openai: {
+        apiKey: "platform-openai-key",
+      },
+    });
     expect(loadedConfig.app.sandbox.e2b).toEqual({
       enabled: true,
       apiKey: "shared-e2b-secret",
@@ -350,6 +356,24 @@ describe("loadConfig", () => {
       callUrl: "https://cal.example.com/jonathan/mistle",
       enabled: false,
     });
+  });
+
+  it("rejects env control-plane API Designer config without platform OpenAI credentials", () => {
+    const env = buildControlPlaneApiServiceEnv();
+    delete env.MISTLE_PLATFORM_OPENAI_API_KEY;
+
+    expect(() =>
+      loadConfig({
+        app: AppIds.CONTROL_PLANE_API,
+        includeGlobal: false,
+        env: {
+          ...env,
+          MISTLE_DESIGNER_SANDBOX_BASE_IMAGE: "registry.example.com/designer:latest",
+          MISTLE_DESIGNER_CODEX_CLI_PATH: "codex",
+          MISTLE_DESIGNER_SANDBOX_PROVIDER: "docker",
+        },
+      }),
+    ).toThrow(/Platform OpenAI credentials are required/u);
   });
 
   it("loads env data-plane API Docker config when shared E2B env is also present", () => {

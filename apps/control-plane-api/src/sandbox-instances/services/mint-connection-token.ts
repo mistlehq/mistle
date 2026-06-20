@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { GetSandboxInstanceResponse } from "@mistle/data-plane-internal-client";
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
+import type { SandboxInstancePurpose } from "@mistle/db/data-plane";
 import { mintConnectionToken as mintGatewayConnectionToken } from "@mistle/gateway-connection-auth";
 
 import {
@@ -81,11 +82,13 @@ async function getExistingSandboxInstance(
   input: {
     organizationId: string;
     instanceId: string;
+    allowedPurposes?: readonly SandboxInstancePurpose[];
   },
 ): Promise<ExistingSandboxInstance> {
   const sandboxInstance = await dataPlaneClient.getSandboxInstance({
     organizationId: input.organizationId,
     instanceId: input.instanceId,
+    ...(input.allowedPurposes === undefined ? {} : { allowedPurposes: input.allowedPurposes }),
   });
 
   if (sandboxInstance === null) {
@@ -106,6 +109,7 @@ export async function mintConnectionToken(
   const sandboxInstance = await getExistingSandboxInstance(dataPlaneClient, {
     organizationId: input.organizationId,
     instanceId: input.instanceId,
+    ...(input.allowedPurposes === undefined ? {} : { allowedPurposes: input.allowedPurposes }),
   });
 
   if (sandboxInstance.status === "failed") {

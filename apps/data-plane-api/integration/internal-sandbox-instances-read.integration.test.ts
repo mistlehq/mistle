@@ -237,6 +237,64 @@ it("returns setup-check-purpose sandbox instances by id", async ({ env }) => {
   });
 });
 
+it("does not return designer-purpose sandbox instances from the default get route", async ({
+  env,
+}) => {
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
+    sandboxInstanceRow({
+      id: "sbi_integration_new_get_designer_default",
+      organizationId: "org_integration_new_get_designer_default",
+      sandboxProfileId: "designer",
+      purpose: SandboxInstancePurposes.DESIGNER,
+      status: SandboxInstanceStatuses.PENDING,
+      providerSandboxId: null,
+      title: "Design triage agent",
+    }),
+  );
+
+  await expect(
+    clientFor(env).getSandboxInstance({
+      organizationId: "org_integration_new_get_designer_default",
+      instanceId: "sbi_integration_new_get_designer_default",
+    }),
+  ).resolves.toBeNull();
+});
+
+it("returns designer-purpose sandbox instances when designer purpose is explicitly allowed", async ({
+  env,
+}) => {
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
+    sandboxInstanceRow({
+      id: "sbi_integration_new_get_designer_allowed",
+      organizationId: "org_integration_new_get_designer_allowed",
+      sandboxProfileId: "designer",
+      purpose: SandboxInstancePurposes.DESIGNER,
+      status: SandboxInstanceStatuses.PENDING,
+      providerSandboxId: null,
+      title: "Design triage agent",
+    }),
+  );
+
+  await expect(
+    clientFor(env).getSandboxInstance({
+      organizationId: "org_integration_new_get_designer_allowed",
+      instanceId: "sbi_integration_new_get_designer_allowed",
+      allowedPurposes: [SandboxInstancePurposes.DESIGNER],
+    }),
+  ).resolves.toEqual({
+    id: "sbi_integration_new_get_designer_allowed",
+    title: "Design triage agent",
+    status: "pending",
+    connectable: false,
+    failureCode: null,
+    failureMessage: null,
+    runtimePlan: null,
+    sandboxProfileId: "designer",
+    sandboxProfileVersion: 1,
+    startupOperation: null,
+  });
+});
+
 it("marks starting sandbox instances failed when provider inspection misses the runtime", async ({
   env,
 }) => {

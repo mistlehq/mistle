@@ -50,6 +50,18 @@ import {
   useIntegrationsDirectoryState,
 } from "./use-integrations-directory-state.js";
 
+type EmbeddedIntegrationsNavigateOptions = {
+  replace?: boolean;
+  state?: unknown;
+};
+
+export type EmbeddedIntegrationsRoute = {
+  detailTargetKey: string | null;
+  navigate: (href: string, options?: EmbeddedIntegrationsNavigateOptions) => void;
+  searchParams: URLSearchParams;
+  setSearchParams: (searchParams: URLSearchParams, options?: { replace?: boolean }) => void;
+};
+
 function buildProviderAppSetupStateByConnectionId(input: {
   connections: readonly {
     id: string;
@@ -191,6 +203,11 @@ function clearUrlConnectionNoticeParams(searchParams: URLSearchParams): URLSearc
   return nextSearchParams;
 }
 
+function formatSearchParamsSuffix(searchParams: URLSearchParams): string {
+  const serialized = searchParams.toString();
+  return serialized.length === 0 ? "" : `?${serialized}`;
+}
+
 function resolveRouteStateConnectionNotice(input: {
   connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
   detailConnectionId: string | null;
@@ -254,12 +271,18 @@ function resolveManagedWebhookSetupState(state: unknown): ManagedWebhookSetupRes
   return parsed.success ? parsed.data : null;
 }
 
-export function IntegrationsPage() {
+export function IntegrationsPage(input?: {
+  embeddedRoute?: EmbeddedIntegrationsRoute;
+}): React.JSX.Element | null {
   const location = useLocation();
-  const navigate = useNavigate();
+  const routeNavigate = useNavigate();
   const params = useParams();
   const queryClient = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [routeSearchParams, setRouteSearchParams] = useSearchParams();
+  const navigate = input?.embeddedRoute?.navigate ?? routeNavigate;
+  const searchParams = input?.embeddedRoute?.searchParams ?? routeSearchParams;
+  const setSearchParams = input?.embeddedRoute?.setSearchParams ?? setRouteSearchParams;
+  const locationState = input?.embeddedRoute === undefined ? location.state : undefined;
   const [urlConnectionNotice, setUrlConnectionNotice] =
     useState<IntegrationConnectionNotice | null>(null);
   const [urlProviderAppSetupErrorNotice, setUrlProviderAppSetupErrorNotice] =
@@ -269,7 +292,7 @@ export function IntegrationsPage() {
   >({});
   useRequiredOrganizationId();
   const organizationSummary = useOrganizationSummary();
-  const detailTargetKey = params["targetKey"] ?? null;
+  const detailTargetKey = input?.embeddedRoute?.detailTargetKey ?? params["targetKey"] ?? null;
   const detailConnectionId = searchParams.get("connectionId");
   const dashboardConfig = getDashboardConfig();
   const directoryState = useIntegrationsDirectoryState({
@@ -361,7 +384,7 @@ export function IntegrationsPage() {
   const routeStateConnectionNotice = resolveRouteStateConnectionNotice({
     connectionMethods: selectedDetailConnectionMethods,
     detailConnectionId,
-    locationState: location.state,
+    locationState,
     selectedConnection: selectedDetailConnection,
   });
   const connectionNotice =
@@ -481,7 +504,7 @@ export function IntegrationsPage() {
               (method) => method.id === editingConnection.connectionMethodId,
             ) ?? null;
           if (editingMethod?.kind === "device-authorization") {
-            const nextSearchParams = new URLSearchParams(location.search);
+            const nextSearchParams = new URLSearchParams(searchParams);
             nextSearchParams.set("reauthorize", "device");
             void navigate(
               `/integrations/${detailTargetKey}/${connectionId}/edit?${nextSearchParams.toString()}`,
@@ -489,7 +512,11 @@ export function IntegrationsPage() {
             return;
           }
 
-          void navigate(`/integrations/${detailTargetKey}/${connectionId}/edit${location.search}`);
+          void navigate(
+            `/integrations/${detailTargetKey}/${connectionId}/edit${formatSearchParamsSuffix(
+              searchParams,
+            )}`,
+          );
         }}
         onStartProviderAppSetup={connectionEditors.providerAppSetup.onStartInstallation}
         onRefreshResource={directoryState.onRefreshResource}

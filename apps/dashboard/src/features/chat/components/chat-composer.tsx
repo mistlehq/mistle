@@ -404,6 +404,7 @@ export type ChatComposerViewModel = {
   canUploadAttachments: boolean;
   isUploadingAttachments: boolean;
   configControlsDisabled: boolean;
+  showAttachmentControl?: boolean;
   showConfigControls?: boolean;
   showReasoningControl?: boolean;
   onComposerDraftChange: (value: ComposerDraft) => void;
@@ -572,6 +573,7 @@ export function ChatComposer({
   canUploadAttachments,
   isUploadingAttachments,
   configControlsDisabled,
+  showAttachmentControl = true,
   showConfigControls = true,
   showReasoningControl = true,
   onComposerDraftChange,
@@ -1845,18 +1847,20 @@ export function ChatComposer({
         </div>
         <div className="flex items-center gap-2">
           <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] items-center gap-1.5 md:flex md:flex-wrap md:items-center md:gap-2">
-            <Button
-              aria-label="Add files"
-              className="text-muted-foreground h-8 min-w-0 rounded-md px-1.5 hover:bg-muted/60"
-              disabled={!canUploadAttachments || isUploadingAttachments}
-              onClick={() => {
-                fileInputRef.current?.click();
-              }}
-              type="button"
-              variant="ghost"
-            >
-              <PlusIcon aria-hidden="true" className="size-4" />
-            </Button>
+            {showAttachmentControl ? (
+              <Button
+                aria-label="Add files"
+                className="text-muted-foreground h-8 min-w-0 rounded-md px-1.5 hover:bg-muted/60"
+                disabled={!canUploadAttachments || isUploadingAttachments}
+                onClick={() => {
+                  fileInputRef.current?.click();
+                }}
+                type="button"
+                variant="ghost"
+              >
+                <PlusIcon aria-hidden="true" className="size-4" />
+              </Button>
+            ) : null}
 
             {showConfigControls ? (
               <>

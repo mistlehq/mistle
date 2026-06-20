@@ -176,9 +176,18 @@ method = "shared_token"
 [internal_auth.shared_token]
 token = "replace-with-internal-service-token"
 
+[platform_credentials.openai]
+api_key = "replace-with-platform-openai-api-key"
+
 [sandbox]
 default_base_image = "registry.example.com/mistle/sandbox-base:prod"
 publish_base_domain = "mistle.example"
+
+[sandbox.designer]
+base_image = "registry.example.com/mistle/sandbox-base:prod"
+codex_cli_path = "codex"
+sandbox_provider = "docker"
+#sandbox_connection_id = "replace-with-sandbox-connection-id"
 
 [sandbox.e2b]
 enabled = true

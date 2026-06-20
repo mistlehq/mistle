@@ -64,10 +64,6 @@ export function resolveAppShellFrame(input: {
   handleNavigateToSettings: () => void;
   handleSignOut: () => void;
   handleSwitchOrganization: (organizationId: string) => void;
-  inDashboardRoot: boolean;
-  inIntegrations: boolean;
-  inSandboxProfiles: boolean;
-  inSessionDetail: boolean;
   inSessions: boolean;
   inSettings: boolean;
   isSigningOut: boolean;
@@ -107,7 +103,7 @@ export function resolveAppShellFrame(input: {
 
   return {
     contentInsetOwner: input.pageMeta.appShellInsetOwner,
-    renderSidebarTrigger: !input.inSessionDetail,
+    renderSidebarTrigger: input.pageMeta.sidebarTriggerOwner === "page-frame",
     sidebarContent: showDedicatedSessionsSidebar ? (
       <div className="animate-in fade-in-0 duration-200">
         <SessionsSidebarHeader
@@ -145,7 +141,7 @@ export function resolveAppShellFrame(input: {
       />
     ),
     topLoadingBar: <TopLoadingBar />,
-    viewportMode: input.inSessionDetail ? "workspace" : input.pageMeta.appShellViewportMode,
+    viewportMode: input.pageMeta.appShellViewportMode,
   };
 }
 

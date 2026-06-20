@@ -117,6 +117,17 @@ const GatewayRelaySchema = z
   ])
   .default({ backend: "memory" });
 
+const PlatformCredentialsSchema = z
+  .object({
+    openai: z
+      .object({
+        api_key: z.string().trim().min(1),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 const SandboxDockerProviderConfigSchema = z.discriminatedUnion("enabled", [
   z
     .object({
@@ -229,6 +240,24 @@ const SandboxModalProviderConfigSchema = z.discriminatedUnion("enabled", [
     })
     .strict(),
 ]);
+
+const DesignerSandboxResourcesConfigSchema = z
+  .object({
+    vcpu_count: z.number().int().positive(),
+    memory_mb: z.number().int().positive(),
+    disk_mb: z.number().int().positive().optional(),
+  })
+  .strict();
+
+const DesignerSandboxConfigSchema = z
+  .object({
+    base_image: z.string().trim().min(1),
+    codex_cli_path: z.string().trim().min(1).default("codex"),
+    sandbox_provider: z.string().trim().min(1),
+    sandbox_connection_id: z.string().trim().min(1).nullable().default(null),
+    sandbox_resources: DesignerSandboxResourcesConfigSchema.nullable().default(null),
+  })
+  .strict();
 
 const ControlPlaneApiAuthSchema = z
   .object({
@@ -401,6 +430,7 @@ export const ConfigSchema = z
       })
       .strict(),
     gateway_relay: GatewayRelaySchema,
+    platform_credentials: PlatformCredentialsSchema.optional(),
     object_store: z
       .object({
         assets: ObjectStoreSchema,
@@ -460,6 +490,7 @@ export const ConfigSchema = z
           })
           .strict(),
         docker: SandboxDockerProviderConfigSchema.optional(),
+        designer: DesignerSandboxConfigSchema.optional(),
         sandboxd_test_faults_enabled: z.boolean().optional(),
         e2b: SandboxE2BProviderConfigSchema.optional(),
         modal: SandboxModalProviderConfigSchema.optional(),
@@ -468,6 +499,19 @@ export const ConfigSchema = z
       })
       .strict(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (
+      value.sandbox.designer !== undefined &&
+      value.platform_credentials?.openai?.api_key === undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["platform_credentials", "openai", "api_key"],
+        message:
+          "Platform OpenAI credentials are required when Designer sandbox config is enabled.",
+      });
+    }
+  });
 
 export type Config = z.infer<typeof ConfigSchema>;

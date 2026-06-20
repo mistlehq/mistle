@@ -13,6 +13,7 @@ import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { CodexJsonRpcClient, CodexJsonRpcRequestError } from "./codex-json-rpc.js";
 import {
   AllCodexThreadSourceKinds,
+  parseCodexThreadReadResponse,
   parseCodexThreadListResponse,
   resolveOriginalCodexThreadId,
   type CodexThreadSummary,
@@ -953,6 +954,9 @@ async function initializeProviderConnection(
       notify: async (notificationInput) => {
         await rpcClient.notify(notificationInput.method, notificationInput.params);
       },
+      respondToServerRequest: async (responseInput) => {
+        await rpcClient.respond(responseInput.requestId, responseInput.result);
+      },
       close: async () => {
         rpcClient.dispose();
         await connection.close();
@@ -1107,6 +1111,53 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
         preview: readNestedString(threadResult, ["thread", "preview"]),
       };
     },
+    readConversationTranscript: async (input) => {
+      let threadResult: unknown;
+      try {
+        threadResult = await input.connection.request({
+          method: CodexMethodNames.THREAD_READ,
+          params: {
+            threadId: input.providerConversationId,
+            includeTurns: true,
+          },
+        });
+      } catch (error) {
+        if (isProviderConversationMissingError(error)) {
+          throw new ConversationProviderError({
+            code: ConversationProviderErrorCodes.PROVIDER_CONVERSATION_MISSING,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Codex read conversation transcript failed with non-error exception.",
+            cause: error,
+          });
+        }
+        if (isUnmaterializedCodexIncludeTurnsError(error)) {
+          return {
+            providerConversationId: input.providerConversationId,
+            name: null,
+            preview: null,
+            turns: [],
+          };
+        }
+        throw new ConversationProviderError({
+          code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Codex read conversation transcript failed with non-error exception.",
+          cause: error,
+        });
+      }
+
+      const parsedThread = parseCodexThreadReadResponse(threadResult);
+      return {
+        providerConversationId: parsedThread.threadId,
+        name: parsedThread.name,
+        preview: parsedThread.preview,
+        turns: parsedThread.turns,
+      };
+    },
     generateConversationTitle: async (input) => {
       const title = await generateConversationTitleWithSandboxCodexExec({
         connectionUrl: input.connectionUrl,
@@ -1222,6 +1273,30 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
     },
     steerExecution: steerCodexExecution,
     submitAssociatedResourceDelivery: submitCodexAssociatedResourceDelivery,
+    respondToServerRequest: async (input) => {
+      if (input.connection.respondToServerRequest === undefined) {
+        throw new ConversationProviderError({
+          code: ConversationProviderErrorCodes.PROVIDER_START_EXECUTION_FAILED,
+          message: "Codex connection does not support server request responses.",
+        });
+      }
+
+      try {
+        await input.connection.respondToServerRequest({
+          requestId: input.requestId,
+          result: input.result,
+        });
+      } catch (error) {
+        throw new ConversationProviderError({
+          code: ConversationProviderErrorCodes.PROVIDER_START_EXECUTION_FAILED,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Codex server request response failed with non-error exception.",
+          cause: error,
+        });
+      }
+    },
     interruptExecution: async (input) => {
       try {
         await input.connection.request({

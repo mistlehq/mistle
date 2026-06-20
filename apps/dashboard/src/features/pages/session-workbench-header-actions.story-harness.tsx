@@ -34,7 +34,7 @@ const StoryActionButtonControl = {
   },
   pressed: false,
 } satisfies Pick<
-  React.ComponentProps<typeof SessionWorkbenchHeaderActions>["cliControl"],
+  NonNullable<React.ComponentProps<typeof SessionWorkbenchHeaderActions>["cliControl"]>,
   "className" | "disabled" | "onClick" | "pressed"
 >;
 

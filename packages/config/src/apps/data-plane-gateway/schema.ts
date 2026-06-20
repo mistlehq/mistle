@@ -197,6 +197,27 @@ export const DataPlaneGatewayInternalAuthConfigSchema = z
   })
   .strict();
 
+export const DataPlaneGatewayPlatformCredentialsConfigSchema = z
+  .object({
+    openai: z
+      .object({
+        apiKey: z.string().trim().min(1),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const PartialDataPlaneGatewayPlatformCredentialsConfigSchema = z
+  .object({
+    openai: z
+      .object({
+        apiKey: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 export const DataPlaneGatewayConfigSchema = z
   .object({
     server: DataPlaneGatewayServerConfigSchema,
@@ -208,6 +229,7 @@ export const DataPlaneGatewayConfigSchema = z
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema,
     controlPlaneApi: DataPlaneGatewayControlPlaneApiConfigSchema,
     internalAuth: DataPlaneGatewayInternalAuthConfigSchema,
+    platformCredentials: DataPlaneGatewayPlatformCredentialsConfigSchema.optional(),
     sandbox: GlobalSandboxConfigSchema,
     telemetry: GlobalTelemetryConfigSchema,
   })
@@ -224,6 +246,7 @@ export const PartialDataPlaneGatewayConfigSchema = z
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema.partial().optional(),
     controlPlaneApi: PartialDataPlaneGatewayControlPlaneApiConfigSchema.optional(),
     internalAuth: DataPlaneGatewayInternalAuthConfigSchema.partial().optional(),
+    platformCredentials: PartialDataPlaneGatewayPlatformCredentialsConfigSchema.optional(),
     sandbox: PartialGlobalSandboxConfigSchema.optional(),
     telemetry: PartialGlobalTelemetryConfigSchema.optional(),
   })

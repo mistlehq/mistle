@@ -10,6 +10,7 @@ import { createApiKeysRoutes } from "./api-keys/index.js";
 import type { ControlPlaneAuth } from "./auth/index.js";
 import { createAuthRoutes } from "./auth/routes.js";
 import { createDashboardRoutes } from "./dashboard/index.js";
+import { createDesignerRoutes } from "./designer/index.js";
 import { createHomeRoutes } from "./home/index.js";
 import { createIdentityLinkingCallbacksRoutes } from "./identity-linking-callbacks/index.js";
 import { createIntegrationCallbacksRoutes } from "./integration-callbacks/index.js";
@@ -168,6 +169,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const authRoutes = createAuthRoutes();
   const apiKeysRoutes = withActiveOrganizationAccess(createApiKeysRoutes());
   const dashboardRoutes = createDashboardRoutes();
+  const designerRoutes = withOrganizationAccess(createDesignerRoutes());
   const triggersRoutes = withActiveOrganizationAccess(createTriggersRoutes());
   const triggerSchedulesRoutes = withActiveOrganizationAccess(createTriggerSchedulesRoutes());
   const triggerWebhooksRoutes = withActiveOrganizationAccess(createTriggerWebhooksRoutes());
@@ -196,6 +198,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   app.route(authRoutes.basePath, authRoutes.routes);
   app.route(apiKeysRoutes.basePath, apiKeysRoutes.routes);
   app.route(dashboardRoutes.basePath, dashboardRoutes.routes);
+  app.route(designerRoutes.basePath, designerRoutes.routes);
   app.route(triggersRoutes.basePath, triggersRoutes.routes);
   app.route(triggerSchedulesRoutes.basePath, triggerSchedulesRoutes.routes);
   app.route(triggerWebhooksRoutes.basePath, triggerWebhooksRoutes.routes);

@@ -8,6 +8,7 @@ import { useCallback, useRef } from "react";
 
 import { useClaudeCodeSessionState } from "../session-agents/claude-code/session-state/index.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
+import type { DashboardControlActionSupport } from "../session-agents/dashboard-control-actions.js";
 import { useOpenCodeSessionState } from "../session-agents/opencode/session-state/index.js";
 import { usePiSessionState } from "../session-agents/pi/session-state/index.js";
 import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-runtime-workbench-capabilities.js";
@@ -40,9 +41,13 @@ import {
   type SessionConversationPaneState,
 } from "./use-session-workbench-conversation-runtime.js";
 import { useSessionWorkbenchHandoffControl } from "./use-session-workbench-handoff-control.js";
-import { useSessionWorkbenchLifecycleState } from "./use-session-workbench-lifecycle-state.js";
+import {
+  useSessionWorkbenchLifecycleState,
+  type SessionWorkbenchSandboxStatusReader,
+} from "./use-session-workbench-lifecycle-state.js";
 import { useSessionWorkbenchRepositoryControl } from "./use-session-workbench-repository-control.js";
 import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
+import type { SessionWorkbenchConnectionTokenMinter } from "./use-session-workbench-transport.js";
 
 type SessionWorkbenchState = {
   terminalCwd: string;
@@ -109,9 +114,15 @@ export type {
 export function useSessionWorkbenchController(input: {
   requestedRuntimeConversationId?: string | null;
   sandboxInstanceId: string | null;
+  sandboxStatusReader?: SessionWorkbenchSandboxStatusReader;
+  mintConnectionToken?: SessionWorkbenchConnectionTokenMinter;
+  dashboardControlActions?: DashboardControlActionSupport;
 }): UseSessionWorkbenchControllerResult {
   const queryClient = useQueryClient();
   const transportManager = useSessionWorkbenchTransport({
+    ...(input.mintConnectionToken === undefined
+      ? {}
+      : { mintConnectionToken: input.mintConnectionToken }),
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const resetSessionTransport = useCallback((): void => {
@@ -129,6 +140,9 @@ export function useSessionWorkbenchController(input: {
     sessionClientRef,
     rpcClientRef,
     sessionEventUnsubscribersRef,
+    ...(input.dashboardControlActions === undefined
+      ? {}
+      : { dashboardControlActions: input.dashboardControlActions }),
   });
   const openCodeSessionState = useOpenCodeSessionState({
     ensureTransportConnected: transportManager.ensureTransportConnected,
@@ -151,6 +165,9 @@ export function useSessionWorkbenchController(input: {
   });
   const workbenchLifecycleState = useSessionWorkbenchLifecycleState({
     sandboxInstanceId: input.sandboxInstanceId,
+    ...(input.sandboxStatusReader === undefined
+      ? {}
+      : { sandboxStatusReader: input.sandboxStatusReader }),
     mainPanelTransitionState: handoff.transitionState,
     requestedRuntimeConversationId: input.requestedRuntimeConversationId ?? null,
     resetSessionTransport,

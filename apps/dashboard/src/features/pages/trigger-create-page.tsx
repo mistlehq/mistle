@@ -14,6 +14,11 @@ const TriggerCreatePageScrollStyle: CSSProperties = {
   scrollbarGutter: "stable",
 };
 
+export type EmbeddedTriggerCreateRoute = {
+  navigate: (href: string) => void | Promise<void>;
+  searchParams: URLSearchParams;
+};
+
 function parseSandboxProfileId(value: string | null): string | undefined {
   if (value === null) {
     return undefined;
@@ -40,21 +45,27 @@ function parseTriggerTemplateId(value: string | null): string | undefined {
   return normalized;
 }
 
-export function TriggerCreatePage(): React.JSX.Element {
+export function TriggerCreatePage(input?: {
+  embeddedRoute?: EmbeddedTriggerCreateRoute;
+}): React.JSX.Element {
   const pageMeta = useAppPageMeta();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const routeNavigate = useNavigate();
+  const [routeSearchParams] = useSearchParams();
+  const navigate = input?.embeddedRoute?.navigate ?? routeNavigate;
+  const searchParams = input?.embeddedRoute?.searchParams ?? routeSearchParams;
   const initialSandboxProfileId = parseSandboxProfileId(searchParams.get("sandboxProfileId"));
   const initialTemplateId = parseTriggerTemplateId(searchParams.get("template"));
   const { title, description } = resolvePageFrameText(pageMeta, "Create trigger");
   const createSuccessPath =
-    initialSandboxProfileId === undefined
-      ? undefined
-      : (trigger: CreatedTriggerNavigationTarget) =>
-          createProfileTriggerDetailPath({
-            profileId: trigger.target.sandboxProfileId,
-            triggerId: trigger.id,
-          });
+    input?.embeddedRoute !== undefined
+      ? () => "/triggers"
+      : initialSandboxProfileId === undefined
+        ? undefined
+        : (trigger: CreatedTriggerNavigationTarget) =>
+            createProfileTriggerDetailPath({
+              profileId: trigger.target.sandboxProfileId,
+              triggerId: trigger.id,
+            });
 
   return (
     <div

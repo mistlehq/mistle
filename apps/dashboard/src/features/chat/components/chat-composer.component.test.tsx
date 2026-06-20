@@ -341,6 +341,13 @@ describe("ChatComposer", () => {
     expect(container.querySelector('input[type="file"]')?.getAttribute("accept")).toBeNull();
   });
 
+  it("hides the file attachment button when attachment controls are disabled for the surface", () => {
+    render(<ChatComposer {...createBaseComposerProps()} showAttachmentControl={false} />);
+
+    expect(screen.queryByRole("button", { name: "Add files" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+  });
+
   it("renders safely when model and reasoning selections are unset", () => {
     render(
       <ChatComposer

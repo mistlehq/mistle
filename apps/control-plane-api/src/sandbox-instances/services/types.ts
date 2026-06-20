@@ -3,6 +3,7 @@ import type {
   ListSandboxInstancesResponse,
 } from "@mistle/data-plane-internal-client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import type { SandboxInstancePurpose } from "@mistle/db/data-plane";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { PtyTransportTokenConfig } from "@mistle/gateway-tunnel-auth";
 import type { PortAccessBootstrapTokenConfig } from "@mistle/port-access-auth";
@@ -13,6 +14,7 @@ import type { SandboxInstanceRuntimeContext } from "./runtime-context.js";
 export type MintSandboxInstanceConnectionTokenInput = {
   organizationId: string;
   instanceId: string;
+  allowedPurposes?: readonly SandboxInstancePurpose[];
   gatewayWebsocketUrl: string;
   tokenTtlSeconds: number;
   tokenConfig: ConnectionTokenConfig;

@@ -234,6 +234,7 @@
                     "type": "string",
                     "enum": [
                       "session",
+                      "designer",
                       "snapshot",
                       "setup_assistant",
                       "setup_check",
@@ -558,6 +559,32 @@
                                           "sandboxProfileVersion"
                                         ],
                                         "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["mistle_mcp_designer_token"]
+                                          },
+                                          "designerSessionId": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": ["kind", "designerSessionId"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["platform_openai_api_key"]
+                                          }
+                                        },
+                                        "required": ["kind"],
+                                        "additionalProperties": false
                                       }
                                     ]
                                   }
@@ -663,6 +690,32 @@
                                     }
                                   },
                                   "required": ["kind", "sandboxProfileId", "sandboxProfileVersion"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": ["mistle_mcp_designer_token"]
+                                    },
+                                    "designerSessionId": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": ["kind", "designerSessionId"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": ["platform_openai_api_key"]
+                                    }
+                                  },
+                                  "required": ["kind"],
                                   "additionalProperties": false
                                 }
                               ]
@@ -2578,6 +2631,7 @@
                       "type": "string",
                       "enum": [
                         "session",
+                        "designer",
                         "snapshot",
                         "setup_assistant",
                         "setup_check",
@@ -2673,6 +2727,15 @@
             },
             "required": true,
             "name": "organizationId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "allowedPurposes",
             "in": "query"
           }
         ],
@@ -3039,6 +3102,32 @@
                                             "sandboxProfileVersion"
                                           ],
                                           "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["mistle_mcp_designer_token"]
+                                            },
+                                            "designerSessionId": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": ["kind", "designerSessionId"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["platform_openai_api_key"]
+                                            }
+                                          },
+                                          "required": ["kind"],
+                                          "additionalProperties": false
                                         }
                                       ]
                                     }
@@ -3148,6 +3237,32 @@
                                       "sandboxProfileId",
                                       "sandboxProfileVersion"
                                     ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["mistle_mcp_designer_token"]
+                                      },
+                                      "designerSessionId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["kind", "designerSessionId"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["platform_openai_api_key"]
+                                      }
+                                    },
+                                    "required": ["kind"],
                                     "additionalProperties": false
                                   }
                                 ]
@@ -4475,6 +4590,15 @@
             },
             "required": true,
             "name": "operationId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "allowedPurposes",
             "in": "query"
           },
           {

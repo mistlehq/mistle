@@ -132,6 +132,24 @@ const ControlPlaneApiSandboxModalConfigSchema = z.discriminatedUnion("enabled", 
     .strict(),
 ]);
 
+const ControlPlaneApiDesignerSandboxConfigSchema = z
+  .object({
+    baseImage: z.string().trim().min(1),
+    codexCliPath: z.string().trim().min(1).default("codex"),
+    sandboxProvider: z.string().trim().min(1),
+    sandboxConnectionId: z.string().trim().min(1).nullable().default(null),
+    sandboxResources: z
+      .object({
+        vcpuCount: z.number().int().positive(),
+        memoryMb: z.number().int().positive(),
+        diskMb: z.number().int().positive().optional(),
+      })
+      .strict()
+      .nullable()
+      .default(null),
+  })
+  .strict();
+
 const ControlPlaneApiAuthGoogleConfigSchema = z
   .object({
     clientId: z.string().min(1),
@@ -245,6 +263,27 @@ export const ControlPlaneApiDataPlaneApiConfigSchema = z
   })
   .strict();
 
+export const ControlPlaneApiPlatformCredentialsConfigSchema = z
+  .object({
+    openai: z
+      .object({
+        apiKey: z.string().trim().min(1),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const PartialControlPlaneApiPlatformCredentialsConfigSchema = z
+  .object({
+    openai: z
+      .object({
+        apiKey: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 export const ControlPlaneApiInternalAuthConfigSchema = z
   .object({
     serviceToken: z.string().trim().min(1),
@@ -279,6 +318,7 @@ export const ControlPlaneApiSandboxRuntimeConfigSchema = z
     modal: ControlPlaneApiSandboxModalConfigSchema.optional(),
     opencomputer: ControlPlaneApiSandboxOpenComputerConfigSchema.optional(),
     tensorlake: ControlPlaneApiSandboxTensorlakeConfigSchema.optional(),
+    designer: ControlPlaneApiDesignerSandboxConfigSchema.optional(),
   })
   .strict();
 
@@ -326,6 +366,7 @@ export const ControlPlaneApiConfigSchema = z
     billing: ControlPlaneApiBillingConfigSchema,
     workflow: ControlPlaneApiWorkflowConfigSchema,
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema,
+    platformCredentials: ControlPlaneApiPlatformCredentialsConfigSchema.optional(),
     internalAuth: ControlPlaneApiInternalAuthConfigSchema,
     connectionToken: ControlPlaneApiConnectionTokenConfigSchema,
     portAccess: ControlPlaneApiPortAccessConfigSchema,
@@ -334,7 +375,20 @@ export const ControlPlaneApiConfigSchema = z
     commitSign: ControlPlaneApiCommitSignConfigSchema.optional(),
     integrations: ControlPlaneApiIntegrationsConfigSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (
+      value.sandbox.designer !== undefined &&
+      value.platformCredentials?.openai?.apiKey === undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["platformCredentials", "openai", "apiKey"],
+        message:
+          "Platform OpenAI credentials are required when Designer sandbox config is enabled.",
+      });
+    }
+  });
 
 export const ControlPlaneApiMaintenanceConfigSchema = z
   .object({
@@ -363,6 +417,7 @@ export const PartialControlPlaneApiConfigSchema = z
     billing: ControlPlaneApiBillingConfigObjectSchema.partial().optional(),
     workflow: ControlPlaneApiWorkflowConfigObjectSchema.partial().optional(),
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema.partial().optional(),
+    platformCredentials: PartialControlPlaneApiPlatformCredentialsConfigSchema.optional(),
     internalAuth: ControlPlaneApiInternalAuthConfigSchema.partial().optional(),
     connectionToken: ControlPlaneApiConnectionTokenConfigSchema.partial().optional(),
     portAccess: ControlPlaneApiPortAccessConfigSchema.partial().optional(),

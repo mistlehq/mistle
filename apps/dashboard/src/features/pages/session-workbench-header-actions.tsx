@@ -74,8 +74,8 @@ type SessionWorkbenchHeaderStatus =
     };
 
 export function SessionWorkbenchHeaderActions(input: {
-  cliControl: SessionWorkbenchHeaderButtonControl;
-  diffControl: SessionWorkbenchHeaderButtonControl;
+  cliControl?: SessionWorkbenchHeaderButtonControl;
+  diffControl?: SessionWorkbenchHeaderButtonControl;
   mobilePortAccessControl?: SessionWorkbenchHeaderMobileSurfaceControl;
   mobileConversationNavigatorControl?: SessionWorkbenchHeaderMobileSurfaceControl;
   portAccessControl?: React.ReactNode;
@@ -189,27 +189,31 @@ export function SessionWorkbenchHeaderActions(input: {
       )}
       <span aria-hidden className="hidden h-5 w-px bg-border sm:block" />
       <div className="hidden items-center gap-2 sm:flex">
-        <Button
-          aria-label={input.cliControl.ariaLabel}
-          aria-pressed={input.cliControl.pressed}
-          className={input.cliControl.className}
-          disabled={input.cliControl.disabled}
-          onClick={input.cliControl.onClick}
-          size="sm"
-          title={input.cliControl.title}
-          type="button"
-          variant="ghost"
-        >
-          <span className="text-sm font-medium">TUI</span>
-        </Button>
+        {input.cliControl === undefined ? null : (
+          <Button
+            aria-label={input.cliControl.ariaLabel}
+            aria-pressed={input.cliControl.pressed}
+            className={input.cliControl.className}
+            disabled={input.cliControl.disabled}
+            onClick={input.cliControl.onClick}
+            size="sm"
+            title={input.cliControl.title}
+            type="button"
+            variant="ghost"
+          >
+            <span className="text-sm font-medium">TUI</span>
+          </Button>
+        )}
         {input.conversationControl === undefined ? null : (
           <HeaderIconButton control={input.conversationControl}>
             <ListBulletsIcon className="size-4" />
           </HeaderIconButton>
         )}
-        <HeaderIconButton control={input.diffControl}>
-          <GitDiffIcon className="size-4" />
-        </HeaderIconButton>
+        {input.diffControl === undefined ? null : (
+          <HeaderIconButton control={input.diffControl}>
+            <GitDiffIcon className="size-4" />
+          </HeaderIconButton>
+        )}
         {desktopPortAccessControl}
         <HeaderIconButton control={input.terminalControl}>
           <TerminalIcon className="size-4" />
@@ -232,9 +236,11 @@ export function SessionWorkbenchHeaderActions(input: {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48 sm:hidden" sideOffset={8}>
           <DropdownMenuGroup>
-            <HeaderMenuItem control={input.cliControl} label="TUI">
-              <IntegrationLogo alt="" className="size-4" logoKey="openai" />
-            </HeaderMenuItem>
+            {input.cliControl === undefined ? null : (
+              <HeaderMenuItem control={input.cliControl} label="TUI">
+                <IntegrationLogo alt="" className="size-4" logoKey="openai" />
+              </HeaderMenuItem>
+            )}
             {mobileConversationNavigatorControl === null &&
             input.conversationControl !== undefined ? (
               <HeaderMenuItem control={input.conversationControl} label="Conversations">
@@ -255,9 +261,11 @@ export function SessionWorkbenchHeaderActions(input: {
                 <span className="truncate">Conversations</span>
               </DropdownMenuItem>
             )}
-            <HeaderMenuItem control={input.diffControl} label="Changes">
-              <GitDiffIcon className="size-4" />
-            </HeaderMenuItem>
+            {input.diffControl === undefined ? null : (
+              <HeaderMenuItem control={input.diffControl} label="Changes">
+                <GitDiffIcon className="size-4" />
+              </HeaderMenuItem>
+            )}
             <HeaderMenuItem control={input.terminalControl} label="Terminal">
               <TerminalIcon className="size-4" />
             </HeaderMenuItem>

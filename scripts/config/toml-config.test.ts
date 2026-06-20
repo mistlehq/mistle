@@ -47,6 +47,9 @@ describe("toml config generation", () => {
     expect(content).toContain("[services.control_plane_api]");
     expect(content).toContain("[gateway_relay]");
     expect(content).toContain('backend = "memory"');
+    expect(content).toContain("[platform_credentials.openai]");
+    expect(content).toContain("[sandbox.designer]");
+    expect(content).toContain('sandbox_provider = "docker"');
     expect(content).toContain(
       "# Use direct_url for migrations and pooled_url for app runtime traffic.",
     );

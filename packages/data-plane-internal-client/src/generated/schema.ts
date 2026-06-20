@@ -241,6 +241,7 @@ export interface paths {
             /** @enum {string} */
             purpose:
               | "session"
+              | "designer"
               | "snapshot"
               | "setup_assistant"
               | "setup_check"
@@ -456,6 +457,15 @@ export interface paths {
                         kind: "mistle_mcp_setup_assistant_token";
                         sandboxProfileId: string;
                         sandboxProfileVersion: number;
+                      }
+                    | {
+                        designerSessionId: string;
+                        /** @enum {string} */
+                        kind: "mistle_mcp_designer_token";
+                      }
+                    | {
+                        /** @enum {string} */
+                        kind: "platform_openai_api_key";
                       };
                   header: string;
                 }[];
@@ -520,6 +530,15 @@ export interface paths {
                       kind: "mistle_mcp_setup_assistant_token";
                       sandboxProfileId: string;
                       sandboxProfileVersion: number;
+                    }
+                  | {
+                      designerSessionId: string;
+                      /** @enum {string} */
+                      kind: "mistle_mcp_designer_token";
+                    }
+                  | {
+                      /** @enum {string} */
+                      kind: "platform_openai_api_key";
                     };
                 egressRuleId: string;
                 familyId: string;
@@ -729,6 +748,7 @@ export interface paths {
     get: {
       parameters: {
         query: {
+          allowedPurposes?: string;
           organizationId: string;
         };
         header?: never;
@@ -961,6 +981,15 @@ export interface paths {
                           kind: "mistle_mcp_setup_assistant_token";
                           sandboxProfileId: string;
                           sandboxProfileVersion: number;
+                        }
+                      | {
+                          designerSessionId: string;
+                          /** @enum {string} */
+                          kind: "mistle_mcp_designer_token";
+                        }
+                      | {
+                          /** @enum {string} */
+                          kind: "platform_openai_api_key";
                         };
                     header: string;
                   }[];
@@ -1025,6 +1054,15 @@ export interface paths {
                         kind: "mistle_mcp_setup_assistant_token";
                         sandboxProfileId: string;
                         sandboxProfileVersion: number;
+                      }
+                    | {
+                        designerSessionId: string;
+                        /** @enum {string} */
+                        kind: "mistle_mcp_designer_token";
+                      }
+                    | {
+                        /** @enum {string} */
+                        kind: "platform_openai_api_key";
                       };
                   egressRuleId: string;
                   familyId: string;
@@ -1545,6 +1583,7 @@ export interface paths {
               /** @enum {string} */
               purpose:
                 | "session"
+                | "designer"
                 | "snapshot"
                 | "setup_assistant"
                 | "setup_check"
@@ -1608,6 +1647,7 @@ export interface paths {
       parameters: {
         query: {
           afterSequence?: number;
+          allowedPurposes?: string;
           limit?: number;
           operationId: string;
           organizationId: string;

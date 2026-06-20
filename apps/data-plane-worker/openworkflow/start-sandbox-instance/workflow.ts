@@ -1319,7 +1319,14 @@ function createRuntimePlanStartupLogFields(
                   credentialMistleMcpSandboxProfileVersion:
                     egressRoute.credentialResolver.sandboxProfileVersion,
                 }
-              : { credentialProviderFamily: egressRoute.credentialResolver.providerFamily }),
+              : egressRoute.credentialResolver.kind === "mistle_mcp_designer_token"
+                ? {
+                    credentialMistleMcpDesignerSessionId:
+                      egressRoute.credentialResolver.designerSessionId,
+                  }
+                : egressRoute.credentialResolver.kind === "platform_openai_api_key"
+                  ? {}
+                  : { credentialProviderFamily: egressRoute.credentialResolver.providerFamily }),
       };
     }),
   };
@@ -1330,6 +1337,7 @@ function resolveStartSandboxOperationKind(
 ): SandboxdOperationKind {
   if (
     purpose === SandboxInstancePurposes.SESSION ||
+    purpose === SandboxInstancePurposes.DESIGNER ||
     purpose === SandboxInstancePurposes.SETUP_ASSISTANT ||
     purpose === SandboxInstancePurposes.SKILLS_DISCOVERY
   ) {

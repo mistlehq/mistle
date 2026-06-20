@@ -12,6 +12,14 @@ type SessionWorkbenchTransport = {
   transport: SandboxSessionTransport;
 };
 
+type SessionWorkbenchConnectionToken = {
+  connectionUrl: string;
+};
+
+export type SessionWorkbenchConnectionTokenMinter = (input: {
+  instanceId: string;
+}) => Promise<SessionWorkbenchConnectionToken>;
+
 type PendingTransportConnection = {
   promise: Promise<SessionWorkbenchTransport>;
   sandboxInstanceId: string;
@@ -25,6 +33,7 @@ export type SessionWorkbenchTransportManager = {
 };
 
 export function useSessionWorkbenchTransport(input: {
+  mintConnectionToken?: SessionWorkbenchConnectionTokenMinter;
   sandboxInstanceId: string | null;
 }): SessionWorkbenchTransportManager {
   const transportRef = useRef<SandboxSessionTransport | null>(null);
@@ -32,6 +41,7 @@ export function useSessionWorkbenchTransport(input: {
   const pendingTransportConnectionRef = useRef<PendingTransportConnection | null>(null);
   const transportGenerationRef = useRef(0);
   const previousSandboxInstanceIdRef = useRef<string | null>(input.sandboxInstanceId);
+  const mintConnectionToken = input.mintConnectionToken ?? mintSandboxInstanceConnectionToken;
 
   const disconnectTransport = useCallback((reason: string): void => {
     transportGenerationRef.current += 1;
@@ -69,7 +79,7 @@ export function useSessionWorkbenchTransport(input: {
       transportRef.current = transport;
 
       const promise = (async (): Promise<SessionWorkbenchTransport> => {
-        const mintedConnection = await mintSandboxInstanceConnectionToken({
+        const mintedConnection = await mintConnectionToken({
           instanceId: ensureInput.sandboxInstanceId,
         });
         await transport.connect({
@@ -114,7 +124,7 @@ export function useSessionWorkbenchTransport(input: {
         }
       }
     },
-    [disconnectTransport],
+    [disconnectTransport, mintConnectionToken],
   );
 
   useEffect(() => {
