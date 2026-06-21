@@ -121,6 +121,10 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
         });
       }
 
+      if (receivedWebhook.response !== undefined) {
+        return createImmediateWebhookResponse(receivedWebhook.response);
+      }
+
       return ctx.json(
         {
           status: receivedWebhook.duplicate ? "duplicate" : "received",

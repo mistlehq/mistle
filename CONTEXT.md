@@ -125,6 +125,14 @@ _Avoid_: Runtime plane, runtime config when referring to the compiled activation
 An external-provider capability selected through an integration binding and exposed to an **Agent runtime** as part of the **Runtime plan**.
 _Avoid_: Mistle MCP, agent runtime MCP when the server belongs to a provider integration
 
+**Draft integration connection**:
+An **Integration connection** created before all provider setup requirements are satisfied.
+_Avoid_: Placeholder connection, fake connection
+
+**Integration connection setup completion**:
+The point at which an **Integration connection** has the provider state and credentials needed for its supported behavior.
+_Avoid_: Connection creation when provider setup is still incomplete
+
 **Provider placeholder credential**:
 A non-secret credential value supplied only to satisfy provider client libraries before managed egress applies the real integration credential.
 _Avoid_: Dummy credential when it could be mistaken for real provider access
@@ -252,6 +260,10 @@ _Avoid_: Routable provider resource when future event routing is not the concern
 **Provider configuration change**:
 A user-approved change to an external provider object made while configuring Mistle behavior.
 _Avoid_: Provider resource refresh when no provider object is modified
+
+**Provider configuration setup**:
+A guided integration setup flow for creating or configuring a provider-side **Provider configuration resource**.
+_Avoid_: Provider app setup when the provider object is not an app
 
 **Agent-started Slack thread**:
 A **Slack thread** whose root message was created by an agent.
@@ -638,6 +650,12 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Mistle Designer session** setup changes do not automatically change the target **Sandbox profile version configuration**.
 - **Mistle Designer** may route a user to an existing integration setup flow rather than creating an **Integration connection** directly.
 - Future **Mistle Designer** work should treat **Integration connection** setup as complete when the relevant control-plane resource state exists.
+- Some **Draft integration connections** need a webhook callback URL before the provider-side **Provider configuration resource** can be created.
+- **Provider configuration setup** is generic product flow while its provider-specific fields and instructions belong to the integration definition.
+- **Provider configuration setup** reuses **Integration connection setup completion** rules instead of defining a separate completion model.
+- A WasenderAPI **Integration connection setup completion** requires both the provider resource credential and the webhook secret used to verify provider deliveries.
+- A WasenderAPI **Integration connection setup completion** does not require a remote provider session health check in the first pass.
+- First-pass WasenderAPI **Provider configuration setup** guides the user through provider-side configuration rather than creating or updating the provider resource from Mistle.
 - Future **Mistle Designer** work may use **User input requests** to collect structured choices before updating a draft **Sandbox profile version**.
 - Future **Mistle Designer** work may save incomplete draft **Sandbox profile version configuration**, but publishing still requires a publishable target **Agent runtime** configuration.
 - Future **Mistle Designer** work should present setup guidance as **Designer recommendations** when the user needs to choose, set up, or review product configuration.

@@ -744,6 +744,26 @@ describe("integrations-definitions index", () => {
           id: "api-key",
           label: "Personal access token",
           kind: "form",
+          createBehavior: "draft-then-setup",
+          setupFlow: {
+            completionRequirements: {
+              kind: "all-of",
+              allOf: [
+                {
+                  kind: "secret-field",
+                  field: "personalAccessToken",
+                },
+                {
+                  kind: "secret-field",
+                  field: "webhookSecret",
+                },
+              ],
+            },
+            routeSegment: "provider-configuration",
+            setupPane: {
+              kind: "provider-configuration",
+            },
+          },
           secretFields: [
             {
               name: "personalAccessToken",
@@ -764,6 +784,30 @@ describe("integrations-definitions index", () => {
     expect(wasenderApiDefinition?.mcp).toBeDefined();
     expect(wasenderApiDefinition?.webhookHandler).toBeUndefined();
     expect(wasenderApiDefinition?.webhookSource).toBeUndefined();
+    const wasenderApiConnectionMethod = wasenderApiDefinition?.connectionMethods.find(
+      (method) => method.id === "api-key",
+    );
+    expect(
+      wasenderApiConnectionMethod?.kind === "form"
+        ? wasenderApiConnectionMethod.setupFlow?.providerConfigurationSetup
+        : undefined,
+    ).toMatchObject({
+      fields: {
+        secretFields: [
+          {
+            name: "personalAccessToken",
+            required: true,
+          },
+          {
+            name: "webhookSecret",
+            required: true,
+          },
+        ],
+      },
+      webhookCallback: {
+        label: "Webhook URL",
+      },
+    });
     expect(whapiDefinition).toMatchObject({
       familyId: "whapi",
       variantId: "whapi-mcp",

@@ -54,6 +54,7 @@ export type ReceivedIntegrationWebhook =
       duplicate: boolean;
       externalDeliveryId: string | null;
       integrationConnectionId: string;
+      response?: IntegrationWebhookImmediateResponse;
       targetKey: string;
       webhookEventId?: string;
     }
@@ -530,12 +531,20 @@ export async function receiveIntegrationWebhook(
 
     webhookRequest = middlewareResult.result;
   } else {
-    webhookRequest = await webhookHandler.resolveWebhookRequest({
-      targetKey: input.targetKey,
-      target: resolvedTarget,
-      headers: normalizedHeaders,
-      rawBody: input.rawBody,
-    });
+    try {
+      webhookRequest = await webhookHandler.resolveWebhookRequest({
+        targetKey: input.targetKey,
+        target: resolvedTarget,
+        headers: normalizedHeaders,
+        rawBody: input.rawBody,
+      });
+    } catch (error) {
+      if (error instanceof IntegrationWebhookError) {
+        throwMappedWebhookError(error);
+      }
+
+      throw error;
+    }
   }
 
   if (webhookRequest.kind === "response" && webhookRequest.verification === "skip") {
@@ -733,6 +742,9 @@ export async function receiveIntegrationWebhook(
     duplicate: insertedRows.insertedWebhookEventId === undefined,
     externalDeliveryId: resolvedWebhookRequest.event.externalDeliveryId ?? null,
     integrationConnectionId: resolvedConnection.id,
+    ...(definition.webhookAcceptedResponse === undefined
+      ? {}
+      : { response: definition.webhookAcceptedResponse }),
     targetKey: input.targetKey,
     ...(insertedRows.persistedWebhookEventId === undefined
       ? {}

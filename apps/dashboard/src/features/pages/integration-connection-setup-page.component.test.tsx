@@ -185,6 +185,89 @@ const SlackWebhookSource: IntegrationWebhookSource = {
   updatedAt: "2026-04-23T00:00:00.000Z",
 };
 
+const WasenderTarget: IntegrationTarget = {
+  targetKey: "wasenderapi-mcp",
+  familyId: "wasenderapi",
+  variantId: "wasenderapi-mcp",
+  kind: "connector",
+  enabled: true,
+  config: {},
+  displayName: "WasenderAPI",
+  description: "WasenderAPI integration",
+  connectionMethods: [
+    {
+      id: "api-key",
+      label: "Personal access token",
+      kind: "form",
+      createBehavior: "draft-then-setup",
+      setupFlow: {
+        routeSegment: "provider-configuration",
+        setupPane: {
+          kind: "provider-configuration",
+        },
+        completionRequirements: {
+          kind: "all-of",
+          allOf: [
+            {
+              kind: "secret-field",
+              field: "personalAccessToken",
+            },
+            {
+              kind: "secret-field",
+              field: "webhookSecret",
+            },
+          ],
+        },
+      },
+      secretFields: [
+        {
+          name: "personalAccessToken",
+          label: "Personal access token",
+          inputType: "password",
+        },
+        {
+          name: "webhookSecret",
+          label: "Webhook secret",
+          inputType: "password",
+        },
+      ],
+    },
+  ],
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+const IncompleteWasenderConnection: IntegrationConnection = {
+  id: "icn_wasender_incomplete",
+  targetKey: "wasenderapi-mcp",
+  displayName: "WasenderAPI Production",
+  status: "active",
+  connectionMethodId: "api-key",
+  connectionMethodLabel: "Personal access token",
+  config: {
+    connection_method: "api-key",
+  },
+  createdAt: "2026-04-23T00:00:00.000Z",
+  updatedAt: "2026-04-23T00:00:00.000Z",
+};
+
+const WasenderWebhookCallbackUrl =
+  "https://control-plane.example.com/p/integration/webhooks/wasenderapi-mcp/eps_wasender_setup";
+
+const WasenderWebhookSource: IntegrationWebhookSource = {
+  id: "iws_wasender_setup",
+  targetKey: "wasenderapi-mcp",
+  integrationConnectionId: IncompleteWasenderConnection.id,
+  displayName: "WasenderAPI webhook",
+  endpointKey: "eps_wasender_setup",
+  callbackUrl: WasenderWebhookCallbackUrl,
+  status: "active",
+  providerMetadata: {},
+  createdAt: "2026-04-23T00:00:00.000Z",
+  updatedAt: "2026-04-23T00:00:00.000Z",
+};
+
 function LocationProbe(): React.JSX.Element {
   const location = useLocation();
 
@@ -337,6 +420,51 @@ describe("IntegrationConnectionSetupPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 3, name: "Slack app manifest" })).toBeTruthy();
     });
+    expect(screen.queryByText("Could not load setup")).toBeNull();
+  });
+
+  it("renders provider configuration setup routes with provider-specific fields", async () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+      targets: [WasenderTarget],
+      connections: [IncompleteWasenderConnection],
+    });
+    queryClient.setQueryData(
+      ["integration-webhook-sources", IncompleteWasenderConnection.id],
+      [WasenderWebhookSource],
+    );
+    seedAuthenticatedSession(queryClient);
+    seedOrganizationSummaryError({ queryClient });
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/integrations/:targetKey/:connectionId/:setupRouteSegment/setup",
+          element: <IntegrationConnectionSetupPage />,
+        },
+      ],
+      {
+        initialEntries: [
+          "/integrations/wasenderapi-mcp/icn_wasender_incomplete/provider-configuration/setup",
+        ],
+      },
+    );
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Set up WasenderAPI" })).toBeTruthy();
+    });
+    expect(screen.getByText(WasenderWebhookCallbackUrl)).toBeTruthy();
+    expect(screen.getByText("Personal access token")).toBeTruthy();
+    expect(screen.getByText("Webhook secret")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save WasenderAPI setup" })).toBeTruthy();
     expect(screen.queryByText("Could not load setup")).toBeNull();
   });
 

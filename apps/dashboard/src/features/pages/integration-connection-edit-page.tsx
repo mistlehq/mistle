@@ -11,7 +11,10 @@ import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import type { OpenIntegrationConnectionEditorInput } from "./integration-connection-editor-state-types.js";
-import { resolveIntegrationConnectionReturnPath } from "./integration-connection-return-path.js";
+import {
+  appendIntegrationConnectionReturnParams,
+  resolveIntegrationConnectionReturnPath,
+} from "./integration-connection-return-path.js";
 import { buildOpenUpdateIntegrationConnectionInput } from "./integrations-page-view-model.js";
 import { useIntegrationConnectionEditorState } from "./use-integration-connection-editor-state.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
@@ -133,18 +136,53 @@ function LoadedIntegrationConnectionEditPage(input: {
   returnPath?: string;
 }): React.JSX.Element {
   const navigate = useNavigate();
+  function resolveConnectionNoticePath(inputPath: {
+    connectionId: string;
+    notice: string;
+    targetKey: string;
+  }): string {
+    const params = {
+      connectionId: inputPath.connectionId,
+      connectionNotice: inputPath.notice,
+    };
+
+    if (input.returnPath !== undefined) {
+      return appendIntegrationConnectionReturnParams({
+        returnPath: input.returnPath,
+        params,
+      });
+    }
+
+    return `/integrations/${inputPath.targetKey}?${new URLSearchParams(params).toString()}`;
+  }
+
   const connectionState = useIntegrationConnectionEditorState({
     initialEditorInput: input.initialEditorInput,
     onClose: () =>
       navigate(input.returnPath ?? `/integrations/${input.initialEditorInput.targetKey}`),
-    onSubmitSuccess: async ({ editor }) => {
+    onSubmitSuccess: async ({ editor, updatedSecretNames }) => {
       if (editor.mode === "update" && editor.reauthorization?.kind === "device-authorization") {
         await navigate(
-          input.returnPath ??
-            `/integrations/${editor.targetKey}?${new URLSearchParams({
-              connectionId: editor.connectionId,
-              connectionNotice: "reauthorized",
-            }).toString()}`,
+          resolveConnectionNoticePath({
+            connectionId: editor.connectionId,
+            notice: "reauthorized",
+            targetKey: editor.targetKey,
+          }),
+        );
+        return;
+      }
+
+      if (
+        editor.mode === "update" &&
+        updatedSecretNames !== undefined &&
+        updatedSecretNames.length > 0
+      ) {
+        await navigate(
+          resolveConnectionNoticePath({
+            connectionId: editor.connectionId,
+            notice: "credentials-updated",
+            targetKey: editor.targetKey,
+          }),
         );
         return;
       }

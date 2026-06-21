@@ -193,6 +193,179 @@ describe.concurrent("integration webhooks ingest integration", () => {
     expect(persistedEvents).toHaveLength(1);
   });
 
+  it("accepts WasenderAPI message simulator deliveries with a 200 response", async ({ env }) => {
+    const targetKey = "wasenderapi-mcp-webhook-ingest-simulator-success";
+    const webhookSecret = "wasenderapi-webhook-secret";
+    await seedWasenderApiTarget(env, targetKey);
+    const { connectionId, endpointKey, organizationId } = await createWasenderApiWebhookConnection({
+      env,
+      targetKey,
+      email: "integration-new-webhooks-ingest-wasenderapi-success@example.com",
+      webhookSecret,
+    });
+
+    const payloadObject = {
+      event: "messages.received",
+      data: {
+        messages: {
+          key: {
+            id: "3EB0X123456789",
+            fromMe: false,
+            remoteJid: "1234567890@s.whatsapp.net",
+          },
+          messageBody: "Hello from the simulator",
+        },
+      },
+    };
+    const response = await postWasenderApiWebhook({
+      env,
+      targetKey,
+      endpointKey,
+      payload: JSON.stringify(payloadObject),
+      webhookSecret,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ received: true });
+
+    const persistedEvent = await env.controlPlaneDb.query.integrationWebhookEvents.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.targetKey, targetKey), eq(table.externalEventId, "3EB0X123456789")),
+    });
+    if (persistedEvent === undefined) {
+      throw new Error("Expected WasenderAPI webhook event to be stored.");
+    }
+
+    expect(persistedEvent.providerEventType).toBe("messages.received");
+    expect(persistedEvent.eventType).toBe("wasenderapi.messages.received");
+    expect(persistedEvent.status).toBe("received");
+    expect(persistedEvent.organizationId).toBe(organizationId);
+    expect(persistedEvent.integrationConnectionId).toBe(connectionId);
+    expect(persistedEvent.payload).toEqual(payloadObject);
+    expect(persistedEvent.sourceOrderKey).toBe("3EB0X123456789");
+  });
+
+  it("accepts WasenderAPI webhook test deliveries without storing webhook events", async ({
+    env,
+  }) => {
+    const targetKey = "wasenderapi-mcp-webhook-ingest-test-success";
+    const webhookSecret = "wasenderapi-webhook-secret";
+    await seedWasenderApiTarget(env, targetKey);
+    const { endpointKey } = await createWasenderApiWebhookConnection({
+      env,
+      targetKey,
+      email: "integration-new-webhooks-ingest-wasenderapi-test@example.com",
+      webhookSecret,
+    });
+
+    const response = await postWasenderApiWebhook({
+      env,
+      targetKey,
+      endpointKey,
+      payload: JSON.stringify({
+        event: "webhook.test",
+        id: "wasender-webhook-test-id",
+      }),
+      webhookSecret,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ received: true });
+    await expect(
+      env.controlPlaneDb.query.integrationWebhookEvents.findMany({
+        where: (table, { eq }) => eq(table.targetKey, targetKey),
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("accepts documented non-message WasenderAPI deliveries with a 200 response", async ({
+    env,
+  }) => {
+    const targetKey = "wasenderapi-mcp-webhook-ingest-session-status";
+    const webhookSecret = "wasenderapi-webhook-secret";
+    await seedWasenderApiTarget(env, targetKey);
+    const { connectionId, endpointKey, organizationId } = await createWasenderApiWebhookConnection({
+      env,
+      targetKey,
+      email: "integration-new-webhooks-ingest-wasenderapi-session@example.com",
+      webhookSecret,
+    });
+
+    const payloadObject = {
+      event: "session.status",
+      sessionId: "wasender-session-id",
+      data: {
+        status: "connected",
+      },
+    };
+    const response = await postWasenderApiWebhook({
+      env,
+      targetKey,
+      endpointKey,
+      payload: JSON.stringify(payloadObject),
+      webhookSecret,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ received: true });
+
+    const persistedEvent = await env.controlPlaneDb.query.integrationWebhookEvents.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.targetKey, targetKey), eq(table.externalEventId, "wasender-session-id")),
+    });
+    if (persistedEvent === undefined) {
+      throw new Error("Expected WasenderAPI session webhook event to be stored.");
+    }
+
+    expect(persistedEvent.providerEventType).toBe("session.status");
+    expect(persistedEvent.eventType).toBe("wasenderapi.session.status");
+    expect(persistedEvent.status).toBe("received");
+    expect(persistedEvent.organizationId).toBe(organizationId);
+    expect(persistedEvent.integrationConnectionId).toBe(connectionId);
+    expect(persistedEvent.payload).toEqual(payloadObject);
+    expect(persistedEvent.sourceOrderKey).toBe("wasender-session-id");
+  });
+
+  it("rejects unsupported WasenderAPI simulator deliveries without returning 500", async ({
+    env,
+  }) => {
+    const targetKey = "wasenderapi-mcp-webhook-ingest-simulator-invalid";
+    const webhookSecret = "wasenderapi-webhook-secret";
+    await seedWasenderApiTarget(env, targetKey);
+    const { endpointKey } = await createWasenderApiWebhookConnection({
+      env,
+      targetKey,
+      email: "integration-new-webhooks-ingest-wasenderapi-invalid@example.com",
+      webhookSecret,
+    });
+
+    const response = await postWasenderApiWebhook({
+      env,
+      targetKey,
+      endpointKey,
+      payload: JSON.stringify({
+        event: "message.received",
+        timestamp: 1_633_456_789,
+        data: {
+          id: "unsupported-message-event",
+        },
+      }),
+      webhookSecret,
+    });
+
+    expect(response.status).toBe(400);
+    const body = IntegrationWebhooksBadRequestResponseSchema.parse(await response.json());
+    expect(body).toEqual({
+      code: "INVALID_WEBHOOK_REQUEST",
+      message: "WasenderAPI webhook event 'message.received' is not supported.",
+    });
+    await expect(
+      env.controlPlaneDb.query.integrationWebhookEvents.findMany({
+        where: (table, { eq }) => eq(table.targetKey, targetKey),
+      }),
+    ).resolves.toEqual([]);
+  });
+
   it("returns Slack URL verification challenges without storing webhook events", async ({
     env,
   }) => {
@@ -514,6 +687,18 @@ async function seedSlackTarget(env: IntegrationTestEnvironment): Promise<void> {
   });
 }
 
+async function seedWasenderApiTarget(
+  env: IntegrationTestEnvironment,
+  targetKey: string,
+): Promise<void> {
+  await seedIntegrationTarget(env, {
+    targetKey,
+    familyId: "wasenderapi",
+    variantId: "wasenderapi-mcp",
+    config: {},
+  });
+}
+
 async function createGitHubWebhookConnection(input: {
   env: IntegrationTestEnvironment;
   targetKey: string;
@@ -624,6 +809,49 @@ async function createSlackWebhookConnection(input: {
   });
   if (webhookSource?.endpointKey === undefined || webhookSource.endpointKey === null) {
     throw new Error("Expected persisted Slack webhook source endpoint key.");
+  }
+
+  return {
+    connectionId: connection.id,
+    endpointKey: webhookSource.endpointKey,
+    organizationId: session.organizationId,
+  };
+}
+
+async function createWasenderApiWebhookConnection(input: {
+  env: IntegrationTestEnvironment;
+  targetKey: string;
+  email: string;
+  webhookSecret: string;
+}): Promise<{ connectionId: string; endpointKey: string; organizationId: string }> {
+  const session = await input.env.auth.createSession({
+    email: input.email,
+  });
+  const response = await createFormConnection({
+    env: input.env,
+    targetKey: input.targetKey,
+    cookie: session.cookie,
+    body: {
+      displayName: "WasenderAPI simulator",
+      methodId: "api-key",
+      config: {
+        connection_method: "api-key",
+      },
+      secrets: {
+        personalAccessToken: "wasenderapi-personal-access-token",
+        webhookSecret: input.webhookSecret,
+      },
+    },
+  });
+  expect(response.status).toBe(201);
+  const connection = CreatedFormIntegrationConnectionSchema.parse(await response.json());
+
+  const webhookSource = await input.env.controlPlaneDb.query.integrationWebhookSources.findFirst({
+    where: (table, { and, eq }) =>
+      and(eq(table.integrationConnectionId, connection.id), eq(table.targetKey, input.targetKey)),
+  });
+  if (webhookSource?.endpointKey === undefined || webhookSource.endpointKey === null) {
+    throw new Error("Expected persisted WasenderAPI webhook source endpoint key.");
   }
 
   return {
@@ -767,6 +995,26 @@ async function postGitHubWebhook(input: {
           secret: input.signatureSecret,
           payload: input.payload,
         }),
+      },
+      body: input.payload,
+    },
+  );
+}
+
+async function postWasenderApiWebhook(input: {
+  env: IntegrationTestEnvironment;
+  targetKey: string;
+  endpointKey: string;
+  payload: string;
+  webhookSecret: string;
+}) {
+  return input.env.controlPlaneApi.http.fetch(
+    `/p/integration/webhooks/${input.targetKey}/${input.endpointKey}`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-webhook-signature": input.webhookSecret,
       },
       body: input.payload,
     },

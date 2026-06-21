@@ -1527,11 +1527,6 @@ export function createSigNozDetailViewStoryProps(): IntegrationConnectionDetailV
 
 export function createWasenderApiDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
   const connectionId = "icn_wasenderapi_dense";
-  const definition = getDefinitionOrThrow({
-    familyId: "wasenderapi",
-    variantId: "wasenderapi-mcp",
-  });
-
   return createScenarioDetailViewStoryProps({
     authMethod: {
       familyId: "wasenderapi",
@@ -1551,10 +1546,7 @@ export function createWasenderApiDetailViewStoryProps(): IntegrationConnectionDe
         endpointKey: "wasenderapi-mcp",
         id: "iws_wasenderapi_prod",
         integrationConnectionId: connectionId,
-        providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
-          definition,
-          events: ["messages.upsert", "messages.received"],
-        }),
+        providerMetadata: {},
         status: "active",
         targetKey: "wasenderapi-mcp",
         updatedAt: DenseStoryLastSyncedAt,
