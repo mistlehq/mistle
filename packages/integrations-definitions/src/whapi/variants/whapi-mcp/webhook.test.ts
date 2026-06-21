@@ -353,17 +353,48 @@ describe("WhapiWebhookHandler", () => {
     });
   });
 
-  it("rejects unadvertised webhook event types", async () => {
+  it("normalizes documented label deliveries", async () => {
     const payload = {
-      labels: [],
+      labels: [
+        {
+          id: "76",
+          name: "Order complete",
+          color: "lightsteelblue",
+        },
+      ],
       event: {
         type: "labels",
         event: "post",
       },
       channel_id: "MANTIS-M72HC",
     };
+    const resolved = await verifyWhapiWebhook({ payload });
+
+    expect(resolved).toEqual({
+      kind: "event",
+      connectionId: "whapi-connection-id",
+      event: {
+        externalEventId: expect.stringMatching(/^labels\.post:[0-9a-f]{64}$/),
+        externalDeliveryId: expect.stringMatching(/^labels\.post:[0-9a-f]{64}$/),
+        providerEventType: "labels.post",
+        eventType: "whapi.labels.post",
+        payload,
+        sourceOrderKey: expect.stringMatching(/^labels\.post:[0-9a-f]{64}$/),
+      },
+    });
+  });
+
+  it("rejects unadvertised webhook event types", async () => {
+    const payload = {
+      products: [],
+      event: {
+        type: "products",
+        event: "post",
+      },
+      channel_id: "MANTIS-M72HC",
+    };
     await expect(verifyWhapiWebhook({ payload })).rejects.toThrow(
-      "Whapi webhook event 'labels.post' is not supported.",
+      "Whapi webhook event 'products.post' is not supported.",
     );
   });
 
