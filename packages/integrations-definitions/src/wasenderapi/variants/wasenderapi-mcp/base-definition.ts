@@ -1,7 +1,9 @@
 import {
   IntegrationConnectionMethodIds,
+  IntegrationFormConnectionMethodCreateBehaviors,
   IntegrationKinds,
   IntegrationMcpTransports,
+  ProviderConfigurationSetupCompletedConfigKey,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 
@@ -46,11 +48,89 @@ export const WasenderApiBaseDefinition: WasenderApiBaseIntegrationDefinition = {
       id: IntegrationConnectionMethodIds.API_KEY,
       label: "Personal access token",
       kind: "form",
+      createBehavior: IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP,
+      setupFlow: {
+        completionRequirements: {
+          kind: "all-of",
+          allOf: [
+            {
+              kind: "secret-field",
+              field: "personalAccessToken",
+            },
+            {
+              kind: "secret-field",
+              field: "webhookSecret",
+            },
+            {
+              kind: "config-field",
+              field: ProviderConfigurationSetupCompletedConfigKey,
+            },
+          ],
+        },
+        providerConfigurationSetup: {
+          title: "Set up WasenderAPI",
+          description:
+            "Create or update a WasenderAPI WhatsApp session with the Mistle webhook URL, then save the account Personal Access Token and session webhook secret.",
+          webhookCallback: {
+            title: "Webhook callback",
+            description: "Copy this URL into the Webhook URL field in WasenderAPI.",
+            label: "Webhook URL",
+            errorTitle: "Could not load webhook URL",
+            missingTitle: "Webhook URL is not available yet",
+            missingMessage:
+              "WasenderAPI setup requires a webhook URL, but this connection does not have one yet.",
+          },
+          instructions: {
+            title: "WasenderAPI setup",
+            items: [
+              "Create or edit a WhatsApp session in WasenderAPI.",
+              "Paste the Mistle webhook URL into the session Webhook URL field.",
+              "Enable webhook notifications for messages.received and messages.upsert.",
+              "Copy the account Personal Access Token from WasenderAPI Settings and the session webhook secret back into Mistle.",
+            ],
+          },
+          fields: {
+            title: "WasenderAPI credentials",
+            description:
+              "Save the account Personal Access Token for MCP access and the webhook secret after configuring the session webhook.",
+            saveLabel: "Save WasenderAPI setup",
+            saveErrorMessage: "Could not save WasenderAPI setup.",
+            configFields: [],
+            secretFields: [
+              {
+                name: "personalAccessToken",
+                label: "Personal access token",
+                placeholder: "Enter personal access token",
+                description:
+                  "Use the account-level Personal Access Token from WasenderAPI Settings. Do not use the session API Access Token from API Credentials.",
+                inputType: "password",
+                required: true,
+                secretLabel: "personal access token",
+              },
+              {
+                name: "webhookSecret",
+                label: "Webhook secret",
+                placeholder: "Enter webhook secret",
+                description: "Webhook secret generated for the WasenderAPI session.",
+                inputType: "password",
+                required: true,
+                secretLabel: "webhook secret",
+              },
+            ],
+          },
+        },
+        routeSegment: "provider-configuration",
+        setupPane: {
+          kind: "provider-configuration",
+        },
+      },
       secretFields: [
         {
           name: "personalAccessToken",
           label: "Personal access token",
           placeholder: "Enter personal access token",
+          description:
+            "Use the account-level Personal Access Token from WasenderAPI Settings. Do not use the session API Access Token from API Credentials.",
           inputType: "password",
           secretType: WasenderApiCredentialSecretTypes.PERSONAL_ACCESS_TOKEN,
           slotKey: WasenderApiCredentialSlotKeys.PERSONAL_ACCESS_TOKEN,

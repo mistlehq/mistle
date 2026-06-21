@@ -112,6 +112,27 @@ describe("resolveInstalledIntegrationConnectionNotice", () => {
     });
   });
 
+  it("resolves the credentials updated notice for the selected connection", () => {
+    expect(
+      resolveInstalledIntegrationConnectionNotice({
+        connectionMethods: [PlainConnectionMethod],
+        detailConnectionId: "connection_1",
+        searchParams: new URLSearchParams("connectionNotice=credentials-updated"),
+        selectedConnection: {
+          connectionMethodId: "plain-form",
+          id: "connection_1",
+        },
+      }),
+    ).toEqual({
+      connectionId: "connection_1",
+      message:
+        "New provider requests will use the updated credentials. If a running agent already failed authentication, retry the action or restart that agent session if it does not reconnect.",
+      resetKey: "credentials-updated:connection_1",
+      title: "Credentials updated",
+      variant: "success",
+    });
+  });
+
   it("resolves the installed notice from provider app setup metadata", () => {
     expect(
       resolveInstalledIntegrationConnectionNotice({

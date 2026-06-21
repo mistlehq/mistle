@@ -81,6 +81,17 @@ export function resolveInstalledIntegrationConnectionNotice(input: {
     };
   }
 
+  if (connectionNotice === "credentials-updated") {
+    return {
+      connectionId: input.detailConnectionId,
+      message:
+        "New provider requests will use the updated credentials. If a running agent already failed authentication, retry the action or restart that agent session if it does not reconnect.",
+      resetKey: `credentials-updated:${input.detailConnectionId}`,
+      title: "Credentials updated",
+      variant: "success",
+    };
+  }
+
   if (connectionNotice !== "installed") {
     return null;
   }

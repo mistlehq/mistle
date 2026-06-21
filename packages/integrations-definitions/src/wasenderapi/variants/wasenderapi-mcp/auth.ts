@@ -1,4 +1,7 @@
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import {
+  IntegrationConnectionMethodIds,
+  ProviderConfigurationSetupCompletedConfigKey,
+} from "@mistle/integrations-core";
 import { z } from "zod";
 
 export const WasenderApiFamilyId = "wasenderapi";
@@ -17,6 +20,7 @@ export const WasenderApiCredentialSlotKeys = {
 export const WasenderApiConnectionConfigSchema = z
   .object({
     connection_method: z.literal(IntegrationConnectionMethodIds.API_KEY),
+    [ProviderConfigurationSetupCompletedConfigKey]: z.string().min(1).optional(),
   })
   .strict();
 

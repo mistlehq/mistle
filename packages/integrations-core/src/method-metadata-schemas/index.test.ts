@@ -239,6 +239,128 @@ describe("integration method metadata schemas", () => {
     });
   });
 
+  it("parses provider configuration setup flow metadata", () => {
+    expect(
+      IntegrationFormConnectionMethodSetupFlowMetadataSchema.parse({
+        routeSegment: "provider-configuration",
+        setupPane: {
+          kind: "provider-configuration",
+        },
+        providerConfigurationSetup: {
+          title: "Set up provider",
+          description: "Configure the provider resource and save credentials.",
+          webhookCallback: {
+            title: "Webhook callback",
+            description: "Copy this URL into the provider.",
+            label: "Webhook URL",
+            errorTitle: "Could not load webhook URL",
+            missingTitle: "Webhook URL is not available yet",
+            missingMessage: "Setup requires a webhook URL.",
+          },
+          instructions: {
+            title: "Provider setup",
+            items: ["Create the provider resource.", "Paste the webhook URL."],
+          },
+          fields: {
+            title: "Credentials",
+            description: "Save the provider credentials.",
+            saveLabel: "Save setup",
+            saveErrorMessage: "Could not save setup.",
+            configFields: [
+              {
+                configKey: "account_id",
+                inputType: "text",
+                label: "Account ID",
+                name: "accountId",
+                required: true,
+              },
+            ],
+            secretFields: [
+              {
+                inputType: "password",
+                label: "API token",
+                name: "apiToken",
+                required: true,
+                secretLabel: "API token",
+              },
+            ],
+          },
+        },
+        completionRequirements: {
+          kind: "all-of",
+          allOf: [
+            {
+              kind: "config-field",
+              field: "account_id",
+            },
+            {
+              kind: "secret-field",
+              field: "apiToken",
+            },
+          ],
+        },
+      }),
+    ).toEqual({
+      routeSegment: "provider-configuration",
+      setupPane: {
+        kind: "provider-configuration",
+      },
+      providerConfigurationSetup: {
+        title: "Set up provider",
+        description: "Configure the provider resource and save credentials.",
+        webhookCallback: {
+          title: "Webhook callback",
+          description: "Copy this URL into the provider.",
+          label: "Webhook URL",
+          errorTitle: "Could not load webhook URL",
+          missingTitle: "Webhook URL is not available yet",
+          missingMessage: "Setup requires a webhook URL.",
+        },
+        instructions: {
+          title: "Provider setup",
+          items: ["Create the provider resource.", "Paste the webhook URL."],
+        },
+        fields: {
+          title: "Credentials",
+          description: "Save the provider credentials.",
+          saveLabel: "Save setup",
+          saveErrorMessage: "Could not save setup.",
+          configFields: [
+            {
+              configKey: "account_id",
+              inputType: "text",
+              label: "Account ID",
+              name: "accountId",
+              required: true,
+            },
+          ],
+          secretFields: [
+            {
+              inputType: "password",
+              label: "API token",
+              name: "apiToken",
+              required: true,
+              secretLabel: "API token",
+            },
+          ],
+        },
+      },
+      completionRequirements: {
+        kind: "all-of",
+        allOf: [
+          {
+            kind: "config-field",
+            field: "account_id",
+          },
+          {
+            kind: "secret-field",
+            field: "apiToken",
+          },
+        ],
+      },
+    });
+  });
+
   it("rejects provider app setup installed detection fields that are not declared", () => {
     const result = IntegrationFormConnectionMethodSetupFlowMetadataSchema.safeParse({
       routeSegment: "provider-app",

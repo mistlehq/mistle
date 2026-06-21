@@ -9,6 +9,7 @@ import type {
   IntegrationFormConnectionMethodSetupCompletionRequirement,
   IntegrationFormConnectionMethodSetupCompletionRequirementLeaf,
   IntegrationFormConnectionMethodProviderAppSetup,
+  IntegrationFormConnectionMethodProviderConfigurationSetup,
   IntegrationFormConnectionMethodSetupPaneMetadata,
   IntegrationFormConnectionMethodSetupStartForm,
   IntegrationKind,
@@ -234,6 +235,13 @@ function resolveConnectionMethod(
                 : {
                     providerAppSetup: cloneProviderAppSetup(method.setupFlow.providerAppSetup),
                   }),
+              ...(method.setupFlow.providerConfigurationSetup === undefined
+                ? {}
+                : {
+                    providerConfigurationSetup: cloneProviderConfigurationSetup(
+                      method.setupFlow.providerConfigurationSetup,
+                    ),
+                  }),
               routeSegment: method.setupFlow.routeSegment,
               ...(method.setupFlow.setupPane === undefined
                 ? {}
@@ -392,6 +400,54 @@ function cloneProviderAppSetup(
         missingMessage: setup.urls.webhookCallback.missingMessage,
         missingTitle: setup.urls.webhookCallback.missingTitle,
       },
+    },
+  };
+}
+
+function cloneProviderConfigurationSetup(
+  setup: IntegrationFormConnectionMethodProviderConfigurationSetup,
+): IntegrationFormConnectionMethodProviderConfigurationSetup {
+  return {
+    description: setup.description,
+    fields: {
+      configFields: setup.fields.configFields.map((field) => ({
+        configKey: field.configKey,
+        ...(field.description === undefined ? {} : { description: field.description }),
+        inputType: field.inputType,
+        label: field.label,
+        name: field.name,
+        ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
+        required: field.required,
+        ...(field.rows === undefined ? {} : { rows: field.rows }),
+      })),
+      description: setup.fields.description,
+      saveErrorMessage: setup.fields.saveErrorMessage,
+      saveLabel: setup.fields.saveLabel,
+      secretFields: setup.fields.secretFields.map((field) => ({
+        ...(field.description === undefined ? {} : { description: field.description }),
+        ...(field.generation === undefined ? {} : { generation: { kind: field.generation.kind } }),
+        inputType: field.inputType,
+        label: field.label,
+        name: field.name,
+        ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
+        required: field.required,
+        ...(field.rows === undefined ? {} : { rows: field.rows }),
+        secretLabel: field.secretLabel,
+      })),
+      title: setup.fields.title,
+    },
+    instructions: {
+      items: [...setup.instructions.items],
+      title: setup.instructions.title,
+    },
+    title: setup.title,
+    webhookCallback: {
+      description: setup.webhookCallback.description,
+      errorTitle: setup.webhookCallback.errorTitle,
+      label: setup.webhookCallback.label,
+      missingMessage: setup.webhookCallback.missingMessage,
+      missingTitle: setup.webhookCallback.missingTitle,
+      title: setup.webhookCallback.title,
     },
   };
 }

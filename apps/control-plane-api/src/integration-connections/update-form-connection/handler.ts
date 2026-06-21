@@ -13,9 +13,15 @@ const routeHandler = async (
   const db = ctx.get("db");
   const dataPlaneClient = ctx.get("dataPlaneClient");
   const integrationRegistry = ctx.get("integrationRegistry");
-  const integrationsConfig = ctx.get("config").integrations;
+  const config = ctx.get("config");
+  const integrationsConfig = config.integrations;
   const { connectionId } = ctx.req.valid("param");
-  const { config, displayName, secrets } = ctx.req.valid("json");
+  const {
+    config: connectionConfig,
+    displayName,
+    providerConfigurationSetup,
+    secrets,
+  } = ctx.req.valid("json");
 
   const updatedConnection = await updateFormConnection(
     {
@@ -23,12 +29,14 @@ const routeHandler = async (
       dataPlaneClient,
       integrationRegistry,
       integrationsConfig,
+      controlPlaneBaseUrl: config.auth.baseUrl,
     },
     {
       organizationId: session.activeOrganizationId,
       connectionId,
       displayName,
-      config,
+      config: connectionConfig,
+      ...(providerConfigurationSetup === undefined ? {} : { providerConfigurationSetup }),
       ...(secrets === undefined ? {} : { secrets }),
     },
   );

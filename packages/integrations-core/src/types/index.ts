@@ -623,9 +623,17 @@ export type IntegrationFormConnectionMethodSetupStartForm = {
   submitLabel: string;
 };
 
-export type IntegrationFormConnectionMethodSetupPaneMetadata = {
+export type IntegrationFormConnectionMethodProviderAppSetupPaneMetadata = {
   kind: "provider-app";
 };
+
+export type IntegrationFormConnectionMethodProviderConfigurationSetupPaneMetadata = {
+  kind: "provider-configuration";
+};
+
+export type IntegrationFormConnectionMethodSetupPaneMetadata =
+  | IntegrationFormConnectionMethodProviderAppSetupPaneMetadata
+  | IntegrationFormConnectionMethodProviderConfigurationSetupPaneMetadata;
 
 export type IntegrationFormConnectionMethodProviderAppSetupExistingAppConfigField = {
   configKey: string;
@@ -706,9 +714,64 @@ export type IntegrationFormConnectionMethodProviderAppSetup = {
   };
 };
 
+export type IntegrationFormConnectionMethodProviderConfigurationSetupConfigField = {
+  configKey: string;
+  description?: string | undefined;
+  inputType: "text" | "textarea";
+  label: string;
+  name: string;
+  placeholder?: string | undefined;
+  required: boolean;
+  rows?: number | undefined;
+};
+
+export type IntegrationFormConnectionMethodProviderConfigurationSetupSecretField = {
+  description?: string | undefined;
+  generation?:
+    | {
+        kind: "random-token";
+      }
+    | undefined;
+  inputType: "password" | "text" | "textarea";
+  label: string;
+  name: string;
+  placeholder?: string | undefined;
+  required: boolean;
+  rows?: number | undefined;
+  secretLabel: string;
+};
+
+export type IntegrationFormConnectionMethodProviderConfigurationSetup = {
+  description: string;
+  fields: {
+    configFields: ReadonlyArray<IntegrationFormConnectionMethodProviderConfigurationSetupConfigField>;
+    description: string;
+    saveErrorMessage: string;
+    saveLabel: string;
+    secretFields: ReadonlyArray<IntegrationFormConnectionMethodProviderConfigurationSetupSecretField>;
+    title: string;
+  };
+  instructions: {
+    items: ReadonlyArray<string>;
+    title: string;
+  };
+  title: string;
+  webhookCallback: {
+    description: string;
+    errorTitle: string;
+    label: string;
+    missingMessage: string;
+    missingTitle: string;
+    title: string;
+  };
+};
+
 export type IntegrationFormConnectionMethodSetupFlowMetadata = {
   completionRequirements?: IntegrationFormConnectionMethodSetupCompletionRequirement | undefined;
   providerAppSetup?: IntegrationFormConnectionMethodProviderAppSetup | undefined;
+  providerConfigurationSetup?:
+    | IntegrationFormConnectionMethodProviderConfigurationSetup
+    | undefined;
   routeSegment: string;
   setupPane?: IntegrationFormConnectionMethodSetupPaneMetadata | undefined;
   startForm?: IntegrationFormConnectionMethodSetupStartForm | undefined;
@@ -919,6 +982,51 @@ export type IntegrationProviderAppSetupCapability<
   >;
 };
 
+export type IntegrationProviderConfigurationSetupCompleteInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  connectionSecrets: Record<string, string>;
+  controlPlaneBaseUrl: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  webhookCallbackUrl?: string | undefined;
+};
+
+export type IntegrationProviderConfigurationSetupFlowCapability<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  complete(
+    input: IntegrationProviderConfigurationSetupCompleteInput<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >,
+  ): MaybePromise<void>;
+  methodId: IntegrationConnectionMethodId;
+  requiresWebhookCallbackUrl?: boolean | undefined;
+  routeSegment: string;
+};
+
+export type IntegrationProviderConfigurationSetupCapability<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  flows: ReadonlyArray<
+    IntegrationProviderConfigurationSetupFlowCapability<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >
+  >;
+};
+
 export type IntegrationFormConnectionMethodSetupCompletionRequirementLeaf =
   | {
       kind: "connection-external-subject";
@@ -931,6 +1039,9 @@ export type IntegrationFormConnectionMethodSetupCompletionRequirementLeaf =
       field: string;
       kind: "secret-field";
     };
+
+export const ProviderConfigurationSetupCompletedConfigKey =
+  "provider_configuration_setup_completed";
 
 export type IntegrationFormConnectionMethodSetupCompletionRequirement =
   | IntegrationFormConnectionMethodSetupCompletionRequirementLeaf
@@ -2796,6 +2907,11 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetSecretsSchema>,
     TConnectionConfig
   >;
+  providerConfigurationSetup?: IntegrationProviderConfigurationSetupCapability<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    TConnectionConfig
+  >;
   redirectHandler?: IntegrationRedirectHandler<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>
@@ -2810,6 +2926,7 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetSecretsSchema>,
     Record<string, string>
   >;
+  webhookAcceptedResponse?: IntegrationWebhookImmediateResponse;
   /**
    * Provider-specific middleware that can perform side effects or short-circuit
    * before the deterministic webhook handler runs. Middleware cannot alter the

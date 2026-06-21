@@ -744,6 +744,30 @@ describe("integrations-definitions index", () => {
           id: "api-key",
           label: "Personal access token",
           kind: "form",
+          createBehavior: "draft-then-setup",
+          setupFlow: {
+            completionRequirements: {
+              kind: "all-of",
+              allOf: [
+                {
+                  kind: "secret-field",
+                  field: "personalAccessToken",
+                },
+                {
+                  kind: "secret-field",
+                  field: "webhookSecret",
+                },
+                {
+                  kind: "config-field",
+                  field: "provider_configuration_setup_completed",
+                },
+              ],
+            },
+            routeSegment: "provider-configuration",
+            setupPane: {
+              kind: "provider-configuration",
+            },
+          },
           secretFields: [
             {
               name: "personalAccessToken",
@@ -764,6 +788,30 @@ describe("integrations-definitions index", () => {
     expect(wasenderApiDefinition?.mcp).toBeDefined();
     expect(wasenderApiDefinition?.webhookHandler).toBeUndefined();
     expect(wasenderApiDefinition?.webhookSource).toBeUndefined();
+    const wasenderApiConnectionMethod = wasenderApiDefinition?.connectionMethods.find(
+      (method) => method.id === "api-key",
+    );
+    expect(
+      wasenderApiConnectionMethod?.kind === "form"
+        ? wasenderApiConnectionMethod.setupFlow?.providerConfigurationSetup
+        : undefined,
+    ).toMatchObject({
+      fields: {
+        secretFields: [
+          {
+            name: "personalAccessToken",
+            required: true,
+          },
+          {
+            name: "webhookSecret",
+            required: true,
+          },
+        ],
+      },
+      webhookCallback: {
+        label: "Webhook URL",
+      },
+    });
     expect(whapiDefinition).toMatchObject({
       familyId: "whapi",
       variantId: "whapi-mcp",
@@ -775,18 +823,27 @@ describe("integrations-definitions index", () => {
           id: "api-key",
           label: "API token",
           kind: "form",
+          setupFlow: {
+            completionRequirements: {
+              kind: "all-of",
+              allOf: [
+                {
+                  kind: "secret-field",
+                  field: "apiToken",
+                },
+                {
+                  kind: "config-field",
+                  field: "provider_configuration_setup_completed",
+                },
+              ],
+            },
+          },
           secretFields: [
             {
               name: "apiToken",
               label: "API token",
               inputType: "password",
               slotKey: "whapi.whapi-mcp.api-key.api-token",
-            },
-            {
-              name: "webhookSecret",
-              label: "Webhook secret",
-              inputType: "password",
-              slotKey: "whapi.whapi-mcp.api-key.webhook-secret",
             },
           ],
         },

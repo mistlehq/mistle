@@ -505,7 +505,6 @@ export const AddFlowStorySpecs = {
     initialConnectionDisplayNameValue: "Whapi Support Channel",
     initialSecrets: {
       apiToken: "whapi_storybook_api_token",
-      webhookSecret: "whapi-storybook-webhook-secret",
     },
     variantId: "whapi-mcp",
   },

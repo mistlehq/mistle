@@ -3,6 +3,7 @@ import type {
   IntegrationFormConnectionMethodSetupManifestDraft,
   IntegrationFormConnectionMethodSetupFlow,
   IntegrationFormConnectionMethodProviderAppSetup,
+  IntegrationFormConnectionMethodProviderConfigurationSetup,
   IntegrationFormConnectionMethodSetupPaneMetadata,
   IntegrationFormConnectionMethodSetupStartForm,
 } from "@mistle/integrations-core";
@@ -75,6 +76,21 @@ export function resolveIntegrationProviderAppSetupOrThrow(input: {
   }
 
   return setupFlow.providerAppSetup;
+}
+
+export function resolveIntegrationProviderConfigurationSetupOrThrow(input: {
+  connection: IntegrationConnection;
+  setupRoute: IntegrationConnectionSetupRoute;
+}): IntegrationFormConnectionMethodProviderConfigurationSetup {
+  const setupFlow = resolveIntegrationSetupFlowOrThrow(input);
+
+  if (setupFlow.providerConfigurationSetup === undefined) {
+    throw new Error(
+      `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define provider configuration setup for target '${input.connection.targetKey}'.`,
+    );
+  }
+
+  return setupFlow.providerConfigurationSetup;
 }
 
 export function resolveIntegrationSetupPaneOrThrow(input: {

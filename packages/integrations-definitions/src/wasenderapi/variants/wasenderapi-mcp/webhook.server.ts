@@ -2,11 +2,13 @@ import { createHash, timingSafeEqual } from "node:crypto";
 
 import {
   createIntegrationWebhookSourceOrderKey,
+  IntegrationWebhookError,
   type IntegrationConnection,
   type IntegrationWebhookEvent,
   type IntegrationWebhookHandler,
   type IntegrationWebhookResolveConnectionResult,
   type IntegrationWebhookVerifyResult,
+  WebhookErrorCodes,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
@@ -14,12 +16,17 @@ import { WasenderApiSupportedWebhookEvents } from "./supported-webhook-events.js
 import type { WasenderApiTargetConfig } from "./target-config-schema.js";
 
 const WasenderApiWebhookSignatureHeaderName = "x-webhook-signature";
+const WasenderApiWebhookTestEventType = "webhook.test";
 
 const WasenderApiWebhookPayloadSchema = z.record(z.string(), z.unknown());
 
 type WasenderApiConnectionSecrets = {
   webhookSecret?: string;
 };
+
+function createInvalidWasenderApiWebhookRequestError(message: string): IntegrationWebhookError {
+  return new IntegrationWebhookError(WebhookErrorCodes.WEBHOOK_REQUEST_INVALID, message);
+}
 
 function parseWasenderApiJsonPayload(input: Uint8Array): Record<string, unknown> {
   const decodedBody = new TextDecoder().decode(input);
@@ -28,16 +35,27 @@ function parseWasenderApiJsonPayload(input: Uint8Array): Record<string, unknown>
   try {
     parsedPayload = JSON.parse(decodedBody);
   } catch {
-    throw new Error("WasenderAPI webhook payload must be valid JSON.");
+    throw createInvalidWasenderApiWebhookRequestError(
+      "WasenderAPI webhook payload must be valid JSON.",
+    );
   }
 
-  return WasenderApiWebhookPayloadSchema.parse(parsedPayload);
+  const parseResult = WasenderApiWebhookPayloadSchema.safeParse(parsedPayload);
+  if (!parseResult.success) {
+    throw createInvalidWasenderApiWebhookRequestError(
+      "WasenderAPI webhook payload must be a JSON object.",
+    );
+  }
+
+  return parseResult.data;
 }
 
 function resolveStringField(input: Readonly<Record<string, unknown>>, key: string): string {
   const value = input[key];
   if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error(`WasenderAPI webhook payload is missing ${key}.`);
+    throw createInvalidWasenderApiWebhookRequestError(
+      `WasenderAPI webhook payload is missing ${key}.`,
+    );
   }
 
   return value.trim();
@@ -108,7 +126,22 @@ function resolveWasenderApiMessageId(
   return (
     resolveNestedStringField({ payload, path: ["data", "messages", "key", "id"] }) ??
     resolveNestedStringField({ payload, path: ["data", "messages", "0", "key", "id"] }) ??
-    resolveNestedStringField({ payload, path: ["data", "key", "id"] })
+    resolveNestedStringField({ payload, path: ["data", "key", "id"] }) ??
+    resolveNestedStringField({ payload, path: ["data", "message", "key", "id"] }) ??
+    resolveNestedStringField({ payload, path: ["data", "keys", "0", "id"] }) ??
+    resolveNestedStringField({ payload, path: ["data", "0", "key", "id"] })
+  );
+}
+
+function resolveWasenderApiResourceId(
+  payload: Readonly<Record<string, unknown>>,
+): string | undefined {
+  return (
+    resolveNestedStringField({ payload, path: ["data", "id"] }) ??
+    resolveNestedStringField({ payload, path: ["data", "jid"] }) ??
+    resolveNestedStringField({ payload, path: ["data", "0", "id"] }) ??
+    resolveNestedStringField({ payload, path: ["data", "0", "jid"] }) ??
+    resolveNestedStringField({ payload, path: ["data", "0"] })
   );
 }
 
@@ -120,10 +153,21 @@ function resolveWasenderApiDeliveryId(input: {
   return (
     resolveOptionalStringField(input.payload, "id") ??
     resolveOptionalStringField(input.payload, "messageId") ??
-    resolveNestedStringField({ payload: input.payload, path: ["data", "id"] }) ??
     resolveWasenderApiMessageId(input.payload) ??
+    resolveWasenderApiResourceId(input.payload) ??
     resolveOptionalStringField(input.payload, "sessionId") ??
     `${input.eventType}:${createHash("sha256").update(input.rawBody).digest("hex")}`
+  );
+}
+
+function resolveWasenderApiWebhookTestDeliveryId(input: {
+  payload: Readonly<Record<string, unknown>>;
+  rawBody: Uint8Array;
+}): string {
+  return (
+    resolveOptionalStringField(input.payload, "id") ??
+    resolveOptionalStringField(input.payload, "testId") ??
+    `${WasenderApiWebhookTestEventType}:${createHash("sha256").update(input.rawBody).digest("hex")}`
   );
 }
 
@@ -224,11 +268,39 @@ export const WasenderApiWebhookHandler: IntegrationWebhookHandler<
   resolveWebhookRequest(input) {
     const payload = parseWasenderApiJsonPayload(input.rawBody);
     const providerEventType = resolveStringField(payload, "event");
+    if (providerEventType === WasenderApiWebhookTestEventType) {
+      const deliveryId = resolveWasenderApiWebhookTestDeliveryId({
+        payload,
+        rawBody: input.rawBody,
+      });
+
+      return {
+        kind: "response",
+        verification: "required",
+        event: {
+          externalEventId: deliveryId,
+          externalDeliveryId: deliveryId,
+          providerEventType,
+          eventType: "wasenderapi.webhook.test",
+          payload,
+          sourceOrderKey: deliveryId,
+        },
+        response: {
+          status: 200,
+          body: {
+            received: true,
+          },
+        },
+      };
+    }
+
     const supportedEventDefinition = WasenderApiSupportedWebhookEvents.find(
       (eventDefinition) => eventDefinition.providerEventType === providerEventType,
     );
     if (supportedEventDefinition === undefined) {
-      throw new Error(`WasenderAPI webhook event '${providerEventType}' is not supported.`);
+      throw createInvalidWasenderApiWebhookRequestError(
+        `WasenderAPI webhook event '${providerEventType}' is not supported.`,
+      );
     }
 
     const deliveryId = resolveWasenderApiDeliveryId({
@@ -250,6 +322,8 @@ export const WasenderApiWebhookHandler: IntegrationWebhookHandler<
         occurredAt,
         orderingIdentifier: deliveryId,
       });
+    } else {
+      event.sourceOrderKey = deliveryId;
     }
 
     return {

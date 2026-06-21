@@ -79,24 +79,64 @@ describe("WhapiMcpBaseDefinition", () => {
     ).toEqual([]);
   });
 
-  it("explains the API token and webhook secret boundaries", () => {
+  it("sets up Whapi with the API token and provider webhook configuration", () => {
     const apiKeyMethod = WhapiMcpBaseDefinition.connectionMethods.find(
       (method) => method.id === "api-key",
     );
 
     expect(apiKeyMethod).toMatchObject({
       kind: "form",
+      createBehavior: "draft-then-setup",
+      setupFlow: {
+        completionRequirements: {
+          kind: "all-of",
+          allOf: [
+            {
+              kind: "secret-field",
+              field: "apiToken",
+            },
+            {
+              kind: "config-field",
+              field: "provider_configuration_setup_completed",
+            },
+          ],
+        },
+        providerConfigurationSetup: {
+          webhookCallback: {
+            description: "Mistle registers this callback URL in Whapi channel settings.",
+            label: "Webhook URL",
+          },
+          instructions: {
+            items: [
+              "Enter the Whapi API token for the WhatsApp channel.",
+              "Save setup so Mistle can register the webhook URL and supported events in Whapi.",
+            ],
+          },
+          fields: {
+            secretFields: expect.arrayContaining([
+              expect.objectContaining({
+                name: "apiToken",
+                description: expect.stringContaining("managed egress"),
+              }),
+            ]),
+          },
+        },
+        routeSegment: "provider-configuration",
+        setupPane: {
+          kind: "provider-configuration",
+        },
+      },
       secretFields: [
         {
           name: "apiToken",
           description: expect.stringContaining("managed egress"),
         },
-        {
-          name: "webhookSecret",
-          description: expect.stringContaining("x-whapi-webhook-secret"),
-        },
       ],
     });
     expect(apiKeyMethod?.configForm).toBe(WhapiConnectionConfigForm);
+    expect(WhapiMcpBaseDefinition.webhookTriggerCapabilitiesRefreshUi).toEqual({
+      actionLabel: "Sync webhook events",
+      pendingLabel: "Syncing...",
+    });
   });
 });

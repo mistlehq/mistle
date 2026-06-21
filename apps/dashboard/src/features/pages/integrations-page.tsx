@@ -31,6 +31,10 @@ import {
 } from "../integrations/integrations-service.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { useOrganizationSummary } from "../shell/use-organization-summary.js";
+import {
+  buildIntegrationConnectionEditPath,
+  isSingleApiKeySecretMethod,
+} from "./integration-connection-auth-edit-routing.js";
 import { renderIntegrationConnectionSetupPane } from "./integration-connection-setup-pane-registry.js";
 import {
   type IntegrationConnectionSetupRoute,
@@ -201,11 +205,6 @@ function clearUrlConnectionNoticeParams(searchParams: URLSearchParams): URLSearc
   nextSearchParams.delete("connectionNotice");
   nextSearchParams.delete("providerAppSetupError");
   return nextSearchParams;
-}
-
-function formatSearchParamsSuffix(searchParams: URLSearchParams): string {
-  const serialized = searchParams.toString();
-  return serialized.length === 0 ? "" : `?${serialized}`;
 }
 
 function resolveRouteStateConnectionNotice(input: {
@@ -490,8 +489,14 @@ export function IntegrationsPage(input?: {
           }
 
           if (editingConnection.connectionMethodId === "api-key") {
-            connectionEditors.onEditApiKey(connectionId);
-            return;
+            const editingMethod =
+              selectedDetailConnectionMethods?.find(
+                (method) => method.id === editingConnection.connectionMethodId,
+              ) ?? null;
+            if (isSingleApiKeySecretMethod(editingMethod)) {
+              connectionEditors.onEditApiKey(connectionId);
+              return;
+            }
           }
 
           if (editingConnection.connectionMethodId === "oauth2-authorization-code") {
@@ -504,18 +509,23 @@ export function IntegrationsPage(input?: {
               (method) => method.id === editingConnection.connectionMethodId,
             ) ?? null;
           if (editingMethod?.kind === "device-authorization") {
-            const nextSearchParams = new URLSearchParams(searchParams);
-            nextSearchParams.set("reauthorize", "device");
             void navigate(
-              `/integrations/${detailTargetKey}/${connectionId}/edit?${nextSearchParams.toString()}`,
+              buildIntegrationConnectionEditPath({
+                connectionId,
+                detailTargetKey,
+                extraSearchParams: {
+                  reauthorize: "device",
+                },
+              }),
             );
             return;
           }
 
           void navigate(
-            `/integrations/${detailTargetKey}/${connectionId}/edit${formatSearchParamsSuffix(
-              searchParams,
-            )}`,
+            buildIntegrationConnectionEditPath({
+              connectionId,
+              detailTargetKey,
+            }),
           );
         }}
         onStartProviderAppSetup={connectionEditors.providerAppSetup.onStartInstallation}

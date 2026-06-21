@@ -68,6 +68,36 @@ const GitHubAppMethod: IntegrationConnectionMethod = {
   ],
 };
 
+const ProviderConfigurationMethod: IntegrationConnectionMethod = {
+  id: "api-key",
+  label: "API key",
+  kind: "form",
+  createBehavior: "draft-then-setup",
+  setupFlow: {
+    completionRequirements: {
+      kind: "all-of",
+      allOf: [
+        {
+          kind: "secret-field",
+          field: "apiToken",
+        },
+        {
+          kind: "config-field",
+          field: "provider_configuration_setup_completed",
+        },
+      ],
+    },
+    routeSegment: "provider-configuration",
+  },
+  secretFields: [
+    {
+      name: "apiToken",
+      label: "API token",
+      inputType: "password",
+    },
+  ],
+};
+
 describe("resolveIncompleteIntegrationConnectionSetupFlow", () => {
   it("returns the setup flow while required secrets are missing", () => {
     const setupFlow = resolveIncompleteIntegrationConnectionSetupFlow({
@@ -120,6 +150,48 @@ describe("resolveIncompleteIntegrationConnectionSetupFlow", () => {
         connectionMethodId: "github-app-installation",
         config: {
           installation_id: "12345",
+        },
+        updatedAt: UpdatedAt,
+      },
+    });
+
+    expect(setupFlow).toBeNull();
+  });
+
+  it("keeps provider configuration setup incomplete when only credentials are saved", () => {
+    const setupFlow = resolveIncompleteIntegrationConnectionSetupFlow({
+      connectionMethods: [ProviderConfigurationMethod],
+      connection: {
+        createdAt: CreatedAt,
+        id: "icn_provider_configuration",
+        targetKey: "provider-configuration-target",
+        displayName: "Provider configuration",
+        status: "active",
+        connectionMethodId: "api-key",
+        configuredSecretNames: ["apiToken"],
+        updatedAt: UpdatedAt,
+      },
+    });
+
+    expect(setupFlow).toEqual({
+      methodId: "api-key",
+      routeSegment: "provider-configuration",
+    });
+  });
+
+  it("completes provider configuration setup when credentials and the provider marker are saved", () => {
+    const setupFlow = resolveIncompleteIntegrationConnectionSetupFlow({
+      connectionMethods: [ProviderConfigurationMethod],
+      connection: {
+        createdAt: CreatedAt,
+        id: "icn_provider_configuration",
+        targetKey: "provider-configuration-target",
+        displayName: "Provider configuration",
+        status: "active",
+        connectionMethodId: "api-key",
+        configuredSecretNames: ["apiToken"],
+        config: {
+          provider_configuration_setup_completed: "provider-configuration",
         },
         updatedAt: UpdatedAt,
       },

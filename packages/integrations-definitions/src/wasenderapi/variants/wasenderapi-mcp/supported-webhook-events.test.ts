@@ -1,35 +1,32 @@
 import { describe, expect, it } from "vitest";
 
-import { WasenderApiSupportedWebhookEvents } from "./supported-webhook-events.js";
+import {
+  WasenderApiSupportedWebhookEvents,
+  WasenderApiWebhookEventMetadata,
+} from "./supported-webhook-events.js";
 
 describe("WasenderApiSupportedWebhookEvents", () => {
-  it("advertises the exact triggerable message events and provider requirements", () => {
+  it("advertises the documented WasenderAPI dashboard events Mistle supports", () => {
     expect(
       WasenderApiSupportedWebhookEvents.map((eventDefinition) => ({
         eventType: eventDefinition.eventType,
         providerEventType: eventDefinition.providerEventType,
         requirements: eventDefinition.requirements,
       })),
-    ).toEqual([
-      {
-        eventType: "wasenderapi.messages.upsert",
-        providerEventType: "messages.upsert",
+    ).toEqual(
+      WasenderApiWebhookEventMetadata.map((metadata) => ({
+        eventType: `wasenderapi.${metadata.providerEventType}`,
+        providerEventType: metadata.providerEventType,
         requirements: {
-          anyOf: [{ event: "messages.upsert" }],
+          anyOf: [{ event: metadata.providerEventType }],
         },
-      },
-      {
-        eventType: "wasenderapi.messages.received",
-        providerEventType: "messages.received",
-        requirements: {
-          anyOf: [{ event: "messages.received" }],
-        },
-      },
-    ]);
+      })),
+    );
+  });
+
+  it("keeps WasenderAPI event source documentation next to provider event metadata", () => {
     expect(
-      WasenderApiSupportedWebhookEvents.some(
-        (eventDefinition) => eventDefinition.providerEventType === "session.status",
-      ),
-    ).toBe(false);
+      WasenderApiWebhookEventMetadata.every((metadata) => metadata.docsUrl.startsWith("https://")),
+    ).toBe(true);
   });
 });

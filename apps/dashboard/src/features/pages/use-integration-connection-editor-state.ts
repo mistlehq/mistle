@@ -44,6 +44,7 @@ type IntegrationConnectionSubmitSuccessInput = {
   editor: IntegrationConnectionEditorState;
   managedWebhookSetup?: ManagedWebhookSetupResult;
   methodId: IntegrationConnectionMethodId;
+  updatedSecretNames?: readonly string[];
 };
 
 type UseIntegrationConnectionEditorStateInput = {
@@ -510,6 +511,9 @@ export function useIntegrationConnectionEditorState(
           connectionId: updatedConnection.id,
           editor,
           methodId: draft.methodId,
+          ...(Object.keys(updateSecrets).length === 0
+            ? {}
+            : { updatedSecretNames: Object.keys(updateSecrets) }),
         });
         return;
       } else {

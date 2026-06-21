@@ -4,6 +4,7 @@ import type {
   IntegrationConnectionMethodDetailFieldSource,
   IntegrationConnectionMethodDetailMetadata,
   IntegrationFormConnectionMethodPostCreateMetadata,
+  IntegrationFormConnectionMethodProviderConfigurationSetup,
   IntegrationFormConnectionMethodSetupCompletionRequirement,
   IntegrationFormConnectionMethodSetupFlowMetadata,
 } from "../types/index.js";
@@ -184,11 +185,18 @@ const IntegrationFormConnectionMethodSetupStartFormSchema = z
   })
   .strict();
 
-const IntegrationFormConnectionMethodSetupPaneMetadataSchema = z
-  .object({
-    kind: z.literal("provider-app"),
-  })
-  .strict();
+const IntegrationFormConnectionMethodSetupPaneMetadataSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("provider-app"),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("provider-configuration"),
+    })
+    .strict(),
+]);
 
 const IntegrationFormConnectionMethodProviderAppSetupSchema = z
   .object({
@@ -322,11 +330,79 @@ const IntegrationFormConnectionMethodProviderAppSetupSchema = z
     }
   });
 
+const IntegrationFormConnectionMethodProviderConfigurationSetupSchema: z.ZodType<IntegrationFormConnectionMethodProviderConfigurationSetup> =
+  z
+    .object({
+      description: z.string().min(1),
+      fields: z
+        .object({
+          configFields: z.array(
+            z
+              .object({
+                configKey: z.string().min(1),
+                description: z.string().min(1).optional(),
+                inputType: z.enum(["text", "textarea"]),
+                label: z.string().min(1),
+                name: z.string().min(1),
+                placeholder: z.string().min(1).optional(),
+                required: z.boolean(),
+                rows: z.number().int().min(1).optional(),
+              })
+              .strict(),
+          ),
+          description: z.string().min(1),
+          saveErrorMessage: z.string().min(1),
+          saveLabel: z.string().min(1),
+          secretFields: z.array(
+            z
+              .object({
+                description: z.string().min(1).optional(),
+                generation: z
+                  .object({
+                    kind: z.literal("random-token"),
+                  })
+                  .strict()
+                  .optional(),
+                inputType: z.enum(["password", "text", "textarea"]),
+                label: z.string().min(1),
+                name: z.string().min(1),
+                placeholder: z.string().min(1).optional(),
+                required: z.boolean(),
+                rows: z.number().int().min(1).optional(),
+                secretLabel: z.string().min(1),
+              })
+              .strict(),
+          ),
+          title: z.string().min(1),
+        })
+        .strict(),
+      instructions: z
+        .object({
+          items: z.array(z.string().min(1)).min(1),
+          title: z.string().min(1),
+        })
+        .strict(),
+      title: z.string().min(1),
+      webhookCallback: z
+        .object({
+          description: z.string().min(1),
+          errorTitle: z.string().min(1),
+          label: z.string().min(1),
+          missingMessage: z.string().min(1),
+          missingTitle: z.string().min(1),
+          title: z.string().min(1),
+        })
+        .strict(),
+    })
+    .strict();
+
 export const IntegrationFormConnectionMethodSetupFlowMetadataSchema: z.ZodType<IntegrationFormConnectionMethodSetupFlowMetadata> =
   z
     .object({
       completionRequirements: IntegrationSetupCompletionRequirementSchema.optional(),
       providerAppSetup: IntegrationFormConnectionMethodProviderAppSetupSchema.optional(),
+      providerConfigurationSetup:
+        IntegrationFormConnectionMethodProviderConfigurationSetupSchema.optional(),
       routeSegment: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
       setupPane: IntegrationFormConnectionMethodSetupPaneMetadataSchema.optional(),
       startForm: IntegrationFormConnectionMethodSetupStartFormSchema.optional(),

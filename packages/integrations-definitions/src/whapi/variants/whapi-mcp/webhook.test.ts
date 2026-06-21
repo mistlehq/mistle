@@ -4,15 +4,12 @@ import { verifyAndResolveWebhookRequestOrThrow } from "@mistle/integrations-core
 import { describe, expect, it } from "vitest";
 
 import { WhapiDefinition } from "./definition.js";
-import { verifyWhapiWebhookSecret } from "./webhook.server.js";
-
-const WebhookSecret = "whapi-webhook-secret";
 
 function encodeJson(input: Record<string, unknown>): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(input));
 }
 
-function verifyWhapiWebhook(input: { payload: Record<string, unknown>; secret?: string }) {
+function verifyWhapiWebhook(input: { payload: Record<string, unknown> }) {
   return verifyAndResolveWebhookRequestOrThrow({
     definition: WhapiDefinition,
     targetKey: "whapi-mcp",
@@ -34,39 +31,12 @@ function verifyWhapiWebhook(input: { payload: Record<string, unknown>; secret?: 
     ],
     resolveConnectionSecrets: () => ({
       apiToken: "whapi-api-token",
-      webhookSecret: WebhookSecret,
     }),
     webhookSourceSecrets: {},
-    headers: {
-      "x-whapi-webhook-secret": input.secret ?? WebhookSecret,
-    },
+    headers: {},
     rawBody: encodeJson(input.payload),
   });
 }
-
-describe("Whapi webhook secret helpers", () => {
-  it("verifies the configured custom callback header", () => {
-    expect(
-      verifyWhapiWebhookSecret({
-        webhookSecret: WebhookSecret,
-        headerValue: WebhookSecret,
-      }),
-    ).toEqual({ ok: true });
-  });
-
-  it("rejects mismatched custom callback header values", () => {
-    expect(
-      verifyWhapiWebhookSecret({
-        webhookSecret: WebhookSecret,
-        headerValue: "wrong-secret",
-      }),
-    ).toEqual({
-      ok: false,
-      code: "invalid-signature",
-      message: "Whapi webhook secret verification failed.",
-    });
-  });
-});
 
 describe("WhapiWebhookHandler", () => {
   it("normalizes documented incoming message deliveries", async () => {
@@ -383,24 +353,54 @@ describe("WhapiWebhookHandler", () => {
     });
   });
 
-  it("rejects unadvertised webhook event types", async () => {
+  it("normalizes documented label deliveries", async () => {
     const payload = {
-      labels: [],
+      labels: [
+        {
+          id: "76",
+          name: "Order complete",
+          color: "lightsteelblue",
+        },
+      ],
       event: {
         type: "labels",
         event: "post",
       },
       channel_id: "MANTIS-M72HC",
     };
+    const resolved = await verifyWhapiWebhook({ payload });
+
+    expect(resolved).toEqual({
+      kind: "event",
+      connectionId: "whapi-connection-id",
+      event: {
+        externalEventId: expect.stringMatching(/^labels\.post:[0-9a-f]{64}$/),
+        externalDeliveryId: expect.stringMatching(/^labels\.post:[0-9a-f]{64}$/),
+        providerEventType: "labels.post",
+        eventType: "whapi.labels.post",
+        payload,
+        sourceOrderKey: expect.stringMatching(/^labels\.post:[0-9a-f]{64}$/),
+      },
+    });
+  });
+
+  it("rejects unadvertised webhook event types", async () => {
+    const payload = {
+      products: [],
+      event: {
+        type: "products",
+        event: "post",
+      },
+      channel_id: "MANTIS-M72HC",
+    };
     await expect(verifyWhapiWebhook({ payload })).rejects.toThrow(
-      "Whapi webhook event 'labels.post' is not supported.",
+      "Whapi webhook event 'products.post' is not supported.",
     );
   });
 
-  it("rejects deliveries without the configured custom callback header", async () => {
+  it("accepts deliveries without a custom callback header", async () => {
     await expect(
       verifyWhapiWebhook({
-        secret: "wrong-secret",
         payload: {
           messages: [],
           event: {
@@ -409,6 +409,11 @@ describe("WhapiWebhookHandler", () => {
           },
         },
       }),
-    ).rejects.toThrow("Whapi webhook secret verification failed.");
+    ).resolves.toMatchObject({
+      connectionId: "whapi-connection-id",
+      event: {
+        providerEventType: "messages.post",
+      },
+    });
   });
 });

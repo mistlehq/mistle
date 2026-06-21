@@ -1458,6 +1458,86 @@ describe("IntegrationConnectionDetailView", () => {
     expect(within(webhookSection).getAllByLabelText("Not enabled")).toHaveLength(1);
   });
 
+  it("renders requirementless webhook events as supported without provider capability status", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_webhook_supported",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "WasenderAPI",
+            authMethodId: "api-key",
+            authMethodLabel: "Personal access token",
+            status: "active",
+            resources: [],
+          },
+        ]}
+        supportedWebhookEvents={[
+          {
+            eventType: "wasenderapi.messages.upsert",
+            providerEventType: "messages.upsert",
+            displayName: "Message upsert",
+            category: "Messages",
+          },
+          {
+            eventType: "wasenderapi.messages.received",
+            providerEventType: "messages.received",
+            displayName: "Message received",
+            category: "Messages",
+          },
+        ]}
+        webhookPolicy={ImplicitWebhookPolicy}
+        webhookSourceStateByConnectionId={
+          new Map([
+            [
+              "icn_webhook_supported",
+              {
+                createErrorMessage: null,
+                deleteErrorMessage: null,
+                deletingWebhookSourceId: null,
+                isCreating: false,
+                isLoading: false,
+                items: [
+                  {
+                    id: "iws_wasenderapi_supported",
+                    targetKey: "wasenderapi-mcp",
+                    integrationConnectionId: "icn_webhook_supported",
+                    displayName: "WasenderAPI webhook",
+                    endpointKey: "ep_wasenderapi_supported",
+                    callbackUrl:
+                      "https://control-plane.example.com/p/integration/webhooks/wasenderapi-mcp/ep_wasenderapi_supported",
+                    status: "active",
+                    providerMetadata: {},
+                    createdAt: "2026-04-03T00:00:00.000Z",
+                    updatedAt: "2026-04-03T00:00:00.000Z",
+                  },
+                ],
+                loadErrorMessage: null,
+                revealedWebhookSecret: null,
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    const webhookSection = screen.getByText("Webhook").closest("section");
+    if (webhookSection === null) {
+      throw new Error("Expected webhook section to render.");
+    }
+
+    expect(within(webhookSection).getByText("Available trigger events")).toBeTruthy();
+    expect(within(webhookSection).getByText("Message upsert")).toBeTruthy();
+    expect(within(webhookSection).getByText("Message received")).toBeTruthy();
+    expect(within(webhookSection).queryByText("Events")).toBeNull();
+    expect(within(webhookSection).queryByText("messages.upsert")).toBeNull();
+    expect(within(webhookSection).queryByText("messages.received")).toBeNull();
+    expect(within(webhookSection).queryByLabelText("Present")).toBeNull();
+    expect(within(webhookSection).queryByLabelText("Missing")).toBeNull();
+    expect(within(webhookSection).queryByLabelText("Not enabled")).toBeNull();
+  });
+
   it.each([
     ["active", "Active"],
     ["disabled", "Disabled"],

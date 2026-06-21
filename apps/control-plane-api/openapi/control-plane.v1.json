@@ -9510,6 +9510,17 @@
                     "type": "object",
                     "additionalProperties": {}
                   },
+                  "providerConfigurationSetup": {
+                    "type": "object",
+                    "properties": {
+                      "routeSegment": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["routeSegment"],
+                    "additionalProperties": false
+                  },
                   "secrets": {
                     "type": "object",
                     "additionalProperties": {
@@ -12345,20 +12356,248 @@
                                           ],
                                           "additionalProperties": false
                                         },
+                                        "providerConfigurationSetup": {
+                                          "type": "object",
+                                          "properties": {
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "fields": {
+                                              "type": "object",
+                                              "properties": {
+                                                "configFields": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "configKey": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
+                                                      "description": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
+                                                      "inputType": {
+                                                        "type": "string",
+                                                        "enum": ["text", "textarea"]
+                                                      },
+                                                      "label": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
+                                                      "name": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
+                                                      "placeholder": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
+                                                      "required": {
+                                                        "type": "boolean"
+                                                      },
+                                                      "rows": {
+                                                        "type": "integer",
+                                                        "minimum": 1
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "configKey",
+                                                      "inputType",
+                                                      "label",
+                                                      "name",
+                                                      "required"
+                                                    ],
+                                                    "additionalProperties": false
+                                                  }
+                                                },
+                                                "description": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "saveErrorMessage": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "saveLabel": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "secretFields": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "description": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
+                                                      "generation": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["random-token"]
+                                                          }
+                                                        },
+                                                        "required": ["kind"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      "inputType": {
+                                                        "type": "string",
+                                                        "enum": ["password", "text", "textarea"]
+                                                      },
+                                                      "label": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
+                                                      "name": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
+                                                      "placeholder": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
+                                                      "required": {
+                                                        "type": "boolean"
+                                                      },
+                                                      "rows": {
+                                                        "type": "integer",
+                                                        "minimum": 1
+                                                      },
+                                                      "secretLabel": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "inputType",
+                                                      "label",
+                                                      "name",
+                                                      "required",
+                                                      "secretLabel"
+                                                    ],
+                                                    "additionalProperties": false
+                                                  }
+                                                },
+                                                "title": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": [
+                                                "configFields",
+                                                "description",
+                                                "saveErrorMessage",
+                                                "saveLabel",
+                                                "secretFields",
+                                                "title"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            "instructions": {
+                                              "type": "object",
+                                              "properties": {
+                                                "items": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  },
+                                                  "minItems": 1
+                                                },
+                                                "title": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["items", "title"],
+                                              "additionalProperties": false
+                                            },
+                                            "title": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "webhookCallback": {
+                                              "type": "object",
+                                              "properties": {
+                                                "description": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "errorTitle": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "label": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "missingMessage": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "missingTitle": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "title": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": [
+                                                "description",
+                                                "errorTitle",
+                                                "label",
+                                                "missingMessage",
+                                                "missingTitle",
+                                                "title"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": [
+                                            "description",
+                                            "fields",
+                                            "instructions",
+                                            "title",
+                                            "webhookCallback"
+                                          ],
+                                          "additionalProperties": false
+                                        },
                                         "routeSegment": {
                                           "type": "string",
                                           "pattern": "^[a-z0-9][a-z0-9-]*$"
                                         },
                                         "setupPane": {
-                                          "type": "object",
-                                          "properties": {
-                                            "kind": {
-                                              "type": "string",
-                                              "enum": ["provider-app"]
+                                          "oneOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": ["provider-app"]
+                                                }
+                                              },
+                                              "required": ["kind"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": ["provider-configuration"]
+                                                }
+                                              },
+                                              "required": ["kind"],
+                                              "additionalProperties": false
                                             }
-                                          },
-                                          "required": ["kind"],
-                                          "additionalProperties": false
+                                          ]
                                         },
                                         "startForm": {
                                           "type": "object",

@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 
 import {
   createIntegrationWebhookSourceOrderKey,
@@ -6,20 +6,13 @@ import {
   type IntegrationWebhookEvent,
   type IntegrationWebhookHandler,
   type IntegrationWebhookResolveConnectionResult,
-  type IntegrationWebhookVerifyResult,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
 import { WhapiSupportedWebhookEvents } from "./supported-webhook-events.js";
 import type { WhapiTargetConfig } from "./target-config-schema.js";
 
-const WhapiWebhookSecretHeaderName = "x-whapi-webhook-secret";
-
 const WhapiWebhookPayloadSchema = z.record(z.string(), z.unknown());
-
-type WhapiConnectionSecrets = {
-  webhookSecret?: string;
-};
 
 function parseWhapiJsonPayload(input: Uint8Array): Record<string, unknown> {
   const decodedBody = new TextDecoder().decode(input);
@@ -143,15 +136,6 @@ function resolveWhapiOccurredAt(payload: Readonly<Record<string, unknown>>): str
   return normalizeWhapiTimestamp(stringCandidate ?? numberCandidate);
 }
 
-function resolveHeader(input: Readonly<Record<string, string>>, headerName: string): string {
-  const value = input[headerName];
-  if (value === undefined || value.trim().length === 0) {
-    throw new Error(`Whapi webhook is missing ${headerName} header.`);
-  }
-
-  return value.trim();
-}
-
 function resolvePathRoutedConnection(
   candidates: ReadonlyArray<IntegrationConnection>,
 ): IntegrationWebhookResolveConnectionResult {
@@ -178,27 +162,10 @@ function resolvePathRoutedConnection(
   };
 }
 
-export function verifyWhapiWebhookSecret(input: {
-  webhookSecret: string;
-  headerValue: string;
-}): IntegrationWebhookVerifyResult {
-  const expectedBytes = Buffer.from(input.webhookSecret);
-  const actualBytes = Buffer.from(input.headerValue);
-  if (expectedBytes.length !== actualBytes.length || !timingSafeEqual(expectedBytes, actualBytes)) {
-    return {
-      ok: false,
-      code: "invalid-signature",
-      message: "Whapi webhook secret verification failed.",
-    };
-  }
-
-  return { ok: true };
-}
-
 export const WhapiWebhookHandler: IntegrationWebhookHandler<
   WhapiTargetConfig,
   Record<string, never>,
-  WhapiConnectionSecrets
+  Record<string, string>
 > = {
   resolveWebhookRequest(input) {
     const payload = parseWhapiJsonPayload(input.rawBody);
@@ -241,30 +208,7 @@ export const WhapiWebhookHandler: IntegrationWebhookHandler<
   resolveConnection(input) {
     return resolvePathRoutedConnection(input.candidates);
   },
-  verify(input) {
-    const webhookSecret = input.connectionSecrets.webhookSecret;
-    if (webhookSecret === undefined || webhookSecret.length === 0) {
-      return {
-        ok: false,
-        code: "invalid-body",
-        message: "Whapi webhook secret is missing for this connection.",
-      };
-    }
-
-    let headerValue: string;
-    try {
-      headerValue = resolveHeader(input.headers, WhapiWebhookSecretHeaderName);
-    } catch (error) {
-      return {
-        ok: false,
-        code: "invalid-headers",
-        message: error instanceof Error ? error.message : "Whapi headers are invalid.",
-      };
-    }
-
-    return verifyWhapiWebhookSecret({
-      webhookSecret,
-      headerValue,
-    });
+  verify() {
+    return { ok: true };
   },
 };

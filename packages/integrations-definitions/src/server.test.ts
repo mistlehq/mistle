@@ -392,12 +392,32 @@ describe("integrations-definitions server", () => {
           id: "api-key",
           label: "Personal access token",
           kind: "form",
+          createBehavior: "draft-then-setup",
         },
       ],
     });
     expect(wasenderApiDefinition?.mcp).toBeDefined();
+    expect(wasenderApiDefinition?.providerConfigurationSetup).toMatchObject({
+      flows: [
+        {
+          methodId: "api-key",
+          requiresWebhookCallbackUrl: true,
+          routeSegment: "provider-configuration",
+        },
+      ],
+    });
     expect(wasenderApiDefinition?.webhookHandler).toBeDefined();
     expect(wasenderApiDefinition?.webhookSource).toBeDefined();
+    const wasenderApiConnectionMethod = wasenderApiDefinition?.connectionMethods.find(
+      (method) => method.id === "api-key",
+    );
+    expect(
+      wasenderApiConnectionMethod?.kind === "form"
+        ? wasenderApiConnectionMethod.setupFlow?.setupPane
+        : undefined,
+    ).toEqual({
+      kind: "provider-configuration",
+    });
     expect(whapiDefinition).toMatchObject({
       familyId: "whapi",
       variantId: "whapi-mcp",
@@ -413,6 +433,15 @@ describe("integrations-definitions server", () => {
       ],
     });
     expect(whapiDefinition?.mcp).toBeDefined();
+    expect(whapiDefinition?.providerConfigurationSetup).toMatchObject({
+      flows: [
+        {
+          methodId: "api-key",
+          requiresWebhookCallbackUrl: true,
+          routeSegment: "provider-configuration",
+        },
+      ],
+    });
     expect(whapiDefinition?.webhookHandler).toBeDefined();
     expect(whapiDefinition?.webhookSource).toBeDefined();
     expect(notionDefinition?.oauth2AuthorizationCode).toBeDefined();

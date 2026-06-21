@@ -1,7 +1,10 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { type ControlPlaneDatabase, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
-import type { IntegrationRegistry } from "@mistle/integrations-core";
+import {
+  ProviderConfigurationSetupCompletedConfigKey,
+  type IntegrationRegistry,
+} from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
 
 import {
@@ -10,6 +13,7 @@ import {
   unwrapOrganizationCredentialKey,
 } from "../../lib/crypto.js";
 import { logger } from "../../logger.js";
+import type { AppContext } from "../../types.js";
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
@@ -21,6 +25,10 @@ import {
   parseUpdateFormSecretsOrThrow,
   resolveFormConnectionMethodOrThrow,
 } from "./form-connection-methods.js";
+import {
+  completeProviderConfigurationSetup,
+  resolveConnectionWithTargetForProviderConfigurationSetup,
+} from "./provider-configuration-setup.js";
 
 type UpdatedConnection = {
   id: string;
@@ -39,6 +47,9 @@ export type UpdateFormConnectionInput = {
   connectionId: string;
   displayName: string;
   config: Record<string, unknown>;
+  providerConfigurationSetup?: {
+    routeSegment: string;
+  };
   secrets?: Record<string, string>;
 };
 
@@ -50,17 +61,17 @@ export async function updateFormConnection(
       "invalidateIntegrationConnectionCredentialCache"
     >;
     integrationRegistry: IntegrationRegistry;
-    integrationsConfig: {
-      masterEncryptionKeys: Record<string, string>;
-    };
+    integrationsConfig: AppContext["var"]["config"]["integrations"];
+    controlPlaneBaseUrl: string;
   },
   input: UpdateFormConnectionInput,
 ): Promise<UpdatedConnection> {
   const { db, dataPlaneClient, integrationRegistry, integrationsConfig } = ctx;
 
-  const existingConnection = await db.query.integrationConnections.findFirst({
-    where: (table, { and, eq }) =>
-      and(eq(table.id, input.connectionId), eq(table.organizationId, input.organizationId)),
+  const existingConnection = await resolveConnectionWithTargetForProviderConfigurationSetup({
+    db,
+    organizationId: input.organizationId,
+    connectionId: input.connectionId,
   });
 
   if (existingConnection === undefined) {
@@ -88,16 +99,7 @@ export async function updateFormConnection(
     );
   }
 
-  const target = await db.query.integrationTargets.findFirst({
-    where: (table, { eq }) => eq(table.targetKey, existingConnection.targetKey),
-  });
-
-  if (target === undefined) {
-    throw new NotFoundError(
-      IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND,
-      `Integration target '${existingConnection.targetKey}' was not found.`,
-    );
-  }
+  const target = existingConnection.target;
 
   const definition = integrationRegistry.getDefinition({
     familyId: target.familyId,
@@ -141,6 +143,15 @@ export async function updateFormConnection(
         invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
       })
     : [];
+  const providerConfigurationSetup = input.providerConfigurationSetup;
+  const persistedConfigBeforeProviderSetup = buildPersistedFormConnectionConfig({
+    parsedConfig,
+    connectionMethodId: existingConnectionMethodId,
+    existingProviderConfigurationSetupCompleted: readProviderConfigurationSetupCompletedConfig(
+      existingConnection.config,
+    ),
+    resetProviderConfigurationSetupCompleted: providerConfigurationSetup !== undefined,
+  });
 
   const organizationCredentialKey = await db.query.organizationCredentialKeys.findFirst({
     where: (table, { eq }) => eq(table.organizationId, input.organizationId),
@@ -211,10 +222,7 @@ export async function updateFormConnection(
         .update(tables.integrationConnections)
         .set({
           displayName: input.displayName,
-          config: {
-            ...parsedConfig,
-            connection_method: existingConnectionMethodId,
-          },
+          config: persistedConfigBeforeProviderSetup,
           updatedAt: sql`now()`,
         })
         .where(eq(tables.integrationConnections.id, existingConnection.id))
@@ -258,8 +266,90 @@ export async function updateFormConnection(
         });
     }
 
+    if (providerConfigurationSetup !== undefined) {
+      const persistedConnectionForProviderSetup = {
+        ...existingConnection,
+        displayName: updatedConnection.displayName,
+        status: updatedConnection.status,
+        config: persistedConfigBeforeProviderSetup,
+      };
+
+      await completeProviderConfigurationSetup(
+        {
+          controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
+          db,
+          integrationRegistry,
+          integrationsConfig,
+        },
+        {
+          connection: persistedConnectionForProviderSetup,
+          definition,
+          methodId: existingConnectionMethodId,
+          parsedConfig,
+          parsedSecrets,
+          routeSegment: providerConfigurationSetup.routeSegment,
+        },
+      );
+
+      const providerSetupCompletedConfig = {
+        ...persistedConfigBeforeProviderSetup,
+        [ProviderConfigurationSetupCompletedConfigKey]: providerConfigurationSetup.routeSegment,
+      };
+      const tables = getControlPlaneDatabaseSchema(db);
+      const [providerSetupCompletedConnection] = await db
+        .update(tables.integrationConnections)
+        .set({
+          config: providerSetupCompletedConfig,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(tables.integrationConnections.id, updatedConnection.id))
+        .returning({
+          updatedAt: tables.integrationConnections.updatedAt,
+        });
+
+      if (providerSetupCompletedConnection === undefined) {
+        throw new Error("Failed to mark provider configuration setup complete.");
+      }
+
+      return {
+        ...updatedConnection,
+        config: providerSetupCompletedConfig,
+        updatedAt: providerSetupCompletedConnection.updatedAt,
+      };
+    }
+
     return updatedConnection;
   } finally {
     unwrappedOrganizationCredentialKey.fill(0);
   }
+}
+
+function buildPersistedFormConnectionConfig(input: {
+  parsedConfig: Record<string, unknown>;
+  connectionMethodId: string;
+  existingProviderConfigurationSetupCompleted: string | undefined;
+  resetProviderConfigurationSetupCompleted: boolean;
+}): Record<string, unknown> {
+  const config: Record<string, unknown> = {
+    ...input.parsedConfig,
+    connection_method: input.connectionMethodId,
+  };
+  delete config[ProviderConfigurationSetupCompletedConfigKey];
+
+  if (
+    !input.resetProviderConfigurationSetupCompleted &&
+    input.existingProviderConfigurationSetupCompleted !== undefined
+  ) {
+    config[ProviderConfigurationSetupCompletedConfigKey] =
+      input.existingProviderConfigurationSetupCompleted;
+  }
+
+  return config;
+}
+
+function readProviderConfigurationSetupCompletedConfig(
+  config: Record<string, unknown> | null,
+): string | undefined {
+  const value = config?.[ProviderConfigurationSetupCompletedConfigKey];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }

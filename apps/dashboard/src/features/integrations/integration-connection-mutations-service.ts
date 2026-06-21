@@ -141,6 +141,9 @@ export async function updateFormIntegrationConnection(input: {
   connectionId: string;
   displayName: string;
   config: Record<string, unknown>;
+  providerConfigurationSetup?: {
+    routeSegment: string;
+  };
   secrets?: Record<string, string>;
 }): Promise<CreatedIntegrationConnection> {
   try {
@@ -151,6 +154,9 @@ export async function updateFormIntegrationConnection(input: {
       body: {
         displayName: input.displayName,
         config: input.config,
+        ...(input.providerConfigurationSetup === undefined
+          ? {}
+          : { providerConfigurationSetup: input.providerConfigurationSetup }),
         ...(input.secrets === undefined ? {} : { secrets: input.secrets }),
       },
       fallbackMessage: "Could not update integration connection.",

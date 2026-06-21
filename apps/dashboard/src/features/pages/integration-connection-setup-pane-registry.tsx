@@ -1,8 +1,10 @@
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { ProviderAppSetupPane } from "./integration-connection-provider-app-setup-pane.js";
+import { ProviderConfigurationSetupPane } from "./integration-connection-provider-configuration-setup-pane.js";
 import {
   resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
   resolveIntegrationProviderAppSetupOrThrow,
+  resolveIntegrationProviderConfigurationSetupOrThrow,
   resolveIntegrationSetupPaneOrThrow,
   resolveIntegrationSetupStartFormOrThrow,
 } from "./integration-connection-setup-manifest-draft.js";
@@ -41,6 +43,23 @@ function renderProviderAppSetupPane(input: {
   );
 }
 
+function renderProviderConfigurationSetupPane(input: {
+  connection: IntegrationConnection;
+  setupRoute: IntegrationConnectionSetupRoute;
+}): React.JSX.Element {
+  return (
+    <ProviderConfigurationSetupPane
+      connection={input.connection}
+      methodId={input.setupRoute.methodId}
+      providerConfigurationSetup={resolveIntegrationProviderConfigurationSetupOrThrow({
+        connection: input.connection,
+        setupRoute: input.setupRoute,
+      })}
+      routeSegment={input.setupRoute.routeSegment}
+    />
+  );
+}
+
 function resolveSetupPane(input: {
   connection: IntegrationConnection;
   setupRoute: IntegrationConnectionSetupRoute;
@@ -50,10 +69,14 @@ function resolveSetupPane(input: {
     return renderProviderAppSetupPane;
   }
 
-  return handleUnsupportedIntegrationSetupPaneKind(setupPane.kind);
+  if (setupPane.kind === "provider-configuration") {
+    return renderProviderConfigurationSetupPane;
+  }
+
+  return handleUnsupportedIntegrationSetupPaneKind(setupPane);
 }
 
-function handleUnsupportedIntegrationSetupPaneKind(_kind: never): never {
+function handleUnsupportedIntegrationSetupPaneKind(_setupPane: never): never {
   throw new Error("Unsupported integration setup pane kind.");
 }
 

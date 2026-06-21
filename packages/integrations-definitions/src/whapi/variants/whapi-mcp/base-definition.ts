@@ -1,7 +1,9 @@
 import {
   IntegrationConnectionMethodIds,
+  IntegrationFormConnectionMethodCreateBehaviors,
   IntegrationKinds,
   IntegrationMcpTransports,
+  ProviderConfigurationSetupCompletedConfigKey,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 
@@ -40,11 +42,74 @@ export const WhapiMcpBaseDefinition: WhapiMcpBaseIntegrationDefinition = {
   bindingConfigSchema: WhapiBindingConfigSchema,
   bindingConfigForm: resolveWhapiBindingConfigForm,
   supportedWebhookEvents: WhapiSupportedWebhookEvents,
+  webhookTriggerCapabilitiesRefreshUi: {
+    actionLabel: "Sync webhook events",
+    pendingLabel: "Syncing...",
+  },
   connectionMethods: [
     {
       id: IntegrationConnectionMethodIds.API_KEY,
       label: "API token",
       kind: "form",
+      createBehavior: IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP,
+      setupFlow: {
+        completionRequirements: {
+          kind: "all-of",
+          allOf: [
+            {
+              kind: "secret-field",
+              field: "apiToken",
+            },
+            {
+              kind: "config-field",
+              field: ProviderConfigurationSetupCompletedConfigKey,
+            },
+          ],
+        },
+        providerConfigurationSetup: {
+          title: "Set up Whapi",
+          description:
+            "Save the API token so Mistle can configure this channel's webhook with the displayed callback URL.",
+          webhookCallback: {
+            title: "Webhook callback",
+            description: "Mistle registers this callback URL in Whapi channel settings.",
+            label: "Webhook URL",
+            errorTitle: "Could not load webhook URL",
+            missingTitle: "Webhook URL is not available yet",
+            missingMessage:
+              "Whapi setup requires a webhook URL, but this connection does not have one yet.",
+          },
+          instructions: {
+            title: "Whapi setup",
+            items: [
+              "Enter the Whapi API token for the WhatsApp channel.",
+              "Save setup so Mistle can register the webhook URL and supported events in Whapi.",
+            ],
+          },
+          fields: {
+            title: "Whapi credentials",
+            description: "Save the API token for managed egress and webhook configuration.",
+            saveLabel: "Save Whapi setup",
+            saveErrorMessage: "Could not save Whapi setup.",
+            configFields: [],
+            secretFields: [
+              {
+                name: "apiToken",
+                label: "API token",
+                placeholder: "Enter API token",
+                description: "Whapi API token used through managed egress.",
+                inputType: "password",
+                required: true,
+                secretLabel: "API token",
+              },
+            ],
+          },
+        },
+        routeSegment: "provider-configuration",
+        setupPane: {
+          kind: "provider-configuration",
+        },
+      },
       secretFields: [
         {
           name: "apiToken",
@@ -54,16 +119,6 @@ export const WhapiMcpBaseDefinition: WhapiMcpBaseIntegrationDefinition = {
           inputType: "password",
           secretType: WhapiCredentialSecretTypes.API_TOKEN,
           slotKey: WhapiCredentialSlotKeys.API_TOKEN,
-        },
-        {
-          name: "webhookSecret",
-          label: "Webhook secret",
-          description:
-            "Secret value to configure as Whapi custom callback header x-whapi-webhook-secret.",
-          placeholder: "Enter webhook secret",
-          inputType: "password",
-          secretType: WhapiCredentialSecretTypes.WEBHOOK_SECRET,
-          slotKey: WhapiCredentialSlotKeys.WEBHOOK_SECRET,
         },
       ],
       configSchema: WhapiConnectionConfigSchema,
