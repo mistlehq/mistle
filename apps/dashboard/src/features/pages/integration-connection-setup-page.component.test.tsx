@@ -339,17 +339,8 @@ const WhapiTarget: IntegrationTarget = {
           kind: "provider-configuration",
         },
         completionRequirements: {
-          kind: "all-of",
-          allOf: [
-            {
-              kind: "secret-field",
-              field: "apiToken",
-            },
-            {
-              kind: "secret-field",
-              field: "webhookSecret",
-            },
-          ],
+          kind: "secret-field",
+          field: "apiToken",
         },
         providerConfigurationSetup: {
           title: "Set up Whapi",
@@ -367,7 +358,7 @@ const WhapiTarget: IntegrationTarget = {
             title: "Whapi setup",
             items: [
               "Paste the Mistle webhook URL into the webhook URL field.",
-              "Configure a custom callback header named x-whapi-webhook-secret with the Mistle webhook secret.",
+              "Enable the webhook events this connection should receive.",
             ],
           },
           fields: {
@@ -385,18 +376,6 @@ const WhapiTarget: IntegrationTarget = {
                 required: true,
                 secretLabel: "API token",
               },
-              {
-                name: "webhookSecret",
-                label: "Mistle webhook secret",
-                description:
-                  "Copy this value into Whapi as the x-whapi-webhook-secret custom callback header.",
-                generation: {
-                  kind: "random-token",
-                },
-                inputType: "text",
-                required: true,
-                secretLabel: "webhook secret",
-              },
             ],
           },
         },
@@ -405,11 +384,6 @@ const WhapiTarget: IntegrationTarget = {
         {
           name: "apiToken",
           label: "API token",
-          inputType: "password",
-        },
-        {
-          name: "webhookSecret",
-          label: "Webhook secret",
           inputType: "password",
         },
       ],
@@ -661,7 +635,7 @@ describe("IntegrationConnectionSetupPage", () => {
     expect(screen.queryByText("Could not load setup")).toBeNull();
   });
 
-  it("renders generated provider configuration secrets as copyable values", async () => {
+  it("renders provider configuration setup fields", async () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
@@ -700,13 +674,12 @@ describe("IntegrationConnectionSetupPage", () => {
       expect(screen.getByRole("heading", { name: "Set up Whapi" })).toBeTruthy();
     });
     expect(screen.getByText(WhapiWebhookCallbackUrl)).toBeTruthy();
-    expect(screen.getByText(/^([0-9a-f]{64})$/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Copy Mistle webhook secret" })).toBeTruthy();
     expect(screen.queryByPlaceholderText("Enter webhook secret")).toBeNull();
+    expect(screen.getByPlaceholderText("Enter API token")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save Whapi setup" })).toBeTruthy();
   });
 
-  it("includes generated provider configuration secrets in the setup save payload", () => {
+  it("includes provider configuration secrets in the setup save payload", () => {
     const setup = getWhapiProviderConfigurationSetup();
     const draft = createInitialProviderConfigurationSetupDraft({
       connection: IncompleteWhapiConnection,
@@ -720,10 +693,8 @@ describe("IntegrationConnectionSetupPage", () => {
       setup,
     });
 
-    expect(draft.webhookSecret).toMatch(/^([0-9a-f]{64})$/);
     expect(secrets).toEqual({
       apiToken: "whapi-api-token",
-      webhookSecret: draft.webhookSecret,
     });
   });
 

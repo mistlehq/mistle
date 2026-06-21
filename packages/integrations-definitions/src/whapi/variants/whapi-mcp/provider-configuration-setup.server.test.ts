@@ -87,11 +87,10 @@ describe("Whapi provider configuration setup", () => {
     await Promise.all(StartedSimulatedWhapiServers.splice(0).map((server) => server.stop()));
   });
 
-  it("builds WHAPI settings with the Mistle webhook URL and custom callback header", () => {
+  it("builds WHAPI settings with the Mistle webhook URL", () => {
     expect(
       buildWhapiWebhookSettingsRequestBody({
         webhookCallbackUrl: "https://control-plane.example.com/p/integration/webhooks/whapi",
-        webhookSecret: "mistle-webhook-secret",
       }),
     ).toEqual({
       webhooks: [
@@ -106,9 +105,6 @@ describe("Whapi provider configuration setup", () => {
             { method: "post", type: "users" },
             { method: "delete", type: "users" },
           ],
-          headers: {
-            "x-whapi-webhook-secret": "mistle-webhook-secret",
-          },
           mode: "body",
           url: "https://control-plane.example.com/p/integration/webhooks/whapi",
         },
@@ -123,14 +119,12 @@ describe("Whapi provider configuration setup", () => {
       apiBaseUrl: simulatedWhapi.apiBaseUrl,
       apiToken: "whapi-token",
       webhookCallbackUrl: "https://control-plane.example.com/p/integration/webhooks/whapi",
-      webhookSecret: "mistle-webhook-secret",
     });
 
     expect(simulatedWhapi.requests).toHaveLength(1);
     expect(simulatedWhapi.requests[0]).toMatchObject({
       body: buildWhapiWebhookSettingsRequestBody({
         webhookCallbackUrl: "https://control-plane.example.com/p/integration/webhooks/whapi",
-        webhookSecret: "mistle-webhook-secret",
       }),
       method: "PATCH",
       url: "/settings",
@@ -152,7 +146,6 @@ describe("Whapi provider configuration setup", () => {
         apiBaseUrl: simulatedWhapi.apiBaseUrl,
         apiToken: "whapi-token",
         webhookCallbackUrl: "https://control-plane.example.com/p/integration/webhooks/whapi",
-        webhookSecret: "mistle-webhook-secret",
       }),
     ).rejects.toThrow("Whapi channel settings update failed with status 400");
   });

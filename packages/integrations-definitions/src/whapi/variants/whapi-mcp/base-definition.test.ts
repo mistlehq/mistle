@@ -79,7 +79,7 @@ describe("WhapiMcpBaseDefinition", () => {
     ).toEqual([]);
   });
 
-  it("explains the API token and webhook secret boundaries", () => {
+  it("sets up Whapi with the API token and provider webhook configuration", () => {
     const apiKeyMethod = WhapiMcpBaseDefinition.connectionMethods.find(
       (method) => method.id === "api-key",
     );
@@ -89,39 +89,21 @@ describe("WhapiMcpBaseDefinition", () => {
       createBehavior: "draft-then-setup",
       setupFlow: {
         completionRequirements: {
-          kind: "all-of",
-          allOf: [
-            {
-              kind: "secret-field",
-              field: "apiToken",
-            },
-            {
-              kind: "secret-field",
-              field: "webhookSecret",
-            },
-          ],
+          kind: "secret-field",
+          field: "apiToken",
         },
         providerConfigurationSetup: {
           webhookCallback: {
             label: "Webhook URL",
           },
           instructions: {
-            items: expect.arrayContaining([
-              expect.stringContaining("x-whapi-webhook-secret"),
-              expect.stringContaining("Update channel settings API"),
-            ]),
+            items: expect.arrayContaining([expect.stringContaining("webhook URL")]),
           },
           fields: {
             secretFields: expect.arrayContaining([
               expect.objectContaining({
-                name: "webhookSecret",
-                description: expect.stringMatching(
-                  /x-whapi-webhook-secret.*Update channel settings API/,
-                ),
-                generation: {
-                  kind: "random-token",
-                },
-                inputType: "text",
+                name: "apiToken",
+                description: expect.stringContaining("managed egress"),
               }),
             ]),
           },
@@ -135,10 +117,6 @@ describe("WhapiMcpBaseDefinition", () => {
         {
           name: "apiToken",
           description: expect.stringContaining("managed egress"),
-        },
-        {
-          name: "webhookSecret",
-          description: expect.stringContaining("x-whapi-webhook-secret"),
         },
       ],
     });

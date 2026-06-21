@@ -4,7 +4,7 @@ import {
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
-import { WhapiWebhookSecretHeaderName, type WhapiConnectionConfig } from "./auth.js";
+import type { WhapiConnectionConfig } from "./auth.js";
 import { WhapiSupportedWebhookEvents } from "./supported-webhook-events.js";
 import { WhapiApiBaseUrl, type WhapiTargetConfig } from "./target-config-schema.js";
 
@@ -67,7 +67,6 @@ function buildWhapiSettingsErrorMessage(input: {
 
 export function buildWhapiWebhookSettingsRequestBody(input: {
   webhookCallbackUrl: string;
-  webhookSecret: string;
 }): Record<string, unknown> {
   return {
     webhooks: [
@@ -76,9 +75,6 @@ export function buildWhapiWebhookSettingsRequestBody(input: {
           method: eventSetting.method,
           type: eventSetting.type,
         })),
-        headers: {
-          [WhapiWebhookSecretHeaderName]: input.webhookSecret,
-        },
         mode: "body",
         url: input.webhookCallbackUrl,
       },
@@ -90,7 +86,6 @@ export async function configureWhapiChannelWebhook(input: {
   apiBaseUrl: string;
   apiToken: string;
   webhookCallbackUrl: string;
-  webhookSecret: string;
 }): Promise<void> {
   const response = await fetch(new URL("/settings", input.apiBaseUrl), {
     method: "PATCH",
@@ -102,7 +97,6 @@ export async function configureWhapiChannelWebhook(input: {
     body: JSON.stringify(
       buildWhapiWebhookSettingsRequestBody({
         webhookCallbackUrl: input.webhookCallbackUrl,
-        webhookSecret: input.webhookSecret,
       }),
     ),
   });
@@ -152,11 +146,6 @@ export const WhapiProviderConfigurationSetupCapability: IntegrationProviderConfi
             label: "an API token",
           }),
           webhookCallbackUrl: input.webhookCallbackUrl,
-          webhookSecret: resolveWhapiSetupSecret({
-            connectionSecrets: input.connectionSecrets,
-            fieldName: "webhookSecret",
-            label: "a webhook secret",
-          }),
         });
       },
     },
