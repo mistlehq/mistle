@@ -727,6 +727,11 @@ export type IntegrationFormConnectionMethodProviderConfigurationSetupConfigField
 
 export type IntegrationFormConnectionMethodProviderConfigurationSetupSecretField = {
   description?: string | undefined;
+  generation?:
+    | {
+        kind: "random-token";
+      }
+    | undefined;
   inputType: "password" | "text" | "textarea";
   label: string;
   name: string;

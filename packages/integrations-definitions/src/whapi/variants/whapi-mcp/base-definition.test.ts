@@ -86,6 +86,46 @@ describe("WhapiMcpBaseDefinition", () => {
 
     expect(apiKeyMethod).toMatchObject({
       kind: "form",
+      createBehavior: "draft-then-setup",
+      setupFlow: {
+        completionRequirements: {
+          kind: "all-of",
+          allOf: [
+            {
+              kind: "secret-field",
+              field: "apiToken",
+            },
+            {
+              kind: "secret-field",
+              field: "webhookSecret",
+            },
+          ],
+        },
+        providerConfigurationSetup: {
+          webhookCallback: {
+            label: "Webhook URL",
+          },
+          instructions: {
+            items: expect.arrayContaining([expect.stringContaining("x-whapi-webhook-secret")]),
+          },
+          fields: {
+            secretFields: expect.arrayContaining([
+              expect.objectContaining({
+                name: "webhookSecret",
+                description: expect.stringContaining("x-whapi-webhook-secret"),
+                generation: {
+                  kind: "random-token",
+                },
+                inputType: "text",
+              }),
+            ]),
+          },
+        },
+        routeSegment: "provider-configuration",
+        setupPane: {
+          kind: "provider-configuration",
+        },
+      },
       secretFields: [
         {
           name: "apiToken",

@@ -1,5 +1,6 @@
 import {
   IntegrationConnectionMethodIds,
+  IntegrationFormConnectionMethodCreateBehaviors,
   IntegrationKinds,
   IntegrationMcpTransports,
   type IntegrationDefinition,
@@ -45,6 +46,80 @@ export const WhapiMcpBaseDefinition: WhapiMcpBaseIntegrationDefinition = {
       id: IntegrationConnectionMethodIds.API_KEY,
       label: "API token",
       kind: "form",
+      createBehavior: IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP,
+      setupFlow: {
+        completionRequirements: {
+          kind: "all-of",
+          allOf: [
+            {
+              kind: "secret-field",
+              field: "apiToken",
+            },
+            {
+              kind: "secret-field",
+              field: "webhookSecret",
+            },
+          ],
+        },
+        providerConfigurationSetup: {
+          title: "Set up Whapi",
+          description:
+            "Create or update a Whapi channel webhook with the Mistle webhook URL, then save the API token and webhook secret.",
+          webhookCallback: {
+            title: "Webhook callback",
+            description: "Copy this URL into the webhook URL field in Whapi channel settings.",
+            label: "Webhook URL",
+            errorTitle: "Could not load webhook URL",
+            missingTitle: "Webhook URL is not available yet",
+            missingMessage:
+              "Whapi setup requires a webhook URL, but this connection does not have one yet.",
+          },
+          instructions: {
+            title: "Whapi setup",
+            items: [
+              "Open the Whapi channel settings for the WhatsApp channel.",
+              "Paste the Mistle webhook URL into the webhook URL field.",
+              "Configure a custom callback header named x-whapi-webhook-secret with the Mistle webhook secret.",
+              "Enable the webhook events this connection should receive, then save the API token and Mistle webhook secret.",
+            ],
+          },
+          fields: {
+            title: "Whapi credentials",
+            description:
+              "Save the API token for managed egress and the Mistle-generated webhook secret configured as the Whapi custom callback header.",
+            saveLabel: "Save Whapi setup",
+            saveErrorMessage: "Could not save Whapi setup.",
+            configFields: [],
+            secretFields: [
+              {
+                name: "apiToken",
+                label: "API token",
+                placeholder: "Enter API token",
+                description: "Whapi API token used through managed egress.",
+                inputType: "password",
+                required: true,
+                secretLabel: "API token",
+              },
+              {
+                name: "webhookSecret",
+                label: "Mistle webhook secret",
+                description:
+                  "Copy this value into Whapi as the x-whapi-webhook-secret custom callback header.",
+                generation: {
+                  kind: "random-token",
+                },
+                inputType: "text",
+                required: true,
+                secretLabel: "webhook secret",
+              },
+            ],
+          },
+        },
+        routeSegment: "provider-configuration",
+        setupPane: {
+          kind: "provider-configuration",
+        },
+      },
       secretFields: [
         {
           name: "apiToken",

@@ -425,6 +425,7 @@ function cloneProviderConfigurationSetup(
       saveLabel: setup.fields.saveLabel,
       secretFields: setup.fields.secretFields.map((field) => ({
         ...(field.description === undefined ? {} : { description: field.description }),
+        ...(field.generation === undefined ? {} : { generation: { kind: field.generation.kind } }),
         inputType: field.inputType,
         label: field.label,
         name: field.name,

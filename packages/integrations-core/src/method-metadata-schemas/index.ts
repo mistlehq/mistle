@@ -357,6 +357,12 @@ const IntegrationFormConnectionMethodProviderConfigurationSetupSchema: z.ZodType
             z
               .object({
                 description: z.string().min(1).optional(),
+                generation: z
+                  .object({
+                    kind: z.literal("random-token"),
+                  })
+                  .strict()
+                  .optional(),
                 inputType: z.enum(["password", "text", "textarea"]),
                 label: z.string().min(1),
                 name: z.string().min(1),

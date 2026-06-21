@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import type { IntegrationFormConnectionMethodProviderConfigurationSetup } from "@mistle/integrations-core";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router";
@@ -13,6 +14,10 @@ import type {
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
+import {
+  buildProviderConfigurationSetupSecrets,
+  createInitialProviderConfigurationSetupDraft,
+} from "./integration-connection-provider-configuration-setup-pane.js";
 import { IntegrationConnectionSetupPage } from "./integration-connection-setup-page.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
@@ -218,6 +223,51 @@ const WasenderTarget: IntegrationTarget = {
             },
           ],
         },
+        providerConfigurationSetup: {
+          title: "Set up WasenderAPI",
+          description: "Configure the WasenderAPI session webhook and credentials.",
+          webhookCallback: {
+            title: "Webhook callback",
+            description: "Copy this URL into the Webhook URL field in WasenderAPI.",
+            label: "Webhook URL",
+            errorTitle: "Could not load webhook URL",
+            missingTitle: "Webhook URL is not available yet",
+            missingMessage:
+              "WasenderAPI setup requires a webhook URL, but this connection does not have one yet.",
+          },
+          instructions: {
+            title: "WasenderAPI setup",
+            items: [
+              "Create or edit a WhatsApp session in WasenderAPI.",
+              "Paste the Mistle webhook URL into the session Webhook URL field.",
+            ],
+          },
+          fields: {
+            title: "WasenderAPI credentials",
+            description: "Save the WasenderAPI credentials.",
+            saveLabel: "Save WasenderAPI setup",
+            saveErrorMessage: "Could not save WasenderAPI setup.",
+            configFields: [],
+            secretFields: [
+              {
+                name: "personalAccessToken",
+                label: "Personal access token",
+                placeholder: "Enter personal access token",
+                inputType: "password",
+                required: true,
+                secretLabel: "personal access token",
+              },
+              {
+                name: "webhookSecret",
+                label: "Webhook secret",
+                placeholder: "Enter webhook secret",
+                inputType: "password",
+                required: true,
+                secretLabel: "webhook secret",
+              },
+            ],
+          },
+        },
       },
       secretFields: [
         {
@@ -267,6 +317,149 @@ const WasenderWebhookSource: IntegrationWebhookSource = {
   createdAt: "2026-04-23T00:00:00.000Z",
   updatedAt: "2026-04-23T00:00:00.000Z",
 };
+
+const WhapiTarget: IntegrationTarget = {
+  targetKey: "whapi-mcp",
+  familyId: "whapi",
+  variantId: "whapi-mcp",
+  kind: "connector",
+  enabled: true,
+  config: {},
+  displayName: "Whapi",
+  description: "Whapi integration",
+  connectionMethods: [
+    {
+      id: "api-key",
+      label: "API token",
+      kind: "form",
+      createBehavior: "draft-then-setup",
+      setupFlow: {
+        routeSegment: "provider-configuration",
+        setupPane: {
+          kind: "provider-configuration",
+        },
+        completionRequirements: {
+          kind: "all-of",
+          allOf: [
+            {
+              kind: "secret-field",
+              field: "apiToken",
+            },
+            {
+              kind: "secret-field",
+              field: "webhookSecret",
+            },
+          ],
+        },
+        providerConfigurationSetup: {
+          title: "Set up Whapi",
+          description: "Configure the Whapi channel webhook and credentials.",
+          webhookCallback: {
+            title: "Webhook callback",
+            description: "Copy this URL into the webhook URL field in Whapi channel settings.",
+            label: "Webhook URL",
+            errorTitle: "Could not load webhook URL",
+            missingTitle: "Webhook URL is not available yet",
+            missingMessage:
+              "Whapi setup requires a webhook URL, but this connection does not have one yet.",
+          },
+          instructions: {
+            title: "Whapi setup",
+            items: [
+              "Paste the Mistle webhook URL into the webhook URL field.",
+              "Configure a custom callback header named x-whapi-webhook-secret with the Mistle webhook secret.",
+            ],
+          },
+          fields: {
+            title: "Whapi credentials",
+            description: "Save the Whapi credentials.",
+            saveLabel: "Save Whapi setup",
+            saveErrorMessage: "Could not save Whapi setup.",
+            configFields: [],
+            secretFields: [
+              {
+                name: "apiToken",
+                label: "API token",
+                placeholder: "Enter API token",
+                inputType: "password",
+                required: true,
+                secretLabel: "API token",
+              },
+              {
+                name: "webhookSecret",
+                label: "Mistle webhook secret",
+                description:
+                  "Copy this value into Whapi as the x-whapi-webhook-secret custom callback header.",
+                generation: {
+                  kind: "random-token",
+                },
+                inputType: "text",
+                required: true,
+                secretLabel: "webhook secret",
+              },
+            ],
+          },
+        },
+      },
+      secretFields: [
+        {
+          name: "apiToken",
+          label: "API token",
+          inputType: "password",
+        },
+        {
+          name: "webhookSecret",
+          label: "Webhook secret",
+          inputType: "password",
+        },
+      ],
+    },
+  ],
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+const IncompleteWhapiConnection: IntegrationConnection = {
+  id: "icn_whapi_incomplete",
+  targetKey: "whapi-mcp",
+  displayName: "Whapi Production",
+  status: "active",
+  connectionMethodId: "api-key",
+  connectionMethodLabel: "API token",
+  config: {
+    connection_method: "api-key",
+  },
+  createdAt: "2026-04-23T00:00:00.000Z",
+  updatedAt: "2026-04-23T00:00:00.000Z",
+};
+
+const WhapiWebhookCallbackUrl =
+  "https://control-plane.example.com/p/integration/webhooks/whapi-mcp/eps_whapi_setup";
+
+const WhapiWebhookSource: IntegrationWebhookSource = {
+  id: "iws_whapi_setup",
+  targetKey: "whapi-mcp",
+  integrationConnectionId: IncompleteWhapiConnection.id,
+  displayName: "Whapi webhook",
+  endpointKey: "eps_whapi_setup",
+  callbackUrl: WhapiWebhookCallbackUrl,
+  status: "active",
+  providerMetadata: {},
+  createdAt: "2026-04-23T00:00:00.000Z",
+  updatedAt: "2026-04-23T00:00:00.000Z",
+};
+
+function getWhapiProviderConfigurationSetup(): IntegrationFormConnectionMethodProviderConfigurationSetup {
+  const method = WhapiTarget.connectionMethods?.find((candidate) => candidate.id === "api-key");
+  const providerConfigurationSetup =
+    method?.kind === "form" ? method.setupFlow?.providerConfigurationSetup : undefined;
+  if (providerConfigurationSetup === undefined) {
+    throw new Error("Whapi test target is missing provider configuration setup.");
+  }
+
+  return providerConfigurationSetup;
+}
 
 function LocationProbe(): React.JSX.Element {
   const location = useLocation();
@@ -466,6 +659,72 @@ describe("IntegrationConnectionSetupPage", () => {
     expect(screen.getByText("Webhook secret")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save WasenderAPI setup" })).toBeTruthy();
     expect(screen.queryByText("Could not load setup")).toBeNull();
+  });
+
+  it("renders generated provider configuration secrets as copyable values", async () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+      targets: [WhapiTarget],
+      connections: [IncompleteWhapiConnection],
+    });
+    queryClient.setQueryData(
+      ["integration-webhook-sources", IncompleteWhapiConnection.id],
+      [WhapiWebhookSource],
+    );
+    seedAuthenticatedSession(queryClient);
+    seedOrganizationSummaryError({ queryClient });
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/integrations/:targetKey/:connectionId/:setupRouteSegment/setup",
+          element: <IntegrationConnectionSetupPage />,
+        },
+      ],
+      {
+        initialEntries: [
+          "/integrations/whapi-mcp/icn_whapi_incomplete/provider-configuration/setup",
+        ],
+      },
+    );
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Set up Whapi" })).toBeTruthy();
+    });
+    expect(screen.getByText(WhapiWebhookCallbackUrl)).toBeTruthy();
+    expect(screen.getByText(/^([0-9a-f]{64})$/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy Mistle webhook secret" })).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Enter webhook secret")).toBeNull();
+    expect(screen.getByRole("button", { name: "Save Whapi setup" })).toBeTruthy();
+  });
+
+  it("includes generated provider configuration secrets in the setup save payload", () => {
+    const setup = getWhapiProviderConfigurationSetup();
+    const draft = createInitialProviderConfigurationSetupDraft({
+      connection: IncompleteWhapiConnection,
+      setup,
+    });
+    const secrets = buildProviderConfigurationSetupSecrets({
+      draft: {
+        ...draft,
+        apiToken: "whapi-api-token",
+      },
+      setup,
+    });
+
+    expect(draft.webhookSecret).toMatch(/^([0-9a-f]{64})$/);
+    expect(secrets).toEqual({
+      apiToken: "whapi-api-token",
+      webhookSecret: draft.webhookSecret,
+    });
   });
 
   it("renders the post-manifest GitHub install screen without requiring the organization summary", async () => {

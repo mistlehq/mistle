@@ -1,5 +1,5 @@
 import type { IntegrationFormConnectionMethodProviderConfigurationSetup } from "@mistle/integrations-core";
-import { Button, Notice } from "@mistle/ui";
+import { Button, CopyableValue, Notice } from "@mistle/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -31,11 +31,12 @@ function noop(): void {
   return;
 }
 
-function createInitialProviderConfigurationSetupDraft(input: {
+export function createInitialProviderConfigurationSetupDraft(input: {
   connection: IntegrationConnection;
   setup: IntegrationFormConnectionMethodProviderConfigurationSetup;
 }): Record<string, string> {
   const draft: Record<string, string> = {};
+  const configuredSecretNames = new Set(input.connection.configuredSecretNames ?? []);
 
   for (const field of input.setup.fields.configFields) {
     const value = input.connection.config?.[field.configKey];
@@ -43,7 +44,10 @@ function createInitialProviderConfigurationSetupDraft(input: {
   }
 
   for (const field of input.setup.fields.secretFields) {
-    draft[field.name] = "";
+    draft[field.name] =
+      field.generation?.kind === "random-token" && !configuredSecretNames.has(field.name)
+        ? generateRandomSecretToken()
+        : "";
   }
 
   return draft;
@@ -84,7 +88,7 @@ function buildProviderConfigurationSetupConfig(input: {
   return config;
 }
 
-function buildProviderConfigurationSetupSecrets(input: {
+export function buildProviderConfigurationSetupSecrets(input: {
   draft: Record<string, string>;
   setup: IntegrationFormConnectionMethodProviderConfigurationSetup;
 }): Record<string, string> | undefined {
@@ -138,6 +142,12 @@ function renderInputType(
   }
 
   return inputType;
+}
+
+function generateRandomSecretToken(): string {
+  const bytes = new Uint8Array(32);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 export function ProviderConfigurationSetupPane(input: {
@@ -280,31 +290,53 @@ export function ProviderConfigurationSetupPane(input: {
                 {...(field.rows === undefined ? {} : { rows: field.rows })}
               />
             ))}
-            {setup.fields.secretFields.map((field) => (
-              <ConfiguredSecretField
-                confirmReplacement={false}
-                configured={configuredSecretFieldKeys.has(field.name)}
-                fieldState={fieldState}
-                id={`provider-configuration-${input.connection.id}-${field.name}`}
-                key={field.name}
-                label={field.label}
-                multiline={field.inputType === "textarea"}
-                onChange={(nextValue) => {
-                  setActionErrorMessage(null);
-                  setDraft((currentDraft) => ({
-                    ...currentDraft,
-                    [field.name]: nextValue,
-                  }));
-                }}
-                required={field.required}
-                secretLabel={field.secretLabel}
-                type={renderInputType(field.inputType)}
-                value={draft[field.name] ?? ""}
-                {...(field.description === undefined ? {} : { description: field.description })}
-                {...(field.placeholder === undefined ? {} : { placeholder: field.placeholder })}
-                {...(field.rows === undefined ? {} : { rows: field.rows })}
-              />
-            ))}
+            {setup.fields.secretFields.map((field) => {
+              const fieldId = `provider-configuration-${input.connection.id}-${field.name}`;
+              const fieldValue = draft[field.name] ?? "";
+              const fieldConfigured = configuredSecretFieldKeys.has(field.name);
+
+              if (field.generation?.kind === "random-token" && !fieldConfigured) {
+                return (
+                  <div className="flex flex-col gap-1.5" key={field.name}>
+                    <CopyableValue
+                      copyAriaLabel={`Copy ${field.label}`}
+                      copyTitle={`Copy ${field.label}`}
+                      label={field.label}
+                      value={fieldValue}
+                    />
+                    {field.description === undefined ? null : (
+                      <p className="text-muted-foreground text-sm">{field.description}</p>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <ConfiguredSecretField
+                  confirmReplacement={false}
+                  configured={fieldConfigured}
+                  fieldState={fieldState}
+                  id={fieldId}
+                  key={field.name}
+                  label={field.label}
+                  multiline={field.inputType === "textarea"}
+                  onChange={(nextValue) => {
+                    setActionErrorMessage(null);
+                    setDraft((currentDraft) => ({
+                      ...currentDraft,
+                      [field.name]: nextValue,
+                    }));
+                  }}
+                  required={field.required}
+                  secretLabel={field.secretLabel}
+                  type={renderInputType(field.inputType)}
+                  value={fieldValue}
+                  {...(field.description === undefined ? {} : { description: field.description })}
+                  {...(field.placeholder === undefined ? {} : { placeholder: field.placeholder })}
+                  {...(field.rows === undefined ? {} : { rows: field.rows })}
+                />
+              );
+            })}
           </div>
 
           {actionErrorMessage === null ? null : (
