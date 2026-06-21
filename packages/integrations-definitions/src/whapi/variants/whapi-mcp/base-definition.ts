@@ -79,7 +79,7 @@ export const WhapiMcpBaseDefinition: WhapiMcpBaseIntegrationDefinition = {
             items: [
               "Open the Whapi channel settings for the WhatsApp channel.",
               "Paste the Mistle webhook URL into the webhook URL field.",
-              "Configure a custom callback header named x-whapi-webhook-secret with the Mistle webhook secret.",
+              "Configure a custom callback header named x-whapi-webhook-secret with the Mistle webhook secret. If Whapi Cloud does not show custom callback headers in the channel settings UI, use the Whapi Update channel settings API to set webhooks[].headers.",
               "Enable the webhook events this connection should receive, then save the API token and Mistle webhook secret.",
             ],
           },
@@ -104,7 +104,7 @@ export const WhapiMcpBaseDefinition: WhapiMcpBaseIntegrationDefinition = {
                 name: "webhookSecret",
                 label: "Mistle webhook secret",
                 description:
-                  "Copy this value into Whapi as the x-whapi-webhook-secret custom callback header.",
+                  "Copy this value into Whapi as the x-whapi-webhook-secret custom callback header. Configure it through the Whapi Update channel settings API if the Cloud UI does not show custom callback headers.",
                 generation: {
                   kind: "random-token",
                 },

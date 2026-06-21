@@ -106,13 +106,18 @@ describe("WhapiMcpBaseDefinition", () => {
             label: "Webhook URL",
           },
           instructions: {
-            items: expect.arrayContaining([expect.stringContaining("x-whapi-webhook-secret")]),
+            items: expect.arrayContaining([
+              expect.stringContaining("x-whapi-webhook-secret"),
+              expect.stringContaining("Update channel settings API"),
+            ]),
           },
           fields: {
             secretFields: expect.arrayContaining([
               expect.objectContaining({
                 name: "webhookSecret",
-                description: expect.stringContaining("x-whapi-webhook-secret"),
+                description: expect.stringMatching(
+                  /x-whapi-webhook-secret.*Update channel settings API/,
+                ),
                 generation: {
                   kind: "random-token",
                 },
