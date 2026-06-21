@@ -221,6 +221,10 @@ const WasenderTarget: IntegrationTarget = {
               kind: "secret-field",
               field: "webhookSecret",
             },
+            {
+              kind: "config-field",
+              field: "provider_configuration_setup_completed",
+            },
           ],
         },
         providerConfigurationSetup: {
@@ -339,15 +343,25 @@ const WhapiTarget: IntegrationTarget = {
           kind: "provider-configuration",
         },
         completionRequirements: {
-          kind: "secret-field",
-          field: "apiToken",
+          kind: "all-of",
+          allOf: [
+            {
+              kind: "secret-field",
+              field: "apiToken",
+            },
+            {
+              kind: "config-field",
+              field: "provider_configuration_setup_completed",
+            },
+          ],
         },
         providerConfigurationSetup: {
           title: "Set up Whapi",
-          description: "Configure the Whapi channel webhook and credentials.",
+          description:
+            "Save the API token so Mistle can configure this channel's webhook with the displayed callback URL.",
           webhookCallback: {
             title: "Webhook callback",
-            description: "Copy this URL into the webhook URL field in Whapi channel settings.",
+            description: "Mistle registers this callback URL in Whapi channel settings.",
             label: "Webhook URL",
             errorTitle: "Could not load webhook URL",
             missingTitle: "Webhook URL is not available yet",
@@ -357,8 +371,8 @@ const WhapiTarget: IntegrationTarget = {
           instructions: {
             title: "Whapi setup",
             items: [
-              "Paste the Mistle webhook URL into the webhook URL field.",
-              "Enable the webhook events this connection should receive.",
+              "Enter the Whapi API token for the WhatsApp channel.",
+              "Save setup so Mistle can register the webhook URL and supported events in Whapi.",
             ],
           },
           fields: {
@@ -674,6 +688,11 @@ describe("IntegrationConnectionSetupPage", () => {
       expect(screen.getByRole("heading", { name: "Set up Whapi" })).toBeTruthy();
     });
     expect(screen.getByText(WhapiWebhookCallbackUrl)).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Save setup so Mistle can register the webhook URL and supported events in Whapi.",
+      ),
+    ).toBeTruthy();
     expect(screen.queryByPlaceholderText("Enter webhook secret")).toBeNull();
     expect(screen.getByPlaceholderText("Enter API token")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save Whapi setup" })).toBeTruthy();

@@ -3,6 +3,7 @@ import {
   IntegrationFormConnectionMethodCreateBehaviors,
   IntegrationKinds,
   IntegrationMcpTransports,
+  ProviderConfigurationSetupCompletedConfigKey,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 
@@ -53,16 +54,25 @@ export const WhapiMcpBaseDefinition: WhapiMcpBaseIntegrationDefinition = {
       createBehavior: IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP,
       setupFlow: {
         completionRequirements: {
-          kind: "secret-field",
-          field: "apiToken",
+          kind: "all-of",
+          allOf: [
+            {
+              kind: "secret-field",
+              field: "apiToken",
+            },
+            {
+              kind: "config-field",
+              field: ProviderConfigurationSetupCompletedConfigKey,
+            },
+          ],
         },
         providerConfigurationSetup: {
           title: "Set up Whapi",
           description:
-            "Create or update a Whapi channel webhook with the Mistle webhook URL, then save the API token.",
+            "Save the API token so Mistle can configure this channel's webhook with the displayed callback URL.",
           webhookCallback: {
             title: "Webhook callback",
-            description: "Copy this URL into the webhook URL field in Whapi channel settings.",
+            description: "Mistle registers this callback URL in Whapi channel settings.",
             label: "Webhook URL",
             errorTitle: "Could not load webhook URL",
             missingTitle: "Webhook URL is not available yet",
@@ -72,9 +82,8 @@ export const WhapiMcpBaseDefinition: WhapiMcpBaseIntegrationDefinition = {
           instructions: {
             title: "Whapi setup",
             items: [
-              "Open the Whapi channel settings for the WhatsApp channel.",
-              "Paste the Mistle webhook URL into the webhook URL field.",
-              "Enable the webhook events this connection should receive, then save the API token.",
+              "Enter the Whapi API token for the WhatsApp channel.",
+              "Save setup so Mistle can register the webhook URL and supported events in Whapi.",
             ],
           },
           fields: {

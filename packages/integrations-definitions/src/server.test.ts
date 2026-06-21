@@ -397,6 +397,15 @@ describe("integrations-definitions server", () => {
       ],
     });
     expect(wasenderApiDefinition?.mcp).toBeDefined();
+    expect(wasenderApiDefinition?.providerConfigurationSetup).toMatchObject({
+      flows: [
+        {
+          methodId: "api-key",
+          requiresWebhookCallbackUrl: true,
+          routeSegment: "provider-configuration",
+        },
+      ],
+    });
     expect(wasenderApiDefinition?.webhookHandler).toBeDefined();
     expect(wasenderApiDefinition?.webhookSource).toBeDefined();
     const wasenderApiConnectionMethod = wasenderApiDefinition?.connectionMethods.find(
@@ -424,6 +433,15 @@ describe("integrations-definitions server", () => {
       ],
     });
     expect(whapiDefinition?.mcp).toBeDefined();
+    expect(whapiDefinition?.providerConfigurationSetup).toMatchObject({
+      flows: [
+        {
+          methodId: "api-key",
+          requiresWebhookCallbackUrl: true,
+          routeSegment: "provider-configuration",
+        },
+      ],
+    });
     expect(whapiDefinition?.webhookHandler).toBeDefined();
     expect(whapiDefinition?.webhookSource).toBeDefined();
     expect(notionDefinition?.oauth2AuthorizationCode).toBeDefined();

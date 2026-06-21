@@ -17,7 +17,9 @@ describe("WasenderApiSupportedWebhookEvents", () => {
       WasenderApiWebhookEventMetadata.map((metadata) => ({
         eventType: `wasenderapi.${metadata.providerEventType}`,
         providerEventType: metadata.providerEventType,
-        requirements: undefined,
+        requirements: {
+          anyOf: [{ event: metadata.providerEventType }],
+        },
       })),
     );
   });

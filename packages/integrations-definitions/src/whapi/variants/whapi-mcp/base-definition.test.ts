@@ -89,15 +89,28 @@ describe("WhapiMcpBaseDefinition", () => {
       createBehavior: "draft-then-setup",
       setupFlow: {
         completionRequirements: {
-          kind: "secret-field",
-          field: "apiToken",
+          kind: "all-of",
+          allOf: [
+            {
+              kind: "secret-field",
+              field: "apiToken",
+            },
+            {
+              kind: "config-field",
+              field: "provider_configuration_setup_completed",
+            },
+          ],
         },
         providerConfigurationSetup: {
           webhookCallback: {
+            description: "Mistle registers this callback URL in Whapi channel settings.",
             label: "Webhook URL",
           },
           instructions: {
-            items: expect.arrayContaining([expect.stringContaining("webhook URL")]),
+            items: [
+              "Enter the Whapi API token for the WhatsApp channel.",
+              "Save setup so Mistle can register the webhook URL and supported events in Whapi.",
+            ],
           },
           fields: {
             secretFields: expect.arrayContaining([

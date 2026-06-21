@@ -1040,6 +1040,9 @@ export type IntegrationFormConnectionMethodSetupCompletionRequirementLeaf =
       kind: "secret-field";
     };
 
+export const ProviderConfigurationSetupCompletedConfigKey =
+  "provider_configuration_setup_completed";
+
 export type IntegrationFormConnectionMethodSetupCompletionRequirement =
   | IntegrationFormConnectionMethodSetupCompletionRequirementLeaf
   | {

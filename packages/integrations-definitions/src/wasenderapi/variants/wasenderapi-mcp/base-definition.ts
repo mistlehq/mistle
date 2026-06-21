@@ -3,6 +3,7 @@ import {
   IntegrationFormConnectionMethodCreateBehaviors,
   IntegrationKinds,
   IntegrationMcpTransports,
+  ProviderConfigurationSetupCompletedConfigKey,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 
@@ -59,6 +60,10 @@ export const WasenderApiBaseDefinition: WasenderApiBaseIntegrationDefinition = {
             {
               kind: "secret-field",
               field: "webhookSecret",
+            },
+            {
+              kind: "config-field",
+              field: ProviderConfigurationSetupCompletedConfigKey,
             },
           ],
         },

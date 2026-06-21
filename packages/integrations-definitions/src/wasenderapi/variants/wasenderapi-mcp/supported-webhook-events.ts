@@ -579,6 +579,9 @@ function createWasenderApiWebhookEventDefinition(
     providerEventType: input.providerEventType,
     displayName: input.displayName,
     category: input.category,
+    requirements: {
+      anyOf: [{ event: input.providerEventType }],
+    },
     payloadReferences: input.payloadReferences,
     ...(input.conversationKeyOptions === undefined
       ? {}

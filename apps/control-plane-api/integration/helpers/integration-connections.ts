@@ -85,6 +85,28 @@ export async function createFormConnection(input: {
   );
 }
 
+export async function createDraftFormConnection(input: {
+  env: IntegrationTestEnvironment;
+  targetKey: string;
+  methodId: string;
+  cookie: string;
+  body: unknown;
+}) {
+  return input.env.controlPlaneApi.http.fetch(
+    `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/${encodeURIComponent(
+      input.methodId,
+    )}/draft`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: input.cookie,
+      },
+      body: JSON.stringify(input.body),
+    },
+  );
+}
+
 export async function updateFormConnection(input: {
   env: IntegrationTestEnvironment;
   connectionId: string;

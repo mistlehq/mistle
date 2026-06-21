@@ -1,4 +1,7 @@
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import {
+  IntegrationConnectionMethodIds,
+  ProviderConfigurationSetupCompletedConfigKey,
+} from "@mistle/integrations-core";
 import { z } from "zod";
 
 export const WhapiFamilyId = "whapi";
@@ -15,6 +18,7 @@ export const WhapiCredentialSlotKeys = {
 export const WhapiConnectionConfigSchema = z
   .object({
     connection_method: z.literal(IntegrationConnectionMethodIds.API_KEY),
+    [ProviderConfigurationSetupCompletedConfigKey]: z.string().min(1).optional(),
   })
   .strict();
 

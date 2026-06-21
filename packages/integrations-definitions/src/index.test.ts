@@ -757,6 +757,10 @@ describe("integrations-definitions index", () => {
                   kind: "secret-field",
                   field: "webhookSecret",
                 },
+                {
+                  kind: "config-field",
+                  field: "provider_configuration_setup_completed",
+                },
               ],
             },
             routeSegment: "provider-configuration",
@@ -819,18 +823,27 @@ describe("integrations-definitions index", () => {
           id: "api-key",
           label: "API token",
           kind: "form",
+          setupFlow: {
+            completionRequirements: {
+              kind: "all-of",
+              allOf: [
+                {
+                  kind: "secret-field",
+                  field: "apiToken",
+                },
+                {
+                  kind: "config-field",
+                  field: "provider_configuration_setup_completed",
+                },
+              ],
+            },
+          },
           secretFields: [
             {
               name: "apiToken",
               label: "API token",
               inputType: "password",
               slotKey: "whapi.whapi-mcp.api-key.api-token",
-            },
-            {
-              name: "webhookSecret",
-              label: "Webhook secret",
-              inputType: "password",
-              slotKey: "whapi.whapi-mcp.api-key.webhook-secret",
             },
           ],
         },

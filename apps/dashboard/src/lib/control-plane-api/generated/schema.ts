@@ -5216,11 +5216,64 @@ export interface paths {
                             };
                           };
                         };
-                        routeSegment: string;
-                        setupPane?: {
-                          /** @enum {string} */
-                          kind: "provider-app";
+                        providerConfigurationSetup?: {
+                          description: string;
+                          fields: {
+                            configFields: {
+                              configKey: string;
+                              description?: string;
+                              /** @enum {string} */
+                              inputType: "text" | "textarea";
+                              label: string;
+                              name: string;
+                              placeholder?: string;
+                              required: boolean;
+                              rows?: number;
+                            }[];
+                            description: string;
+                            saveErrorMessage: string;
+                            saveLabel: string;
+                            secretFields: {
+                              description?: string;
+                              generation?: {
+                                /** @enum {string} */
+                                kind: "random-token";
+                              };
+                              /** @enum {string} */
+                              inputType: "password" | "text" | "textarea";
+                              label: string;
+                              name: string;
+                              placeholder?: string;
+                              required: boolean;
+                              rows?: number;
+                              secretLabel: string;
+                            }[];
+                            title: string;
+                          };
+                          instructions: {
+                            items: string[];
+                            title: string;
+                          };
+                          title: string;
+                          webhookCallback: {
+                            description: string;
+                            errorTitle: string;
+                            label: string;
+                            missingMessage: string;
+                            missingTitle: string;
+                            title: string;
+                          };
                         };
+                        routeSegment: string;
+                        setupPane?:
+                          | {
+                              /** @enum {string} */
+                              kind: "provider-app";
+                            }
+                          | {
+                              /** @enum {string} */
+                              kind: "provider-configuration";
+                            };
                         startForm?: {
                           fields: {
                             actions?: {

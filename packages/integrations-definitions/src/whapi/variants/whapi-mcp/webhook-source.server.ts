@@ -9,7 +9,7 @@ import { WhapiConnectionConfigSchema, type WhapiConnectionConfig } from "./auth.
 import {
   buildWhapiWebhookTriggerCapabilitiesProviderMetadata,
   loadWhapiChannelSettings,
-} from "./provider-configuration-setup.server.js";
+} from "./channel-settings.server.js";
 import { WhapiApiBaseUrl } from "./target-config-schema.js";
 import type { WhapiTargetConfig } from "./target-config-schema.js";
 
