@@ -121,5 +121,9 @@ describe("WhapiMcpBaseDefinition", () => {
       ],
     });
     expect(apiKeyMethod?.configForm).toBe(WhapiConnectionConfigForm);
+    expect(WhapiMcpBaseDefinition.webhookTriggerCapabilitiesRefreshUi).toEqual({
+      actionLabel: "Sync webhook events",
+      pendingLabel: "Syncing...",
+    });
   });
 });

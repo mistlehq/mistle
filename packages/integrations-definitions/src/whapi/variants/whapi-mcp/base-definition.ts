@@ -41,6 +41,10 @@ export const WhapiMcpBaseDefinition: WhapiMcpBaseIntegrationDefinition = {
   bindingConfigSchema: WhapiBindingConfigSchema,
   bindingConfigForm: resolveWhapiBindingConfigForm,
   supportedWebhookEvents: WhapiSupportedWebhookEvents,
+  webhookTriggerCapabilitiesRefreshUi: {
+    actionLabel: "Sync webhook events",
+    pendingLabel: "Syncing...",
+  },
   connectionMethods: [
     {
       id: IntegrationConnectionMethodIds.API_KEY,

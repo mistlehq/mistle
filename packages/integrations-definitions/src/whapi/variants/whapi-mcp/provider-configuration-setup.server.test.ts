@@ -1,8 +1,10 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
+import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "@mistle/integrations-core";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  buildWhapiWebhookTriggerCapabilitiesProviderMetadata,
   buildWhapiWebhookSettingsRequestBody,
   configureWhapiChannelWebhook,
 } from "./provider-configuration-setup.server.js";
@@ -34,8 +36,10 @@ async function readRequestBody(request: IncomingMessage): Promise<string> {
 
 async function startSimulatedWhapiApi(
   input: {
-    statusCode?: number;
-    responseBody?: Record<string, unknown>;
+    getResponseBody?: Record<string, unknown>;
+    getStatusCode?: number;
+    patchResponseBody?: Record<string, unknown>;
+    patchStatusCode?: number;
   } = {},
 ): Promise<SimulatedWhapiServer> {
   const requests: SimulatedWhapiRequest[] = [];
@@ -48,9 +52,18 @@ async function startSimulatedWhapiApi(
       url: request.url,
     });
 
-    response.statusCode = input.statusCode ?? 200;
+    // WHAPI documents PATCH /settings for channel settings updates and GET /settings
+    // for reading the current channel settings:
+    // https://whapi.readme.io/reference/updatechannelsettings
+    // https://whapi.readme.io/reference/getchannelsettings
+    const responseBody =
+      request.method === "GET"
+        ? (input.getResponseBody ?? { webhooks: [] })
+        : (input.patchResponseBody ?? { ok: true });
+    response.statusCode =
+      request.method === "GET" ? (input.getStatusCode ?? 200) : (input.patchStatusCode ?? 200);
     response.setHeader("content-type", "application/json");
-    response.end(JSON.stringify(input.responseBody ?? { ok: true }));
+    response.end(JSON.stringify(responseBody));
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -112,31 +125,66 @@ describe("Whapi provider configuration setup", () => {
     });
   });
 
+  it("builds trigger capability metadata from WHAPI channel settings", () => {
+    expect(
+      buildWhapiWebhookTriggerCapabilitiesProviderMetadata({
+        settingsJson: {
+          webhooks: [
+            {
+              events: [
+                { method: "post", type: "messages" },
+                { method: "put", type: "messages" },
+              ],
+              mode: "body",
+              url: "https://control-plane.example.com/p/integration/webhooks/whapi",
+            },
+          ],
+        },
+        webhookCallbackUrl: "https://control-plane.example.com/p/integration/webhooks/whapi",
+      }),
+    ).toEqual({
+      [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+        events: ["messages.post", "messages.put"],
+      },
+    });
+  });
+
   it("updates WHAPI channel settings through PATCH /settings", async () => {
-    const simulatedWhapi = await startSimulatedWhapiApi();
+    const webhookCallbackUrl = "https://control-plane.example.com/p/integration/webhooks/whapi";
+    const simulatedWhapi = await startSimulatedWhapiApi({
+      getResponseBody: buildWhapiWebhookSettingsRequestBody({
+        webhookCallbackUrl,
+      }),
+    });
 
     await configureWhapiChannelWebhook({
       apiBaseUrl: simulatedWhapi.apiBaseUrl,
       apiToken: "whapi-token",
-      webhookCallbackUrl: "https://control-plane.example.com/p/integration/webhooks/whapi",
+      webhookCallbackUrl,
     });
 
-    expect(simulatedWhapi.requests).toHaveLength(1);
+    expect(simulatedWhapi.requests).toHaveLength(2);
     expect(simulatedWhapi.requests[0]).toMatchObject({
       body: buildWhapiWebhookSettingsRequestBody({
-        webhookCallbackUrl: "https://control-plane.example.com/p/integration/webhooks/whapi",
+        webhookCallbackUrl,
       }),
       method: "PATCH",
       url: "/settings",
     });
     expect(simulatedWhapi.requests[0]?.headers.authorization).toBe("Bearer whapi-token");
     expect(simulatedWhapi.requests[0]?.headers["content-type"]).toBe("application/json");
+    expect(simulatedWhapi.requests[1]).toMatchObject({
+      body: null,
+      method: "GET",
+      url: "/settings",
+    });
+    expect(simulatedWhapi.requests[1]?.headers.authorization).toBe("Bearer whapi-token");
   });
 
   it("surfaces WHAPI settings update failures", async () => {
     const simulatedWhapi = await startSimulatedWhapiApi({
-      statusCode: 400,
-      responseBody: {
+      patchStatusCode: 400,
+      patchResponseBody: {
         message: "Wrong settings format",
       },
     });
@@ -148,5 +196,65 @@ describe("Whapi provider configuration setup", () => {
         webhookCallbackUrl: "https://control-plane.example.com/p/integration/webhooks/whapi",
       }),
     ).rejects.toThrow("Whapi channel settings update failed with status 400");
+  });
+
+  it("surfaces WHAPI settings read failures", async () => {
+    const simulatedWhapi = await startSimulatedWhapiApi({
+      getStatusCode: 500,
+      getResponseBody: {
+        message: "Settings unavailable",
+      },
+    });
+
+    await expect(
+      configureWhapiChannelWebhook({
+        apiBaseUrl: simulatedWhapi.apiBaseUrl,
+        apiToken: "whapi-token",
+        webhookCallbackUrl: "https://control-plane.example.com/p/integration/webhooks/whapi",
+      }),
+    ).rejects.toThrow("Whapi channel settings read failed with status 500");
+  });
+
+  it("rejects WHAPI settings that do not include the Mistle webhook URL", async () => {
+    const simulatedWhapi = await startSimulatedWhapiApi({
+      getResponseBody: buildWhapiWebhookSettingsRequestBody({
+        webhookCallbackUrl: "https://other.example.com/webhook",
+      }),
+    });
+
+    await expect(
+      configureWhapiChannelWebhook({
+        apiBaseUrl: simulatedWhapi.apiBaseUrl,
+        apiToken: "whapi-token",
+        webhookCallbackUrl: "https://control-plane.example.com/p/integration/webhooks/whapi",
+      }),
+    ).rejects.toThrow(
+      "Whapi channel settings verification failed: webhook URL 'https://control-plane.example.com/p/integration/webhooks/whapi' is not configured.",
+    );
+  });
+
+  it("rejects WHAPI settings that do not include the expected events", async () => {
+    const webhookCallbackUrl = "https://control-plane.example.com/p/integration/webhooks/whapi";
+    const simulatedWhapi = await startSimulatedWhapiApi({
+      getResponseBody: {
+        webhooks: [
+          {
+            events: [{ method: "post", type: "messages" }],
+            mode: "body",
+            url: webhookCallbackUrl,
+          },
+        ],
+      },
+    });
+
+    await expect(
+      configureWhapiChannelWebhook({
+        apiBaseUrl: simulatedWhapi.apiBaseUrl,
+        apiToken: "whapi-token",
+        webhookCallbackUrl,
+      }),
+    ).rejects.toThrow(
+      "Whapi channel settings verification failed: webhook URL 'https://control-plane.example.com/p/integration/webhooks/whapi' is missing expected events: messages.put",
+    );
   });
 });
