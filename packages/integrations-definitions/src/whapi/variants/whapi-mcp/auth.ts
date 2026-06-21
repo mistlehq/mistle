@@ -14,6 +14,8 @@ export const WhapiCredentialSlotKeys = {
   WEBHOOK_SECRET: "whapi.whapi-mcp.api-key.webhook-secret",
 };
 
+export const WhapiWebhookSecretHeaderName = "x-whapi-webhook-secret";
+
 export const WhapiConnectionConfigSchema = z
   .object({
     connection_method: z.literal(IntegrationConnectionMethodIds.API_KEY),

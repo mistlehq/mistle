@@ -982,6 +982,51 @@ export type IntegrationProviderAppSetupCapability<
   >;
 };
 
+export type IntegrationProviderConfigurationSetupCompleteInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  connectionSecrets: Record<string, string>;
+  controlPlaneBaseUrl: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  webhookCallbackUrl?: string | undefined;
+};
+
+export type IntegrationProviderConfigurationSetupFlowCapability<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  complete(
+    input: IntegrationProviderConfigurationSetupCompleteInput<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >,
+  ): MaybePromise<void>;
+  methodId: IntegrationConnectionMethodId;
+  requiresWebhookCallbackUrl?: boolean | undefined;
+  routeSegment: string;
+};
+
+export type IntegrationProviderConfigurationSetupCapability<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  flows: ReadonlyArray<
+    IntegrationProviderConfigurationSetupFlowCapability<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >
+  >;
+};
+
 export type IntegrationFormConnectionMethodSetupCompletionRequirementLeaf =
   | {
       kind: "connection-external-subject";
@@ -2855,6 +2900,11 @@ export type IntegrationDefinition<
     TConnectionConfig
   >;
   providerAppSetup?: IntegrationProviderAppSetupCapability<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    TConnectionConfig
+  >;
+  providerConfigurationSetup?: IntegrationProviderConfigurationSetupCapability<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,
     TConnectionConfig

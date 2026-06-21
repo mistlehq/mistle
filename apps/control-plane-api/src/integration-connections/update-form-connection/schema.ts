@@ -20,6 +20,12 @@ export const UpdateFormConnectionBodySchema = z
   .object({
     displayName: z.string().min(1),
     config: z.record(z.string(), z.unknown()),
+    providerConfigurationSetup: z
+      .object({
+        routeSegment: z.string().min(1),
+      })
+      .strict()
+      .optional(),
     secrets: z.record(z.string(), z.string()).optional(),
   })
   .strict();

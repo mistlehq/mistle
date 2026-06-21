@@ -154,6 +154,7 @@ export function ProviderConfigurationSetupPane(input: {
   connection: IntegrationConnection;
   methodId: string;
   providerConfigurationSetup: IntegrationFormConnectionMethodProviderConfigurationSetup;
+  routeSegment: string;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const setup = input.providerConfigurationSetup;
@@ -189,6 +190,9 @@ export function ProviderConfigurationSetupPane(input: {
           methodId: input.methodId,
           setup,
         }),
+        providerConfigurationSetup: {
+          routeSegment: input.routeSegment,
+        },
         ...(secrets === undefined ? {} : { secrets }),
       });
 

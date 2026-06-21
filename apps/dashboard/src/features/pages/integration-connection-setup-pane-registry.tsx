@@ -55,6 +55,7 @@ function renderProviderConfigurationSetupPane(input: {
         connection: input.connection,
         setupRoute: input.setupRoute,
       })}
+      routeSegment={input.setupRoute.routeSegment}
     />
   );
 }

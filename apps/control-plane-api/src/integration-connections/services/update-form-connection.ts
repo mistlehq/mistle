@@ -10,6 +10,7 @@ import {
   unwrapOrganizationCredentialKey,
 } from "../../lib/crypto.js";
 import { logger } from "../../logger.js";
+import type { AppContext } from "../../types.js";
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
@@ -21,6 +22,10 @@ import {
   parseUpdateFormSecretsOrThrow,
   resolveFormConnectionMethodOrThrow,
 } from "./form-connection-methods.js";
+import {
+  completeProviderConfigurationSetup,
+  resolveConnectionWithTargetForProviderConfigurationSetup,
+} from "./provider-configuration-setup.js";
 
 type UpdatedConnection = {
   id: string;
@@ -39,6 +44,9 @@ export type UpdateFormConnectionInput = {
   connectionId: string;
   displayName: string;
   config: Record<string, unknown>;
+  providerConfigurationSetup?: {
+    routeSegment: string;
+  };
   secrets?: Record<string, string>;
 };
 
@@ -50,17 +58,17 @@ export async function updateFormConnection(
       "invalidateIntegrationConnectionCredentialCache"
     >;
     integrationRegistry: IntegrationRegistry;
-    integrationsConfig: {
-      masterEncryptionKeys: Record<string, string>;
-    };
+    integrationsConfig: AppContext["var"]["config"]["integrations"];
+    controlPlaneBaseUrl: string;
   },
   input: UpdateFormConnectionInput,
 ): Promise<UpdatedConnection> {
   const { db, dataPlaneClient, integrationRegistry, integrationsConfig } = ctx;
 
-  const existingConnection = await db.query.integrationConnections.findFirst({
-    where: (table, { and, eq }) =>
-      and(eq(table.id, input.connectionId), eq(table.organizationId, input.organizationId)),
+  const existingConnection = await resolveConnectionWithTargetForProviderConfigurationSetup({
+    db,
+    organizationId: input.organizationId,
+    connectionId: input.connectionId,
   });
 
   if (existingConnection === undefined) {
@@ -88,16 +96,7 @@ export async function updateFormConnection(
     );
   }
 
-  const target = await db.query.integrationTargets.findFirst({
-    where: (table, { eq }) => eq(table.targetKey, existingConnection.targetKey),
-  });
-
-  if (target === undefined) {
-    throw new NotFoundError(
-      IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND,
-      `Integration target '${existingConnection.targetKey}' was not found.`,
-    );
-  }
+  const target = existingConnection.target;
 
   const definition = integrationRegistry.getDefinition({
     familyId: target.familyId,
@@ -141,6 +140,25 @@ export async function updateFormConnection(
         invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
       })
     : [];
+
+  if (input.providerConfigurationSetup !== undefined) {
+    await completeProviderConfigurationSetup(
+      {
+        controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
+        db,
+        integrationRegistry,
+        integrationsConfig,
+      },
+      {
+        connection: existingConnection,
+        definition,
+        methodId: existingConnectionMethodId,
+        parsedConfig,
+        parsedSecrets,
+        routeSegment: input.providerConfigurationSetup.routeSegment,
+      },
+    );
+  }
 
   const organizationCredentialKey = await db.query.organizationCredentialKeys.findFirst({
     where: (table, { eq }) => eq(table.organizationId, input.organizationId),

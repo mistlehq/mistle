@@ -10,10 +10,9 @@ import {
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
+import { WhapiWebhookSecretHeaderName } from "./auth.js";
 import { WhapiSupportedWebhookEvents } from "./supported-webhook-events.js";
 import type { WhapiTargetConfig } from "./target-config-schema.js";
-
-const WhapiWebhookSecretHeaderName = "x-whapi-webhook-secret";
 
 const WhapiWebhookPayloadSchema = z.record(z.string(), z.unknown());
 

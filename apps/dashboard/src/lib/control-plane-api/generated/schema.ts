@@ -2586,6 +2586,9 @@ export interface paths {
               [key: string]: unknown;
             };
             displayName: string;
+            providerConfigurationSetup?: {
+              routeSegment: string;
+            };
             secrets?: {
               [key: string]: string;
             };
