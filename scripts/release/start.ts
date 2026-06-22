@@ -68,6 +68,13 @@ function commitRelease(version: string): void {
   });
 }
 
+function formatReleaseFiles(): void {
+  execFileSync("pnpm", ["format"], {
+    cwd: RepositoryRootPath,
+    stdio: "inherit",
+  });
+}
+
 function createReleasePullRequest(version: string, branch: string): void {
   const temporaryDirectoryPath = mkdtempSync(join(tmpdir(), "mistle-release-pr-"));
   const bodyPath = join(temporaryDirectoryPath, "body.md");
@@ -121,6 +128,7 @@ function main(): void {
   updateSandboxdCargoLockFile(RepositoryRootPath, version);
   updateMstlCargoTomlVersionFiles(RepositoryRootPath, version);
   updateMstlCargoLockFiles(RepositoryRootPath, version);
+  formatReleaseFiles();
 
   execFileSync("git", ["switch", "-c", branch], {
     cwd: RepositoryRootPath,
