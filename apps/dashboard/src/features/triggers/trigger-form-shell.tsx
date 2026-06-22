@@ -1,5 +1,7 @@
 import {
   Button,
+  ButtonGroup,
+  DropdownMenuItem,
   Field,
   FieldContent,
   FieldDescription,
@@ -12,6 +14,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  MoreActionsMenu,
   Switch,
   cn,
 } from "@mistle/ui";
@@ -158,6 +161,7 @@ export function TriggerFormSelectField(input: {
 
 export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Element {
   const disabled = input.isDeleting || input.isSaving;
+  const submitButtonLabel = input.isSaving ? "Saving..." : input.submitLabel;
   const triggerEnabledId = `${input.inputIdPrefix}-enabled`;
   const triggerNameId = `${input.inputIdPrefix}-name`;
   const primaryRepositoryInputId = `${input.inputIdPrefix}-primary-repository-combobox`;
@@ -236,18 +240,30 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
             />
           </div>
 
-          {input.onDelete === null ? null : (
-            <Button
-              aria-label="Delete trigger"
-              disabled={disabled}
-              onClick={input.onDelete}
-              size="icon-sm"
-              type="button"
-              variant="outline"
-            >
-              <TrashIcon aria-hidden className="size-4" />
+          <ButtonGroup aria-label="Trigger actions" className="shrink-0">
+            <Button disabled={disabled} onClick={input.onSubmit} type="button">
+              {submitButtonLabel}
             </Button>
-          )}
+
+            {input.onDelete === null ? null : (
+              <MoreActionsMenu
+                disabled={disabled}
+                triggerIconVariant="chevron-down"
+                triggerLabel="More trigger actions"
+                triggerSize="icon"
+                triggerVariant="default"
+              >
+                <DropdownMenuItem
+                  disabled={disabled}
+                  onClick={input.onDelete}
+                  variant="destructive"
+                >
+                  <TrashIcon aria-hidden className="size-4" />
+                  Delete trigger
+                </DropdownMenuItem>
+              </MoreActionsMenu>
+            )}
+          </ButtonGroup>
         </div>
       ) : null}
 
@@ -402,7 +418,7 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
           </Notice>
         )}
         <Button disabled={disabled} onClick={input.onSubmit} type="button">
-          {input.isSaving ? "Saving..." : input.submitLabel}
+          {submitButtonLabel}
         </Button>
       </FormPageFooter>
     </FormPageStack>

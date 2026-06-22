@@ -192,6 +192,13 @@ const ExistingSlackTriggerWithArchivedChannelValues: WebhookTriggerFormValues = 
   },
 };
 
+const SlackMentionTopActionsValues: WebhookTriggerFormValues = {
+  ...ExistingSlackTriggerValues,
+  name: "Slack Mention",
+  sandboxProfileId: "sbp_workspace_assistant",
+  primaryRepositoryId: "mistlehq/company-os",
+};
+
 const ExistingTriggerWithExcludedAuthorValues: WebhookTriggerFormValues = {
   ...ExistingTriggerValues,
   eventParameterRules: {
@@ -367,6 +374,28 @@ export const EditPageLayout: Story = {
     mode: "edit",
     onDelete: function onDelete() {},
     values: ExistingTriggerValues,
+  },
+};
+
+export const EditPageWithTopActions: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    primaryRepositoryOptions: [
+      {
+        value: "mistlehq/company-os",
+        label: "mistlehq/company-os",
+        path: "/root/mistlehq/company-os",
+      },
+    ],
+    sandboxProfileOptions: [
+      {
+        value: "sbp_workspace_assistant",
+        label: "Workspace Assistant v3",
+      },
+    ],
+    values: SlackMentionTopActionsValues,
+    webhookEventOptions: SlackWebhookEventOptions,
   },
 };
 

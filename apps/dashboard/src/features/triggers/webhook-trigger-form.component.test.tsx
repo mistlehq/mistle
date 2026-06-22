@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
@@ -121,30 +121,36 @@ describe("WebhookTriggerForm", () => {
     });
   }
 
-  function renderFormWithOptions(input: {
+  type RenderFormOptions = {
     mode?: "create" | "edit";
     values?: WebhookTriggerFormValues;
+    isDeleting?: boolean;
+    isSaving?: boolean;
     triggerPickerDisabledState?: WebhookTriggerEventPickerDisabledState | null;
     sandboxProfileStatusMessage?: TriggerFormShellStatusMessage | undefined;
     webhookEventOptions?: typeof WebhookEventOptions;
     primaryRepositoryOptions?: readonly WebhookTriggerFormOption[];
+    onDelete?: () => void;
+    onSubmit?: () => void;
     onValueChange?: (
       key: keyof WebhookTriggerFormValues,
       value: string | boolean | string[] | WebhookTriggerEventParameterRuleMap,
     ) => void;
-  }): ReturnType<typeof render> {
-    return render(
+  };
+
+  function createFormElement(input: RenderFormOptions): React.JSX.Element {
+    return (
       <QueryClientProvider client={TestQueryClient}>
         <WebhookTriggerForm
           connectionOptions={ConnectionOptions}
           fieldErrors={{}}
           formError={null}
           validationSummaryError={null}
-          isDeleting={false}
-          isSaving={false}
+          isDeleting={input.isDeleting ?? false}
+          isSaving={input.isSaving ?? false}
           mode={input.mode ?? "create"}
-          onDelete={(input.mode ?? "create") === "edit" ? () => {} : null}
-          onSubmit={() => {}}
+          onDelete={(input.mode ?? "create") === "edit" ? (input.onDelete ?? (() => {})) : null}
+          onSubmit={input.onSubmit ?? (() => {})}
           onValueChange={input.onValueChange ?? (() => {})}
           {...(input.primaryRepositoryOptions === undefined
             ? {}
@@ -157,8 +163,12 @@ describe("WebhookTriggerForm", () => {
           webhookEventOptions={input.webhookEventOptions ?? WebhookEventOptions}
           values={input.values ?? FormValues}
         />
-      </QueryClientProvider>,
+      </QueryClientProvider>
     );
+  }
+
+  function renderFormWithOptions(input: RenderFormOptions): ReturnType<typeof render> {
+    return render(createFormElement(input));
   }
 
   it("shows selected option labels in the select triggers instead of raw ids", () => {
@@ -291,6 +301,62 @@ describe("WebhookTriggerForm", () => {
     expect(triggerNameInput).toBeDefined();
     expect(form.queryByDisplayValue("Your trigger")).toBeNull();
     expect(form.queryByRole("button", { name: "Edit trigger name" })).toBeNull();
+  });
+
+  it("renders edit-page save access in the header and keeps delete under more actions", () => {
+    let deleteCount = 0;
+    let submitCount = 0;
+
+    renderFormWithOptions({
+      mode: "edit",
+      onDelete: () => {
+        deleteCount += 1;
+      },
+      onSubmit: () => {
+        submitCount += 1;
+      },
+      values: buildFormValues(),
+    });
+
+    const saveButtons = screen.getAllByRole("button", { name: "Save" });
+
+    expect(saveButtons).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Delete trigger" })).toBeNull();
+
+    const [headerSaveButton, footerSaveButton] = saveButtons;
+    if (headerSaveButton === undefined || footerSaveButton === undefined) {
+      throw new Error("Expected header and footer save buttons.");
+    }
+
+    fireEvent.click(headerSaveButton);
+    fireEvent.click(footerSaveButton);
+    expect(submitCount).toBe(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "More trigger actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete trigger" }));
+
+    expect(deleteCount).toBe(1);
+  });
+
+  it("disables the already-open delete action while the edit page is saving", () => {
+    let deleteCount = 0;
+    const enabledInput: RenderFormOptions = {
+      mode: "edit",
+      onDelete: () => {
+        deleteCount += 1;
+      },
+      values: buildFormValues(),
+    };
+    const { rerender } = renderFormWithOptions(enabledInput);
+
+    fireEvent.click(screen.getByRole("button", { name: "More trigger actions" }));
+    rerender(createFormElement({ ...enabledInput, isSaving: true }));
+
+    const deleteMenuItem = screen.getByRole("menuitem", { name: "Delete trigger" });
+    expect(deleteMenuItem.getAttribute("data-disabled")).not.toBeNull();
+
+    fireEvent.click(deleteMenuItem);
+    expect(deleteCount).toBe(0);
   });
 
   it("shows the selected-profile trigger binding message when triggers are unavailable", () => {
