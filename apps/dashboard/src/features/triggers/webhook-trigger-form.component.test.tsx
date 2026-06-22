@@ -7,16 +7,24 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import type { TriggerFormShellStatusMessage } from "./trigger-form-shell.js";
 import type { WebhookTriggerEventPickerDisabledState } from "./webhook-trigger-event-picker-state.js";
-import type { WebhookTriggerEventParameterRuleMap } from "./webhook-trigger-event-types.js";
+import {
+  WebhookTriggerEventParameterRuleOperators,
+  type WebhookTriggerEventParameterRuleMap,
+} from "./webhook-trigger-event-types.js";
 import {
   WebhookTriggerForm,
+  type WebhookTriggerFormFieldErrors,
   type WebhookTriggerFormOption,
   type WebhookTriggerFormValues,
 } from "./webhook-trigger-form.js";
-import { createWebhookTriggerEventId } from "./webhook-trigger-option-builders.js";
+import {
+  createWebhookTriggerEventConditionId,
+  createWebhookTriggerEventId,
+} from "./webhook-trigger-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
   createGithubPullRequestOpenedEventOption,
+  createInvocationTokenParameter,
   GitHubConnectionId,
   GitHubConnectionLabel,
   GitHubWebhookSourceId,
@@ -129,6 +137,7 @@ describe("WebhookTriggerForm", () => {
     triggerPickerDisabledState?: WebhookTriggerEventPickerDisabledState | null;
     sandboxProfileStatusMessage?: TriggerFormShellStatusMessage | undefined;
     webhookEventOptions?: typeof WebhookEventOptions;
+    fieldErrors?: WebhookTriggerFormFieldErrors;
     primaryRepositoryOptions?: readonly WebhookTriggerFormOption[];
     onDelete?: () => void;
     onSubmit?: () => void;
@@ -143,7 +152,7 @@ describe("WebhookTriggerForm", () => {
       <QueryClientProvider client={TestQueryClient}>
         <WebhookTriggerForm
           connectionOptions={ConnectionOptions}
-          fieldErrors={{}}
+          fieldErrors={input.fieldErrors ?? {}}
           formError={null}
           validationSummaryError={null}
           isDeleting={input.isDeleting ?? false}
@@ -456,6 +465,90 @@ describe("WebhookTriggerForm", () => {
     expect(invalidSelectTriggers).toHaveLength(2);
   });
 
+  it("marks invalid invocation token filters and shows the error under the field", () => {
+    const invocationTokenEventOption = createGithubIssueCommentCreatedEventOption({
+      parameters: [createInvocationTokenParameter(["comment", "body"])],
+    });
+
+    renderFormWithOptions({
+      fieldErrors: {
+        eventParameterRules: {
+          triggerId: invocationTokenEventOption.id,
+          parameterId: "invocationToken",
+          message: "Invocation token filters cannot contain whitespace.",
+        },
+      },
+      values: buildFormValues({
+        eventParameterRules: {
+          [invocationTokenEventOption.id]: {
+            invocationToken: {
+              operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
+              value: "JIRA ticket created:",
+            },
+          },
+        },
+      }),
+      webhookEventOptions: [invocationTokenEventOption],
+    });
+
+    const invocationTokenInput = screen.getByRole("textbox", { name: "invocation token" });
+    expect(invocationTokenInput.getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByText("Invocation token filters cannot contain whitespace.")).toBeDefined();
+  });
+
+  it("marks only the invalid invocation token field when duplicate conditions share a parameter id", () => {
+    const invocationTokenEventOption = createGithubIssueCommentCreatedEventOption({
+      parameters: [createInvocationTokenParameter(["comment", "body"])],
+    });
+    const firstConditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: invocationTokenEventOption.id,
+      index: 0,
+    });
+    const secondConditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: invocationTokenEventOption.id,
+      index: 1,
+    });
+
+    renderFormWithOptions({
+      fieldErrors: {
+        eventParameterRules: {
+          triggerId: secondConditionId,
+          parameterId: "invocationToken",
+          message: "Invocation token filters cannot contain whitespace.",
+        },
+      },
+      values: buildFormValues({
+        eventIds: [firstConditionId, secondConditionId],
+        eventParameterRules: {
+          [firstConditionId]: {
+            invocationToken: {
+              operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
+              value: "jira-ticket-created",
+            },
+          },
+          [secondConditionId]: {
+            invocationToken: {
+              operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
+              value: "JIRA ticket created:",
+            },
+          },
+        },
+      }),
+      webhookEventOptions: [invocationTokenEventOption],
+    });
+
+    const invocationTokenInputs = screen.getAllByRole("textbox", { name: "invocation token" });
+    const [firstInput, secondInput] = invocationTokenInputs;
+    if (firstInput === undefined || secondInput === undefined) {
+      throw new Error("Expected duplicate invocation token fields.");
+    }
+
+    expect(invocationTokenInputs).toHaveLength(2);
+    expect(firstInput.getAttribute("aria-invalid")).toBeNull();
+    expect(secondInput.getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByText("Invocation token filters cannot contain whitespace.")).toBeDefined();
+  });
+
   it("shows the required-fields summary and inline copy for generic input template errors", () => {
     render(
       <QueryClientProvider client={TestQueryClient}>
@@ -493,10 +586,11 @@ describe("WebhookTriggerForm", () => {
     );
 
     expect(screen.getByText("Please address the fields highlighted in red.")).toBeDefined();
-    expect(screen.queryByText("Trigger name is required.")).toBeNull();
-    expect(screen.queryByText("Select a sandbox profile.")).toBeNull();
+    expect(screen.getByText("Trigger name is required.")).toBeDefined();
+    expect(screen.getByText("Select a sandbox profile.")).toBeDefined();
     expect(screen.getAllByText("User message is required.").length).toBeGreaterThan(0);
     expect(screen.getByText("Please add an event")).toBeDefined();
+    expect(screen.getAllByRole("status").length).toBeGreaterThanOrEqual(3);
   });
 
   it("shows save failures at the top of the form", () => {

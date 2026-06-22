@@ -12,14 +12,16 @@ import { validateWebhookTriggerFormValues } from "./webhook-trigger-form-helpers
 import {
   WebhookTriggerForm,
   type WebhookTriggerEventOption,
+  type WebhookTriggerFormFieldErrors,
   type WebhookTriggerFormOption,
   type WebhookTriggerFormValues,
-  type WebhookTriggerFormValueKey,
 } from "./webhook-trigger-form.js";
 import { DefaultWebhookTriggerMessageTemplate } from "./webhook-trigger-input-template.js";
 import { createWebhookTriggerEventConditionId } from "./webhook-trigger-option-builders.js";
 import {
+  containsRule,
   createWebhookTriggerStoryQueryClient,
+  existsRule,
   isNotRule,
   isRule,
   StoryGitHubConnectionId,
@@ -32,6 +34,8 @@ import {
   StorySlackAppMentionTriggerId,
   StorySlackConnectionId,
   StorySlackEventOptions,
+  StorySlackMessageTriggerId,
+  StorySlackReactionAddedTriggerId,
 } from "./webhook-trigger-story-fixtures.js";
 
 const StripeConnectionId = "conn_stripe_prod";
@@ -42,6 +46,8 @@ const StoryPullRequestReviewRequestedConditionId = conditionId(
 const StoryIssueCommentCreatedConditionId = conditionId(StoryIssueCommentCreatedTriggerId);
 const StoryPushDeletedConditionId = conditionId(StoryPushDeletedTriggerId);
 const StorySlackAppMentionConditionId = conditionId(StorySlackAppMentionTriggerId);
+const StorySlackMessageConditionId = conditionId(StorySlackMessageTriggerId);
+const StorySlackReactionAddedConditionId = conditionId(StorySlackReactionAddedTriggerId);
 
 function conditionId(eventOptionId: string, index = 0): string {
   return createWebhookTriggerEventConditionId({ eventOptionId, index });
@@ -172,6 +178,42 @@ const ExistingSlackTriggerWithMultipleChannelsValues: WebhookTriggerFormValues =
   },
 };
 
+const ExistingSlackMessageAndReactionTriggerValues: WebhookTriggerFormValues = {
+  ...ExistingSlackTriggerValues,
+  name: "Slack message and reaction triage",
+  conversationKeyTemplate:
+    "slack:thread:{{payload.event.channel}}:{{payload.event.mistle_thread_root_ts}}",
+  eventIds: [StorySlackMessageConditionId, StorySlackReactionAddedConditionId],
+  eventParameterRules: {
+    [StorySlackMessageConditionId]: {
+      channel: isAnyOfRule(["C_ALERTS_001", "C_ENG_001"]),
+      sender: isRule("U1234567890"),
+      messageText: containsRule("deployment failed"),
+      threadReply: existsRule(),
+    },
+    [StorySlackReactionAddedConditionId]: {
+      channel: isAnyOfRule(["C_ALERTS_001"]),
+      reaction: isRule("thumbsup"),
+      reactingUser: isRule("U1234567890"),
+      reactedMessageAuthor: isNotRule("U9999999999"),
+    },
+  },
+};
+
+const ExistingSlackMessageWithInvalidInvocationTokenValues: WebhookTriggerFormValues = {
+  ...ExistingSlackTriggerValues,
+  name: "Slack message invocation token",
+  eventIds: [StorySlackMessageConditionId],
+  eventParameterRules: {
+    [StorySlackMessageConditionId]: {
+      invocationToken: {
+        operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
+        value: "JIRA ticket created:",
+      },
+    },
+  },
+};
+
 const ExistingGitHubTriggerWithMultipleResourcesValues: WebhookTriggerFormValues = {
   ...ExistingTriggerValues,
   eventParameterRules: {
@@ -251,7 +293,7 @@ const ExistingReviewRequestBotTriggerValues: WebhookTriggerFormValues = {
 export function WebhookTriggerFormStoryHarness(input: {
   mode: "create" | "edit";
   values: WebhookTriggerFormValues;
-  fieldErrors?: Partial<Record<WebhookTriggerFormValueKey, string>>;
+  fieldErrors?: WebhookTriggerFormFieldErrors;
   validationSummaryError?: string | null;
   formError?: string | null;
   isSaving?: boolean;
@@ -268,9 +310,7 @@ export function WebhookTriggerFormStoryHarness(input: {
 }): React.JSX.Element {
   const [queryClient] = useState(() => createWebhookTriggerStoryQueryClient());
   const [values, setValues] = useState(input.values);
-  const [fieldErrors, setFieldErrors] = useState<
-    Partial<Record<WebhookTriggerFormValueKey, string>>
-  >({
+  const [fieldErrors, setFieldErrors] = useState<WebhookTriggerFormFieldErrors>({
     ...(input.fieldErrors ?? {}),
   });
   const [validationSummaryError, setValidationSummaryError] = useState<string | null>(
@@ -395,6 +435,32 @@ export const EditPageWithTopActions: Story = {
       },
     ],
     values: SlackMentionTopActionsValues,
+    webhookEventOptions: SlackWebhookEventOptions,
+  },
+};
+
+export const EditPageWithSlackMessageAndReactionFilters: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    values: ExistingSlackMessageAndReactionTriggerValues,
+    webhookEventOptions: SlackWebhookEventOptions,
+  },
+};
+
+export const EditPageWithInvalidSlackInvocationToken: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    fieldErrors: {
+      eventParameterRules: {
+        triggerId: StorySlackMessageConditionId,
+        parameterId: "invocationToken",
+        message: "Invocation token filters cannot contain whitespace.",
+      },
+    },
+    validationSummaryError: "Please address the fields highlighted in red.",
+    values: ExistingSlackMessageWithInvalidInvocationTokenValues,
     webhookEventOptions: SlackWebhookEventOptions,
   },
 };

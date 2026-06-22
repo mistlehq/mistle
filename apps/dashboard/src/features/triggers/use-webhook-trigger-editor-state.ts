@@ -27,6 +27,7 @@ import {
   validateWebhookTriggerFormValues,
 } from "./webhook-trigger-form-helpers.js";
 import type {
+  WebhookTriggerFormFieldErrors,
   WebhookTriggerFormOption,
   WebhookTriggerFormValues,
 } from "./webhook-trigger-form-types.js";
@@ -72,9 +73,7 @@ export function resolveNoActiveProfileVersionMessage(input: {
   return `The sandbox profile ${input.selectedProfileName ?? input.selectedProfileId} has no active version. Publish the profile before creating triggers.`;
 }
 
-function hasRequiredFieldErrors(
-  fieldErrors: Partial<Record<keyof WebhookTriggerFormValues, string>>,
-): boolean {
+function hasRequiredFieldErrors(fieldErrors: WebhookTriggerFormFieldErrors): boolean {
   return (
     fieldErrors.name !== undefined ||
     fieldErrors.sandboxProfileId !== undefined ||
@@ -340,7 +339,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
   webhookEventOptions: readonly WebhookTriggerEventOption[];
   triggerPickerDisabledState: WebhookTriggerEventPickerDisabledState | null;
   values: WebhookTriggerFormValues;
-  fieldErrors: Partial<Record<keyof WebhookTriggerFormValues, string>>;
+  fieldErrors: WebhookTriggerFormFieldErrors;
   validationSummaryError: string | null;
   formError: string | null;
   deleteError: string | null;
@@ -358,9 +357,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
 } {
   const queryClient = useQueryClient();
   const [formValues, setFormValues] = useState(input.initialValues);
-  const [fieldErrors, setFieldErrors] = useState<
-    Partial<Record<keyof WebhookTriggerFormValues, string>>
-  >({});
+  const [fieldErrors, setFieldErrors] = useState<WebhookTriggerFormFieldErrors>({});
   const [validationSummaryError, setValidationSummaryError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -619,16 +616,50 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
           sandboxProfileId: _sandboxProfileId,
           eventIds: _eventIds,
           conversationKeyTemplate: _conversationKeyTemplate,
+          eventParameterRules: _eventParameterRules,
           ...remainingErrors
         } = currentErrors;
 
         void _sandboxProfileId;
         void _eventIds;
         void _conversationKeyTemplate;
+        void _eventParameterRules;
 
         return {
           ...remainingErrors,
         };
+      }
+
+      if (key === "eventIds") {
+        const {
+          eventIds: _eventIds,
+          conversationKeyTemplate: _conversationKeyTemplate,
+          eventParameterRules: _eventParameterRules,
+          ...remainingErrors
+        } = currentErrors;
+
+        void _eventIds;
+        void _conversationKeyTemplate;
+        void _eventParameterRules;
+
+        return remainingErrors;
+      }
+
+      if (key === "eventParameterRules") {
+        const { eventParameterRules: _eventParameterRules, ...remainingErrors } = currentErrors;
+        const nextEventParameterError =
+          currentErrors.eventParameterRules === undefined
+            ? undefined
+            : validateWebhookTriggerFormValues(nextValues, webhookEventOptions).eventParameterRules;
+
+        void _eventParameterRules;
+
+        return nextEventParameterError === undefined
+          ? remainingErrors
+          : {
+              ...remainingErrors,
+              eventParameterRules: nextEventParameterError,
+            };
       }
 
       return {

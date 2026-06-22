@@ -23,3 +23,15 @@ export type WebhookTriggerFormValues = {
 };
 
 export type WebhookTriggerFormValueKey = keyof WebhookTriggerFormValues;
+
+export type WebhookTriggerEventParameterFieldError = {
+  triggerId: string;
+  parameterId: string;
+  message: string;
+};
+
+export type WebhookTriggerFormFieldErrors = Partial<
+  Record<Exclude<WebhookTriggerFormValueKey, "eventParameterRules">, string>
+> & {
+  eventParameterRules?: WebhookTriggerEventParameterFieldError;
+};
