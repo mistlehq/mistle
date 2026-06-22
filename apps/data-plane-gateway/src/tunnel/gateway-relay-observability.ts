@@ -29,6 +29,7 @@ type GatewayNatsConnectionStatus =
   | "staleConnection"
   | "update";
 type GatewayForwardingRequestOutcome = "succeeded" | "failed";
+type GatewayForwardingReadinessStatus = "not_ready" | "checking" | "ready";
 type GatewayForwardingSelfCheckOutcome = "succeeded" | "failed";
 type GatewayForwardingPortAccessAuthorizationOutcome =
   | "authorized"
@@ -40,6 +41,7 @@ type GatewayRelayInstruments = {
   envelopeEvents: Counter;
   forwardingPortAccessAuthorizationDuration: Histogram;
   forwardingPortAccessAuthorizationEvents: Counter;
+  forwardingReadinessEvents: Counter;
   forwardingRequestDuration: Histogram;
   forwardingRequestEvents: Counter;
   forwardingSelfCheckEvents: Counter;
@@ -95,6 +97,9 @@ function getGatewayRelayInstruments(): GatewayRelayInstruments {
         unit: "ms",
       },
     ),
+    forwardingReadinessEvents: meter.createCounter("mistle.gateway.forwarding.readiness.events", {
+      description: "Gateway forwarding readiness transitions observed by the data-plane gateway.",
+    }),
     forwardingRequestEvents: meter.createCounter("mistle.gateway.forwarding.request.events", {
       description: "Gateway forwarding NATS request outcomes observed by the data-plane gateway.",
     }),
@@ -381,6 +386,45 @@ export function recordGatewayForwardingRequestEvent(input: {
   }
 
   logger.warn(buildGatewayForwardingRequestLogData(input), "Gateway forwarding request failed");
+}
+
+export function recordGatewayForwardingReadinessChangedEvent(input: {
+  backend: GatewayRelayBackend;
+  changedAtMs: number;
+  error?: unknown;
+  localNodeId: string;
+  nextReason: string;
+  nextStatus: GatewayForwardingReadinessStatus;
+  previousReason: string;
+  previousStatus: GatewayForwardingReadinessStatus;
+  subject: string;
+}): void {
+  getGatewayRelayInstruments().forwardingReadinessEvents.add(1, {
+    "mistle.gateway.relay.backend": input.backend,
+    "mistle.gateway.forwarding.previous_readiness_status": input.previousStatus,
+    "mistle.gateway.forwarding.readiness_reason": input.nextReason,
+    "mistle.gateway.forwarding.readiness_status": input.nextStatus,
+  });
+
+  const logData = {
+    eventName: "gateway.forwarding.readiness_changed",
+    error: input.error,
+    "mistle.gateway.node_id": input.localNodeId,
+    "mistle.gateway.relay.backend": input.backend,
+    "mistle.gateway.forwarding.previous_readiness_reason": input.previousReason,
+    "mistle.gateway.forwarding.previous_readiness_status": input.previousStatus,
+    "mistle.gateway.forwarding.readiness_changed_at_ms": input.changedAtMs,
+    "mistle.gateway.forwarding.readiness_reason": input.nextReason,
+    "mistle.gateway.forwarding.readiness_status": input.nextStatus,
+    "mistle.gateway.forwarding.subject": input.subject,
+  };
+
+  if (input.nextStatus === "not_ready") {
+    logger.warn(logData, "Gateway forwarding readiness changed");
+    return;
+  }
+
+  logger.info(logData, "Gateway forwarding readiness changed");
 }
 
 export function recordGatewayForwardingSelfCheckEvent(input: {
