@@ -23,7 +23,6 @@ import {
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
-import { z } from "zod";
 
 import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
@@ -41,6 +40,7 @@ import {
 } from "../src/sandbox-profiles/index.js";
 import { createApiKeyCredential, createApiKeyToken } from "./helpers/api-keys.js";
 import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
+import { callMcpJsonRpcResponse, callMcpTool, listMcpTools } from "./helpers/mcp-json-rpc.js";
 import {
   integrationConnectionRow,
   integrationTargetRow,
@@ -58,49 +58,6 @@ const McpTokenConfig = {
   tokenIssuer: "integration-new-control-plane-api",
   tokenAudience: "integration-new-mistle-mcp",
 };
-
-const JsonRpcToolResponseSchema = z
-  .object({
-    jsonrpc: z.literal("2.0"),
-    id: z.union([z.string(), z.number()]),
-    result: z
-      .object({
-        structuredContent: z.unknown().optional(),
-        isError: z.boolean().optional(),
-      })
-      .loose(),
-  })
-  .strict();
-
-const JsonRpcToolsListResponseSchema = z
-  .object({
-    jsonrpc: z.literal("2.0"),
-    id: z.union([z.string(), z.number()]),
-    result: z
-      .object({
-        tools: z.array(
-          z
-            .object({
-              name: z.string().min(1),
-              inputSchema: z
-                .object({
-                  type: z.literal("object"),
-                })
-                .loose(),
-              annotations: z
-                .object({
-                  idempotentHint: z.boolean().optional(),
-                })
-                .loose()
-                .optional(),
-              outputSchema: z.unknown().optional(),
-            })
-            .loose(),
-        ),
-      })
-      .loose(),
-  })
-  .strict();
 
 const DockerSandboxRuntimeColumns = {
   sandboxProvider: "docker",
@@ -134,6 +91,7 @@ describe.concurrent("MCP profile tools integration", () => {
       "create_scheduled_trigger",
       "create_webhook_trigger",
       "get_trigger",
+      "list_supported_capabilities",
       "list_trigger_webhook_events",
       "list_triggers",
       "profile_draft_setup_script_put",
@@ -1892,93 +1850,6 @@ describe.concurrent("MCP profile tools integration", () => {
     expect(result.isError).toBe(true);
   });
 });
-
-async function callMcpTool(input: {
-  env: IntegrationTestEnvironment;
-  token: string;
-  name: string;
-  arguments: Record<string, unknown>;
-}): Promise<z.infer<typeof JsonRpcToolResponseSchema>["result"]> {
-  const message = await callMcpJsonRpc({
-    env: input.env,
-    token: input.token,
-    id: "mcp-test",
-    method: "tools/call",
-    params: {
-      name: input.name,
-      arguments: input.arguments,
-    },
-  });
-
-  return JsonRpcToolResponseSchema.parse(message).result;
-}
-
-async function listMcpTools(input: {
-  env: IntegrationTestEnvironment;
-  token: string;
-}): Promise<z.infer<typeof JsonRpcToolsListResponseSchema>["result"]["tools"]> {
-  const message = await callMcpJsonRpc({
-    env: input.env,
-    token: input.token,
-    id: "mcp-tools-list-test",
-    method: "tools/list",
-    params: {},
-  });
-
-  return JsonRpcToolsListResponseSchema.parse(message).result.tools;
-}
-
-async function callMcpJsonRpc(input: {
-  env: IntegrationTestEnvironment;
-  token: string;
-  id: string;
-  method: "tools/call" | "tools/list";
-  params: Record<string, unknown>;
-}): Promise<unknown> {
-  const response = await callMcpJsonRpcResponse(input);
-
-  expect(response.status).toBe(200);
-  return parseStreamableHttpJsonRpcMessage(await response.text());
-}
-
-async function callMcpJsonRpcResponse(input: {
-  env: IntegrationTestEnvironment;
-  token: string;
-  id: string;
-  method: "tools/call" | "tools/list";
-  params: Record<string, unknown>;
-}) {
-  return input.env.controlPlaneApi.http.fetch("/mcp", {
-    method: "POST",
-    headers: {
-      accept: "application/json, text/event-stream",
-      authorization: `Bearer ${input.token}`,
-      "content-type": "application/json",
-      forwarded: createForwardedHeaderForBaseUrl(input.env.controlPlaneApi.hostBaseUrl),
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: input.id,
-      method: input.method,
-      params: input.params,
-    }),
-  });
-}
-
-function createForwardedHeaderForBaseUrl(baseUrl: string): string {
-  const url = new URL(baseUrl);
-  return `proto=${url.protocol.slice(0, -1)};host=${url.host}`;
-}
-
-function parseStreamableHttpJsonRpcMessage(responseBody: string): unknown {
-  const dataLine = responseBody.split("\n").find((line) => line.startsWith("data: "));
-
-  if (dataLine === undefined) {
-    throw new Error("Expected MCP streamable HTTP response to contain a data line.");
-  }
-
-  return JSON.parse(dataLine.slice("data: ".length));
-}
 
 type SandboxInstanceRow = DataPlaneTables["sandboxInstances"]["$inferInsert"];
 type SandboxOperationEventRow = DataPlaneTables["sandboxOperationEvents"]["$inferInsert"];
