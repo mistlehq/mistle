@@ -20,6 +20,7 @@ import type { SandboxRuntimeReadinessStore } from "../runtime-state/sandbox-runt
 import type { AsyncTaskTracker } from "../runtime/async-task-tracker.js";
 import { createGatewayDrainingAdmissionResponse } from "../runtime/gateway-drain-admission.js";
 import type { GatewayDrainRegistry } from "../runtime/gateway-drain-registry.js";
+import type { GatewayForwardingReadiness } from "../runtime/gateway-forwarding-readiness.js";
 import type { GatewayLifecycle } from "../runtime/gateway-lifecycle.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
@@ -79,6 +80,7 @@ type RegisterSandboxTunnelRouteInput = {
   allowRemoteOwnerConnections: boolean;
   clock: Clock;
   drainRegistry: GatewayDrainRegistry;
+  forwardingReadiness: GatewayForwardingReadiness;
   healthConfig: DataPlaneGatewayHealthConfig;
   lifecycle: GatewayLifecycle;
   scheduler: Scheduler;
@@ -134,6 +136,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     input.sandboxRuntimeAttachmentStore,
     input.sandboxInstanceDeadlineService,
     input.sandboxDeadlineLifecycleCoordinator,
+    input.forwardingReadiness,
     input.clock,
     input.scheduler,
     input.healthConfig,

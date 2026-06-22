@@ -96,6 +96,7 @@ import {
   GatewayForwardingRecoverySupervisor,
   type GatewayForwardingReplacementReason,
 } from "./gateway-forwarding-recovery-supervisor.js";
+import { createGatewayForwardingReplacementHandler } from "./gateway-forwarding-replacement.js";
 import { GatewayLifecycle } from "./gateway-lifecycle.js";
 export {
   GatewayWebSocketCloseCodes,
@@ -465,13 +466,20 @@ export function createDataPlaneGatewayRuntime(
   const nodeWebSocket = createNodeWebSocket({ app });
   const drainRegistry = new GatewayDrainRegistry();
   const sandboxTunnelTaskTracker = new AsyncTaskTracker();
+  const requestUnrecoverableForwardingReplacement = createGatewayForwardingReplacementHandler({
+    closeForServiceRestartWaitMs: ServiceRestartConnectionDrainTimeoutMs,
+    drainRegistry,
+    lifecycle,
+    localNodeId: nodeId,
+    onUnrecoverableForwarding,
+  });
   const forwardingRecoverySupervisor = new GatewayForwardingRecoverySupervisor({
     clock: systemClock,
     isDraining: () => !lifecycle.isServing(),
     localNodeId: nodeId,
     readiness: forwardingReadiness,
     scheduler: systemScheduler,
-    terminate: onUnrecoverableForwarding,
+    terminate: requestUnrecoverableForwardingReplacement,
   });
   let hasValkeyClient = false;
   let valkeyClient!: ValkeyClient;
@@ -784,6 +792,7 @@ export function createDataPlaneGatewayRuntime(
     allowRemoteOwnerConnections: config.app.gatewayRelay.backend === "nats",
     clock: systemClock,
     drainRegistry,
+    forwardingReadiness,
     healthConfig: config.app.health,
     lifecycle,
     scheduler: systemScheduler,
