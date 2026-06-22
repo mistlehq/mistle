@@ -78,6 +78,9 @@ packageExtensions:
   drizzle-kit@*:
     peerDependencies:
       drizzle-orm: "*"
+  dockview@*:
+    peerDependencies:
+      react-dom: "*"
   "@phosphor-icons/react@*":
     peerDependencies:
       "@types/react": "*"
