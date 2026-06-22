@@ -6,7 +6,7 @@ import {
 } from "./webhook-triggers-types.js";
 
 describe("webhook triggers types", () => {
-  it("parses a webhook trigger resource", () => {
+  it("parses a webhook trigger", () => {
     const parsed = WebhookTriggerSchema.parse({
       conversationKeyTemplate: "{{event.id}}",
       createdAt: "2026-03-11T10:00:00.000Z",

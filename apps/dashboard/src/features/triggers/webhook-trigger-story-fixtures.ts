@@ -1,6 +1,10 @@
 import { QueryClient } from "@tanstack/react-query";
 
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
+import {
+  createSlackChannelResource,
+  createSlackChannelResources,
+} from "../integrations/slack-channel-resource-story-support.js";
 import type { WebhookTriggerEventOption } from "./webhook-trigger-event-types.js";
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import { createWebhookTriggerEventId } from "./webhook-trigger-option-builders.js";
@@ -267,35 +271,21 @@ export const StoryGitHubTeamResourcesSyncFailed: IntegrationConnectionResources 
   items: [],
 };
 
-const StorySlackChannelResources: IntegrationConnectionResources = {
+const StorySlackChannelResources = createSlackChannelResources({
   connectionId: StorySlackConnectionId,
-  familyId: "slack",
-  kind: "channel",
-  syncState: "ready",
-  lastSyncedAt: "2026-03-17T00:00:00.000Z",
   items: [
-    {
-      id: "icr_slack_channel_1",
-      familyId: "slack",
-      kind: "channel",
+    createSlackChannelResource({
+      index: 1,
       externalId: "C_ALERTS_001",
-      handle: "C_ALERTS_001",
       displayName: "#alerts",
-      status: "accessible",
-      metadata: {},
-    },
-    {
-      id: "icr_slack_channel_2",
-      familyId: "slack",
-      kind: "channel",
+    }),
+    createSlackChannelResource({
+      index: 2,
       externalId: "C_ENG_001",
-      handle: "C_ENG_001",
       displayName: "#engineering",
-      status: "accessible",
-      metadata: {},
-    },
+    }),
   ],
-};
+});
 
 export const StorySlackChannelResourcesSyncing: IntegrationConnectionResources = {
   ...StorySlackChannelResources,

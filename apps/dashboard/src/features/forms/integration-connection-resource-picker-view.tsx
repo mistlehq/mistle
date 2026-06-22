@@ -1,6 +1,7 @@
 import {
   Button,
   Combobox,
+  ComboboxChip,
   ComboboxChips,
   ComboboxChipsInput,
   ComboboxContent,
@@ -12,34 +13,58 @@ import {
 import { ArrowClockwiseIcon } from "@phosphor-icons/react";
 import { useCallback, useState } from "react";
 
-import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
 import {
   buildIntegrationResourcePickerViewModel,
   type IntegrationResourceListViewState,
 } from "./integration-resource-picker-view-model.js";
 
-export type IntegrationResourcePickerViewProps = {
+export type IntegrationConnectionResourcePickerItem = {
+  id: string;
+  value: string;
+  label: string;
+};
+
+export type IntegrationConnectionResourcePickerResource = {
+  id: string;
+  handle: string;
+  displayName: string;
+};
+
+export type IntegrationConnectionResourcePickerDensity = "default" | "compact";
+
+export type IntegrationConnectionResourcePickerViewProps = {
+  density?: IntegrationConnectionResourcePickerDensity | undefined;
   id: string;
   label: string;
+  resourceLabelPlural?: string | undefined;
   search: string;
   searchPlaceholder: string;
   refreshLabel: string;
   refreshTooltip: string;
-  selectedHandles: readonly string[];
-  unavailableSelectedHandles: readonly string[];
+  selectedValues: readonly string[];
+  unavailableSelectedValues: readonly string[];
   listState: IntegrationResourceListViewState;
-  visibleItems: readonly IntegrationConnectionResource[];
+  visibleItems: readonly IntegrationConnectionResourcePickerItem[];
   isRefreshing: boolean;
   disabled?: boolean | undefined;
   refreshErrorMessage: string | null;
   emptyMessage: string;
   onSearchChange: (nextValue: string) => void;
   onSelectionChange: (nextValue: readonly string[]) => void;
-  onToggleAll: () => void;
   onRefresh: () => void;
   onBlur: () => void;
   onFocus: () => void;
 };
+
+export function toIntegrationConnectionResourcePickerItems(
+  resources: readonly IntegrationConnectionResourcePickerResource[],
+): IntegrationConnectionResourcePickerItem[] {
+  return resources.map((resource) => ({
+    id: resource.id,
+    value: resource.handle,
+    label: resource.displayName,
+  }));
+}
 
 function IntegrationResourceMessageSection(input: {
   message: string;
@@ -93,13 +118,14 @@ function ResourceMessages(input: {
 }
 
 function ComboboxLayout(input: {
-  props: IntegrationResourcePickerViewProps;
+  props: IntegrationConnectionResourcePickerViewProps;
   viewModel: ReturnType<typeof buildIntegrationResourcePickerViewModel>;
   allVisibleSelected: boolean;
   someVisibleSelected: boolean;
 }): React.JSX.Element {
   const anchorRef = useComboboxAnchor();
   const [isOpen, setIsOpen] = useState(false);
+  const density = input.props.density ?? "default";
   const selectAllRef = useCallback(
     (element: HTMLInputElement | null) => {
       if (element) {
@@ -108,6 +134,31 @@ function ComboboxLayout(input: {
     },
     [input.someVisibleSelected],
   );
+  const itemLabelsByValue = new Map<string, string>();
+  for (const item of input.props.visibleItems) {
+    itemLabelsByValue.set(item.value, item.label);
+  }
+  const chipsClassName = density === "compact" ? "min-h-10 w-full gap-1 px-2 py-1" : "w-full";
+  const chipClassName = density === "compact" ? "h-6 max-w-full" : "max-w-full";
+  const contentClassName = density === "compact" ? "w-[min(30rem,calc(100vw-2rem))] p-0" : "p-0";
+  const listWrapperClassName =
+    density === "compact" ? "max-h-64 overflow-y-auto p-2" : "max-h-72 overflow-y-auto p-2";
+  const listClassName = density === "compact" ? "max-h-48" : "max-h-56";
+
+  function toggleAllVisibleItems(): void {
+    const visibleValues = input.props.visibleItems.map((item) => item.value);
+    const visibleValueSet = new Set(visibleValues);
+    if (input.allVisibleSelected) {
+      input.props.onSelectionChange(
+        input.props.selectedValues.filter((value) => !visibleValueSet.has(value)),
+      );
+      return;
+    }
+
+    const selectedSet = new Set(input.props.selectedValues);
+    const valuesToAdd = visibleValues.filter((value) => !selectedSet.has(value));
+    input.props.onSelectionChange([...input.props.selectedValues, ...valuesToAdd]);
+  }
 
   return (
     <Combobox<string, true>
@@ -145,12 +196,12 @@ function ComboboxLayout(input: {
         input.props.onSelectionChange(value);
       }}
       open={isOpen}
-      value={[...input.props.selectedHandles]}
+      value={[...input.props.selectedValues]}
     >
       <div className="flex flex-col gap-2">
         <div ref={anchorRef}>
           <ComboboxChips
-            className="w-full"
+            className={chipsClassName}
             onClick={() => {
               if (input.props.disabled === true) {
                 return;
@@ -159,13 +210,12 @@ function ComboboxLayout(input: {
               setIsOpen(true);
             }}
           >
-            {input.props.selectedHandles.map((selectedHandle) => (
-              <div
-                className="bg-muted text-foreground flex h-[calc(--spacing(5.5))] max-w-full items-center rounded-sm px-1.5 text-xs font-medium"
-                key={selectedHandle}
-              >
-                <span className="truncate">{selectedHandle}</span>
-              </div>
+            {input.props.selectedValues.map((selectedValue) => (
+              <ComboboxChip className={chipClassName} key={selectedValue}>
+                <span className="truncate">
+                  {itemLabelsByValue.get(selectedValue) ?? selectedValue}
+                </span>
+              </ComboboxChip>
             ))}
             <ComboboxChipsInput
               aria-label={input.props.label}
@@ -174,7 +224,7 @@ function ComboboxLayout(input: {
               id={input.props.id}
               onFocus={input.props.onFocus}
               placeholder={
-                input.props.selectedHandles.length === 0 ? input.props.searchPlaceholder : ""
+                input.props.selectedValues.length === 0 ? input.props.searchPlaceholder : ""
               }
             />
           </ComboboxChips>
@@ -183,7 +233,7 @@ function ComboboxLayout(input: {
       </div>
 
       {isOpen ? (
-        <ComboboxContent anchor={anchorRef} className="p-0">
+        <ComboboxContent anchor={anchorRef} className={contentClassName}>
           <div className="border-b px-2 py-1.5">
             <div className="flex items-center justify-between gap-2">
               <label className="hover:bg-muted text-foreground inline-flex min-w-0 items-center gap-2 rounded-sm px-2 py-1 text-sm">
@@ -191,7 +241,7 @@ function ComboboxLayout(input: {
                   checked={input.allVisibleSelected}
                   disabled={input.props.disabled === true}
                   onChange={() => {
-                    input.props.onToggleAll();
+                    toggleAllVisibleItems();
                   }}
                   ref={selectAllRef}
                   type="checkbox"
@@ -207,6 +257,9 @@ function ComboboxLayout(input: {
                 <Button
                   aria-label={input.props.refreshLabel}
                   disabled={input.props.disabled === true || input.props.isRefreshing}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                  }}
                   onClick={input.props.onRefresh}
                   size="icon-xs"
                   title={input.props.refreshTooltip}
@@ -221,12 +274,12 @@ function ComboboxLayout(input: {
               </div>
             </div>
           </div>
-          <div className="max-h-72 overflow-y-auto p-2">
+          <div className={listWrapperClassName}>
             <ResourceMessages variant="default" viewModel={input.viewModel} />
-            <ComboboxList className="max-h-56">
+            <ComboboxList className={listClassName}>
               {input.props.visibleItems.map((resource) => (
-                <ComboboxItem key={resource.id} value={resource.handle}>
-                  <span className="truncate">{resource.handle}</span>
+                <ComboboxItem key={resource.id} value={resource.value}>
+                  <span className="truncate">{resource.label}</span>
                 </ComboboxItem>
               ))}
             </ComboboxList>
@@ -242,21 +295,21 @@ function ComboboxLayout(input: {
   );
 }
 
-export function IntegrationResourcePickerView(
-  props: IntegrationResourcePickerViewProps,
+export function IntegrationConnectionResourcePickerView(
+  props: IntegrationConnectionResourcePickerViewProps,
 ): React.JSX.Element {
   const viewModel = buildIntegrationResourcePickerViewModel({
     title: undefined,
     availableCount: undefined,
+    resourceLabelPlural: props.resourceLabelPlural,
     refreshLabel: props.refreshLabel,
     syncMetadata: null,
     syncState: undefined,
     emptyMessage: props.emptyMessage,
     search: props.search,
-    selectedCount: props.selectedHandles.length,
+    selectedCount: props.selectedValues.length,
     refreshErrorMessage: props.refreshErrorMessage,
-    unavailableSelectedHandles: props.unavailableSelectedHandles,
-    unavailableSelectedHandlesCount: props.unavailableSelectedHandles.length,
+    unavailableSelectedHandles: props.unavailableSelectedValues,
     listState:
       props.listState.mode === "ready"
         ? { mode: "ready" }
@@ -266,12 +319,12 @@ export function IntegrationResourcePickerView(
     visibleItemsCount: props.visibleItems.length,
   });
 
-  const selectedSet = new Set(props.selectedHandles);
+  const selectedSet = new Set(props.selectedValues);
   const allVisibleSelected =
     props.visibleItems.length > 0 &&
-    props.visibleItems.every((item) => selectedSet.has(item.handle));
+    props.visibleItems.every((item) => selectedSet.has(item.value));
   const someVisibleSelected =
-    !allVisibleSelected && props.visibleItems.some((item) => selectedSet.has(item.handle));
+    !allVisibleSelected && props.visibleItems.some((item) => selectedSet.has(item.value));
 
   return (
     <ComboboxLayout

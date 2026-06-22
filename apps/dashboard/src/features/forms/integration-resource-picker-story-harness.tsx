@@ -29,34 +29,17 @@ export function useIntegrationResourcePickerStoryState(input: {
     selectedCount: selectedHandles.length,
     refreshErrorMessage: null,
     unavailableSelectedHandles: [],
-    unavailableSelectedHandlesCount: 0,
     listState: {
       mode: "ready",
     },
     visibleItemsCount: visibleItems.length,
   });
 
-  function toggleAll(): void {
-    const visibleHandleSet = new Set(visibleItems.map((item) => item.handle));
-    const allVisibleSelected = visibleItems.every((item) => selectedHandles.includes(item.handle));
-
-    if (allVisibleSelected) {
-      setSelectedHandles((current) => current.filter((handle) => !visibleHandleSet.has(handle)));
-    } else {
-      const selectedSet = new Set(selectedHandles);
-      const handlesToAdd = visibleItems
-        .filter((item) => !selectedSet.has(item.handle))
-        .map((item) => item.handle);
-      setSelectedHandles((current) => [...current, ...handlesToAdd]);
-    }
-  }
-
   return {
     search,
     setSearch,
     selectedHandles,
     setSelectedHandles,
-    toggleAll,
     visibleItems,
     viewModel,
   };

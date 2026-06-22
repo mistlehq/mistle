@@ -6,7 +6,10 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { IntegrationResourcePickerView } from "../forms/integration-resource-picker-view.js";
+import {
+  IntegrationConnectionResourcePickerView,
+  toIntegrationConnectionResourcePickerItems,
+} from "../forms/integration-connection-resource-picker-view.js";
 import {
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
@@ -120,6 +123,7 @@ function RepositoryResourcesPicker(input: {
   });
 
   const visibleItems = resourceQuery.data?.items ?? [];
+  const visiblePickerItems = toIntegrationConnectionResourcePickerItems(visibleItems);
   const availableHandles = new Set(visibleItems.map((item) => item.handle));
   const unavailableSelectedHandles =
     resourceQuery.data === undefined || debouncedSearch.length > 0
@@ -152,26 +156,6 @@ function RepositoryResourcesPicker(input: {
     });
   }
 
-  function toggleAll(): void {
-    if (input.disabled === true) {
-      return;
-    }
-
-    const visibleHandleSet = new Set(visibleItems.map((item) => item.handle));
-    const allVisibleSelected = visibleItems.every((item) => selectedHandles.includes(item.handle));
-
-    if (allVisibleSelected) {
-      updateSelectedHandles(selectedHandles.filter((handle) => !visibleHandleSet.has(handle)));
-      return;
-    }
-
-    const selectedSet = new Set(selectedHandles);
-    const handlesToAdd = visibleItems
-      .filter((item) => !selectedSet.has(item.handle))
-      .map((item) => item.handle);
-    updateSelectedHandles([...selectedHandles, ...handlesToAdd]);
-  }
-
   if (input.readOnly === true) {
     return selectedHandles.length === 0 ? (
       <p className="text-muted-foreground text-sm">No repositories selected.</p>
@@ -190,7 +174,7 @@ function RepositoryResourcesPicker(input: {
   }
 
   return (
-    <IntegrationResourcePickerView
+    <IntegrationConnectionResourcePickerView
       disabled={input.disabled === true}
       emptyMessage="No repositories available for this connection."
       id={`sandbox-profile-repositories-${input.connection.id}`}
@@ -209,7 +193,6 @@ function RepositoryResourcesPicker(input: {
               }
             : {
                 mode: "ready",
-                items: resourceQuery.data.items,
               }
       }
       onBlur={() => {}}
@@ -219,7 +202,7 @@ function RepositoryResourcesPicker(input: {
       }}
       onSearchChange={setSearch}
       onSelectionChange={updateSelectedHandles}
-      onToggleAll={toggleAll}
+      resourceLabelPlural="repositories"
       refreshErrorMessage={refreshErrorMessage}
       refreshLabel="Refresh repositories"
       refreshTooltip={
@@ -229,9 +212,9 @@ function RepositoryResourcesPicker(input: {
       }
       search={search}
       searchPlaceholder="Add repositories"
-      selectedHandles={selectedHandles}
-      unavailableSelectedHandles={unavailableSelectedHandles}
-      visibleItems={visibleItems}
+      selectedValues={selectedHandles}
+      unavailableSelectedValues={unavailableSelectedHandles}
+      visibleItems={visiblePickerItems}
     />
   );
 }

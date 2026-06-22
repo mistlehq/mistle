@@ -351,23 +351,25 @@ function renderSlackChannelTriggerPicker(): ReturnType<typeof render> {
   );
 }
 
-function openComboboxByPlaceholder(placeholder: string): HTMLElement {
-  const combobox = screen.getAllByRole("combobox").find((element) => {
-    return element.getAttribute("placeholder") === placeholder;
+function openMultiResourcePickerByLabel(label: string): HTMLElement {
+  const combobox = screen.getAllByRole("combobox", { name: label }).find((element) => {
+    return element.getAttribute("data-slot") === "combobox-chip-input";
   });
   if (combobox === undefined) {
-    throw new Error(`Expected combobox with placeholder '${placeholder}'.`);
+    throw new Error(`Expected multi resource picker '${label}'.`);
   }
 
-  const comboboxTrigger = combobox
-    .closest('[data-slot="input-group"]')
-    ?.querySelector('button[data-slot="input-group-button"]');
-  if (comboboxTrigger === undefined || comboboxTrigger === null) {
-    throw new Error(`Expected combobox trigger for placeholder '${placeholder}'.`);
+  const chipToolbar = combobox.closest('[data-slot="combobox-chips"]');
+  if (chipToolbar === null) {
+    throw new Error(`Expected chip toolbar for multi resource picker '${label}'.`);
   }
 
-  fireEvent.click(comboboxTrigger);
+  fireEvent.click(chipToolbar);
   return combobox;
+}
+
+function expectSelectedResourceLabel(label: string): void {
+  expect(screen.getAllByText(label).length).toBeGreaterThan(0);
 }
 
 describe("WebhookTriggerEventPicker", () => {
@@ -615,7 +617,7 @@ describe("WebhookTriggerEventPicker", () => {
       },
     });
 
-    expect(screen.getAllByPlaceholderText("octocat").length).toBeGreaterThan(0);
+    expectSelectedResourceLabel("octocat");
     expect(screen.queryByPlaceholderText("Any author")).toBeNull();
   });
 
@@ -623,15 +625,17 @@ describe("WebhookTriggerEventPicker", () => {
     renderSlackChannelTriggerPicker();
 
     await waitFor(() => {
-      expect(screen.getAllByPlaceholderText("#alerts").length).toBeGreaterThan(0);
+      expect(screen.getByText("#alerts")).toBeDefined();
     });
   });
 
-  it("renders a resource refresh footer for Slack channel trigger parameters", async () => {
+  it("renders a resource refresh control for Slack channel trigger parameters", async () => {
     renderSlackChannelTriggerPicker();
 
-    await screen.findByPlaceholderText("#alerts");
-    openComboboxByPlaceholder("#alerts");
+    await waitFor(() => {
+      expect(screen.getByText("#alerts")).toBeDefined();
+    });
+    openMultiResourcePickerByLabel("channel");
 
     const refreshButton = await screen.findByRole("button", { name: "Refresh channels" });
     refreshButton.focus();
@@ -658,7 +662,8 @@ describe("WebhookTriggerEventPicker", () => {
       },
     });
 
-    expect(screen.getAllByPlaceholderText("retired-user (Unavailable)").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("retired-user").length).toBeGreaterThan(0);
+    expect(screen.getByText("The selected resources are no longer available:")).toBeDefined();
   });
 
   it("renders GitHub actor bot parameters from synced bot resources", async () => {
@@ -682,7 +687,7 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request opened")).toBeDefined();
     expect(screen.getByText("by bot")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByPlaceholderText("dependabot[bot]").length).toBeGreaterThan(0);
+      expectSelectedResourceLabel("dependabot[bot]");
     });
   });
 
@@ -748,7 +753,7 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request review requested")).toBeDefined();
     expect(screen.getByText("for team")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByPlaceholderText("Platform (mistle)").length).toBeGreaterThan(0);
+      expectSelectedResourceLabel("Platform (mistle)");
     });
     expect(container.textContent).not.toContain("Any requested reviewer");
   });
@@ -769,11 +774,11 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("for team")).toBeDefined();
     expect(screen.queryByText("for reviewer")).toBeNull();
     await waitFor(() => {
-      expect(screen.getAllByPlaceholderText("Platform (mistle)").length).toBeGreaterThan(0);
+      expectSelectedResourceLabel("Platform (mistle)");
     });
   });
 
-  it("renders a resource refresh footer for one-of resource trigger parameters", async () => {
+  it("renders a resource refresh control for one-of resource trigger parameters", async () => {
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
@@ -786,15 +791,17 @@ describe("WebhookTriggerEventPicker", () => {
       },
     });
 
-    await screen.findAllByPlaceholderText("Platform (mistle)");
-    openComboboxByPlaceholder("Platform (mistle)");
+    await waitFor(() => {
+      expectSelectedResourceLabel("Platform (mistle)");
+    });
+    openMultiResourcePickerByLabel("requested GitHub team");
 
     expect(
       await screen.findByRole("button", { name: "Refresh requested GitHub teams" }),
     ).toBeDefined();
   });
 
-  it("pluralizes resource refresh footer labels for branch trigger parameters", async () => {
+  it("pluralizes resource refresh labels for branch trigger parameters", async () => {
     const triggerId = createWebhookTriggerEventId({
       webhookSourceId: GitHubWebhookSourceId,
       eventType: "github.pull_request.opened",
@@ -812,8 +819,10 @@ describe("WebhookTriggerEventPicker", () => {
       },
     });
 
-    await screen.findByPlaceholderText("main");
-    openComboboxByPlaceholder("main");
+    await waitFor(() => {
+      expectSelectedResourceLabel("main");
+    });
+    openMultiResourcePickerByLabel("base branch");
 
     const malformedBranchPlural = "Refresh base " + "branch" + "s";
 
@@ -837,7 +846,7 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request review requested")).toBeDefined();
     expect(screen.getByText("for bot")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByPlaceholderText("mistle-agent[bot]").length).toBeGreaterThan(0);
+      expectSelectedResourceLabel("mistle-agent[bot]");
     });
   });
 
@@ -855,7 +864,7 @@ describe("WebhookTriggerEventPicker", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getAllByPlaceholderText("legacy-team (Unavailable)").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("legacy-team").length).toBeGreaterThan(0);
     });
   });
 
@@ -883,7 +892,7 @@ describe("WebhookTriggerEventPicker", () => {
 
     expect(screen.getByText("for team")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByPlaceholderText("platform (Unavailable)").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("platform").length).toBeGreaterThan(0);
     });
     expect(
       screen.getByText(
@@ -909,7 +918,7 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request review request removed")).toBeDefined();
     expect(screen.getByText("for team")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByPlaceholderText("Platform (mistle)").length).toBeGreaterThan(0);
+      expectSelectedResourceLabel("Platform (mistle)");
     });
   });
 
@@ -929,7 +938,7 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("Pull request review request removed")).toBeDefined();
     expect(screen.getByText("for bot")).toBeDefined();
     await waitFor(() => {
-      expect(screen.getAllByPlaceholderText("mistle-agent[bot]").length).toBeGreaterThan(0);
+      expectSelectedResourceLabel("mistle-agent[bot]");
     });
   });
 
@@ -1069,21 +1078,7 @@ describe("WebhookTriggerEventPicker", () => {
       </QueryClientProvider>,
     );
 
-    const authorCombobox = screen.getAllByRole("combobox").find((element) => {
-      return element.getAttribute("placeholder") === "octocat";
-    });
-    if (authorCombobox === undefined) {
-      throw new Error("Expected selected author combobox.");
-    }
-
-    const authorComboboxTrigger = authorCombobox
-      .closest('[data-slot="input-group"]')
-      ?.querySelector('button[data-slot="input-group-button"]');
-    if (authorComboboxTrigger === undefined || authorComboboxTrigger === null) {
-      throw new Error("Expected selected author combobox trigger.");
-    }
-
-    fireEvent.click(authorComboboxTrigger);
+    openMultiResourcePickerByLabel("actor");
     fireEvent.click(screen.getByRole("option", { name: "hubot" }));
 
     await waitFor(() => {
@@ -1396,22 +1391,15 @@ describe("WebhookTriggerEventPicker", () => {
       </QueryClientProvider>,
     );
 
-    const resourceComboboxes = screen
-      .getAllByRole("combobox")
-      .filter((element) => element.getAttribute("placeholder") === "octocat");
-    const resourceCombobox = resourceComboboxes[0];
-    if (resourceCombobox === undefined) {
-      throw new Error("Expected resource combobox.");
-    }
+    expectSelectedResourceLabel("octocat");
+    const resourceCombobox = openMultiResourcePickerByLabel("actor");
     fireEvent.change(resourceCombobox, {
       target: { value: "unsaved query" },
     });
+    fireEvent.keyDown(resourceCombobox, { key: "Escape" });
     fireEvent.click(screen.getByRole("button", { name: "Switch author" }));
 
-    const updatedResourceComboboxes = screen
-      .getAllByRole("combobox")
-      .filter((element) => element.getAttribute("placeholder") === "hubot");
-    expect(updatedResourceComboboxes.length).toBeGreaterThan(0);
+    expectSelectedResourceLabel("hubot");
     expect(screen.queryByDisplayValue("unsaved query")).toBeNull();
   });
 });
