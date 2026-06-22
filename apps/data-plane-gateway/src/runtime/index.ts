@@ -91,6 +91,7 @@ import type {
 } from "../types.js";
 import { AsyncTaskTracker, type AsyncTaskDrainResult } from "./async-task-tracker.js";
 import { GatewayDrainRegistry } from "./gateway-drain-registry.js";
+import { GatewayForwardingReadiness } from "./gateway-forwarding-readiness.js";
 import { GatewayLifecycle } from "./gateway-lifecycle.js";
 export {
   GatewayWebSocketCloseCodes,
@@ -246,6 +247,11 @@ function createGatewayRelayRuntimeResources(input: {
     );
   } else {
     const subjectPrefix = `${input.config.nats.namePrefix}.gateway`;
+    const gatewayForwardingReadiness = new GatewayForwardingReadiness({
+      clock: systemClock,
+      localNodeId: input.nodeId,
+      subject: `${subjectPrefix}.forward.${input.nodeId}`,
+    });
     natsRelayTransport = new NatsRelayTransportAdapter(input.nodeId, subjectPrefix);
     natsPeerResolver = new NatsRelayPeerResolver(
       input.nodeId,
@@ -258,6 +264,7 @@ function createGatewayRelayRuntimeResources(input: {
       input.nodeId,
       subjectPrefix,
       input.gatewayForwardingServer,
+      gatewayForwardingReadiness,
     );
     relayTransport = natsRelayTransport;
     peerResolver = natsPeerResolver;

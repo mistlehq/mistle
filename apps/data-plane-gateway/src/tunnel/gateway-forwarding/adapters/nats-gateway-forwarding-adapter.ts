@@ -10,6 +10,7 @@ import {
 } from "@nats-io/transport-node";
 import { z } from "zod";
 
+import type { GatewayForwardingReadiness } from "../../../runtime/gateway-forwarding-readiness.js";
 import { BootstrapTunnelNotConnectedError } from "../../bootstrap-tunnel-not-connected-error.js";
 import {
   recordGatewayForwardingRequestEvent,
@@ -294,12 +295,14 @@ function decodeJson(data: Uint8Array): unknown {
 export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdapter {
   private readonly activeResponseTasks = new Set<Promise<void>>();
   private connection: NatsConnection | undefined;
+  private forwardingGeneration = 0;
   private subscription: Subscription | undefined;
 
   public constructor(
     private readonly nodeId: string,
     private readonly subjectPrefix: string,
     private readonly localServer: GatewayForwardingServerAdapter,
+    private readonly readiness: GatewayForwardingReadiness,
   ) {}
 
   public start(connection: NatsConnection): void {
@@ -308,16 +311,32 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
     }
 
     const subscription = connection.subscribe(this.localForwardingSubject());
+    const forwardingGeneration = this.nextForwardingGeneration();
     this.connection = connection;
     this.subscription = subscription;
-    void this.processSubscription(subscription).catch((error: unknown) => {
-      recordGatewayRelaySubscriptionFailure({
-        backend: "nats",
-        error,
-        localNodeId: this.nodeId,
-        subscriptionKind: "gateway_forwarding",
+    this.readiness.markChecking({ reason: "subscription_started" });
+    void this.processSubscription(subscription)
+      .then(() => {
+        if (this.isCurrentForwardingSubscription(subscription, forwardingGeneration)) {
+          this.nextForwardingGeneration();
+          this.readiness.markNotReady({ reason: "subscription_exited" });
+        }
+      })
+      .catch((error: unknown) => {
+        if (this.isCurrentForwardingSubscription(subscription, forwardingGeneration)) {
+          this.nextForwardingGeneration();
+          this.readiness.markNotReady({
+            error,
+            reason: "subscription_failed",
+          });
+        }
+        recordGatewayRelaySubscriptionFailure({
+          backend: "nats",
+          error,
+          localNodeId: this.nodeId,
+          subscriptionKind: "gateway_forwarding",
+        });
       });
-    });
   }
 
   public async stop(): Promise<void> {
@@ -326,8 +345,10 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
       return;
     }
 
+    this.nextForwardingGeneration();
     this.subscription = undefined;
     this.connection = undefined;
+    this.readiness.markNotReady({ reason: "stopping" });
     await subscription.drain();
     await this.waitForActiveResponseTasks();
   }
@@ -356,8 +377,16 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
         scheduleNextSelfCheck();
         return;
       }
+      const subscription = this.subscription;
+      const forwardingGeneration = this.forwardingGeneration;
       isInFlight = true;
-      void this.checkLocalForwardingResponder(connection, () => isStopped).finally(() => {
+      void this.checkLocalForwardingResponder(
+        connection,
+        () =>
+          isStopped ||
+          subscription === undefined ||
+          !this.isCurrentForwardingSubscription(subscription, forwardingGeneration),
+      ).finally(() => {
         isInFlight = false;
         scheduleNextSelfCheck();
       });
@@ -681,6 +710,10 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
           clientStreamId: 1,
         },
       });
+      if (isStopped()) {
+        return;
+      }
+      this.readiness.markReady({ reason: "self_check_succeeded" });
       recordGatewayForwardingSelfCheckEvent({
         backend: "nats",
         durationMs: Date.now() - startedAtMs,
@@ -692,6 +725,10 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
       if (isStopped()) {
         return;
       }
+      this.readiness.markNotReady({
+        error,
+        reason: "self_check_failed",
+      });
       recordGatewayForwardingSelfCheckEvent({
         backend: "nats",
         durationMs: Date.now() - startedAtMs,
@@ -705,6 +742,18 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
         subject,
       });
     }
+  }
+
+  private nextForwardingGeneration(): number {
+    this.forwardingGeneration += 1;
+    return this.forwardingGeneration;
+  }
+
+  private isCurrentForwardingSubscription(
+    subscription: Subscription,
+    forwardingGeneration: number,
+  ): boolean {
+    return this.subscription === subscription && this.forwardingGeneration === forwardingGeneration;
   }
 
   private recordForwardingRequest(input: {
