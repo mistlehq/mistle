@@ -14,6 +14,7 @@ import {
 } from "../../runtime-state/durations.js";
 import type { SandboxPresenceStore } from "../../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../../runtime-state/sandbox-runtime-attachment-store.js";
+import type { GatewayForwardingReadiness } from "../../runtime/gateway-forwarding-readiness.js";
 import type { InteractiveStreamRouter } from "../gateway-forwarding/index.js";
 import type { TunnelRelayCoordinator } from "../relay-coordinator.js";
 import {
@@ -35,8 +36,11 @@ type LeaseRenewalHandle = {
   stop: () => void;
 };
 
+class GatewayForwardingNotReadyForRuntimeAttachmentError extends Error {}
+
 export const BootstrapTunnelCloseCauses = {
   GATEWAY_ATTACH_FATAL_ERROR: "gateway_attach_fatal_error",
+  GATEWAY_FORWARDING_NOT_READY: "gateway_forwarding_not_ready",
   GATEWAY_HEALTH_MISSED_PONGS: "gateway_health_missed_pongs",
   GATEWAY_MESSAGE_HANDLER_ERROR: "gateway_message_handler_error",
   GATEWAY_OWNER_LEASE_LOST: "gateway_owner_lease_lost",
@@ -124,6 +128,7 @@ export class TunnelSessionService {
     private readonly sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore,
     private readonly sandboxInstanceDeadlineService: SandboxInstanceDeadlineService,
     private readonly sandboxDeadlineLifecycleCoordinator: SandboxDeadlineLifecycleCoordinator,
+    private readonly forwardingReadiness: GatewayForwardingReadiness,
     private readonly clock: Clock,
     private readonly scheduler: Scheduler,
     private readonly healthConfig: DataPlaneGatewayHealthConfig,
@@ -829,6 +834,7 @@ export class TunnelSessionService {
     relaySessionId: string;
     sandboxInstanceId: string;
   }): Promise<void> {
+    this.ensureForwardingReadyForRuntimeAttachment();
     await this.sandboxRuntimeAttachmentStore.upsertAttachment({
       sandboxInstanceId: input.sandboxInstanceId,
       ownerLeaseId: input.leaseId,
@@ -861,6 +867,7 @@ export class TunnelSessionService {
         return;
       }
 
+      this.ensureForwardingReadyForRuntimeAttachment();
       await this.refreshRuntimeAttachment({
         attachedAtMs: input.attachedAtMs,
         leaseId: input.leaseId,
@@ -949,11 +956,19 @@ export class TunnelSessionService {
         ttlMs: input.ownerLeaseTtlMs,
       });
     } catch (error) {
+      const closeCause =
+        error instanceof GatewayForwardingNotReadyForRuntimeAttachmentError
+          ? BootstrapTunnelCloseCauses.GATEWAY_FORWARDING_NOT_READY
+          : BootstrapTunnelCloseCauses.GATEWAY_ATTACH_FATAL_ERROR;
+      const closeReason =
+        error instanceof GatewayForwardingNotReadyForRuntimeAttachmentError
+          ? "Gateway forwarding is not ready for sandbox runtime attachment."
+          : "Failed to activate sandbox runtime attachment for attached bootstrap tunnel.";
       this.recordBootstrapCloseContext({
         attachedPeer: input.attachedPeer,
-        cause: BootstrapTunnelCloseCauses.GATEWAY_ATTACH_FATAL_ERROR,
+        cause: closeCause,
         gatewayInitiated: true,
-        reason: "Failed to activate sandbox runtime attachment for attached bootstrap tunnel.",
+        reason: closeReason,
       });
       logger.error(
         {
@@ -966,10 +981,9 @@ export class TunnelSessionService {
         "Failed to activate sandbox runtime attachment for attached bootstrap tunnel",
       );
       input.onFatalError({
-        closeReason: "Failed to activate sandbox runtime attachment for attached bootstrap tunnel.",
+        closeReason,
         error,
-        statusMessage:
-          "Failed to activate sandbox runtime attachment for attached bootstrap tunnel.",
+        statusMessage: closeReason,
       });
     }
   }
@@ -985,10 +999,36 @@ export class TunnelSessionService {
     ttlMs: number;
   }): LeaseRenewalHandle {
     let stopped = false;
+    let renewalInFlight = false;
     let scheduledHandle: TimerHandle | undefined;
+    let unsubscribeReadiness: (() => void) | undefined;
+
+    const cancelScheduledRenewal = (): void => {
+      if (scheduledHandle === undefined) {
+        return;
+      }
+
+      this.scheduler.cancel(scheduledHandle);
+      scheduledHandle = undefined;
+    };
+
+    const stopRenewal = (): void => {
+      if (stopped) {
+        return;
+      }
+
+      stopped = true;
+      unsubscribeReadiness?.();
+      unsubscribeReadiness = undefined;
+      cancelScheduledRenewal();
+    };
 
     const scheduleNextRenewal = (): void => {
-      if (stopped) {
+      if (stopped || !this.forwardingReadiness.isReady()) {
+        cancelScheduledRenewal();
+        return;
+      }
+      if (scheduledHandle !== undefined) {
         return;
       }
 
@@ -998,30 +1038,38 @@ export class TunnelSessionService {
     };
 
     const renewRuntimeAttachment = async (): Promise<void> => {
-      if (stopped) {
+      scheduledHandle = undefined;
+      if (stopped || !this.forwardingReadiness.isReady()) {
         return;
       }
       if (input.socket.readyState !== WebSocket.OPEN) {
-        stopped = true;
-        scheduledHandle = undefined;
+        stopRenewal();
         return;
       }
 
       const nowMs = this.clock.nowMs();
 
       try {
+        renewalInFlight = true;
         const currentAttachment = await this.sandboxRuntimeAttachmentStore.getAttachment({
           sandboxInstanceId: input.sandboxInstanceId,
           nowMs,
         });
-        if (
-          currentAttachment !== null &&
-          (currentAttachment.ownerLeaseId !== input.leaseId ||
-            currentAttachment.sessionId !== input.relaySessionId)
-        ) {
-          stopped = true;
-          scheduledHandle = undefined;
+        if (currentAttachment === null) {
+          stopRenewal();
           input.onLeaseLost();
+          return;
+        }
+        if (
+          currentAttachment.ownerLeaseId !== input.leaseId ||
+          currentAttachment.sessionId !== input.relaySessionId
+        ) {
+          stopRenewal();
+          input.onLeaseLost();
+          return;
+        }
+
+        if (!this.forwardingReadiness.isReady()) {
           return;
         }
 
@@ -1036,30 +1084,45 @@ export class TunnelSessionService {
           return;
         }
 
-        stopped = true;
-        scheduledHandle = undefined;
+        stopRenewal();
         input.onRefreshFailed(error);
         return;
+      } finally {
+        renewalInFlight = false;
       }
 
       scheduleNextRenewal();
     };
 
+    unsubscribeReadiness = this.forwardingReadiness.subscribe((state) => {
+      if (stopped) {
+        return;
+      }
+      if (state.status !== "ready") {
+        cancelScheduledRenewal();
+        return;
+      }
+      if (scheduledHandle === undefined && !renewalInFlight) {
+        void renewRuntimeAttachment();
+      }
+    });
+
     scheduleNextRenewal();
 
     return {
-      stop: () => {
-        if (stopped) {
-          return;
-        }
-
-        stopped = true;
-        if (scheduledHandle !== undefined) {
-          this.scheduler.cancel(scheduledHandle);
-          scheduledHandle = undefined;
-        }
-      },
+      stop: stopRenewal,
     };
+  }
+
+  private ensureForwardingReadyForRuntimeAttachment(): void {
+    if (this.forwardingReadiness.isReady()) {
+      return;
+    }
+
+    const snapshot = this.forwardingReadiness.getSnapshot();
+    throw new GatewayForwardingNotReadyForRuntimeAttachmentError(
+      `Gateway forwarding is ${snapshot.status}; refusing sandbox runtime attachment write for subject '${snapshot.subject}'.`,
+    );
   }
 
   private startPresenceLeaseRenewal(input: {
