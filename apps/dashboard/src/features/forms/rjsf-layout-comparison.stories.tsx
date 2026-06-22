@@ -22,11 +22,14 @@ import type React from "react";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import {
+  IntegrationConnectionResourcePickerView,
+  toIntegrationConnectionResourcePickerItems,
+} from "./integration-connection-resource-picker-view.js";
+import {
   createGithubRepositoryResources,
   RepositoryItems,
 } from "./integration-resource-picker-story-support.js";
 import type { IntegrationResourceListViewState } from "./integration-resource-picker-view-model.js";
-import { IntegrationResourcePickerView } from "./integration-resource-picker-view.js";
 import { SchemaFormWithoutSubmit, type SchemaFormContext } from "./schema-form.js";
 
 type JsonObject = Record<string, unknown>;
@@ -113,10 +116,9 @@ type ComparisonCase = {
   rjsf: React.ReactNode;
 };
 
-function createReadyState(items: typeof RepositoryItems): IntegrationResourceListViewState {
+function createReadyState(): IntegrationResourceListViewState {
   return {
     mode: "ready",
-    items,
   };
 }
 
@@ -224,26 +226,25 @@ function ManualCommaSeparatedStringArray(): React.JSX.Element {
 
 function ManualResourcePicker(): React.JSX.Element {
   return (
-    <IntegrationResourcePickerView
+    <IntegrationConnectionResourcePickerView
       emptyMessage="No repositories available for this connection."
       id="manual-repositories"
       isRefreshing={false}
       label="Repositories"
-      listState={createReadyState(RepositoryItems)}
+      listState={createReadyState()}
       onBlur={() => {}}
       onFocus={() => {}}
       onRefresh={() => {}}
       onSelectionChange={() => {}}
       onSearchChange={() => {}}
-      onToggleAll={() => {}}
       refreshErrorMessage={null}
       refreshLabel="Refresh repositories"
       refreshTooltip="Refresh repositories\nLast synced Mar 9, 2026, 12:00 PM"
       search=""
       searchPlaceholder="Search repositories"
-      selectedHandles={["mistle/main-dashboard", "mistle/control-plane-api"]}
-      unavailableSelectedHandles={[]}
-      visibleItems={RepositoryItems}
+      selectedValues={["mistle/main-dashboard", "mistle/control-plane-api"]}
+      unavailableSelectedValues={[]}
+      visibleItems={toIntegrationConnectionResourcePickerItems(RepositoryItems)}
     />
   );
 }
@@ -636,7 +637,7 @@ function RjsfLayoutComparisonStory(input: { caseItem?: ComparisonCase }): React.
           },
           {
             description:
-              "The resource picker is a custom RJSF widget. Keep its standalone view and schema-driven rendering aligned.",
+              "The resource picker is a custom RJSF widget. Keep the shared picker view and schema-driven rendering aligned.",
             manual: <ManualResourcePicker />,
             rjsf: <RjsfResourcePicker />,
             caseTitle: "Resource Picker",
@@ -778,7 +779,7 @@ export const ResourcePicker: Story = {
       <RjsfLayoutComparisonStory
         caseItem={{
           description:
-            "The resource picker is a custom RJSF widget. Keep its standalone view and schema-driven rendering aligned.",
+            "The resource picker is a custom RJSF widget. Keep the shared picker view and schema-driven rendering aligned.",
           manual: <ManualResourcePicker />,
           rjsf: <RjsfResourcePicker />,
           caseTitle: "Resource Picker",

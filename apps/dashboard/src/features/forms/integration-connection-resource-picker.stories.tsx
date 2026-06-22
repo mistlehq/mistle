@@ -3,24 +3,24 @@ import type React from "react";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { GitHubUserStoryItems } from "../integrations/github-user-resource-story-support.js";
-import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
+import { StoryManySlackChannelResources } from "../integrations/slack-channel-resource-story-support.js";
+import {
+  IntegrationConnectionResourcePickerView,
+  toIntegrationConnectionResourcePickerItems,
+} from "./integration-connection-resource-picker-view.js";
 import { useIntegrationResourcePickerStoryState } from "./integration-resource-picker-story-harness.js";
 import { RepositoryItems } from "./integration-resource-picker-story-support.js";
 import { type IntegrationResourceListViewState } from "./integration-resource-picker-view-model.js";
-import { IntegrationResourcePickerView } from "./integration-resource-picker-view.js";
 
-function createReadyState(
-  items: readonly IntegrationConnectionResource[],
-): IntegrationResourceListViewState {
+function createReadyState(): IntegrationResourceListViewState {
   return {
     mode: "ready",
-    items,
   };
 }
 
 const meta = {
-  title: "Dashboard/Forms/Integration Resource Picker",
-  component: IntegrationResourcePickerView,
+  title: "Dashboard/Forms/Integration Connection Resource Picker",
+  component: IntegrationConnectionResourcePickerView,
   decorators: [withDashboardCenteredStory],
   args: {
     id: "storybook-repositories",
@@ -29,25 +29,27 @@ const meta = {
     searchPlaceholder: "Search 24 repositories",
     refreshLabel: "Refresh repositories",
     refreshTooltip: "Refresh repositories\nLast synced Mar 9, 2026, 12:00 PM",
-    selectedHandles: [],
-    unavailableSelectedHandles: [],
-    listState: createReadyState(RepositoryItems),
-    visibleItems: RepositoryItems,
+    resourceLabelPlural: "repositories",
+    selectedValues: [],
+    unavailableSelectedValues: [],
+    listState: createReadyState(),
+    visibleItems: toIntegrationConnectionResourcePickerItems(RepositoryItems),
     isRefreshing: false,
     refreshErrorMessage: null,
     emptyMessage: "No repositories available for this connection.",
     onSearchChange: () => {},
     onSelectionChange: () => {},
-    onToggleAll: () => {},
     onRefresh: () => {},
     onBlur: () => {},
     onFocus: () => {},
   },
-} satisfies Meta<typeof IntegrationResourcePickerView>;
+} satisfies Meta<typeof IntegrationConnectionResourcePickerView>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+const CompactSlackChannelStoryResources = StoryManySlackChannelResources.items.slice(3, 7);
 
 function StorySection(input: {
   title: string;
@@ -81,17 +83,16 @@ export const InteractiveSelection: Story = {
     });
 
     return (
-      <IntegrationResourcePickerView
+      <IntegrationConnectionResourcePickerView
         {...args}
         emptyMessage={storyState.viewModel.emptyMessage}
-        listState={createReadyState(storyState.visibleItems)}
+        listState={createReadyState()}
         onSelectionChange={storyState.setSelectedHandles}
         onSearchChange={storyState.setSearch}
-        onToggleAll={storyState.toggleAll}
         search={storyState.search}
         searchPlaceholder={storyState.viewModel.searchPlaceholder}
-        selectedHandles={storyState.selectedHandles}
-        visibleItems={storyState.visibleItems}
+        selectedValues={storyState.selectedHandles}
+        visibleItems={toIntegrationConnectionResourcePickerItems(storyState.visibleItems)}
         refreshTooltip={storyState.viewModel.refreshTooltip}
       />
     );
@@ -106,10 +107,56 @@ export const GitHubUsers: Story = {
     searchPlaceholder: `Search ${GitHubUserStoryItems.length.toString()} GitHub users`,
     refreshLabel: "Refresh GitHub users",
     refreshTooltip: "Refresh GitHub users\nLast synced Apr 13, 2026, 3:37 PM",
-    selectedHandles: ["jon-low", "octocat"],
-    listState: createReadyState(GitHubUserStoryItems),
-    visibleItems: GitHubUserStoryItems,
+    selectedValues: ["jon-low", "octocat"],
+    listState: createReadyState(),
+    visibleItems: toIntegrationConnectionResourcePickerItems(GitHubUserStoryItems),
     emptyMessage: "No GitHub users available for this connection.",
+  },
+};
+
+export const CompactTriggerField: Story = {
+  name: "Compact trigger field",
+  args: {
+    density: "compact",
+    id: "storybook-trigger-channels",
+    label: "channel",
+    resourceLabelPlural: "channels",
+    searchPlaceholder: "Search channels",
+    refreshLabel: "Refresh channels",
+    refreshTooltip: "Refresh channels\nLast synced Apr 13, 2026, 3:37 PM",
+    selectedValues: [
+      "C_ENG_MONITOR",
+      "C_ENG_PRODUCTION_DEPLOY",
+      "C_ENG_STAGING_DEPLOY",
+      "C_ENGINEERING",
+    ],
+    listState: createReadyState(),
+    visibleItems: toIntegrationConnectionResourcePickerItems(CompactSlackChannelStoryResources),
+    emptyMessage: "No channels available for this connection.",
+  },
+};
+
+export const ManySlackChannels: Story = {
+  name: "Many Slack channels",
+  args: {
+    density: "compact",
+    id: "storybook-many-slack-channels",
+    label: "channel",
+    resourceLabelPlural: "channels",
+    searchPlaceholder: `Search ${StoryManySlackChannelResources.items.length.toString()} channels`,
+    refreshLabel: "Refresh channels",
+    refreshTooltip: "Refresh channels\nLast synced Apr 13, 2026, 3:37 PM",
+    selectedValues: [
+      "C_ENG_MONITOR",
+      "C_ENG_PRODUCTION_DEPLOY",
+      "C_ENG_STAGING_DEPLOY",
+      "C_ENGINEERING",
+      "C_PLATFORM_RUNTIME",
+      "C_RELEASE_COORDINATION",
+    ],
+    listState: createReadyState(),
+    visibleItems: toIntegrationConnectionResourcePickerItems(StoryManySlackChannelResources.items),
+    emptyMessage: "No channels available for this connection.",
   },
 };
 
@@ -121,9 +168,9 @@ export const StateGallery: Story = {
           description="Closed-state empty sync guidance remains visible below the field."
           title="Never Synced"
         >
-          <IntegrationResourcePickerView
+          <IntegrationConnectionResourcePickerView
             {...args}
-            listState={createReadyState([])}
+            listState={createReadyState()}
             refreshTooltip="Refresh repositories"
             searchPlaceholder="Search 0 repositories"
             visibleItems={[]}
@@ -134,7 +181,7 @@ export const StateGallery: Story = {
           description="Refresh errors stay visible even when the picker is closed."
           title="Refresh Failed"
         >
-          <IntegrationResourcePickerView
+          <IntegrationConnectionResourcePickerView
             {...args}
             refreshErrorMessage="Could not refresh resources for this connection."
           />
@@ -144,14 +191,14 @@ export const StateGallery: Story = {
           description="Sync failures with cached results still show the error below the field."
           title="Sync Failed"
         >
-          <IntegrationResourcePickerView
+          <IntegrationConnectionResourcePickerView
             {...args}
             listState={{
               mode: "error",
               message: "GitHub rejected the resource sync for this connection.",
             }}
             refreshTooltip="Refresh repositories\nGitHub rejected the resource sync for this connection."
-            visibleItems={RepositoryItems.slice(0, 3)}
+            visibleItems={toIntegrationConnectionResourcePickerItems(RepositoryItems.slice(0, 3))}
           />
         </StorySection>
 
@@ -159,12 +206,12 @@ export const StateGallery: Story = {
           description="Unavailable selected repositories stay visible outside the popup."
           title="Stale Selected Repositories"
         >
-          <IntegrationResourcePickerView
+          <IntegrationConnectionResourcePickerView
             {...args}
-            listState={createReadyState(RepositoryItems.slice(0, 3))}
-            selectedHandles={["mistle/main-dashboard", "mistle/private-internal-tools"]}
-            unavailableSelectedHandles={["mistle/private-internal-tools"]}
-            visibleItems={RepositoryItems.slice(0, 3)}
+            listState={createReadyState()}
+            selectedValues={["mistle/main-dashboard", "mistle/private-internal-tools"]}
+            unavailableSelectedValues={["mistle/private-internal-tools"]}
+            visibleItems={toIntegrationConnectionResourcePickerItems(RepositoryItems.slice(0, 3))}
           />
         </StorySection>
       </div>

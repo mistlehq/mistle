@@ -26,6 +26,12 @@ import { type FocusEvent, useId, useRef, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
+  IntegrationConnectionResourcePickerView,
+  toIntegrationConnectionResourcePickerItems,
+  type IntegrationConnectionResourcePickerItem,
+} from "../forms/integration-connection-resource-picker-view.js";
+import type { IntegrationResourceListViewState } from "../forms/integration-resource-picker-view-model.js";
+import {
   filterStringComboboxOptions,
   resolveStringComboboxOption,
   type StringComboboxOption,
@@ -509,11 +515,10 @@ export function WebhookTriggerEventPickerAddButton(input: {
 
 function normalizeResourceParameterOptions(input: {
   items: readonly ResourceParameterOption[];
+  markMissingSelectedOptionsUnavailable: boolean;
   selectedValues: readonly string[];
 }): ResourceParameterOption[] {
-  const sortedOptions = [...input.items].sort((left, right) =>
-    left.displayName.localeCompare(right.displayName),
-  );
+  const sortedOptions = sortResourceParameterOptions(input.items);
   const missingSelectedOptions = input.selectedValues
     .filter(
       (selectedValue) =>
@@ -523,10 +528,18 @@ function normalizeResourceParameterOptions(input: {
     .map((selectedValue) => ({
       id: `missing:${selectedValue}`,
       handle: selectedValue,
-      displayName: `${selectedValue} (Unavailable)`,
+      displayName: input.markMissingSelectedOptionsUnavailable
+        ? `${selectedValue} (Unavailable)`
+        : selectedValue,
     }));
 
   return [...sortedOptions, ...missingSelectedOptions];
+}
+
+function sortResourceParameterOptions(
+  items: readonly ResourceParameterOption[],
+): ResourceParameterOption[] {
+  return [...items].sort((left, right) => left.displayName.localeCompare(right.displayName));
 }
 
 function useTriggerParameterResources(input: {
@@ -556,8 +569,18 @@ function useTriggerParameterResources(input: {
     refetchInterval: (query) =>
       query.state.data?.syncState === "syncing" ? ResourceSyncPollIntervalMs : false,
   });
+  const availableResourceOptions = sortResourceParameterOptions(resourceQuery.data?.items ?? []);
+  const unavailableSelectedValues =
+    resourceQuery.data === undefined
+      ? []
+      : input.selectedValues.filter(
+          (selectedValue) =>
+            selectedValue.trim().length > 0 &&
+            availableResourceOptions.every((option) => option.handle !== selectedValue),
+        );
   const normalizedResourceOptions = normalizeResourceParameterOptions({
-    items: resourceQuery.data?.items ?? [],
+    items: availableResourceOptions,
+    markMissingSelectedOptionsUnavailable: resourceQuery.data !== undefined,
     selectedValues: input.selectedValues,
   });
   const resourceErrorMessage = resolveResourceParameterErrorMessage({
@@ -568,10 +591,12 @@ function useTriggerParameterResources(input: {
   });
 
   return {
+    availableResourceOptions,
     normalizedResourceOptions,
     resourceErrorMessage,
     resourceQuery,
     resourceQueryKey,
+    unavailableSelectedValues,
   };
 }
 
@@ -796,8 +821,12 @@ function OneOfParameterGroupField(input: {
               }
               rule={selectedRule}
               resourceQueryKey={selectedResources.resourceQueryKey}
-              resourceOptions={selectedResources.normalizedResourceOptions}
+              resourceErrorMessage={selectedResources.resourceErrorMessage}
+              resourceOptions={selectedResources.availableResourceOptions}
+              resourceQueryIsError={selectedResources.resourceQuery.isError}
+              resourceQueryIsPending={selectedResources.resourceQuery.isPending}
               syncState={selectedResources.resourceQuery.data?.syncState}
+              unavailableSelectedValues={selectedResources.unavailableSelectedValues}
               showOperator={false}
             />
           ) : (
@@ -1030,8 +1059,12 @@ function EventParameterField(input: {
         placeholder={placeholder}
         rule={input.rule}
         resourceQueryKey={resources.resourceQueryKey}
-        resourceOptions={resources.normalizedResourceOptions}
+        resourceErrorMessage={resources.resourceErrorMessage}
+        resourceOptions={resources.availableResourceOptions}
+        resourceQueryIsError={resources.resourceQuery.isError}
+        resourceQueryIsPending={resources.resourceQuery.isPending}
         syncState={resources.resourceQuery.data?.syncState}
+        unavailableSelectedValues={resources.unavailableSelectedValues}
       />
     );
   }
@@ -1066,22 +1099,56 @@ function ResourceMultiSelectParameterField(input: {
     handle: string;
     displayName: string;
   }>;
+  resourceErrorMessage: string | null;
   resourceQueryKey: readonly ["trigger-trigger-parameters", string, string];
+  resourceQueryIsError: boolean;
+  resourceQueryIsPending: boolean;
   syncState: string | undefined;
+  unavailableSelectedValues: readonly string[];
   onRuleChange: (rule: WebhookTriggerEventParameterRule) => void;
   showOperator?: boolean;
 }): React.JSX.Element {
   const inputId = useId();
-  const anchorRef = useComboboxAnchor();
-  const [isOpen, setIsOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
   const showOperator = input.showOperator ?? true;
   const selectedValues = resolveParameterRuleValues(input.rule);
-  const selectedLabels = selectedValues
-    .map(
-      (value) =>
-        input.resourceOptions.find((option) => option.handle === value)?.displayName ?? value,
-    )
-    .join(", ");
+  const resourceLabel = formatRefreshResourceLabel(input.parameter.label);
+  const pickerItems = toIntegrationConnectionResourcePickerItems(input.resourceOptions);
+  const visiblePickerItems = filterIntegrationConnectionResourcePickerItems(pickerItems, search);
+  const refreshLabel = `Refresh ${resourceLabel}`;
+  const refreshMutation = useMutation({
+    mutationFn: async () =>
+      refreshIntegrationConnectionResources({
+        connectionId: input.connectionId,
+        kind: input.parameter.resourceKind,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: input.resourceQueryKey,
+      });
+    },
+  });
+  const refreshErrorMessage =
+    refreshMutation.error === null || refreshMutation.error === undefined
+      ? null
+      : resolveApiErrorMessage({
+          error: refreshMutation.error,
+          fallbackMessage: `Could not refresh ${resourceLabel}.`,
+        });
+  const listState: IntegrationResourceListViewState = input.resourceQueryIsPending
+    ? {
+        mode: "loading",
+      }
+    : input.resourceQueryIsError
+      ? {
+          mode: "error",
+          message: input.resourceErrorMessage ?? `Could not load ${resourceLabel}.`,
+        }
+      : {
+          mode: "ready",
+        };
+  const isRefreshing = refreshMutation.isPending || input.syncState === "syncing";
 
   return (
     <span className={EventParameterRowClassName}>
@@ -1099,56 +1166,56 @@ function ResourceMultiSelectParameterField(input: {
           }}
         />
       ) : null}
-      <Combobox<string, true>
-        disabled={input.disabled}
-        multiple
-        onOpenChange={setIsOpen}
-        onValueChange={(values) => {
-          input.onRuleChange({
-            operator: resolveEqualityOperator(input.rule),
-            value: "",
-            values,
-          });
-        }}
-        open={isOpen}
-        value={selectedValues}
-      >
-        <div className={EventParameterControlClassName} ref={anchorRef}>
-          <ComboboxInput
-            disabled={input.disabled}
-            id={inputId}
-            placeholder={
-              selectedValues.length === 0 ? `Any ${input.parameter.label}` : selectedLabels
-            }
-            showClear={false}
-          />
-        </div>
-        {isOpen ? (
-          <ComboboxContent
-            align="start"
-            anchor={anchorRef}
-            className="w-[min(22rem,calc(100vw-2rem))] p-0"
-          >
-            <ComboboxList className="max-h-72">
-              {input.resourceOptions.map((option) => (
-                <ComboboxItem key={option.id} value={option.handle}>
-                  <span className="truncate">{option.displayName}</span>
-                </ComboboxItem>
-              ))}
-            </ComboboxList>
-            <ResourceRefreshFooter
-              connectionId={input.connectionId}
-              disabled={input.disabled}
-              parameterLabel={input.parameter.label}
-              resourceKind={input.parameter.resourceKind}
-              resourceQueryKey={input.resourceQueryKey}
-              syncState={input.syncState}
-            />
-          </ComboboxContent>
-        ) : null}
-      </Combobox>
+      <div className={EventParameterControlClassName}>
+        <IntegrationConnectionResourcePickerView
+          density="compact"
+          disabled={input.disabled}
+          emptyMessage={`No ${resourceLabel} available for this connection.`}
+          id={inputId}
+          isRefreshing={isRefreshing}
+          label={input.parameter.label}
+          listState={listState}
+          onBlur={() => {}}
+          onFocus={() => {}}
+          onRefresh={() => {
+            refreshMutation.mutate();
+          }}
+          onSearchChange={setSearch}
+          onSelectionChange={(values) => {
+            input.onRuleChange({
+              operator: resolveEqualityOperator(input.rule),
+              value: "",
+              values,
+            });
+          }}
+          refreshErrorMessage={refreshErrorMessage}
+          refreshLabel={refreshLabel}
+          refreshTooltip={refreshLabel}
+          resourceLabelPlural={resourceLabel}
+          search={search}
+          searchPlaceholder={input.placeholder}
+          selectedValues={selectedValues}
+          unavailableSelectedValues={input.unavailableSelectedValues}
+          visibleItems={visiblePickerItems}
+        />
+      </div>
     </span>
   );
+}
+
+function filterIntegrationConnectionResourcePickerItems(
+  items: readonly IntegrationConnectionResourcePickerItem[],
+  search: string,
+): IntegrationConnectionResourcePickerItem[] {
+  const normalizedSearch = search.trim().toLowerCase();
+  if (normalizedSearch.length === 0) {
+    return [...items];
+  }
+
+  return items.filter((item) => {
+    const haystack = `${item.label} ${item.value}`.toLowerCase();
+    return haystack.includes(normalizedSearch);
+  });
 }
 
 export function resolveEnumSelectParameterRule(input: {

@@ -12,8 +12,11 @@ import {
 } from "../integrations/integrations-service.js";
 import { sandboxProfileIntegrationDirectoryQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { formatDateTime } from "../shared/date-formatters.js";
+import {
+  IntegrationConnectionResourcePickerView,
+  toIntegrationConnectionResourcePickerItems,
+} from "./integration-connection-resource-picker-view.js";
 import { buildIntegrationResourcePickerViewModel } from "./integration-resource-picker-view-model.js";
-import { IntegrationResourcePickerView } from "./integration-resource-picker-view.js";
 import type { SchemaFormContext } from "./schema-form.js";
 
 type JsonObject = Record<string, unknown>;
@@ -136,26 +139,12 @@ export function IntegrationResourcePickerWidget(
   }
 
   const visibleItems = resourceQuery.data?.items ?? [];
+  const visiblePickerItems = toIntegrationConnectionResourcePickerItems(visibleItems);
   const availableHandles = new Set(visibleItems.map((item) => item.handle));
   const unavailableSelectedHandles =
     resourceQuery.data === undefined || debouncedSearch.length > 0
       ? []
       : selectedHandles.filter((handle) => !availableHandles.has(handle));
-
-  function toggleAll(): void {
-    const visibleHandleSet = new Set(visibleItems.map((item) => item.handle));
-    const allVisibleSelected = visibleItems.every((item) => selectedHandles.includes(item.handle));
-
-    if (allVisibleSelected) {
-      props.onChange(selectedHandles.filter((handle) => !visibleHandleSet.has(handle)));
-    } else {
-      const selectedSet = new Set(selectedHandles);
-      const handlesToAdd = visibleItems
-        .filter((item) => !selectedSet.has(item.handle))
-        .map((item) => item.handle);
-      props.onChange([...selectedHandles, ...handlesToAdd]);
-    }
-  }
 
   function triggerRefresh(): void {
     refreshMutation.mutate();
@@ -213,7 +202,6 @@ export function IntegrationResourcePickerWidget(
     selectedCount: selectedHandles.length,
     refreshErrorMessage,
     unavailableSelectedHandles,
-    unavailableSelectedHandlesCount: unavailableSelectedHandles.length,
     listState: resourceQuery.isPending
       ? {
           mode: "loading",
@@ -230,7 +218,7 @@ export function IntegrationResourcePickerWidget(
   });
 
   return (
-    <IntegrationResourcePickerView
+    <IntegrationConnectionResourcePickerView
       emptyMessage={widgetViewModel.emptyMessage}
       id={props.id}
       isRefreshing={refreshMutation.isPending}
@@ -248,7 +236,6 @@ export function IntegrationResourcePickerWidget(
               }
             : {
                 mode: "ready",
-                items: resourceQuery.data.items,
               }
       }
       onBlur={() => {
@@ -260,15 +247,15 @@ export function IntegrationResourcePickerWidget(
       onRefresh={triggerRefresh}
       onSelectionChange={props.onChange}
       onSearchChange={setSearch}
-      onToggleAll={toggleAll}
+      resourceLabelPlural={options.title}
       refreshErrorMessage={refreshErrorMessage}
       refreshLabel={refreshLabel}
       refreshTooltip={widgetViewModel.refreshTooltip}
       search={search}
       searchPlaceholder={widgetViewModel.searchPlaceholder}
-      selectedHandles={selectedHandles}
-      unavailableSelectedHandles={unavailableSelectedHandles}
-      visibleItems={visibleItems}
+      selectedValues={selectedHandles}
+      unavailableSelectedValues={unavailableSelectedHandles}
+      visibleItems={visiblePickerItems}
     />
   );
 }

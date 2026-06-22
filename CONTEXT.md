@@ -257,6 +257,10 @@ _Avoid_: Provider object, touched resource
 An external provider object used to configure integrations, triggers, or sandbox profile behavior.
 _Avoid_: Routable provider resource when future event routing is not the concern
 
+**Integration connection resource selection**:
+A user selection of provider resource handles available through an **Integration connection** for configuring Mistle behavior.
+_Avoid_: Trigger-only resource selection when the same provider resources are selected outside triggers
+
 **Provider configuration change**:
 A user-approved change to an external provider object made while configuring Mistle behavior.
 _Avoid_: Provider resource refresh when no provider object is modified

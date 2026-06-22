@@ -8,14 +8,12 @@ export type IntegrationResourceListViewState =
     }
   | {
       mode: "ready";
-      items?: readonly unknown[];
     };
 
 export type IntegrationResourcePickerViewModel = {
   searchPlaceholder: string;
   refreshTooltip: string;
   emptyMessage: string;
-  hasVisibleItems: boolean;
   selectedCountLabel: string | null;
   messageSections: IntegrationResourceWidgetMessageSection[];
 };
@@ -64,9 +62,10 @@ function resolveIntegrationResourceEmptyMessage(input: {
   syncState: string | undefined;
   emptyMessage: string | undefined;
   search: string;
+  resourceLabelPlural: string;
 }): string {
   if (input.search.trim().length > 0) {
-    return "No repositories match this search.";
+    return `No ${input.resourceLabelPlural.toLowerCase()} match this search.`;
   }
 
   if (input.emptyMessage !== undefined) {
@@ -118,6 +117,7 @@ function resolveSyncFailureState(input: {
 export function buildIntegrationResourcePickerViewModel(input: {
   title: string | undefined;
   availableCount: number | undefined;
+  resourceLabelPlural?: string | undefined;
   refreshLabel: string;
   syncMetadata: string | null;
   syncState: string | undefined;
@@ -126,7 +126,6 @@ export function buildIntegrationResourcePickerViewModel(input: {
   selectedCount: number;
   refreshErrorMessage: string | null;
   unavailableSelectedHandles?: readonly string[] | undefined;
-  unavailableSelectedHandlesCount: number;
   listState: IntegrationResourceListViewState;
   visibleItemsCount: number;
 }): IntegrationResourcePickerViewModel {
@@ -139,6 +138,7 @@ export function buildIntegrationResourcePickerViewModel(input: {
     syncState: input.syncState,
     emptyMessage: input.emptyMessage,
     search: input.search,
+    resourceLabelPlural: input.resourceLabelPlural ?? "resources",
   });
   const messageSections: IntegrationResourceWidgetMessageSection[] = [];
 
@@ -150,7 +150,10 @@ export function buildIntegrationResourcePickerViewModel(input: {
     });
   }
 
-  if (input.unavailableSelectedHandlesCount > 0 && input.unavailableSelectedHandles) {
+  if (
+    input.unavailableSelectedHandles !== undefined &&
+    input.unavailableSelectedHandles.length > 0
+  ) {
     messageSections.push({
       variant: "alert",
       message: "The selected resources are no longer available:",
@@ -181,7 +184,6 @@ export function buildIntegrationResourcePickerViewModel(input: {
       syncMetadata: input.syncMetadata,
     }),
     emptyMessage,
-    hasVisibleItems,
     selectedCountLabel: resolveSelectedCountLabel(input.selectedCount),
     messageSections,
   };

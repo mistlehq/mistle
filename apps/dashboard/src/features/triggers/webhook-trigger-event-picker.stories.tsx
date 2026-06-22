@@ -4,6 +4,8 @@ import { useState } from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
+import { StoryManySlackChannelResources } from "../integrations/slack-channel-resource-story-support.js";
 import { WebhookTriggerEventPicker } from "./webhook-trigger-event-picker.js";
 import type {
   WebhookTriggerEventOption,
@@ -74,6 +76,7 @@ function StoryHarness(input: {
   error?: string;
   showGitHubTeamSyncError?: boolean;
   showSlackChannelSyncing?: boolean;
+  slackChannelResources?: IntegrationConnectionResources;
 }): React.JSX.Element {
   const [queryClient] = useState(() =>
     createWebhookTriggerStoryQueryClient({
@@ -82,7 +85,9 @@ function StoryHarness(input: {
         : {}),
       ...(input.showSlackChannelSyncing === true
         ? { slackChannelResources: StorySlackChannelResourcesSyncing }
-        : {}),
+        : input.slackChannelResources === undefined
+          ? {}
+          : { slackChannelResources: input.slackChannelResources }),
     }),
   );
   const [selectedEventIds, setSelectedEventIds] = useState([...input.selectedEventIds]);
@@ -153,6 +158,19 @@ async function findVisibleButtonByName(
   }
 
   return visibleButton;
+}
+
+async function openMultiResourcePickerByLabel(
+  queries: ReturnType<typeof within>,
+  label: string,
+): Promise<void> {
+  const combobox = await queries.findByRole("combobox", { name: label });
+  const chipToolbar = combobox.closest('[data-slot="combobox-chips"]');
+  if (chipToolbar === null) {
+    throw new Error(`Expected chip toolbar for '${label}'.`);
+  }
+
+  await userEvent.click(chipToolbar);
 }
 
 export const Default: Story = {
@@ -235,8 +253,8 @@ export const GitHubReviewRequestTeamSyncFailed: Story = {
   },
 };
 
-export const SlackChannelRefreshFooter: Story = {
-  name: "Slack channel refresh footer",
+export const SlackChannelRefreshControl: Story = {
+  name: "Slack channel refresh control",
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: StorySlackConnectionId,
@@ -251,13 +269,13 @@ export const SlackChannelRefreshFooter: Story = {
   play: async ({ canvasElement }): Promise<void> => {
     const body = within(canvasElement.ownerDocument.body);
 
-    await userEvent.click(await body.findByDisplayValue("#engineering"));
+    await openMultiResourcePickerByLabel(body, "channel");
     await findVisibleButtonByName(body, "Refresh channels");
   },
 };
 
-export const SlackChannelRefreshingFooter: Story = {
-  name: "Slack channel refreshing footer",
+export const SlackChannelRefreshingControl: Story = {
+  name: "Slack channel refreshing control",
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: StorySlackConnectionId,
@@ -273,7 +291,7 @@ export const SlackChannelRefreshingFooter: Story = {
   play: async ({ canvasElement }): Promise<void> => {
     const body = within(canvasElement.ownerDocument.body);
 
-    await userEvent.click(await body.findByDisplayValue("#engineering"));
+    await openMultiResourcePickerByLabel(body, "channel");
     await expect(await findVisibleButtonByName(body, "Refresh channels")).toBeDisabled();
     await expect(body.getByText("Refreshing channels")).toBeVisible();
   },
@@ -376,6 +394,28 @@ export const SlackAppMentionMultipleChannels: Story = {
       },
     },
     eventOptions: StorySlackEventOptions,
+  },
+};
+
+export const SlackAppMentionManyChannels: Story = {
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: StorySlackConnectionId,
+    selectedEventIds: [StorySlackAppMentionConditionId],
+    eventParameterRules: {
+      [StorySlackAppMentionConditionId]: {
+        channel: isAnyOfRule([
+          "C_ENG_MONITOR",
+          "C_ENG_PRODUCTION_DEPLOY",
+          "C_ENG_STAGING_DEPLOY",
+          "C_ENGINEERING",
+          "C_PLATFORM_RUNTIME",
+          "C_RELEASE_COORDINATION",
+        ]),
+      },
+    },
+    eventOptions: StorySlackEventOptions,
+    slackChannelResources: StoryManySlackChannelResources,
   },
 };
 

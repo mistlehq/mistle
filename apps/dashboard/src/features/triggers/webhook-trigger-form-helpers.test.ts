@@ -275,7 +275,7 @@ describe("toWebhookTriggerFormValues", () => {
     });
   });
 
-  it("maps a trigger resource into form values", () => {
+  it("maps a webhook trigger into form values", () => {
     expect(toWebhookTriggerFormValues(SampleTrigger)).toEqual({
       name: "GitHub pushes to repo triage",
       sandboxProfileId: "sbp_repo",
