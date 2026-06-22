@@ -41,6 +41,7 @@ import {
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
+import { TriggerFormFieldError } from "./trigger-form-shell.js";
 import { isWebhookTriggerEventOptionUnavailable } from "./webhook-trigger-event-option-availability.js";
 import {
   resolveSelectedWebhookTriggerEventOptions,
@@ -54,6 +55,7 @@ import type {
   WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
+import type { WebhookTriggerEventParameterFieldError } from "./webhook-trigger-form-types.js";
 import { createWebhookTriggerEventConditionId } from "./webhook-trigger-option-builders.js";
 
 const EventParameterRowClassName = "flex w-full items-center gap-4";
@@ -101,6 +103,7 @@ export function WebhookTriggerEventPicker(input: {
   disabledState?: WebhookTriggerEventPickerDisabledState | null;
   eventParameterRules: WebhookTriggerEventParameterRuleMap;
   error: string | undefined;
+  eventParameterError?: WebhookTriggerEventParameterFieldError;
   onValueChange?: (value: string[]) => void;
   onEventParameterRuleChange: (input: {
     triggerId: string;
@@ -180,6 +183,9 @@ export function WebhookTriggerEventPicker(input: {
                 connectionId={input.selectedConnectionId}
                 disabled={selectedEventControlsDisabled}
                 eventOption={option}
+                {...(input.eventParameterError === undefined
+                  ? {}
+                  : { eventParameterError: input.eventParameterError })}
                 rules={input.eventParameterRules[option.id] ?? {}}
                 onRuleChange={(parameterId, rule) => {
                   input.onEventParameterRuleChange({
@@ -250,6 +256,9 @@ export function WebhookTriggerEventPicker(input: {
                 connectionId={input.selectedConnectionId}
                 disabled={selectedEventControlsDisabled}
                 eventOption={option}
+                {...(input.eventParameterError === undefined
+                  ? {}
+                  : { eventParameterError: input.eventParameterError })}
                 rules={input.eventParameterRules[option.id] ?? {}}
                 onRuleChange={(parameterId, rule) => {
                   input.onEventParameterRuleChange({
@@ -333,6 +342,7 @@ function EventParameterFields(input: {
   connectionId: string;
   disabled: boolean;
   eventOption: WebhookTriggerEventOption;
+  eventParameterError?: WebhookTriggerEventParameterFieldError;
   rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
   onRuleChange: (parameterId: string, rule: WebhookTriggerEventParameterRule) => void;
   onRulesChange: (rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>) => void;
@@ -375,6 +385,10 @@ function EventParameterFields(input: {
             connectionId={input.connectionId}
             disabled={input.disabled}
             eventType={input.eventOption.eventType}
+            {...(input.eventParameterError?.triggerId === input.eventOption.id &&
+            input.eventParameterError.parameterId === parameter.id
+              ? { errorMessage: input.eventParameterError.message }
+              : {})}
             key={`${input.eventOption.id}:${parameter.id}`}
             onRuleChange={(rule) => {
               input.onRuleChange(parameter.id, rule);
@@ -919,6 +933,7 @@ function EventParameterField(input: {
   connectionId: string;
   disabled: boolean;
   eventType: string;
+  errorMessage?: string;
   parameter: NonNullable<WebhookTriggerEventOption["parameters"]>[number];
   rule: WebhookTriggerEventParameterRule | undefined;
   onRuleChange: (rule: WebhookTriggerEventParameterRule) => void;
@@ -958,19 +973,22 @@ function EventParameterField(input: {
               </TooltipContent>
             </Tooltip>
           </span>
-          <Input
-            aria-label={input.parameter.label}
-            className={EventParameterControlClassName}
-            disabled={input.disabled}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-              input.onRuleChange({
-                operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
-                value: event.currentTarget.value,
-              });
-            }}
-            placeholder={input.parameter.placeholder}
-            value={value}
-          />
+          <span className={`${EventParameterControlClassName} space-y-2`}>
+            <Input
+              aria-invalid={input.errorMessage === undefined ? undefined : true}
+              aria-label={input.parameter.label}
+              disabled={input.disabled}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                input.onRuleChange({
+                  operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
+                  value: event.currentTarget.value,
+                });
+              }}
+              placeholder={input.parameter.placeholder}
+              value={value}
+            />
+            <TriggerFormFieldError message={input.errorMessage} />
+          </span>
         </span>
       );
     }

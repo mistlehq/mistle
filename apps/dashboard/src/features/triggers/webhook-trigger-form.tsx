@@ -35,11 +35,13 @@ import {
 } from "./webhook-trigger-form-state.js";
 import {
   type WebhookTriggerFormOption,
+  type WebhookTriggerFormFieldErrors,
   type WebhookTriggerFormValueKey,
   type WebhookTriggerFormValues,
 } from "./webhook-trigger-form-types.js";
 import { DefaultWebhookTriggerMessageTemplate } from "./webhook-trigger-input-template.js";
 export type {
+  WebhookTriggerFormFieldErrors,
   WebhookTriggerFormOption,
   WebhookTriggerFormValueKey,
   WebhookTriggerFormValues,
@@ -55,7 +57,10 @@ type WebhookTriggerTypeSpecificSectionProps = {
   connectionOptions: readonly WebhookTriggerFormOption[];
   webhookEventOptions: readonly WebhookTriggerEventOption[];
   triggerPickerDisabledState: WebhookTriggerEventPickerDisabledState | null;
-  fieldErrors: Pick<WebhookTriggerFormProps["fieldErrors"], "conversationKeyTemplate" | "eventIds">;
+  fieldErrors: Pick<
+    WebhookTriggerFormFieldErrors,
+    "conversationKeyTemplate" | "eventIds" | "eventParameterRules"
+  >;
   formState: ReturnType<typeof resolveWebhookTriggerFormState>;
   onValueChange: (
     key: "conversationKeyTemplate" | "eventIds" | "eventParameterRules",
@@ -79,7 +84,7 @@ type WebhookTriggerFormProps = {
   primaryRepositoryOptions?: readonly WebhookTriggerFormOption[];
   webhookEventOptions: readonly WebhookTriggerEventOption[];
   triggerPickerDisabledState: WebhookTriggerEventPickerDisabledState | null;
-  fieldErrors: Partial<Record<WebhookTriggerFormValueKey, string>>;
+  fieldErrors: WebhookTriggerFormFieldErrors;
   validationSummaryError: string | null;
   formError: string | null;
   isSaving: boolean;
@@ -124,6 +129,9 @@ export function WebhookTriggerTypeSpecificSection(
         <WebhookTriggerEventPicker
           error={input.fieldErrors.eventIds}
           eventOptions={input.webhookEventOptions}
+          {...(input.fieldErrors.eventParameterRules === undefined
+            ? {}
+            : { eventParameterError: input.fieldErrors.eventParameterRules })}
           hasConnectedIntegrations={input.connectionOptions.length > 0}
           disabledState={input.triggerPickerDisabledState}
           onEventParameterRuleChange={({ triggerId, parameterId, rule }) => {

@@ -14,8 +14,10 @@ import type {
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import { createWebhookTriggerEventConditionId } from "./webhook-trigger-option-builders.js";
 import {
+  containsRule,
   containsTokenRule,
   createWebhookTriggerStoryQueryClient,
+  existsRule,
   isNotRule,
   isRule,
   StoryGitHubConnectionId,
@@ -28,6 +30,9 @@ import {
   StoryPullRequestReviewRequestedTriggerId,
   StoryPushDeletedTriggerId,
   StorySlackAppMentionTriggerId,
+  StorySlackMessageTriggerId,
+  StorySlackReactionAddedTriggerId,
+  StorySlackReactionRemovedTriggerId,
   StorySlackConnectionId,
   StorySlackChannelResourcesSyncing,
   StorySlackEventOptions,
@@ -54,6 +59,9 @@ const StoryPullRequestReviewCommentCreatedConditionId = conditionId(
 );
 const StoryPushDeletedConditionId = conditionId(StoryPushDeletedTriggerId);
 const StorySlackAppMentionConditionId = conditionId(StorySlackAppMentionTriggerId);
+const StorySlackMessageConditionId = conditionId(StorySlackMessageTriggerId);
+const StorySlackReactionAddedConditionId = conditionId(StorySlackReactionAddedTriggerId);
+const StorySlackReactionRemovedConditionId = conditionId(StorySlackReactionRemovedTriggerId);
 
 function conditionId(eventOptionId: string, index = 0): string {
   return createWebhookTriggerEventConditionId({ eventOptionId, index });
@@ -416,6 +424,44 @@ export const SlackAppMentionManyChannels: Story = {
     },
     eventOptions: StorySlackEventOptions,
     slackChannelResources: StoryManySlackChannelResources,
+  },
+};
+
+export const SlackMessageFilters: Story = {
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: StorySlackConnectionId,
+    selectedEventIds: [StorySlackMessageConditionId],
+    eventParameterRules: {
+      [StorySlackMessageConditionId]: {
+        channel: isAnyOfRule(["C_ALERTS_001", "C_ENG_001"]),
+        sender: isRule("U1234567890"),
+        messageText: containsRule("deployment failed"),
+        threadReply: existsRule(),
+      },
+    },
+    eventOptions: StorySlackEventOptions,
+  },
+};
+
+export const SlackReactionFilters: Story = {
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: StorySlackConnectionId,
+    selectedEventIds: [StorySlackReactionAddedConditionId, StorySlackReactionRemovedConditionId],
+    eventParameterRules: {
+      [StorySlackReactionAddedConditionId]: {
+        channel: isAnyOfRule(["C_ALERTS_001"]),
+        reaction: isRule("thumbsup"),
+        reactingUser: isRule("U1234567890"),
+        reactedMessageAuthor: isNotRule("U9999999999"),
+      },
+      [StorySlackReactionRemovedConditionId]: {
+        channel: isAnyOfRule(["C_ENG_001"]),
+        reaction: isRule("eyes"),
+      },
+    },
+    eventOptions: StorySlackEventOptions,
   },
 };
 

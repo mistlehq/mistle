@@ -103,6 +103,71 @@ const SlackChannelParameter: IntegrationWebhookEventParameterDefinition = {
   prefix: "in",
 };
 
+const SlackMessageSenderParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "sender",
+  label: "sender user ID",
+  kind: "string",
+  payloadPath: ["event", "user"],
+  prefix: "from",
+  placeholder: "U1234567890",
+};
+
+const SlackMessageTextParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "messageText",
+  label: "message text",
+  kind: "string",
+  payloadPath: ["event", "text"],
+  matchMode: "contains",
+  prefix: "containing",
+  placeholder: "deployment failed",
+};
+
+const SlackThreadReplyParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "threadReply",
+  label: "thread reply",
+  kind: "enum-select",
+  payloadPath: ["event", "thread_ts"],
+  matchMode: "exists",
+  options: [
+    {
+      value: "exists",
+      label: "is in a thread",
+    },
+    {
+      value: "not_exists",
+      label: "is not in a thread",
+    },
+  ],
+};
+
+const SlackReactionNameParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "reaction",
+  label: "reaction",
+  kind: "string",
+  payloadPath: ["event", "reaction"],
+  prefix: "named",
+  placeholder: "thumbsup",
+};
+
+const SlackReactionActorParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "reactingUser",
+  label: "reacting user ID",
+  kind: "string",
+  payloadPath: ["event", "user"],
+  prefix: "by",
+  placeholder: "U1234567890",
+};
+
+const SlackReactedMessageAuthorParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "reactedMessageAuthor",
+  label: "message author user ID",
+  kind: "string",
+  payloadPath: ["event", "item_user"],
+  prefix: "on message by",
+  placeholder: "U1234567890",
+  negatedMatchRequiresExists: true,
+};
+
 const SlackWebhookPermissionRequirements = {
   APP_MENTIONS_READ: {
     permission: "app_mentions:read",
@@ -187,7 +252,13 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     requirements: SlackMessageRequirements,
     payloadReferences: SlackMessagePayloadReferences,
     conversationKeyOptions: [SlackChannelConversationKeyOption, SlackThreadConversationKeyOption],
-    parameters: [createSlackInvocationTokenParameter()],
+    parameters: [
+      createSlackInvocationTokenParameter(),
+      SlackChannelParameter,
+      SlackMessageSenderParameter,
+      SlackMessageTextParameter,
+      SlackThreadReplyParameter,
+    ],
   }),
   createSlackWebhookEventDefinition({
     eventType: "slack:app_mention",
@@ -217,6 +288,12 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
       SlackThreadConversationKeyOption,
       SlackReactedMessageConversationKeyOption,
     ],
+    parameters: [
+      SlackChannelParameter,
+      SlackReactionNameParameter,
+      SlackReactionActorParameter,
+      SlackReactedMessageAuthorParameter,
+    ],
   }),
   createSlackWebhookEventDefinition({
     eventType: "slack:reaction_removed",
@@ -232,6 +309,12 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
       SlackChannelConversationKeyOption,
       SlackThreadConversationKeyOption,
       SlackReactedMessageConversationKeyOption,
+    ],
+    parameters: [
+      SlackChannelParameter,
+      SlackReactionNameParameter,
+      SlackReactionActorParameter,
+      SlackReactedMessageAuthorParameter,
     ],
   }),
 ];

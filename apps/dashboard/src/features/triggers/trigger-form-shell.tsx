@@ -81,17 +81,6 @@ export type TriggerFormShellStatusMessage = {
   variant: "alert" | "default";
 };
 
-function shouldRenderCommonTriggerInlineFieldError(input: {
-  key: CommonTriggerFormValueKey;
-  message: string | undefined;
-}): boolean {
-  if (input.message === undefined) {
-    return false;
-  }
-
-  return input.key !== "name" && input.key !== "sandboxProfileId";
-}
-
 export function TriggerFormFieldError(input: {
   message: string | undefined;
   className?: string;
@@ -100,7 +89,15 @@ export function TriggerFormFieldError(input: {
     return null;
   }
 
-  return <p className={cn("text-destructive text-sm", input.className)}>{input.message}</p>;
+  return (
+    <div aria-live="polite" data-slot="field-error" role="status">
+      <div
+        className={cn("flex items-center justify-start text-xs text-destructive", input.className)}
+      >
+        <span>{input.message}</span>
+      </div>
+    </div>
+  );
 }
 
 export function TriggerFormSelectField(input: {
@@ -109,53 +106,67 @@ export function TriggerFormSelectField(input: {
   placeholder: string;
   options: readonly TriggerFormShellOption[];
   error: string | undefined;
-  showInlineError?: boolean;
-  orientation?: "vertical" | "horizontal";
   disabled?: boolean;
   onValueChange: (value: string) => void;
 }): React.JSX.Element {
   const selectedOption = input.options.find((option) => option.value === input.value);
-  const isInvalid = input.error !== undefined;
 
   return (
-    <Field orientation={input.orientation ?? "vertical"}>
+    <Field>
       <FieldLabel>{input.label}</FieldLabel>
       <FieldContent>
-        <Select
-          disabled={input.disabled}
-          onValueChange={(value) => {
-            if (value === null) {
-              return;
-            }
-
-            input.onValueChange(value);
-          }}
+        <TriggerFormSelectControl
+          error={input.error}
+          onValueChange={input.onValueChange}
+          options={input.options}
+          placeholder={input.placeholder}
+          selectedLabel={selectedOption?.label}
           value={input.value}
-        >
-          <SelectTrigger
-            aria-invalid={isInvalid ? true : undefined}
-            className={input.orientation === "horizontal" ? undefined : "w-full"}
-          >
-            <SelectValue placeholder={input.placeholder}>{selectedOption?.label}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {input.options.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                <div className="flex flex-col gap-0.5">
-                  <span>{option.label}</span>
-                  {option.description === undefined ? null : (
-                    <span className="text-muted-foreground text-xs">{option.description}</span>
-                  )}
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <TriggerFormFieldError
-          message={input.showInlineError === false ? undefined : input.error}
+          {...(input.disabled === undefined ? {} : { disabled: input.disabled })}
         />
+        <TriggerFormFieldError message={input.error} />
       </FieldContent>
     </Field>
+  );
+}
+
+function TriggerFormSelectControl(input: {
+  value: string;
+  placeholder: string;
+  selectedLabel: string | undefined;
+  options: readonly TriggerFormShellOption[];
+  error: string | undefined;
+  disabled?: boolean;
+  onValueChange: (value: string) => void;
+}): React.JSX.Element {
+  return (
+    <Select
+      disabled={input.disabled}
+      onValueChange={(value) => {
+        if (value === null) {
+          return;
+        }
+
+        input.onValueChange(value);
+      }}
+      value={input.value}
+    >
+      <SelectTrigger aria-invalid={input.error !== undefined ? true : undefined} className="w-full">
+        <SelectValue placeholder={input.placeholder}>{input.selectedLabel}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {input.options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            <div className="flex flex-col gap-0.5">
+              <span>{option.label}</span>
+              {option.description === undefined ? null : (
+                <span className="text-muted-foreground text-xs">{option.description}</span>
+              )}
+            </div>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -181,16 +192,7 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
             }}
             value={input.name}
           />
-          <TriggerFormFieldError
-            message={
-              shouldRenderCommonTriggerInlineFieldError({
-                key: "name",
-                message: input.fieldErrors.name,
-              })
-                ? input.fieldErrors.name
-                : undefined
-            }
-          />
+          <TriggerFormFieldError message={input.fieldErrors.name} />
         </FieldContent>
       </Field>
     </div>
@@ -200,21 +202,30 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
       <div className="p-4">{input.triggerTypeField}</div>
     );
   const sandboxProfileFieldError = input.fieldErrors.sandboxProfileId;
+  const selectedSandboxProfileOption = input.sandboxProfileOptions.find(
+    (option) => option.value === input.sandboxProfileId,
+  );
   const sandboxProfileField = (
     <div className="p-4">
-      <TriggerFormSelectField
-        disabled={disabled}
-        error={sandboxProfileFieldError}
-        label="Sandbox profile"
-        orientation="horizontal"
-        onValueChange={(value) => {
-          input.onValueChange("sandboxProfileId", value);
-        }}
-        options={input.sandboxProfileOptions}
-        placeholder="Select profile"
-        showInlineError={false}
-        value={input.sandboxProfileId}
-      />
+      <Field orientation="horizontal">
+        <FieldLabel>Sandbox profile</FieldLabel>
+        <FieldContent>
+          <div className="flex w-fit max-w-full flex-col gap-1 self-end">
+            <TriggerFormSelectControl
+              error={sandboxProfileFieldError}
+              onValueChange={(value) => {
+                input.onValueChange("sandboxProfileId", value);
+              }}
+              options={input.sandboxProfileOptions}
+              placeholder="Select profile"
+              selectedLabel={selectedSandboxProfileOption?.label}
+              value={input.sandboxProfileId}
+              disabled={disabled}
+            />
+            <TriggerFormFieldError message={sandboxProfileFieldError} />
+          </div>
+        </FieldContent>
+      </Field>
     </div>
   );
 
@@ -224,14 +235,7 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <WebhookTriggerTitleEditor
-              errorMessage={
-                shouldRenderCommonTriggerInlineFieldError({
-                  key: "name",
-                  message: input.fieldErrors.name,
-                })
-                  ? input.fieldErrors.name
-                  : undefined
-              }
+              errorMessage={input.fieldErrors.name}
               onCommit={(nextValue) => {
                 input.onValueChange("name", nextValue);
               }}
@@ -394,17 +398,7 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
                   tokens={input.inputTemplateTokens}
                   value={input.inputTemplate}
                 />
-                <TriggerFormFieldError
-                  message={
-                    shouldRenderCommonTriggerInlineFieldError({
-                      key: "inputTemplate",
-                      message: input.fieldErrors.inputTemplate,
-                    })
-                      ? input.fieldErrors.inputTemplate
-                      : undefined
-                  }
-                  className="text-right text-xs"
-                />
+                <TriggerFormFieldError message={input.fieldErrors.inputTemplate} />
               </FieldContent>
             </Field>
           </div>

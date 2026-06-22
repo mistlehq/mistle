@@ -291,12 +291,46 @@ function resolvePayloadFilterBotHandleState(
   return "mixed-or-empty";
 }
 
+function parameterSupportsPayloadFilter(input: {
+  parameter: WebhookTriggerEventParameterOption;
+  filter: PayloadFilterPathNode;
+}): boolean {
+  const { parameter, filter } = input;
+
+  if (parameter.negatedMatchRequiresExists === true && filter.op === "exists") {
+    return true;
+  }
+
+  if (parameter.kind === "enum-select" && parameter.matchMode === "exists") {
+    return filter.op === "exists" || filter.op === "not_exists";
+  }
+
+  if (parameter.kind === "string" && parameter.matchMode === "contains") {
+    return filter.op === "contains";
+  }
+
+  if (parameter.kind === "string" && parameter.matchMode === "contains_token") {
+    return filter.op === "contains_token";
+  }
+
+  if (parameter.kind === "resource-select" && parameter.multiValue === true) {
+    return filter.op === "in" || filter.op === "eq" || filter.op === "neq";
+  }
+
+  return filter.op === "eq" || filter.op === "neq";
+}
+
 function resolvePayloadFilterParameter(input: {
   parameters: readonly WebhookTriggerEventParameterOption[];
   filter: PayloadFilterPathNode;
 }): WebhookTriggerEventParameterOption | undefined {
-  const matchingParameters = input.parameters.filter((parameter) =>
-    payloadPathMatches({ parameter, filter: input.filter }),
+  const matchingParameters = input.parameters.filter(
+    (parameter) =>
+      payloadPathMatches({ parameter, filter: input.filter }) &&
+      parameterSupportsPayloadFilter({
+        parameter,
+        filter: input.filter,
+      }),
   );
   const firstMatchingParameter = matchingParameters[0];
   if (matchingParameters.length <= 1 || firstMatchingParameter === undefined) {

@@ -44,6 +44,10 @@ const SlackAppMentionTriggerId = createWebhookTriggerEventId({
   webhookSourceId: SlackWebhookSourceId,
   eventType: "slack:app_mention",
 });
+const SlackMessageTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: SlackWebhookSourceId,
+  eventType: "slack:message",
+});
 const PushConditionId0 = createWebhookTriggerEventConditionId({
   eventOptionId: createWebhookTriggerEventId({
     webhookSourceId: GitHubWebhookSourceId,
@@ -76,6 +80,10 @@ const PullRequestReviewRequestedConditionId0 = createWebhookTriggerEventConditio
 });
 const SlackAppMentionConditionId0 = createWebhookTriggerEventConditionId({
   eventOptionId: SlackAppMentionTriggerId,
+  index: 0,
+});
+const SlackMessageConditionId0 = createWebhookTriggerEventConditionId({
+  eventOptionId: SlackMessageTriggerId,
   index: 0,
 });
 
@@ -112,6 +120,13 @@ function isNotAnyOfRule(values: readonly string[]) {
 function containsTokenRule(value: string) {
   return {
     operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
+    value,
+  };
+}
+
+function containsRule(value: string) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.CONTAINS,
     value,
   };
 }
@@ -197,6 +212,33 @@ const SlackAppMentionEventOption: WebhookTriggerEventOption = {
       payloadPath: ["event", "channel"],
       prefix: "in",
       multiValue: true,
+    },
+  ],
+};
+
+const SlackMessageEventOption: WebhookTriggerEventOption = {
+  id: SlackMessageTriggerId,
+  eventType: "slack:message",
+  integrationWebhookSourceId: SlackWebhookSourceId,
+  connectionId: SlackConnectionId,
+  connectionLabel: "Slack Engineering",
+  label: "Message",
+  logoKey: "slack",
+  parameters: [
+    {
+      id: "invocationToken",
+      label: "invocation token",
+      kind: "string",
+      payloadPath: ["event", "text"],
+      matchMode: "contains_token",
+      controlVariant: "invocation-token",
+    },
+    {
+      id: "messageText",
+      label: "message text",
+      kind: "string",
+      payloadPath: ["event", "text"],
+      matchMode: "contains",
     },
   ],
 };
@@ -829,6 +871,46 @@ describe("toWebhookTriggerFormValues", () => {
     });
   });
 
+  it("hydrates Slack message text and invocation filters that share the event text path", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          integrationWebhookSourceId: SlackWebhookSourceId,
+          eventConditions: [
+            {
+              eventType: "slack:message",
+              payloadFilter: {
+                op: "and",
+                filters: [
+                  {
+                    op: "contains",
+                    path: ["event", "text"],
+                    value: "deployment failed",
+                  },
+                  {
+                    op: "contains_token",
+                    path: ["event", "text"],
+                    value: "@mistle",
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        [SlackMessageEventOption],
+      ),
+    ).toMatchObject({
+      eventIds: [SlackMessageConditionId0],
+      eventParameterRules: {
+        [SlackMessageConditionId0]: {
+          messageText: containsRule("deployment failed"),
+          invocationToken: containsTokenRule("@mistle"),
+        },
+      },
+    });
+  });
+
   it("hydrates explicit invocation trigger parameters out of contains_token filters", () => {
     expect(
       toWebhookTriggerFormValues(
@@ -983,6 +1065,46 @@ describe("validateWebhookTriggerFormValues", () => {
           },
         },
         GitHubEventOptions,
+      ),
+    ).toEqual({});
+  });
+
+  it("rejects invocation token filters that contain whitespace", () => {
+    expect(
+      validateWebhookTriggerFormValues(
+        {
+          ...BaseFormValues,
+          eventIds: [SlackMessageConditionId0],
+          eventParameterRules: {
+            [SlackMessageConditionId0]: {
+              invocationToken: containsTokenRule("JIRA ticket created:"),
+            },
+          },
+        },
+        [SlackMessageEventOption],
+      ),
+    ).toEqual({
+      eventParameterRules: {
+        triggerId: SlackMessageConditionId0,
+        parameterId: "invocationToken",
+        message: "Invocation token filters cannot contain whitespace.",
+      },
+    });
+  });
+
+  it("accepts invocation token filters without whitespace", () => {
+    expect(
+      validateWebhookTriggerFormValues(
+        {
+          ...BaseFormValues,
+          eventIds: [SlackMessageConditionId0],
+          eventParameterRules: {
+            [SlackMessageConditionId0]: {
+              invocationToken: containsTokenRule("jira-ticket-created"),
+            },
+          },
+        },
+        [SlackMessageEventOption],
       ),
     ).toEqual({});
   });

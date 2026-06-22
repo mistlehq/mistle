@@ -7,7 +7,7 @@ import {
 import { resolveSelectedWebhookTriggerEventOptions } from "./webhook-trigger-event-picker-state.js";
 import type { WebhookTriggerEventOption } from "./webhook-trigger-event-types.js";
 import type {
-  WebhookTriggerFormValueKey,
+  WebhookTriggerFormFieldErrors,
   WebhookTriggerFormValues,
 } from "./webhook-trigger-form-types.js";
 import { DefaultWebhookTriggerMessageTemplate } from "./webhook-trigger-input-template.js";
@@ -28,6 +28,53 @@ type ResolvedSelectedEvents = {
   webhookSourceIds: string[];
   webhookSourceId: string | null;
 };
+
+function ruleHasConfiguredValue(rule: { value: string; values?: readonly string[] }): boolean {
+  return (
+    rule.value.trim().length > 0 || (rule.values ?? []).some((value) => value.trim().length > 0)
+  );
+}
+
+function valueContainsWhitespace(value: string): boolean {
+  return /\s/u.test(value);
+}
+
+function findInvocationTokenValidationError(input: {
+  values: WebhookTriggerFormValues;
+  eventOptions: readonly WebhookTriggerEventOption[];
+}): WebhookTriggerFormFieldErrors["eventParameterRules"] {
+  const selectedEventOptions = resolveSelectedWebhookTriggerEventOptions({
+    eventOptions: input.eventOptions,
+    selectedEventIds: input.values.eventIds,
+  });
+
+  for (const eventOption of selectedEventOptions) {
+    const rules = input.values.eventParameterRules[eventOption.id] ?? {};
+    for (const parameter of eventOption.parameters ?? []) {
+      if (parameter.kind !== "string" || parameter.controlVariant !== "invocation-token") {
+        continue;
+      }
+
+      const rule = rules[parameter.id];
+      if (rule === undefined || !ruleHasConfiguredValue(rule)) {
+        continue;
+      }
+
+      const configuredValues = [rule.value, ...(rule.values ?? [])].filter(
+        (value) => value.trim().length > 0,
+      );
+      if (configuredValues.some(valueContainsWhitespace)) {
+        return {
+          triggerId: eventOption.id,
+          parameterId: parameter.id,
+          message: "Invocation token filters cannot contain whitespace.",
+        };
+      }
+    }
+  }
+
+  return undefined;
+}
 
 function resolveSelectedEvents(input: {
   eventIds: readonly string[];
@@ -136,8 +183,8 @@ export function toWebhookTriggerFormValues(
 export function validateWebhookTriggerFormValues(
   values: WebhookTriggerFormValues,
   eventOptions: readonly WebhookTriggerEventOption[] = [],
-): Partial<Record<WebhookTriggerFormValueKey, string>> {
-  const errors: Partial<Record<WebhookTriggerFormValueKey, string>> = {};
+): WebhookTriggerFormFieldErrors {
+  const errors: WebhookTriggerFormFieldErrors = {};
   const trimmedInputTemplate = values.inputTemplate.trim();
 
   if (values.name.trim().length === 0) {
@@ -183,6 +230,14 @@ export function validateWebhookTriggerFormValues(
 
   if (values.conversationKeyTemplate.trim().length === 0) {
     errors.conversationKeyTemplate = "Conversation key template is required.";
+  }
+
+  const invocationTokenValidationError = findInvocationTokenValidationError({
+    values,
+    eventOptions,
+  });
+  if (invocationTokenValidationError !== undefined) {
+    errors.eventParameterRules = invocationTokenValidationError;
   }
 
   const selectedConversationKeyOptions = resolveCommonWebhookTriggerConversationKeyOptions({

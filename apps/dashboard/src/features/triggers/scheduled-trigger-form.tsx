@@ -50,17 +50,6 @@ type ScheduledTriggerTypeSpecificSectionProps = {
   onValueChange: (key: "conversationMode" | "cronExpression" | "timezone", value: string) => void;
 };
 
-function shouldRenderInlineFieldError(input: {
-  key: ScheduledTriggerFormValueKey;
-  message: string | undefined;
-}): boolean {
-  if (input.message === undefined) {
-    return false;
-  }
-
-  return input.key !== "name" && input.key !== "sandboxProfileId";
-}
-
 function CronExpressionBreakdownList(input: {
   breakdown: CronExpressionBreakdown | null;
   message: string;
@@ -121,16 +110,7 @@ export function ScheduledTriggerTypeSpecificSection(
                 placeholder="0 9 * * 1"
                 value={input.values.cronExpression}
               />
-              <TriggerFormFieldError
-                message={
-                  shouldRenderInlineFieldError({
-                    key: "cronExpression",
-                    message: input.fieldErrors.cronExpression,
-                  })
-                    ? input.fieldErrors.cronExpression
-                    : undefined
-                }
-              />
+              <TriggerFormFieldError message={input.fieldErrors.cronExpression} />
             </FieldContent>
           </Field>
           <Field>
@@ -152,16 +132,7 @@ export function ScheduledTriggerTypeSpecificSection(
                 placeholder="Asia/Singapore"
                 value={input.values.timezone}
               />
-              <TriggerFormFieldError
-                message={
-                  shouldRenderInlineFieldError({
-                    key: "timezone",
-                    message: input.fieldErrors.timezone,
-                  })
-                    ? input.fieldErrors.timezone
-                    : undefined
-                }
-              />
+              <TriggerFormFieldError message={input.fieldErrors.timezone} />
             </FieldContent>
           </Field>
         </div>

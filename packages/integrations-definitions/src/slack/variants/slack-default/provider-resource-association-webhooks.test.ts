@@ -11,7 +11,7 @@ import {
 } from "./provider-resource-association-webhooks.js";
 
 describe("SlackAssociatedResourceEventsCapability", () => {
-  it("advertises thread reply filters", () => {
+  it("advertises filters that can match thread reply events", () => {
     expect(SlackAssociatedResourceEventsCapability.supportedEvents).toEqual([
       {
         resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
@@ -34,6 +34,23 @@ describe("SlackAssociatedResourceEventsCapability", () => {
             payloadPath: ["event", "channel"],
             prefix: "in",
             multiValue: true,
+          },
+          {
+            id: "sender",
+            label: "sender user ID",
+            kind: "string",
+            payloadPath: ["event", "user"],
+            prefix: "from",
+            placeholder: "U1234567890",
+          },
+          {
+            id: "messageText",
+            label: "message text",
+            kind: "string",
+            payloadPath: ["event", "text"],
+            matchMode: "contains",
+            prefix: "containing",
+            placeholder: "deployment failed",
           },
         ],
       },

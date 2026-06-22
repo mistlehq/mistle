@@ -44,6 +44,7 @@ import {
 } from "./webhook-trigger-form-helpers.js";
 import { resolveWebhookTriggerFormState } from "./webhook-trigger-form-state.js";
 import {
+  type WebhookTriggerFormFieldErrors,
   type WebhookTriggerFormValueKey,
   type WebhookTriggerFormValues,
 } from "./webhook-trigger-form-types.js";
@@ -87,6 +88,11 @@ type CreateTriggerFormValueKey =
   | "triggerType"
   | Exclude<WebhookTriggerFormValueKey, keyof CommonCreateTriggerFormValues>
   | Exclude<ScheduledTriggerFormValueKey, keyof CommonCreateTriggerFormValues>;
+
+type CreateTriggerFormFieldErrors = Partial<
+  Record<Exclude<CreateTriggerFormValueKey, "eventParameterRules">, string>
+> &
+  Pick<WebhookTriggerFormFieldErrors, "eventParameterRules">;
 
 const RequiredFieldSummaryMessage = "Please address the fields highlighted in red.";
 const RequiredTriggerTypeSelectionMessage = "Select a trigger source.";
@@ -167,7 +173,7 @@ function toScheduledValues(values: CreateTriggerFormValues): ScheduledTriggerFor
 
 function hasRequiredFieldErrors(
   kind: TriggerTypeValue | null,
-  fieldErrors: Partial<Record<CreateTriggerFormValueKey, string>>,
+  fieldErrors: CreateTriggerFormFieldErrors,
 ): boolean {
   if (
     fieldErrors.triggerType !== undefined ||
@@ -313,9 +319,7 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(
     initialTemplate?.kind === "scheduled" ? (input.initialTemplateId ?? null) : null,
   );
-  const [fieldErrors, setFieldErrors] = useState<
-    Partial<Record<CreateTriggerFormValueKey, string>>
-  >({});
+  const [fieldErrors, setFieldErrors] = useState<CreateTriggerFormFieldErrors>({});
   const [validationSummaryError, setValidationSummaryError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const sandboxProfilePrerequisites = useTriggerSandboxProfileOptions();
@@ -627,6 +631,7 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
           primaryRepositoryId: _primaryRepositoryId,
           eventIds: _eventIds,
           conversationKeyTemplate: _conversationKeyTemplate,
+          eventParameterRules: _eventParameterRules,
           ...remainingErrors
         } = currentErrors;
 
@@ -634,6 +639,7 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
         void _primaryRepositoryId;
         void _eventIds;
         void _conversationKeyTemplate;
+        void _eventParameterRules;
 
         return remainingErrors;
       }
@@ -707,11 +713,13 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
         const {
           eventIds: _eventIds,
           conversationKeyTemplate: _conversationKeyTemplate,
+          eventParameterRules: _eventParameterRules,
           ...remainingErrors
         } = currentErrors;
 
         void _eventIds;
         void _conversationKeyTemplate;
+        void _eventParameterRules;
 
         return remainingErrors;
       }
@@ -726,10 +734,28 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
       }
 
       const { eventParameterRules: _eventParameterRules, ...remainingErrors } = currentErrors;
+      const nextEventParameterError =
+        currentErrors.eventParameterRules === undefined
+          ? undefined
+          : validateWebhookTriggerFormValues(
+              toWebhookValues({
+                ...formValues,
+                eventParameterRules:
+                  typeof value === "string" || Array.isArray(value)
+                    ? formValues.eventParameterRules
+                    : value,
+              }),
+              webhookEventOptions,
+            ).eventParameterRules;
 
       void _eventParameterRules;
 
-      return remainingErrors;
+      return nextEventParameterError === undefined
+        ? remainingErrors
+        : {
+            ...remainingErrors,
+            eventParameterRules: nextEventParameterError,
+          };
     });
     setValidationSummaryError(null);
     setFormError(null);
@@ -787,7 +813,7 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
   }
 
   function onSubmit() {
-    const nextFieldErrors: Partial<Record<CreateTriggerFormValueKey, string>> =
+    const nextFieldErrors: CreateTriggerFormFieldErrors =
       kind === null
         ? { triggerType: RequiredTriggerTypeSelectionMessage }
         : kind === "scheduled"

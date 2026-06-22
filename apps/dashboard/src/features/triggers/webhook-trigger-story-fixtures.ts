@@ -40,6 +40,20 @@ export function containsTokenRule(value: string) {
   };
 }
 
+export function containsRule(value: string) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.CONTAINS,
+    value,
+  };
+}
+
+export function existsRule() {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.EXISTS,
+    value: "exists",
+  };
+}
+
 export const StoryIssueCommentCreatedTriggerId = createWebhookTriggerEventId({
   webhookSourceId: StoryGitHubWebhookSourceId,
   eventType: "github.issue_comment.created",
@@ -67,6 +81,18 @@ export const StoryPushDeletedTriggerId = createWebhookTriggerEventId({
 export const StorySlackAppMentionTriggerId = createWebhookTriggerEventId({
   webhookSourceId: StorySlackWebhookSourceId,
   eventType: "slack:app_mention",
+});
+export const StorySlackMessageTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: StorySlackWebhookSourceId,
+  eventType: "slack:message",
+});
+export const StorySlackReactionAddedTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: StorySlackWebhookSourceId,
+  eventType: "slack:reaction_added",
+});
+export const StorySlackReactionRemovedTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: StorySlackWebhookSourceId,
+  eventType: "slack:reaction_removed",
 });
 export const StoryWasenderApiMessagesUpsertTriggerId = createWebhookTriggerEventId({
   webhookSourceId: StoryWasenderApiWebhookSourceId,
@@ -361,6 +387,161 @@ export const StorySlackEventOptions: readonly WebhookTriggerEventOption[] = [
         payloadPath: ["event", "channel"],
         prefix: "in",
         multiValue: true,
+      },
+    ],
+  },
+  {
+    id: StorySlackMessageTriggerId,
+    eventType: "slack:message",
+    integrationWebhookSourceId: StorySlackWebhookSourceId,
+    connectionId: StorySlackConnectionId,
+    connectionLabel: "Slack Engineering",
+    label: "Message",
+    category: "Slack Engineering / Messages",
+    logoKey: "slack",
+    parameters: [
+      {
+        id: "invocationToken",
+        label: "invocation token",
+        kind: "string",
+        payloadPath: ["event", "text"],
+        matchMode: "contains_token",
+        controlVariant: "invocation-token",
+      },
+      {
+        id: "channel",
+        label: "channel",
+        kind: "resource-select",
+        resourceKind: "channel",
+        payloadPath: ["event", "channel"],
+        prefix: "in",
+        multiValue: true,
+      },
+      {
+        id: "sender",
+        label: "sender user ID",
+        kind: "string",
+        payloadPath: ["event", "user"],
+        prefix: "from",
+        placeholder: "U1234567890",
+      },
+      {
+        id: "messageText",
+        label: "message text",
+        kind: "string",
+        payloadPath: ["event", "text"],
+        matchMode: "contains",
+        prefix: "containing",
+        placeholder: "deployment failed",
+      },
+      {
+        id: "threadReply",
+        label: "thread reply",
+        kind: "enum-select",
+        payloadPath: ["event", "thread_ts"],
+        matchMode: "exists",
+        options: [
+          {
+            value: "exists",
+            label: "is in a thread",
+          },
+          {
+            value: "not_exists",
+            label: "is not in a thread",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: StorySlackReactionAddedTriggerId,
+    eventType: "slack:reaction_added",
+    integrationWebhookSourceId: StorySlackWebhookSourceId,
+    connectionId: StorySlackConnectionId,
+    connectionLabel: "Slack Engineering",
+    label: "Reaction added",
+    category: "Slack Engineering / Reactions",
+    logoKey: "slack",
+    parameters: [
+      {
+        id: "channel",
+        label: "channel",
+        kind: "resource-select",
+        resourceKind: "channel",
+        payloadPath: ["event", "channel"],
+        prefix: "in",
+        multiValue: true,
+      },
+      {
+        id: "reaction",
+        label: "reaction",
+        kind: "string",
+        payloadPath: ["event", "reaction"],
+        prefix: "named",
+        placeholder: "thumbsup",
+      },
+      {
+        id: "reactingUser",
+        label: "reacting user ID",
+        kind: "string",
+        payloadPath: ["event", "user"],
+        prefix: "by",
+        placeholder: "U1234567890",
+      },
+      {
+        id: "reactedMessageAuthor",
+        label: "message author user ID",
+        kind: "string",
+        payloadPath: ["event", "item_user"],
+        prefix: "on message by",
+        placeholder: "U1234567890",
+        negatedMatchRequiresExists: true,
+      },
+    ],
+  },
+  {
+    id: StorySlackReactionRemovedTriggerId,
+    eventType: "slack:reaction_removed",
+    integrationWebhookSourceId: StorySlackWebhookSourceId,
+    connectionId: StorySlackConnectionId,
+    connectionLabel: "Slack Engineering",
+    label: "Reaction removed",
+    category: "Slack Engineering / Reactions",
+    logoKey: "slack",
+    parameters: [
+      {
+        id: "channel",
+        label: "channel",
+        kind: "resource-select",
+        resourceKind: "channel",
+        payloadPath: ["event", "channel"],
+        prefix: "in",
+        multiValue: true,
+      },
+      {
+        id: "reaction",
+        label: "reaction",
+        kind: "string",
+        payloadPath: ["event", "reaction"],
+        prefix: "named",
+        placeholder: "thumbsup",
+      },
+      {
+        id: "reactingUser",
+        label: "reacting user ID",
+        kind: "string",
+        payloadPath: ["event", "user"],
+        prefix: "by",
+        placeholder: "U1234567890",
+      },
+      {
+        id: "reactedMessageAuthor",
+        label: "message author user ID",
+        kind: "string",
+        payloadPath: ["event", "item_user"],
+        prefix: "on message by",
+        placeholder: "U1234567890",
+        negatedMatchRequiresExists: true,
       },
     ],
   },
