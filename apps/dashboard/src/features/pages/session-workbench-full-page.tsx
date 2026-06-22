@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { useSearchParams } from "react-router";
 
 import { isUnavailableResourceError } from "../api/http-api-error.js";
+import type { ChatEntry } from "../chat/chat-types.js";
 import type { DashboardControlActionSupport } from "../session-agents/dashboard-control-actions.js";
 import {
   RuntimeConversationNavigatorPanel,
@@ -81,7 +82,44 @@ export type SessionWorkbenchFullPageProps = {
   secondaryPanel: SessionWorkbenchFullPageSecondaryPanel;
   setSearchParams: ReturnType<typeof useSearchParams>[1];
   dashboardControlActions?: DashboardControlActionSupport;
+  autoStartTurn?: {
+    key: string;
+    prompt: string;
+  };
 };
+
+export function shouldAutoStartWorkbenchTurn(input: {
+  activeConversationId: string | null;
+  activeTurnState: "idle" | "running";
+  autoStartTurn: SessionWorkbenchFullPageProps["autoStartTurn"] | undefined;
+  chatEntries: readonly ChatEntry[];
+  initialEntryStartupState: unknown;
+  isStartingTurn: boolean;
+  startedTurnKeys: ReadonlySet<string>;
+  transitionState: "restoring_chat" | "stable_chat" | "stable_cli" | "switching_to_cli";
+}): boolean {
+  if (input.autoStartTurn === undefined) {
+    return false;
+  }
+
+  if (input.startedTurnKeys.has(input.autoStartTurn.key)) {
+    return false;
+  }
+
+  if (
+    input.activeConversationId === null ||
+    input.transitionState !== "stable_chat" ||
+    input.initialEntryStartupState !== null ||
+    input.activeTurnState !== "idle" ||
+    input.isStartingTurn
+  ) {
+    return false;
+  }
+
+  return !input.chatEntries.some(
+    (entry) => entry.kind === "user-message" && entry.text === input.autoStartTurn?.prompt,
+  );
+}
 
 export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
@@ -103,6 +141,8 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
   const [composerDraft, setComposerDraft] = useState(createComposerDraft(""));
   const [isMobileConversationNavigatorOpen, setMobileConversationNavigatorOpen] = useState(false);
   const isMobileSecondaryPanelLayout = useIsBelowBreakpoint(CssBreakpointVariables.SM);
+  const autoStartedTurnKeysRef = useRef<ReadonlySet<string>>(new Set());
+  const autoStartingTurnKeysRef = useRef<ReadonlySet<string>>(new Set());
   const [pendingDiffComments, setPendingDiffComments] = useState<
     readonly PendingSessionDiffComment[]
   >([]);
@@ -509,6 +549,62 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
     !hasEnteredReadyWorkbench && alert === null ? workbench.initialEntryStartupState : null;
   const isConversationTurnRunning =
     conversationPane.composerStateInput.turnControl.activeTurnState === "running";
+
+  useEffect(() => {
+    const autoStartTurn = input.autoStartTurn;
+    if (autoStartTurn === undefined) {
+      return;
+    }
+
+    if (
+      !shouldAutoStartWorkbenchTurn({
+        activeConversationId: conversationPane.activeConversationId,
+        activeTurnState: conversationPane.composerStateInput.turnControl.activeTurnState,
+        autoStartTurn,
+        chatEntries: conversationPane.chatState.entries,
+        initialEntryStartupState,
+        isStartingTurn: conversationPane.composerStateInput.turnControl.isStarting,
+        startedTurnKeys: new Set([
+          ...autoStartedTurnKeysRef.current,
+          ...autoStartingTurnKeysRef.current,
+        ]),
+        transitionState: workbench.primaryPanelState.transitionState,
+      })
+    ) {
+      return;
+    }
+
+    autoStartingTurnKeysRef.current = new Set([
+      ...autoStartingTurnKeysRef.current,
+      autoStartTurn.key,
+    ]);
+    void conversationPane.composerStateInput.turnControl
+      .startTurn({
+        submittedPrompt: autoStartTurn.prompt,
+        transcriptPrompt: autoStartTurn.prompt,
+        resolveSkillMentions: false,
+      })
+      .then(() => {
+        autoStartingTurnKeysRef.current = new Set(
+          [...autoStartingTurnKeysRef.current].filter((key) => key !== autoStartTurn.key),
+        );
+        autoStartedTurnKeysRef.current = new Set([
+          ...autoStartedTurnKeysRef.current,
+          autoStartTurn.key,
+        ]);
+      })
+      .catch(() => {
+        autoStartingTurnKeysRef.current = new Set(
+          [...autoStartingTurnKeysRef.current].filter((key) => key !== autoStartTurn.key),
+        );
+      });
+  }, [
+    conversationPane.chatState.entries,
+    conversationPane.composerStateInput.turnControl,
+    initialEntryStartupState,
+    input.autoStartTurn,
+    workbench.primaryPanelState.transitionState,
+  ]);
 
   if (isUnavailableResourceError(workbench.sandboxStatusQuery.error)) {
     return (

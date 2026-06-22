@@ -336,11 +336,22 @@ function LoadedDesignerSessionPage(input: {
     },
     [input.designerSession.id, input.designerSession.sandboxInstanceId],
   );
+  const autoStartTurn = useMemo(
+    () =>
+      input.designerSession.initialPrompt === null
+        ? undefined
+        : {
+            key: `designer:${input.designerSession.id}:initial-prompt`,
+            prompt: input.designerSession.initialPrompt,
+          },
+    [input.designerSession.id, input.designerSession.initialPrompt],
+  );
 
   return (
     <SessionWorkbenchFullPage
       key={`${input.designerSession.id}:${input.designerSession.sandboxInstanceId}`}
       documentTitleFallback="Designer"
+      {...(autoStartTurn === undefined ? {} : { autoStartTurn })}
       frameTitle="Designer"
       headerControls={{
         cli: false,
