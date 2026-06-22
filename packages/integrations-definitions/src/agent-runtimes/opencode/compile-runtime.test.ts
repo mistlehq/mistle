@@ -275,7 +275,7 @@ describe("compileOpenCodeRuntime", () => {
           release: {
             kind: "tag",
             match: "exact",
-            tag: "v1.15.11",
+            tag: "v1.17.9",
           },
           asset: {
             kind: "by_arch",
@@ -283,13 +283,13 @@ describe("compileOpenCodeRuntime", () => {
               fileName: "opencode-linux-x64-baseline.tar.gz",
               format: "tar.gz",
               extractedPath: "opencode",
-              sha256: "eb19eabc9cb7fa8a73898328b69720738d35e0cad716898bfdbc2547f88b2450",
+              sha256: "c2d616582081086f1601d5cb54aaef4e019cbacdf789d8da9282f64c97551717",
             },
             aarch64: {
               fileName: "opencode-linux-arm64.tar.gz",
               format: "tar.gz",
               extractedPath: "opencode",
-              sha256: "93e4399f308c49387c25ec2b570602bf0f9dd5f57989427946c0c28dbf259ff4",
+              sha256: "8cc511f9794e575e5d3c4c2654930d05670186df649c26b50889ac73c65dde21",
             },
           },
           installPath: "/usr/local/bin/opencode",
