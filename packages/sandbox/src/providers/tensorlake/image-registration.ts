@@ -27,6 +27,7 @@ export async function registerTensorlakeSandboxBaseImage(
         {
           registeredName: input.source.imageId,
           contextDir: input.contextPath,
+          dockerCompat: true,
         },
         { emit: buildLogs.emit },
       );
