@@ -13,6 +13,8 @@ export type GatewayForwardingReadinessStatus =
 export type GatewayForwardingReadinessReason =
   /** Initial state before the forwarding adapter has started. */
   | "startup"
+  /** The initial NATS request check failed before startup could finish. */
+  | "startup_check_failed"
   /** The forwarding adapter is shutting down or draining. */
   | "stopping"
   /** The local forwarding subscription was created and is being checked through NATS. */

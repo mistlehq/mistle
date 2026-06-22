@@ -306,15 +306,15 @@ function createGatewayRelayRuntimeResources(input: {
           localNodeId: input.nodeId,
           role: "relay",
         });
-        natsRelayTransport.start(connection);
-        natsPeerResolver.start(connection);
-        natsGatewayForwarding.start(connection);
-
         const selfCheckConnection = await connect({
           name: `mistle-data-plane-gateway-${input.nodeId}-forwarding-self-check`,
           servers: input.config.nats.url,
         });
         natsForwardingSelfCheckConnection = selfCheckConnection;
+        natsRelayTransport.start(connection);
+        natsPeerResolver.start(connection);
+        await natsGatewayForwarding.start(connection, selfCheckConnection);
+
         natsForwardingSelfCheckStatusWatcherStop = watchNatsConnectionStatus({
           connection: selfCheckConnection,
           localNodeId: input.nodeId,
