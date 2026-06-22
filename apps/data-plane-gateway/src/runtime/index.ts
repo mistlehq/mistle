@@ -203,6 +203,7 @@ function toGatewayForwardingPortAccessAuthorizationError(
 function createGatewayRelayRuntimeResources(input: {
   activeBootstrapSessionStore: ReturnType<typeof createAttachmentBackedActiveBootstrapSessionStore>;
   config: DataPlaneGatewayConfig["gatewayRelay"];
+  forwardingReadiness: GatewayForwardingReadiness;
   gatewayForwardingServer: LocalGatewayForwardingServerAdapter;
   nodeId: string;
 }): GatewayRelayRuntimeResources {
@@ -247,11 +248,6 @@ function createGatewayRelayRuntimeResources(input: {
     );
   } else {
     const subjectPrefix = `${input.config.nats.namePrefix}.gateway`;
-    const gatewayForwardingReadiness = new GatewayForwardingReadiness({
-      clock: systemClock,
-      localNodeId: input.nodeId,
-      subject: `${subjectPrefix}.forward.${input.nodeId}`,
-    });
     natsRelayTransport = new NatsRelayTransportAdapter(input.nodeId, subjectPrefix);
     natsPeerResolver = new NatsRelayPeerResolver(
       input.nodeId,
@@ -264,7 +260,7 @@ function createGatewayRelayRuntimeResources(input: {
       input.nodeId,
       subjectPrefix,
       input.gatewayForwardingServer,
-      gatewayForwardingReadiness,
+      input.forwardingReadiness,
     );
     relayTransport = natsRelayTransport;
     peerResolver = natsPeerResolver;
@@ -397,9 +393,21 @@ export function createDataPlaneGatewayRuntime(
   config: DataPlaneGatewayRuntimeConfig,
 ): DataPlaneGatewayRuntime {
   const lifecycle = new GatewayLifecycle(systemClock);
-  const app = createApp(config.app, lifecycle);
-  const nodeWebSocket = createNodeWebSocket({ app });
   const nodeId = typeid("dpg").toString();
+  const forwardingReadiness = new GatewayForwardingReadiness({
+    backend: config.app.gatewayRelay.backend,
+    clock: systemClock,
+    localNodeId: nodeId,
+    subject:
+      config.app.gatewayRelay.backend === "nats"
+        ? `${config.app.gatewayRelay.nats.namePrefix}.gateway.forward.${nodeId}`
+        : "memory",
+  });
+  if (config.app.gatewayRelay.backend === "memory") {
+    forwardingReadiness.markReady({ reason: "local_backend" });
+  }
+  const app = createApp(config.app, lifecycle, forwardingReadiness);
+  const nodeWebSocket = createNodeWebSocket({ app });
   const drainRegistry = new GatewayDrainRegistry();
   const sandboxTunnelTaskTracker = new AsyncTaskTracker();
   let hasValkeyClient = false;
@@ -520,6 +528,7 @@ export function createDataPlaneGatewayRuntime(
   const relayResources = createGatewayRelayRuntimeResources({
     activeBootstrapSessionStore,
     config: config.app.gatewayRelay,
+    forwardingReadiness,
     gatewayForwardingServer,
     nodeId,
   });

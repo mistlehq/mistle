@@ -41,6 +41,7 @@ describe("NatsGatewayForwardingAdapter", () => {
         const subjectPrefix = "integration.gateway-forwarding-startup";
         const nodeId = "gateway-a";
         const readiness = new GatewayForwardingReadiness({
+          backend: "nats",
           clock: createMutableClock(1_000),
           localNodeId: nodeId,
           subject: `${subjectPrefix}.forward.${nodeId}`,
@@ -58,6 +59,7 @@ describe("NatsGatewayForwardingAdapter", () => {
 
         expect(readiness.getState()).toEqual({
           changedAtMs: 1_000,
+          lastCheckAtMs: 1_000,
           reason: "self_check_succeeded",
           status: "ready",
         });
@@ -90,6 +92,7 @@ describe("NatsGatewayForwardingAdapter", () => {
         const subjectPrefix = "integration.gateway-forwarding-subscription-exit";
         const nodeId = "gateway-a";
         const readiness = new GatewayForwardingReadiness({
+          backend: "nats",
           clock,
           localNodeId: nodeId,
           subject: `${subjectPrefix}.forward.${nodeId}`,

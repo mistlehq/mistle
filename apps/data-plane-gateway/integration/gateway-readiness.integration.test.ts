@@ -25,9 +25,15 @@ it(
     expect(servingHealthResponse.status).toBe(200);
     expect(await servingHealthResponse.json()).toEqual({ ok: true });
     expect(servingReadinessResponse.status).toBe(200);
-    expect(await servingReadinessResponse.json()).toEqual({
+    expect(await servingReadinessResponse.json()).toMatchObject({
       ok: true,
       status: "serving",
+      forwarding: {
+        lastCheckAtMs: null,
+        reason: "local_backend",
+        status: "ready",
+        subject: "memory",
+      },
     });
 
     startGatewayDrain(env.service("data-plane-gateway"));
@@ -42,6 +48,12 @@ it(
       ok: false,
       status: "draining",
       reason: "service_restart",
+      forwarding: {
+        lastCheckAtMs: null,
+        reason: "local_backend",
+        status: "ready",
+        subject: "memory",
+      },
     });
   },
   TestTimeoutMs,
