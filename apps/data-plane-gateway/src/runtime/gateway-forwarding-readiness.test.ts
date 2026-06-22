@@ -14,7 +14,9 @@ describe("GatewayForwardingReadiness", () => {
 
     expect(readiness.getState()).toEqual({
       changedAtMs: 1_000,
+      consecutiveFailedChecks: 0,
       lastCheckAtMs: undefined,
+      notReadySinceMs: 1_000,
       reason: "startup",
       status: "not_ready",
     });
@@ -34,7 +36,9 @@ describe("GatewayForwardingReadiness", () => {
     readiness.markChecking({ reason: "subscription_started" });
     expect(readiness.getState()).toEqual({
       changedAtMs: 1_050,
+      consecutiveFailedChecks: 0,
       lastCheckAtMs: undefined,
+      notReadySinceMs: undefined,
       reason: "subscription_started",
       status: "checking",
     });
@@ -44,7 +48,9 @@ describe("GatewayForwardingReadiness", () => {
     readiness.markReady({ reason: "self_check_succeeded" });
     expect(readiness.getState()).toEqual({
       changedAtMs: 1_075,
+      consecutiveFailedChecks: 0,
       lastCheckAtMs: 1_075,
+      notReadySinceMs: undefined,
       reason: "self_check_succeeded",
       status: "ready",
     });
@@ -67,7 +73,9 @@ describe("GatewayForwardingReadiness", () => {
 
     expect(readiness.getState()).toEqual({
       changedAtMs: 1_100,
+      consecutiveFailedChecks: 0,
       lastCheckAtMs: 1_000,
+      notReadySinceMs: 1_100,
       reason: "subscription_exited",
       status: "not_ready",
     });
@@ -90,7 +98,9 @@ describe("GatewayForwardingReadiness", () => {
 
     expect(readiness.getState()).toEqual({
       changedAtMs: 1_000,
+      consecutiveFailedChecks: 0,
       lastCheckAtMs: 1_250,
+      notReadySinceMs: undefined,
       reason: "self_check_succeeded",
       status: "ready",
     });

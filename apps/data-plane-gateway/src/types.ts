@@ -45,6 +45,7 @@ export type DataPlaneGatewayConfig = LoadDataPlaneGatewayConfigResult["app"] & {
 };
 export type DataPlaneGatewayRuntimeConfig = {
   app: DataPlaneGatewayConfig;
+  onUnrecoverableForwarding?: (reason: string) => void;
 };
 
 export type AppContextBindings = {
@@ -91,6 +92,7 @@ export type DataPlaneGatewayRuntime = {
     portsTargetAuthorizeService: PortsTargetAuthorizeService;
   };
   request: (path: string, init?: RequestInit) => Promise<Response>;
+  forceNatsRelayReconnect?: () => Promise<void>;
   startDrain: () => void;
   start: () => Promise<void>;
   stop: () => Promise<void>;
