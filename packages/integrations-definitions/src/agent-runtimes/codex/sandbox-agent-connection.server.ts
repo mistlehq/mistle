@@ -28,17 +28,6 @@ export type SandboxAgentConnection = {
   close: (input?: CloseSandboxAgentConnectionInput) => Promise<void>;
 };
 
-function formatOpenErrorMessage(client: AgentStreamClient): string {
-  const openError = client.openError;
-  if (openError === null) {
-    return (
-      client.errorMessage ?? "Sandbox agent websocket closed before stream.open acknowledgement."
-    );
-  }
-
-  return `Sandbox agent stream.open request was rejected (${openError.code}): ${openError.message}`;
-}
-
 function formatResetErrorMessage(client: AgentStreamClient): string | null {
   const resetInfo = client.resetInfo;
   if (resetInfo === null) {
@@ -69,13 +58,6 @@ export async function connectSandboxAgentConnection(
   } catch (error) {
     client.disconnect();
     transport.disconnect();
-
-    if (client.openError !== null) {
-      throw new Error(formatOpenErrorMessage(client), {
-        cause: error,
-      });
-    }
-
     throw error;
   }
 

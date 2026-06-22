@@ -1,4 +1,5 @@
 import type { AgentRuntimeConversationDeliveryCapability } from "@mistle/integrations-core";
+import { SandboxSessionStreamOpenError } from "@mistle/sandbox-session-client";
 import { HandleTriggerConversationDeliveryWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { shouldRethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
 
@@ -6,6 +7,8 @@ import { getWorkflowContext } from "../core/context.js";
 import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
 import type { PreparedTriggerRun } from "../shared/trigger-run-types.js";
 import {
+  TriggerRunFailureCodes,
+  createTriggerRunExecutionError,
   isPermanentTriggerRunExecutionFailure,
   markTriggerRunCompleted,
   markTriggerRunFailed,
@@ -72,6 +75,44 @@ const IdempotentProviderDeliveryStepRetryPolicy = {
   maximumAttempts: 3,
 } as const;
 
+export const GatewayHandoffDeliveryStepRetryPolicy = {
+  maximumAttempts: 3,
+} as const;
+
+const RetryableGatewayHandoffErrorCodes = {
+  BOOTSTRAP_NOT_CONNECTED: "bootstrap_not_connected",
+} as const;
+
+export function isRetryableGatewayHandoffError(error: unknown): boolean {
+  return collectSandboxSessionStreamOpenErrorCodes(error).some(
+    (code) => code === RetryableGatewayHandoffErrorCodes.BOOTSTRAP_NOT_CONNECTED,
+  );
+}
+
+async function withRetryableGatewayHandoffError<T>(input: {
+  operation: () => Promise<T>;
+  sandboxInstanceId: string;
+}): Promise<T> {
+  try {
+    return await input.operation();
+  } catch (error) {
+    if (!isRetryableGatewayHandoffError(error)) {
+      throw error;
+    }
+
+    throw createTriggerRunExecutionError({
+      code: TriggerRunFailureCodes.TRIGGER_RUN_EXECUTION_FAILED,
+      message: getErrorMessage(error),
+      cause: error,
+      metadata: {
+        "mistle.gateway.handoff.failure_code": "bootstrap_not_connected",
+        "mistle.retry.classification": "transient_gateway_handoff",
+        "mistle.sandbox.instance_id": input.sandboxInstanceId,
+      },
+    });
+  }
+}
+
 function resolveProviderCreateConversationRetryPolicy(input: {
   conversationDeliveryPolicy: AgentRuntimeConversationDeliveryCapability;
 }): typeof IdempotentProviderDeliveryStepRetryPolicy | typeof SingleAttemptDeliveryStepRetryPolicy {
@@ -81,6 +122,50 @@ function resolveProviderCreateConversationRetryPolicy(input: {
     case "single_attempt":
       return SingleAttemptDeliveryStepRetryPolicy;
   }
+}
+
+function collectSandboxSessionStreamOpenErrorCodes(error: unknown): string[] {
+  const codes: string[] = [];
+  let current: unknown = error;
+  const seen = new Set<unknown>();
+
+  while (current !== undefined && current !== null && !seen.has(current)) {
+    seen.add(current);
+    const code = getSandboxSessionStreamOpenErrorCode(current);
+    if (code !== undefined) {
+      codes.push(code);
+    }
+    current = getUnknownProperty(current, "cause");
+  }
+
+  return codes;
+}
+
+function getSandboxSessionStreamOpenErrorCode(error: unknown): string | undefined {
+  if (error instanceof SandboxSessionStreamOpenError) {
+    return error.openError.code;
+  }
+
+  const openError = getUnknownProperty(error, "openError");
+  return getUnknownStringProperty(openError, "code");
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  const message = getUnknownStringProperty(error, "message");
+  if (message !== undefined) {
+    return message;
+  }
+
+  return "Gateway handoff failed with a non-error exception.";
+}
+
+function getUnknownStringProperty(input: unknown, key: string): string | undefined {
+  const value = getUnknownProperty(input, key);
+  return typeof value === "string" ? value : undefined;
 }
 
 export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlaneWorkflow(
@@ -431,12 +516,16 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
                 DurableTriggerConversationDeliveryStepPrefixes.INSPECT_RESUME_PROVIDER_CONVERSATION,
               taskId: activeTask.taskId,
             }),
-            retryPolicy: SingleAttemptDeliveryStepRetryPolicy,
+            retryPolicy: GatewayHandoffDeliveryStepRetryPolicy,
           },
           async () =>
-            inspectAndResumeConversationProviderDeliveryConversation({
-              deliveryInput: await createProviderDeliveryInput(),
-              providerConversationId: createdProviderConversation.providerConversationId,
+            withRetryableGatewayHandoffError({
+              sandboxInstanceId: ensuredTriggerSandbox.sandboxInstanceId,
+              operation: async () =>
+                inspectAndResumeConversationProviderDeliveryConversation({
+                  deliveryInput: await createProviderDeliveryInput(),
+                  providerConversationId: createdProviderConversation.providerConversationId,
+                }),
             }),
         );
 
