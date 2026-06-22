@@ -59,7 +59,9 @@ describe("NatsGatewayForwardingAdapter", () => {
 
         expect(readiness.getState()).toEqual({
           changedAtMs: 1_000,
+          consecutiveFailedChecks: 0,
           lastCheckAtMs: 1_000,
+          notReadySinceMs: undefined,
           reason: "self_check_succeeded",
           status: "ready",
         });

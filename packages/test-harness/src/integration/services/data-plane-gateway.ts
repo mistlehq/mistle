@@ -157,7 +157,7 @@ function start(input: {
       throw error;
     }
 
-    return {
+    const service: TestService = {
       id: ServiceIds.DATA_PLANE_GATEWAY,
       mode: startInput.mode,
       endpoints: {
@@ -176,6 +176,12 @@ function start(input: {
         }
       },
     };
+
+    if (runtime.forceNatsRelayReconnect !== undefined) {
+      service.forceNatsRelayReconnect = runtime.forceNatsRelayReconnect;
+    }
+
+    return service;
   };
 }
 

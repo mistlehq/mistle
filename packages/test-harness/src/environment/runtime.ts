@@ -451,6 +451,12 @@ function syncHandleRuntime(handle: TestServiceHandle, service: TestService): voi
   } else {
     handle.startDrain = service.startDrain;
   }
+
+  if (service.forceNatsRelayReconnect === undefined) {
+    delete handle.forceNatsRelayReconnect;
+  } else {
+    handle.forceNatsRelayReconnect = service.forceNatsRelayReconnect;
+  }
 }
 
 async function startServices(input: {
