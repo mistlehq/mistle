@@ -145,6 +145,10 @@ _Avoid_: No-op publish, external dependency refresh
 A **Sandbox profile version** setting that lets an agent runtime use Mistle-owned resources through a selected organization API key.
 _Avoid_: Allow agent toggle, Mistle MCP toggle
 
+**Mistle capability catalog**:
+A Mistle-provided description of product-supported integration, runtime, trigger, provider resource, and setup capabilities that an agent can inspect before deciding which current resources are available or what setup to recommend.
+_Avoid_: Designer capability catalog, available capabilities when referring to supportability rather than current organization/profile state
+
 **Mistle Designer resource access**:
 A **Mistle Designer session** capability that lets Designer use Mistle-owned resources without selecting an organization API key on a target **Sandbox profile version**.
 _Avoid_: Mistle resource access when the access belongs to Designer rather than the target profile

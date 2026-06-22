@@ -1,4 +1,5 @@
 import { SandboxProfileVersionAgentRuntimeIds, TriggerKinds } from "@mistle/db/control-plane";
+import { MistleSupportedCapabilityKinds } from "@mistle/integrations-definitions/server";
 import { z } from "zod";
 
 // MCP tool schemas are discovery metadata first: `tools/list` must serialize
@@ -38,6 +39,14 @@ export const mcpListSandboxProfilesInputSchema = z
     limit: z.number().int().min(1).max(100).optional(),
     after: z.string().min(1).optional(),
     before: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const mcpListSupportedCapabilitiesInputSchema = z
+  .object({
+    providerFamilyId: z.string().min(1).optional(),
+    capabilityKind: z.enum(MistleSupportedCapabilityKinds).optional(),
+    includeDetails: z.boolean().optional(),
   })
   .strict();
 

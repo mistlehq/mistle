@@ -92,6 +92,7 @@ export * from "./whapi/server.js";
 export * from "./zai/index.js";
 export * from "./forms/index.js";
 export * from "./agent-runtimes/provider-selection.js";
+export * from "./capability-catalog.js";
 export * from "./registry/agent-runtimes.js";
 export * from "./registry/agent-runtimes.server.js";
 export * from "./shared/remote-mcp-server-catalog/index.js";
