@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { useSearchParams } from "react-router";
 
 import { isUnavailableResourceError } from "../api/http-api-error.js";
+import type { ChatEntry } from "../chat/chat-types.js";
 import type { DashboardControlActionSupport } from "../session-agents/dashboard-control-actions.js";
 import {
   RuntimeConversationNavigatorPanel,
@@ -31,7 +32,7 @@ import { parseSessionDiffPatch } from "./session-diff-panel-model.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 import { SessionPortAccessPopover, SessionPortAccessSheet } from "./session-port-access-popover.js";
 import { filterUnmatchedSessionServerRequests } from "./session-server-request-filter.js";
-import { SessionStartupStatus } from "./session-startup-status.js";
+import { SessionStartupStatus, type SessionStartupState } from "./session-startup-status.js";
 import type {
   SessionTerminalContentInset,
   SessionTerminalThemeMode,
@@ -81,7 +82,54 @@ export type SessionWorkbenchFullPageProps = {
   secondaryPanel: SessionWorkbenchFullPageSecondaryPanel;
   setSearchParams: ReturnType<typeof useSearchParams>[1];
   dashboardControlActions?: DashboardControlActionSupport;
+  autoStartTurn?: {
+    key: string;
+    prompt: string;
+  };
 };
+
+type SessionWorkbenchActiveTurnState = ReturnType<
+  typeof useSessionWorkbenchController
+>["conversationPane"]["composerStateInput"]["turnControl"]["activeTurnState"];
+
+type SessionWorkbenchPrimaryPanelTransitionState = ReturnType<
+  typeof useSessionWorkbenchController
+>["workbench"]["primaryPanelState"]["transitionState"];
+
+export function shouldAutoStartWorkbenchTurn(input: {
+  activeConversationId: string | null;
+  activeTurnState: SessionWorkbenchActiveTurnState;
+  autoStartTurn: SessionWorkbenchFullPageProps["autoStartTurn"] | undefined;
+  chatEntries: readonly ChatEntry[];
+  initialEntryStartupState: SessionStartupState | null;
+  isStartingTurn: boolean;
+  startedTurnKeys: ReadonlySet<string>;
+  transitionState: SessionWorkbenchPrimaryPanelTransitionState;
+}): boolean {
+  if (input.autoStartTurn === undefined) {
+    return false;
+  }
+
+  const autoStartTurn = input.autoStartTurn;
+
+  if (input.startedTurnKeys.has(autoStartTurn.key)) {
+    return false;
+  }
+
+  if (
+    input.activeConversationId === null ||
+    input.transitionState !== "stable_chat" ||
+    input.initialEntryStartupState !== null ||
+    input.activeTurnState !== "idle" ||
+    input.isStartingTurn
+  ) {
+    return false;
+  }
+
+  return !input.chatEntries.some(
+    (entry) => entry.kind === "user-message" && entry.text === autoStartTurn.prompt,
+  );
+}
 
 export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
@@ -103,6 +151,8 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
   const [composerDraft, setComposerDraft] = useState(createComposerDraft(""));
   const [isMobileConversationNavigatorOpen, setMobileConversationNavigatorOpen] = useState(false);
   const isMobileSecondaryPanelLayout = useIsBelowBreakpoint(CssBreakpointVariables.SM);
+  const autoStartedTurnKeysRef = useRef(new Set<string>());
+  const autoStartingTurnKeysRef = useRef(new Set<string>());
   const [pendingDiffComments, setPendingDiffComments] = useState<
     readonly PendingSessionDiffComment[]
   >([]);
@@ -507,8 +557,58 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
   }, [workbench.connectionReadiness.canConnect, workbench.primaryPanelState.transitionState]);
   const initialEntryStartupState =
     !hasEnteredReadyWorkbench && alert === null ? workbench.initialEntryStartupState : null;
-  const isConversationTurnRunning =
-    conversationPane.composerStateInput.turnControl.activeTurnState === "running";
+  const activeConversationId = conversationPane.activeConversationId;
+  const turnControl = conversationPane.composerStateInput.turnControl;
+  const isConversationTurnRunning = turnControl.activeTurnState === "running";
+
+  useEffect(() => {
+    const autoStartTurn = input.autoStartTurn;
+    if (autoStartTurn === undefined) {
+      return;
+    }
+
+    if (
+      !shouldAutoStartWorkbenchTurn({
+        activeConversationId,
+        activeTurnState: turnControl.activeTurnState,
+        autoStartTurn,
+        chatEntries: conversationPane.chatState.entries,
+        initialEntryStartupState,
+        isStartingTurn: turnControl.isStarting,
+        startedTurnKeys: new Set([
+          ...autoStartedTurnKeysRef.current,
+          ...autoStartingTurnKeysRef.current,
+        ]),
+        transitionState: workbench.primaryPanelState.transitionState,
+      })
+    ) {
+      return;
+    }
+
+    autoStartingTurnKeysRef.current.add(autoStartTurn.key);
+    void turnControl
+      .startTurn({
+        submittedPrompt: autoStartTurn.prompt,
+        transcriptPrompt: autoStartTurn.prompt,
+        resolveSkillMentions: false,
+      })
+      .then(() => {
+        autoStartingTurnKeysRef.current.delete(autoStartTurn.key);
+        autoStartedTurnKeysRef.current.add(autoStartTurn.key);
+      })
+      .catch(() => {
+        autoStartingTurnKeysRef.current.delete(autoStartTurn.key);
+      });
+  }, [
+    activeConversationId,
+    conversationPane.chatState.entries,
+    initialEntryStartupState,
+    input.autoStartTurn,
+    turnControl.activeTurnState,
+    turnControl.isStarting,
+    turnControl.startTurn,
+    workbench.primaryPanelState.transitionState,
+  ]);
 
   if (isUnavailableResourceError(workbench.sandboxStatusQuery.error)) {
     return (

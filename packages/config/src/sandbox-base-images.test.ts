@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getLocalDevDockerRegistryDesignerBaseImageRef,
   getLocalDevDockerRegistrySandboxBaseImageRef,
+  getLocalPreparedRuntimeDesignerBaseImageRef,
   getLocalPreparedRuntimeSandboxBaseImageRef,
   getLocalTestSandboxBaseImageRef,
   parseLocalSandboxBaseImageRefs,
@@ -13,11 +15,18 @@ describe("readLocalSandboxBaseImageRefs", () => {
   it("reads the checked-in local sandbox base image manifest", () => {
     expect(readLocalSandboxBaseImageRefs()).toEqual({
       localDev: {
-        dockerRegistry: "127.0.0.1:5001/mistle/sandbox-base:dev",
-        preparedRuntime: "mistle/sandbox-base:dev",
+        dockerRegistryHost: "127.0.0.1:5001",
+        repositories: {
+          sandboxBase: "mistle/sandbox-base",
+          designerBase: "mistle/designer-base",
+        },
+        tag: "dev",
       },
       localTest: {
-        docker: "mistle/sandbox-base:test",
+        repositories: {
+          sandboxBase: "mistle/sandbox-base",
+        },
+        tag: "test",
       },
     });
   });
@@ -27,6 +36,10 @@ describe("readLocalSandboxBaseImageRefs", () => {
       "127.0.0.1:5001/mistle/sandbox-base:dev",
     );
     expect(getLocalPreparedRuntimeSandboxBaseImageRef()).toBe("mistle/sandbox-base:dev");
+    expect(getLocalDevDockerRegistryDesignerBaseImageRef()).toBe(
+      "127.0.0.1:5001/mistle/designer-base:dev",
+    );
+    expect(getLocalPreparedRuntimeDesignerBaseImageRef()).toBe("mistle/designer-base:dev");
     expect(getLocalTestSandboxBaseImageRef()).toBe("mistle/sandbox-base:test");
   });
 });
@@ -36,11 +49,18 @@ describe("parseLocalSandboxBaseImageRefs", () => {
     expect(() =>
       parseLocalSandboxBaseImageRefs({
         localDev: {
-          dockerRegistry: "127.0.0.1:5001/mistle/sandbox-base:dev",
-          preparedRuntime: "mistle/sandbox-base:dev",
+          dockerRegistryHost: "127.0.0.1:5001",
+          repositories: {
+            sandboxBase: "mistle/sandbox-base",
+            designerBase: "mistle/designer-base",
+          },
+          tag: "dev",
         },
         localTest: {
-          docker: "mistle/sandbox-base:test",
+          repositories: {
+            sandboxBase: "mistle/sandbox-base",
+          },
+          tag: "test",
         },
         publicRemote: {
           stable: "ghcr.io/mistlehq/sandbox-base@sha256:1234",

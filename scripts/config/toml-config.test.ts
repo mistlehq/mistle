@@ -49,6 +49,8 @@ describe("toml config generation", () => {
     expect(content).toContain('backend = "memory"');
     expect(content).toContain("[platform_credentials.openai]");
     expect(content).toContain("[sandbox.designer]");
+    expect(content).toContain('default_base_image = "127.0.0.1:5001/mistle/sandbox-base:dev"');
+    expect(content).toContain('base_image = "127.0.0.1:5001/mistle/designer-base:dev"');
     expect(content).toContain('sandbox_provider = "docker"');
     expect(content).toContain(
       "# Use direct_url for migrations and pooled_url for app runtime traffic.",

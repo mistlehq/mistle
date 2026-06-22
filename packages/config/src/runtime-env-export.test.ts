@@ -107,7 +107,7 @@ describe("exportServiceConfigToEnv", () => {
     });
     expectEntry(entries, {
       name: "MISTLE_DESIGNER_SANDBOX_BASE_IMAGE",
-      value: "registry.example.com/mistle/sandbox-base:prod",
+      value: "registry.example.com/mistle/designer-base:prod",
     });
     expectEntry(entries, {
       name: "MISTLE_DESIGNER_CODEX_CLI_PATH",

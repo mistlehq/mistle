@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   SandboxBaseImagePublishModes,
@@ -27,7 +27,8 @@ import {
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..");
 
-const DEFAULT_REPOSITORY = "ghcr.io/mistlehq/sandbox-base";
+const DEFAULT_SANDBOX_BASE_REPOSITORY = "ghcr.io/mistlehq/sandbox-base";
+const DEFAULT_DESIGNER_BASE_REPOSITORY = "ghcr.io/mistlehq/designer-base";
 const DEFAULT_PLATFORM = "linux/amd64";
 const SANDBOX_BASE_DOCKERFILE_PATH = "packages/sandboxd/Dockerfile";
 const TENSORLAKE_SANDBOXD_BINARY_PATH = "packages/sandboxd/.generated/tensorlake/sandboxd";
@@ -40,6 +41,7 @@ const OPENCOMPUTER_SANDBOXD_ARCHIVE_PARTS_PATH =
   "dev/.generated/sandbox-base/opencomputer/sandboxd-parts";
 const SANDBOX_BASE_TARGET = "sandbox-base";
 const SANDBOX_BASE_SYSTEM_TESTS_TARGET = "sandbox-base-system-tests";
+const SANDBOX_DESIGNER_BASE_TARGET = "sandbox-designer-base";
 const SANDBOXD_BUILD_ARTIFACT_PATH = "/app/packages/sandboxd/target/release/sandboxd";
 const TENSORLAKE_COPY_PART_SIZE = "512k";
 const OPENCOMPUTER_COPY_PART_SIZE = "64k";
@@ -95,11 +97,14 @@ Builds or registers a sandbox base image for the selected provider.
 
 Docker options:
   --output-image-ref <ref>             Output image ref to build
-  --repository <ref>                   Image repository when --output-image-ref is omitted (default: ${DEFAULT_REPOSITORY})
+  --repository <ref>                   Image repository when --output-image-ref is omitted
+                                        (default: ${DEFAULT_SANDBOX_BASE_REPOSITORY}, or
+                                        ${DEFAULT_DESIGNER_BASE_REPOSITORY} for sandbox-designer-base)
   --tag <tag>                          Tag when --output-image-ref is omitted. Must start with dev- or sys-
   --additional-output-image-ref <ref>  Additional output tag. Can be repeated
   --platform <value>                   Docker platform (default: ${DEFAULT_PLATFORM})
-  --target <target>                    Dockerfile target (sandbox-base or sandbox-base-system-tests)
+  --target <target>                    Dockerfile target (sandbox-base, sandbox-base-system-tests,
+                                          or sandbox-designer-base)
   --publish-mode <push|load>           Publish mode (default: push)
   --label <key=value>                  Docker image label. Can be repeated
 
@@ -218,7 +223,7 @@ function parseLabel(value: string): readonly [string, string] {
   return [key, labelValue];
 }
 
-function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
+export function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
   const additionalOutputImageRefs: string[] = [];
   const labels: Record<string, string> = {};
   let apiKey: string | undefined;
@@ -229,7 +234,7 @@ function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
   let platform: string | undefined;
   let provider: SandboxProvider | undefined;
   let publishMode: "load" | "push" = SandboxBaseImagePublishModes.PUSH;
-  let repository = DEFAULT_REPOSITORY;
+  let repository: string | undefined;
   let repositoryProvided = false;
   let sandboxdArtifactSha256: string | undefined;
   let sandboxdArtifactUrl: string | undefined;
@@ -368,7 +373,7 @@ function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
     throw new Error("--provider is required.");
   }
 
-  if (repository.trim().length === 0) {
+  if (repository !== undefined && repository.trim().length === 0) {
     throw new Error("--repository must not be empty.");
   }
 
@@ -379,10 +384,11 @@ function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
   if (
     target !== undefined &&
     target !== SANDBOX_BASE_TARGET &&
-    target !== SANDBOX_BASE_SYSTEM_TESTS_TARGET
+    target !== SANDBOX_BASE_SYSTEM_TESTS_TARGET &&
+    target !== SANDBOX_DESIGNER_BASE_TARGET
   ) {
     throw new Error(
-      `--target must be ${SANDBOX_BASE_TARGET} or ${SANDBOX_BASE_SYSTEM_TESTS_TARGET}.`,
+      `--target must be ${SANDBOX_BASE_TARGET}, ${SANDBOX_BASE_SYSTEM_TESTS_TARGET}, or ${SANDBOX_DESIGNER_BASE_TARGET}.`,
     );
   }
 
@@ -390,12 +396,19 @@ function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
     throw new Error("--tag must start with dev- or sys-.");
   }
 
+  const resolvedTarget = target ?? SANDBOX_BASE_TARGET;
+  const resolvedRepository =
+    repository ??
+    (resolvedTarget === SANDBOX_DESIGNER_BASE_TARGET
+      ? DEFAULT_DESIGNER_BASE_REPOSITORY
+      : DEFAULT_SANDBOX_BASE_REPOSITORY);
+
   return {
     additionalOutputImageRefs,
     labels,
     provider,
     publishMode,
-    repository,
+    repository: resolvedRepository,
     repositoryProvided,
     ...(apiKey === undefined ? {} : { apiKey }),
     ...(cpuCount === undefined ? {} : { cpuCount }),
@@ -1202,4 +1215,7 @@ async function main(): Promise<void> {
   throw new Error("Unsupported sandbox provider.");
 }
 
-await main();
+const scriptPath = process.argv[1];
+if (scriptPath !== undefined && import.meta.url === pathToFileURL(scriptPath).href) {
+  await main();
+}

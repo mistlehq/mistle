@@ -7,7 +7,10 @@ import {
   isObjectRecord,
   setValueAtPath,
 } from "../../packages/config/src/core/record.js";
-import { getLocalDevDockerRegistrySandboxBaseImageRef } from "../../packages/config/src/sandbox-base-images.js";
+import {
+  getLocalDevDockerRegistryDesignerBaseImageRef,
+  getLocalDevDockerRegistrySandboxBaseImageRef,
+} from "../../packages/config/src/sandbox-base-images.js";
 
 export type ConfigRecord = Record<string, unknown>;
 
@@ -307,7 +310,7 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
       default_base_image: getLocalDevDockerRegistrySandboxBaseImageRef(),
       publish_base_domain: "mistle.localhost",
       designer: {
-        base_image: getLocalDevDockerRegistrySandboxBaseImageRef(),
+        base_image: getLocalDevDockerRegistryDesignerBaseImageRef(),
         codex_cli_path: "codex",
         sandbox_provider: "docker",
       },

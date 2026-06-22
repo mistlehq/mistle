@@ -629,6 +629,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Mistle Designer resource access** defines technical access authority; approval behavior for mutating actions is a separate **Mistle Designer** interaction policy.
 - **Mistle Designer resource access** is scoped to a **Mistle Designer session** and organization rather than one target **Sandbox profile version**.
 - **Mistle Designer sessions** persist the user's initial prompt, workspace state, and Codex-backed Designer chat runtime state.
+- A **Mistle Designer session** submits its initial prompt as the first Designer chat turn after the Designer sandbox chat runtime is ready.
 - The target **Sandbox profile version**'s **Agent runtime** remains a user choice even when authored through **Mistle Designer**.
 - First-pass **Mistle Designer sessions** reuse the normal sandbox session workbench transport against the designer sandbox instance.
 - Designer-specific control-plane APIs own **Mistle Designer session** metadata, connection-token minting, and **Designer canvas tab** persistence.
@@ -642,7 +643,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Designer canvas tab** may accept a dashboard-internal route before that route has a supported embedded rendering surface.
 - A **Designer page** is the top-level dashboard entry point for **Mistle Designer sessions**.
 - The **Designer page** presents a composer for starting a new **Mistle Designer session** before the list of past **Mistle Designer sessions**.
-- Submitting the **Designer page** composer creates a **Mistle Designer session** and opens that session's designer workspace.
+- Submitting the **Designer page** composer creates a **Mistle Designer session**, opens that session's designer workspace, and seeds the first Designer chat turn from the submitted prompt.
 - **Mistle Designer session** access is controlled by Designer-specific user organization permissions in the first pass, not API-key scopes.
 - A **Designer canvas** may start empty until **Mistle Designer** opens a route-backed tab.
 - **Mistle Designer** may open ordinary dashboard routes in **Designer canvas tabs**.

@@ -13,7 +13,7 @@ use serde::Deserialize;
 static ENV_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 static ATTACHMENT_ROOT_OVERRIDE: LazyLock<Mutex<Option<PathBuf>>> =
     LazyLock::new(|| Mutex::new(None));
-static LOCAL_SANDBOX_BASE_IMAGE_REFS: LazyLock<LocalSandboxBaseImageRefs> = LazyLock::new(|| {
+static LOCAL_PREPARED_RUNTIME_SANDBOX_BASE_IMAGE_REF: LazyLock<String> = LazyLock::new(|| {
     let manifest_path = sandbox_base_images_manifest_path();
     let manifest_contents = fs::read_to_string(&manifest_path).unwrap_or_else(|error| {
         panic!(
@@ -22,8 +22,13 @@ static LOCAL_SANDBOX_BASE_IMAGE_REFS: LazyLock<LocalSandboxBaseImageRefs> = Lazy
         )
     });
 
-    serde_json::from_str(&manifest_contents)
-        .expect("sandbox base images manifest should be valid JSON")
+    let refs: LocalSandboxBaseImageRefs = serde_json::from_str(&manifest_contents)
+        .expect("sandbox base images manifest should be valid JSON");
+
+    format!(
+        "{}:{}",
+        refs.local_dev.repositories.sandbox_base, refs.local_dev.tag
+    )
 });
 
 #[derive(Deserialize)]
@@ -35,7 +40,14 @@ struct LocalSandboxBaseImageRefs {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct LocalDevSandboxBaseImageRefs {
-    prepared_runtime: String,
+    repositories: LocalDevSandboxBaseImageRepositories,
+    tag: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalDevSandboxBaseImageRepositories {
+    sandbox_base: String,
 }
 
 fn sandbox_base_images_manifest_path() -> PathBuf {
@@ -184,8 +196,5 @@ pub fn attachment_root_override() -> Option<PathBuf> {
 }
 
 pub fn local_prepared_runtime_sandbox_base_image_ref() -> &'static str {
-    LOCAL_SANDBOX_BASE_IMAGE_REFS
-        .local_dev
-        .prepared_runtime
-        .as_str()
+    LOCAL_PREPARED_RUNTIME_SANDBOX_BASE_IMAGE_REF.as_str()
 }
