@@ -8,6 +8,8 @@ const LocalSandboxBaseImageRefsSchema = z
       .object({
         dockerRegistry: z.string().min(1),
         preparedRuntime: z.string().min(1),
+        designerDockerRegistry: z.string().min(1),
+        preparedDesignerRuntime: z.string().min(1),
       })
       .strict(),
     localTest: z
@@ -190,6 +192,14 @@ export function getLocalDevDockerRegistrySandboxBaseImageRef(fromImportMetaUrl?:
 
 export function getLocalPreparedRuntimeSandboxBaseImageRef(fromImportMetaUrl?: string): string {
   return readLocalSandboxBaseImageRefs(fromImportMetaUrl).localDev.preparedRuntime;
+}
+
+export function getLocalDevDockerRegistryDesignerBaseImageRef(fromImportMetaUrl?: string): string {
+  return readLocalSandboxBaseImageRefs(fromImportMetaUrl).localDev.designerDockerRegistry;
+}
+
+export function getLocalPreparedRuntimeDesignerBaseImageRef(fromImportMetaUrl?: string): string {
+  return readLocalSandboxBaseImageRefs(fromImportMetaUrl).localDev.preparedDesignerRuntime;
 }
 
 export function getLocalTestSandboxBaseImageRef(fromImportMetaUrl?: string): string {

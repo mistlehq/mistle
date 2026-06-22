@@ -184,7 +184,7 @@ default_base_image = "registry.example.com/mistle/sandbox-base:prod"
 publish_base_domain = "mistle.example"
 
 [sandbox.designer]
-base_image = "registry.example.com/mistle/sandbox-base:prod"
+base_image = "registry.example.com/mistle/designer-base:prod"
 codex_cli_path = "codex"
 sandbox_provider = "docker"
 #sandbox_connection_id = "replace-with-sandbox-connection-id"

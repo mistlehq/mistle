@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getLocalDevDockerRegistryDesignerBaseImageRef,
   getLocalDevDockerRegistrySandboxBaseImageRef,
+  getLocalPreparedRuntimeDesignerBaseImageRef,
   getLocalPreparedRuntimeSandboxBaseImageRef,
   getLocalTestSandboxBaseImageRef,
   parseLocalSandboxBaseImageRefs,
@@ -15,6 +17,8 @@ describe("readLocalSandboxBaseImageRefs", () => {
       localDev: {
         dockerRegistry: "127.0.0.1:5001/mistle/sandbox-base:dev",
         preparedRuntime: "mistle/sandbox-base:dev",
+        designerDockerRegistry: "127.0.0.1:5001/mistle/designer-base:dev",
+        preparedDesignerRuntime: "mistle/designer-base:dev",
       },
       localTest: {
         docker: "mistle/sandbox-base:test",
@@ -27,6 +31,10 @@ describe("readLocalSandboxBaseImageRefs", () => {
       "127.0.0.1:5001/mistle/sandbox-base:dev",
     );
     expect(getLocalPreparedRuntimeSandboxBaseImageRef()).toBe("mistle/sandbox-base:dev");
+    expect(getLocalDevDockerRegistryDesignerBaseImageRef()).toBe(
+      "127.0.0.1:5001/mistle/designer-base:dev",
+    );
+    expect(getLocalPreparedRuntimeDesignerBaseImageRef()).toBe("mistle/designer-base:dev");
     expect(getLocalTestSandboxBaseImageRef()).toBe("mistle/sandbox-base:test");
   });
 });
@@ -38,6 +46,8 @@ describe("parseLocalSandboxBaseImageRefs", () => {
         localDev: {
           dockerRegistry: "127.0.0.1:5001/mistle/sandbox-base:dev",
           preparedRuntime: "mistle/sandbox-base:dev",
+          designerDockerRegistry: "127.0.0.1:5001/mistle/designer-base:dev",
+          preparedDesignerRuntime: "mistle/designer-base:dev",
         },
         localTest: {
           docker: "mistle/sandbox-base:test",

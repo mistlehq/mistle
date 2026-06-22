@@ -40,6 +40,7 @@ const OPENCOMPUTER_SANDBOXD_ARCHIVE_PARTS_PATH =
   "dev/.generated/sandbox-base/opencomputer/sandboxd-parts";
 const SANDBOX_BASE_TARGET = "sandbox-base";
 const SANDBOX_BASE_SYSTEM_TESTS_TARGET = "sandbox-base-system-tests";
+const SANDBOX_DESIGNER_BASE_TARGET = "sandbox-designer-base";
 const SANDBOXD_BUILD_ARTIFACT_PATH = "/app/packages/sandboxd/target/release/sandboxd";
 const TENSORLAKE_COPY_PART_SIZE = "512k";
 const OPENCOMPUTER_COPY_PART_SIZE = "64k";
@@ -99,7 +100,8 @@ Docker options:
   --tag <tag>                          Tag when --output-image-ref is omitted. Must start with dev- or sys-
   --additional-output-image-ref <ref>  Additional output tag. Can be repeated
   --platform <value>                   Docker platform (default: ${DEFAULT_PLATFORM})
-  --target <target>                    Dockerfile target (sandbox-base or sandbox-base-system-tests)
+  --target <target>                    Dockerfile target (sandbox-base, sandbox-base-system-tests,
+                                          or sandbox-designer-base)
   --publish-mode <push|load>           Publish mode (default: push)
   --label <key=value>                  Docker image label. Can be repeated
 
@@ -379,10 +381,11 @@ function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
   if (
     target !== undefined &&
     target !== SANDBOX_BASE_TARGET &&
-    target !== SANDBOX_BASE_SYSTEM_TESTS_TARGET
+    target !== SANDBOX_BASE_SYSTEM_TESTS_TARGET &&
+    target !== SANDBOX_DESIGNER_BASE_TARGET
   ) {
     throw new Error(
-      `--target must be ${SANDBOX_BASE_TARGET} or ${SANDBOX_BASE_SYSTEM_TESTS_TARGET}.`,
+      `--target must be ${SANDBOX_BASE_TARGET}, ${SANDBOX_BASE_SYSTEM_TESTS_TARGET}, or ${SANDBOX_DESIGNER_BASE_TARGET}.`,
     );
   }
 

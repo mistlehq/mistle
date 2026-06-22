@@ -6,7 +6,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  getLocalDevDockerRegistryDesignerBaseImageRef,
   getLocalDevDockerRegistrySandboxBaseImageRef,
+  getLocalPreparedRuntimeDesignerBaseImageRef,
   getLocalPreparedRuntimeSandboxBaseImageRef,
 } from "../../packages/config/src/sandbox-base-images.js";
 import {
@@ -35,6 +37,8 @@ const LOCAL_REGISTRY_HOST = "127.0.0.1:5001";
 const DISTRIBUTED_GATEWAY_PORTS = [5203, 5204] as const;
 const SANDBOX_BASE_IMAGE_TAG = getLocalPreparedRuntimeSandboxBaseImageRef();
 const SANDBOX_BASE_IMAGE_REGISTRY_TAG = getLocalDevDockerRegistrySandboxBaseImageRef();
+const DESIGNER_BASE_IMAGE_TAG = getLocalPreparedRuntimeDesignerBaseImageRef();
+const DESIGNER_BASE_IMAGE_REGISTRY_TAG = getLocalDevDockerRegistryDesignerBaseImageRef();
 const SANDBOX_BASE_DOCKERFILE_PATH = "packages/sandboxd/Dockerfile";
 const SANDBOX_BASE_CACHE_DIR = resolve(REPO_ROOT, ".local", "sandbox-base");
 const SANDBOX_BASE_CACHE_KEY_PATH = resolve(SANDBOX_BASE_CACHE_DIR, ".cache-key");
@@ -515,6 +519,27 @@ async function start(): Promise<void> {
       console.log("Sandbox base image is up to date.");
     }
 
+    if (!sandboxBaseCacheHit || !dockerImageExists(DESIGNER_BASE_IMAGE_TAG)) {
+      if (sandboxBaseCacheHit) {
+        console.log(
+          "Sandbox base cache is valid but the Designer image is missing, rebuilding it...",
+        );
+      }
+      console.log("Building Designer base image...");
+      await createDockerBaseImageBuilder({ env: sharedDevEnv }).ensureBaseImage({
+        source: {
+          kind: SandboxBaseImageSourceKinds.DOCKERFILE,
+          contextPath: REPO_ROOT,
+          dockerfilePath: SANDBOX_BASE_DOCKERFILE_PATH,
+          imageId: DESIGNER_BASE_IMAGE_TAG,
+          publishMode: SandboxBaseImagePublishModes.LOAD,
+          target: "sandbox-designer-base",
+        },
+      });
+    } else {
+      console.log("Designer base image is up to date.");
+    }
+
     console.log("Publishing sandbox base image to the local HTTP registry...");
     runOrThrow({
       command: "docker",
@@ -524,6 +549,17 @@ async function start(): Promise<void> {
     await publishLocalDockerImageToHttpRegistry({
       sourceImageRef: SANDBOX_BASE_IMAGE_TAG,
       targetImageRef: SANDBOX_BASE_IMAGE_REGISTRY_TAG,
+    });
+
+    console.log("Publishing Designer base image to the local HTTP registry...");
+    runOrThrow({
+      command: "docker",
+      args: ["tag", DESIGNER_BASE_IMAGE_TAG, DESIGNER_BASE_IMAGE_REGISTRY_TAG],
+      env: sharedDevEnv,
+    });
+    await publishLocalDockerImageToHttpRegistry({
+      sourceImageRef: DESIGNER_BASE_IMAGE_TAG,
+      targetImageRef: DESIGNER_BASE_IMAGE_REGISTRY_TAG,
     });
 
     if (!sandboxBaseCacheHit) {

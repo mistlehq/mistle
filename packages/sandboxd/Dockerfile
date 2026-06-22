@@ -156,3 +156,40 @@ RUN cd /opt/mistle/system-test-fixtures/vite-dev-server \
 STOPSIGNAL SIGRTMIN+3
 
 ENTRYPOINT ["/sbin/init"]
+
+FROM sandbox-base AS sandbox-designer-base
+
+ARG TARGETARCH
+ARG CODEX_CLI_VERSION=0.140.0
+
+RUN case "${TARGETARCH}" in \
+      amd64) \
+        codex_asset="codex-x86_64-unknown-linux-musl.tar.gz"; \
+        codex_binary="codex-x86_64-unknown-linux-musl"; \
+        codex_sha256="48e591964d4bbaab7c0433daed41c65ea8f152fc0f1dd2334a42e3dd322a4906"; \
+        ;; \
+      arm64) \
+        codex_asset="codex-aarch64-unknown-linux-musl.tar.gz"; \
+        codex_binary="codex-aarch64-unknown-linux-musl"; \
+        codex_sha256="ec6c804d415e42dd28cc6f8c6cb5238b00c9af4bfb58b63be55e26ec4ee576c0"; \
+        ;; \
+      *) \
+        echo "Unsupported Designer Codex CLI architecture: ${TARGETARCH}" >&2; \
+        exit 1; \
+        ;; \
+    esac \
+  && curl -fsSL \
+    "https://github.com/openai/codex/releases/download/rust-v${CODEX_CLI_VERSION}/${codex_asset}" \
+    -o /tmp/codex.tar.gz \
+  && echo "${codex_sha256}  /tmp/codex.tar.gz" | sha256sum -c - \
+  && tar -xzf /tmp/codex.tar.gz -C /tmp \
+  && install -m 0755 "/tmp/${codex_binary}" /usr/local/bin/codex \
+  && rm -f /tmp/codex.tar.gz "/tmp/${codex_binary}" \
+  && codex --version
+
+LABEL org.opencontainers.image.title="Mistle Designer Base"
+LABEL org.opencontainers.image.description="Sandbox base image for Mistle Designer sessions"
+
+STOPSIGNAL SIGRTMIN+3
+
+ENTRYPOINT ["/sbin/init"]
