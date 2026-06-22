@@ -9,7 +9,9 @@ export {
   type RuntimeEnvExportValueFormat,
 } from "./runtime-env-export.js";
 export {
+  getLocalDevDockerRegistryDesignerBaseImageRef,
   getLocalDevDockerRegistrySandboxBaseImageRef,
+  getLocalPreparedRuntimeDesignerBaseImageRef,
   getLocalPreparedRuntimeSandboxBaseImageRef,
   getLocalTestSandboxBaseImageRef,
   parseLocalSandboxBaseImageRefs,

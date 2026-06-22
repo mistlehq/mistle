@@ -15,13 +15,18 @@ describe("readLocalSandboxBaseImageRefs", () => {
   it("reads the checked-in local sandbox base image manifest", () => {
     expect(readLocalSandboxBaseImageRefs()).toEqual({
       localDev: {
-        dockerRegistry: "127.0.0.1:5001/mistle/sandbox-base:dev",
-        preparedRuntime: "mistle/sandbox-base:dev",
-        designerDockerRegistry: "127.0.0.1:5001/mistle/designer-base:dev",
-        preparedDesignerRuntime: "mistle/designer-base:dev",
+        dockerRegistryHost: "127.0.0.1:5001",
+        repositories: {
+          sandboxBase: "mistle/sandbox-base",
+          designerBase: "mistle/designer-base",
+        },
+        tag: "dev",
       },
       localTest: {
-        docker: "mistle/sandbox-base:test",
+        repositories: {
+          sandboxBase: "mistle/sandbox-base",
+        },
+        tag: "test",
       },
     });
   });
@@ -44,13 +49,18 @@ describe("parseLocalSandboxBaseImageRefs", () => {
     expect(() =>
       parseLocalSandboxBaseImageRefs({
         localDev: {
-          dockerRegistry: "127.0.0.1:5001/mistle/sandbox-base:dev",
-          preparedRuntime: "mistle/sandbox-base:dev",
-          designerDockerRegistry: "127.0.0.1:5001/mistle/designer-base:dev",
-          preparedDesignerRuntime: "mistle/designer-base:dev",
+          dockerRegistryHost: "127.0.0.1:5001",
+          repositories: {
+            sandboxBase: "mistle/sandbox-base",
+            designerBase: "mistle/designer-base",
+          },
+          tag: "dev",
         },
         localTest: {
-          docker: "mistle/sandbox-base:test",
+          repositories: {
+            sandboxBase: "mistle/sandbox-base",
+          },
+          tag: "test",
         },
         publicRemote: {
           stable: "ghcr.io/mistlehq/sandbox-base@sha256:1234",

@@ -1,6 +1,9 @@
 import { fileURLToPath } from "node:url";
 
-import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
+import {
+  getLocalDevDockerRegistryDesignerBaseImageRef,
+  getLocalDevDockerRegistrySandboxBaseImageRef,
+} from "@mistle/config";
 import { createControlPlaneApiRuntime } from "@mistle/control-plane-api/runtime";
 import type { ControlPlaneApiConfig } from "@mistle/control-plane-api/types";
 import { z } from "zod";
@@ -321,7 +324,7 @@ function config(input: {
       gatewayWsUrl: input.gatewayWsUrl,
       ...createControlPlaneApiSandboxProviderConfig(input.sandbox),
       designer: {
-        baseImage: input.sandboxBaseImageRef ?? getLocalDevDockerRegistrySandboxBaseImageRef(),
+        baseImage: getLocalDevDockerRegistryDesignerBaseImageRef(),
         codexCliPath: "codex",
         sandboxProvider: "docker",
         sandboxConnectionId: null,

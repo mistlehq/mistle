@@ -6,15 +6,24 @@ const LocalSandboxBaseImageRefsSchema = z
   .object({
     localDev: z
       .object({
-        dockerRegistry: z.string().min(1),
-        preparedRuntime: z.string().min(1),
-        designerDockerRegistry: z.string().min(1),
-        preparedDesignerRuntime: z.string().min(1),
+        dockerRegistryHost: z.string().min(1),
+        repositories: z
+          .object({
+            sandboxBase: z.string().min(1),
+            designerBase: z.string().min(1),
+          })
+          .strict(),
+        tag: z.string().min(1),
       })
       .strict(),
     localTest: z
       .object({
-        docker: z.string().min(1),
+        repositories: z
+          .object({
+            sandboxBase: z.string().min(1),
+          })
+          .strict(),
+        tag: z.string().min(1),
       })
       .strict(),
   })
@@ -186,22 +195,56 @@ export function readLocalSandboxBaseImageRefs(
   return parseLocalSandboxBaseImageRefs(rawManifest);
 }
 
+function createDockerRegistryImageRef(input: {
+  registryHost: string;
+  repository: string;
+  tag: string;
+}): string {
+  return `${input.registryHost}/${input.repository}:${input.tag}`;
+}
+
+function createLocalImageRef(input: { repository: string; tag: string }): string {
+  return `${input.repository}:${input.tag}`;
+}
+
 export function getLocalDevDockerRegistrySandboxBaseImageRef(fromImportMetaUrl?: string): string {
-  return readLocalSandboxBaseImageRefs(fromImportMetaUrl).localDev.dockerRegistry;
+  const refs = readLocalSandboxBaseImageRefs(fromImportMetaUrl);
+  return createDockerRegistryImageRef({
+    registryHost: refs.localDev.dockerRegistryHost,
+    repository: refs.localDev.repositories.sandboxBase,
+    tag: refs.localDev.tag,
+  });
 }
 
 export function getLocalPreparedRuntimeSandboxBaseImageRef(fromImportMetaUrl?: string): string {
-  return readLocalSandboxBaseImageRefs(fromImportMetaUrl).localDev.preparedRuntime;
+  const refs = readLocalSandboxBaseImageRefs(fromImportMetaUrl);
+  return createLocalImageRef({
+    repository: refs.localDev.repositories.sandboxBase,
+    tag: refs.localDev.tag,
+  });
 }
 
 export function getLocalDevDockerRegistryDesignerBaseImageRef(fromImportMetaUrl?: string): string {
-  return readLocalSandboxBaseImageRefs(fromImportMetaUrl).localDev.designerDockerRegistry;
+  const refs = readLocalSandboxBaseImageRefs(fromImportMetaUrl);
+  return createDockerRegistryImageRef({
+    registryHost: refs.localDev.dockerRegistryHost,
+    repository: refs.localDev.repositories.designerBase,
+    tag: refs.localDev.tag,
+  });
 }
 
 export function getLocalPreparedRuntimeDesignerBaseImageRef(fromImportMetaUrl?: string): string {
-  return readLocalSandboxBaseImageRefs(fromImportMetaUrl).localDev.preparedDesignerRuntime;
+  const refs = readLocalSandboxBaseImageRefs(fromImportMetaUrl);
+  return createLocalImageRef({
+    repository: refs.localDev.repositories.designerBase,
+    tag: refs.localDev.tag,
+  });
 }
 
 export function getLocalTestSandboxBaseImageRef(fromImportMetaUrl?: string): string {
-  return readLocalSandboxBaseImageRefs(fromImportMetaUrl).localTest.docker;
+  const refs = readLocalSandboxBaseImageRefs(fromImportMetaUrl);
+  return createLocalImageRef({
+    repository: refs.localTest.repositories.sandboxBase,
+    tag: refs.localTest.tag,
+  });
 }
