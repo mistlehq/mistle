@@ -17,12 +17,14 @@ import { createAttachmentBackedActiveBootstrapSessionStore } from "../../runtime
 import { InMemorySandboxPresenceStore } from "../../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
 import {
+  ATTACHMENT_TTL_MS,
   type DataPlaneGatewayHealthConfig,
   DefaultDataPlaneGatewayHealthConfig,
   OWNER_LEASE_RENEW_INTERVAL_MS,
   WEBSOCKET_PING_INTERVAL_MS,
   WEBSOCKET_PONG_TIMEOUT_MS,
 } from "../../runtime-state/durations.js";
+import { GatewayForwardingReadiness } from "../../runtime/gateway-forwarding-readiness.js";
 import { BootstrapTunnelNotConnectedError } from "../bootstrap-tunnel-not-connected-error.js";
 import { LocalGatewayForwardingClientAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
@@ -42,6 +44,17 @@ const BootstrapSessionId = "sess_bootstrap";
 const ConnectionSessionId = "conn_1";
 const OwnerLeaseId = "lease_test";
 
+function createReadyForwardingReadiness(clock: ReturnType<typeof createMutableClock>) {
+  const readiness = new GatewayForwardingReadiness({
+    backend: "nats",
+    clock,
+    localNodeId: GatewayNodeId,
+    subject: `mistle.gateway.forward.${GatewayNodeId}`,
+  });
+  readiness.markReady({ reason: "self_check_succeeded" });
+  return readiness;
+}
+
 function createDeferred(): {
   promise: Promise<void>;
   resolve: () => void;
@@ -57,6 +70,12 @@ function createDeferred(): {
     promise,
     resolve: resolveDeferred,
   };
+}
+
+async function flushAsyncWork(iterations = 10): Promise<void> {
+  for (let index = 0; index < iterations; index += 1) {
+    await Promise.resolve();
+  }
 }
 
 type RuntimeLifecycleEventKind =
@@ -281,6 +300,7 @@ async function createDisconnectTestHarness() {
     runtimeReady?: boolean;
   }> = [];
   const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
+  const forwardingReadiness = createReadyForwardingReadiness(clock);
   await attachmentStore.upsertAttachment({
     sandboxInstanceId: SandboxInstanceId,
     ownerLeaseId: OwnerLeaseId,
@@ -356,6 +376,7 @@ async function createDisconnectTestHarness() {
       DefaultDataPlaneGatewayLifecycleDurations,
     ),
     new SandboxDeadlineLifecycleCoordinator(),
+    forwardingReadiness,
     clock,
     scheduler,
     DefaultDataPlaneGatewayHealthConfig,
@@ -401,6 +422,7 @@ function createBootstrapHealthTestHarness(input?: { healthConfig?: DataPlaneGate
     runtimeReady?: boolean;
   }> = [];
   const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
+  const forwardingReadiness = createReadyForwardingReadiness(clock);
   const tunnelSessionRegistry = new TunnelSessionRegistry(
     new InMemoryTunnelSessionRegistryAdapter(),
   );
@@ -466,6 +488,7 @@ function createBootstrapHealthTestHarness(input?: { healthConfig?: DataPlaneGate
       DefaultDataPlaneGatewayLifecycleDurations,
     ),
     lifecycleCoordinator,
+    forwardingReadiness,
     clock,
     scheduler,
     input?.healthConfig ?? DefaultDataPlaneGatewayHealthConfig,
@@ -473,6 +496,8 @@ function createBootstrapHealthTestHarness(input?: { healthConfig?: DataPlaneGate
 
   return {
     clock,
+    attachmentStore,
+    forwardingReadiness,
     lifecycleCoordinator,
     lifecycleEvents,
     rawSocket: new FakeRawSocket(),
@@ -530,6 +555,130 @@ describe("TunnelSessionService", () => {
       },
       socketAgeMs: 1_250,
     });
+  });
+
+  it("does not create a runtime attachment when gateway forwarding is not ready", async () => {
+    const { attachmentStore, clock, forwardingReadiness, rawSocket, service } =
+      createBootstrapHealthTestHarness();
+    forwardingReadiness.markNotReady({ reason: "nats_disconnected" });
+
+    let fatalError: unknown;
+    let fatalStatusMessage: string | undefined;
+    const attachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: (failure) => {
+        fatalError = failure.error;
+        fatalStatusMessage = failure.statusMessage;
+      },
+      onLeaseLost: () => {
+        throw new Error("Bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Bootstrap transport should remain healthy in this test.");
+      },
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: createFakePeerSocket(rawSocket),
+    });
+    await attachedPeer.activationPromise;
+
+    const attachment = await attachmentStore.getAttachment({
+      sandboxInstanceId: SandboxInstanceId,
+      nowMs: clock.nowMs(),
+    });
+    expect(attachment).toBeNull();
+    expect(fatalStatusMessage).toBe(
+      "Gateway forwarding is not ready for sandbox runtime attachment.",
+    );
+    expect(fatalError).toBeInstanceOf(Error);
+    if (!(fatalError instanceof Error)) {
+      throw new Error("Expected forwarding readiness failure to be reported as an Error.");
+    }
+    expect(fatalError.message).toContain("Gateway forwarding is not_ready");
+
+    attachedPeer.websocketHealthHandle?.stop();
+  });
+
+  it("pauses runtime attachment renewal while forwarding is not ready and resumes when it recovers", async () => {
+    const { attachmentStore, clock, forwardingReadiness, rawSocket, scheduler, service } =
+      createBootstrapHealthTestHarness();
+
+    const attachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: () => {
+        throw new Error("Bootstrap attach should not fail in this test.");
+      },
+      onLeaseLost: () => {
+        throw new Error("Bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Bootstrap transport should remain healthy in this test.");
+      },
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: createFakePeerSocket(rawSocket),
+    });
+    await attachedPeer.activationPromise;
+
+    forwardingReadiness.markNotReady({ reason: "nats_disconnected" });
+    clock.advanceMs(20_000);
+    scheduler.runDue();
+    await flushAsyncWork();
+
+    forwardingReadiness.markReady({ reason: "self_check_succeeded" });
+    await flushAsyncWork();
+
+    clock.advanceMs(ATTACHMENT_TTL_MS - 1);
+    const attachment = await attachmentStore.getAttachment({
+      sandboxInstanceId: SandboxInstanceId,
+      nowMs: clock.nowMs(),
+    });
+    expect(attachment?.ownerLeaseId).toBe(OwnerLeaseId);
+
+    attachedPeer.websocketHealthHandle?.stop();
+  });
+
+  it("does not recreate an expired runtime attachment when forwarding recovers after the ttl", async () => {
+    const { attachmentStore, clock, forwardingReadiness, rawSocket, scheduler, service } =
+      createBootstrapHealthTestHarness();
+
+    let leaseLostMessage: string | undefined;
+    const attachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: () => {
+        throw new Error("Bootstrap attach should not fail in this test.");
+      },
+      onLeaseLost: (failure) => {
+        leaseLostMessage = failure.statusMessage;
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Bootstrap transport should remain healthy in this test.");
+      },
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: createFakePeerSocket(rawSocket),
+    });
+    await attachedPeer.activationPromise;
+
+    forwardingReadiness.markNotReady({ reason: "nats_disconnected" });
+    clock.advanceMs(ATTACHMENT_TTL_MS);
+    scheduler.runDue();
+    await flushAsyncWork();
+
+    forwardingReadiness.markReady({ reason: "self_check_succeeded" });
+    await flushAsyncWork();
+
+    const attachment = await attachmentStore.getAttachment({
+      sandboxInstanceId: SandboxInstanceId,
+      nowMs: clock.nowMs(),
+    });
+    expect(attachment).toBeNull();
+    expect(leaseLostMessage).toBe("Sandbox active attachment was replaced.");
+
+    attachedPeer.websocketHealthHandle?.stop();
   });
 
   it("preserves the first bootstrap close cause when later paths report transport errors", async () => {
@@ -969,6 +1118,7 @@ describe("TunnelSessionService", () => {
         DefaultDataPlaneGatewayLifecycleDurations,
       ),
       new SandboxDeadlineLifecycleCoordinator(),
+      createReadyForwardingReadiness(clock),
       clock,
       scheduler,
       DefaultDataPlaneGatewayHealthConfig,
@@ -1093,6 +1243,7 @@ describe("TunnelSessionService", () => {
         DefaultDataPlaneGatewayLifecycleDurations,
       ),
       new SandboxDeadlineLifecycleCoordinator(),
+      createReadyForwardingReadiness(clock),
       clock,
       scheduler,
       DefaultDataPlaneGatewayHealthConfig,
@@ -1213,6 +1364,7 @@ describe("TunnelSessionService", () => {
         DefaultDataPlaneGatewayLifecycleDurations,
       ),
       new SandboxDeadlineLifecycleCoordinator(),
+      createReadyForwardingReadiness(clock),
       clock,
       scheduler,
       DefaultDataPlaneGatewayHealthConfig,
@@ -1348,6 +1500,7 @@ describe("TunnelSessionService", () => {
         DefaultDataPlaneGatewayLifecycleDurations,
       ),
       lifecycleCoordinator,
+      createReadyForwardingReadiness(clock),
       clock,
       scheduler,
       DefaultDataPlaneGatewayHealthConfig,

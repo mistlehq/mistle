@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import type { GatewayForwardingReadiness } from "./runtime/gateway-forwarding-readiness.js";
 import type { GatewayLifecycle } from "./runtime/gateway-lifecycle.js";
 import { createAppResources, setAppResources, stopAppResources } from "./runtime/resources.js";
 import type { AppContextBindings, DataPlaneGatewayApp, DataPlaneGatewayConfig } from "./types.js";
@@ -7,6 +8,7 @@ import type { AppContextBindings, DataPlaneGatewayApp, DataPlaneGatewayConfig } 
 export function createApp(
   config: DataPlaneGatewayConfig,
   lifecycle: GatewayLifecycle,
+  forwardingReadiness: GatewayForwardingReadiness,
 ): DataPlaneGatewayApp {
   const app = new Hono<AppContextBindings>();
   const resources = createAppResources(config);
@@ -17,16 +19,28 @@ export function createApp(
 
   app.get("/__readyz", (c) => {
     const state = lifecycle.getState();
-    if (state.status === "serving") {
-      return c.json({ ok: true, status: state.status });
+    const forwarding = forwardingReadiness.getSnapshot();
+    if (state.status === "serving" && forwarding.status === "ready") {
+      return c.json({
+        ok: true,
+        status: state.status,
+        forwarding,
+      });
     }
 
     return c.json(
       {
         ok: false,
         status: state.status,
-        reason: state.reason,
-        startedAtMs: state.startedAtMs,
+        forwarding,
+        ...(state.status === "draining"
+          ? {
+              reason: state.reason,
+              startedAtMs: state.startedAtMs,
+            }
+          : {
+              reason: forwarding.reason,
+            }),
       },
       503,
     );

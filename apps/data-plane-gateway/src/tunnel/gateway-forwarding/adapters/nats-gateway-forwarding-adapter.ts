@@ -1,4 +1,4 @@
-import type { Scheduler, TimerHandle } from "@mistle/time";
+import { systemScheduler, type Scheduler, type TimerHandle } from "@mistle/time";
 import {
   ClosedConnectionError,
   DrainingConnectionError,
@@ -10,6 +10,7 @@ import {
 } from "@nats-io/transport-node";
 import { z } from "zod";
 
+import type { GatewayForwardingReadiness } from "../../../runtime/gateway-forwarding-readiness.js";
 import { BootstrapTunnelNotConnectedError } from "../../bootstrap-tunnel-not-connected-error.js";
 import {
   recordGatewayForwardingRequestEvent,
@@ -41,6 +42,7 @@ import {
 } from "../types.js";
 
 const RequestTimeoutMs = 5_000;
+const StartupReadinessTimeoutMs = 10_000;
 const MaxConcurrentForwardingResponses = 64;
 const DefaultSelfCheckIntervalMs = 30_000;
 const SelfCheckSandboxInstanceId = "__gateway_forwarding_self_check__";
@@ -294,30 +296,69 @@ function decodeJson(data: Uint8Array): unknown {
 export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdapter {
   private readonly activeResponseTasks = new Set<Promise<void>>();
   private connection: NatsConnection | undefined;
+  private forwardingGeneration = 0;
   private subscription: Subscription | undefined;
 
   public constructor(
     private readonly nodeId: string,
     private readonly subjectPrefix: string,
     private readonly localServer: GatewayForwardingServerAdapter,
+    private readonly readiness: GatewayForwardingReadiness,
+    private readonly scheduler: Scheduler = systemScheduler,
   ) {}
 
-  public start(connection: NatsConnection): void {
+  public async start(
+    connection: NatsConnection,
+    readinessCheckConnection: NatsConnection,
+  ): Promise<void> {
     if (this.subscription !== undefined) {
       throw new Error("NATS gateway forwarding adapter is already started.");
     }
 
     const subscription = connection.subscribe(this.localForwardingSubject());
+    const forwardingGeneration = this.nextForwardingGeneration();
     this.connection = connection;
     this.subscription = subscription;
-    void this.processSubscription(subscription).catch((error: unknown) => {
-      recordGatewayRelaySubscriptionFailure({
-        backend: "nats",
-        error,
-        localNodeId: this.nodeId,
-        subscriptionKind: "gateway_forwarding",
+    this.readiness.markChecking({ reason: "subscription_started" });
+    void this.processSubscription(subscription)
+      .then(() => {
+        if (this.isCurrentForwardingSubscription(subscription, forwardingGeneration)) {
+          this.nextForwardingGeneration();
+          this.readiness.markNotReady({ reason: "subscription_exited" });
+        }
+      })
+      .catch((error: unknown) => {
+        if (this.isCurrentForwardingSubscription(subscription, forwardingGeneration)) {
+          this.nextForwardingGeneration();
+          this.readiness.markNotReady({
+            error,
+            reason: "subscription_failed",
+          });
+        }
+        recordGatewayRelaySubscriptionFailure({
+          backend: "nats",
+          error,
+          localNodeId: this.nodeId,
+          subscriptionKind: "gateway_forwarding",
+        });
       });
-    });
+
+    try {
+      await this.runStartupReadinessCheckWithTimeout({
+        connection,
+        forwardingGeneration,
+        readinessCheckConnection,
+        subscription,
+      });
+    } catch (error) {
+      if (this.subscription === subscription) {
+        this.readiness.markNotReady({
+          error,
+          reason: "startup_check_failed",
+        });
+      }
+      throw error;
+    }
   }
 
   public async stop(): Promise<void> {
@@ -326,8 +367,10 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
       return;
     }
 
+    this.nextForwardingGeneration();
     this.subscription = undefined;
     this.connection = undefined;
+    this.readiness.markNotReady({ reason: "stopping" });
     await subscription.drain();
     await this.waitForActiveResponseTasks();
   }
@@ -356,8 +399,16 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
         scheduleNextSelfCheck();
         return;
       }
+      const subscription = this.subscription;
+      const forwardingGeneration = this.forwardingGeneration;
       isInFlight = true;
-      void this.checkLocalForwardingResponder(connection, () => isStopped).finally(() => {
+      void this.checkLocalForwardingReadiness(
+        connection,
+        () =>
+          isStopped ||
+          subscription === undefined ||
+          !this.isCurrentForwardingSubscription(subscription, forwardingGeneration),
+      ).finally(() => {
         isInFlight = false;
         scheduleNextSelfCheck();
       });
@@ -661,10 +712,54 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
     return forwardingResponse;
   }
 
-  private async checkLocalForwardingResponder(
+  private async runStartupReadinessCheck(input: {
+    connection: NatsConnection;
+    forwardingGeneration: number;
+    readinessCheckConnection: NatsConnection;
+    subscription: Subscription;
+  }): Promise<void> {
+    await input.connection.flush();
+    const isReady = await this.checkLocalForwardingReadiness(
+      input.readinessCheckConnection,
+      () => !this.isCurrentForwardingSubscription(input.subscription, input.forwardingGeneration),
+    );
+    if (!isReady) {
+      throw new Error(
+        `NATS gateway forwarding readiness check failed for subject '${this.localForwardingSubject()}'.`,
+      );
+    }
+  }
+
+  private async runStartupReadinessCheckWithTimeout(input: {
+    connection: NatsConnection;
+    forwardingGeneration: number;
+    readinessCheckConnection: NatsConnection;
+    subscription: Subscription;
+  }): Promise<void> {
+    let timeoutHandle: TimerHandle | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutHandle = this.scheduler.schedule(() => {
+        reject(
+          new Error(
+            `Timed out waiting for NATS gateway forwarding readiness check for subject '${this.localForwardingSubject()}'.`,
+          ),
+        );
+      }, StartupReadinessTimeoutMs);
+    });
+
+    try {
+      await Promise.race([this.runStartupReadinessCheck(input), timeout]);
+    } finally {
+      if (timeoutHandle !== undefined) {
+        this.scheduler.cancel(timeoutHandle);
+      }
+    }
+  }
+
+  public async checkLocalForwardingReadiness(
     connection: NatsConnection,
     isStopped: () => boolean,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const subject = this.localForwardingSubject();
     const startedAtMs = Date.now();
     try {
@@ -681,6 +776,10 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
           clientStreamId: 1,
         },
       });
+      if (isStopped()) {
+        return false;
+      }
+      this.readiness.markReady({ reason: "self_check_succeeded" });
       recordGatewayForwardingSelfCheckEvent({
         backend: "nats",
         durationMs: Date.now() - startedAtMs,
@@ -688,10 +787,15 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
         outcome: "succeeded",
         subject,
       });
+      return true;
     } catch (error) {
       if (isStopped()) {
-        return;
+        return false;
       }
+      this.readiness.markNotReady({
+        error,
+        reason: "self_check_failed",
+      });
       recordGatewayForwardingSelfCheckEvent({
         backend: "nats",
         durationMs: Date.now() - startedAtMs,
@@ -704,7 +808,20 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
             : "unexpected_error",
         subject,
       });
+      return false;
     }
+  }
+
+  private nextForwardingGeneration(): number {
+    this.forwardingGeneration += 1;
+    return this.forwardingGeneration;
+  }
+
+  private isCurrentForwardingSubscription(
+    subscription: Subscription,
+    forwardingGeneration: number,
+  ): boolean {
+    return this.subscription === subscription && this.forwardingGeneration === forwardingGeneration;
   }
 
   private recordForwardingRequest(input: {

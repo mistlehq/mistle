@@ -91,6 +91,12 @@ import type {
 } from "../types.js";
 import { AsyncTaskTracker, type AsyncTaskDrainResult } from "./async-task-tracker.js";
 import { GatewayDrainRegistry } from "./gateway-drain-registry.js";
+import { GatewayForwardingReadiness } from "./gateway-forwarding-readiness.js";
+import {
+  GatewayForwardingRecoverySupervisor,
+  type GatewayForwardingReplacementReason,
+} from "./gateway-forwarding-recovery-supervisor.js";
+import { createGatewayForwardingReplacementHandler } from "./gateway-forwarding-replacement.js";
 import { GatewayLifecycle } from "./gateway-lifecycle.js";
 export {
   GatewayWebSocketCloseCodes,
@@ -104,6 +110,7 @@ const ServiceRestartConnectionDrainTimeoutMs = 25_000;
 const ShutdownTunnelTaskDrainTimeoutMs = 5_000;
 
 type GatewayRelayRuntimeResources = {
+  forceNatsReconnect?: () => Promise<void>;
   gatewayForwardingClient: GatewayForwardingClientAdapter;
   relayCoordinator: TunnelRelayCoordinator;
   start: () => Promise<void>;
@@ -202,6 +209,7 @@ function toGatewayForwardingPortAccessAuthorizationError(
 function createGatewayRelayRuntimeResources(input: {
   activeBootstrapSessionStore: ReturnType<typeof createAttachmentBackedActiveBootstrapSessionStore>;
   config: DataPlaneGatewayConfig["gatewayRelay"];
+  forwardingReadiness: GatewayForwardingReadiness;
   gatewayForwardingServer: LocalGatewayForwardingServerAdapter;
   nodeId: string;
 }): GatewayRelayRuntimeResources {
@@ -214,6 +222,7 @@ function createGatewayRelayRuntimeResources(input: {
   let natsForwardingSelfCheckConnection: NatsConnection | undefined;
   let natsForwardingSelfCheckStatusWatcherStop: (() => void) | undefined;
   let natsForwardingSelfCheckStop: (() => void) | undefined;
+  let natsForwardingReconnectCheckInFlight = false;
   let natsRelayTransport: NatsRelayTransportAdapter | undefined;
   let natsPeerResolver: NatsRelayPeerResolver | undefined;
   let natsGatewayForwarding: NatsGatewayForwardingAdapter | undefined;
@@ -258,6 +267,7 @@ function createGatewayRelayRuntimeResources(input: {
       input.nodeId,
       subjectPrefix,
       input.gatewayForwardingServer,
+      input.forwardingReadiness,
     );
     relayTransport = natsRelayTransport;
     peerResolver = natsPeerResolver;
@@ -265,6 +275,18 @@ function createGatewayRelayRuntimeResources(input: {
   }
 
   return {
+    ...(input.config.backend === "nats"
+      ? {
+          forceNatsReconnect: async (): Promise<void> => {
+            const connection = natsConnection;
+            if (connection === undefined) {
+              throw new Error("NATS gateway relay resources are not started.");
+            }
+
+            await connection.reconnect();
+          },
+        }
+      : {}),
     gatewayForwardingClient,
     relayCoordinator: new TunnelRelayCoordinator(
       input.nodeId,
@@ -294,20 +316,42 @@ function createGatewayRelayRuntimeResources(input: {
       });
       natsConnection = connection;
       try {
-        natsConnectionStatusWatcherStop = watchNatsConnectionStatus({
-          connection,
-          localNodeId: input.nodeId,
-          role: "relay",
-        });
-        natsRelayTransport.start(connection);
-        natsPeerResolver.start(connection);
-        natsGatewayForwarding.start(connection);
-
         const selfCheckConnection = await connect({
           name: `mistle-data-plane-gateway-${input.nodeId}-forwarding-self-check`,
           servers: input.config.nats.url,
         });
         natsForwardingSelfCheckConnection = selfCheckConnection;
+        natsConnectionStatusWatcherStop = watchNatsConnectionStatus({
+          connection,
+          localNodeId: input.nodeId,
+          onStatus: (status) => {
+            if (status.type === "disconnect") {
+              input.forwardingReadiness.markNotReady({ reason: "nats_disconnected" });
+              return;
+            }
+            if (status.type !== "reconnect") {
+              return;
+            }
+            input.forwardingReadiness.markChecking({ reason: "nats_reconnected" });
+            if (natsForwardingReconnectCheckInFlight) {
+              return;
+            }
+            natsForwardingReconnectCheckInFlight = true;
+            void natsGatewayForwarding
+              .checkLocalForwardingReadiness(
+                selfCheckConnection,
+                () => natsForwardingSelfCheckConnection !== selfCheckConnection,
+              )
+              .finally(() => {
+                natsForwardingReconnectCheckInFlight = false;
+              });
+          },
+          role: "relay",
+        });
+        natsRelayTransport.start(connection);
+        natsPeerResolver.start(connection);
+        await natsGatewayForwarding.start(connection, selfCheckConnection);
+
         natsForwardingSelfCheckStatusWatcherStop = watchNatsConnectionStatus({
           connection: selfCheckConnection,
           localNodeId: input.nodeId,
@@ -335,6 +379,7 @@ function createGatewayRelayRuntimeResources(input: {
 function watchNatsConnectionStatus(input: {
   connection: NatsConnection;
   localNodeId: string;
+  onStatus?: (status: Status) => void;
   role: "relay" | "forwarding_self_check";
 }): () => void {
   let isStopped = false;
@@ -344,6 +389,7 @@ function watchNatsConnectionStatus(input: {
       if (isStopped) {
         break;
       }
+      input.onStatus?.(status);
       const server = natsStatusServer(status);
       const statusEvent: Parameters<typeof recordGatewayRelayNatsConnectionStatusEvent>[0] = {
         localNodeId: input.localNodeId,
@@ -390,11 +436,51 @@ export function createDataPlaneGatewayRuntime(
   config: DataPlaneGatewayRuntimeConfig,
 ): DataPlaneGatewayRuntime {
   const lifecycle = new GatewayLifecycle(systemClock);
-  const app = createApp(config.app, lifecycle);
-  const nodeWebSocket = createNodeWebSocket({ app });
   const nodeId = typeid("dpg").toString();
+  const onUnrecoverableForwarding =
+    config.onUnrecoverableForwarding ??
+    ((reason: GatewayForwardingReplacementReason) => {
+      logger.error(
+        {
+          eventName: "data_plane_gateway.runtime.forwarding_unrecoverable",
+          "mistle.gateway.node_id": nodeId,
+          "mistle.gateway.forwarding.replacement_reason": reason,
+        },
+        "Data-plane gateway forwarding is unrecoverable.",
+      );
+      process.exit(1);
+    });
+  const forwardingReadiness = new GatewayForwardingReadiness({
+    backend: config.app.gatewayRelay.backend,
+    clock: systemClock,
+    localNodeId: nodeId,
+    subject:
+      config.app.gatewayRelay.backend === "nats"
+        ? `${config.app.gatewayRelay.nats.namePrefix}.gateway.forward.${nodeId}`
+        : "memory",
+  });
+  if (config.app.gatewayRelay.backend === "memory") {
+    forwardingReadiness.markReady({ reason: "local_backend" });
+  }
+  const app = createApp(config.app, lifecycle, forwardingReadiness);
+  const nodeWebSocket = createNodeWebSocket({ app });
   const drainRegistry = new GatewayDrainRegistry();
   const sandboxTunnelTaskTracker = new AsyncTaskTracker();
+  const requestUnrecoverableForwardingReplacement = createGatewayForwardingReplacementHandler({
+    closeForServiceRestartWaitMs: ServiceRestartConnectionDrainTimeoutMs,
+    drainRegistry,
+    lifecycle,
+    localNodeId: nodeId,
+    onUnrecoverableForwarding,
+  });
+  const forwardingRecoverySupervisor = new GatewayForwardingRecoverySupervisor({
+    clock: systemClock,
+    isDraining: () => !lifecycle.isServing(),
+    localNodeId: nodeId,
+    readiness: forwardingReadiness,
+    scheduler: systemScheduler,
+    terminate: requestUnrecoverableForwardingReplacement,
+  });
   let hasValkeyClient = false;
   let valkeyClient!: ValkeyClient;
   let sandboxKeepaliveStore: InMemorySandboxKeepaliveStore | ValkeySandboxKeepaliveStore;
@@ -513,6 +599,7 @@ export function createDataPlaneGatewayRuntime(
   const relayResources = createGatewayRelayRuntimeResources({
     activeBootstrapSessionStore,
     config: config.app.gatewayRelay,
+    forwardingReadiness,
     gatewayForwardingServer,
     nodeId,
   });
@@ -705,6 +792,7 @@ export function createDataPlaneGatewayRuntime(
     allowRemoteOwnerConnections: config.app.gatewayRelay.backend === "nats",
     clock: systemClock,
     drainRegistry,
+    forwardingReadiness,
     healthConfig: config.app.health,
     lifecycle,
     scheduler: systemScheduler,
@@ -838,6 +926,7 @@ export function createDataPlaneGatewayRuntime(
         await telemetryIngressService.shutdown();
       });
       await measureShutdownPhase(shutdownTimings, "relay-resources-stop", async () => {
+        forwardingRecoverySupervisor.stop();
         await relayResources.stop();
       });
 
@@ -896,6 +985,11 @@ export function createDataPlaneGatewayRuntime(
       portsTargetAuthorizeService,
     },
     request: async (path, init) => app.request(path, init),
+    ...(relayResources.forceNatsReconnect === undefined
+      ? {}
+      : {
+          forceNatsRelayReconnect: relayResources.forceNatsReconnect,
+        }),
     startDrain: () => {
       lifecycle.startDrain({
         reason: GatewayWebSocketCloseReasons.SERVICE_RESTART,
@@ -912,6 +1006,7 @@ export function createDataPlaneGatewayRuntime(
         await connectValkeyClient(valkeyClient);
       }
       await relayResources.start();
+      forwardingRecoverySupervisor.start();
 
       startedServer = startServer({
         app,
