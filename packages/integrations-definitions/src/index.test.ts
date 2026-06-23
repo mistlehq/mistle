@@ -1385,6 +1385,7 @@ describe("integrations-definitions index", () => {
       "gcp::gcp-mcp",
       "google-analytics::google-analytics-mcp",
       "googleads::googleads-default",
+      "google-business-profile::google-business-profile-mcp",
       "google-search-console::google-search-console-mcp",
       "google-workspace::google-workspace-mcp",
       "inception::inception-default",
