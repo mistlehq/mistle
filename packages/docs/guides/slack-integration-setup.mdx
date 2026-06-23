@@ -56,9 +56,11 @@ Add these bot scopes before installing the app:
 | Scope               | Enables                                               |
 | ------------------- | ----------------------------------------------------- |
 | `app_mentions:read` | Receive `app_mention` events for Slack triggers       |
+| `channels:history`  | Receive public channel messages for Slack triggers    |
 | `channels:read`     | Sync public channels as selectable trigger resources  |
 | `files:read`        | Read and download files shared with the app           |
 | `files:write`       | Upload files as the app                               |
+| `groups:history`    | Receive private channel messages for Slack triggers   |
 | `groups:read`       | Sync private channels as selectable trigger resources |
 | `usergroups:read`   | Sync user groups as selectable trigger resources      |
 | `users:read`        | Sync users as selectable trigger resources            |
@@ -77,6 +79,8 @@ Enable the Slack Events API and subscribe the bot to these events:
 | `group_archive`     | Refresh synced private channels when archived |
 | `group_unarchive`   | Refresh synced private channels when restored |
 | `group_rename`      | Refresh synced private channels when renamed  |
+| `message.channels`  | Slack message triggers in public channels     |
+| `message.groups`    | Slack message triggers in private channels    |
 | `subteam_created`   | Refresh synced user groups when created       |
 | `subteam_updated`   | Refresh synced user groups when updated       |
 | `team_join`         | Refresh synced users when a member joins      |

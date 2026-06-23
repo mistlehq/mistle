@@ -182,7 +182,7 @@ const SlackMessageTypeParameter: IntegrationWebhookEventParameterDefinition = {
   options: [
     {
       value: "channel_or_dm_message",
-      label: "Channel or DM message",
+      label: "Channel message",
       payloadFilter: {
         op: "not",
         filter: SlackThreadReplyPayloadFilter,

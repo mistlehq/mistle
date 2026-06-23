@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { SlackResourceSyncTriggers } from "../../shared/resource-definitions.js";
 import {
   buildSlackAppManifestCreateUrl,
   buildSlackAppManifestExportUrl,
@@ -39,7 +40,10 @@ describe("SlackAppManifestTemplate", () => {
             "app_mention",
             "channel_archive",
             "channel_created",
+            "channel_unarchive",
             "channel_rename",
+            "group_archive",
+            "group_unarchive",
             "group_rename",
             "message.channels",
             "message.groups",
@@ -82,16 +86,9 @@ describe("SlackAppManifestTemplate", () => {
 
   it("subscribes to every Events API-compatible Slack event that can trigger resource sync", () => {
     const botEvents = SlackAppManifestTemplate.settings.event_subscriptions.bot_events;
-    const eventsApiResourceSyncEvents = [
-      "channel_archive",
-      "channel_created",
-      "channel_rename",
-      "group_rename",
-      "subteam_created",
-      "subteam_updated",
-      "team_join",
-      "user_change",
-    ];
+    const eventsApiResourceSyncEvents = SlackResourceSyncTriggers.map((trigger) =>
+      trigger.eventType.replace(/^slack:/, ""),
+    );
 
     expect(botEvents).toEqual(expect.arrayContaining(eventsApiResourceSyncEvents));
   });
@@ -130,7 +127,10 @@ describe("buildSlackAppManifest", () => {
             "app_mention",
             "channel_archive",
             "channel_created",
+            "channel_unarchive",
             "channel_rename",
+            "group_archive",
+            "group_unarchive",
             "group_rename",
             "message.channels",
             "message.groups",
