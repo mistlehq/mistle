@@ -22,6 +22,7 @@ import { GoogleWorkspaceDefinition } from "./google-workspace/browser.js";
 import { InceptionDefinition } from "./inception/index.js";
 import { JiraDefinition } from "./jira/browser.js";
 import { KimiDefinition } from "./kimi/index.js";
+import { KlaviyoDefinition } from "./klaviyo/browser.js";
 import { LinearBaseDefinition } from "./linear/variants/linear-default/base-definition.js";
 import { MetaAdsDefinition } from "./metaads/browser.js";
 import { MiniMaxDefinition } from "./minimax/index.js";
@@ -69,6 +70,7 @@ export * from "./jira-shared.js";
 export * from "./github/browser.js";
 export * from "./inception/index.js";
 export * from "./kimi/index.js";
+export * from "./klaviyo/browser.js";
 export * from "./linear/browser.js";
 export * from "./metaads/browser.js";
 export * from "./minimax/index.js";
@@ -113,6 +115,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   InceptionDefinition,
   JiraDefinition,
   KimiDefinition,
+  KlaviyoDefinition,
   GitHubCloudDefinition,
   GitHubEnterpriseServerDefinition,
   LinearBaseDefinition,

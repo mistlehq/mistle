@@ -116,6 +116,10 @@ describe("integrations-definitions server", () => {
       familyId: "posthog",
       variantId: "posthog-mcp",
     });
+    const klaviyoDefinition = registry.getDefinition({
+      familyId: "klaviyo",
+      variantId: "klaviyo-mcp",
+    });
     const railwayDefinition = registry.getDefinition({
       familyId: "railway",
       variantId: "railway-mcp",
@@ -349,6 +353,16 @@ describe("integrations-definitions server", () => {
     expect(postHogDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(postHogDefinition?.webhookHandler).toBeUndefined();
     expect(postHogDefinition?.webhookSource).toBeUndefined();
+    expect(klaviyoDefinition).toMatchObject({
+      familyId: "klaviyo",
+      variantId: "klaviyo-mcp",
+      kind: "connector",
+      displayName: "Klaviyo",
+      logoKey: "klaviyo",
+    });
+    expect(klaviyoDefinition?.oauth2AuthorizationCode).toBeDefined();
+    expect(klaviyoDefinition?.webhookHandler).toBeUndefined();
+    expect(klaviyoDefinition?.webhookSource).toBeUndefined();
     expect(railwayDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(railwayDefinition?.webhookHandler).toBeUndefined();
     expect(railwayDefinition?.webhookSource).toBeUndefined();
@@ -506,7 +520,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(42);
+    expect(definitions).toHaveLength(44);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
@@ -521,6 +535,7 @@ describe("integrations-definitions server", () => {
         "google-workspace::google-workspace-mcp",
         "inception::inception-default",
         "kimi::kimi-default",
+        "klaviyo::klaviyo-mcp",
         "metaads::metaads-default",
         "minimax::minimax-default",
         "notion::notion-mcp",

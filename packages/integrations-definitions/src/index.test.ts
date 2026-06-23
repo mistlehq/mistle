@@ -125,6 +125,10 @@ describe("integrations-definitions index", () => {
       familyId: "posthog",
       variantId: "posthog-mcp",
     });
+    const klaviyoDefinition = registry.getDefinition({
+      familyId: "klaviyo",
+      variantId: "klaviyo-mcp",
+    });
     const railwayDefinition = registry.getDefinition({
       familyId: "railway",
       variantId: "railway-mcp",
@@ -438,6 +442,27 @@ describe("integrations-definitions index", () => {
       displayName: "Kimi",
       allowedRuntimeIds: ["opencode", "pi"],
     });
+    expect(klaviyoDefinition).toMatchObject({
+      familyId: "klaviyo",
+      variantId: "klaviyo-mcp",
+      kind: "connector",
+      displayName: "Klaviyo",
+      logoKey: "klaviyo",
+      connectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "Klaviyo OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect Klaviyo",
+              helperText: "Authorize Klaviyo hosted MCP access.",
+            },
+          },
+        },
+      ],
+    });
+    expect(klaviyoDefinition?.oauth2AuthorizationCode).toBeUndefined();
     expect(miniMaxDefinition).toMatchObject({
       familyId: "minimax",
       variantId: "minimax-default",
@@ -1326,7 +1351,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(42);
+    expect(definitions).toHaveLength(44);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -1346,6 +1371,7 @@ describe("integrations-definitions index", () => {
       "inception::inception-default",
       "jira::jira-default",
       "kimi::kimi-default",
+      "klaviyo::klaviyo-mcp",
       "github::github-cloud",
       "github::github-enterprise-server",
       "linear::linear-default",

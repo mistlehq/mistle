@@ -1,0 +1,34 @@
+---
+title: Klaviyo
+description: Connect Klaviyo to Mistle
+icon: /icons/integrations/klaviyo.png
+---
+
+## Overview
+
+Connect to Klaviyo through Klaviyo hosted MCP OAuth.
+
+The Klaviyo integration exposes hosted MCP access through Klaviyo's official remote MCP server.
+
+## Connect In Mistle
+
+Open **Integrations** in the dashboard, choose **Klaviyo**, then select **Klaviyo MCP OAuth**.
+
+The browser redirects to Klaviyo, the user approves access, and the returned OAuth credentials are stored for the connection.
+
+There are no user-entered secret fields for this target.
+
+## Use With A Sandbox Profile
+
+After the connection exists:
+
+1. Open the sandbox profile that should use Klaviyo.
+2. Add Klaviyo to the profile's integration configuration.
+3. Select the Klaviyo MCP tool.
+4. Save and publish the profile version.
+
+## Official Reference
+
+- [Klaviyo MCP server](https://developers.klaviyo.com/en/docs/model_context_protocol_mcp_server)
+
+This integration uses the hosted MCP server at `https://mcp.klaviyo.com/mcp`.

@@ -132,6 +132,14 @@ describe("dashboard integration logo assets", () => {
     expect(height).toBe(24);
   });
 
+  it("keeps the Klaviyo logo square so it does not regress to the wordmark", () => {
+    const { colorType, height, width } = readPngHeader("klaviyo.png");
+
+    expect(width).toBe(512);
+    expect(height).toBe(512);
+    expect(colorType).toBe(6);
+  });
+
   it("keeps the WasenderAPI logo square and opaque for light and dark surfaces", () => {
     const { colorType, height, width } = readPngHeader("wasenderapi.png");
 
