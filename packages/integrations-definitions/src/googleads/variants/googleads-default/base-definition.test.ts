@@ -28,7 +28,9 @@ const BaseInput = {
     id: "icn_googleads",
     status: "active",
     config: {
-      connection_method: "api-key",
+      connection_method: "oauth2-authorization-code",
+      client_id: "google_client_123.apps.googleusercontent.com",
+      developer_token: "developer_token_123",
     },
   },
   binding: {

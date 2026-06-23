@@ -108,6 +108,19 @@ function createGoogleAdsMcpRuntimeClient(googleAdsCliInstallPath: string): Runti
   };
 }
 
+function resolveGoogleAdsAdditionalHeaders(
+  connectionConfig: ReturnType<typeof GoogleAdsConnectionConfigSchema.parse>,
+): Record<string, string> {
+  return {
+    "developer-token": connectionConfig.developer_token,
+    ...(connectionConfig.login_customer_id === undefined
+      ? {}
+      : {
+          "login-customer-id": connectionConfig.login_customer_id,
+        }),
+  };
+}
+
 export function compileGoogleAdsBinding(input: GoogleAdsCompileBindingInput): CompileBindingResult {
   const targetConfig = GoogleAdsTargetConfigSchema.parse(input.target.config);
   const baseUrl = resolveGoogleAdsBaseUrl(targetConfig.api_version);
@@ -135,26 +148,9 @@ export function compileGoogleAdsBinding(input: GoogleAdsCompileBindingInput): Co
           kind: "integration_connection",
           connectionId: input.connection.id,
           secretType: GoogleAdsCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
-          slotKey: GoogleAdsCredentialSlotKeys.ACCESS_TOKEN,
+          slotKey: GoogleAdsCredentialSlotKeys.accessToken,
         },
-        additionalCredentialHeaders: [
-          {
-            header: "developer-token",
-            credentialResolver: {
-              kind: "integration_connection",
-              connectionId: input.connection.id,
-              secretType: GoogleAdsCredentialSecretTypes.API_KEY,
-              slotKey: GoogleAdsCredentialSlotKeys.DEVELOPER_TOKEN,
-            },
-          },
-        ],
-        ...(connectionConfig.login_customer_id === undefined
-          ? {}
-          : {
-              additionalHeaders: {
-                "login-customer-id": connectionConfig.login_customer_id,
-              },
-            }),
+        additionalHeaders: resolveGoogleAdsAdditionalHeaders(connectionConfig),
       },
     ],
     artifacts: includesGoogleAdsToolArtifact ? [createGoogleAdsCliArtifact(baseUrl)] : [],

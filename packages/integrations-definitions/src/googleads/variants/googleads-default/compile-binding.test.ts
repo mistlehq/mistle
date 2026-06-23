@@ -101,7 +101,9 @@ function compileWithTools(input: {
       id: "icn_googleads",
       status: "active",
       config: {
-        connection_method: IntegrationConnectionMethodIds.API_KEY,
+        connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+        client_id: "google_client_123.apps.googleusercontent.com",
+        developer_token: "developer_token_123",
         login_customer_id: "9876543210",
       },
     },
@@ -143,20 +145,10 @@ describe("compileGoogleAdsBinding", () => {
           kind: "integration_connection",
           connectionId: "icn_googleads",
           secretType: "oauth2_access_token",
-          slotKey: GoogleAdsCredentialSlotKeys.ACCESS_TOKEN,
+          slotKey: GoogleAdsCredentialSlotKeys.accessToken,
         },
-        additionalCredentialHeaders: [
-          {
-            header: "developer-token",
-            credentialResolver: {
-              kind: "integration_connection",
-              connectionId: "icn_googleads",
-              secretType: "api_key",
-              slotKey: GoogleAdsCredentialSlotKeys.DEVELOPER_TOKEN,
-            },
-          },
-        ],
         additionalHeaders: {
+          "developer-token": "developer_token_123",
           "login-customer-id": "9876543210",
         },
       },

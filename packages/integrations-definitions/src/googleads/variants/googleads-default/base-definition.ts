@@ -8,15 +8,13 @@ import {
 import {
   type GoogleAdsConnectionConfig,
   GoogleAdsConnectionConfigSchema,
-  GoogleAdsCredentialSecretTypes,
-  GoogleAdsCredentialSlotKeys,
+  GoogleAdsConnectionStartConfigSchema,
   GoogleAdsDefaultVariantId,
   GoogleAdsFamilyId,
 } from "./auth.js";
 import { resolveGoogleAdsBindingConfigForm } from "./binding-config-form.js";
 import { GoogleAdsBindingConfigSchema } from "./binding-config-schema.js";
 import { compileGoogleAdsBinding, GoogleAdsMcpUrl } from "./compile-binding.js";
-import { GoogleAdsConnectionConfigForm } from "./connection-config-form.js";
 import { GoogleAdsTargetConfigSchema } from "./target-config-schema.js";
 import { GoogleAdsTargetSecretSchema } from "./target-secret-schema.js";
 import { GoogleAdsToolIds } from "./tool-ids.js";
@@ -41,29 +39,60 @@ export const GoogleAdsBaseDefinition: GoogleAdsBaseIntegrationDefinition = {
   bindingConfigForm: resolveGoogleAdsBindingConfigForm,
   connectionMethods: [
     {
-      id: IntegrationConnectionMethodIds.API_KEY,
-      label: "Access token",
-      kind: "form",
-      secretFields: [
-        {
-          name: "accessToken",
-          label: "OAuth access token",
-          placeholder: "Enter Google OAuth access token",
-          inputType: "password",
-          secretType: GoogleAdsCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
-          slotKey: GoogleAdsCredentialSlotKeys.ACCESS_TOKEN,
-        },
-        {
-          name: "developerToken",
-          label: "Developer token",
-          placeholder: "Enter Google Ads developer token",
-          inputType: "password",
-          secretType: GoogleAdsCredentialSecretTypes.API_KEY,
-          slotKey: GoogleAdsCredentialSlotKeys.DEVELOPER_TOKEN,
-        },
-      ],
+      id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+      label: "Google OAuth",
+      kind: "redirect",
       configSchema: GoogleAdsConnectionConfigSchema,
-      configForm: GoogleAdsConnectionConfigForm,
+      startConfigSchema: GoogleAdsConnectionStartConfigSchema,
+      startConfigForm: () => ({
+        schema: {
+          type: "object",
+          properties: {
+            client_id: {
+              type: "string",
+              title: "OAuth client ID",
+            },
+            client_secret: {
+              type: "string",
+              title: "OAuth client secret",
+            },
+            developer_token: {
+              type: "string",
+              title: "Developer token",
+            },
+            login_customer_id: {
+              type: "string",
+              title: "Login customer ID",
+            },
+          },
+          required: ["client_id", "client_secret", "developer_token"],
+        },
+        uiSchema: {
+          client_id: {
+            "ui:placeholder": "1234567890-abc.apps.googleusercontent.com",
+          },
+          client_secret: {
+            "ui:widget": "password",
+          },
+          developer_token: {
+            "ui:widget": "password",
+          },
+          login_customer_id: {
+            "ui:placeholder": "1234567890",
+          },
+        },
+      }),
+      ui: {
+        create: {
+          submitLabel: "Connect Google Ads",
+          helperText: "Authorize Google Ads API access with your Google OAuth client.",
+          showCallbackUrl: true,
+        },
+        reauthorize: {
+          actionLabel: "Re-authorize",
+          pendingLabel: "Starting...",
+        },
+      },
     },
   ],
   mcp: (input) =>

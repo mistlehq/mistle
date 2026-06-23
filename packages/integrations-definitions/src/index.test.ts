@@ -504,23 +504,9 @@ describe("integrations-definitions index", () => {
       logoKey: "googleads",
       connectionMethods: [
         {
-          id: "api-key",
-          label: "Access token",
-          kind: "form",
-          secretFields: [
-            {
-              name: "accessToken",
-              label: "OAuth access token",
-              inputType: "password",
-              slotKey: "googleads.googleads-default.api-key.access-token",
-            },
-            {
-              name: "developerToken",
-              label: "Developer token",
-              inputType: "password",
-              slotKey: "googleads.googleads-default.api-key.developer-token",
-            },
-          ],
+          id: "oauth2-authorization-code",
+          label: "Google OAuth",
+          kind: "redirect",
         },
       ],
     });

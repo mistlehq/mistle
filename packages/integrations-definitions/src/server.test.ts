@@ -339,7 +339,7 @@ describe("integrations-definitions server", () => {
       displayName: "Google Ads",
       logoKey: "googleads",
     });
-    expect(googleAdsDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(googleAdsDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(googleAdsDefinition?.webhookHandler).toBeUndefined();
     expect(googleAdsDefinition?.webhookSource).toBeUndefined();
     expect(expoDefinition?.oauth2AuthorizationCode).toBeDefined();

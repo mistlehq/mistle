@@ -279,6 +279,7 @@ describe("browser definitions", () => {
       displayName: "Google Ads",
       logoKey: "googleads",
     });
+    expect(definition?.oauth2AuthorizationCode).toBeUndefined();
   });
 
   it("keeps Google Workspace browser definitions free of server-only OAuth handlers", () => {
