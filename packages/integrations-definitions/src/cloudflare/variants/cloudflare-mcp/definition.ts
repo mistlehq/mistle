@@ -11,7 +11,10 @@ import {
   CloudflareCredentialSecretTypes,
   CloudflareCredentialSlotKeys,
 } from "./auth.js";
-import { resolveCloudflareBindingConfigForm } from "./binding-config-form.js";
+import {
+  CloudflareConnectionConfigForm,
+  resolveCloudflareBindingConfigForm,
+} from "./binding-config-form.js";
 import { CloudflareBindingConfigSchema } from "./binding-config-schema.js";
 import { compileCloudflareBinding } from "./compile-binding.js";
 import { CloudflareMcpServerCatalog } from "./mcp-catalog.js";
@@ -53,6 +56,7 @@ export const CloudflareDefinition: CloudflareMcpIntegrationDefinition = {
         },
       ],
       configSchema: CloudflareConnectionConfigSchema,
+      configForm: CloudflareConnectionConfigForm,
     },
   ],
   mcp: (input) =>

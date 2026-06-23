@@ -1,7 +1,11 @@
 import { resolveIntegrationForm } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { resolveCloudflareBindingConfigForm } from "./binding-config-form.js";
+import { CloudflareConnectionConfigSchema } from "./auth.js";
+import {
+  CloudflareConnectionConfigForm,
+  resolveCloudflareBindingConfigForm,
+} from "./binding-config-form.js";
 import { CloudflareBindingConfigSchema } from "./binding-config-schema.js";
 import { CloudflareMcpServerIds } from "./mcp-catalog.js";
 
@@ -39,6 +43,31 @@ describe("resolveCloudflareBindingConfigForm", () => {
           inline: false,
           emptyMessage: "No matching remote MCP servers.",
         },
+      },
+    });
+  });
+
+  it("hides the single API token connection method while defaulting it in config", () => {
+    const resolvedForm = resolveIntegrationForm({
+      schema: CloudflareConnectionConfigSchema,
+      form: CloudflareConnectionConfigForm,
+      context: {
+        familyId: "cloudflare",
+        variantId: "cloudflare-mcp",
+        kind: "connector",
+      },
+    });
+
+    expect(resolvedForm.schema).toMatchObject({
+      properties: {
+        connection_method: {
+          default: "api-key",
+        },
+      },
+    });
+    expect(resolvedForm.uiSchema).toEqual({
+      connection_method: {
+        "ui:widget": "hidden",
       },
     });
   });
