@@ -30,7 +30,7 @@ export const GoogleAdsConnectionStartConfigSchema = z
   .object({
     client_id: z.string().trim().min(1),
     client_secret: z.string().trim().min(1),
-    developer_token: z.string().trim().min(1),
+    developer_token: z.string().trim().min(1).optional(),
     login_customer_id: z.string().trim().min(1).optional(),
   })
   .strict();

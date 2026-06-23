@@ -245,6 +245,7 @@ async function startOAuth2AuthorizationCodeRedirect(
       targetKey: input.targetKey,
       target: resolved.target,
       connectionConfig,
+      intent: input.intent === "reauthorize" ? "reauthorize" : "create",
       state: input.state,
       redirectUrl,
       pkce: {

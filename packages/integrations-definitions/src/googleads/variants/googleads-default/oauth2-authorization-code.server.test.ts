@@ -89,6 +89,7 @@ describe("Google Ads OAuth authorization code support", () => {
         login_customer_id: "1234567890",
       },
       redirectUrl: "https://mistle.example.com/oauth/callback",
+      intent: "create",
       state: "state_abc",
       pkce: {
         challenge: "challenge_456",
@@ -101,6 +102,38 @@ describe("Google Ads OAuth authorization code support", () => {
       clientId: "google_client_123.apps.googleusercontent.com",
       clientSecret: "google_secret_456",
       developerToken: "developer_token_123",
+      loginCustomerId: "1234567890",
+    });
+  });
+
+  it("starts reauthorization without requiring the existing encrypted developer token", async () => {
+    const result = await GoogleAdsOAuth2AuthorizationCodeCapability.startAuthorization({
+      organizationId: "org_123",
+      targetKey: "googleads-default",
+      target: {
+        familyId: "googleads",
+        variantId: "googleads-default",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      connectionConfig: {
+        client_id: "google_client_123.apps.googleusercontent.com",
+        client_secret: "google_secret_456",
+        login_customer_id: "1234567890",
+      },
+      redirectUrl: "https://mistle.example.com/oauth/callback",
+      intent: "reauthorize",
+      state: "state_abc",
+      pkce: {
+        challenge: "challenge_456",
+        challengeMethod: "S256",
+      },
+    });
+
+    expect(result.providerState).toEqual({
+      clientId: "google_client_123.apps.googleusercontent.com",
+      clientSecret: "google_secret_456",
       loginCustomerId: "1234567890",
     });
   });
@@ -123,6 +156,7 @@ describe("Google Ads OAuth authorization code support", () => {
           developer_token: "developer_token_123",
         },
         redirectUrl: "https://mistle.example.com/oauth/callback",
+        intent: "create",
         state: "state_abc",
       }),
     ).toThrow("Google Ads OAuth authorization requires PKCE.");
@@ -222,6 +256,34 @@ describe("Google Ads OAuth authorization code support", () => {
     ).toThrow(
       "Google Ads OAuth authorization did not return a refresh token. Reconnect the integration and approve offline access.",
     );
+  });
+
+  it("does not rotate the encrypted developer token when reauthorization state omits it", () => {
+    expect(
+      resolveGoogleAdsCompleteGrantResult({
+        providerState: {
+          clientId: "google_client_123.apps.googleusercontent.com",
+          clientSecret: "google_secret_456",
+          loginCustomerId: "1234567890",
+        },
+        response: {
+          access_token: "access_123",
+          refresh_token: "refresh_123",
+          expires_in: "3600",
+        },
+        issuedAt: new Date("2026-06-23T00:00:00.000Z"),
+      }),
+    ).toEqual({
+      connectionConfig: {
+        connection_method: "oauth2-authorization-code",
+        client_id: "google_client_123.apps.googleusercontent.com",
+        login_customer_id: "1234567890",
+      },
+      accessToken: "access_123",
+      accessTokenExpiresAt: "2026-06-23T01:00:00.000Z",
+      refreshToken: "refresh_123",
+      clientSecret: "google_secret_456",
+    });
   });
 
   it("rejects non-positive token expiry values", () => {

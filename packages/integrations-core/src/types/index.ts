@@ -1475,6 +1475,7 @@ export type IntegrationOAuth2AuthorizationCodeStartAuthorizationInput<
   targetKey: string;
   target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
   connectionConfig: Record<string, unknown>;
+  intent: "create" | "reauthorize";
   state: string;
   redirectUrl: string;
   pkce?: {

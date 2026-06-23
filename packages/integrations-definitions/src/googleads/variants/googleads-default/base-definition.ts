@@ -88,6 +88,10 @@ export const GoogleAdsBaseDefinition: GoogleAdsBaseIntegrationDefinition = {
           helperText: "Authorize Google Ads API access with your Google OAuth client.",
           showCallbackUrl: true,
         },
+        reauthorize: {
+          actionLabel: "Re-authorize",
+          pendingLabel: "Starting...",
+        },
       },
     },
   ],

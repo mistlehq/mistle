@@ -90,6 +90,7 @@ describe("GCP OAuth authorization code helpers", () => {
           client_id: "google_client_123.apps.googleusercontent.com",
           client_secret: "google_secret_456",
         },
+        intent: "create",
         state: "state_123",
         redirectUrl: "https://mistle.example.com/oauth/callback",
         pkce: {

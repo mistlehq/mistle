@@ -47,7 +47,7 @@ const GoogleAdsProviderStateSchema = z
   .object({
     clientId: z.string().min(1),
     clientSecret: z.string().min(1),
-    developerToken: z.string().min(1),
+    developerToken: z.string().min(1).optional(),
     loginCustomerId: z.string().min(1).optional(),
   })
   .strict();
@@ -221,13 +221,17 @@ export function resolveGoogleAdsCompleteGrantResult(input: {
     refreshToken: input.response.refresh_token,
     clientSecret: input.providerState.clientSecret,
     ...(credentialMetadata === undefined ? {} : { credentialMetadata }),
-    additionalCredentials: [
-      {
-        slotKey: GoogleAdsDeveloperTokenCredentialSlotKey,
-        secretKind: GoogleAdsCredentialSecretTypes.API_KEY,
-        plaintext: input.providerState.developerToken,
-      },
-    ],
+    ...(input.providerState.developerToken === undefined
+      ? {}
+      : {
+          additionalCredentials: [
+            {
+              slotKey: GoogleAdsDeveloperTokenCredentialSlotKey,
+              secretKind: GoogleAdsCredentialSecretTypes.API_KEY,
+              plaintext: input.providerState.developerToken,
+            },
+          ],
+        }),
   };
 }
 
@@ -378,6 +382,9 @@ export const GoogleAdsOAuth2AuthorizationCodeCapability: IntegrationOAuth2Author
     }
 
     const connectionConfig = GoogleAdsConnectionStartConfigSchema.parse(input.connectionConfig);
+    if (input.intent === "create" && connectionConfig.developer_token === undefined) {
+      throw new Error("Google Ads OAuth authorization requires a developer token.");
+    }
 
     return {
       authorizationUrl: buildGoogleAdsAuthorizationUrl({
@@ -389,7 +396,9 @@ export const GoogleAdsOAuth2AuthorizationCodeCapability: IntegrationOAuth2Author
       providerState: {
         clientId: connectionConfig.client_id,
         clientSecret: connectionConfig.client_secret,
-        developerToken: connectionConfig.developer_token,
+        ...(connectionConfig.developer_token === undefined
+          ? {}
+          : { developerToken: connectionConfig.developer_token }),
         ...(connectionConfig.login_customer_id === undefined
           ? {}
           : {

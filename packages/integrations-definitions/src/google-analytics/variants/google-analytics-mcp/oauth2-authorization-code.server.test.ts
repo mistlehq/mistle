@@ -87,6 +87,7 @@ describe("Google Analytics OAuth authorization code support", () => {
         client_secret: "google_secret_456",
       },
       redirectUrl: "https://mistle.example.com/oauth/callback",
+      intent: "create",
       state: "state_abc",
       pkce: {
         challenge: "challenge_456",
@@ -118,6 +119,7 @@ describe("Google Analytics OAuth authorization code support", () => {
           client_secret: "google_secret_456",
         },
         redirectUrl: "https://mistle.example.com/oauth/callback",
+        intent: "create",
         state: "state_abc",
       }),
     ).toThrow("Google Analytics OAuth authorization requires PKCE.");
