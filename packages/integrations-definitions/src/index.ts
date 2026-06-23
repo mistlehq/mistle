@@ -40,6 +40,7 @@ import {
   TensorlakeSandboxRuntimeDefinition,
 } from "./sandbox-runtimes/index.js";
 import { SentryDefinition } from "./sentry/browser.js";
+import { ShopifyDefinition } from "./shopify/browser.js";
 import { SignozDefinition } from "./signoz/browser.js";
 import { SlackDefinition } from "./slack/browser.js";
 import { StripeDefinition } from "./stripe/browser.js";
@@ -80,6 +81,7 @@ export * from "./sandbox-runtimes/index.js";
 export * from "./sentry/browser.js";
 export * from "./signoz/browser.js";
 export * from "./slack/browser.js";
+export * from "./shopify/browser.js";
 export * from "./stripe/browser.js";
 export * from "./supabase/browser.js";
 export * from "./wasenderapi/browser.js";
@@ -126,6 +128,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   SentryDefinition,
   SignozDefinition,
   SlackDefinition,
+  ShopifyDefinition,
   StripeDefinition,
   SupabaseDefinition,
   WasenderApiDefinition,

@@ -234,6 +234,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "shopify-default",
+        familyId: "shopify",
+        variantId: "shopify-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "signoz-mcp",
         familyId: "signoz",
         variantId: "signoz-mcp",

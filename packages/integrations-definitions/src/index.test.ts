@@ -1300,7 +1300,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(40);
+    expect(definitions).toHaveLength(41);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -1339,6 +1339,7 @@ describe("integrations-definitions index", () => {
       "sentry::sentry-mcp",
       "signoz::signoz-mcp",
       "slack::slack-default",
+      "shopify::shopify-default",
       "stripe::stripe-mcp",
       "supabase::supabase-mcp",
       "wasenderapi::wasenderapi-mcp",
