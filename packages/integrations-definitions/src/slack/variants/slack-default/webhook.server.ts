@@ -190,7 +190,11 @@ function resolveSlackEventClassification(input: {
     providerEventType === "channel_rename" ||
     providerEventType === "group_archive" ||
     providerEventType === "group_unarchive" ||
-    providerEventType === "group_rename"
+    providerEventType === "group_rename" ||
+    providerEventType === "team_join" ||
+    providerEventType === "user_change" ||
+    providerEventType === "subteam_created" ||
+    providerEventType === "subteam_updated"
   ) {
     return {
       providerEventType,

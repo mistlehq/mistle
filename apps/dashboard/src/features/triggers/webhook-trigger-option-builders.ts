@@ -156,6 +156,10 @@ export function createWebhookTriggerEventOption(input: {
                   kind: parameter.kind,
                   resourceKind: parameter.resourceKind,
                   payloadPath: [...parameter.payloadPath],
+                  ...(parameter.matchMode === undefined ? {} : { matchMode: parameter.matchMode }),
+                  ...(parameter.matchValuePrefix === undefined
+                    ? {}
+                    : { matchValuePrefix: parameter.matchValuePrefix }),
                   ...(parameter.multiValue === undefined
                     ? {}
                     : { multiValue: parameter.multiValue }),
@@ -177,6 +181,9 @@ export function createWebhookTriggerEventOption(input: {
                     options: parameter.options.map((option) => ({
                       value: option.value,
                       label: option.label,
+                      ...(option.payloadFilter === undefined
+                        ? {}
+                        : { payloadFilter: structuredClone(option.payloadFilter) }),
                     })),
                     ...(parameter.negatedMatchRequiresExists === undefined
                       ? {}

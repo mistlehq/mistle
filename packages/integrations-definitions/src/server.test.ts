@@ -469,6 +469,14 @@ describe("integrations-definitions server", () => {
         kind: "channel",
         bindingField: "channels",
       }),
+      expect.objectContaining({
+        kind: "user",
+        bindingField: "users",
+      }),
+      expect.objectContaining({
+        kind: "user_group",
+        bindingField: "userGroups",
+      }),
     ]);
     expect(slackDefinition?.resourceSyncTriggers).toEqual([
       {
@@ -498,6 +506,22 @@ describe("integrations-definitions server", () => {
       {
         eventType: "slack:group_rename",
         resourceKinds: ["channel"],
+      },
+      {
+        eventType: "slack:team_join",
+        resourceKinds: ["user"],
+      },
+      {
+        eventType: "slack:user_change",
+        resourceKinds: ["user"],
+      },
+      {
+        eventType: "slack:subteam_created",
+        resourceKinds: ["user_group"],
+      },
+      {
+        eventType: "slack:subteam_updated",
+        resourceKinds: ["user_group"],
       },
     ]);
     expect(typeof slackDefinition?.listConnectionResources).toBe("function");

@@ -31,6 +31,76 @@ export function createSlackChannelResources(input: {
   };
 }
 
+export function createSlackUserResource(input: {
+  index: number;
+  externalId: string;
+  displayName: string;
+  isBot?: boolean;
+}): IntegrationConnectionResources["items"][number] {
+  return {
+    id: `icr_slack_user_${input.index.toString()}`,
+    familyId: "slack",
+    kind: "user",
+    externalId: input.externalId,
+    handle: input.externalId,
+    displayName: input.displayName,
+    status: "accessible",
+    metadata: {
+      isBot: input.isBot ?? false,
+    },
+  };
+}
+
+export function createSlackUserResources(input: {
+  connectionId: string;
+  items: readonly IntegrationConnectionResources["items"][number][];
+}): IntegrationConnectionResources {
+  return {
+    connectionId: input.connectionId,
+    familyId: "slack",
+    kind: "user",
+    syncState: "ready",
+    lastSyncedAt: "2026-03-17T00:00:00.000Z",
+    items: input.items,
+  };
+}
+
+export function createSlackUserGroupResource(input: {
+  index: number;
+  externalId: string;
+  handle: string;
+  displayName: string;
+  userCount: number;
+}): IntegrationConnectionResources["items"][number] {
+  return {
+    id: `icr_slack_user_group_${input.index.toString()}`,
+    familyId: "slack",
+    kind: "user_group",
+    externalId: input.externalId,
+    handle: input.externalId,
+    displayName: input.displayName,
+    status: "accessible",
+    metadata: {
+      handle: input.handle,
+      userCount: input.userCount,
+    },
+  };
+}
+
+export function createSlackUserGroupResources(input: {
+  connectionId: string;
+  items: readonly IntegrationConnectionResources["items"][number][];
+}): IntegrationConnectionResources {
+  return {
+    connectionId: input.connectionId,
+    familyId: "slack",
+    kind: "user_group",
+    syncState: "ready",
+    lastSyncedAt: "2026-03-17T00:00:00.000Z",
+    items: input.items,
+  };
+}
+
 export const StoryManySlackChannelResources = createSlackChannelResources({
   connectionId: "conn_slack_prod",
   items: [

@@ -385,11 +385,11 @@ function EventParameterFields(input: {
             connectionId={input.connectionId}
             disabled={input.disabled}
             eventType={input.eventOption.eventType}
+            key={`${input.eventOption.id}:${parameter.id}`}
             {...(input.eventParameterError?.triggerId === input.eventOption.id &&
             input.eventParameterError.parameterId === parameter.id
               ? { errorMessage: input.eventParameterError.message }
               : {})}
-            key={`${input.eventOption.id}:${parameter.id}`}
             onRuleChange={(rule) => {
               input.onRuleChange(parameter.id, rule);
             }}
@@ -746,6 +746,7 @@ function OneOfParameterGroupField(input: {
   const selectedParameter = selectedOption.parameter;
   const selectedRule = input.rules[selectedParameter.id];
   const selectedValue = selectedRule?.value ?? "";
+  const selectedPrefixLabel = selectedParameter.prefix ?? selectedParameter.label;
   const selectedResources = useTriggerParameterResources({
     connectionId: input.connectionId,
     resourceKind:
@@ -796,23 +797,27 @@ function OneOfParameterGroupField(input: {
           ))}
         </SelectContent>
       </Select>
-      <EqualityOperatorSelect
-        disabled={input.disabled}
-        includePrefix={false}
-        parameter={selectedParameter}
-        value={resolveEqualityOperator(selectedRule)}
-        onValueChange={(operator) => {
-          input.onRuleChange(selectedParameter.id, {
-            operator,
-            value: selectedValue,
-            ...(selectedParameter.kind === "resource-select" &&
-            selectedParameter.multiValue === true &&
-            selectedRule?.values !== undefined
-              ? { values: selectedRule.values }
-              : {}),
-          });
-        }}
-      />
+      {isEqualityParameter(selectedParameter) ? (
+        <EqualityOperatorSelect
+          disabled={input.disabled}
+          includePrefix={false}
+          parameter={selectedParameter}
+          value={resolveEqualityOperator(selectedRule)}
+          onValueChange={(operator) => {
+            input.onRuleChange(selectedParameter.id, {
+              operator,
+              value: selectedValue,
+              ...(selectedParameter.kind === "resource-select" &&
+              selectedParameter.multiValue === true &&
+              selectedRule?.values !== undefined
+                ? { values: selectedRule.values }
+                : {}),
+            });
+          }}
+        />
+      ) : selectedOption.label === selectedPrefixLabel ? null : (
+        <span className="text-muted-foreground w-36 shrink-0 text-sm">{selectedPrefixLabel}</span>
+      )}
       {selectedParameter.kind === "resource-select" ? (
         <div className={`${EventParameterControlClassName} space-y-1.5`}>
           {selectedParameter.multiValue === true ? (
@@ -1083,6 +1088,7 @@ function EventParameterField(input: {
         resourceQueryIsPending={resources.resourceQuery.isPending}
         syncState={resources.resourceQuery.data?.syncState}
         unavailableSelectedValues={resources.unavailableSelectedValues}
+        showOperator={isEqualityParameter(input.parameter)}
       />
     );
   }
@@ -1183,7 +1189,11 @@ function ResourceMultiSelectParameterField(input: {
             });
           }}
         />
-      ) : null}
+      ) : (
+        <span className={EventParameterLabelClassName}>
+          {input.parameter.prefix ?? input.parameter.label}
+        </span>
+      )}
       <div className={EventParameterControlClassName}>
         <IntegrationConnectionResourcePickerView
           density="compact"
@@ -1245,7 +1255,7 @@ export function resolveEnumSelectParameterRule(input: {
 }): WebhookTriggerEventParameterRule {
   const selectedValue = input.value === null || input.value === "__any__" ? "" : input.value;
 
-  if (input.parameter.matchMode === "eq") {
+  if (input.parameter.matchMode === "eq" || input.parameter.matchMode === "payload_filter") {
     return {
       operator: WebhookTriggerEventParameterRuleOperators.IS,
       value: selectedValue,
@@ -1265,7 +1275,8 @@ function isEqualityParameter(
   parameter: NonNullable<WebhookTriggerEventOption["parameters"]>[number],
 ): boolean {
   return (
-    parameter.kind === "resource-select" ||
+    (parameter.kind === "resource-select" &&
+      (parameter.matchMode === undefined || parameter.matchMode === "eq")) ||
     (parameter.kind === "string" &&
       (parameter.matchMode === undefined || parameter.matchMode === "eq")) ||
     (parameter.kind === "enum-select" && parameter.matchMode === "eq")

@@ -21,7 +21,6 @@ import { createWebhookTriggerEventConditionId } from "./webhook-trigger-option-b
 import {
   containsRule,
   createWebhookTriggerStoryQueryClient,
-  existsRule,
   isNotRule,
   isRule,
   StoryGitHubConnectionId,
@@ -188,8 +187,10 @@ const ExistingSlackMessageAndReactionTriggerValues: WebhookTriggerFormValues = {
     [StorySlackMessageConditionId]: {
       channel: isAnyOfRule(["C_ALERTS_001", "C_ENG_001"]),
       sender: isRule("U1234567890"),
+      userMention: isAnyOfRule(["U5555555555"]),
+      userGroupMention: isAnyOfRule(["S_ENG", "S_SUPPORT"]),
       messageText: containsRule("deployment failed"),
-      threadReply: existsRule(),
+      messageType: isRule("thread_reply"),
     },
     [StorySlackReactionAddedConditionId]: {
       channel: isAnyOfRule(["C_ALERTS_001"]),

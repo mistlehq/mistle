@@ -985,7 +985,7 @@ describe("slack webhook handler", () => {
     });
   });
 
-  it("normalizes Slack channel lifecycle events for resource sync triggers", () => {
+  it("normalizes Slack inventory lifecycle events for resource sync triggers", () => {
     const lifecyclePayloads = [
       {
         payload: {
@@ -1073,6 +1073,62 @@ describe("slack webhook handler", () => {
         },
         expectedEventType: "slack:group_rename",
       },
+      {
+        payload: {
+          ...createSlackMessagePayload(),
+          event: {
+            type: "team_join",
+            user: {
+              id: "U123",
+              name: "casey",
+            },
+          },
+          event_id: "Ev134",
+        },
+        expectedEventType: "slack:team_join",
+      },
+      {
+        payload: {
+          ...createSlackMessagePayload(),
+          event: {
+            type: "user_change",
+            user: {
+              id: "U123",
+              name: "casey-renamed",
+            },
+          },
+          event_id: "Ev135",
+        },
+        expectedEventType: "slack:user_change",
+      },
+      {
+        payload: {
+          ...createSlackMessagePayload(),
+          event: {
+            type: "subteam_created",
+            subteam: {
+              id: "S123",
+              handle: "eng",
+            },
+          },
+          event_id: "Ev136",
+        },
+        expectedEventType: "slack:subteam_created",
+      },
+      {
+        payload: {
+          ...createSlackMessagePayload(),
+          event: {
+            type: "subteam_updated",
+            subteam: {
+              id: "S123",
+              handle: "engineering",
+            },
+          },
+          event_id: "Ev137",
+        },
+        expectedEventType: "slack:subteam_updated",
+      },
     ] as const;
 
     for (const lifecyclePayload of lifecyclePayloads) {
@@ -1109,7 +1165,7 @@ describe("slack webhook handler", () => {
       JSON.stringify({
         ...createSlackMessagePayload(),
         event: {
-          type: "team_join",
+          type: "file_created",
         },
       }),
     );
@@ -1129,7 +1185,7 @@ describe("slack webhook handler", () => {
         headers: {},
         rawBody,
       }),
-    ).toThrow("Slack event type 'team_join' is not supported.");
+    ).toThrow("Slack event type 'file_created' is not supported.");
   });
 
   it("verifies valid Slack webhook signatures", () => {

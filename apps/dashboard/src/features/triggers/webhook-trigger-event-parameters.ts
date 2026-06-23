@@ -12,9 +12,22 @@ type PayloadFilterNode =
       filters: PayloadFilterNode[];
     }
   | {
+      op: "or";
+      filters: PayloadFilterNode[];
+    }
+  | {
+      op: "not";
+      filter: PayloadFilterNode;
+    }
+  | {
       op: "eq" | "neq" | "contains" | "contains_token";
       path: string[];
       value: string;
+    }
+  | {
+      op: "eq_path" | "neq_path";
+      path: string[];
+      otherPath: string[];
     }
   | {
       op: "in";
@@ -26,6 +39,10 @@ type PayloadFilterNode =
       path: string[];
     };
 type PayloadFilterPathNode = Extract<PayloadFilterNode, { path: string[] }>;
+type EnumSelectPayloadFilterOption = Extract<
+  WebhookTriggerEventParameterOption,
+  { kind: "enum-select" }
+>["options"][number];
 
 function findEventOptionByTriggerId(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
@@ -48,7 +65,7 @@ function parseKnownPayloadFilterNode(value: unknown): PayloadFilterNode | null {
     return null;
   }
 
-  if (value["op"] === "and") {
+  if (value["op"] === "and" || value["op"] === "or") {
     const filters = value["filters"];
     if (!Array.isArray(filters)) {
       return null;
@@ -63,12 +80,29 @@ function parseKnownPayloadFilterNode(value: unknown): PayloadFilterNode | null {
     }
 
     return {
-      op: "and",
+      op: value["op"],
       filters: parsedFilters,
     };
   }
 
-  if (value["op"] === "eq" || value["op"] === "neq") {
+  if (value["op"] === "not") {
+    const parsedFilter = parseKnownPayloadFilterNode(value["filter"]);
+    if (parsedFilter === null) {
+      return null;
+    }
+
+    return {
+      op: "not",
+      filter: parsedFilter,
+    };
+  }
+
+  if (
+    value["op"] === "eq" ||
+    value["op"] === "neq" ||
+    value["op"] === "contains" ||
+    value["op"] === "contains_token"
+  ) {
     if (!isStringArray(value["path"]) || typeof value["value"] !== "string") {
       return null;
     }
@@ -80,27 +114,15 @@ function parseKnownPayloadFilterNode(value: unknown): PayloadFilterNode | null {
     };
   }
 
-  if (value["op"] === "contains") {
-    if (!isStringArray(value["path"]) || typeof value["value"] !== "string") {
+  if (value["op"] === "eq_path" || value["op"] === "neq_path") {
+    if (!isStringArray(value["path"]) || !isStringArray(value["otherPath"])) {
       return null;
     }
 
     return {
-      op: "contains",
+      op: value["op"],
       path: value["path"],
-      value: value["value"],
-    };
-  }
-
-  if (value["op"] === "contains_token") {
-    if (!isStringArray(value["path"]) || typeof value["value"] !== "string") {
-      return null;
-    }
-
-    return {
-      op: "contains_token",
-      path: value["path"],
-      value: value["value"],
+      otherPath: value["otherPath"],
     };
   }
 
@@ -180,6 +202,16 @@ function buildContainsTokenNode(input: { path: string[]; value: string }): Paylo
   };
 }
 
+function buildTextMatchNode(input: {
+  matchMode: "contains" | "contains_token";
+  path: string[];
+  value: string;
+}): PayloadFilterNode {
+  return input.matchMode === "contains"
+    ? buildContainsNode({ path: input.path, value: input.value })
+    : buildContainsTokenNode({ path: input.path, value: input.value });
+}
+
 function buildExistsNode(input: {
   path: string[];
   operator: "exists" | "not_exists";
@@ -188,6 +220,60 @@ function buildExistsNode(input: {
     op: input.operator,
     path: input.path,
   };
+}
+
+function clonePayloadFilterNode(filter: PayloadFilterNode): PayloadFilterNode {
+  if (filter.op === "and" || filter.op === "or") {
+    return {
+      op: filter.op,
+      filters: filter.filters.map(clonePayloadFilterNode),
+    };
+  }
+
+  if (filter.op === "not") {
+    return {
+      op: "not",
+      filter: clonePayloadFilterNode(filter.filter),
+    };
+  }
+
+  if (filter.op === "in") {
+    return {
+      op: "in",
+      path: [...filter.path],
+      values: [...filter.values],
+    };
+  }
+
+  if (filter.op === "eq_path" || filter.op === "neq_path") {
+    return {
+      op: filter.op,
+      path: [...filter.path],
+      otherPath: [...filter.otherPath],
+    };
+  }
+
+  if (filter.op === "exists" || filter.op === "not_exists") {
+    return {
+      op: filter.op,
+      path: [...filter.path],
+    };
+  }
+
+  if (
+    filter.op === "eq" ||
+    filter.op === "neq" ||
+    filter.op === "contains" ||
+    filter.op === "contains_token"
+  ) {
+    return {
+      op: filter.op,
+      path: [...filter.path],
+      value: filter.value,
+    };
+  }
+
+  throw new Error("Unsupported payload filter op.");
 }
 
 function resolveOneOfGroupParameterIds(eventOption: WebhookTriggerEventOption): Set<string> {
@@ -314,7 +400,19 @@ function parameterSupportsPayloadFilter(input: {
   }
 
   if (parameter.kind === "resource-select" && parameter.multiValue === true) {
+    const matchMode = resolveResourceSelectMatchMode(parameter);
+    if (matchMode === "contains" || matchMode === "contains_token") {
+      return filter.op === matchMode;
+    }
+
     return filter.op === "in" || filter.op === "eq" || filter.op === "neq";
+  }
+
+  if (parameter.kind === "resource-select") {
+    const matchMode = resolveResourceSelectMatchMode(parameter);
+    if (matchMode === "contains" || matchMode === "contains_token") {
+      return filter.op === matchMode;
+    }
   }
 
   return filter.op === "eq" || filter.op === "neq";
@@ -335,6 +433,27 @@ function resolvePayloadFilterParameter(input: {
   const firstMatchingParameter = matchingParameters[0];
   if (matchingParameters.length <= 1 || firstMatchingParameter === undefined) {
     return firstMatchingParameter;
+  }
+
+  const matchingPrefixedResourceParameters = matchingParameters.filter((parameter) => {
+    if (
+      parameter.kind !== "resource-select" ||
+      parameter.matchValuePrefix === undefined ||
+      (input.filter.op !== "contains" && input.filter.op !== "contains_token")
+    ) {
+      return false;
+    }
+
+    return (
+      parseResourceSelectFilterValue({
+        parameter,
+        value: input.filter.value,
+      }) !== null
+    );
+  });
+
+  if (matchingPrefixedResourceParameters.length === 1) {
+    return matchingPrefixedResourceParameters[0];
   }
 
   const matchingBotParameter = matchingParameters.find((parameter) =>
@@ -379,10 +498,254 @@ function mergePayloadFilterNodes(filters: readonly PayloadFilterNode[]): Payload
       };
 }
 
+function mergeOrPayloadFilterNodes(
+  filters: readonly PayloadFilterNode[],
+): PayloadFilterNode | null {
+  if (filters.length === 0) {
+    return null;
+  }
+
+  return filters.length === 1
+    ? (filters[0] ?? null)
+    : {
+        op: "or",
+        filters: [...filters],
+      };
+}
+
 function flattenAndPayloadFilterNodes(filters: readonly PayloadFilterNode[]): PayloadFilterNode[] {
   return filters.flatMap((filter) =>
     filter.op === "and" ? flattenAndPayloadFilterNodes(filter.filters) : [filter],
   );
+}
+
+function flattenOrPayloadFilterNodes(filters: readonly PayloadFilterNode[]): PayloadFilterNode[] {
+  return filters.flatMap((filter) =>
+    filter.op === "or" ? flattenOrPayloadFilterNodes(filter.filters) : [filter],
+  );
+}
+
+function canExtractOrPayloadFilters(input: {
+  parameters: readonly WebhookTriggerEventParameterOption[];
+  filters: readonly PayloadFilterNode[];
+}): boolean {
+  let parameterId: string | null = null;
+
+  for (const filter of input.filters) {
+    if (
+      filter.op !== "eq" &&
+      filter.op !== "contains" &&
+      filter.op !== "contains_token" &&
+      filter.op !== "in"
+    ) {
+      return false;
+    }
+
+    const parameter = resolvePayloadFilterParameter({
+      parameters: input.parameters,
+      filter,
+    });
+    if (parameter?.kind !== "resource-select" || parameter.multiValue !== true) {
+      return false;
+    }
+
+    const matchMode = resolveResourceSelectMatchMode(parameter);
+    if (
+      ((filter.op === "contains" || filter.op === "contains_token") && filter.op !== matchMode) ||
+      ((filter.op === "eq" || filter.op === "in") &&
+        (matchMode === "contains" || matchMode === "contains_token"))
+    ) {
+      return false;
+    }
+
+    parameterId ??= parameter.id;
+    if (parameter.id !== parameterId) {
+      return false;
+    }
+  }
+
+  return parameterId !== null;
+}
+
+function expandExtractableOrPayloadFilters(input: {
+  parameters: readonly WebhookTriggerEventParameterOption[];
+  filters: readonly PayloadFilterNode[];
+}): PayloadFilterNode[] {
+  return input.filters.flatMap((filter) => {
+    if (filter.op !== "or") {
+      return [filter];
+    }
+
+    const filters = flattenOrPayloadFilterNodes(filter.filters);
+    return canExtractOrPayloadFilters({
+      parameters: input.parameters,
+      filters,
+    })
+      ? filters
+      : [filter];
+  });
+}
+
+function pathNodesMatch(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((segment, index) => segment === right[index]);
+}
+
+function payloadFilterNodesMatch(left: PayloadFilterNode, right: PayloadFilterNode): boolean {
+  if (left.op !== right.op) {
+    return false;
+  }
+
+  if (left.op === "and" || left.op === "or") {
+    if (right.op !== left.op || left.filters.length !== right.filters.length) {
+      return false;
+    }
+
+    return left.filters.every((leftFilter, index) => {
+      const rightFilter = right.filters[index];
+      return rightFilter !== undefined && payloadFilterNodesMatch(leftFilter, rightFilter);
+    });
+  }
+
+  if (left.op === "not") {
+    return right.op === "not" && payloadFilterNodesMatch(left.filter, right.filter);
+  }
+
+  if (left.op === "in") {
+    return (
+      right.op === "in" &&
+      pathNodesMatch(left.path, right.path) &&
+      left.values.length === right.values.length &&
+      left.values.every((value, index) => value === right.values[index])
+    );
+  }
+
+  if (left.op === "eq_path" || left.op === "neq_path") {
+    return (
+      right.op === left.op &&
+      pathNodesMatch(left.path, right.path) &&
+      pathNodesMatch(left.otherPath, right.otherPath)
+    );
+  }
+
+  if (left.op === "exists" || left.op === "not_exists") {
+    return right.op === left.op && pathNodesMatch(left.path, right.path);
+  }
+
+  if (
+    left.op === "eq" ||
+    left.op === "neq" ||
+    left.op === "contains" ||
+    left.op === "contains_token"
+  ) {
+    return (
+      right.op === left.op && pathNodesMatch(left.path, right.path) && left.value === right.value
+    );
+  }
+
+  return false;
+}
+
+function removeMatchingPayloadFilters(input: {
+  filters: readonly PayloadFilterNode[];
+  optionFilter: PayloadFilterNode;
+}): {
+  matched: boolean;
+  remainingFilters: PayloadFilterNode[];
+} {
+  const directMatchIndex = input.filters.findIndex((filter) =>
+    payloadFilterNodesMatch(filter, input.optionFilter),
+  );
+  if (directMatchIndex >= 0) {
+    return {
+      matched: true,
+      remainingFilters: input.filters.filter((_, index) => index !== directMatchIndex),
+    };
+  }
+
+  if (input.optionFilter.op !== "and") {
+    return {
+      matched: false,
+      remainingFilters: [...input.filters],
+    };
+  }
+
+  const remainingFilters = [...input.filters];
+  for (const optionFilter of flattenAndPayloadFilterNodes(input.optionFilter.filters)) {
+    const matchingIndex = remainingFilters.findIndex((filter) =>
+      payloadFilterNodesMatch(filter, optionFilter),
+    );
+    if (matchingIndex < 0) {
+      return {
+        matched: false,
+        remainingFilters: [...input.filters],
+      };
+    }
+
+    remainingFilters.splice(matchingIndex, 1);
+  }
+
+  return {
+    matched: true,
+    remainingFilters,
+  };
+}
+
+function findMatchingPayloadFilterOption(input: {
+  options: readonly EnumSelectPayloadFilterOption[];
+  filters: readonly PayloadFilterNode[];
+}): {
+  option: EnumSelectPayloadFilterOption;
+  removeResult: ReturnType<typeof removeMatchingPayloadFilters>;
+} | null {
+  for (const option of input.options) {
+    const optionPayloadFilter =
+      option.payloadFilter === undefined ? null : parseKnownPayloadFilterNode(option.payloadFilter);
+    if (optionPayloadFilter === null) {
+      continue;
+    }
+
+    const removeResult = removeMatchingPayloadFilters({
+      filters: input.filters,
+      optionFilter: optionPayloadFilter,
+    });
+    if (removeResult.matched) {
+      return {
+        option,
+        removeResult,
+      };
+    }
+  }
+
+  return null;
+}
+
+function resolveResourceSelectMatchMode(
+  parameter: Extract<WebhookTriggerEventParameterOption, { kind: "resource-select" }>,
+): "eq" | "contains" | "contains_token" {
+  return parameter.matchMode ?? "eq";
+}
+
+function formatResourceSelectFilterValue(input: {
+  parameter: Extract<WebhookTriggerEventParameterOption, { kind: "resource-select" }>;
+  value: string;
+}): string {
+  return `${input.parameter.matchValuePrefix ?? ""}${input.value}`;
+}
+
+function parseResourceSelectFilterValue(input: {
+  parameter: Extract<WebhookTriggerEventParameterOption, { kind: "resource-select" }>;
+  value: string;
+}): string | null {
+  const prefix = input.parameter.matchValuePrefix;
+  if (prefix === undefined) {
+    return input.value;
+  }
+
+  if (!input.value.startsWith(prefix)) {
+    return null;
+  }
+
+  return input.value.slice(prefix.length);
 }
 
 function mergeMultiValueResourceRule(input: {
@@ -454,6 +817,27 @@ function buildPayloadFilterNodeForTrigger(input: {
         continue;
       }
 
+      const matchMode = resolveResourceSelectMatchMode(parameter);
+      if (matchMode === "contains" || matchMode === "contains_token") {
+        if (rule?.operator === WebhookTriggerEventParameterRuleOperators.IS_NOT) {
+          continue;
+        }
+
+        const textMatchFilter = mergeOrPayloadFilterNodes(
+          configuredValues.map((value) =>
+            buildTextMatchNode({
+              matchMode,
+              path: [...parameter.payloadPath],
+              value: formatResourceSelectFilterValue({ parameter, value }),
+            }),
+          ),
+        );
+        if (textMatchFilter !== null) {
+          filters.push(textMatchFilter);
+        }
+        continue;
+      }
+
       if (rule?.operator === WebhookTriggerEventParameterRuleOperators.IS_NOT) {
         if (parameter.negatedMatchRequiresExists === true) {
           filters.push(
@@ -486,6 +870,36 @@ function buildPayloadFilterNodeForTrigger(input: {
     }
 
     if (configuredValue.length === 0) {
+      continue;
+    }
+
+    if (parameter.kind === "resource-select") {
+      const matchMode = resolveResourceSelectMatchMode(parameter);
+      if (matchMode === "contains" || matchMode === "contains_token") {
+        if (rule?.operator !== WebhookTriggerEventParameterRuleOperators.IS) {
+          continue;
+        }
+
+        filters.push(
+          buildTextMatchNode({
+            matchMode,
+            path: [...parameter.payloadPath],
+            value: formatResourceSelectFilterValue({ parameter, value: configuredValue }),
+          }),
+        );
+        continue;
+      }
+    }
+
+    if (parameter.kind === "enum-select" && parameter.matchMode === "payload_filter") {
+      const selectedOption = parameter.options.find((option) => option.value === configuredValue);
+      const selectedPayloadFilter =
+        selectedOption?.payloadFilter === undefined
+          ? null
+          : parseKnownPayloadFilterNode(selectedOption.payloadFilter);
+      if (selectedPayloadFilter !== null) {
+        filters.push(clonePayloadFilterNode(selectedPayloadFilter));
+      }
       continue;
     }
 
@@ -675,13 +1089,59 @@ export function extractWebhookTriggerEventParameterRules(input: {
       continue;
     }
 
-    const rootFilters =
-      parsedPayloadFilter.op === "and"
-        ? flattenAndPayloadFilterNodes(parsedPayloadFilter.filters)
-        : [parsedPayloadFilter];
-    const remainingFilters: PayloadFilterNode[] = [];
+    const rootComposition = parsedPayloadFilter.op;
+    const eventParameters = eventOption.parameters ?? [];
+    const rootFilters = expandExtractableOrPayloadFilters({
+      parameters: eventParameters,
+      filters:
+        parsedPayloadFilter.op === "and"
+          ? flattenAndPayloadFilterNodes(parsedPayloadFilter.filters)
+          : parsedPayloadFilter.op === "or"
+            ? flattenOrPayloadFilterNodes(parsedPayloadFilter.filters)
+            : [parsedPayloadFilter],
+    });
+    if (
+      rootComposition === "or" &&
+      !canExtractOrPayloadFilters({
+        parameters: eventParameters,
+        filters: rootFilters,
+      })
+    ) {
+      remainingPayloadFilter[conditionId] = eventPayloadFilter;
+      continue;
+    }
 
-    for (const filter of rootFilters) {
+    const remainingFilters: PayloadFilterNode[] = [];
+    const remainingRootFilters = [...rootFilters];
+
+    for (const parameter of eventParameters) {
+      if (parameter.kind !== "enum-select" || parameter.matchMode !== "payload_filter") {
+        continue;
+      }
+
+      const match = findMatchingPayloadFilterOption({
+        options: parameter.options,
+        filters: remainingRootFilters,
+      });
+      if (match === null) {
+        continue;
+      }
+
+      remainingRootFilters.splice(
+        0,
+        remainingRootFilters.length,
+        ...match.removeResult.remainingFilters,
+      );
+      eventParameterRules[conditionId] = {
+        ...(eventParameterRules[conditionId] ?? {}),
+        [parameter.id]: {
+          operator: WebhookTriggerEventParameterRuleOperators.IS,
+          value: match.option.value,
+        },
+      };
+    }
+
+    for (const filter of remainingRootFilters) {
       if (
         filter.op !== "eq" &&
         filter.op !== "neq" &&
@@ -698,7 +1158,7 @@ export function extractWebhookTriggerEventParameterRules(input: {
       let extracted = false;
 
       const parameter = resolvePayloadFilterParameter({
-        parameters: eventOption.parameters ?? [],
+        parameters: eventParameters,
         filter,
       });
       if (parameter === undefined) {
@@ -743,7 +1203,26 @@ export function extractWebhookTriggerEventParameterRules(input: {
           extracted = true;
         }
       } else if (parameter.kind === "resource-select" && parameter.multiValue === true) {
-        if (filter.op === "in" || filter.op === "eq" || filter.op === "neq") {
+        const matchMode = resolveResourceSelectMatchMode(parameter);
+        if (
+          (matchMode === "contains" || matchMode === "contains_token") &&
+          filter.op === matchMode
+        ) {
+          const parsedValue = parseResourceSelectFilterValue({
+            parameter,
+            value: filter.value,
+          });
+          if (parsedValue !== null) {
+            const mergeResult = mergeMultiValueResourceRule({
+              conditionRules: eventParameterRules[conditionId] ?? {},
+              parameterId: parameter.id,
+              operator: WebhookTriggerEventParameterRuleOperators.IS,
+              values: [parsedValue],
+            });
+            eventParameterRules[conditionId] = mergeResult.rules;
+            extracted = mergeResult.merged;
+          }
+        } else if (filter.op === "in" || filter.op === "eq" || filter.op === "neq") {
           const operator =
             filter.op === "neq"
               ? WebhookTriggerEventParameterRuleOperators.IS_NOT
@@ -756,6 +1235,25 @@ export function extractWebhookTriggerEventParameterRules(input: {
           });
           eventParameterRules[conditionId] = mergeResult.rules;
           extracted = mergeResult.merged;
+        }
+      } else if (
+        parameter.kind === "resource-select" &&
+        (parameter.matchMode === "contains" || parameter.matchMode === "contains_token") &&
+        filter.op === parameter.matchMode
+      ) {
+        const parsedValue = parseResourceSelectFilterValue({
+          parameter,
+          value: filter.value,
+        });
+        if (parsedValue !== null) {
+          eventParameterRules[conditionId] = {
+            ...(eventParameterRules[conditionId] ?? {}),
+            [parameter.id]: {
+              operator: WebhookTriggerEventParameterRuleOperators.IS,
+              value: parsedValue,
+            },
+          };
+          extracted = true;
         }
       } else if (filter.op === "eq" || filter.op === "neq") {
         eventParameterRules[conditionId] = {
@@ -774,6 +1272,12 @@ export function extractWebhookTriggerEventParameterRules(input: {
       if (!extracted) {
         remainingFilters.push(filter);
       }
+    }
+
+    if (rootComposition === "or" && remainingFilters.length > 0) {
+      delete eventParameterRules[conditionId];
+      remainingPayloadFilter[conditionId] = eventPayloadFilter;
+      continue;
     }
 
     const remainingEventFilter = mergePayloadFilterNodes(remainingFilters);

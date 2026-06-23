@@ -19,6 +19,7 @@ import type {
   IntegrationWebhookSourceLifecycle,
 } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
+import type { WebhookPayloadFilter } from "@mistle/webhooks";
 
 const IntegrationRegistry = createIntegrationRegistry();
 
@@ -42,6 +43,8 @@ type ResolvedWebhookEventParameter =
       kind: "resource-select";
       resourceKind: string;
       payloadPath: string[];
+      matchMode?: "eq" | "contains" | "contains_token";
+      matchValuePrefix?: string;
       multiValue?: boolean;
       negatedMatchRequiresExists?: boolean;
       prefix?: string;
@@ -65,10 +68,11 @@ type ResolvedWebhookEventParameter =
       label: string;
       kind: "enum-select";
       payloadPath: string[];
-      matchMode: "eq" | "exists";
+      matchMode: "eq" | "exists" | "payload_filter";
       options: {
         value: string;
         label: string;
+        payloadFilter?: WebhookPayloadFilter;
       }[];
       negatedMatchRequiresExists?: boolean;
       prefix?: string;
@@ -631,6 +635,10 @@ function cloneWebhookEventParameter(
       kind: parameter.kind,
       resourceKind: parameter.resourceKind,
       payloadPath: [...parameter.payloadPath],
+      ...(parameter.matchMode === undefined ? {} : { matchMode: parameter.matchMode }),
+      ...(parameter.matchValuePrefix === undefined
+        ? {}
+        : { matchValuePrefix: parameter.matchValuePrefix }),
       ...(parameter.multiValue === undefined ? {} : { multiValue: parameter.multiValue }),
       ...(parameter.negatedMatchRequiresExists === undefined
         ? {}
@@ -650,6 +658,9 @@ function cloneWebhookEventParameter(
       options: parameter.options.map((option) => ({
         value: option.value,
         label: option.label,
+        ...(option.payloadFilter === undefined
+          ? {}
+          : { payloadFilter: structuredClone(option.payloadFilter) }),
       })),
       ...(parameter.negatedMatchRequiresExists === undefined
         ? {}

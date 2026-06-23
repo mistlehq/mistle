@@ -13280,6 +13280,14 @@
                                             },
                                             "minItems": 1
                                           },
+                                          "matchMode": {
+                                            "type": "string",
+                                            "enum": ["eq", "contains", "contains_token"]
+                                          },
+                                          "matchValuePrefix": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
                                           "multiValue": {
                                             "type": "boolean"
                                           },
@@ -13382,7 +13390,7 @@
                                           },
                                           "matchMode": {
                                             "type": "string",
-                                            "enum": ["eq", "exists"]
+                                            "enum": ["eq", "exists", "payload_filter"]
                                           },
                                           "options": {
                                             "type": "array",
@@ -13396,6 +13404,10 @@
                                                 "label": {
                                                   "type": "string",
                                                   "minLength": 1
+                                                },
+                                                "payloadFilter": {
+                                                  "type": "object",
+                                                  "additionalProperties": {}
                                                 }
                                               },
                                               "required": ["value", "label"],
@@ -13522,6 +13534,14 @@
                                             },
                                             "minItems": 1
                                           },
+                                          "matchMode": {
+                                            "type": "string",
+                                            "enum": ["eq", "contains", "contains_token"]
+                                          },
+                                          "matchValuePrefix": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
                                           "multiValue": {
                                             "type": "boolean"
                                           },
@@ -13624,7 +13644,7 @@
                                           },
                                           "matchMode": {
                                             "type": "string",
-                                            "enum": ["eq", "exists"]
+                                            "enum": ["eq", "exists", "payload_filter"]
                                           },
                                           "options": {
                                             "type": "array",
@@ -13638,6 +13658,10 @@
                                                 "label": {
                                                   "type": "string",
                                                   "minLength": 1
+                                                },
+                                                "payloadFilter": {
+                                                  "type": "object",
+                                                  "additionalProperties": {}
                                                 }
                                               },
                                               "required": ["value", "label"],

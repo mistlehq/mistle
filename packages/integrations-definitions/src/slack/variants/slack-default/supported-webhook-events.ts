@@ -9,6 +9,13 @@ import type {
 import { createInvocationTokenParameter } from "../../../shared/invocation-token-parameter.js";
 import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
 
+type SlackMessageTypePayloadFilter = NonNullable<
+  Extract<
+    IntegrationWebhookEventParameterDefinition,
+    { kind: "enum-select" }
+  >["options"][number]["payloadFilter"]
+>;
+
 const SlackEventPayloadReference: IntegrationWebhookPayloadReference = {
   path: ["event"],
   description: "Slack event payload object.",
@@ -105,11 +112,39 @@ const SlackChannelParameter: IntegrationWebhookEventParameterDefinition = {
 
 const SlackMessageSenderParameter: IntegrationWebhookEventParameterDefinition = {
   id: "sender",
-  label: "sender user ID",
-  kind: "string",
+  label: "sender",
+  kind: "resource-select",
+  resourceKind: "user",
   payloadPath: ["event", "user"],
+  multiValue: true,
   prefix: "from",
-  placeholder: "U1234567890",
+  placeholder: "Any sender",
+};
+
+const SlackUserMentionParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "userMention",
+  label: "user mention",
+  kind: "resource-select",
+  resourceKind: "user",
+  payloadPath: ["event", "text"],
+  matchMode: "contains_token",
+  matchValuePrefix: "<@",
+  multiValue: true,
+  prefix: "mentioning user",
+  placeholder: "Any mentioned user",
+};
+
+const SlackUserGroupMentionParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "userGroupMention",
+  label: "user group mention",
+  kind: "resource-select",
+  resourceKind: "user_group",
+  payloadPath: ["event", "text"],
+  matchMode: "contains_token",
+  matchValuePrefix: "<!subteam^",
+  multiValue: true,
+  prefix: "mentioning group",
+  placeholder: "Any user group",
 };
 
 const SlackMessageTextParameter: IntegrationWebhookEventParameterDefinition = {
@@ -122,20 +157,41 @@ const SlackMessageTextParameter: IntegrationWebhookEventParameterDefinition = {
   placeholder: "deployment failed",
 };
 
-const SlackThreadReplyParameter: IntegrationWebhookEventParameterDefinition = {
-  id: "threadReply",
-  label: "thread reply",
-  kind: "enum-select",
-  payloadPath: ["event", "thread_ts"],
-  matchMode: "exists",
-  options: [
+const SlackThreadReplyPayloadFilter: SlackMessageTypePayloadFilter = {
+  op: "and",
+  filters: [
     {
-      value: "exists",
-      label: "is in a thread",
+      op: "exists",
+      path: ["event", "thread_ts"],
     },
     {
-      value: "not_exists",
-      label: "is not in a thread",
+      op: "neq_path",
+      path: ["event", "thread_ts"],
+      otherPath: ["event", "ts"],
+    },
+  ],
+};
+
+const SlackMessageTypeParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "messageType",
+  label: "message type",
+  kind: "enum-select",
+  payloadPath: ["event", "thread_ts"],
+  matchMode: "payload_filter",
+  placeholder: "Any message",
+  options: [
+    {
+      value: "channel_or_dm_message",
+      label: "Channel message",
+      payloadFilter: {
+        op: "not",
+        filter: SlackThreadReplyPayloadFilter,
+      },
+    },
+    {
+      value: "thread_reply",
+      label: "Thread reply",
+      payloadFilter: SlackThreadReplyPayloadFilter,
     },
   ],
 };
@@ -151,20 +207,24 @@ const SlackReactionNameParameter: IntegrationWebhookEventParameterDefinition = {
 
 const SlackReactionActorParameter: IntegrationWebhookEventParameterDefinition = {
   id: "reactingUser",
-  label: "reacting user ID",
-  kind: "string",
+  label: "reacting user",
+  kind: "resource-select",
+  resourceKind: "user",
   payloadPath: ["event", "user"],
+  multiValue: true,
   prefix: "by",
-  placeholder: "U1234567890",
+  placeholder: "Any reacting user",
 };
 
 const SlackReactedMessageAuthorParameter: IntegrationWebhookEventParameterDefinition = {
   id: "reactedMessageAuthor",
-  label: "message author user ID",
-  kind: "string",
+  label: "message author",
+  kind: "resource-select",
+  resourceKind: "user",
   payloadPath: ["event", "item_user"],
+  multiValue: true,
   prefix: "on message by",
-  placeholder: "U1234567890",
+  placeholder: "Any message author",
   negatedMatchRequiresExists: true,
 };
 
@@ -256,8 +316,10 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
       createSlackInvocationTokenParameter(),
       SlackChannelParameter,
       SlackMessageSenderParameter,
+      SlackUserMentionParameter,
+      SlackUserGroupMentionParameter,
       SlackMessageTextParameter,
-      SlackThreadReplyParameter,
+      SlackMessageTypeParameter,
     ],
   }),
   createSlackWebhookEventDefinition({
@@ -271,7 +333,12 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     ),
     payloadReferences: SlackMessagePayloadReferences,
     conversationKeyOptions: [SlackChannelConversationKeyOption, SlackThreadConversationKeyOption],
-    parameters: [createSlackInvocationTokenParameter(), SlackChannelParameter],
+    parameters: [
+      createSlackInvocationTokenParameter(),
+      SlackChannelParameter,
+      SlackUserMentionParameter,
+      SlackUserGroupMentionParameter,
+    ],
   }),
   createSlackWebhookEventDefinition({
     eventType: "slack:reaction_added",

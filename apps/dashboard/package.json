@@ -34,6 +34,7 @@
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/ui": "workspace:*",
+    "@mistle/webhooks": "workspace:*",
     "@phosphor-icons/react": "^2.1.7",
     "@pierre/diffs": "^1.2.5",
     "@posthog/react": "^1.9.1",

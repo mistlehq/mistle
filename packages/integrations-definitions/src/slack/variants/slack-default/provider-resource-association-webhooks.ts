@@ -121,7 +121,11 @@ function mergeSlackThreadReplyParameters(
 
   for (const eventDefinition of eventDefinitions) {
     for (const parameter of eventDefinition.parameters ?? []) {
-      if (parameter.id === "threadReply") {
+      if (
+        parameter.id === "messageType" ||
+        parameter.id === "userMention" ||
+        parameter.id === "userGroupMention"
+      ) {
         continue;
       }
       if (seenParameterIds.has(parameter.id)) {

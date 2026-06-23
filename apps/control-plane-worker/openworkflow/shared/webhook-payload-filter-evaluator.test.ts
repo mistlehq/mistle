@@ -71,6 +71,49 @@ describe("webhook filter evaluator", () => {
     expect(matches).toBe(true);
   });
 
+  it("compares values from two payload paths", () => {
+    expect(
+      evaluateWebhookPayloadFilter({
+        filter: {
+          op: "and",
+          filters: [
+            {
+              op: "exists",
+              path: ["event", "thread_ts"],
+            },
+            {
+              op: "neq_path",
+              path: ["event", "thread_ts"],
+              otherPath: ["event", "ts"],
+            },
+          ],
+        },
+        payload: {
+          event: {
+            ts: "1710000001.000200",
+            thread_ts: "1710000000.000100",
+          },
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      evaluateWebhookPayloadFilter({
+        filter: {
+          op: "neq_path",
+          path: ["event", "thread_ts"],
+          otherPath: ["event", "ts"],
+        },
+        payload: {
+          event: {
+            ts: "1710000000.000100",
+            thread_ts: "1710000000.000100",
+          },
+        },
+      }),
+    ).toBe(false);
+  });
+
   it("supports all scalar comparisons and string operations", () => {
     const payload = {
       action: "created",

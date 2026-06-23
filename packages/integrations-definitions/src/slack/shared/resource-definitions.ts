@@ -26,6 +26,24 @@ export function createSlackResourceDefinitions(): ReadonlyArray<IntegrationResou
       description: "Slack channels accessible to this connection, including private channels.",
       credential: SlackBotTokenResourceCredential,
     },
+    {
+      kind: "user",
+      selectionMode: IntegrationResourceSelectionModes.MULTI,
+      bindingField: "users",
+      displayNameSingular: "user",
+      displayNamePlural: "users",
+      description: "Slack users accessible to this connection, including bot users.",
+      credential: SlackBotTokenResourceCredential,
+    },
+    {
+      kind: "user_group",
+      selectionMode: IntegrationResourceSelectionModes.MULTI,
+      bindingField: "userGroups",
+      displayNameSingular: "user group",
+      displayNamePlural: "user groups",
+      description: "Slack user groups that can be mentioned in messages.",
+      credential: SlackBotTokenResourceCredential,
+    },
   ];
 }
 
@@ -57,5 +75,21 @@ export const SlackResourceSyncTriggers: ReadonlyArray<IntegrationResourceSyncTri
   {
     eventType: "slack:group_rename",
     resourceKinds: ["channel"],
+  },
+  {
+    eventType: "slack:team_join",
+    resourceKinds: ["user"],
+  },
+  {
+    eventType: "slack:user_change",
+    resourceKinds: ["user"],
+  },
+  {
+    eventType: "slack:subteam_created",
+    resourceKinds: ["user_group"],
+  },
+  {
+    eventType: "slack:subteam_updated",
+    resourceKinds: ["user_group"],
   },
 ];

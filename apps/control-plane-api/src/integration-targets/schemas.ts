@@ -113,6 +113,8 @@ const IntegrationWebhookTriggerRequirementsSchema = z
   })
   .strict();
 
+const WebhookPayloadFilterTransportSchema = z.record(z.string(), z.unknown());
+
 const IntegrationWebhookEventParameterDefinitionSchema = z.union([
   z
     .object({
@@ -121,6 +123,8 @@ const IntegrationWebhookEventParameterDefinitionSchema = z.union([
       kind: z.literal("resource-select"),
       resourceKind: z.string().min(1),
       payloadPath: z.array(z.string().min(1)).min(1),
+      matchMode: z.enum(["eq", "contains", "contains_token"]).optional(),
+      matchValuePrefix: z.string().min(1).optional(),
       multiValue: z.boolean().optional(),
       negatedMatchRequiresExists: z.boolean().optional(),
       prefix: z.string().min(1).optional(),
@@ -148,13 +152,14 @@ const IntegrationWebhookEventParameterDefinitionSchema = z.union([
       label: z.string().min(1),
       kind: z.literal("enum-select"),
       payloadPath: z.array(z.string().min(1)).min(1),
-      matchMode: z.enum(["eq", "exists"]),
+      matchMode: z.enum(["eq", "exists", "payload_filter"]),
       options: z
         .array(
           z
             .object({
               value: z.string().min(1),
               label: z.string().min(1),
+              payloadFilter: WebhookPayloadFilterTransportSchema.optional(),
             })
             .strict(),
         )

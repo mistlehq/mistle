@@ -54,6 +54,20 @@ describe("webhook payload filter schema", () => {
     expect(parsedAny.op).toBe("or");
   });
 
+  it("parses field-to-field comparisons", () => {
+    expect(
+      parseWebhookPayloadFilter({
+        op: "neq_path",
+        path: ["event", "thread_ts"],
+        otherPath: ["event", "ts"],
+      }),
+    ).toEqual({
+      op: "neq_path",
+      path: ["event", "thread_ts"],
+      otherPath: ["event", "ts"],
+    });
+  });
+
   it("rejects string-based paths to enforce array segment paths", () => {
     const parsedFilter = WebhookPayloadFilterSchema.safeParse({
       op: "eq",
