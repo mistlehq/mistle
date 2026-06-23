@@ -1053,6 +1053,58 @@ describe("toWebhookTriggerFormValues", () => {
     });
   });
 
+  it("preserves Slack OR filters across different parameters as advanced payload filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          integrationWebhookSourceId: SlackWebhookSourceId,
+          eventConditions: [
+            {
+              eventType: "slack:message",
+              payloadFilter: {
+                op: "or",
+                filters: [
+                  {
+                    op: "contains",
+                    path: ["event", "text"],
+                    value: "deployment failed",
+                  },
+                  {
+                    op: "contains_token",
+                    path: ["event", "text"],
+                    value: "<@U1234567890",
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        [SlackMessageEventOption],
+      ),
+    ).toMatchObject({
+      eventIds: [SlackMessageConditionId0],
+      eventParameterRules: {},
+      remainingPayloadFilter: {
+        [SlackMessageConditionId0]: {
+          op: "or",
+          filters: [
+            {
+              op: "contains",
+              path: ["event", "text"],
+              value: "deployment failed",
+            },
+            {
+              op: "contains_token",
+              path: ["event", "text"],
+              value: "<@U1234567890",
+            },
+          ],
+        },
+      },
+    });
+  });
+
   it("hydrates Slack message text and invocation filters that share the event text path", () => {
     expect(
       toWebhookTriggerFormValues(

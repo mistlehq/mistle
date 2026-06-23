@@ -540,6 +540,48 @@ function flattenOrPayloadFilterNodes(filters: readonly PayloadFilterNode[]): Pay
   );
 }
 
+function canExtractOrPayloadFilters(input: {
+  parameters: readonly WebhookTriggerEventParameterOption[];
+  filters: readonly PayloadFilterNode[];
+}): boolean {
+  let parameterId: string | null = null;
+
+  for (const filter of input.filters) {
+    if (
+      filter.op !== "eq" &&
+      filter.op !== "contains" &&
+      filter.op !== "contains_token" &&
+      filter.op !== "in"
+    ) {
+      return false;
+    }
+
+    const parameter = resolvePayloadFilterParameter({
+      parameters: input.parameters,
+      filter,
+    });
+    if (parameter?.kind !== "resource-select" || parameter.multiValue !== true) {
+      return false;
+    }
+
+    const matchMode = resolveResourceSelectMatchMode(parameter);
+    if (
+      ((filter.op === "contains" || filter.op === "contains_token") && filter.op !== matchMode) ||
+      ((filter.op === "eq" || filter.op === "in") &&
+        (matchMode === "contains" || matchMode === "contains_token"))
+    ) {
+      return false;
+    }
+
+    parameterId ??= parameter.id;
+    if (parameter.id !== parameterId) {
+      return false;
+    }
+  }
+
+  return parameterId !== null;
+}
+
 function pathNodesMatch(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((segment, index) => segment === right[index]);
 }
@@ -1015,17 +1057,29 @@ export function extractWebhookTriggerEventParameterRules(input: {
     }
 
     const rootComposition = parsedPayloadFilter.op;
+    const eventParameters = eventOption.parameters ?? [];
     const rootFilters =
       parsedPayloadFilter.op === "and"
         ? flattenAndPayloadFilterNodes(parsedPayloadFilter.filters)
         : parsedPayloadFilter.op === "or"
           ? flattenOrPayloadFilterNodes(parsedPayloadFilter.filters)
           : [parsedPayloadFilter];
+    if (
+      rootComposition === "or" &&
+      !canExtractOrPayloadFilters({
+        parameters: eventParameters,
+        filters: rootFilters,
+      })
+    ) {
+      remainingPayloadFilter[conditionId] = eventPayloadFilter;
+      continue;
+    }
+
     const remainingFilters: PayloadFilterNode[] = [];
     const previousConditionRules = eventParameterRules[conditionId];
     const remainingRootFilters = [...rootFilters];
 
-    for (const parameter of eventOption.parameters ?? []) {
+    for (const parameter of eventParameters) {
       if (parameter.kind !== "enum-select" || parameter.matchMode !== "payload_filter") {
         continue;
       }
