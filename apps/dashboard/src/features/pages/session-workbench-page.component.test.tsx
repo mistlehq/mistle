@@ -14,7 +14,6 @@ import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.j
 import {
   resolveConversationScopedComposerRenderKey,
   SessionWorkbenchPage,
-  shouldFormatInitialUserMessageAsTriggerInput,
 } from "./session-workbench-page.js";
 
 function renderSessionWorkbenchPage(input?: {
@@ -423,36 +422,6 @@ describe("SessionWorkbenchPage", () => {
     });
 
     expect(await screen.findByRole("status", { name: "Connecting chat" })).toBeTruthy();
-  });
-
-  it("formats trigger input only when the active conversation is the provider conversation", () => {
-    expect(
-      shouldFormatInitialUserMessageAsTriggerInput({
-        activeConversationId: "conversation_provider",
-        triggerConversation: { providerConversationId: "conversation_provider" },
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldFormatInitialUserMessageAsTriggerInput({
-        activeConversationId: "conversation_manual",
-        triggerConversation: { providerConversationId: "conversation_provider" },
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldFormatInitialUserMessageAsTriggerInput({
-        activeConversationId: "conversation_manual",
-        triggerConversation: null,
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldFormatInitialUserMessageAsTriggerInput({
-        activeConversationId: null,
-        triggerConversation: { providerConversationId: null },
-      }),
-    ).toBe(false);
   });
 
   it("uses the requested runtime conversation as the composer scope before active conversation catches up", () => {

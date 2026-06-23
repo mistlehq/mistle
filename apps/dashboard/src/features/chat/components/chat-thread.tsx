@@ -21,7 +21,6 @@ import { ChatUserMessage } from "./chat-user-message.js";
 
 type ChatThreadProps = {
   entries: readonly ChatEntry[];
-  formatInitialUserMessageAsTriggerInput?: boolean;
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
   onUserMessageAction?: (actionId: string) => void;
@@ -101,14 +100,12 @@ function mapGenericItemToSemanticGroup(block: ChatGenericItemEntry): ChatSemanti
 
 function ChatThreadView({
   entries,
-  formatInitialUserMessageAsTriggerInput = false,
   isRespondingToServerRequest,
   onRespondToServerRequest,
   onUserMessageAction,
   pendingServerRequests,
 }: ChatThreadProps): React.JSX.Element {
   const chatTurnGroups = buildChatTurnGroups(entries);
-  const initialUserMessageId = entries.find((entry) => entry.kind === "user-message")?.id ?? null;
 
   function renderUserMessage(
     entry: Extract<ChatEntry, { kind: "user-message" }>,
@@ -129,9 +126,7 @@ function ChatThreadView({
               },
             })}
         {...(entry.label === undefined ? {} : { label: entry.label })}
-        formatTriggerInput={
-          formatInitialUserMessageAsTriggerInput && entry.id === initialUserMessageId
-        }
+        formatTriggerInput
         text={entry.text}
       />
     );

@@ -705,10 +705,6 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
             }),
             scrollBehavior: "follow-streaming-at-bottom",
             chatEntries: conversationPane.chatState.entries,
-            formatInitialUserMessageAsTriggerInput: shouldFormatInitialUserMessageAsTriggerInput({
-              activeConversationId: conversationPane.activeConversationId,
-              triggerConversation: workbench.sandboxStatusQuery.data?.triggerConversation ?? null,
-            }),
             onUserMessageAction: conversationPane.dismissUserMessageAction,
             isRespondingToServerRequest:
               conversationPane.serverRequestsState.isRespondingToServerRequest,
@@ -782,17 +778,6 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
   );
 }
 
-export function shouldFormatInitialUserMessageAsTriggerInput(input: {
-  activeConversationId: string | null;
-  triggerConversation: { providerConversationId: string | null } | null;
-}): boolean {
-  return (
-    input.triggerConversation !== null &&
-    input.triggerConversation.providerConversationId !== null &&
-    input.triggerConversation.providerConversationId === input.activeConversationId
-  );
-}
-
 export function resolveConversationScopedComposerRenderKey(input: {
   activeConversationId: string | null;
   providerConversationId: string | null;
@@ -819,7 +804,6 @@ type PrimaryPanelConversationContent = Pick<
   | "initialBottomScrollResetKey"
   | "scrollBehavior"
   | "chatEntries"
-  | "formatInitialUserMessageAsTriggerInput"
   | "onUserMessageAction"
   | "isRespondingToServerRequest"
   | "onRespondToServerRequest"

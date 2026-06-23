@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { ChatThread } from "./chat-thread.js";
 
 describe("ChatThread", () => {
-  it("formats only the initial user message as trigger input when enabled", () => {
+  it("formats every runtime user message with structured JSON", () => {
     const { container } = render(
       <ChatThread
         entries={[
@@ -22,21 +22,21 @@ describe("ChatThread", () => {
             id: "user_2",
             turnId: "turn_2",
             kind: "user-message",
-            text: 'Manual follow-up {"type":"message"}',
+            text: 'Payload: {"type":"message","text":"follow-up"}',
             attachments: [],
             status: "completed",
           },
         ]}
-        formatInitialUserMessageAsTriggerInput
         isRespondingToServerRequest={false}
         onRespondToServerRequest={() => {}}
         pendingServerRequests={[]}
       />,
     );
 
-    expect(container.querySelectorAll("[data-chat-trigger-input-presentation]")).toHaveLength(1);
+    expect(container.querySelectorAll("[data-chat-trigger-input-presentation]")).toHaveLength(2);
     expect(screen.getByText("Provider payload.event:")).toBeTruthy();
-    expect(screen.getByText('Manual follow-up {"type":"message"}')).toBeTruthy();
+    expect(screen.getByText("Payload:")).toBeTruthy();
+    expect(screen.queryByText('Payload: {"type":"message","text":"follow-up"}')).toBeNull();
   });
 
   it("renders command approvals inline with the matching command block", () => {
