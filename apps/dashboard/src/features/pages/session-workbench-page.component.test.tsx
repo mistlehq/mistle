@@ -11,11 +11,8 @@ import { createTestQueryClient } from "../../test-support/query-client.js";
 import { HttpApiError } from "../api/http-api-error.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
-import {
-  resolveConversationScopedComposerRenderKey,
-  SessionWorkbenchPage,
-  shouldFormatInitialUserMessageAsTriggerInput,
-} from "./session-workbench-page.js";
+import { resolveConversationScopedComposerRenderKey } from "./session-workbench-full-page.js";
+import { SessionWorkbenchPage } from "./session-workbench-page.js";
 
 function renderSessionWorkbenchPage(input?: {
   queryClientOptions?: Parameters<typeof createTestQueryClient>[0];
@@ -425,41 +422,10 @@ describe("SessionWorkbenchPage", () => {
     expect(await screen.findByRole("status", { name: "Connecting chat" })).toBeTruthy();
   });
 
-  it("formats trigger input only when the active conversation is the provider conversation", () => {
-    expect(
-      shouldFormatInitialUserMessageAsTriggerInput({
-        activeConversationId: "conversation_provider",
-        triggerConversation: { providerConversationId: "conversation_provider" },
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldFormatInitialUserMessageAsTriggerInput({
-        activeConversationId: "conversation_manual",
-        triggerConversation: { providerConversationId: "conversation_provider" },
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldFormatInitialUserMessageAsTriggerInput({
-        activeConversationId: "conversation_manual",
-        triggerConversation: null,
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldFormatInitialUserMessageAsTriggerInput({
-        activeConversationId: null,
-        triggerConversation: { providerConversationId: null },
-      }),
-    ).toBe(false);
-  });
-
   it("uses the requested runtime conversation as the composer scope before active conversation catches up", () => {
     expect(
       resolveConversationScopedComposerRenderKey({
         activeConversationId: "conversation_previous",
-        providerConversationId: "conversation_provider",
         requestedRuntimeConversationId: "conversation_next",
         sandboxInstanceId: "sbi_test",
         triggerConversation: {
@@ -473,7 +439,6 @@ describe("SessionWorkbenchPage", () => {
     expect(
       resolveConversationScopedComposerRenderKey({
         activeConversationId: "conversation_active",
-        providerConversationId: "conversation_provider",
         requestedRuntimeConversationId: null,
         sandboxInstanceId: "sbi_test",
         triggerConversation: {
@@ -485,7 +450,6 @@ describe("SessionWorkbenchPage", () => {
     expect(
       resolveConversationScopedComposerRenderKey({
         activeConversationId: null,
-        providerConversationId: "conversation_provider",
         requestedRuntimeConversationId: null,
         sandboxInstanceId: "sbi_test",
         triggerConversation: {
@@ -497,17 +461,6 @@ describe("SessionWorkbenchPage", () => {
     expect(
       resolveConversationScopedComposerRenderKey({
         activeConversationId: null,
-        providerConversationId: "conversation_provider",
-        requestedRuntimeConversationId: null,
-        sandboxInstanceId: "sbi_test",
-        triggerConversation: null,
-      }),
-    ).toBe("sbi_test:conversation_provider");
-
-    expect(
-      resolveConversationScopedComposerRenderKey({
-        activeConversationId: null,
-        providerConversationId: null,
         requestedRuntimeConversationId: null,
         sandboxInstanceId: null,
         triggerConversation: null,

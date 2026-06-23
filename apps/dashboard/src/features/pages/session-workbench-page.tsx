@@ -4,11 +4,6 @@ import { useParams, useSearchParams } from "react-router";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
 import { SessionWorkbenchFullPage } from "./session-workbench-full-page.js";
 
-export {
-  resolveConversationScopedComposerRenderKey,
-  shouldFormatInitialUserMessageAsTriggerInput,
-} from "./session-workbench-full-page.js";
-
 export function shouldResetConversationScopedComposerStateForActiveConversationChange(input: {
   lastActiveConversationId: string | null;
   nextActiveConversationId: string | null;

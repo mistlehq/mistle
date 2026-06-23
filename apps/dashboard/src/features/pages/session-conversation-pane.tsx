@@ -32,7 +32,6 @@ import {
 
 type SessionConversationMainContentProps = {
   activeTurnId: string | null;
-  formatInitialUserMessageAsTriggerInput?: boolean;
   isTurnInProgress: boolean;
   pendingTurnId: string | null;
   autoScrollToBottomOnInitialLoad?: boolean;
@@ -77,7 +76,6 @@ type SessionConversationBottomPanelDraftControllerProps = Omit<
 
 function SessionConversationMainContentView({
   activeTurnId,
-  formatInitialUserMessageAsTriggerInput = false,
   isTurnInProgress,
   pendingTurnId,
   autoScrollToBottomOnInitialLoad = false,
@@ -120,7 +118,6 @@ function SessionConversationMainContentView({
     >
       <ChatThread
         entries={chatEntries}
-        formatInitialUserMessageAsTriggerInput={formatInitialUserMessageAsTriggerInput}
         isRespondingToServerRequest={isRespondingToServerRequest}
         onRespondToServerRequest={onRespondToServerRequest}
         {...(onUserMessageAction === undefined ? {} : { onUserMessageAction })}

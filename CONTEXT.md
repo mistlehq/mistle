@@ -329,9 +329,9 @@ _Avoid_: Trigger delivery context when no Trigger is involved
 The exact text generated from a **Trigger**'s input template and delivered to the agent.
 _Avoid_: Trigger payload, formatted trigger message
 
-**Trigger input presentation**:
-A dashboard-only display interpretation derived from a **Rendered trigger input** that may make structured content easier to read without changing what was delivered to the agent.
-_Avoid_: Rendered trigger input, formatted trigger input
+**Structured JSON input presentation**:
+A dashboard-only display interpretation that may make JSON object spans in a **Runtime user message** easier to read without changing what was delivered to the agent.
+_Avoid_: Rendered trigger input, formatted trigger input, trigger input presentation
 
 **Conversation**:
 A logical agent dialogue.

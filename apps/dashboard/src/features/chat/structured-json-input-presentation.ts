@@ -1,4 +1,4 @@
-export type StructuredTriggerInputSegment =
+export type StructuredJsonInputSegment =
   | {
       kind: "json";
       text: string;
@@ -8,8 +8,8 @@ export type StructuredTriggerInputSegment =
       text: string;
     };
 
-export type StructuredTriggerInputPresentation = {
-  inlineSegments: readonly StructuredTriggerInputSegment[];
+export type StructuredJsonInputPresentation = {
+  inlineSegments: readonly StructuredJsonInputSegment[];
 };
 
 type JsonObjectSpan = {
@@ -18,7 +18,7 @@ type JsonObjectSpan = {
   startIndex: number;
 };
 
-export function presentTriggerInput(text: string): StructuredTriggerInputPresentation | null {
+export function presentStructuredJsonInput(text: string): StructuredJsonInputPresentation | null {
   const jsonSpans = findJsonObjectSpans(text);
   if (jsonSpans.length === 0) {
     return null;
@@ -165,8 +165,8 @@ function isStrictJsonObjectText(text: string): boolean {
 function createJsonInlineSegments(
   text: string,
   jsonSpans: readonly JsonObjectSpan[],
-): readonly StructuredTriggerInputSegment[] {
-  const segments: StructuredTriggerInputSegment[] = [];
+): readonly StructuredJsonInputSegment[] {
+  const segments: StructuredJsonInputSegment[] = [];
   let currentIndex = 0;
 
   for (const span of jsonSpans) {
