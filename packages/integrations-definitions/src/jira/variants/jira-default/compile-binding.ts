@@ -34,8 +34,8 @@ const JiraMcpProcessStopTimeoutMs = 10_000;
 const JiraMcpProcessStopGracePeriodMs = 2_000;
 // Pin exact release tags for sandbox startup to avoid live upstream version
 // resolution and the associated rate-limit / availability failures.
-const JiraCliReleaseTag = "jira/v0.6.0";
-const JiraCliLinuxAmd64Sha256 = "8b04dc4ab6a14f9b9ddb9f59455b7f01d825a377191b30ea0b0e3946740d1ca7";
+const JiraCliReleaseTag = "jira/v0.7.0";
+const JiraCliLinuxAmd64Sha256 = "a29d961ffa0470664d41829b612d98d4870bd8f73755260cd0d19b388dc7a457";
 
 function createJiraCliArtifact(upstreamBaseUrl: string): CompileBindingResult["artifacts"][number] {
   return {
