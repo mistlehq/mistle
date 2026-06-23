@@ -188,6 +188,12 @@
         "vitest/no-standalone-expect": "off",
       },
     },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "rules": {
+        "vitest/expect-expect": "off",
+      },
+    },
   ],
   "ignorePatterns": ["**/dist/**", "**/node_modules/**", "**/coverage/**", "**/.turbo/**"],
 }
