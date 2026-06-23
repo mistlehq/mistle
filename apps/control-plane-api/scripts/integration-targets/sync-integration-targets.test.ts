@@ -115,6 +115,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "google-search-console-mcp",
+        familyId: "google-search-console",
+        variantId: "google-search-console-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "google-workspace-mcp",
         familyId: "google-workspace",
         variantId: "google-workspace-mcp",

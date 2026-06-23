@@ -19,6 +19,7 @@ import { GcpMcpBaseDefinition } from "./gcp/variants/gcp-mcp/base-definition.js"
 import { GitHubCloudBaseDefinition } from "./github/variants/github-cloud/base-definition.js";
 import { GitHubEnterpriseServerBaseDefinition } from "./github/variants/github-enterprise-server/base-definition.js";
 import { GoogleAnalyticsMcpBaseDefinition } from "./google-analytics/variants/google-analytics-mcp/base-definition.js";
+import { GoogleSearchConsoleMcpBaseDefinition } from "./google-search-console/variants/google-search-console-mcp/base-definition.js";
 import { GoogleWorkspaceMcpBaseDefinition } from "./google-workspace/variants/google-workspace-mcp/base-definition.js";
 import { InceptionDefinition } from "./inception/index.js";
 import { JiraBaseDefinition } from "./jira/variants/jira-default/base-definition.js";
@@ -64,6 +65,7 @@ export const ExpoBrowserDefinition = ExpoMcpBaseDefinition;
 export const FireworksBrowserDefinition = FireworksDefinition;
 export const GcpBrowserDefinition = GcpMcpBaseDefinition;
 export const GoogleAnalyticsBrowserDefinition = GoogleAnalyticsMcpBaseDefinition;
+export const GoogleSearchConsoleBrowserDefinition = GoogleSearchConsoleMcpBaseDefinition;
 export const GitHubCloudBrowserDefinition = GitHubCloudBaseDefinition;
 export const GitHubEnterpriseServerBrowserDefinition = GitHubEnterpriseServerBaseDefinition;
 export const GoogleWorkspaceBrowserDefinition = GoogleWorkspaceMcpBaseDefinition;
@@ -109,6 +111,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   FireworksBrowserDefinition,
   GcpBrowserDefinition,
   GoogleAnalyticsBrowserDefinition,
+  GoogleSearchConsoleBrowserDefinition,
   GoogleWorkspaceBrowserDefinition,
   InceptionBrowserDefinition,
   JiraBrowserDefinition,
@@ -172,6 +175,7 @@ export * from "./expo/browser.js";
 export * from "./fireworks/index.js";
 export * from "./gcp/browser.js";
 export * from "./google-analytics/browser.js";
+export * from "./google-search-console/browser.js";
 export * from "./google-workspace/browser.js";
 export * from "./github/browser.js";
 export * from "./inception/index.js";

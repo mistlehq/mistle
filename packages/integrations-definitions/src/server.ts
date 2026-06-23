@@ -22,6 +22,7 @@ import { FireworksDefinition } from "./fireworks/index.js";
 import { GcpDefinition } from "./gcp/server.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/index.js";
 import { GoogleAnalyticsDefinition } from "./google-analytics/server.js";
+import { GoogleSearchConsoleDefinition } from "./google-search-console/server.js";
 import { GoogleWorkspaceDefinition } from "./google-workspace/server.js";
 import { InceptionDefinition } from "./inception/index.js";
 import { JiraDefinition } from "./jira/index.js";
@@ -71,6 +72,7 @@ export * from "./expo/server.js";
 export * from "./fireworks/index.js";
 export * from "./gcp/server.js";
 export * from "./google-analytics/server.js";
+export * from "./google-search-console/server.js";
 export * from "./google-workspace/server.js";
 export * from "./jira/index.js";
 export * from "./github/index.js";
@@ -121,6 +123,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   FireworksDefinition,
   GcpDefinition,
   GoogleAnalyticsDefinition,
+  GoogleSearchConsoleDefinition,
   GoogleWorkspaceDefinition,
   InceptionDefinition,
   JiraDefinition,

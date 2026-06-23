@@ -140,6 +140,13 @@ describe("dashboard integration logo assets", () => {
     expect(colorType).toBe(6);
   });
 
+  it("keeps the Google Search Console logo square so it does not regress to the wide wordmark", () => {
+    const { height, width } = readSvgViewBoxDimensions("google-search-console.svg");
+
+    expect(width).toBe(157.67);
+    expect(height).toBe(157.68);
+  });
+
   it("keeps the WasenderAPI logo square and opaque for light and dark surfaces", () => {
     const { colorType, height, width } = readPngHeader("wasenderapi.png");
 
