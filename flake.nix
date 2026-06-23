@@ -12,29 +12,29 @@
         pkgs = import nixpkgs { inherit system; };
         nodejs = if pkgs ? nodejs_25 then pkgs.nodejs_25 else pkgs.nodejs;
         docsNodejs = if pkgs ? nodejs_22 then pkgs.nodejs_22 else pkgs.nodejs;
-        codexVersion = "0.142.0-alpha.10";
-        opencodeVersion = "1.17.8";
+        codexVersion = "0.142.0-alpha.12";
+        opencodeVersion = "1.17.9";
         codexReleaseAsset =
           {
             x86_64-linux = {
               fileName = "codex-x86_64-unknown-linux-musl.tar.gz";
               binaryName = "codex-x86_64-unknown-linux-musl";
-              hash = "sha256-NYDToKZDP79vYgC9XFCpKPjS/kx3ciD+q0CDlu/Ye4g=";
+              hash = "sha256-lRT05zjwmcg6WMUjHEVm1Crx1cWXko3hGRO5g2ZOPGI=";
             };
             aarch64-linux = {
               fileName = "codex-aarch64-unknown-linux-musl.tar.gz";
               binaryName = "codex-aarch64-unknown-linux-musl";
-              hash = "sha256-zF24UrJON23kcigaV2AhNRT+uIjcQQ6/Az5eB/K/5pc=";
+              hash = "sha256-c1h7WoddWylYa84yFgADjd87zwxQ8FXvIJhV7wdPi5k=";
             };
             x86_64-darwin = {
               fileName = "codex-x86_64-apple-darwin.tar.gz";
               binaryName = "codex-x86_64-apple-darwin";
-              hash = "sha256-fCWGzg+G7XTL5gHyXo2mmFn1OuXU25t7CJjItBz6A6A=";
+              hash = "sha256-VVQ3cnR+VHvVep9iprjjYvi1g2H7NB1cH5rJryVufJU=";
             };
             aarch64-darwin = {
               fileName = "codex-aarch64-apple-darwin.tar.gz";
               binaryName = "codex-aarch64-apple-darwin";
-              hash = "sha256-7+tNC4mX3wTzeRG/P6oqsA52DgTSh0nzPwmJywQo7ME=";
+              hash = "sha256-VvZgcnjEcgtR8fTVD1RejqngFa2O3MPOPfZ/JKKB+XE=";
             };
           }
           .${system}
@@ -43,22 +43,22 @@
           {
             x86_64-linux = {
               fileName = "opencode-linux-x64-baseline.tar.gz";
-              hash = "sha256-mzS/NL3GbqNN3VhYoTH+vyi2JHaTrL+1+1ya2U2QOIs=";
+              hash = "sha256-wtYWWCCBCG8WAdXLVKrvTgGcus33idjakoL2TJdVFxc=";
               unpackPhase = ''tar -xzf "$src"'';
             };
             aarch64-linux = {
               fileName = "opencode-linux-arm64.tar.gz";
-              hash = "sha256-z7NKappA+aKtsNDzqzh7lzB4I9B1Vyv7VKVTIorc670=";
+              hash = "sha256-jMUR+XlOV15dPEwmVJMNBWcBht9knCa1CImsc8Zd3iE=";
               unpackPhase = ''tar -xzf "$src"'';
             };
             x86_64-darwin = {
               fileName = "opencode-darwin-x64-baseline.zip";
-              hash = "sha256-U8rGpBGvjSnHTYML2y+HRJlNBUKFFxDb251Uz5uOlUQ=";
+              hash = "sha256-bXNrYjuYcsEzYII49qfX47EWR9kgw8FFihztnJ84OTI=";
               unpackPhase = ''unzip "$src"'';
             };
             aarch64-darwin = {
               fileName = "opencode-darwin-arm64.zip";
-              hash = "sha256-TXKwivTuGGo/L4RitmZbSkwMeuip8mrxh8V6/viIWNc=";
+              hash = "sha256-kT2BOojKT2IJucSOVIvTdu700edMK7ETqpGqlseE0zI=";
               unpackPhase = ''unzip "$src"'';
             };
           }

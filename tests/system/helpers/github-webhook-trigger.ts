@@ -1797,14 +1797,16 @@ async function createWebhookTrigger(input: {
         name: `GitHub Webhook Trigger ${randomUUID()}`,
         enabled: true,
         integrationWebhookSourceId: input.githubWebhookSource.id,
-        eventTypes: ["github.issue_comment.created"],
-        payloadFilter: {
-          "github.issue_comment.created": {
-            op: "contains",
-            path: ["comment", "body"],
-            value: input.payloadMarker,
+        eventConditions: [
+          {
+            eventType: "github.issue_comment.created",
+            payloadFilter: {
+              op: "contains",
+              path: ["comment", "body"],
+              value: input.payloadMarker,
+            },
           },
-        },
+        ],
         inputTemplate: "GitHub issue comment webhook: {{payload.comment.body}}",
         instructions: input.instructions ?? null,
         conversationKeyTemplate: "github-issue-{{payload.issue.number}}",
