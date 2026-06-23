@@ -1105,6 +1105,57 @@ describe("toWebhookTriggerFormValues", () => {
     });
   });
 
+  it("hydrates Slack mention OR filters when combined with other parameter filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          integrationWebhookSourceId: SlackWebhookSourceId,
+          eventConditions: [
+            {
+              eventType: "slack:message",
+              payloadFilter: {
+                op: "and",
+                filters: [
+                  {
+                    op: "or",
+                    filters: [
+                      {
+                        op: "contains_token",
+                        path: ["event", "text"],
+                        value: "<@U1234567890",
+                      },
+                      {
+                        op: "contains_token",
+                        path: ["event", "text"],
+                        value: "<@U9999999999",
+                      },
+                    ],
+                  },
+                  {
+                    op: "contains",
+                    path: ["event", "text"],
+                    value: "deployment failed",
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        [SlackMessageEventOption],
+      ),
+    ).toMatchObject({
+      eventIds: [SlackMessageConditionId0],
+      eventParameterRules: {
+        [SlackMessageConditionId0]: {
+          userMention: isAnyOfRule(["U1234567890", "U9999999999"]),
+          messageText: containsRule("deployment failed"),
+        },
+      },
+      remainingPayloadFilter: null,
+    });
+  });
+
   it("hydrates Slack message text and invocation filters that share the event text path", () => {
     expect(
       toWebhookTriggerFormValues(

@@ -582,6 +582,25 @@ function canExtractOrPayloadFilters(input: {
   return parameterId !== null;
 }
 
+function expandExtractableOrPayloadFilters(input: {
+  parameters: readonly WebhookTriggerEventParameterOption[];
+  filters: readonly PayloadFilterNode[];
+}): PayloadFilterNode[] {
+  return input.filters.flatMap((filter) => {
+    if (filter.op !== "or") {
+      return [filter];
+    }
+
+    const filters = flattenOrPayloadFilterNodes(filter.filters);
+    return canExtractOrPayloadFilters({
+      parameters: input.parameters,
+      filters,
+    })
+      ? filters
+      : [filter];
+  });
+}
+
 function pathNodesMatch(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((segment, index) => segment === right[index]);
 }
@@ -1058,12 +1077,15 @@ export function extractWebhookTriggerEventParameterRules(input: {
 
     const rootComposition = parsedPayloadFilter.op;
     const eventParameters = eventOption.parameters ?? [];
-    const rootFilters =
-      parsedPayloadFilter.op === "and"
-        ? flattenAndPayloadFilterNodes(parsedPayloadFilter.filters)
-        : parsedPayloadFilter.op === "or"
-          ? flattenOrPayloadFilterNodes(parsedPayloadFilter.filters)
-          : [parsedPayloadFilter];
+    const rootFilters = expandExtractableOrPayloadFilters({
+      parameters: eventParameters,
+      filters:
+        parsedPayloadFilter.op === "and"
+          ? flattenAndPayloadFilterNodes(parsedPayloadFilter.filters)
+          : parsedPayloadFilter.op === "or"
+            ? flattenOrPayloadFilterNodes(parsedPayloadFilter.filters)
+            : [parsedPayloadFilter],
+    });
     if (
       rootComposition === "or" &&
       !canExtractOrPayloadFilters({
