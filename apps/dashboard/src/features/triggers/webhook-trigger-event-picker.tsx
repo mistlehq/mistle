@@ -385,11 +385,11 @@ function EventParameterFields(input: {
             connectionId={input.connectionId}
             disabled={input.disabled}
             eventType={input.eventOption.eventType}
+            key={`${input.eventOption.id}:${parameter.id}`}
             {...(input.eventParameterError?.triggerId === input.eventOption.id &&
             input.eventParameterError.parameterId === parameter.id
               ? { errorMessage: input.eventParameterError.message }
               : {})}
-            key={`${input.eventOption.id}:${parameter.id}`}
             onRuleChange={(rule) => {
               input.onRuleChange(parameter.id, rule);
             }}
@@ -746,6 +746,7 @@ function OneOfParameterGroupField(input: {
   const selectedParameter = selectedOption.parameter;
   const selectedRule = input.rules[selectedParameter.id];
   const selectedValue = selectedRule?.value ?? "";
+  const selectedPrefixLabel = selectedParameter.prefix ?? selectedParameter.label;
   const selectedResources = useTriggerParameterResources({
     connectionId: input.connectionId,
     resourceKind:
@@ -814,10 +815,8 @@ function OneOfParameterGroupField(input: {
             });
           }}
         />
-      ) : (
-        <span className="text-muted-foreground w-36 shrink-0 text-sm">
-          {selectedParameter.prefix ?? selectedParameter.label}
-        </span>
+      ) : selectedOption.label === selectedPrefixLabel ? null : (
+        <span className="text-muted-foreground w-36 shrink-0 text-sm">{selectedPrefixLabel}</span>
       )}
       {selectedParameter.kind === "resource-select" ? (
         <div className={`${EventParameterControlClassName} space-y-1.5`}>

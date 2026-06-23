@@ -685,7 +685,7 @@ describe("WebhookTriggerEventPicker", () => {
     });
 
     expect(screen.getByText("Pull request opened")).toBeDefined();
-    expect(screen.getByText("by bot")).toBeDefined();
+    expect(screen.getAllByText("by bot").length).toBeGreaterThan(0);
     await waitFor(() => {
       expectSelectedResourceLabel("dependabot[bot]");
     });
@@ -751,7 +751,7 @@ describe("WebhookTriggerEventPicker", () => {
     });
 
     expect(screen.getByText("Pull request review requested")).toBeDefined();
-    expect(screen.getByText("for team")).toBeDefined();
+    expect(screen.getAllByText("for team").length).toBeGreaterThan(0);
     await waitFor(() => {
       expectSelectedResourceLabel("Platform (mistle)");
     });
@@ -771,7 +771,7 @@ describe("WebhookTriggerEventPicker", () => {
       },
     });
 
-    expect(screen.getByText("for team")).toBeDefined();
+    expect(screen.getAllByText("for team").length).toBeGreaterThan(0);
     expect(screen.queryByText("for reviewer")).toBeNull();
     await waitFor(() => {
       expectSelectedResourceLabel("Platform (mistle)");
@@ -844,7 +844,7 @@ describe("WebhookTriggerEventPicker", () => {
     });
 
     expect(screen.getByText("Pull request review requested")).toBeDefined();
-    expect(screen.getByText("for bot")).toBeDefined();
+    expect(screen.getAllByText("for bot").length).toBeGreaterThan(0);
     await waitFor(() => {
       expectSelectedResourceLabel("mistle-agent[bot]");
     });
@@ -890,7 +890,7 @@ describe("WebhookTriggerEventPicker", () => {
       },
     });
 
-    expect(screen.getByText("for team")).toBeDefined();
+    expect(screen.getAllByText("for team").length).toBeGreaterThan(0);
     await waitFor(() => {
       expect(screen.getAllByText("platform").length).toBeGreaterThan(0);
     });
@@ -916,7 +916,7 @@ describe("WebhookTriggerEventPicker", () => {
     });
 
     expect(screen.getByText("Pull request review request removed")).toBeDefined();
-    expect(screen.getByText("for team")).toBeDefined();
+    expect(screen.getAllByText("for team").length).toBeGreaterThan(0);
     await waitFor(() => {
       expectSelectedResourceLabel("Platform (mistle)");
     });
@@ -936,7 +936,7 @@ describe("WebhookTriggerEventPicker", () => {
     });
 
     expect(screen.getByText("Pull request review request removed")).toBeDefined();
-    expect(screen.getByText("for bot")).toBeDefined();
+    expect(screen.getAllByText("for bot").length).toBeGreaterThan(0);
     await waitFor(() => {
       expectSelectedResourceLabel("mistle-agent[bot]");
     });
