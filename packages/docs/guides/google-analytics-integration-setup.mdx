@@ -1,0 +1,83 @@
+---
+title: Google Analytics
+description: Connect Google Analytics to Mistle
+---
+
+## Overview
+
+Connect Google Analytics by authorizing Mistle with a Google OAuth client that you create in Google Cloud.
+
+Mistle uses the OAuth authorization code flow to obtain Google access tokens. The local Google Analytics MCP server runs inside the sandbox runtime boundary and calls the Google Analytics Admin API and Google Analytics Data API through Mistle-managed egress, where Mistle injects the connected OAuth token into those outbound requests.
+
+The Google Analytics integration is read-only. Mistle requests only this OAuth scope:
+
+- `https://www.googleapis.com/auth/analytics.readonly`
+
+## Prerequisites
+
+Before connecting Google Analytics:
+
+1. Create or choose a Google Analytics 4 property.
+2. Make sure the Google account that will authorize Mistle has access to that Analytics account or property.
+3. Create or choose a Google Cloud project that will own the OAuth client.
+4. If your Google Auth Platform app is in testing mode, add the authorizing Google account as a test user.
+
+## Enable Google Analytics APIs
+
+Enable the Google Analytics Admin API and Google Analytics Data API in the Google Cloud project that owns the OAuth client:
+
+```bash
+gcloud services enable \
+  analyticsadmin.googleapis.com \
+  analyticsdata.googleapis.com \
+  --project=PROJECT_ID
+```
+
+Replace `PROJECT_ID` with the Google Cloud project ID.
+
+## Configure OAuth Consent
+
+In **Google Auth Platform**, configure branding, audience, and data access for the OAuth app.
+
+Add this scope:
+
+- `https://www.googleapis.com/auth/analytics.readonly`
+
+For an internal Workspace rollout, select **Internal** audience when available. For an external app in testing mode, add every authorizing Google account as a test user before connecting.
+
+## Create A Google OAuth Client
+
+Create a Web application OAuth client in Google Auth Platform.
+
+1. In Mistle, open **Integrations** and choose **Google Analytics**.
+2. Copy the **callback URL** shown by Mistle.
+3. In Google Cloud, open **Google Auth Platform > Clients**.
+4. Create an OAuth client with **Application type** set to **Web application**.
+5. Add the Mistle callback URL to **Authorized redirect URIs**.
+6. Create the client and copy its **Client ID** and **Client secret**.
+7. Return to Mistle, enter the client ID and client secret, and click **Connect Google Analytics**.
+8. Complete the Google consent flow with the Google account that should back the connection.
+
+## Connect Google Analytics To A Sandbox Profile
+
+After the Google Analytics connection is active:
+
+1. Open the sandbox profile that should use Google Analytics.
+2. Add the Google Analytics integration connection to the profile.
+3. In **Resources & Tools**, select the Google Analytics MCP server.
+4. Publish the profile version.
+
+Sessions using that published profile can inspect account summaries, properties, metadata, compatibility checks, reports, realtime reports, funnel reports, and Google Ads links through the read-only Google Analytics MCP tools.
+
+## Access Boundary
+
+The OAuth scope lets Mistle read Google Analytics data that the connected Google user can already access. It does not grant write access to Analytics configuration, Measurement Protocol ingestion, or Google Ads management.
+
+For least privilege, authorize Mistle with a Google account that has access only to the Analytics accounts and properties agents should inspect.
+
+## Official References
+
+- [Google Analytics Admin API](https://developers.google.com/analytics/devguides/config/admin/v1)
+- [Google Analytics Data API](https://developers.google.com/analytics/devguides/reporting/data/v1)
+- [Google Analytics API scopes](https://developers.google.com/analytics/devguides/config/admin/v1/authorization)
+- [OAuth 2.0 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server)

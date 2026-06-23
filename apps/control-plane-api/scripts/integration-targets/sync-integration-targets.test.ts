@@ -101,6 +101,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "google-analytics-mcp",
+        familyId: "google-analytics",
+        variantId: "google-analytics-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "google-workspace-mcp",
         familyId: "google-workspace",
         variantId: "google-workspace-mcp",

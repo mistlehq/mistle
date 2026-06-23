@@ -74,6 +74,11 @@
       "config": {}
     },
     {
+      "targetKey": "google-analytics-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "google-workspace-mcp",
       "enabled": true,
       "config": {}
