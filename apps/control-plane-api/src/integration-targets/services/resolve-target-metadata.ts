@@ -43,6 +43,8 @@ type ResolvedWebhookEventParameter =
       kind: "resource-select";
       resourceKind: string;
       payloadPath: string[];
+      matchMode?: "eq" | "contains" | "contains_token";
+      matchValuePrefix?: string;
       multiValue?: boolean;
       negatedMatchRequiresExists?: boolean;
       prefix?: string;

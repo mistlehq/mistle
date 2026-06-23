@@ -9,6 +9,13 @@ import type {
 import { createInvocationTokenParameter } from "../../../shared/invocation-token-parameter.js";
 import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
 
+type SlackMessageTypePayloadFilter = NonNullable<
+  Extract<
+    IntegrationWebhookEventParameterDefinition,
+    { kind: "enum-select" }
+  >["options"][number]["payloadFilter"]
+>;
+
 const SlackEventPayloadReference: IntegrationWebhookPayloadReference = {
   path: ["event"],
   description: "Slack event payload object.",
@@ -150,6 +157,21 @@ const SlackMessageTextParameter: IntegrationWebhookEventParameterDefinition = {
   placeholder: "deployment failed",
 };
 
+const SlackThreadReplyPayloadFilter: SlackMessageTypePayloadFilter = {
+  op: "and",
+  filters: [
+    {
+      op: "exists",
+      path: ["event", "thread_ts"],
+    },
+    {
+      op: "neq_path",
+      path: ["event", "thread_ts"],
+      otherPath: ["event", "ts"],
+    },
+  ],
+};
+
 const SlackMessageTypeParameter: IntegrationWebhookEventParameterDefinition = {
   id: "messageType",
   label: "message type",
@@ -163,39 +185,13 @@ const SlackMessageTypeParameter: IntegrationWebhookEventParameterDefinition = {
       label: "Channel or DM message",
       payloadFilter: {
         op: "not",
-        filter: {
-          op: "and",
-          filters: [
-            {
-              op: "exists",
-              path: ["event", "thread_ts"],
-            },
-            {
-              op: "neq_path",
-              path: ["event", "thread_ts"],
-              otherPath: ["event", "ts"],
-            },
-          ],
-        },
+        filter: SlackThreadReplyPayloadFilter,
       },
     },
     {
       value: "thread_reply",
       label: "Thread reply",
-      payloadFilter: {
-        op: "and",
-        filters: [
-          {
-            op: "exists",
-            path: ["event", "thread_ts"],
-          },
-          {
-            op: "neq_path",
-            path: ["event", "thread_ts"],
-            otherPath: ["event", "ts"],
-          },
-        ],
-      },
+      payloadFilter: SlackThreadReplyPayloadFilter,
     },
   ],
 };

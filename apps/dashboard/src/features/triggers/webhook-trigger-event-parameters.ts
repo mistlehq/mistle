@@ -39,6 +39,10 @@ type PayloadFilterNode =
       path: string[];
     };
 type PayloadFilterPathNode = Extract<PayloadFilterNode, { path: string[] }>;
+type EnumSelectPayloadFilterOption = Extract<
+  WebhookTriggerEventParameterOption,
+  { kind: "enum-select" }
+>["options"][number];
 
 function findEventOptionByTriggerId(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
@@ -93,7 +97,12 @@ function parseKnownPayloadFilterNode(value: unknown): PayloadFilterNode | null {
     };
   }
 
-  if (value["op"] === "eq" || value["op"] === "neq") {
+  if (
+    value["op"] === "eq" ||
+    value["op"] === "neq" ||
+    value["op"] === "contains" ||
+    value["op"] === "contains_token"
+  ) {
     if (!isStringArray(value["path"]) || typeof value["value"] !== "string") {
       return null;
     }
@@ -114,30 +123,6 @@ function parseKnownPayloadFilterNode(value: unknown): PayloadFilterNode | null {
       op: value["op"],
       path: value["path"],
       otherPath: value["otherPath"],
-    };
-  }
-
-  if (value["op"] === "contains") {
-    if (!isStringArray(value["path"]) || typeof value["value"] !== "string") {
-      return null;
-    }
-
-    return {
-      op: "contains",
-      path: value["path"],
-      value: value["value"],
-    };
-  }
-
-  if (value["op"] === "contains_token") {
-    if (!isStringArray(value["path"]) || typeof value["value"] !== "string") {
-      return null;
-    }
-
-    return {
-      op: "contains_token",
-      path: value["path"],
-      value: value["value"],
     };
   }
 
@@ -288,7 +273,7 @@ function clonePayloadFilterNode(filter: PayloadFilterNode): PayloadFilterNode {
     };
   }
 
-  throw new Error(`Unsupported payload filter op '${filter.op}'.`);
+  throw new Error("Unsupported payload filter op.");
 }
 
 function resolveOneOfGroupParameterIds(eventOption: WebhookTriggerEventOption): Set<string> {
@@ -705,6 +690,35 @@ function removeMatchingPayloadFilters(input: {
   };
 }
 
+function findMatchingPayloadFilterOption(input: {
+  options: readonly EnumSelectPayloadFilterOption[];
+  filters: readonly PayloadFilterNode[];
+}): {
+  option: EnumSelectPayloadFilterOption;
+  removeResult: ReturnType<typeof removeMatchingPayloadFilters>;
+} | null {
+  for (const option of input.options) {
+    const optionPayloadFilter =
+      option.payloadFilter === undefined ? null : parseKnownPayloadFilterNode(option.payloadFilter);
+    if (optionPayloadFilter === null) {
+      continue;
+    }
+
+    const removeResult = removeMatchingPayloadFilters({
+      filters: input.filters,
+      optionFilter: optionPayloadFilter,
+    });
+    if (removeResult.matched) {
+      return {
+        option,
+        removeResult,
+      };
+    }
+  }
+
+  return null;
+}
+
 function resolveResourceSelectMatchMode(
   parameter: Extract<WebhookTriggerEventParameterOption, { kind: "resource-select" }>,
 ): "eq" | "contains" | "contains_token" {
@@ -1098,7 +1112,6 @@ export function extractWebhookTriggerEventParameterRules(input: {
     }
 
     const remainingFilters: PayloadFilterNode[] = [];
-    const previousConditionRules = eventParameterRules[conditionId];
     const remainingRootFilters = [...rootFilters];
 
     for (const parameter of eventParameters) {
@@ -1106,47 +1119,24 @@ export function extractWebhookTriggerEventParameterRules(input: {
         continue;
       }
 
-      const selectedOption = parameter.options.find((option) => {
-        const optionPayloadFilter =
-          option.payloadFilter === undefined
-            ? null
-            : parseKnownPayloadFilterNode(option.payloadFilter);
-        if (optionPayloadFilter === null) {
-          return false;
-        }
-
-        return removeMatchingPayloadFilters({
-          filters: remainingRootFilters,
-          optionFilter: optionPayloadFilter,
-        }).matched;
-      });
-
-      if (selectedOption === undefined) {
-        continue;
-      }
-
-      const selectedPayloadFilter =
-        selectedOption.payloadFilter === undefined
-          ? null
-          : parseKnownPayloadFilterNode(selectedOption.payloadFilter);
-      if (selectedPayloadFilter === null) {
-        continue;
-      }
-
-      const removeResult = removeMatchingPayloadFilters({
+      const match = findMatchingPayloadFilterOption({
+        options: parameter.options,
         filters: remainingRootFilters,
-        optionFilter: selectedPayloadFilter,
       });
-      if (!removeResult.matched) {
+      if (match === null) {
         continue;
       }
 
-      remainingRootFilters.splice(0, remainingRootFilters.length, ...removeResult.remainingFilters);
+      remainingRootFilters.splice(
+        0,
+        remainingRootFilters.length,
+        ...match.removeResult.remainingFilters,
+      );
       eventParameterRules[conditionId] = {
         ...(eventParameterRules[conditionId] ?? {}),
         [parameter.id]: {
           operator: WebhookTriggerEventParameterRuleOperators.IS,
-          value: selectedOption.value,
+          value: match.option.value,
         },
       };
     }
@@ -1168,7 +1158,7 @@ export function extractWebhookTriggerEventParameterRules(input: {
       let extracted = false;
 
       const parameter = resolvePayloadFilterParameter({
-        parameters: eventOption.parameters ?? [],
+        parameters: eventParameters,
         filter,
       });
       if (parameter === undefined) {
@@ -1285,11 +1275,7 @@ export function extractWebhookTriggerEventParameterRules(input: {
     }
 
     if (rootComposition === "or" && remainingFilters.length > 0) {
-      if (previousConditionRules === undefined) {
-        delete eventParameterRules[conditionId];
-      } else {
-        eventParameterRules[conditionId] = previousConditionRules;
-      }
+      delete eventParameterRules[conditionId];
       remainingPayloadFilter[conditionId] = eventPayloadFilter;
       continue;
     }

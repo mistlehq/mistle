@@ -51,13 +51,6 @@ export function containsRule(value: string) {
   };
 }
 
-export function existsRule() {
-  return {
-    operator: WebhookTriggerEventParameterRuleOperators.EXISTS,
-    value: "exists",
-  };
-}
-
 export const StoryIssueCommentCreatedTriggerId = createWebhookTriggerEventId({
   webhookSourceId: StoryGitHubWebhookSourceId,
   eventType: "github.issue_comment.created",
