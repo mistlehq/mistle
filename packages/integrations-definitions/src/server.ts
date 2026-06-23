@@ -9,6 +9,7 @@ import {
 
 import { AgentMailDefinition } from "./agentmail/server.js";
 import { AnthropicDefinition } from "./anthropic/index.js";
+import { AutumnDefinition } from "./autumn/server.js";
 import { AwsDefinition } from "./aws/server.js";
 import { BugSnagDefinition } from "./bugsnag/server.js";
 import { CloudflareDefinition } from "./cloudflare/server.js";
@@ -55,6 +56,7 @@ import { ZaiDefinition } from "./zai/index.js";
 
 export * from "./agentmail/server.js";
 export * from "./anthropic/index.js";
+export * from "./autumn/server.js";
 export * from "./aws/server.js";
 export * from "./bugsnag/server.js";
 export * from "./cloudflare/server.js";
@@ -105,6 +107,7 @@ export * from "./shared/webhook-callback-url.server.js";
 const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   AgentMailDefinition,
   AnthropicDefinition,
+  AutumnDefinition,
   AwsDefinition,
   BugSnagDefinition,
   CloudflareDefinition,

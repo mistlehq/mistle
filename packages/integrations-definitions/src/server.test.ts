@@ -499,12 +499,13 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(41);
+    expect(definitions).toHaveLength(42);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
       expect.arrayContaining([
         "agentmail::agentmail-mcp",
+        "autumn::autumn-mcp",
         "bugsnag::bugsnag-mcp",
         "deepseek::deepseek-default",
         "expo::expo-mcp",

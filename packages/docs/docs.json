@@ -36,8 +36,9 @@
             "group": "Integrations",
             "pages": [
               "guides/agentmail-integration-setup",
-              "guides/aws-integration-setup",
               "guides/anthropic-integration-setup",
+              "guides/autumn-integration-setup",
+              "guides/aws-integration-setup",
               "guides/bugsnag-integration-setup",
               "guides/cloudflare-integration-setup",
               "guides/datadog-integration-setup",

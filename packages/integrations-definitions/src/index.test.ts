@@ -1300,12 +1300,13 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(41);
+    expect(definitions).toHaveLength(42);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
       "agentmail::agentmail-mcp",
       "anthropic::anthropic-default",
+      "autumn::autumn-mcp",
       "aws::aws-cli-default",
       "bugsnag::bugsnag-mcp",
       "cloudflare::cloudflare-mcp",
