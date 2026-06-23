@@ -109,6 +109,11 @@
       "config": {}
     },
     {
+      "targetKey": "metaads-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "minimax-default",
       "enabled": true,
       "config": {}

@@ -26,6 +26,7 @@ import { InceptionDefinition } from "./inception/index.js";
 import { JiraDefinition } from "./jira/index.js";
 import { KimiDefinition } from "./kimi/index.js";
 import { LinearDefinition } from "./linear/index.js";
+import { MetaAdsDefinition } from "./metaads/server.js";
 import { MiniMaxDefinition } from "./minimax/index.js";
 import { NotionDefinition } from "./notion/server.js";
 import { OpenAiApiKeyDefinition } from "./openai/index.js";
@@ -74,6 +75,7 @@ export * from "./github/shared/identity-linking.server.js";
 export * from "./inception/index.js";
 export * from "./kimi/index.js";
 export * from "./linear/index.js";
+export * from "./metaads/server.js";
 export * from "./minimax/index.js";
 export * from "./notion/server.js";
 export * from "./openai/index.js";
@@ -121,6 +123,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   GitHubCloudDefinition,
   GitHubEnterpriseServerDefinition,
   LinearDefinition,
+  MetaAdsDefinition,
   MiniMaxDefinition,
   NotionDefinition,
   OpenAiApiKeyDefinition,

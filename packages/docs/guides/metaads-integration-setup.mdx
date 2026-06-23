@@ -1,0 +1,70 @@
+---
+title: Meta Ads
+description: Connect Meta Ads to Mistle
+icon: /icons/integrations/metaads.svg
+---
+
+## Overview
+
+Connect Meta Ads by providing a Meta access token. Mistle uses the token to route the bundled Meta Ads CLI and MCP server through the Meta Marketing API.
+
+This integration is a thin wrapper around Meta's APIs. The token's Meta app, business, user, system-user, and ad-account permissions determine what agents can read or change. Mistle does not grant, inspect, or enforce Meta permissions beyond storing the token for the connection and routing tool traffic through managed egress.
+
+## Configuring Meta Access
+
+Before creating the connection, make sure:
+
+1. You have access to the Meta business, app, user, or system user that owns the token.
+2. The token is allowed to access the ad accounts and Marketing API operations you want agents to use.
+3. Write permissions are granted in Meta when agents should create, update, or delete Meta Ads resources.
+
+If Meta rejects a request because the token is missing access, Mistle surfaces the Meta API error to the agent.
+
+## Connect In Mistle
+
+Open **Integrations** in the dashboard, choose **Meta Ads**, then select **Access token**.
+
+Enter:
+
+| Field        | Value             |
+| ------------ | ----------------- |
+| Access token | Meta access token |
+
+## Using The Tools
+
+After the connection is added to a sandbox profile, agents can use:
+
+- the Meta Ads CLI for named commands and raw Graph API requests
+- the Meta Ads MCP server for discoverable tool calls
+
+The raw Graph API request command and tool are the complete API coverage surface. Named commands and tools provide progressive discovery for common Marketing API workflows such as ad accounts, campaigns, ad sets, ads, creatives, insights, and targeting search.
+
+## Self-Hosted Target Config
+
+Self-hosted deployments can enable `metaads-default` with an empty config:
+
+```json
+{
+  "targetKey": "metaads-default",
+  "enabled": true,
+  "config": {}
+}
+```
+
+By default, the integration uses Meta Graph API `v25.0`. Operators can set `graph_api_version` when a deployment must pin a different supported Meta Graph API version:
+
+```json
+{
+  "targetKey": "metaads-default",
+  "enabled": true,
+  "config": {
+    "graph_api_version": "v25.0"
+  }
+}
+```
+
+## Official References
+
+- [Meta Marketing APIs](https://developers.facebook.com/docs/marketing-apis/)
+- [Meta Graph API](https://developers.facebook.com/docs/graph-api/)
+- [Meta access tokens](https://developers.facebook.com/docs/facebook-login/guides/access-tokens/)

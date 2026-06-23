@@ -58,6 +58,7 @@ These targets only need to be enabled:
 - `jira-default`
 - `kimi-default`
 - `linear-default`
+- `metaads-default`
 - `minimax-default`
 - `modal-default`
 - `notion-mcp`
@@ -136,6 +137,22 @@ At this point, `github-enterprise-server` is only supported for self-hosted depl
 Use the `openai-default` block from `integration-targets.json` as your starting point. That block defines:
 
 - `api_base_url`
+
+### Meta Ads
+
+`metaads-default` can use an empty config. By default, it routes through Meta Graph API `v25.0`.
+
+Set `graph_api_version` only when your deployment needs to pin a different supported Meta Graph API version:
+
+```json
+{
+  "targetKey": "metaads-default",
+  "enabled": true,
+  "config": {
+    "graph_api_version": "v25.0"
+  }
+}
+```
 
 ### Agent And Sandbox Runtime Targets
 

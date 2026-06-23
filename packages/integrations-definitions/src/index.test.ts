@@ -73,6 +73,10 @@ describe("integrations-definitions index", () => {
       familyId: "minimax",
       variantId: "minimax-default",
     });
+    const metaAdsDefinition = registry.getDefinition({
+      familyId: "metaads",
+      variantId: "metaads-default",
+    });
     const zaiDefinition = registry.getDefinition({
       familyId: "zai",
       variantId: "zai-coding-plan",
@@ -440,6 +444,28 @@ describe("integrations-definitions index", () => {
       kind: "agent",
       displayName: "MiniMax",
       allowedRuntimeIds: ["opencode", "pi"],
+    });
+    expect(metaAdsDefinition).toMatchObject({
+      familyId: "metaads",
+      variantId: "metaads-default",
+      kind: "connector",
+      displayName: "Meta Ads",
+      logoKey: "metaads",
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "Access token",
+          kind: "form",
+          secretFields: [
+            {
+              name: "accessToken",
+              label: "Access token",
+              inputType: "password",
+              slotKey: "metaads.metaads-default.api-key.access-token",
+            },
+          ],
+        },
+      ],
     });
     expect(zaiDefinition).toMatchObject({
       familyId: "zai",
@@ -1300,7 +1326,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(41);
+    expect(definitions).toHaveLength(42);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -1322,6 +1348,7 @@ describe("integrations-definitions index", () => {
       "github::github-cloud",
       "github::github-enterprise-server",
       "linear::linear-default",
+      "metaads::metaads-default",
       "minimax::minimax-default",
       "notion::notion-mcp",
       "openai::openai-default",

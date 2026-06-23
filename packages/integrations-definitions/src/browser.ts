@@ -23,6 +23,7 @@ import { InceptionDefinition } from "./inception/index.js";
 import { JiraBaseDefinition } from "./jira/variants/jira-default/base-definition.js";
 import { KimiDefinition } from "./kimi/index.js";
 import { LinearBaseDefinition } from "./linear/variants/linear-default/base-definition.js";
+import { MetaAdsBaseDefinition } from "./metaads/variants/metaads-default/base-definition.js";
 import { MiniMaxDefinition } from "./minimax/index.js";
 import { NotionMcpBaseDefinition } from "./notion/variants/notion-mcp/base-definition.js";
 import { OpenAiApiKeyDefinition } from "./openai/variants/openai-default/definition.js";
@@ -67,6 +68,7 @@ export const InceptionBrowserDefinition = InceptionDefinition;
 export const JiraBrowserDefinition = JiraBaseDefinition;
 export const KimiBrowserDefinition = KimiDefinition;
 export const LinearBrowserDefinition = LinearBaseDefinition;
+export const MetaAdsBrowserDefinition = MetaAdsBaseDefinition;
 export const MiniMaxBrowserDefinition = MiniMaxDefinition;
 export const NotionBrowserDefinition = NotionMcpBaseDefinition;
 export const OpenCodeGoBrowserDefinition = OpenCodeGoDefinition;
@@ -109,6 +111,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   GitHubCloudBrowserDefinition,
   GitHubEnterpriseServerBrowserDefinition,
   LinearBrowserDefinition,
+  MetaAdsBrowserDefinition,
   MiniMaxBrowserDefinition,
   NotionBrowserDefinition,
   OpenAiApiKeyDefinition,
@@ -168,6 +171,7 @@ export * from "./inception/index.js";
 export * from "./jira/browser.js";
 export * from "./kimi/index.js";
 export * from "./linear/browser.js";
+export * from "./metaads/browser.js";
 export * from "./minimax/index.js";
 export * from "./notion/browser.js";
 export * from "./opencode/index.js";
