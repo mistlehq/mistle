@@ -111,7 +111,7 @@ describe.concurrent("designer sessions integration", () => {
       'Use `trigger` for user, provider, schedule, or system events such as "GitHub PR opened" or "Slack message received".',
     );
     expect(codexAgents?.content).toContain(
-      "Put provider/source details directly on trigger items with `integrationLabel` and `eventLabel` when known.",
+      "Put provider/source details directly on trigger items with `integrationTargetKey`, `integrationLabel`, and `eventLabel` when known.",
     );
     expect(codexAgents?.content).toContain(
       'For a request like "Build a triaging agent", the initial blueprint should read like a process',

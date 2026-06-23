@@ -950,6 +950,11 @@
                                               "type": "string",
                                               "enum": ["trigger"]
                                             },
+                                            "integrationTargetKey": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
                                             "integrationLabel": {
                                               "type": "string",
                                               "minLength": 1,
@@ -1582,6 +1587,11 @@
                                                   "kind": {
                                                     "type": "string",
                                                     "enum": ["trigger"]
+                                                  },
+                                                  "integrationTargetKey": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 128
                                                   },
                                                   "integrationLabel": {
                                                     "type": "string",
@@ -2368,6 +2378,11 @@
                                               "type": "string",
                                               "enum": ["trigger"]
                                             },
+                                            "integrationTargetKey": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
                                             "integrationLabel": {
                                               "type": "string",
                                               "minLength": 1,
@@ -2888,6 +2903,11 @@
                                             "type": "string",
                                             "enum": ["trigger"]
                                           },
+                                          "integrationTargetKey": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
                                           "integrationLabel": {
                                             "type": "string",
                                             "minLength": 1,
@@ -3377,6 +3397,11 @@
                                             "kind": {
                                               "type": "string",
                                               "enum": ["trigger"]
+                                            },
+                                            "integrationTargetKey": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
                                             },
                                             "integrationLabel": {
                                               "type": "string",
@@ -3988,6 +4013,11 @@
                                               "type": "string",
                                               "enum": ["trigger"]
                                             },
+                                            "integrationTargetKey": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
                                             "integrationLabel": {
                                               "type": "string",
                                               "minLength": 1,
@@ -4508,6 +4538,11 @@
                                             "type": "string",
                                             "enum": ["trigger"]
                                           },
+                                          "integrationTargetKey": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
                                           "integrationLabel": {
                                             "type": "string",
                                             "minLength": 1,
@@ -4997,6 +5032,11 @@
                                             "kind": {
                                               "type": "string",
                                               "enum": ["trigger"]
+                                            },
+                                            "integrationTargetKey": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
                                             },
                                             "integrationLabel": {
                                               "type": "string",

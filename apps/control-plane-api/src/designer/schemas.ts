@@ -54,6 +54,7 @@ const designerBlueprintRoutingPolicyItemSchema = designerBlueprintCommonItemSche
 const designerBlueprintTriggerItemSchema = designerBlueprintCommonItemSchema
   .extend({
     kind: z.literal("trigger"),
+    integrationTargetKey: z.string().min(1).max(128).optional(),
     integrationLabel: z.string().min(1).max(80).optional(),
     eventLabel: z.string().min(1).max(160).optional(),
   })

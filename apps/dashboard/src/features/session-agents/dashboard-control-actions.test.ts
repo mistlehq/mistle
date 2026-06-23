@@ -56,6 +56,10 @@ describe("dashboard control actions", () => {
                                 kind: {
                                   enum: ["trigger"],
                                 },
+                                integrationTargetKey: {
+                                  description:
+                                    "Stable Mistle integration target key, such as slack-default or github-cloud. Use only when the trigger source maps to a selected or known integration target.",
+                                },
                                 integrationLabel: {
                                   description:
                                     "Provider or integration label shown on the trigger, such as GitHub or Slack.",
@@ -166,6 +170,7 @@ describe("dashboard control actions", () => {
           id: "issue-opened",
           kind: "trigger",
           label: "GitHub issue trigger",
+          integrationTargetKey: "github-cloud",
           integrationLabel: "GitHub",
           eventLabel: "Issue opened",
           state: "proposed",

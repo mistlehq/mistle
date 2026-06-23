@@ -205,12 +205,19 @@ const DesignerBlueprintTriggerItemJsonSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Workflow-start trigger item. Use this for provider, schedule, or system events that start or advance the workflow; include integrationLabel and eventLabel when known.",
+    "Workflow-start trigger item. Use this for provider, schedule, or system events that start or advance the workflow; include integrationTargetKey when a real Mistle integration target is selected or known, and include integrationLabel and eventLabel when known.",
   properties: {
     ...DesignerBlueprintCommonItemJsonSchemaProperties,
     kind: {
       type: "string",
       enum: ["trigger"],
+    },
+    integrationTargetKey: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+      description:
+        "Stable Mistle integration target key, such as slack-default or github-cloud. Use only when the trigger source maps to a selected or known integration target.",
     },
     integrationLabel: {
       type: "string",

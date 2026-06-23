@@ -1083,6 +1083,7 @@ export interface paths {
                             eventLabel?: string;
                             id: string;
                             integrationLabel?: string;
+                            integrationTargetKey?: string;
                             /** @enum {string} */
                             kind: "trigger";
                             label: string;
@@ -1320,6 +1321,7 @@ export interface paths {
                           eventLabel?: string;
                           id: string;
                           integrationLabel?: string;
+                          integrationTargetKey?: string;
                           /** @enum {string} */
                           kind: "trigger";
                           label: string;
@@ -1451,6 +1453,7 @@ export interface paths {
                             eventLabel?: string;
                             id: string;
                             integrationLabel?: string;
+                            integrationTargetKey?: string;
                             /** @enum {string} */
                             kind: "trigger";
                             label: string;
@@ -1693,6 +1696,7 @@ export interface paths {
                               eventLabel?: string;
                               id: string;
                               integrationLabel?: string;
+                              integrationTargetKey?: string;
                               /** @enum {string} */
                               kind: "trigger";
                               label: string;
@@ -1914,6 +1918,7 @@ export interface paths {
                             eventLabel?: string;
                             id: string;
                             integrationLabel?: string;
+                            integrationTargetKey?: string;
                             /** @enum {string} */
                             kind: "trigger";
                             label: string;
@@ -2160,6 +2165,7 @@ export interface paths {
                             eventLabel?: string;
                             id: string;
                             integrationLabel?: string;
+                            integrationTargetKey?: string;
                             /** @enum {string} */
                             kind: "trigger";
                             label: string;
@@ -2397,6 +2403,7 @@ export interface paths {
                           eventLabel?: string;
                           id: string;
                           integrationLabel?: string;
+                          integrationTargetKey?: string;
                           /** @enum {string} */
                           kind: "trigger";
                           label: string;
@@ -2528,6 +2535,7 @@ export interface paths {
                             eventLabel?: string;
                             id: string;
                             integrationLabel?: string;
+                            integrationTargetKey?: string;
                             /** @enum {string} */
                             kind: "trigger";
                             label: string;

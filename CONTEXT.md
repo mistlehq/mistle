@@ -89,7 +89,11 @@ _Avoid_: Step, setup task
 **Designer blueprint trigger**:
 A trigger represented in a **Designer blueprint** that starts or advances the proposed workflow.
 _Avoid_: Workflow event when the concept is the same as the trigger that starts the workflow
-_Properties_: May include an integration label and event label when known
+_Properties_: May include a **Designer blueprint integration target**, integration label, and event label when known
+
+**Designer blueprint integration target**:
+The stable integration target identity attached to a **Designer blueprint trigger** when the proposed trigger source maps to a real Mistle integration target.
+_Avoid_: Integration label when the value must resolve product metadata such as the integration logo
 
 **Designer blueprint agent step**:
 An agent-performed unit of work represented in a **Designer blueprint**.
@@ -730,6 +734,8 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A first-pass **Designer blueprint** renderer is visual-only and read-only, with pan and zoom but without visible action buttons, node dragging, or graph editing.
 - A **Designer blueprint** is organized process-first: it shows **Designer blueprint triggers**, **Designer blueprint agent steps**, and **Designer blueprint workflow outputs** as the main workflow.
 - Trigger source details such as the integration/provider and event should be shown on the trigger item when known.
+- A **Designer blueprint integration target** uses the same stable target key as an **Integration target** and may be used by the dashboard to resolve product metadata such as the integration logo.
+- **Integration labels** in **Designer blueprint triggers** are display text and should not be used as product identity.
 - A **Designer blueprint** supports only workflow item kinds: trigger, agent step, routing policy, and workflow output.
 - Product resources such as integrations, provider resources, sandbox profiles, sandbox profile changes, and confirmations are not **Designer blueprint** item kinds. Those decisions belong in chat or later setup-focused canvas tabs after the user aligns on the workflow.
 - A **Designer blueprint** may represent multiple triggers entering the same workflow.

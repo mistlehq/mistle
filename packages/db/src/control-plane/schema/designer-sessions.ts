@@ -41,6 +41,7 @@ export type DesignerBlueprintTriggerItem = {
   description?: string | undefined;
   parentId?: string | undefined;
   state: DesignerBlueprintItemState;
+  integrationTargetKey?: string | undefined;
   integrationLabel?: string | undefined;
   eventLabel?: string | undefined;
 };

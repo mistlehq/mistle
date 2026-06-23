@@ -10,6 +10,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { ResolvedAppearanceProvider } from "../appearance/appearance-provider.js";
 import { DesignerBlueprintCurrentTabHref } from "../designer/designer-blueprint-schema.js";
+import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { DesignerCanvasWorkspace } from "./designer-session-page-view.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
@@ -161,6 +162,27 @@ describe("DesignerCanvasWorkspace", () => {
   it("renders blueprint tabs as a visual-only React Flow graph", async () => {
     renderDesignerCanvasWorkspace({
       activeTabHref: DesignerBlueprintCurrentTabHref,
+      configureQueryClient: (queryClient) => {
+        queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+          targets: [
+            {
+              targetKey: "github-cloud",
+              familyId: "github",
+              variantId: "github-cloud",
+              kind: "git",
+              enabled: true,
+              config: {},
+              displayName: "GitHub",
+              description: "Connect GitHub.",
+              logoKey: "github",
+              targetHealth: {
+                configStatus: "valid",
+              },
+            },
+          ],
+          connections: [],
+        });
+      },
       tabs: [
         {
           kind: "blueprint",
@@ -178,6 +200,7 @@ describe("DesignerCanvasWorkspace", () => {
                 id: "issue-opened",
                 kind: "trigger",
                 label: "GitHub issue trigger",
+                integrationTargetKey: "github-cloud",
                 integrationLabel: "GitHub",
                 eventLabel: "Issue opened",
                 state: "proposed",
@@ -224,6 +247,11 @@ describe("DesignerCanvasWorkspace", () => {
 
     expect(await screen.findByText("Issue opened")).toBeDefined();
     expect(screen.getByLabelText("GitHub · Trigger")).toBeDefined();
+    await waitFor(() => {
+      expect(
+        document.querySelector(`img[src="${resolveIntegrationLogoPath({ logoKey: "github" })}"]`),
+      ).toBeDefined();
+    });
     expect(await screen.findByText("Classify issue")).toBeDefined();
     expect(await screen.findByText("Triage summary")).toBeDefined();
     expect(screen.getByRole("region", { name: "Designer blueprint graph" })).toBeDefined();
