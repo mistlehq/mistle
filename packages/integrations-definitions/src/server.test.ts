@@ -92,6 +92,10 @@ describe("integrations-definitions server", () => {
       familyId: "linear",
       variantId: "linear-default",
     });
+    const metaAdsDefinition = registry.getDefinition({
+      familyId: "metaads",
+      variantId: "metaads-default",
+    });
     const notionDefinition = registry.getDefinition({
       familyId: "notion",
       variantId: "notion-mcp",
@@ -317,6 +321,9 @@ describe("integrations-definitions server", () => {
     expect(datadogDefinition?.webhookHandler).toBeUndefined();
     expect(datadogDefinition?.webhookSource).toBeUndefined();
     expect(datadogDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(metaAdsDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(metaAdsDefinition?.webhookHandler).toBeUndefined();
+    expect(metaAdsDefinition?.webhookSource).toBeUndefined();
     expect(expoDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(expoDefinition?.webhookHandler).toBeUndefined();
     expect(expoDefinition?.webhookSource).toBeUndefined();
@@ -514,6 +521,7 @@ describe("integrations-definitions server", () => {
         "google-workspace::google-workspace-mcp",
         "inception::inception-default",
         "kimi::kimi-default",
+        "metaads::metaads-default",
         "minimax::minimax-default",
         "notion::notion-mcp",
         "openrouter::openrouter-default",

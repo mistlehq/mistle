@@ -23,6 +23,7 @@ import { InceptionDefinition } from "./inception/index.js";
 import { JiraDefinition } from "./jira/browser.js";
 import { KimiDefinition } from "./kimi/index.js";
 import { LinearBaseDefinition } from "./linear/variants/linear-default/base-definition.js";
+import { MetaAdsDefinition } from "./metaads/browser.js";
 import { MiniMaxDefinition } from "./minimax/index.js";
 import { NotionDefinition } from "./notion/browser.js";
 import { OpenAiApiKeyDefinition } from "./openai/index.js";
@@ -69,6 +70,7 @@ export * from "./github/browser.js";
 export * from "./inception/index.js";
 export * from "./kimi/index.js";
 export * from "./linear/browser.js";
+export * from "./metaads/browser.js";
 export * from "./minimax/index.js";
 export * from "./notion/browser.js";
 export * from "./openai/index.js";
@@ -114,6 +116,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   GitHubCloudDefinition,
   GitHubEnterpriseServerDefinition,
   LinearBaseDefinition,
+  MetaAdsDefinition,
   MiniMaxDefinition,
   NotionDefinition,
   OpenAiApiKeyDefinition,

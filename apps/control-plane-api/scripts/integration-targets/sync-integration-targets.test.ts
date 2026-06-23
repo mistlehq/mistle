@@ -150,6 +150,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "metaads-default",
+        familyId: "metaads",
+        variantId: "metaads-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "minimax-default",
         familyId: "minimax",
         variantId: "minimax-default",
