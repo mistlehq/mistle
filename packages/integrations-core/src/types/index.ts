@@ -2504,6 +2504,8 @@ export type IntegrationWebhookEventParameterDefinition =
       kind: "resource-select";
       resourceKind: string;
       payloadPath: ReadonlyArray<string>;
+      matchMode?: "eq" | "contains" | "contains_token" | undefined;
+      matchValuePrefix?: string | undefined;
       multiValue?: boolean | undefined;
       negatedMatchRequiresExists?: boolean | undefined;
       prefix?: string | undefined;

@@ -105,11 +105,39 @@ const SlackChannelParameter: IntegrationWebhookEventParameterDefinition = {
 
 const SlackMessageSenderParameter: IntegrationWebhookEventParameterDefinition = {
   id: "sender",
-  label: "sender user ID",
-  kind: "string",
+  label: "sender",
+  kind: "resource-select",
+  resourceKind: "user",
   payloadPath: ["event", "user"],
+  multiValue: true,
   prefix: "from",
-  placeholder: "U1234567890",
+  placeholder: "Any sender",
+};
+
+const SlackUserMentionParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "userMention",
+  label: "user mention",
+  kind: "resource-select",
+  resourceKind: "user",
+  payloadPath: ["event", "text"],
+  matchMode: "contains_token",
+  matchValuePrefix: "<@",
+  multiValue: true,
+  prefix: "mentioning user",
+  placeholder: "Any mentioned user",
+};
+
+const SlackUserGroupMentionParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "userGroupMention",
+  label: "user group mention",
+  kind: "resource-select",
+  resourceKind: "user_group",
+  payloadPath: ["event", "text"],
+  matchMode: "contains_token",
+  matchValuePrefix: "<!subteam^",
+  multiValue: true,
+  prefix: "mentioning group",
+  placeholder: "Any user group",
 };
 
 const SlackMessageTextParameter: IntegrationWebhookEventParameterDefinition = {
@@ -151,20 +179,24 @@ const SlackReactionNameParameter: IntegrationWebhookEventParameterDefinition = {
 
 const SlackReactionActorParameter: IntegrationWebhookEventParameterDefinition = {
   id: "reactingUser",
-  label: "reacting user ID",
-  kind: "string",
+  label: "reacting user",
+  kind: "resource-select",
+  resourceKind: "user",
   payloadPath: ["event", "user"],
+  multiValue: true,
   prefix: "by",
-  placeholder: "U1234567890",
+  placeholder: "Any reacting user",
 };
 
 const SlackReactedMessageAuthorParameter: IntegrationWebhookEventParameterDefinition = {
   id: "reactedMessageAuthor",
-  label: "message author user ID",
-  kind: "string",
+  label: "message author",
+  kind: "resource-select",
+  resourceKind: "user",
   payloadPath: ["event", "item_user"],
+  multiValue: true,
   prefix: "on message by",
-  placeholder: "U1234567890",
+  placeholder: "Any message author",
   negatedMatchRequiresExists: true,
 };
 
@@ -256,6 +288,8 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
       createSlackInvocationTokenParameter(),
       SlackChannelParameter,
       SlackMessageSenderParameter,
+      SlackUserMentionParameter,
+      SlackUserGroupMentionParameter,
       SlackMessageTextParameter,
       SlackThreadReplyParameter,
     ],
@@ -271,7 +305,12 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     ),
     payloadReferences: SlackMessagePayloadReferences,
     conversationKeyOptions: [SlackChannelConversationKeyOption, SlackThreadConversationKeyOption],
-    parameters: [createSlackInvocationTokenParameter(), SlackChannelParameter],
+    parameters: [
+      createSlackInvocationTokenParameter(),
+      SlackChannelParameter,
+      SlackUserMentionParameter,
+      SlackUserGroupMentionParameter,
+    ],
   }),
   createSlackWebhookEventDefinition({
     eventType: "slack:reaction_added",

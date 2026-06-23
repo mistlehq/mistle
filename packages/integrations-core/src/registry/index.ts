@@ -18,7 +18,7 @@ function isEqualityStyleWebhookEventParameter(
   parameter: IntegrationWebhookEventParameterDefinition,
 ): boolean {
   if (parameter.kind === "resource-select") {
-    return true;
+    return parameter.matchMode === undefined || parameter.matchMode === "eq";
   }
 
   if (parameter.kind === "string") {

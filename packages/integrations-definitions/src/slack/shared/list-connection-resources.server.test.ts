@@ -242,4 +242,246 @@ describe("listSlackConnectionResources", () => {
       await server.stop();
     }
   });
+
+  it("lists active Slack users, includes bots, excludes deleted users, and paginates", async () => {
+    const seenUrls: string[] = [];
+    const server = await startTestServer({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        seenUrls.push(requestUrl.toString());
+        const cursor = requestUrl.searchParams.get("cursor");
+        response.setHeader("content-type", "application/json");
+
+        // Grounded in Slack's documented users.list response shape:
+        // https://docs.slack.dev/reference/methods/users.list/
+        if (cursor === null) {
+          response.end(
+            JSON.stringify({
+              ok: true,
+              members: [
+                {
+                  id: "U_HUMAN",
+                  team_id: "T123",
+                  name: "casey",
+                  real_name: "Casey Low",
+                  deleted: false,
+                  is_bot: false,
+                  is_app_user: false,
+                  profile: {
+                    display_name: "Casey",
+                    real_name: "Casey Low",
+                    image_48: "https://example.invalid/casey.png",
+                  },
+                },
+                {
+                  id: "U_DELETED",
+                  name: "deleted-user",
+                  deleted: true,
+                },
+              ],
+              response_metadata: {
+                next_cursor: "users-cursor-2",
+              },
+            }),
+          );
+          return;
+        }
+
+        response.end(
+          JSON.stringify({
+            ok: true,
+            members: [
+              {
+                id: "U_BOT",
+                name: "deploybot",
+                deleted: false,
+                is_bot: true,
+                is_app_user: true,
+                is_workflow_bot: false,
+                profile: {
+                  real_name: "Deploy Bot",
+                },
+              },
+            ],
+            response_metadata: {
+              next_cursor: "",
+            },
+          }),
+        );
+      },
+    });
+
+    try {
+      const result = await listSlackConnectionResources({
+        organizationId: "org_test",
+        targetKey: "slack-default-test",
+        target: {
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            apiBaseUrl: `${server.baseUrl}/api`,
+          },
+          secrets: {},
+        },
+        connection: {
+          id: "icn_slack",
+          status: "active",
+          config: {
+            connection_method: "slack-bot-token",
+          },
+        },
+        kind: "user",
+        credential: {
+          kind: "value",
+          value: "xoxb-test-token",
+        },
+      });
+
+      expect(seenUrls).toEqual([
+        "http://127.0.0.1/api/users.list",
+        "http://127.0.0.1/api/users.list?cursor=users-cursor-2",
+      ]);
+      expect(result).toEqual({
+        resources: [
+          {
+            externalId: "U_HUMAN",
+            handle: "U_HUMAN",
+            displayName: "Casey",
+            metadata: {
+              name: "casey",
+              realName: "Casey Low",
+              profileDisplayName: "Casey",
+              profileRealName: "Casey Low",
+              image48: "https://example.invalid/casey.png",
+              teamId: "T123",
+              deleted: false,
+              isBot: false,
+              isAppUser: false,
+              isWorkflowBot: false,
+            },
+          },
+          {
+            externalId: "U_BOT",
+            handle: "U_BOT",
+            displayName: "Deploy Bot",
+            metadata: {
+              name: "deploybot",
+              profileRealName: "Deploy Bot",
+              deleted: false,
+              isBot: true,
+              isAppUser: true,
+              isWorkflowBot: false,
+            },
+          },
+        ],
+      });
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("lists active Slack user groups without requesting membership lists", async () => {
+    const seenUrls: string[] = [];
+    const server = await startTestServer({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        seenUrls.push(requestUrl.toString());
+        response.setHeader("content-type", "application/json");
+
+        // Grounded in Slack's documented usergroups.list response shape:
+        // https://docs.slack.dev/reference/methods/usergroups.list/
+        response.end(
+          JSON.stringify({
+            ok: true,
+            usergroups: [
+              {
+                id: "S_ENG",
+                team_id: "T123",
+                is_usergroup: true,
+                name: "Engineering",
+                description: "Engineering team",
+                handle: "eng",
+                is_external: false,
+                date_delete: 0,
+                user_count: "12",
+              },
+              {
+                id: "S_DISABLED",
+                is_usergroup: true,
+                name: "Disabled Group",
+                handle: "old-team",
+                date_delete: 1_710_000_000,
+              },
+            ],
+          }),
+        );
+      },
+    });
+
+    try {
+      const result = await listSlackConnectionResources({
+        organizationId: "org_test",
+        targetKey: "slack-default-test",
+        target: {
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            apiBaseUrl: `${server.baseUrl}/api`,
+          },
+          secrets: {},
+        },
+        connection: {
+          id: "icn_slack",
+          status: "active",
+          config: {
+            connection_method: "slack-bot-token",
+          },
+        },
+        kind: "user_group",
+        credential: {
+          kind: "value",
+          value: "xoxb-test-token",
+        },
+      });
+
+      expect(seenUrls).toEqual([
+        "http://127.0.0.1/api/usergroups.list?include_disabled=false&include_users=false",
+      ]);
+      expect(result).toEqual({
+        resources: [
+          {
+            externalId: "S_ENG",
+            handle: "S_ENG",
+            displayName: "@eng",
+            metadata: {
+              handle: "eng",
+              name: "Engineering",
+              description: "Engineering team",
+              teamId: "T123",
+              userCount: "12",
+              isUserGroup: true,
+              isExternal: false,
+              dateDelete: 0,
+            },
+          },
+        ],
+      });
+    } finally {
+      await server.stop();
+    }
+  });
 });

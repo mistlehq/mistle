@@ -285,6 +285,22 @@ _Avoid_: Slack channel, Slack message when the intended routing scope is the ful
 A **Multi-value trigger event parameter** that matches the Slack channel carrying a Slack **Trigger event**.
 _Avoid_: App mention channel when the parameter applies to Slack events beyond app mentions
 
+**Slack user trigger parameter**:
+A **Trigger event parameter** that matches a Slack user ID carried by a Slack **Trigger event**.
+_Avoid_: Human user filter when the matching identity may be a bot, linked user when the identity is not tied to a Mistle user
+
+**Slack user group**:
+A Slack identity group that can be mentioned in Slack message text.
+_Avoid_: Slack user group handle when stable identity is required, Slack user membership group when matching does not depend on membership, Slack channel
+
+**Slack user group mention trigger parameter**:
+A **Trigger event parameter** that matches an explicit Slack user group mention carried by a Slack message-like **Trigger event**.
+_Avoid_: Slack user group membership filter, team membership filter
+
+**Slack user**:
+A Slack identity that can appear in Slack user-ID event fields, whether human, app bot, workflow bot, or Slack-owned special user.
+_Avoid_: Linked user when the identity is not tied to a Mistle user, human when the identity may be automated
+
 **Routable provider resource key**:
 The provider-derived identity used to match provider events to a **Routable provider resource**.
 _Avoid_: Conversation key, group key
@@ -794,6 +810,14 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **GitHub team review target** matches GitHub's team slug in the provider event payload, not an organization-qualified team identity.
 - A **GitHub team review target** can be discovered only from a GitHub organization that owns accessible repositories.
 - A **Trigger event** for a removed provider review request delivers cancellation intent into the **Trigger conversation**; it does not imply hard runtime cancellation.
+- A **Slack user** may represent a human or bot identity.
+- A **Slack user trigger parameter** uses synced **Slack users** as selectable values.
+- A **Slack user group mention trigger parameter** matches a mention in event text, not membership of the acting **Slack user**.
+- A **Slack user group mention trigger parameter** belongs to message-like Slack **Trigger events**, not reaction **Trigger events**.
+- A **Slack user group** is matched by its Slack user group ID rather than its visible handle.
+- A synced **Slack user group** does not imply synced group membership.
+- Fresh **Slack user** and **Slack user group** selections should represent active provider identities.
+- Slack user group membership changes do not change synced **Slack user group** identity selections.
 - A **Trigger event parameter** may have one or more **Trigger event parameter rules**.
 - A **Trigger event parameter** may require existence when applying a negated **Trigger event parameter rule**.
 - A **Trigger event parameter rule** may include or exclude matching provider event values.

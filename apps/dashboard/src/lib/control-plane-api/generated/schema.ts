@@ -5441,6 +5441,9 @@ export interface paths {
                         /** @enum {string} */
                         kind: "resource-select";
                         label: string;
+                        /** @enum {string} */
+                        matchMode?: "eq" | "contains" | "contains_token";
+                        matchValuePrefix?: string;
                         multiValue?: boolean;
                         negatedMatchRequiresExists?: boolean;
                         payloadPath: string[];
@@ -5509,6 +5512,9 @@ export interface paths {
                         /** @enum {string} */
                         kind: "resource-select";
                         label: string;
+                        /** @enum {string} */
+                        matchMode?: "eq" | "contains" | "contains_token";
+                        matchValuePrefix?: string;
                         multiValue?: boolean;
                         negatedMatchRequiresExists?: boolean;
                         payloadPath: string[];

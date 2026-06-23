@@ -8,6 +8,7 @@ export const SlackAppManifestBotScopes = [
   "groups:history",
   "groups:read",
   "reactions:read",
+  "usergroups:read",
   "users:read",
 ] satisfies readonly string[];
 
@@ -21,6 +22,10 @@ export const SlackAppManifestBotEvents = [
   "message.groups",
   "reaction_added",
   "reaction_removed",
+  "subteam_created",
+  "subteam_updated",
+  "team_join",
+  "user_change",
 ] satisfies readonly string[];
 
 export const SlackAppManifestTemplate = {

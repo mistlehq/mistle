@@ -601,6 +601,10 @@ function cloneStoryAssociatedResourceEventParameter(
         kind: parameter.kind,
         resourceKind: parameter.resourceKind,
         payloadPath: [...parameter.payloadPath],
+        ...(parameter.matchMode === undefined ? {} : { matchMode: parameter.matchMode }),
+        ...(parameter.matchValuePrefix === undefined
+          ? {}
+          : { matchValuePrefix: parameter.matchValuePrefix }),
         ...(parameter.negatedMatchRequiresExists === undefined
           ? {}
           : { negatedMatchRequiresExists: parameter.negatedMatchRequiresExists }),

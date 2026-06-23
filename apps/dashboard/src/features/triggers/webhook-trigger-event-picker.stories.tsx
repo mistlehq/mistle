@@ -435,9 +435,28 @@ export const SlackMessageFilters: Story = {
     eventParameterRules: {
       [StorySlackMessageConditionId]: {
         channel: isAnyOfRule(["C_ALERTS_001", "C_ENG_001"]),
-        sender: isRule("U1234567890"),
+        sender: isAnyOfRule(["U1234567890", "U9999999999"]),
+        userMention: isAnyOfRule(["U5555555555"]),
+        userGroupMention: isAnyOfRule(["S_ENG", "S_SUPPORT"]),
         messageText: containsRule("deployment failed"),
         threadReply: existsRule(),
+      },
+    },
+    eventOptions: StorySlackEventOptions,
+  },
+};
+
+export const SlackAppMentionUserGroupMention: Story = {
+  name: "Slack app mention user group mention",
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: StorySlackConnectionId,
+    selectedEventIds: [StorySlackAppMentionConditionId],
+    eventParameterRules: {
+      [StorySlackAppMentionConditionId]: {
+        channel: isAnyOfRule(["C_ALERTS_001"]),
+        userMention: isRule("U5555555555"),
+        userGroupMention: isRule("S_ENG"),
       },
     },
     eventOptions: StorySlackEventOptions,
@@ -459,6 +478,7 @@ export const SlackReactionFilters: Story = {
       [StorySlackReactionRemovedConditionId]: {
         channel: isAnyOfRule(["C_ENG_001"]),
         reaction: isRule("eyes"),
+        reactingUser: isRule("U9999999999"),
       },
     },
     eventOptions: StorySlackEventOptions,

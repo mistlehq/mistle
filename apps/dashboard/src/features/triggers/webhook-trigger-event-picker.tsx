@@ -796,23 +796,29 @@ function OneOfParameterGroupField(input: {
           ))}
         </SelectContent>
       </Select>
-      <EqualityOperatorSelect
-        disabled={input.disabled}
-        includePrefix={false}
-        parameter={selectedParameter}
-        value={resolveEqualityOperator(selectedRule)}
-        onValueChange={(operator) => {
-          input.onRuleChange(selectedParameter.id, {
-            operator,
-            value: selectedValue,
-            ...(selectedParameter.kind === "resource-select" &&
-            selectedParameter.multiValue === true &&
-            selectedRule?.values !== undefined
-              ? { values: selectedRule.values }
-              : {}),
-          });
-        }}
-      />
+      {isEqualityParameter(selectedParameter) ? (
+        <EqualityOperatorSelect
+          disabled={input.disabled}
+          includePrefix={false}
+          parameter={selectedParameter}
+          value={resolveEqualityOperator(selectedRule)}
+          onValueChange={(operator) => {
+            input.onRuleChange(selectedParameter.id, {
+              operator,
+              value: selectedValue,
+              ...(selectedParameter.kind === "resource-select" &&
+              selectedParameter.multiValue === true &&
+              selectedRule?.values !== undefined
+                ? { values: selectedRule.values }
+                : {}),
+            });
+          }}
+        />
+      ) : (
+        <span className="text-muted-foreground w-36 shrink-0 text-sm">
+          {selectedParameter.prefix ?? selectedParameter.label}
+        </span>
+      )}
       {selectedParameter.kind === "resource-select" ? (
         <div className={`${EventParameterControlClassName} space-y-1.5`}>
           {selectedParameter.multiValue === true ? (
@@ -1083,6 +1089,7 @@ function EventParameterField(input: {
         resourceQueryIsPending={resources.resourceQuery.isPending}
         syncState={resources.resourceQuery.data?.syncState}
         unavailableSelectedValues={resources.unavailableSelectedValues}
+        showOperator={isEqualityParameter(input.parameter)}
       />
     );
   }
@@ -1183,7 +1190,11 @@ function ResourceMultiSelectParameterField(input: {
             });
           }}
         />
-      ) : null}
+      ) : (
+        <span className={EventParameterLabelClassName}>
+          {input.parameter.prefix ?? input.parameter.label}
+        </span>
+      )}
       <div className={EventParameterControlClassName}>
         <IntegrationConnectionResourcePickerView
           density="compact"
@@ -1265,7 +1276,8 @@ function isEqualityParameter(
   parameter: NonNullable<WebhookTriggerEventOption["parameters"]>[number],
 ): boolean {
   return (
-    parameter.kind === "resource-select" ||
+    (parameter.kind === "resource-select" &&
+      (parameter.matchMode === undefined || parameter.matchMode === "eq")) ||
     (parameter.kind === "string" &&
       (parameter.matchMode === undefined || parameter.matchMode === "eq")) ||
     (parameter.kind === "enum-select" && parameter.matchMode === "eq")

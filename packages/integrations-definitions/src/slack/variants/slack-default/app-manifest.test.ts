@@ -45,6 +45,10 @@ describe("SlackAppManifestTemplate", () => {
             "message.groups",
             "reaction_added",
             "reaction_removed",
+            "subteam_created",
+            "subteam_updated",
+            "team_join",
+            "user_change",
           ],
         },
         interactivity: {
@@ -68,6 +72,7 @@ describe("SlackAppManifestTemplate", () => {
             "groups:history",
             "groups:read",
             "reactions:read",
+            "usergroups:read",
             "users:read",
           ],
         },
@@ -82,6 +87,10 @@ describe("SlackAppManifestTemplate", () => {
       "channel_created",
       "channel_rename",
       "group_rename",
+      "subteam_created",
+      "subteam_updated",
+      "team_join",
+      "user_change",
     ];
 
     expect(botEvents).toEqual(expect.arrayContaining(eventsApiResourceSyncEvents));
@@ -127,6 +136,10 @@ describe("buildSlackAppManifest", () => {
             "message.groups",
             "reaction_added",
             "reaction_removed",
+            "subteam_created",
+            "subteam_updated",
+            "team_join",
+            "user_change",
           ],
         },
         interactivity: {
@@ -148,6 +161,8 @@ describe("buildSlackAppManifest", () => {
             "files:write",
             "groups:history",
             "reactions:read",
+            "usergroups:read",
+            "users:read",
           ]),
         },
       },

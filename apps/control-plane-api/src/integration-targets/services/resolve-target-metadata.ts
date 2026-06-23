@@ -631,6 +631,10 @@ function cloneWebhookEventParameter(
       kind: parameter.kind,
       resourceKind: parameter.resourceKind,
       payloadPath: [...parameter.payloadPath],
+      ...(parameter.matchMode === undefined ? {} : { matchMode: parameter.matchMode }),
+      ...(parameter.matchValuePrefix === undefined
+        ? {}
+        : { matchValuePrefix: parameter.matchValuePrefix }),
       ...(parameter.multiValue === undefined ? {} : { multiValue: parameter.multiValue }),
       ...(parameter.negatedMatchRequiresExists === undefined
         ? {}

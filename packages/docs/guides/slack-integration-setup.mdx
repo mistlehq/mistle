@@ -60,6 +60,8 @@ Add these bot scopes before installing the app:
 | `files:read`        | Read and download files shared with the app           |
 | `files:write`       | Upload files as the app                               |
 | `groups:read`       | Sync private channels as selectable trigger resources |
+| `usergroups:read`   | Sync user groups as selectable trigger resources      |
+| `users:read`        | Sync users as selectable trigger resources            |
 
 ### Configure Event Subscriptions
 
@@ -75,6 +77,10 @@ Enable the Slack Events API and subscribe the bot to these events:
 | `group_archive`     | Refresh synced private channels when archived |
 | `group_unarchive`   | Refresh synced private channels when restored |
 | `group_rename`      | Refresh synced private channels when renamed  |
+| `subteam_created`   | Refresh synced user groups when created       |
+| `subteam_updated`   | Refresh synced user groups when updated       |
+| `team_join`         | Refresh synced users when a member joins      |
+| `user_change`       | Refresh synced users when member data changes |
 
 ### Install The App And Collect Credentials
 

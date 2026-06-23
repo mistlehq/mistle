@@ -213,6 +213,28 @@ const SlackAppMentionEventOption: WebhookTriggerEventOption = {
       prefix: "in",
       multiValue: true,
     },
+    {
+      id: "userMention",
+      label: "user mention",
+      kind: "resource-select",
+      resourceKind: "user",
+      payloadPath: ["event", "text"],
+      matchMode: "contains_token",
+      matchValuePrefix: "<@",
+      prefix: "mentioning user",
+      multiValue: true,
+    },
+    {
+      id: "userGroupMention",
+      label: "user group mention",
+      kind: "resource-select",
+      resourceKind: "user_group",
+      payloadPath: ["event", "text"],
+      matchMode: "contains_token",
+      matchValuePrefix: "<!subteam^",
+      prefix: "mentioning group",
+      multiValue: true,
+    },
   ],
 };
 
@@ -232,6 +254,37 @@ const SlackMessageEventOption: WebhookTriggerEventOption = {
       payloadPath: ["event", "text"],
       matchMode: "contains_token",
       controlVariant: "invocation-token",
+    },
+    {
+      id: "sender",
+      label: "sender",
+      kind: "resource-select",
+      resourceKind: "user",
+      payloadPath: ["event", "user"],
+      prefix: "from",
+      multiValue: true,
+    },
+    {
+      id: "userMention",
+      label: "user mention",
+      kind: "resource-select",
+      resourceKind: "user",
+      payloadPath: ["event", "text"],
+      matchMode: "contains_token",
+      matchValuePrefix: "<@",
+      prefix: "mentioning user",
+      multiValue: true,
+    },
+    {
+      id: "userGroupMention",
+      label: "user group mention",
+      kind: "resource-select",
+      resourceKind: "user_group",
+      payloadPath: ["event", "text"],
+      matchMode: "contains_token",
+      matchValuePrefix: "<!subteam^",
+      prefix: "mentioning group",
+      multiValue: true,
     },
     {
       id: "messageText",
@@ -868,6 +921,86 @@ describe("toWebhookTriggerFormValues", () => {
           },
         },
       ],
+    });
+  });
+
+  it("hydrates Slack user group mention filters from message text payload filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          integrationWebhookSourceId: SlackWebhookSourceId,
+          eventConditions: [
+            {
+              eventType: "slack:message",
+              payloadFilter: {
+                op: "or",
+                filters: [
+                  {
+                    op: "contains_token",
+                    path: ["event", "text"],
+                    value: "<!subteam^S_ENG",
+                  },
+                  {
+                    op: "contains_token",
+                    path: ["event", "text"],
+                    value: "<!subteam^S_SUPPORT",
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        [SlackMessageEventOption],
+      ),
+    ).toMatchObject({
+      eventIds: [SlackMessageConditionId0],
+      eventParameterRules: {
+        [SlackMessageConditionId0]: {
+          userGroupMention: isAnyOfRule(["S_ENG", "S_SUPPORT"]),
+        },
+      },
+      remainingPayloadFilter: null,
+    });
+  });
+
+  it("hydrates Slack user mention filters from message text payload filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          integrationWebhookSourceId: SlackWebhookSourceId,
+          eventConditions: [
+            {
+              eventType: "slack:message",
+              payloadFilter: {
+                op: "or",
+                filters: [
+                  {
+                    op: "contains_token",
+                    path: ["event", "text"],
+                    value: "<@U1234567890",
+                  },
+                  {
+                    op: "contains_token",
+                    path: ["event", "text"],
+                    value: "<@U9999999999",
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        [SlackMessageEventOption],
+      ),
+    ).toMatchObject({
+      eventIds: [SlackMessageConditionId0],
+      eventParameterRules: {
+        [SlackMessageConditionId0]: {
+          userMention: isAnyOfRule(["U1234567890", "U9999999999"]),
+        },
+      },
+      remainingPayloadFilter: null,
     });
   });
 
@@ -1525,6 +1658,84 @@ describe("trigger payload transforms", () => {
         sandboxProfileId: "sbp_repo",
         primaryRepositoryId: null,
       },
+    });
+  });
+
+  it("builds Slack user group mention parameters into text token payload filters", () => {
+    expect(
+      toCreateWebhookTriggerPayload(
+        {
+          ...BaseFormValues,
+          conversationKeyTemplate: "slack:channel:{{payload.event.channel}}",
+          eventIds: [SlackAppMentionConditionId0],
+          eventParameterRules: {
+            [SlackAppMentionConditionId0]: {
+              userGroupMention: isAnyOfRule(["S_ENG", "S_SUPPORT"]),
+            },
+          },
+        },
+        [SlackAppMentionEventOption],
+      ),
+    ).toMatchObject({
+      eventConditions: [
+        {
+          eventType: "slack:app_mention",
+          payloadFilter: {
+            op: "or",
+            filters: [
+              {
+                op: "contains_token",
+                path: ["event", "text"],
+                value: "<!subteam^S_ENG",
+              },
+              {
+                op: "contains_token",
+                path: ["event", "text"],
+                value: "<!subteam^S_SUPPORT",
+              },
+            ],
+          },
+        },
+      ],
+    });
+  });
+
+  it("builds Slack user mention parameters into text token payload filters", () => {
+    expect(
+      toCreateWebhookTriggerPayload(
+        {
+          ...BaseFormValues,
+          conversationKeyTemplate: "slack:channel:{{payload.event.channel}}",
+          eventIds: [SlackAppMentionConditionId0],
+          eventParameterRules: {
+            [SlackAppMentionConditionId0]: {
+              userMention: isAnyOfRule(["U1234567890", "U9999999999"]),
+            },
+          },
+        },
+        [SlackAppMentionEventOption],
+      ),
+    ).toMatchObject({
+      eventConditions: [
+        {
+          eventType: "slack:app_mention",
+          payloadFilter: {
+            op: "or",
+            filters: [
+              {
+                op: "contains_token",
+                path: ["event", "text"],
+                value: "<@U1234567890",
+              },
+              {
+                op: "contains_token",
+                path: ["event", "text"],
+                value: "<@U9999999999",
+              },
+            ],
+          },
+        },
+      ],
     });
   });
 

@@ -13280,6 +13280,14 @@
                                             },
                                             "minItems": 1
                                           },
+                                          "matchMode": {
+                                            "type": "string",
+                                            "enum": ["eq", "contains", "contains_token"]
+                                          },
+                                          "matchValuePrefix": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
                                           "multiValue": {
                                             "type": "boolean"
                                           },
@@ -13521,6 +13529,14 @@
                                               "minLength": 1
                                             },
                                             "minItems": 1
+                                          },
+                                          "matchMode": {
+                                            "type": "string",
+                                            "enum": ["eq", "contains", "contains_token"]
+                                          },
+                                          "matchValuePrefix": {
+                                            "type": "string",
+                                            "minLength": 1
                                           },
                                           "multiValue": {
                                             "type": "boolean"

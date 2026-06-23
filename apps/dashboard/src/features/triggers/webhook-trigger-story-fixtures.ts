@@ -4,6 +4,10 @@ import type { IntegrationConnectionResources } from "../integrations/integration
 import {
   createSlackChannelResource,
   createSlackChannelResources,
+  createSlackUserGroupResource,
+  createSlackUserGroupResources,
+  createSlackUserResource,
+  createSlackUserResources,
 } from "../integrations/slack-channel-resource-story-support.js";
 import type { WebhookTriggerEventOption } from "./webhook-trigger-event-types.js";
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
@@ -313,6 +317,48 @@ const StorySlackChannelResources = createSlackChannelResources({
   ],
 });
 
+const StorySlackUserResources = createSlackUserResources({
+  connectionId: StorySlackConnectionId,
+  items: [
+    createSlackUserResource({
+      index: 1,
+      externalId: "U1234567890",
+      displayName: "Ari Tan",
+    }),
+    createSlackUserResource({
+      index: 2,
+      externalId: "U9999999999",
+      displayName: "Release Bot",
+      isBot: true,
+    }),
+    createSlackUserResource({
+      index: 3,
+      externalId: "U5555555555",
+      displayName: "Mina Patel",
+    }),
+  ],
+});
+
+const StorySlackUserGroupResources = createSlackUserGroupResources({
+  connectionId: StorySlackConnectionId,
+  items: [
+    createSlackUserGroupResource({
+      index: 1,
+      externalId: "S_ENG",
+      handle: "eng-oncall",
+      displayName: "@eng-oncall",
+      userCount: 14,
+    }),
+    createSlackUserGroupResource({
+      index: 2,
+      externalId: "S_SUPPORT",
+      handle: "support-escalations",
+      displayName: "@support-escalations",
+      userCount: 8,
+    }),
+  ],
+});
+
 export const StorySlackChannelResourcesSyncing: IntegrationConnectionResources = {
   ...StorySlackChannelResources,
   syncState: "syncing",
@@ -388,6 +434,30 @@ export const StorySlackEventOptions: readonly WebhookTriggerEventOption[] = [
         prefix: "in",
         multiValue: true,
       },
+      {
+        id: "userMention",
+        label: "user mention",
+        kind: "resource-select",
+        resourceKind: "user",
+        payloadPath: ["event", "text"],
+        matchMode: "contains_token",
+        matchValuePrefix: "<@",
+        prefix: "mentioning user",
+        placeholder: "Any mentioned user",
+        multiValue: true,
+      },
+      {
+        id: "userGroupMention",
+        label: "user group mention",
+        kind: "resource-select",
+        resourceKind: "user_group",
+        payloadPath: ["event", "text"],
+        matchMode: "contains_token",
+        matchValuePrefix: "<!subteam^",
+        prefix: "mentioning group",
+        placeholder: "Any user group",
+        multiValue: true,
+      },
     ],
   },
   {
@@ -419,11 +489,37 @@ export const StorySlackEventOptions: readonly WebhookTriggerEventOption[] = [
       },
       {
         id: "sender",
-        label: "sender user ID",
-        kind: "string",
+        label: "sender",
+        kind: "resource-select",
+        resourceKind: "user",
         payloadPath: ["event", "user"],
+        multiValue: true,
         prefix: "from",
-        placeholder: "U1234567890",
+        placeholder: "Any sender",
+      },
+      {
+        id: "userMention",
+        label: "user mention",
+        kind: "resource-select",
+        resourceKind: "user",
+        payloadPath: ["event", "text"],
+        matchMode: "contains_token",
+        matchValuePrefix: "<@",
+        multiValue: true,
+        prefix: "mentioning user",
+        placeholder: "Any mentioned user",
+      },
+      {
+        id: "userGroupMention",
+        label: "user group mention",
+        kind: "resource-select",
+        resourceKind: "user_group",
+        payloadPath: ["event", "text"],
+        matchMode: "contains_token",
+        matchValuePrefix: "<!subteam^",
+        multiValue: true,
+        prefix: "mentioning group",
+        placeholder: "Any user group",
       },
       {
         id: "messageText",
@@ -482,19 +578,23 @@ export const StorySlackEventOptions: readonly WebhookTriggerEventOption[] = [
       },
       {
         id: "reactingUser",
-        label: "reacting user ID",
-        kind: "string",
+        label: "reacting user",
+        kind: "resource-select",
+        resourceKind: "user",
         payloadPath: ["event", "user"],
+        multiValue: true,
         prefix: "by",
-        placeholder: "U1234567890",
+        placeholder: "Any reacting user",
       },
       {
         id: "reactedMessageAuthor",
-        label: "message author user ID",
-        kind: "string",
+        label: "message author",
+        kind: "resource-select",
+        resourceKind: "user",
         payloadPath: ["event", "item_user"],
+        multiValue: true,
         prefix: "on message by",
-        placeholder: "U1234567890",
+        placeholder: "Any message author",
         negatedMatchRequiresExists: true,
       },
     ],
@@ -528,19 +628,23 @@ export const StorySlackEventOptions: readonly WebhookTriggerEventOption[] = [
       },
       {
         id: "reactingUser",
-        label: "reacting user ID",
-        kind: "string",
+        label: "reacting user",
+        kind: "resource-select",
+        resourceKind: "user",
         payloadPath: ["event", "user"],
+        multiValue: true,
         prefix: "by",
-        placeholder: "U1234567890",
+        placeholder: "Any reacting user",
       },
       {
         id: "reactedMessageAuthor",
-        label: "message author user ID",
-        kind: "string",
+        label: "message author",
+        kind: "resource-select",
+        resourceKind: "user",
         payloadPath: ["event", "item_user"],
+        multiValue: true,
         prefix: "on message by",
-        placeholder: "U1234567890",
+        placeholder: "Any message author",
         negatedMatchRequiresExists: true,
       },
     ],
@@ -636,6 +740,8 @@ export const StoryWhapiEventOptions: readonly WebhookTriggerEventOption[] = [
 export function createWebhookTriggerStoryQueryClient(input?: {
   githubTeamResources?: IntegrationConnectionResources;
   slackChannelResources?: IntegrationConnectionResources;
+  slackUserGroupResources?: IntegrationConnectionResources;
+  slackUserResources?: IntegrationConnectionResources;
 }): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -669,6 +775,14 @@ export function createWebhookTriggerStoryQueryClient(input?: {
   queryClient.setQueryData(
     ["trigger-trigger-parameters", StorySlackConnectionId, "channel"],
     input?.slackChannelResources ?? StorySlackChannelResources,
+  );
+  queryClient.setQueryData(
+    ["trigger-trigger-parameters", StorySlackConnectionId, "user"],
+    input?.slackUserResources ?? StorySlackUserResources,
+  );
+  queryClient.setQueryData(
+    ["trigger-trigger-parameters", StorySlackConnectionId, "user_group"],
+    input?.slackUserGroupResources ?? StorySlackUserGroupResources,
   );
 
   return queryClient;

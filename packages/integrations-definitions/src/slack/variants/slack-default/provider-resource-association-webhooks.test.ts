@@ -37,11 +37,13 @@ describe("SlackAssociatedResourceEventsCapability", () => {
           },
           {
             id: "sender",
-            label: "sender user ID",
-            kind: "string",
+            label: "sender",
+            kind: "resource-select",
+            resourceKind: "user",
             payloadPath: ["event", "user"],
+            multiValue: true,
             prefix: "from",
-            placeholder: "U1234567890",
+            placeholder: "Any sender",
           },
           {
             id: "messageText",
