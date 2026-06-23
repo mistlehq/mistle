@@ -7,6 +7,8 @@ const controlPlaneApiDir = dirname(scriptDir);
 const workspaceRoot = resolve(controlPlaneApiDir, "..", "..");
 const commitSignDir = resolve(workspaceRoot, "packages", "commit-sign");
 const commitSignBinaryDir = resolve(commitSignDir, "target", "debug");
+const instrumentEntry = resolve(controlPlaneApiDir, "src", "instrument.ts");
+const serverEntry = resolve(controlPlaneApiDir, "src", "index.ts");
 
 function ensureCommitSignBinary(): void {
   const result = spawnSync("cargo", ["build", "--locked", "--bin", "commit-sign"], {
@@ -20,7 +22,7 @@ function ensureCommitSignBinary(): void {
 }
 
 function runDevServer(): void {
-  const child = spawn("tsx", ["watch", "--import", "./src/instrument.ts", "src/index.ts"], {
+  const child = spawn("tsx", ["watch", "--import", instrumentEntry, serverEntry], {
     cwd: controlPlaneApiDir,
     stdio: "inherit",
     env: {
