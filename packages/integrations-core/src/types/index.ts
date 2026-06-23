@@ -1115,6 +1115,11 @@ export type IntegrationRedirectConnectionMethodDefinition<
 > & {
   kind: "redirect";
   secretFields?: never;
+  reauthorizationSecretFields?: ReadonlyArray<{
+    name: string;
+    slotKey: string;
+    secretKind: IntegrationCredentialSecretKind;
+  }>;
   startConfigSchema?: IntegrationConfigSchema<Record<string, unknown>>;
   startConfigForm?: IntegrationFormDefinition<
     TTargetConfig,

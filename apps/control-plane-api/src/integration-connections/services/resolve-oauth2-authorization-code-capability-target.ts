@@ -4,6 +4,7 @@ import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
   IntegrationConnectionMethodIds,
   type IntegrationConfigSchema,
+  type IntegrationCredentialSecretKind,
   type IntegrationRegistry,
   type IntegrationOAuth2AuthorizationCodeCapability,
 } from "@mistle/integrations-core";
@@ -86,6 +87,11 @@ export type ResolvedOAuth2AuthorizationCodeCapabilityTarget = {
         pendingLabel: string;
       };
     };
+    reauthorizationSecretFields?: ReadonlyArray<{
+      name: string;
+      slotKey: string;
+      secretKind: IntegrationCredentialSecretKind;
+    }>;
   };
   connectionMethodStartConfigSchema?: IntegrationConfigSchema<Record<string, unknown>>;
 };
@@ -208,6 +214,9 @@ export async function resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow(
         oauth2ConnectionMethod.ui.reauthorize === undefined
           ? {}
           : { reauthorize: oauth2ConnectionMethod.ui.reauthorize },
+      ...(oauth2ConnectionMethod.reauthorizationSecretFields === undefined
+        ? {}
+        : { reauthorizationSecretFields: oauth2ConnectionMethod.reauthorizationSecretFields }),
     },
     ...(oauth2ConnectionMethod.startConfigSchema === undefined
       ? {}

@@ -88,6 +88,7 @@ describe("Google Search Console OAuth authorization code support", () => {
           client_secret: "google_secret_456",
         },
         redirectUrl: "https://mistle.example.com/oauth/callback",
+        intent: "create",
         state: "state_abc",
         pkce: {
           challenge: "challenge_456",
@@ -120,6 +121,7 @@ describe("Google Search Console OAuth authorization code support", () => {
           client_secret: "google_secret_456",
         },
         redirectUrl: "https://mistle.example.com/oauth/callback",
+        intent: "create",
         state: "state_abc",
       }),
     ).toThrow("Google Search Console OAuth authorization requires PKCE.");

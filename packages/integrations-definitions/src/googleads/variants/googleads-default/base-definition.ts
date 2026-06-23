@@ -9,7 +9,9 @@ import {
   type GoogleAdsConnectionConfig,
   GoogleAdsConnectionConfigSchema,
   GoogleAdsConnectionStartConfigSchema,
+  GoogleAdsCredentialSecretTypes,
   GoogleAdsDefaultVariantId,
+  GoogleAdsDeveloperTokenCredentialSlotKey,
   GoogleAdsFamilyId,
 } from "./auth.js";
 import { resolveGoogleAdsBindingConfigForm } from "./binding-config-form.js";
@@ -44,6 +46,13 @@ export const GoogleAdsBaseDefinition: GoogleAdsBaseIntegrationDefinition = {
       kind: "redirect",
       configSchema: GoogleAdsConnectionConfigSchema,
       startConfigSchema: GoogleAdsConnectionStartConfigSchema,
+      reauthorizationSecretFields: [
+        {
+          name: "developer_token",
+          slotKey: GoogleAdsDeveloperTokenCredentialSlotKey,
+          secretKind: GoogleAdsCredentialSecretTypes.API_KEY,
+        },
+      ],
       startConfigForm: () => ({
         schema: {
           type: "object",

@@ -382,9 +382,6 @@ export const GoogleAdsOAuth2AuthorizationCodeCapability: IntegrationOAuth2Author
     }
 
     const connectionConfig = GoogleAdsConnectionStartConfigSchema.parse(input.connectionConfig);
-    if (input.intent === "create" && connectionConfig.developer_token === undefined) {
-      throw new Error("Google Ads OAuth authorization requires a developer token.");
-    }
 
     return {
       authorizationUrl: buildGoogleAdsAuthorizationUrl({
@@ -396,7 +393,7 @@ export const GoogleAdsOAuth2AuthorizationCodeCapability: IntegrationOAuth2Author
       providerState: {
         clientId: connectionConfig.client_id,
         clientSecret: connectionConfig.client_secret,
-        ...(connectionConfig.developer_token === undefined
+        ...(input.intent === "reauthorize"
           ? {}
           : { developerToken: connectionConfig.developer_token }),
         ...(connectionConfig.login_customer_id === undefined

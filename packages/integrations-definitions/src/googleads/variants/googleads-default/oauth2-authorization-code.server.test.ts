@@ -120,6 +120,7 @@ describe("Google Ads OAuth authorization code support", () => {
       connectionConfig: {
         client_id: "google_client_123.apps.googleusercontent.com",
         client_secret: "google_secret_456",
+        developer_token: "existing_developer_token_123",
         login_customer_id: "1234567890",
       },
       redirectUrl: "https://mistle.example.com/oauth/callback",

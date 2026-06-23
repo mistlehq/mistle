@@ -9,6 +9,7 @@ import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
   createOAuth2AuthorizationCodeCredentialSlotKeys,
   IntegrationConnectionMethodIds,
+  type IntegrationCredentialSecretKind,
   type IntegrationRegistry,
 } from "@mistle/integrations-core";
 
@@ -162,11 +163,45 @@ async function resolveOAuth2ClientSecretForReauthorization(input: {
   });
 }
 
+async function resolveOAuth2ReauthorizationSecrets(input: {
+  db: ControlPlaneDatabase;
+  organizationId: string;
+  connectionId: string;
+  integrationsConfig: {
+    masterEncryptionKeys: Record<string, string>;
+  };
+  secretFields:
+    | ReadonlyArray<{
+        name: string;
+        slotKey: string;
+        secretKind: IntegrationCredentialSecretKind;
+      }>
+    | undefined;
+}): Promise<Record<string, string>> {
+  const resolvedSecrets: Record<string, string> = {};
+  for (const field of input.secretFields ?? []) {
+    resolvedSecrets[field.name] = await resolveConnectionSecretOrThrow({
+      db: input.db,
+      organizationId: input.organizationId,
+      connectionId: input.connectionId,
+      slotKey: field.slotKey,
+      secretKind: field.secretKind,
+      integrationsConfig: input.integrationsConfig,
+    });
+  }
+
+  return resolvedSecrets;
+}
+
 function createReauthorizationConnectionConfig(input: {
   storedConfig: Record<string, unknown> | null;
   clientSecret: string | undefined;
+  secrets?: Record<string, string>;
 }): Record<string, unknown> {
-  const connectionConfig = removeFrameworkConnectionConfigFields(input.storedConfig);
+  const connectionConfig = {
+    ...removeFrameworkConnectionConfigFields(input.storedConfig),
+    ...input.secrets,
+  };
   if (input.clientSecret === undefined) {
     return connectionConfig;
   }
@@ -376,6 +411,13 @@ export async function startOAuth2AuthorizationCodeConnectionReauthorization(
           variantId: resolved.target.variantId,
           integrationsConfig: ctx.integrationsConfig,
         });
+  const reauthorizationSecrets = await resolveOAuth2ReauthorizationSecrets({
+    db: ctx.db,
+    organizationId: input.organizationId,
+    connectionId: existingConnection.id,
+    integrationsConfig: ctx.integrationsConfig,
+    secretFields: resolved.connectionMethod.reauthorizationSecretFields,
+  });
 
   return startOAuth2AuthorizationCodeRedirect(ctx, {
     organizationId: input.organizationId,
@@ -383,6 +425,7 @@ export async function startOAuth2AuthorizationCodeConnectionReauthorization(
     connectionConfig: createReauthorizationConnectionConfig({
       storedConfig: existingConnection.config,
       clientSecret,
+      secrets: reauthorizationSecrets,
     }),
     controlPlaneBaseUrl: input.controlPlaneBaseUrl,
     state: createRedirectState(),
