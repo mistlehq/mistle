@@ -108,6 +108,42 @@ const MixedServerRequestEntries: readonly ServerRequestEntry[] = [
   },
 ];
 
+const SuggestedNextActionEntries: readonly ServerRequestEntry[] = [
+  {
+    requestId: "suggested-next-action-request-1",
+    method: "tool/requestUserInput",
+    kind: "tool-user-input",
+    questions: [
+      {
+        header: "Suggested next actions",
+        id: "suggested-next-action",
+        options: [
+          {
+            label: "Stop all sequences - let's start fresh with new messaging",
+            description:
+              "Recommended when the current sequence no longer matches the desired tone.",
+            isOther: false,
+          },
+          {
+            label:
+              "Don't stop yet - show me who accepted my LinkedIn connection so I can follow up manually",
+            description: "Keeps current outreach active while surfacing manual follow-up targets.",
+            isOther: false,
+          },
+          {
+            label: "Keep the sequences running - I want to workshop new copy first, then update",
+            description: "Avoids interrupting active campaigns before replacement copy is ready.",
+            isOther: false,
+          },
+        ],
+        question: "Which next action should Designer take?",
+      },
+    ],
+    status: "pending",
+    responseErrorMessage: null,
+  },
+];
+
 function createMixedServerRequestEntriesWithResponseErrors(): readonly ServerRequestEntry[] {
   return MixedServerRequestEntries.map((entry) => {
     return {
@@ -137,6 +173,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const MixedRequests: Story = {};
+
+export const SuggestedNextActions: Story = {
+  args: {
+    entries: SuggestedNextActionEntries,
+  },
+};
 
 export const ResponseErrors: Story = {
   args: {

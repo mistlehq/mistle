@@ -105,6 +105,82 @@ describe("ServerRequestsPanel", () => {
     ]);
   });
 
+  it("renders long user input options as numbered selectable rows", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: "next-action-request-1",
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [
+              {
+                header: "Suggested next actions",
+                id: "next-action",
+                question: "What should Designer do next?",
+                options: [
+                  {
+                    label: "Stop all sequences - let's start fresh with new messaging",
+                    description: "Recommended when the current campaign is clearly stale.",
+                    isOther: false,
+                  },
+                  {
+                    label:
+                      "Don't stop yet - show me who accepted my LinkedIn connection so I can follow up manually",
+                    description: "Keeps outreach active while surfacing manual follow-up targets.",
+                    isOther: false,
+                  },
+                  {
+                    label:
+                      "Keep the sequences running - I want to workshop new copy first, then update",
+                    description: "Avoids interrupting active campaigns before new copy is ready.",
+                    isOther: false,
+                  },
+                ],
+              },
+            ],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Suggested next actions").textContent).toBe("Suggested next actions");
+    expect(screen.queryByText("User input requested")).toBeNull();
+    expect(screen.queryByText("tool/requestUserInput")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Submit responses" })).toBeNull();
+    expect(screen.getByText("1").textContent).toBe("1");
+    expect(
+      screen.getByText("Keeps outreach active while surfacing manual follow-up targets.")
+        .textContent,
+    ).toBe("Keeps outreach active while surfacing manual follow-up targets.");
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Don't stop yet - show me who accepted my LinkedIn connection/u,
+      }),
+    );
+
+    expect(submittedResults).toEqual([
+      {
+        answers: [
+          {
+            id: "next-action",
+            value:
+              "Don't stop yet - show me who accepted my LinkedIn connection so I can follow up manually",
+          },
+        ],
+      },
+    ]);
+  });
+
   it("submits a prefilled multiline user input answer unchanged", () => {
     const submittedResults: unknown[] = [];
 
