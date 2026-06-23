@@ -21,6 +21,7 @@ import { GitHubEnterpriseServerBaseDefinition } from "./github/variants/github-e
 import { GoogleAnalyticsMcpBaseDefinition } from "./google-analytics/variants/google-analytics-mcp/base-definition.js";
 import { GoogleSearchConsoleMcpBaseDefinition } from "./google-search-console/variants/google-search-console-mcp/base-definition.js";
 import { GoogleWorkspaceMcpBaseDefinition } from "./google-workspace/variants/google-workspace-mcp/base-definition.js";
+import { GoogleAdsBaseDefinition } from "./googleads/variants/googleads-default/base-definition.js";
 import { InceptionDefinition } from "./inception/index.js";
 import { JiraBaseDefinition } from "./jira/variants/jira-default/base-definition.js";
 import { KimiDefinition } from "./kimi/index.js";
@@ -64,6 +65,7 @@ export const DeepSeekBrowserDefinition = DeepSeekDefinition;
 export const ExpoBrowserDefinition = ExpoMcpBaseDefinition;
 export const FireworksBrowserDefinition = FireworksDefinition;
 export const GcpBrowserDefinition = GcpMcpBaseDefinition;
+export const GoogleAdsBrowserDefinition = GoogleAdsBaseDefinition;
 export const GoogleAnalyticsBrowserDefinition = GoogleAnalyticsMcpBaseDefinition;
 export const GoogleSearchConsoleBrowserDefinition = GoogleSearchConsoleMcpBaseDefinition;
 export const GitHubCloudBrowserDefinition = GitHubCloudBaseDefinition;
@@ -111,6 +113,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   FireworksBrowserDefinition,
   GcpBrowserDefinition,
   GoogleAnalyticsBrowserDefinition,
+  GoogleAdsBrowserDefinition,
   GoogleSearchConsoleBrowserDefinition,
   GoogleWorkspaceBrowserDefinition,
   InceptionBrowserDefinition,
@@ -174,6 +177,7 @@ export * from "./deepseek/index.js";
 export * from "./expo/browser.js";
 export * from "./fireworks/index.js";
 export * from "./gcp/browser.js";
+export * from "./googleads/browser.js";
 export * from "./google-analytics/browser.js";
 export * from "./google-search-console/browser.js";
 export * from "./google-workspace/browser.js";

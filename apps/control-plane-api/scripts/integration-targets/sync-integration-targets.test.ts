@@ -129,6 +129,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "googleads-default",
+        familyId: "googleads",
+        variantId: "googleads-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "inception-default",
         familyId: "inception",
         variantId: "inception-default",

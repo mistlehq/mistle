@@ -20,6 +20,7 @@ import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./githu
 import { GoogleAnalyticsDefinition } from "./google-analytics/browser.js";
 import { GoogleSearchConsoleDefinition } from "./google-search-console/browser.js";
 import { GoogleWorkspaceDefinition } from "./google-workspace/browser.js";
+import { GoogleAdsDefinition } from "./googleads/browser.js";
 import { InceptionDefinition } from "./inception/index.js";
 import { JiraDefinition } from "./jira/browser.js";
 import { KimiDefinition } from "./kimi/index.js";
@@ -64,6 +65,7 @@ export * from "./deepseek/index.js";
 export * from "./expo/browser.js";
 export * from "./fireworks/index.js";
 export * from "./gcp/browser.js";
+export * from "./googleads/browser.js";
 export * from "./google-analytics/browser.js";
 export * from "./google-search-console/browser.js";
 export * from "./google-workspace/browser.js";
@@ -113,6 +115,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   FireworksDefinition,
   GcpDefinition,
   GoogleAnalyticsDefinition,
+  GoogleAdsDefinition,
   GoogleSearchConsoleDefinition,
   GoogleWorkspaceDefinition,
   InceptionDefinition,

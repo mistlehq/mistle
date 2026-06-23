@@ -94,6 +94,11 @@
       "config": {}
     },
     {
+      "targetKey": "googleads-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "inception-default",
       "enabled": true,
       "config": {}

@@ -60,6 +60,10 @@ describe("integrations-definitions server", () => {
       familyId: "google-workspace",
       variantId: "google-workspace-mcp",
     });
+    const googleAdsDefinition = registry.getDefinition({
+      familyId: "googleads",
+      variantId: "googleads-default",
+    });
     const jiraDefinition = registry.getDefinition({
       familyId: "jira",
       variantId: "jira-default",
@@ -328,6 +332,16 @@ describe("integrations-definitions server", () => {
     expect(metaAdsDefinition?.oauth2AuthorizationCode).toBeUndefined();
     expect(metaAdsDefinition?.webhookHandler).toBeUndefined();
     expect(metaAdsDefinition?.webhookSource).toBeUndefined();
+    expect(googleAdsDefinition).toMatchObject({
+      familyId: "googleads",
+      variantId: "googleads-default",
+      kind: "connector",
+      displayName: "Google Ads",
+      logoKey: "googleads",
+    });
+    expect(googleAdsDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(googleAdsDefinition?.webhookHandler).toBeUndefined();
+    expect(googleAdsDefinition?.webhookSource).toBeUndefined();
     expect(expoDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(expoDefinition?.webhookHandler).toBeUndefined();
     expect(expoDefinition?.webhookSource).toBeUndefined();
@@ -556,6 +570,7 @@ describe("integrations-definitions server", () => {
         "expo::expo-mcp",
         "fireworks::fireworks-default",
         "google-analytics::google-analytics-mcp",
+        "googleads::googleads-default",
         "google-search-console::google-search-console-mcp",
         "google-workspace::google-workspace-mcp",
         "inception::inception-default",
