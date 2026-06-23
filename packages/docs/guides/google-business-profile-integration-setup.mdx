@@ -1,0 +1,90 @@
+---
+title: Google Business Profile
+description: Connect Google Business Profile to Mistle
+icon: /icons/integrations/google-business-profile.svg
+---
+
+## Overview
+
+Connect Google Business Profile by authorizing Mistle with a Google OAuth client that you create in Google Cloud.
+
+Mistle uses the OAuth authorization code flow to obtain Google access tokens. The local Google Business Profile MCP server runs inside the sandbox runtime boundary and calls Google Business Profile APIs through Mistle-managed egress, where Mistle injects the connected OAuth token into outbound requests.
+
+This integration is a thin wrapper around Google's Business Profile APIs. The connected Google account, Business Profile access, API approval status, and OAuth scopes determine what agents can read or change. Mistle stores the token for the connection and routes tool traffic through managed egress.
+
+Mistle requests this OAuth scope:
+
+- `https://www.googleapis.com/auth/business.manage`
+
+## Prerequisites
+
+Before connecting Google Business Profile:
+
+1. Create or choose a Google Business Profile account and location.
+2. Make sure the Google account that will authorize Mistle has the required access to that Business Profile.
+3. Create or choose a Google Cloud project that will own the OAuth client.
+4. Request and receive Google Business Profile API access for the Google Cloud project. Projects without Business Profile API approval may receive quota or access errors from Google.
+5. If your Google Auth Platform app is in testing mode, add the authorizing Google account as a test user.
+
+## Enable The Business Profile APIs
+
+Enable the relevant Business Profile APIs in the Google Cloud project that owns the OAuth client:
+
+```bash
+gcloud services enable \
+  mybusinessaccountmanagement.googleapis.com \
+  mybusinessbusinessinformation.googleapis.com \
+  businessprofileperformance.googleapis.com \
+  mybusiness.googleapis.com \
+  --project=PROJECT_ID
+```
+
+Replace `PROJECT_ID` with the Google Cloud project ID.
+
+## Configure OAuth Consent
+
+In **Google Auth Platform**, configure branding, audience, and data access for the OAuth app.
+
+Add this scope:
+
+- `https://www.googleapis.com/auth/business.manage`
+
+For an internal Workspace rollout, select **Internal** audience when available. For an external app in testing mode, add every authorizing Google account as a test user before connecting.
+
+## Create A Google OAuth Client
+
+Create a Web application OAuth client in Google Auth Platform.
+
+1. In Mistle, open **Integrations** and choose **Google Business Profile**.
+2. Copy the **callback URL** shown by Mistle.
+3. In Google Cloud, open **Google Auth Platform > Clients**.
+4. Create an OAuth client with **Application type** set to **Web application**.
+5. Add the Mistle callback URL to **Authorized redirect URIs**.
+6. Create the client and copy its **Client ID** and **Client secret**.
+7. Return to Mistle, enter the client ID and client secret, and click **Connect Google Business Profile**.
+8. Complete the Google consent flow with the Google account that should back the connection.
+
+## Connect Google Business Profile To A Sandbox Profile
+
+After the Google Business Profile connection is active:
+
+1. Open the sandbox profile that should use Google Business Profile.
+2. Add the Google Business Profile integration connection to the profile.
+3. In **Resources & Tools**, select the Google Business Profile MCP server.
+4. Publish the profile version.
+
+Sessions using that published profile can inspect and manage Business Profile accounts, locations, reviews, media, local posts, and performance metrics through the Google Business Profile MCP tools.
+
+## Access Boundary
+
+The OAuth scope lets Mistle use Google Business Profile APIs as the connected Google user. It does not bypass Google account permissions, Business Profile role assignments, Google Cloud API enablement, API approval, or Google quotas.
+
+For least privilege, authorize Mistle with a Google account that has access only to the Business Profile accounts and locations agents should manage.
+
+## Official References
+
+- [Business Profile APIs](https://developers.google.com/my-business)
+- [Account Management API](https://developers.google.com/my-business/reference/accountmanagement/rest)
+- [Business Information API](https://developers.google.com/my-business/reference/businessinformation/rest)
+- [Business Profile Performance API](https://developers.google.com/my-business/reference/performance/rest)
+- [OAuth 2.0 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server)

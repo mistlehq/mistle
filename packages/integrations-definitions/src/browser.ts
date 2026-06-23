@@ -19,6 +19,7 @@ import { GcpMcpBaseDefinition } from "./gcp/variants/gcp-mcp/base-definition.js"
 import { GitHubCloudBaseDefinition } from "./github/variants/github-cloud/base-definition.js";
 import { GitHubEnterpriseServerBaseDefinition } from "./github/variants/github-enterprise-server/base-definition.js";
 import { GoogleAnalyticsMcpBaseDefinition } from "./google-analytics/variants/google-analytics-mcp/base-definition.js";
+import { GoogleBusinessProfileMcpBaseDefinition } from "./google-business-profile/variants/google-business-profile-mcp/base-definition.js";
 import { GoogleSearchConsoleMcpBaseDefinition } from "./google-search-console/variants/google-search-console-mcp/base-definition.js";
 import { GoogleWorkspaceMcpBaseDefinition } from "./google-workspace/variants/google-workspace-mcp/base-definition.js";
 import { GoogleAdsBaseDefinition } from "./googleads/variants/googleads-default/base-definition.js";
@@ -67,6 +68,7 @@ export const FireworksBrowserDefinition = FireworksDefinition;
 export const GcpBrowserDefinition = GcpMcpBaseDefinition;
 export const GoogleAdsBrowserDefinition = GoogleAdsBaseDefinition;
 export const GoogleAnalyticsBrowserDefinition = GoogleAnalyticsMcpBaseDefinition;
+export const GoogleBusinessProfileBrowserDefinition = GoogleBusinessProfileMcpBaseDefinition;
 export const GoogleSearchConsoleBrowserDefinition = GoogleSearchConsoleMcpBaseDefinition;
 export const GitHubCloudBrowserDefinition = GitHubCloudBaseDefinition;
 export const GitHubEnterpriseServerBrowserDefinition = GitHubEnterpriseServerBaseDefinition;
@@ -114,6 +116,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   GcpBrowserDefinition,
   GoogleAnalyticsBrowserDefinition,
   GoogleAdsBrowserDefinition,
+  GoogleBusinessProfileBrowserDefinition,
   GoogleSearchConsoleBrowserDefinition,
   GoogleWorkspaceBrowserDefinition,
   InceptionBrowserDefinition,
@@ -179,6 +182,7 @@ export * from "./fireworks/index.js";
 export * from "./gcp/browser.js";
 export * from "./googleads/browser.js";
 export * from "./google-analytics/browser.js";
+export * from "./google-business-profile/browser.js";
 export * from "./google-search-console/browser.js";
 export * from "./google-workspace/browser.js";
 export * from "./github/browser.js";

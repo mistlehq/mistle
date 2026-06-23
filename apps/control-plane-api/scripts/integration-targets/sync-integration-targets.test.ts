@@ -115,6 +115,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "google-business-profile-mcp",
+        familyId: "google-business-profile",
+        variantId: "google-business-profile-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "google-search-console-mcp",
         familyId: "google-search-console",
         variantId: "google-search-console-mcp",
