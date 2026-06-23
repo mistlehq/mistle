@@ -345,8 +345,8 @@ describe("listSlackConnectionResources", () => {
       });
 
       expect(seenUrls).toEqual([
-        "http://127.0.0.1/api/users.list",
-        "http://127.0.0.1/api/users.list?cursor=users-cursor-2",
+        "http://127.0.0.1/api/users.list?limit=200",
+        "http://127.0.0.1/api/users.list?limit=200&cursor=users-cursor-2",
       ]);
       expect(result).toEqual({
         resources: [

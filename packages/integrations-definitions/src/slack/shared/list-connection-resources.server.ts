@@ -16,6 +16,7 @@ import type { SlackTargetSecrets } from "../variants/slack-default/target-secret
 const SlackChannelKind = "channel";
 const SlackUserKind = "user";
 const SlackUserGroupKind = "user_group";
+const SlackUsersListLimit = "200";
 
 const SlackConversationSchema = z.looseObject({
   id: z.string().min(1),
@@ -111,6 +112,7 @@ function buildSlackConversationsListUrl(input: { apiBaseUrl: string; cursor?: st
 
 function buildSlackUsersListUrl(input: { apiBaseUrl: string; cursor?: string }): URL {
   const apiUrl = new URL(buildUrlWithPath(input.apiBaseUrl, "/users.list"));
+  apiUrl.searchParams.set("limit", SlackUsersListLimit);
   if (input.cursor !== undefined && input.cursor.length > 0) {
     apiUrl.searchParams.set("cursor", input.cursor);
   }
