@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 
+import { CloudflareConnectionConfigForm } from "./binding-config-form.js";
 import { CloudflareDefinition } from "./definition.js";
 import { CloudflareMcpServerIds } from "./mcp-catalog.js";
 
 describe("CloudflareDefinition", () => {
   it("defines API-token Cloudflare API MCP Code Mode access", () => {
+    const apiTokenMethod = CloudflareDefinition.connectionMethods.find(
+      (method) => method.id === "api-key",
+    );
+
     expect(CloudflareDefinition).toMatchObject({
       familyId: "cloudflare",
       variantId: "cloudflare-mcp",
@@ -27,6 +32,11 @@ describe("CloudflareDefinition", () => {
         },
       ],
     });
+    expect(apiTokenMethod?.kind).toBe("form");
+    if (apiTokenMethod?.kind !== "form") {
+      throw new Error("Expected Cloudflare API token method to be a form method.");
+    }
+    expect(apiTokenMethod.configForm).toBe(CloudflareConnectionConfigForm);
   });
 
   it("resolves selected Cloudflare MCP servers from the binding config", () => {
