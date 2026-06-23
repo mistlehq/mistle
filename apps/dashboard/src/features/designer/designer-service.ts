@@ -5,16 +5,37 @@ import { normalizeHttpApiError } from "../api/http-api-error.js";
 import { requestControlPlane } from "../api/request-control-plane.js";
 import type { MintSandboxConnectionTokenResult } from "../sessions/sessions-service.js";
 import { DesignerApiError } from "./designer-api-errors.js";
+import {
+  DesignerBlueprintCurrentTabHref,
+  DesignerBlueprintCurrentTabId,
+  DesignerBlueprintDocumentSchema,
+} from "./designer-blueprint-schema.js";
 
 const AgentRuntimeIdSchema = z.enum(["claude-code", "codex", "opencode", "pi"]);
 
-const DesignerSessionCanvasTabSchema = z
+const DesignerSessionRouteCanvasTabSchema = z
   .object({
+    kind: z.literal("route"),
     id: z.string().min(1),
     title: z.string().min(1),
     href: z.string().min(1),
   })
   .strict();
+
+const DesignerSessionBlueprintCanvasTabSchema = z
+  .object({
+    kind: z.literal("blueprint"),
+    id: z.literal(DesignerBlueprintCurrentTabId),
+    title: z.string().min(1),
+    href: z.literal(DesignerBlueprintCurrentTabHref),
+    blueprint: DesignerBlueprintDocumentSchema,
+  })
+  .strict();
+
+const DesignerSessionCanvasTabSchema = z.discriminatedUnion("kind", [
+  DesignerSessionRouteCanvasTabSchema,
+  DesignerSessionBlueprintCanvasTabSchema,
+]);
 
 const DesignerSessionStartupOperationSchema = z
   .object({
@@ -85,6 +106,14 @@ export type DesignerSessionCanvasTab = z.output<typeof DesignerSessionCanvasTabS
 export const designerSessionsQueryKey = ["designer", "sessions"] as const;
 export function designerSessionQueryKey(sessionId: string) {
   return ["designer", "sessions", sessionId] as const;
+}
+
+export function createPutDesignerSessionCanvasTabsRequestBody(input: {
+  tabs: readonly DesignerSessionCanvasTab[];
+}): { tabs: readonly DesignerSessionCanvasTab[] } {
+  return {
+    tabs: input.tabs,
+  };
 }
 
 export async function listDesignerSessions(input?: {
@@ -253,13 +282,9 @@ export async function putDesignerSessionCanvasTabs(input: {
       operation: "putDesignerSessionCanvasTabs",
       method: "PUT",
       pathname: `/v1/designer/sessions/${encodeURIComponent(input.sessionId)}/canvas-tabs`,
-      body: {
-        tabs: input.tabs.map((tab) => ({
-          id: tab.id,
-          title: tab.title,
-          href: tab.href,
-        })),
-      },
+      body: createPutDesignerSessionCanvasTabsRequestBody({
+        tabs: input.tabs,
+      }),
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not save Designer canvas tabs.",
     });

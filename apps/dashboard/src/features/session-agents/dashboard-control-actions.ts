@@ -2,13 +2,17 @@ import type { CodexDynamicToolSpec } from "@mistle/integrations-definitions/agen
 import type { CodexJsonRpcServerRequest } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { z } from "zod";
 
+import { DesignerBlueprintDocumentSchema } from "../designer/designer-blueprint-schema.js";
+
 export const DesignerCanvasTabOpenAction = "designerCanvas.tabOpen";
+export const DesignerBlueprintTabUpsertAction = "designerBlueprint.tabUpsert";
 export const DashboardControlDynamicToolRequestMethod = "item/tool/call";
 export const DashboardControlDynamicToolNamespace = "dashboard_control";
-export const DesignerCanvasTabOpenDynamicToolName = "open_designer_canvas_tab";
+export const DesignerCanvasTabShowDynamicToolName = "show_designer_canvas_tab";
 
-const DesignerCanvasTabOpenInputSchema = z
+const DesignerCanvasRouteTabShowInputSchema = z
   .object({
+    kind: z.literal("route"),
     id: z.string().min(1).max(128),
     title: z.string().min(1).max(120),
     href: z
@@ -21,11 +25,28 @@ const DesignerCanvasTabOpenInputSchema = z
   })
   .strict();
 
-const DashboardControlDynamicToolCallSchema = z
+const DesignerBlueprintTabShowInputSchema = z
+  .object({
+    kind: z.literal("blueprint"),
+    title: z.string().min(1).max(120),
+    blueprint: DesignerBlueprintDocumentSchema,
+  })
+  .strict();
+
+const DesignerCanvasTabShowInputSchema = z
+  .object({
+    tab: z.discriminatedUnion("kind", [
+      DesignerCanvasRouteTabShowInputSchema,
+      DesignerBlueprintTabShowInputSchema,
+    ]),
+  })
+  .strict();
+
+const DesignerCanvasTabShowDynamicToolCallSchema = z
   .object({
     namespace: z.literal(DashboardControlDynamicToolNamespace),
-    tool: z.literal(DesignerCanvasTabOpenDynamicToolName),
-    arguments: DesignerCanvasTabOpenInputSchema,
+    tool: z.literal(DesignerCanvasTabShowDynamicToolName),
+    arguments: DesignerCanvasTabShowInputSchema,
   })
   .loose();
 
@@ -48,15 +69,23 @@ const DashboardControlDynamicToolInputSchema = z
   })
   .strict();
 
-export type DesignerCanvasTabOpenInput = z.output<typeof DesignerCanvasTabOpenInputSchema>;
+export type DesignerCanvasRouteTabShowInput = z.output<
+  typeof DesignerCanvasRouteTabShowInputSchema
+>;
+export type DesignerBlueprintTabShowInput = z.output<typeof DesignerBlueprintTabShowInputSchema>;
 export type DashboardControlDynamicToolCallResponse = z.output<
   typeof DashboardControlDynamicToolInputSchema
 >;
 
-export type DashboardControlActionRequest = {
-  action: typeof DesignerCanvasTabOpenAction;
-  input: DesignerCanvasTabOpenInput;
-};
+export type DashboardControlActionRequest =
+  | {
+      action: typeof DesignerCanvasTabOpenAction;
+      input: DesignerCanvasRouteTabShowInput;
+    }
+  | {
+      action: typeof DesignerBlueprintTabUpsertAction;
+      input: DesignerBlueprintTabShowInput;
+    };
 
 export type DashboardControlActionHandler = (
   request: DashboardControlActionRequest,
@@ -67,34 +96,356 @@ export type DashboardControlActionSupport = {
   handleAction: DashboardControlActionHandler;
 };
 
-export const DesignerCanvasTabOpenDynamicToolSpec = {
+const DesignerBlueprintConditionValueJsonSchema = {
+  anyOf: [
+    { type: "string" },
+    {
+      type: "array",
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      minItems: 1,
+      maxItems: 50,
+    },
+    { type: "number" },
+    { type: "boolean" },
+  ],
+};
+
+const DesignerBlueprintRoutingConditionJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    field: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+    },
+    operator: {
+      type: "string",
+      enum: ["equals", "not_equals", "includes", "excludes", "in", "empty", "not_empty"],
+    },
+    value: DesignerBlueprintConditionValueJsonSchema,
+  },
+  required: ["field", "operator"],
+};
+
+const DesignerBlueprintRoutingRuleJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    label: {
+      type: "string",
+      minLength: 1,
+      maxLength: 160,
+    },
+    when: {
+      type: "array",
+      items: DesignerBlueprintRoutingConditionJsonSchema,
+      minItems: 1,
+      maxItems: 20,
+      description: "Conjunctive conditions. Every condition in this array must match.",
+    },
+    routeTo: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+      description: "Optional item id to route to. Must reference an item in blueprint.items.",
+    },
+  },
+  required: ["when"],
+};
+
+const DesignerBlueprintCommonItemJsonSchemaProperties = {
+  id: {
+    type: "string",
+    minLength: 1,
+    maxLength: 128,
+    description: "Stable item id. Must be unique within blueprint.items.",
+  },
+  label: {
+    type: "string",
+    minLength: 1,
+    maxLength: 160,
+  },
+  description: {
+    type: "string",
+    minLength: 1,
+    maxLength: 2000,
+  },
+  parentId: {
+    type: "string",
+    minLength: 1,
+    maxLength: 128,
+    description: "Optional parent item id for sub-workflow/detail items.",
+  },
+  state: {
+    type: "string",
+    enum: ["proposed", "needs_setup", "ready_to_confirm", "applied", "blocked"],
+  },
+};
+
+const DesignerBlueprintStandardItemJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Workflow item. Use agent_step for agent work and workflow_output for visible workflow results.",
+  properties: {
+    ...DesignerBlueprintCommonItemJsonSchemaProperties,
+    kind: {
+      type: "string",
+      enum: ["agent_step", "workflow_output"],
+    },
+  },
+  required: ["id", "kind", "label", "state"],
+};
+
+const DesignerBlueprintTriggerItemJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Workflow-start trigger item. Use this for provider, schedule, or system events that start or advance the workflow; include integrationLabel and eventLabel when known.",
+  properties: {
+    ...DesignerBlueprintCommonItemJsonSchemaProperties,
+    kind: {
+      type: "string",
+      enum: ["trigger"],
+    },
+    integrationLabel: {
+      type: "string",
+      minLength: 1,
+      maxLength: 80,
+      description: "Provider or integration label shown on the trigger, such as GitHub or Slack.",
+    },
+    eventLabel: {
+      type: "string",
+      minLength: 1,
+      maxLength: 160,
+      description: "Specific event shown on the trigger, such as PR opened or message received.",
+    },
+  },
+  required: ["id", "kind", "label", "state"],
+};
+
+const DesignerBlueprintRoutingPolicyItemJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    ...DesignerBlueprintCommonItemJsonSchemaProperties,
+    kind: {
+      type: "string",
+      enum: ["routing_policy"],
+    },
+    rules: {
+      type: "array",
+      items: DesignerBlueprintRoutingRuleJsonSchema,
+      minItems: 1,
+      maxItems: 20,
+    },
+  },
+  required: ["id", "kind", "label", "state", "rules"],
+};
+
+const DesignerBlueprintDocumentJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Workflow visualization. Model what happens using trigger nodes, agent steps, routing policies, and outputs. Links, actions, and routing rule targets must reference item ids; the top-level outcome is not an item id.",
+  properties: {
+    version: {
+      type: "number",
+      enum: [1],
+    },
+    title: {
+      type: "string",
+      minLength: 1,
+      maxLength: 160,
+    },
+    outcome: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        label: {
+          type: "string",
+          minLength: 1,
+          maxLength: 160,
+        },
+        description: {
+          type: "string",
+          minLength: 1,
+          maxLength: 2000,
+        },
+      },
+      required: ["label"],
+    },
+    items: {
+      type: "array",
+      items: {
+        oneOf: [
+          DesignerBlueprintStandardItemJsonSchema,
+          DesignerBlueprintTriggerItemJsonSchema,
+          DesignerBlueprintRoutingPolicyItemJsonSchema,
+        ],
+      },
+      maxItems: 100,
+      description: "Semantic solution items. Item ids must be unique.",
+    },
+    links: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          from: {
+            type: "string",
+            minLength: 1,
+            maxLength: 128,
+            description: "Source item id. Must reference an item in blueprint.items.",
+          },
+          to: {
+            type: "string",
+            minLength: 1,
+            maxLength: 128,
+            description: "Target item id. Must reference an item in blueprint.items.",
+          },
+          kind: {
+            type: "string",
+            enum: [
+              "requires",
+              "triggers",
+              "configures",
+              "produces",
+              "confirms",
+              "routes_to",
+              "hands_off_to",
+              "uses",
+            ],
+          },
+        },
+        required: ["from", "to", "kind"],
+      },
+      maxItems: 200,
+    },
+    actions: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          id: {
+            type: "string",
+            minLength: 1,
+            maxLength: 128,
+          },
+          itemId: {
+            type: "string",
+            minLength: 1,
+            maxLength: 128,
+            description:
+              "Item id this action belongs to. Must reference an item in blueprint.items.",
+          },
+          kind: {
+            type: "string",
+            enum: [
+              "open_integration_setup",
+              "open_trigger_create",
+              "open_trigger_edit",
+              "open_sandbox_profile",
+              "open_sandbox_profile_section",
+            ],
+          },
+          label: {
+            type: "string",
+            minLength: 1,
+            maxLength: 160,
+          },
+          href: {
+            type: "string",
+            minLength: 1,
+            maxLength: 2048,
+            description: "Dashboard-internal absolute path such as /integrations/linear.",
+          },
+        },
+        required: ["id", "itemId", "kind", "label", "href"],
+      },
+      maxItems: 50,
+    },
+  },
+  required: ["version", "title", "outcome", "items", "links", "actions"],
+};
+
+const DesignerCanvasRouteTabJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    kind: {
+      type: "string",
+      enum: ["route"],
+    },
+    id: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+      description: "Stable tab id for this dashboard route.",
+    },
+    title: {
+      type: "string",
+      minLength: 1,
+      maxLength: 120,
+    },
+    href: {
+      type: "string",
+      minLength: 1,
+      maxLength: 2048,
+      description: "Dashboard-internal absolute path.",
+    },
+  },
+  required: ["kind", "id", "title", "href"],
+};
+
+const DesignerCanvasBlueprintTabJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    kind: {
+      type: "string",
+      enum: ["blueprint"],
+    },
+    title: {
+      type: "string",
+      minLength: 1,
+      maxLength: 120,
+    },
+    blueprint: {
+      ...DesignerBlueprintDocumentJsonSchema,
+      description:
+        "Designer blueprint document. Must use version 1, fit within 64 KB, and contain semantic structure rather than renderer coordinates. The dashboard assigns the stable blueprint tab id and href.",
+    },
+  },
+  required: ["kind", "title", "blueprint"],
+};
+
+export const DesignerCanvasTabShowDynamicToolSpec = {
   namespace: DashboardControlDynamicToolNamespace,
-  name: DesignerCanvasTabOpenDynamicToolName,
-  description: "Open and focus a dashboard-internal route in a Designer canvas tab.",
+  name: DesignerCanvasTabShowDynamicToolName,
+  description:
+    "Show a route or blueprint in the Designer canvas. The dashboard creates, replaces, or focuses the matching tab.",
   inputSchema: {
     type: "object",
     additionalProperties: false,
     properties: {
-      id: {
-        type: "string",
-        minLength: 1,
-        maxLength: 128,
-      },
-      title: {
-        type: "string",
-        minLength: 1,
-        maxLength: 120,
-      },
-      href: {
-        type: "string",
-        minLength: 1,
-        maxLength: 2048,
-        description: "Dashboard-internal absolute path.",
+      tab: {
+        oneOf: [DesignerCanvasRouteTabJsonSchema, DesignerCanvasBlueprintTabJsonSchema],
       },
     },
-    required: ["id", "title", "href"],
+    required: ["tab"],
   },
 } satisfies CodexDynamicToolSpec;
+
+export const DashboardControlDynamicToolSpecs = [
+  DesignerCanvasTabShowDynamicToolSpec,
+] satisfies readonly CodexDynamicToolSpec[];
 
 export function isDashboardControlDynamicToolCallRequest(
   request: CodexJsonRpcServerRequest,
@@ -109,24 +460,44 @@ export function isDashboardControlDynamicToolCallRequest(
   return (
     identity.success &&
     identity.data.namespace === DashboardControlDynamicToolNamespace &&
-    identity.data.tool === DesignerCanvasTabOpenDynamicToolName
+    identity.data.tool === DesignerCanvasTabShowDynamicToolName
   );
 }
 
 export function parseDashboardControlDynamicToolCall(
   params: unknown,
 ): DashboardControlActionRequest | DashboardControlDynamicToolCallResponse {
-  const parsedRequest = DashboardControlDynamicToolCallSchema.safeParse(params);
-  if (!parsedRequest.success) {
+  const parsedCanvasTabRequest = DesignerCanvasTabShowDynamicToolCallSchema.safeParse(params);
+  if (!parsedCanvasTabRequest.success) {
+    const identity = DashboardControlDynamicToolCallIdentitySchema.safeParse(params);
+    if (
+      identity.success &&
+      identity.data.namespace === DashboardControlDynamicToolNamespace &&
+      identity.data.tool === DesignerCanvasTabShowDynamicToolName
+    ) {
+      return createDashboardControlDynamicToolCallResponse({
+        success: false,
+        text: "Designer canvas tab input is invalid.",
+      });
+    }
+
     return createDashboardControlDynamicToolCallResponse({
       success: false,
-      text: "Designer canvas tab input is invalid.",
+      text: "Dashboard control action input is invalid.",
     });
   }
 
+  const requestedTab = parsedCanvasTabRequest.data.arguments.tab;
+  if (requestedTab.kind === "route") {
+    return {
+      action: DesignerCanvasTabOpenAction,
+      input: requestedTab,
+    };
+  }
+
   return {
-    action: DesignerCanvasTabOpenAction,
-    input: parsedRequest.data.arguments,
+    action: DesignerBlueprintTabUpsertAction,
+    input: requestedTab,
   };
 }
 

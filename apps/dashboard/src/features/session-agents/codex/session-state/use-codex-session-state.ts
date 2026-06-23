@@ -43,7 +43,7 @@ import {
 } from "../../../pages/session-composer/session-composer-trigger-detection.js";
 import {
   createDashboardControlDynamicToolCallResponse,
-  DesignerCanvasTabOpenDynamicToolSpec,
+  DashboardControlDynamicToolSpecs,
   isDashboardControlDynamicToolCallRequest,
   parseDashboardControlDynamicToolCall,
   type DashboardControlActionRequest,
@@ -537,8 +537,7 @@ export function useCodexSessionState(input: {
   );
 
   const dashboardControlDynamicTools = useMemo(
-    () =>
-      input.dashboardControlActions === undefined ? [] : [DesignerCanvasTabOpenDynamicToolSpec],
+    () => (input.dashboardControlActions === undefined ? [] : DashboardControlDynamicToolSpecs),
     [input.dashboardControlActions],
   );
 

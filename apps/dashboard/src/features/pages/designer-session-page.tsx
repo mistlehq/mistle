@@ -4,6 +4,10 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import {
+  DesignerBlueprintCurrentTabHref,
+  DesignerBlueprintCurrentTabId,
+} from "../designer/designer-blueprint-schema.js";
+import {
   designerSessionQueryKey,
   getDesignerSession,
   mintDesignerSessionConnectionToken,
@@ -12,10 +16,12 @@ import {
   type DesignerSessionCanvasTab,
 } from "../designer/designer-service.js";
 import {
+  DesignerBlueprintTabUpsertAction,
   DesignerCanvasTabOpenAction,
   type DashboardControlActionHandler,
   type DashboardControlActionSupport,
-  type DesignerCanvasTabOpenInput,
+  type DesignerBlueprintTabShowInput,
+  type DesignerCanvasRouteTabShowInput,
 } from "../session-agents/dashboard-control-actions.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
@@ -36,7 +42,7 @@ function useDesignerSessionId(): string {
 
 function upsertDesignerCanvasTab(input: {
   currentTabs: readonly DesignerSessionCanvasTab[];
-  requestedTab: DesignerCanvasTabOpenInput;
+  requestedTab: DesignerCanvasRouteTabShowInput;
 }): readonly DesignerSessionCanvasTab[] {
   const matchingHrefTab = input.currentTabs.find((tab) => tab.href === input.requestedTab.href);
   if (matchingHrefTab !== undefined) {
@@ -44,8 +50,10 @@ function upsertDesignerCanvasTab(input: {
       tab.href !== input.requestedTab.href
         ? tab
         : {
-            ...tab,
+            kind: "route",
+            id: tab.id,
             title: input.requestedTab.title,
+            href: input.requestedTab.href,
           },
     );
   }
@@ -56,6 +64,7 @@ function upsertDesignerCanvasTab(input: {
       tab.id !== input.requestedTab.id
         ? tab
         : {
+            kind: "route",
             id: tab.id,
             title: input.requestedTab.title,
             href: input.requestedTab.href,
@@ -66,11 +75,36 @@ function upsertDesignerCanvasTab(input: {
   return [
     ...input.currentTabs,
     {
+      kind: "route",
       id: input.requestedTab.id,
       title: input.requestedTab.title,
       href: input.requestedTab.href,
     },
   ];
+}
+
+function upsertDesignerBlueprintCanvasTab(input: {
+  currentTabs: readonly DesignerSessionCanvasTab[];
+  requestedTab: DesignerBlueprintTabShowInput;
+}): readonly DesignerSessionCanvasTab[] {
+  const blueprintTab: DesignerSessionCanvasTab = {
+    kind: "blueprint",
+    id: DesignerBlueprintCurrentTabId,
+    title: input.requestedTab.title,
+    href: DesignerBlueprintCurrentTabHref,
+    blueprint: input.requestedTab.blueprint,
+  };
+  const hasExistingBlueprintTab = input.currentTabs.some(
+    (tab) => tab.id === DesignerBlueprintCurrentTabId,
+  );
+
+  if (!hasExistingBlueprintTab) {
+    return [...input.currentTabs, blueprintTab];
+  }
+
+  return input.currentTabs.map((tab) =>
+    tab.id === DesignerBlueprintCurrentTabId ? blueprintTab : tab,
+  );
 }
 
 export function mergeDesignerCanvasTabSnapshotIntoLatestTabs(input: {
@@ -185,14 +219,24 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
       const nextSave = canvasTabSaveQueueRef.current
         .catch(() => {})
         .then(async () => {
-          const nextTabs = upsertDesignerCanvasTab({
-            currentTabs: latestPersistedCanvasTabsRef.current,
-            requestedTab: request.input,
-          });
+          const nextTabs =
+            request.action === DesignerCanvasTabOpenAction
+              ? upsertDesignerCanvasTab({
+                  currentTabs: latestPersistedCanvasTabsRef.current,
+                  requestedTab: request.input,
+                })
+              : upsertDesignerBlueprintCanvasTab({
+                  currentTabs: latestPersistedCanvasTabsRef.current,
+                  requestedTab: request.input,
+                });
+          const activeHref =
+            request.action === DesignerCanvasTabOpenAction
+              ? request.input.href
+              : DesignerBlueprintCurrentTabHref;
           await persistCanvasTabs(nextTabs);
           latestPersistedCanvasTabsRef.current = nextTabs;
           setCanvasTabs(nextTabs);
-          setActiveTabHref(request.input.href);
+          setActiveTabHref(activeHref);
         });
       canvasTabSaveQueueRef.current = nextSave;
       await nextSave;
@@ -202,7 +246,7 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
 
   const dashboardControlActions = useMemo<DashboardControlActionSupport>(
     () => ({
-      supportedActions: [DesignerCanvasTabOpenAction],
+      supportedActions: [DesignerCanvasTabOpenAction, DesignerBlueprintTabUpsertAction],
       handleAction: handleDashboardControlAction,
     }),
     [handleDashboardControlAction],

@@ -11,11 +11,13 @@ describe("mergeDesignerCanvasTabSnapshotIntoLatestTabs", () => {
       mergeDesignerCanvasTabSnapshotIntoLatestTabs({
         latestTabs: [
           {
+            kind: "route",
             id: "integrations",
             title: "Integrations",
             href: "/integrations",
           },
           {
+            kind: "route",
             id: "profile",
             title: "ABC Profile",
             href: "/sandbox-profiles/sbp_abc",
@@ -23,6 +25,7 @@ describe("mergeDesignerCanvasTabSnapshotIntoLatestTabs", () => {
         ],
         snapshotTabs: [
           {
+            kind: "route",
             id: "integrations",
             title: "Slack",
             href: "/integrations/slack",
@@ -31,11 +34,13 @@ describe("mergeDesignerCanvasTabSnapshotIntoLatestTabs", () => {
       }),
     ).toEqual([
       {
+        kind: "route",
         id: "integrations",
         title: "Slack",
         href: "/integrations/slack",
       },
       {
+        kind: "route",
         id: "profile",
         title: "ABC Profile",
         href: "/sandbox-profiles/sbp_abc",
@@ -50,11 +55,13 @@ describe("removeDesignerCanvasTabFromLatestTabs", () => {
       removeDesignerCanvasTabFromLatestTabs({
         latestTabs: [
           {
+            kind: "route",
             id: "integrations",
             title: "Integrations",
             href: "/integrations",
           },
           {
+            kind: "route",
             id: "triggers",
             title: "ABC Triggers",
             href: "/sandbox-profiles/sbp_abc/triggers",
@@ -64,6 +71,7 @@ describe("removeDesignerCanvasTabFromLatestTabs", () => {
       }),
     ).toEqual([
       {
+        kind: "route",
         id: "triggers",
         title: "ABC Triggers",
         href: "/sandbox-profiles/sbp_abc/triggers",

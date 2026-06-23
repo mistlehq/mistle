@@ -780,6 +780,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
       activeConversationId: activeRuntime.conversation.activeConversationId,
       attachmentTargetId: activeRuntime.conversation.attachmentTargetId,
       chatState: activeRuntime.conversation.chatState,
+      isInitialConversationHydrated: activeRuntime.conversation.isInitialConversationHydrated,
       ...(activeRuntime.conversation.dismissUserMessageAction === undefined
         ? {}
         : { dismissUserMessageAction: activeRuntime.conversation.dismissUserMessageAction }),

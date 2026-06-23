@@ -85,6 +85,38 @@ describe.concurrent("designer sessions integration", () => {
       "Do not publish sandbox profile versions, start sandbox sessions, create provider-side resources, or mutate external provider configuration unless there is an explicit user-approved runtime action for that operation.",
     );
     expect(codexAgents?.content).toContain("Search Mistle docs with the `mistle_docs` MCP server");
+    expect(codexAgents?.content).toContain(
+      "For open-ended workflow requests, the first user-visible action after understanding the requested outcome is to show a Designer blueprint.",
+    );
+    expect(codexAgents?.content).toContain(
+      'For broad requests such as "Build a triaging agent", draft a minimal workflow blueprint before calling Mistle MCP tools.',
+    );
+    expect(codexAgents?.content).toContain(
+      "Ask for the next concrete setup decision needed to implement the workflow, such as the source system, whether to use an existing sandbox profile or create one, or whether provider writes should be allowed.",
+    );
+    expect(codexAgents?.content).toContain(
+      "Ask one focused clarification only when the request is too unclear to draft even a high-level workflow.",
+    );
+    expect(codexAgents?.content).toContain(
+      "Organize the blueprint as the workflow process first: show the triggers that start or advance the workflow, the agent steps that run, and the outputs the workflow produces.",
+    );
+    expect(codexAgents?.content).toContain(
+      'Use `trigger` for user, provider, schedule, or system events such as "GitHub PR opened" or "Slack message received".',
+    );
+    expect(codexAgents?.content).toContain(
+      "Put provider/source details directly on trigger items with `integrationLabel` and `eventLabel` when known.",
+    );
+    expect(codexAgents?.content).toContain(
+      'For a request like "Build a triaging agent", the initial blueprint should read like a process',
+    );
+    expect(codexAgents?.content).toContain(
+      "Item states are required schema metadata, but the workflow graph does not display them.",
+    );
+    expect(codexAgents?.content).toContain('show_designer_canvas_tab` with `tab.kind: "blueprint"');
+    expect(codexAgents?.content).toContain(
+      "not a Mistle MCP tool. Do not search Mistle MCP tool discovery",
+    );
+    expect(codexAgents?.content).toContain('show_designer_canvas_tab` with `tab.kind: "route"');
 
     const listResponse = await env.controlPlaneApi.http.fetch("/v1/designer/sessions", {
       headers: {
@@ -172,11 +204,13 @@ describe.concurrent("designer sessions integration", () => {
         body: JSON.stringify({
           tabs: [
             {
+              kind: "route",
               id: "integrations",
               title: "Integrations",
               href: "/integrations",
             },
             {
+              kind: "route",
               id: "sandbox-profile",
               title: "Sandbox Profile",
               href: "/sandbox-profiles/sbp_designer/draft",
@@ -189,11 +223,13 @@ describe.concurrent("designer sessions integration", () => {
     const updated = DesignerSessionSchema.parse(await updateResponse.json());
     expect(updated.canvasTabs).toEqual([
       {
+        kind: "route",
         id: "integrations",
         title: "Integrations",
         href: "/integrations",
       },
       {
+        kind: "route",
         id: "sandbox-profile",
         title: "Sandbox Profile",
         href: "/sandbox-profiles/sbp_designer/draft",
@@ -211,6 +247,7 @@ describe.concurrent("designer sessions integration", () => {
         body: JSON.stringify({
           tabs: [
             {
+              kind: "route",
               id: "session",
               title: "Session",
               href: `/sessions/${created.sandboxInstanceId}`,
@@ -224,6 +261,7 @@ describe.concurrent("designer sessions integration", () => {
       DesignerSessionSchema.parse(await updateBySandboxInstanceResponse.json()).canvasTabs,
     ).toEqual([
       {
+        kind: "route",
         id: "session",
         title: "Session",
         href: `/sessions/${created.sandboxInstanceId}`,
@@ -335,6 +373,7 @@ describe.concurrent("designer sessions integration", () => {
           body: JSON.stringify({
             tabs: [
               {
+                kind: "route",
                 id: "invalid",
                 title: "Invalid",
                 href,
@@ -400,6 +439,7 @@ describe.concurrent("designer sessions integration", () => {
         body: JSON.stringify({
           tabs: [
             {
+              kind: "route",
               id: "integrations",
               title: "Integrations",
               href: "/integrations",
@@ -421,6 +461,7 @@ describe.concurrent("designer sessions integration", () => {
         body: JSON.stringify({
           tabs: [
             {
+              kind: "route",
               id: "integrations",
               title: "Integrations",
               href: "/integrations",
@@ -472,6 +513,7 @@ describe.concurrent("designer sessions integration", () => {
         body: JSON.stringify({
           tabs: [
             {
+              kind: "route",
               id: "integrations",
               title: "Integrations",
               href: "/integrations",
@@ -583,6 +625,7 @@ describe.concurrent("designer sessions integration", () => {
         body: JSON.stringify({
           tabs: [
             {
+              kind: "route",
               id: "integrations",
               title: "Integrations",
               href: "/integrations",
@@ -601,6 +644,7 @@ describe.concurrent("designer sessions integration", () => {
         body: JSON.stringify({
           tabs: [
             {
+              kind: "route",
               id: "integrations",
               title: "Integrations",
               href: "/integrations",

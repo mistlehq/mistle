@@ -19,6 +19,7 @@ type PiExtensionUIResponseInput = Parameters<
 
 const ReadyBootstrap: CodexRuntimeInput["bootstrap"] = {
   phase: { status: "ready" },
+  isActiveThreadSynced: true,
   composerCapabilities: [],
   establishedSnapshot: {
     availableModels: [],

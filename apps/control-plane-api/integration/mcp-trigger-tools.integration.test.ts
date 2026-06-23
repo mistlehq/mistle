@@ -948,56 +948,72 @@ describe.concurrent("MCP trigger tools integration", () => {
     expect(result.isError).toBe(true);
   });
 
-  it("prevents designer MCP tokens from creating or updating triggers", async ({ env }) => {
+  it("allows designer MCP tokens to create and update triggers", async ({ env }) => {
     const session = await env.auth.createSession({
-      email: "integration-new-mcp-designer-trigger-mutation-forbidden@example.com",
+      email: "integration-new-mcp-designer-trigger-mutation@example.com",
     });
     const token = await mintMcpToken({
       config: McpTokenConfig,
       claims: {
         kind: "designer",
-        sub: "sbi_mcp_designer_trigger_mutation_forbidden",
+        sub: "sbi_mcp_designer_trigger_mutation",
         organizationId: session.organizationId,
-        designerSessionId: "dsn_mcp_designer_trigger_mutation_forbidden",
+        designerSessionId: "dsn_mcp_designer_trigger_mutation",
       },
       ttlSeconds: 300,
     });
 
     await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
-      id: "dsn_mcp_designer_trigger_mutation_forbidden",
+      id: "dsn_mcp_designer_trigger_mutation",
       organizationId: session.organizationId,
-      sandboxInstanceId: "sbi_mcp_designer_trigger_mutation_forbidden",
+      sandboxInstanceId: "sbi_mcp_designer_trigger_mutation",
       initialPrompt: null,
       canvasTabs: [],
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_mcp_designer_trigger_mutation",
+      webhookSourceId: "iws_mcp_designer_trigger_mutation",
+      profileId: "sbp_mcp_designer_trigger_mutation",
+      profileVersion: 1,
+      profileActiveVersion: 1,
     });
 
     const createResult = await callMcpTool({
       env,
       token: token.token,
-      name: "create_scheduled_trigger",
+      name: "create_webhook_trigger",
       arguments: {
-        name: "Forbidden Designer scheduled trigger",
+        name: "Designer GitHub issue triage",
         enabled: true,
-        cronExpression: "15 8 * * *",
-        timezone: "UTC",
-        userMessage: "Run the scheduled maintenance check",
+        integrationWebhookSourceId: "iws_mcp_designer_trigger_mutation",
+        eventTypes: [GitHubIssueCommentCreatedEventType],
+        userMessage: "Triage {{payload.issue.title}}",
+        instructions: "Classify issue severity and propose owner/component.",
+        conversationKeyTemplate: "{{payload.issue.node_id}}",
+        idempotencyKeyTemplate: "{{payload.comment.node_id}}",
         target: {
-          sandboxProfileId: "sbp_mcp_designer_trigger_mutation_forbidden",
+          sandboxProfileId: "sbp_mcp_designer_trigger_mutation",
         },
       },
     });
+    expect(createResult.isError).toBeUndefined();
+    const createdTrigger = GetTriggerResponseSchema.parse(createResult.structuredContent);
+
     const updateResult = await callMcpTool({
       env,
       token: token.token,
       name: "rename_trigger",
       arguments: {
-        triggerId: "atm_mcp_designer_trigger_mutation_forbidden",
-        name: "Forbidden Designer trigger rename",
+        triggerId: createdTrigger.id,
+        name: "Designer GitHub issue triage renamed",
       },
     });
 
-    expect(createResult.isError).toBe(true);
-    expect(updateResult.isError).toBe(true);
+    expect(updateResult.isError).toBeUndefined();
+    const updatedTrigger = GetTriggerResponseSchema.parse(updateResult.structuredContent);
+    expect(updatedTrigger.name).toBe("Designer GitHub issue triage renamed");
   });
 });
 
