@@ -13,6 +13,7 @@ import {
 const ShopifyClientCredentialsTokenResponseSchema = z
   .object({
     access_token: z.string().min(1),
+    expires_in: z.number().int().positive(),
     scope: z.string().optional(),
   })
   .loose();
@@ -40,6 +41,13 @@ export function parseShopifyClientCredentialsTokenResponse(
 
 export function resolveShopifyClientCredentialsTokenEndpoint(shopDomain: string): string {
   return `https://${normalizeShopifyShopDomain(shopDomain)}/admin/oauth/access_token`;
+}
+
+export function resolveShopifyAccessTokenExpiresAt(input: {
+  issuedAt: Date;
+  expiresInSeconds: number;
+}): string {
+  return new Date(input.issuedAt.getTime() + input.expiresInSeconds * 1000).toISOString();
 }
 
 export async function exchangeShopifyClientCredentials(
@@ -75,6 +83,10 @@ export async function exchangeShopifyClientCredentials(
 
   return {
     accessToken: parsedResponse.access_token,
+    accessTokenExpiresAt: resolveShopifyAccessTokenExpiresAt({
+      issuedAt: new Date(),
+      expiresInSeconds: parsedResponse.expires_in,
+    }),
     ...(parsedResponse.scope === undefined
       ? {}
       : {

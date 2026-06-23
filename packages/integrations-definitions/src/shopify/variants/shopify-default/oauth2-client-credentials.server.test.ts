@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildShopifyClientCredentialsRequestBody,
   parseShopifyClientCredentialsTokenResponse,
+  resolveShopifyAccessTokenExpiresAt,
   resolveShopifyClientCredentialsTokenEndpoint,
 } from "./oauth2-client-credentials.server.js";
 
@@ -24,12 +25,25 @@ describe("parseShopifyClientCredentialsTokenResponse", () => {
     expect(
       parseShopifyClientCredentialsTokenResponse({
         access_token: "access-token-123",
+        expires_in: 86_400,
         scope: "read_products,write_products",
       }),
     ).toEqual({
       access_token: "access-token-123",
+      expires_in: 86_400,
       scope: "read_products,write_products",
     });
+  });
+});
+
+describe("resolveShopifyAccessTokenExpiresAt", () => {
+  it("calculates the token expiry timestamp", () => {
+    expect(
+      resolveShopifyAccessTokenExpiresAt({
+        issuedAt: new Date("2026-06-23T00:00:00.000Z"),
+        expiresInSeconds: 86_400,
+      }),
+    ).toBe("2026-06-24T00:00:00.000Z");
   });
 });
 
