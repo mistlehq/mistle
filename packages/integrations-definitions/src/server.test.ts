@@ -499,7 +499,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(40);
+    expect(definitions).toHaveLength(41);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
@@ -520,6 +520,7 @@ describe("integrations-definitions server", () => {
         "railway::railway-mcp",
         "render::render-mcp",
         "resend::resend-mcp",
+        "shopify::shopify-default",
         "stripe::stripe-mcp",
         "supabase::supabase-mcp",
         "wasenderapi::wasenderapi-mcp",
