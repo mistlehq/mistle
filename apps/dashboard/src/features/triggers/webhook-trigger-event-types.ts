@@ -1,4 +1,5 @@
 import type { IntegrationWebhookTriggerRequirements } from "@mistle/integrations-core";
+import type { WebhookPayloadFilter } from "@mistle/webhooks";
 
 export const WebhookTriggerEventOptionAvailabilities = {
   AVAILABLE: "available",
@@ -39,10 +40,11 @@ export type WebhookTriggerEventParameterOption =
       label: string;
       kind: "enum-select";
       payloadPath: string[];
-      matchMode: "eq" | "exists";
+      matchMode: "eq" | "exists" | "payload_filter";
       options: readonly {
         value: string;
         label: string;
+        payloadFilter?: WebhookPayloadFilter;
       }[];
       negatedMatchRequiresExists?: boolean;
       prefix?: string;

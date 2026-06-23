@@ -293,6 +293,55 @@ const SlackMessageEventOption: WebhookTriggerEventOption = {
       payloadPath: ["event", "text"],
       matchMode: "contains",
     },
+    {
+      id: "messageType",
+      label: "message type",
+      kind: "enum-select",
+      payloadPath: ["event", "thread_ts"],
+      matchMode: "payload_filter",
+      placeholder: "Any message",
+      options: [
+        {
+          value: "channel_or_dm_message",
+          label: "Channel or DM message",
+          payloadFilter: {
+            op: "not",
+            filter: {
+              op: "and",
+              filters: [
+                {
+                  op: "exists",
+                  path: ["event", "thread_ts"],
+                },
+                {
+                  op: "neq_path",
+                  path: ["event", "thread_ts"],
+                  otherPath: ["event", "ts"],
+                },
+              ],
+            },
+          },
+        },
+        {
+          value: "thread_reply",
+          label: "Thread reply",
+          payloadFilter: {
+            op: "and",
+            filters: [
+              {
+                op: "exists",
+                path: ["event", "thread_ts"],
+              },
+              {
+                op: "neq_path",
+                path: ["event", "thread_ts"],
+                otherPath: ["event", "ts"],
+              },
+            ],
+          },
+        },
+      ],
+    },
   ],
 };
 
@@ -1044,6 +1093,45 @@ describe("toWebhookTriggerFormValues", () => {
     });
   });
 
+  it("hydrates Slack message type filters for thread replies", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        withWebhookTriggerEventConditions({
+          trigger: SampleTrigger,
+          integrationWebhookSourceId: SlackWebhookSourceId,
+          eventConditions: [
+            {
+              eventType: "slack:message",
+              payloadFilter: {
+                op: "and",
+                filters: [
+                  {
+                    op: "exists",
+                    path: ["event", "thread_ts"],
+                  },
+                  {
+                    op: "neq_path",
+                    path: ["event", "thread_ts"],
+                    otherPath: ["event", "ts"],
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        [SlackMessageEventOption],
+      ),
+    ).toMatchObject({
+      eventIds: [SlackMessageConditionId0],
+      eventParameterRules: {
+        [SlackMessageConditionId0]: {
+          messageType: isRule("thread_reply"),
+        },
+      },
+      remainingPayloadFilter: null,
+    });
+  });
+
   it("hydrates explicit invocation trigger parameters out of contains_token filters", () => {
     expect(
       toWebhookTriggerFormValues(
@@ -1731,6 +1819,44 @@ describe("trigger payload transforms", () => {
                 op: "contains_token",
                 path: ["event", "text"],
                 value: "<@U9999999999",
+              },
+            ],
+          },
+        },
+      ],
+    });
+  });
+
+  it("builds Slack message type parameters into payload filters", () => {
+    expect(
+      toCreateWebhookTriggerPayload(
+        {
+          ...BaseFormValues,
+          conversationKeyTemplate: "slack:channel:{{payload.event.channel}}",
+          eventIds: [SlackMessageConditionId0],
+          eventParameterRules: {
+            [SlackMessageConditionId0]: {
+              messageType: isRule("thread_reply"),
+            },
+          },
+        },
+        [SlackMessageEventOption],
+      ),
+    ).toMatchObject({
+      eventConditions: [
+        {
+          eventType: "slack:message",
+          payloadFilter: {
+            op: "and",
+            filters: [
+              {
+                op: "exists",
+                path: ["event", "thread_ts"],
+              },
+              {
+                op: "neq_path",
+                path: ["event", "thread_ts"],
+                otherPath: ["event", "ts"],
               },
             ],
           },

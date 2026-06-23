@@ -641,6 +641,9 @@ function cloneStoryAssociatedResourceEventParameter(
         options: parameter.options.map((option) => ({
           value: option.value,
           label: option.label,
+          ...(option.payloadFilter === undefined
+            ? {}
+            : { payloadFilter: structuredClone(option.payloadFilter) }),
         })),
         ...(parameter.negatedMatchRequiresExists === undefined
           ? {}

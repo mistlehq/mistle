@@ -297,6 +297,10 @@ _Avoid_: Slack user group handle when stable identity is required, Slack user me
 A **Trigger event parameter** that matches an explicit Slack user group mention carried by a Slack message-like **Trigger event**.
 _Avoid_: Slack user group membership filter, team membership filter
 
+**Slack message type trigger parameter**:
+A **Trigger event parameter** that matches whether a Slack message-like **Trigger event** is a channel or DM message or a thread reply.
+_Avoid_: Thread reply parameter, in-thread filter
+
 **Slack user**:
 A Slack identity that can appear in Slack user-ID event fields, whether human, app bot, workflow bot, or Slack-owned special user.
 _Avoid_: Linked user when the identity is not tied to a Mistle user, human when the identity may be automated

@@ -30,6 +30,16 @@ export type WebhookPayloadFilter =
       value: WebhookPayloadFilterScalar;
     }
   | {
+      op: "eq_path";
+      path: WebhookPayloadFilterPath;
+      otherPath: WebhookPayloadFilterPath;
+    }
+  | {
+      op: "neq_path";
+      path: WebhookPayloadFilterPath;
+      otherPath: WebhookPayloadFilterPath;
+    }
+  | {
       op: "in";
       path: WebhookPayloadFilterPath;
       values: ReadonlyArray<WebhookPayloadFilterScalar>;
@@ -138,6 +148,20 @@ export const WebhookPayloadFilterSchema: z.ZodType<WebhookPayloadFilter> = z.laz
         op: z.literal("neq"),
         path: WebhookPayloadFilterPathSchema,
         value: WebhookPayloadFilterScalarSchema,
+      })
+      .strict(),
+    z
+      .object({
+        op: z.literal("eq_path"),
+        path: WebhookPayloadFilterPathSchema,
+        otherPath: WebhookPayloadFilterPathSchema,
+      })
+      .strict(),
+    z
+      .object({
+        op: z.literal("neq_path"),
+        path: WebhookPayloadFilterPathSchema,
+        otherPath: WebhookPayloadFilterPathSchema,
       })
       .strict(),
     z

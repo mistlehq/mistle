@@ -5473,10 +5473,13 @@ export interface paths {
                         kind: "enum-select";
                         label: string;
                         /** @enum {string} */
-                        matchMode: "eq" | "exists";
+                        matchMode: "eq" | "exists" | "payload_filter";
                         negatedMatchRequiresExists?: boolean;
                         options: {
                           label: string;
+                          payloadFilter?: {
+                            [key: string]: unknown;
+                          };
                           value: string;
                         }[];
                         payloadPath: string[];
@@ -5544,10 +5547,13 @@ export interface paths {
                         kind: "enum-select";
                         label: string;
                         /** @enum {string} */
-                        matchMode: "eq" | "exists";
+                        matchMode: "eq" | "exists" | "payload_filter";
                         negatedMatchRequiresExists?: boolean;
                         options: {
                           label: string;
+                          payloadFilter?: {
+                            [key: string]: unknown;
+                          };
                           value: string;
                         }[];
                         payloadPath: string[];

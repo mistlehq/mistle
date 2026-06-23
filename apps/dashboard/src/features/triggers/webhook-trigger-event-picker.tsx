@@ -1256,7 +1256,7 @@ export function resolveEnumSelectParameterRule(input: {
 }): WebhookTriggerEventParameterRule {
   const selectedValue = input.value === null || input.value === "__any__" ? "" : input.value;
 
-  if (input.parameter.matchMode === "eq") {
+  if (input.parameter.matchMode === "eq" || input.parameter.matchMode === "payload_filter") {
     return {
       operator: WebhookTriggerEventParameterRuleOperators.IS,
       value: selectedValue,

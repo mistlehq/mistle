@@ -4,6 +4,7 @@ import {
   IntegrationFormConnectionMethodSetupFlowMetadataSchema,
   type IntegrationManagedWebhookSourcePostCreateMetadata,
 } from "@mistle/integrations-core";
+import { WebhookPayloadFilterSchema } from "@mistle/webhooks";
 import { z } from "zod";
 
 import { normalizeHttpApiError } from "../api/http-api-error.js";
@@ -105,13 +106,14 @@ const IntegrationWebhookEventParameterDefinitionSchema = z.union([
       label: z.string().min(1),
       kind: z.literal("enum-select"),
       payloadPath: z.array(z.string().min(1)).min(1),
-      matchMode: z.enum(["eq", "exists"]),
+      matchMode: z.enum(["eq", "exists", "payload_filter"]),
       options: z
         .array(
           z
             .object({
               value: z.string().min(1),
               label: z.string().min(1),
+              payloadFilter: WebhookPayloadFilterSchema.optional(),
             })
             .strict(),
         )

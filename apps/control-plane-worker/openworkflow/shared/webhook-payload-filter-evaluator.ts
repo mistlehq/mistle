@@ -193,6 +193,26 @@ export function evaluateWebhookPayloadFilter(input: {
     return resolvedValue !== filter.value;
   }
 
+  if (filter.op === "eq_path") {
+    return (
+      resolvedValue ===
+      getWebhookPayloadValueAtPath({
+        payload,
+        path: filter.otherPath,
+      })
+    );
+  }
+
+  if (filter.op === "neq_path") {
+    return (
+      resolvedValue !==
+      getWebhookPayloadValueAtPath({
+        payload,
+        path: filter.otherPath,
+      })
+    );
+  }
+
   if (filter.op === "in") {
     if (!isWebhookPayloadFilterScalar(resolvedValue)) {
       return false;

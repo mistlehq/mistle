@@ -150,20 +150,52 @@ const SlackMessageTextParameter: IntegrationWebhookEventParameterDefinition = {
   placeholder: "deployment failed",
 };
 
-const SlackThreadReplyParameter: IntegrationWebhookEventParameterDefinition = {
-  id: "threadReply",
-  label: "thread reply",
+const SlackMessageTypeParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "messageType",
+  label: "message type",
   kind: "enum-select",
   payloadPath: ["event", "thread_ts"],
-  matchMode: "exists",
+  matchMode: "payload_filter",
+  placeholder: "Any message",
   options: [
     {
-      value: "exists",
-      label: "is in a thread",
+      value: "channel_or_dm_message",
+      label: "Channel or DM message",
+      payloadFilter: {
+        op: "not",
+        filter: {
+          op: "and",
+          filters: [
+            {
+              op: "exists",
+              path: ["event", "thread_ts"],
+            },
+            {
+              op: "neq_path",
+              path: ["event", "thread_ts"],
+              otherPath: ["event", "ts"],
+            },
+          ],
+        },
+      },
     },
     {
-      value: "not_exists",
-      label: "is not in a thread",
+      value: "thread_reply",
+      label: "Thread reply",
+      payloadFilter: {
+        op: "and",
+        filters: [
+          {
+            op: "exists",
+            path: ["event", "thread_ts"],
+          },
+          {
+            op: "neq_path",
+            path: ["event", "thread_ts"],
+            otherPath: ["event", "ts"],
+          },
+        ],
+      },
     },
   ],
 };
@@ -291,7 +323,7 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
       SlackUserMentionParameter,
       SlackUserGroupMentionParameter,
       SlackMessageTextParameter,
-      SlackThreadReplyParameter,
+      SlackMessageTypeParameter,
     ],
   }),
   createSlackWebhookEventDefinition({

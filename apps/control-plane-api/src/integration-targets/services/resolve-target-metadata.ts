@@ -19,6 +19,7 @@ import type {
   IntegrationWebhookSourceLifecycle,
 } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
+import type { WebhookPayloadFilter } from "@mistle/webhooks";
 
 const IntegrationRegistry = createIntegrationRegistry();
 
@@ -65,10 +66,11 @@ type ResolvedWebhookEventParameter =
       label: string;
       kind: "enum-select";
       payloadPath: string[];
-      matchMode: "eq" | "exists";
+      matchMode: "eq" | "exists" | "payload_filter";
       options: {
         value: string;
         label: string;
+        payloadFilter?: WebhookPayloadFilter;
       }[];
       negatedMatchRequiresExists?: boolean;
       prefix?: string;
@@ -654,6 +656,9 @@ function cloneWebhookEventParameter(
       options: parameter.options.map((option) => ({
         value: option.value,
         label: option.label,
+        ...(option.payloadFilter === undefined
+          ? {}
+          : { payloadFilter: structuredClone(option.payloadFilter) }),
       })),
       ...(parameter.negatedMatchRequiresExists === undefined
         ? {}

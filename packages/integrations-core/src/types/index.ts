@@ -1,3 +1,4 @@
+import type { WebhookPayloadFilter } from "@mistle/webhooks";
 import type { z } from "zod";
 
 import type {
@@ -2480,6 +2481,7 @@ export type IntegrationMcpConfig = {
 export type IntegrationWebhookEventParameterOptionDefinition = {
   value: string;
   label: string;
+  payloadFilter?: WebhookPayloadFilter | undefined;
 };
 
 /**
@@ -2529,7 +2531,7 @@ export type IntegrationWebhookEventParameterDefinition =
       label: string;
       kind: "enum-select";
       payloadPath: ReadonlyArray<string>;
-      matchMode: "eq" | "exists";
+      matchMode: "eq" | "exists" | "payload_filter";
       options: ReadonlyArray<IntegrationWebhookEventParameterOptionDefinition>;
       negatedMatchRequiresExists?: boolean | undefined;
       prefix?: string | undefined;

@@ -13390,7 +13390,7 @@
                                           },
                                           "matchMode": {
                                             "type": "string",
-                                            "enum": ["eq", "exists"]
+                                            "enum": ["eq", "exists", "payload_filter"]
                                           },
                                           "options": {
                                             "type": "array",
@@ -13404,6 +13404,10 @@
                                                 "label": {
                                                   "type": "string",
                                                   "minLength": 1
+                                                },
+                                                "payloadFilter": {
+                                                  "type": "object",
+                                                  "additionalProperties": {}
                                                 }
                                               },
                                               "required": ["value", "label"],
@@ -13640,7 +13644,7 @@
                                           },
                                           "matchMode": {
                                             "type": "string",
-                                            "enum": ["eq", "exists"]
+                                            "enum": ["eq", "exists", "payload_filter"]
                                           },
                                           "options": {
                                             "type": "array",
@@ -13654,6 +13658,10 @@
                                                 "label": {
                                                   "type": "string",
                                                   "minLength": 1
+                                                },
+                                                "payloadFilter": {
+                                                  "type": "object",
+                                                  "additionalProperties": {}
                                                 }
                                               },
                                               "required": ["value", "label"],

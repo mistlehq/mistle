@@ -16,9 +16,18 @@ type PayloadFilterNode =
       filters: PayloadFilterNode[];
     }
   | {
+      op: "not";
+      filter: PayloadFilterNode;
+    }
+  | {
       op: "eq" | "neq" | "contains" | "contains_token";
       path: string[];
       value: string;
+    }
+  | {
+      op: "eq_path" | "neq_path";
+      path: string[];
+      otherPath: string[];
     }
   | {
       op: "in";
@@ -72,6 +81,18 @@ function parseKnownPayloadFilterNode(value: unknown): PayloadFilterNode | null {
     };
   }
 
+  if (value["op"] === "not") {
+    const parsedFilter = parseKnownPayloadFilterNode(value["filter"]);
+    if (parsedFilter === null) {
+      return null;
+    }
+
+    return {
+      op: "not",
+      filter: parsedFilter,
+    };
+  }
+
   if (value["op"] === "eq" || value["op"] === "neq") {
     if (!isStringArray(value["path"]) || typeof value["value"] !== "string") {
       return null;
@@ -81,6 +102,18 @@ function parseKnownPayloadFilterNode(value: unknown): PayloadFilterNode | null {
       op: value["op"],
       path: value["path"],
       value: value["value"],
+    };
+  }
+
+  if (value["op"] === "eq_path" || value["op"] === "neq_path") {
+    if (!isStringArray(value["path"]) || !isStringArray(value["otherPath"])) {
+      return null;
+    }
+
+    return {
+      op: value["op"],
+      path: value["path"],
+      otherPath: value["otherPath"],
     };
   }
 
@@ -202,6 +235,60 @@ function buildExistsNode(input: {
     op: input.operator,
     path: input.path,
   };
+}
+
+function clonePayloadFilterNode(filter: PayloadFilterNode): PayloadFilterNode {
+  if (filter.op === "and" || filter.op === "or") {
+    return {
+      op: filter.op,
+      filters: filter.filters.map(clonePayloadFilterNode),
+    };
+  }
+
+  if (filter.op === "not") {
+    return {
+      op: "not",
+      filter: clonePayloadFilterNode(filter.filter),
+    };
+  }
+
+  if (filter.op === "in") {
+    return {
+      op: "in",
+      path: [...filter.path],
+      values: [...filter.values],
+    };
+  }
+
+  if (filter.op === "eq_path" || filter.op === "neq_path") {
+    return {
+      op: filter.op,
+      path: [...filter.path],
+      otherPath: [...filter.otherPath],
+    };
+  }
+
+  if (filter.op === "exists" || filter.op === "not_exists") {
+    return {
+      op: filter.op,
+      path: [...filter.path],
+    };
+  }
+
+  if (
+    filter.op === "eq" ||
+    filter.op === "neq" ||
+    filter.op === "contains" ||
+    filter.op === "contains_token"
+  ) {
+    return {
+      op: filter.op,
+      path: [...filter.path],
+      value: filter.value,
+    };
+  }
+
+  throw new Error(`Unsupported payload filter op '${filter.op}'.`);
 }
 
 function resolveOneOfGroupParameterIds(eventOption: WebhookTriggerEventOption): Set<string> {
@@ -453,6 +540,110 @@ function flattenOrPayloadFilterNodes(filters: readonly PayloadFilterNode[]): Pay
   );
 }
 
+function pathNodesMatch(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((segment, index) => segment === right[index]);
+}
+
+function payloadFilterNodesMatch(left: PayloadFilterNode, right: PayloadFilterNode): boolean {
+  if (left.op !== right.op) {
+    return false;
+  }
+
+  if (left.op === "and" || left.op === "or") {
+    if (right.op !== left.op || left.filters.length !== right.filters.length) {
+      return false;
+    }
+
+    return left.filters.every((leftFilter, index) => {
+      const rightFilter = right.filters[index];
+      return rightFilter !== undefined && payloadFilterNodesMatch(leftFilter, rightFilter);
+    });
+  }
+
+  if (left.op === "not") {
+    return right.op === "not" && payloadFilterNodesMatch(left.filter, right.filter);
+  }
+
+  if (left.op === "in") {
+    return (
+      right.op === "in" &&
+      pathNodesMatch(left.path, right.path) &&
+      left.values.length === right.values.length &&
+      left.values.every((value, index) => value === right.values[index])
+    );
+  }
+
+  if (left.op === "eq_path" || left.op === "neq_path") {
+    return (
+      right.op === left.op &&
+      pathNodesMatch(left.path, right.path) &&
+      pathNodesMatch(left.otherPath, right.otherPath)
+    );
+  }
+
+  if (left.op === "exists" || left.op === "not_exists") {
+    return right.op === left.op && pathNodesMatch(left.path, right.path);
+  }
+
+  if (
+    left.op === "eq" ||
+    left.op === "neq" ||
+    left.op === "contains" ||
+    left.op === "contains_token"
+  ) {
+    return (
+      right.op === left.op && pathNodesMatch(left.path, right.path) && left.value === right.value
+    );
+  }
+
+  return false;
+}
+
+function removeMatchingPayloadFilters(input: {
+  filters: readonly PayloadFilterNode[];
+  optionFilter: PayloadFilterNode;
+}): {
+  matched: boolean;
+  remainingFilters: PayloadFilterNode[];
+} {
+  const directMatchIndex = input.filters.findIndex((filter) =>
+    payloadFilterNodesMatch(filter, input.optionFilter),
+  );
+  if (directMatchIndex >= 0) {
+    return {
+      matched: true,
+      remainingFilters: input.filters.filter((_, index) => index !== directMatchIndex),
+    };
+  }
+
+  if (input.optionFilter.op !== "and") {
+    return {
+      matched: false,
+      remainingFilters: [...input.filters],
+    };
+  }
+
+  const remainingFilters = [...input.filters];
+  for (const optionFilter of flattenAndPayloadFilterNodes(input.optionFilter.filters)) {
+    const matchingIndex = remainingFilters.findIndex((filter) =>
+      payloadFilterNodesMatch(filter, optionFilter),
+    );
+    if (matchingIndex < 0) {
+      return {
+        matched: false,
+        remainingFilters: [...input.filters],
+      };
+    }
+
+    remainingFilters.splice(matchingIndex, 1);
+  }
+
+  return {
+    matched: true,
+    remainingFilters,
+  };
+}
+
 function resolveResourceSelectMatchMode(
   parameter: Extract<WebhookTriggerEventParameterOption, { kind: "resource-select" }>,
 ): "eq" | "contains" | "contains_token" {
@@ -623,6 +814,18 @@ function buildPayloadFilterNodeForTrigger(input: {
         );
         continue;
       }
+    }
+
+    if (parameter.kind === "enum-select" && parameter.matchMode === "payload_filter") {
+      const selectedOption = parameter.options.find((option) => option.value === configuredValue);
+      const selectedPayloadFilter =
+        selectedOption?.payloadFilter === undefined
+          ? null
+          : parseKnownPayloadFilterNode(selectedOption.payloadFilter);
+      if (selectedPayloadFilter !== null) {
+        filters.push(clonePayloadFilterNode(selectedPayloadFilter));
+      }
+      continue;
     }
 
     if (parameter.kind === "enum-select" && parameter.matchMode === "exists") {
@@ -820,8 +1023,59 @@ export function extractWebhookTriggerEventParameterRules(input: {
           : [parsedPayloadFilter];
     const remainingFilters: PayloadFilterNode[] = [];
     const previousConditionRules = eventParameterRules[conditionId];
+    const remainingRootFilters = [...rootFilters];
 
-    for (const filter of rootFilters) {
+    for (const parameter of eventOption.parameters ?? []) {
+      if (parameter.kind !== "enum-select" || parameter.matchMode !== "payload_filter") {
+        continue;
+      }
+
+      const selectedOption = parameter.options.find((option) => {
+        const optionPayloadFilter =
+          option.payloadFilter === undefined
+            ? null
+            : parseKnownPayloadFilterNode(option.payloadFilter);
+        if (optionPayloadFilter === null) {
+          return false;
+        }
+
+        return removeMatchingPayloadFilters({
+          filters: remainingRootFilters,
+          optionFilter: optionPayloadFilter,
+        }).matched;
+      });
+
+      if (selectedOption === undefined) {
+        continue;
+      }
+
+      const selectedPayloadFilter =
+        selectedOption.payloadFilter === undefined
+          ? null
+          : parseKnownPayloadFilterNode(selectedOption.payloadFilter);
+      if (selectedPayloadFilter === null) {
+        continue;
+      }
+
+      const removeResult = removeMatchingPayloadFilters({
+        filters: remainingRootFilters,
+        optionFilter: selectedPayloadFilter,
+      });
+      if (!removeResult.matched) {
+        continue;
+      }
+
+      remainingRootFilters.splice(0, remainingRootFilters.length, ...removeResult.remainingFilters);
+      eventParameterRules[conditionId] = {
+        ...(eventParameterRules[conditionId] ?? {}),
+        [parameter.id]: {
+          operator: WebhookTriggerEventParameterRuleOperators.IS,
+          value: selectedOption.value,
+        },
+      };
+    }
+
+    for (const filter of remainingRootFilters) {
       if (
         filter.op !== "eq" &&
         filter.op !== "neq" &&
