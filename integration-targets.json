@@ -19,6 +19,11 @@
       "config": {}
     },
     {
+      "targetKey": "autumn-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "aws-cli-default",
       "enabled": true,
       "config": {}

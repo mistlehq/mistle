@@ -1,0 +1,38 @@
+---
+title: Autumn
+description: Connect Autumn to Mistle
+icon: /icons/integrations/autumn.svg
+---
+
+## Overview
+
+Connect to Autumn through Autumn's hosted MCP server with an Autumn secret key.
+
+The Autumn integration exposes billing, customer, plan, balance, and request-log workflows to agent runtimes through Autumn's official hosted MCP endpoint.
+
+## Connect In Mistle
+
+Open **Integrations** in the dashboard, choose **Autumn**, then select **Secret key**.
+
+Enter:
+
+| Field             | Value                                                                            |
+| ----------------- | -------------------------------------------------------------------------------- |
+| Autumn secret key | Autumn secret key with access to the organization billing data agents should use |
+
+Mistle stores the secret key on the connection and injects it into requests to Autumn MCP through managed egress.
+
+## Use With A Sandbox Profile
+
+After the connection exists:
+
+1. Open the sandbox profile that should use Autumn.
+2. Add Autumn to the profile's integration configuration.
+3. Select the Autumn MCP server.
+4. Save and publish the profile version.
+
+## Official Reference
+
+- [Autumn MCP server documentation](https://docs.useautumn.com/documentation/mcp)
+
+This integration uses the hosted MCP server at `https://mcp.useautumn.com/mcp`.

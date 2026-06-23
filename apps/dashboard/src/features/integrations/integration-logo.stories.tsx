@@ -4,6 +4,7 @@ import { IntegrationLogo } from "./integration-logo.js";
 
 const DashboardLogoKeys = [
   "anthropic",
+  "autumn",
   "aws",
   "bugsnag",
   "datadog",

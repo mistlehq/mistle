@@ -7,6 +7,7 @@ import {
 
 import { AgentMailMcpBaseDefinition } from "./agentmail/variants/agentmail-mcp/base-definition.js";
 import { AnthropicDefinition } from "./anthropic/index.js";
+import { AutumnDefinition } from "./autumn/variants/autumn-mcp/definition.js";
 import { AwsBaseDefinition } from "./aws/variants/aws-cli-default/base-definition.js";
 import { BugSnagMcpBaseDefinition } from "./bugsnag/variants/bugsnag-mcp/base-definition.js";
 import { CloudflareDefinition } from "./cloudflare/variants/cloudflare-mcp/definition.js";
@@ -51,6 +52,7 @@ import { WhapiMcpBaseDefinition } from "./whapi/variants/whapi-mcp/base-definiti
 import { ZaiDefinition } from "./zai/index.js";
 export const AgentMailBrowserDefinition = AgentMailMcpBaseDefinition;
 export const AnthropicBrowserDefinition = AnthropicDefinition;
+export const AutumnBrowserDefinition = AutumnDefinition;
 export const AwsBrowserDefinition = AwsBaseDefinition;
 export const BugSnagBrowserDefinition = BugSnagMcpBaseDefinition;
 export const CloudflareBrowserDefinition = CloudflareDefinition;
@@ -93,6 +95,7 @@ export const ZaiBrowserDefinition = ZaiDefinition;
 const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   AgentMailBrowserDefinition,
   AnthropicBrowserDefinition,
+  AutumnBrowserDefinition,
   AwsBrowserDefinition,
   BugSnagBrowserDefinition,
   CloudflareBrowserDefinition,
@@ -154,6 +157,7 @@ export function createBrowserDefinitionsBundle(): IntegrationDefinitionsBundle<A
 export * from "./agentmail/browser.js";
 export * from "./anthropic/index.js";
 export * from "./agent-runtimes/provider-selection.js";
+export * from "./autumn/browser.js";
 export * from "./bugsnag/browser.js";
 export * from "./cloudflare/browser.js";
 export * from "./datadog/index.js";

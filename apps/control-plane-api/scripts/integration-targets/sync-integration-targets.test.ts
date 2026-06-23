@@ -24,6 +24,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "autumn-mcp",
+        familyId: "autumn",
+        variantId: "autumn-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "aws-cli-default",
         familyId: "aws",
         variantId: "aws-cli-default",
