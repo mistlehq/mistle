@@ -37,14 +37,14 @@ export const LongMessage: Story = {
 
 export const ProviderLabeledJsonInput: Story = {
   args: {
-    formatTriggerInput: true,
+    formatStructuredJsonInput: true,
     text: 'Provider payload.event: {"type":"message.created","id":"evt_storybook_provider","text":"This field stays inside the formatted JSON block.","metadata":{"requestId":"req_storybook_provider","unsafeNumericId":1234567890123456789}}',
   },
 };
 
 export const RawJsonObjectInput: Story = {
   args: {
-    formatTriggerInput: true,
+    formatStructuredJsonInput: true,
     text: JSON.stringify({
       event: "session.bootstrap",
       payload: {
@@ -61,9 +61,9 @@ export const RawJsonObjectInput: Story = {
 
 export const RawJsonObjectWithTextField: Story = {
   args: {
-    formatTriggerInput: true,
+    formatStructuredJsonInput: true,
     text: JSON.stringify({
-      text: "Run this raw JSON trigger input.",
+      text: "Run this raw JSON structured input.",
       channel: "C123",
       metadata: {
         requestId: "req_storybook_json_text",
@@ -74,7 +74,7 @@ export const RawJsonObjectWithTextField: Story = {
 
 export const MixedProseJsonInput: Story = {
   args: {
-    formatTriggerInput: true,
+    formatStructuredJsonInput: true,
     text: `Please investigate this issue here ${JSON.stringify({
       issue: {
         key: "MST-123",
@@ -90,7 +90,7 @@ export const MixedProseJsonInput: Story = {
 
 export const MultipleJsonSpansInput: Story = {
   args: {
-    formatTriggerInput: true,
+    formatStructuredJsonInput: true,
     text: `First ${JSON.stringify({ requestId: "req_storybook_first" })} then ${JSON.stringify({
       requestId: "req_storybook_second",
     })}`,
@@ -99,7 +99,7 @@ export const MultipleJsonSpansInput: Story = {
 
 export const MarkdownFencedJsonInput: Story = {
   args: {
-    formatTriggerInput: true,
+    formatStructuredJsonInput: true,
     text: [
       "Please keep this code block as Markdown:",
       "```json",

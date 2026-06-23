@@ -11,10 +11,8 @@ import { createTestQueryClient } from "../../test-support/query-client.js";
 import { HttpApiError } from "../api/http-api-error.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
-import {
-  resolveConversationScopedComposerRenderKey,
-  SessionWorkbenchPage,
-} from "./session-workbench-page.js";
+import { resolveConversationScopedComposerRenderKey } from "./session-workbench-full-page.js";
+import { SessionWorkbenchPage } from "./session-workbench-page.js";
 
 function renderSessionWorkbenchPage(input?: {
   queryClientOptions?: Parameters<typeof createTestQueryClient>[0];
@@ -428,7 +426,6 @@ describe("SessionWorkbenchPage", () => {
     expect(
       resolveConversationScopedComposerRenderKey({
         activeConversationId: "conversation_previous",
-        providerConversationId: "conversation_provider",
         requestedRuntimeConversationId: "conversation_next",
         sandboxInstanceId: "sbi_test",
         triggerConversation: {
@@ -442,7 +439,6 @@ describe("SessionWorkbenchPage", () => {
     expect(
       resolveConversationScopedComposerRenderKey({
         activeConversationId: "conversation_active",
-        providerConversationId: "conversation_provider",
         requestedRuntimeConversationId: null,
         sandboxInstanceId: "sbi_test",
         triggerConversation: {
@@ -454,7 +450,6 @@ describe("SessionWorkbenchPage", () => {
     expect(
       resolveConversationScopedComposerRenderKey({
         activeConversationId: null,
-        providerConversationId: "conversation_provider",
         requestedRuntimeConversationId: null,
         sandboxInstanceId: "sbi_test",
         triggerConversation: {
@@ -466,17 +461,6 @@ describe("SessionWorkbenchPage", () => {
     expect(
       resolveConversationScopedComposerRenderKey({
         activeConversationId: null,
-        providerConversationId: "conversation_provider",
-        requestedRuntimeConversationId: null,
-        sandboxInstanceId: "sbi_test",
-        triggerConversation: null,
-      }),
-    ).toBe("sbi_test:conversation_provider");
-
-    expect(
-      resolveConversationScopedComposerRenderKey({
-        activeConversationId: null,
-        providerConversationId: null,
         requestedRuntimeConversationId: null,
         sandboxInstanceId: null,
         triggerConversation: null,

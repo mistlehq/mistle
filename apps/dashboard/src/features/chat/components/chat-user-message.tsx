@@ -2,9 +2,9 @@ import { Button } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
 
 import type { ChatAttachment } from "../chat-types.js";
-import { presentTriggerInput } from "../trigger-input-presentation.js";
-import type { StructuredTriggerInputPresentation } from "../trigger-input-presentation.js";
-import type { StructuredTriggerInputSegment } from "../trigger-input-presentation.js";
+import { presentStructuredJsonInput } from "../structured-json-input-presentation.js";
+import type { StructuredJsonInputPresentation } from "../structured-json-input-presentation.js";
+import type { StructuredJsonInputSegment } from "../structured-json-input-presentation.js";
 import { ChatMarkdownMessage } from "./chat-markdown-message.js";
 
 type JsonSyntaxToken = {
@@ -14,7 +14,7 @@ type JsonSyntaxToken = {
 
 type ChatUserMessageProps = {
   attachments?: readonly ChatAttachment[];
-  formatTriggerInput?: boolean;
+  formatStructuredJsonInput?: boolean;
   label?: string;
   labelAction?: {
     ariaLabel: string;
@@ -25,7 +25,9 @@ type ChatUserMessageProps = {
 
 export function ChatUserMessage(props: ChatUserMessageProps): React.JSX.Element {
   const attachments = props.attachments ?? [];
-  const presentation = props.formatTriggerInput ? presentTriggerInput(props.text) : null;
+  const presentation = props.formatStructuredJsonInput
+    ? presentStructuredJsonInput(props.text)
+    : null;
 
   return (
     <div className="flex justify-end" data-chat-user-message>
@@ -48,7 +50,7 @@ export function ChatUserMessage(props: ChatUserMessageProps): React.JSX.Element 
         }}
       >
         {presentation !== null ? (
-          <StructuredTriggerInputMessage presentation={presentation} />
+          <StructuredJsonInputMessage presentation={presentation} />
         ) : props.text.length === 0 ? null : (
           <ChatMarkdownMessage isStreaming={false} preserveSoftLineBreaks text={props.text} />
         )}
@@ -81,20 +83,20 @@ export function ChatUserMessage(props: ChatUserMessageProps): React.JSX.Element 
   );
 }
 
-function StructuredTriggerInputMessage(props: {
-  presentation: StructuredTriggerInputPresentation;
+function StructuredJsonInputMessage(props: {
+  presentation: StructuredJsonInputPresentation;
 }): React.JSX.Element {
   return (
-    <div className="min-w-0 space-y-2" data-chat-trigger-input-presentation>
+    <div className="min-w-0 space-y-2" data-chat-structured-json-input-presentation>
       {props.presentation.inlineSegments.map((segment, index) => (
-        <StructuredTriggerInputSegmentView key={index} segment={segment} />
+        <StructuredJsonInputSegmentView key={index} segment={segment} />
       ))}
     </div>
   );
 }
 
-function StructuredTriggerInputSegmentView(props: {
-  segment: StructuredTriggerInputSegment;
+function StructuredJsonInputSegmentView(props: {
+  segment: StructuredJsonInputSegment;
 }): React.JSX.Element {
   if (props.segment.kind === "text") {
     return (

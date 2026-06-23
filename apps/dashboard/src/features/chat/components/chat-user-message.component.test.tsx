@@ -22,7 +22,7 @@ describe("ChatUserMessage", () => {
   it("presents provider-labeled JSON input without rendering the raw compact payload", () => {
     const originalText =
       'Provider payload.event: {"type":"message.created","text":"keep this inside JSON","requestId":"req_123"}';
-    const { container } = render(<ChatUserMessage formatTriggerInput text={originalText} />);
+    const { container } = render(<ChatUserMessage formatStructuredJsonInput text={originalText} />);
 
     expect(screen.getByText("Provider payload.event:")).toBeTruthy();
     expect(screen.queryByText("keep this inside JSON")).toBeNull();
@@ -33,7 +33,7 @@ describe("ChatUserMessage", () => {
 
   it("presents valid raw JSON objects with inline pretty JSON", () => {
     const originalText = '{"text":"run this","channel":"C123"}';
-    const { container } = render(<ChatUserMessage formatTriggerInput text={originalText} />);
+    const { container } = render(<ChatUserMessage formatStructuredJsonInput text={originalText} />);
 
     expect(screen.queryByText("JSON object")).toBeNull();
     expect(screen.queryByText("run this")).toBeNull();
@@ -50,7 +50,7 @@ describe("ChatUserMessage", () => {
   it("does not render a field-count message for JSON objects without a message field", () => {
     const { container } = render(
       <ChatUserMessage
-        formatTriggerInput
+        formatStructuredJsonInput
         text='{"event":"session.bootstrap","payload":{"id":"req_123"}}'
       />,
     );
@@ -63,7 +63,7 @@ describe("ChatUserMessage", () => {
   it("renders prose and embedded JSON in the authored order", () => {
     const { container } = render(
       <ChatUserMessage
-        formatTriggerInput
+        formatStructuredJsonInput
         text='Please investigate this issue here {"issue":{"key":"MST-123"}} and then fix it'
       />,
     );
@@ -74,7 +74,7 @@ describe("ChatUserMessage", () => {
     expect(getJsonBlockText(container)).toContain('"key": "MST-123"');
     expect(screen.getByText("and then fix it")).toBeTruthy();
 
-    const presentation = container.querySelector("[data-chat-trigger-input-presentation]");
+    const presentation = container.querySelector("[data-chat-structured-json-input-presentation]");
     expect(presentation?.textContent).toContain(
       'Please investigate this issue here{\n  "issue": {\n    "key": "MST-123"\n  }\n}and then fix it',
     );
@@ -90,7 +90,7 @@ describe("ChatUserMessage", () => {
     ].join("\n");
     const { container } = render(<ChatUserMessage text={originalText} />);
 
-    expect(container.querySelector("[data-chat-trigger-input-presentation]")).toBeNull();
+    expect(container.querySelector("[data-chat-structured-json-input-presentation]")).toBeNull();
     expect(container.querySelector("code")?.textContent).toContain('{"text":"keep this as code"}');
   });
 
@@ -98,7 +98,7 @@ describe("ChatUserMessage", () => {
     const originalText = 'Please inspect {"issue":{"key":"MST-123"}} and summarize it.';
     const { container } = render(<ChatUserMessage text={originalText} />);
 
-    expect(container.querySelector("[data-chat-trigger-input-presentation]")).toBeNull();
+    expect(container.querySelector("[data-chat-structured-json-input-presentation]")).toBeNull();
     expect(screen.getByText(originalText)).toBeTruthy();
   });
 });

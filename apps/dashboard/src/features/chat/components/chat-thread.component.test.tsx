@@ -33,7 +33,9 @@ describe("ChatThread", () => {
       />,
     );
 
-    expect(container.querySelectorAll("[data-chat-trigger-input-presentation]")).toHaveLength(2);
+    expect(
+      container.querySelectorAll("[data-chat-structured-json-input-presentation]"),
+    ).toHaveLength(2);
     expect(screen.getByText("Provider payload.event:")).toBeTruthy();
     expect(screen.getByText("Payload:")).toBeTruthy();
     expect(screen.queryByText('Payload: {"type":"message","text":"follow-up"}')).toBeNull();

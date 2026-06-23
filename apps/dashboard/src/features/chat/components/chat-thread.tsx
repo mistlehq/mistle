@@ -126,7 +126,7 @@ function ChatThreadView({
               },
             })}
         {...(entry.label === undefined ? {} : { label: entry.label })}
-        formatTriggerInput
+        formatStructuredJsonInput
         text={entry.text}
       />
     );

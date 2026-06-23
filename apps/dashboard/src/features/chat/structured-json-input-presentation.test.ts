@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { presentTriggerInput } from "./trigger-input-presentation.js";
+import { presentStructuredJsonInput } from "./structured-json-input-presentation.js";
 
-describe("trigger input presentation", () => {
+describe("structured JSON input presentation", () => {
   it("formats provider-labeled JSON inline without provider-specific extraction", () => {
     const originalText =
       'Provider payload.event: {"type":"message.created","channel":"channel_123","text":"Run the requested task","eventId":"evt_123"}';
 
-    expect(presentTriggerInput(originalText)).toEqual({
+    expect(presentStructuredJsonInput(originalText)).toEqual({
       inlineSegments: [
         { kind: "text", text: "Provider payload.event:" },
         {
@@ -31,7 +31,7 @@ describe("trigger input presentation", () => {
     const originalText =
       '{"event":"session.bootstrap","payload":{"requestId":"req_123"},"metadata":{"source":"trigger"}}';
 
-    expect(presentTriggerInput(originalText)).toEqual({
+    expect(presentStructuredJsonInput(originalText)).toEqual({
       inlineSegments: [
         {
           kind: "json",
@@ -52,7 +52,7 @@ describe("trigger input presentation", () => {
   it("preserves unsafe numeric lexemes when formatting JSON", () => {
     const originalText = '{"installation":{"id":1234567890123456789}}';
 
-    expect(presentTriggerInput(originalText)).toEqual({
+    expect(presentStructuredJsonInput(originalText)).toEqual({
       inlineSegments: [
         {
           kind: "json",
@@ -67,7 +67,7 @@ describe("trigger input presentation", () => {
   it("formats every valid JSON object span in authored order", () => {
     const originalText = 'First {"a":1} second {"b":2}';
 
-    expect(presentTriggerInput(originalText)).toEqual({
+    expect(presentStructuredJsonInput(originalText)).toEqual({
       inlineSegments: [
         { kind: "text", text: "First" },
         { kind: "json", text: ["{", '  "a": 1', "}"].join("\n") },
@@ -81,7 +81,7 @@ describe("trigger input presentation", () => {
     const originalText =
       'Please investigate this issue here {"issue":{"key":"MST-123","summary":"Fails to sync"}} and then fix it';
 
-    expect(presentTriggerInput(originalText)).toEqual({
+    expect(presentStructuredJsonInput(originalText)).toEqual({
       inlineSegments: [
         { kind: "text", text: "Please investigate this issue here" },
         {
@@ -112,7 +112,7 @@ describe("trigger input presentation", () => {
       "Respond in the original thread.",
     ].join("\n");
 
-    expect(presentTriggerInput(originalText)).toEqual({
+    expect(presentStructuredJsonInput(originalText)).toEqual({
       inlineSegments: [
         { kind: "text", text: "Please handle:\n- verify the event\n\nProvider payload.event:" },
         {
@@ -127,7 +127,7 @@ describe("trigger input presentation", () => {
   it("continues scanning after non-JSON braces before a valid JSON object", () => {
     const originalText = 'Use {repo} context. Provider payload.event: {"type":"message"}';
 
-    expect(presentTriggerInput(originalText)).toEqual({
+    expect(presentStructuredJsonInput(originalText)).toEqual({
       inlineSegments: [
         { kind: "text", text: "Use {repo} context. Provider payload.event:" },
         { kind: "json", text: JSON.stringify({ type: "message" }, null, 2) },
@@ -138,7 +138,7 @@ describe("trigger input presentation", () => {
   it("formats JSON objects from otherwise unrecognized text", () => {
     const originalText = 'Provider payload: {"text":"run","metadata":{"requestId":"req_123"}}';
 
-    expect(presentTriggerInput(originalText)).toEqual({
+    expect(presentStructuredJsonInput(originalText)).toEqual({
       inlineSegments: [
         { kind: "text", text: "Provider payload:" },
         {
@@ -159,7 +159,7 @@ describe("trigger input presentation", () => {
   it("does not extract obvious message fields into summaries", () => {
     const originalText = 'payload.event: {"text":"run this"}';
 
-    expect(presentTriggerInput(originalText)).toEqual({
+    expect(presentStructuredJsonInput(originalText)).toEqual({
       inlineSegments: [
         { kind: "text", text: "payload.event:" },
         { kind: "json", text: JSON.stringify({ text: "run this" }, null, 2) },
@@ -176,7 +176,7 @@ describe("trigger input presentation", () => {
       "Thanks.",
     ].join("\n");
 
-    expect(presentTriggerInput(originalText)).toBeNull();
+    expect(presentStructuredJsonInput(originalText)).toBeNull();
   });
 
   it("renders unchanged for JSON inside longer Markdown code fences", () => {
@@ -189,7 +189,7 @@ describe("trigger input presentation", () => {
       "````",
     ].join("\n");
 
-    expect(presentTriggerInput(originalText)).toBeNull();
+    expect(presentStructuredJsonInput(originalText)).toBeNull();
   });
 
   it("renders unchanged when an inner info-string fence line is inside a Markdown code fence", () => {
@@ -197,22 +197,24 @@ describe("trigger input presentation", () => {
       "\n",
     );
 
-    expect(presentTriggerInput(originalText)).toBeNull();
+    expect(presentStructuredJsonInput(originalText)).toBeNull();
   });
 
   it("renders unchanged for malformed JSON", () => {
-    expect(presentTriggerInput('Provider payload.event: {"text":"missing close"')).toBeNull();
+    expect(
+      presentStructuredJsonInput('Provider payload.event: {"text":"missing close"'),
+    ).toBeNull();
   });
 
   it("does not recover nested JSON from malformed outer JSON", () => {
-    expect(presentTriggerInput('Provider payload.event: {"outer":{"inner":"x"}')).toBeNull();
+    expect(presentStructuredJsonInput('Provider payload.event: {"outer":{"inner":"x"}')).toBeNull();
   });
 
   it("renders unchanged for provider-labeled JSON arrays", () => {
-    expect(presentTriggerInput('Provider payload.event: [{"text":"array"}]')).toBeNull();
+    expect(presentStructuredJsonInput('Provider payload.event: [{"text":"array"}]')).toBeNull();
   });
 
   it("renders unchanged for raw JSON arrays", () => {
-    expect(presentTriggerInput('[{"text":"array"}]')).toBeNull();
+    expect(presentStructuredJsonInput('[{"text":"array"}]')).toBeNull();
   });
 });

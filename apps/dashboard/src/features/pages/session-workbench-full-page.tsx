@@ -698,7 +698,6 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
             autoScrollToBottomOnInitialLoad: true,
             initialBottomScrollResetKey: resolveConversationScopedComposerRenderKey({
               activeConversationId: conversationPane.activeConversationId,
-              providerConversationId: null,
               requestedRuntimeConversationId: input.requestedRuntimeConversationId,
               sandboxInstanceId: input.sandboxInstanceId,
               triggerConversation: workbench.sandboxStatusQuery.data?.triggerConversation ?? null,
@@ -780,7 +779,6 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
 
 export function resolveConversationScopedComposerRenderKey(input: {
   activeConversationId: string | null;
-  providerConversationId: string | null;
   requestedRuntimeConversationId: string | null;
   sandboxInstanceId: string | null;
   triggerConversation: { providerConversationId: string | null } | null;
@@ -789,7 +787,6 @@ export function resolveConversationScopedComposerRenderKey(input: {
     input.requestedRuntimeConversationId ??
     input.activeConversationId ??
     input.triggerConversation?.providerConversationId ??
-    input.providerConversationId ??
     "no-thread";
 
   return [input.sandboxInstanceId ?? "missing-session", conversationScopeId].join(":");
