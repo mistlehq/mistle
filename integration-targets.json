@@ -84,6 +84,11 @@
       "config": {}
     },
     {
+      "targetKey": "google-search-console-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "google-workspace-mcp",
       "enabled": true,
       "config": {}

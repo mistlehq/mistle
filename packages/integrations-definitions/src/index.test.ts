@@ -1351,7 +1351,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(44);
+    expect(definitions).toHaveLength(45);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -1367,6 +1367,7 @@ describe("integrations-definitions index", () => {
       "fireworks::fireworks-default",
       "gcp::gcp-mcp",
       "google-analytics::google-analytics-mcp",
+      "google-search-console::google-search-console-mcp",
       "google-workspace::google-workspace-mcp",
       "inception::inception-default",
       "jira::jira-default",

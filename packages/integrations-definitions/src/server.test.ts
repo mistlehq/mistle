@@ -544,7 +544,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(44);
+    expect(definitions).toHaveLength(45);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
@@ -556,6 +556,7 @@ describe("integrations-definitions server", () => {
         "expo::expo-mcp",
         "fireworks::fireworks-default",
         "google-analytics::google-analytics-mcp",
+        "google-search-console::google-search-console-mcp",
         "google-workspace::google-workspace-mcp",
         "inception::inception-default",
         "kimi::kimi-default",
