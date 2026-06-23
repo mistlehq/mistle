@@ -5,22 +5,22 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
-  buildGoogleSearchConsoleAuthorizationCodeExchangeRequestBody,
-  buildGoogleSearchConsoleAuthorizationUrl,
-  buildGoogleSearchConsoleRefreshRequestBody,
-  classifyGoogleSearchConsoleRefreshFailure,
-  createGoogleSearchConsoleRefreshTransportFailure,
-  GoogleSearchConsoleMcpOAuth2AuthorizationCodeCapability,
-  resolveGoogleSearchConsoleAccessTokenExpiresAt,
-  resolveGoogleSearchConsoleAuthorizationCodeOrThrow,
-  resolveGoogleSearchConsoleCompleteGrantResult,
-  resolveGoogleSearchConsoleRefreshResult,
+  buildGoogleAdsAuthorizationCodeExchangeRequestBody,
+  buildGoogleAdsAuthorizationUrl,
+  buildGoogleAdsRefreshRequestBody,
+  classifyGoogleAdsRefreshFailure,
+  createGoogleAdsRefreshTransportFailure,
+  GoogleAdsOAuth2AuthorizationCodeCapability,
+  resolveGoogleAdsAccessTokenExpiresAt,
+  resolveGoogleAdsAuthorizationCodeOrThrow,
+  resolveGoogleAdsCompleteGrantResult,
+  resolveGoogleAdsRefreshResult,
 } from "./oauth2-authorization-code.server.js";
 
-describe("Google Search Console OAuth authorization code support", () => {
-  it("builds a Google authorization URL with offline access and the Google Search Console readonly scope", () => {
+describe("Google Ads OAuth authorization code support", () => {
+  it("builds a Google authorization URL with offline access and the Google Ads scope", () => {
     const authorizationUrl = new URL(
-      buildGoogleSearchConsoleAuthorizationUrl({
+      buildGoogleAdsAuthorizationUrl({
         clientId: "google_client_123.apps.googleusercontent.com",
         redirectUrl: "https://mistle.example.com/oauth/callback",
         state: "state_abc",
@@ -39,7 +39,7 @@ describe("Google Search Console OAuth authorization code support", () => {
     );
     expect(authorizationUrl.searchParams.get("state")).toBe("state_abc");
     expect(authorizationUrl.searchParams.get("scope")).toBe(
-      "https://www.googleapis.com/auth/webmasters.readonly",
+      "https://www.googleapis.com/auth/adwords",
     );
     expect(authorizationUrl.searchParams.get("access_type")).toBe("offline");
     expect(authorizationUrl.searchParams.get("prompt")).toBe("consent");
@@ -49,7 +49,7 @@ describe("Google Search Console OAuth authorization code support", () => {
 
   it("builds Google token exchange and refresh request bodies", () => {
     expect(
-      buildGoogleSearchConsoleAuthorizationCodeExchangeRequestBody({
+      buildGoogleAdsAuthorizationCodeExchangeRequestBody({
         code: "code_123",
         redirectUrl: "https://mistle.example.com/oauth/callback",
         clientId: "google_client_123.apps.googleusercontent.com",
@@ -61,7 +61,7 @@ describe("Google Search Console OAuth authorization code support", () => {
     );
 
     expect(
-      buildGoogleSearchConsoleRefreshRequestBody({
+      buildGoogleAdsRefreshRequestBody({
         refreshToken: "refresh_123",
         clientId: "google_client_123.apps.googleusercontent.com",
         clientSecret: "google_secret_456",
@@ -71,33 +71,64 @@ describe("Google Search Console OAuth authorization code support", () => {
     );
   });
 
-  it("starts authorization through the capability and stores client secret in provider state", async () => {
-    const result = await GoogleSearchConsoleMcpOAuth2AuthorizationCodeCapability.startAuthorization(
-      {
-        organizationId: "org_123",
-        targetKey: "google-search-console-mcp",
-        target: {
-          familyId: "google-search-console",
-          variantId: "google-search-console-mcp",
-          enabled: true,
-          config: {},
-          secrets: {},
-        },
-        connectionConfig: {
-          client_id: "google_client_123.apps.googleusercontent.com",
-          client_secret: "google_secret_456",
-        },
-        redirectUrl: "https://mistle.example.com/oauth/callback",
-        intent: "create",
-        state: "state_abc",
-        pkce: {
-          challenge: "challenge_456",
-          challengeMethod: "S256",
-        },
+  it("starts authorization through the capability and stores Ads connection state", async () => {
+    const result = await GoogleAdsOAuth2AuthorizationCodeCapability.startAuthorization({
+      organizationId: "org_123",
+      targetKey: "googleads-default",
+      target: {
+        familyId: "googleads",
+        variantId: "googleads-default",
+        enabled: true,
+        config: {},
+        secrets: {},
       },
-    );
+      connectionConfig: {
+        client_id: "google_client_123.apps.googleusercontent.com",
+        client_secret: "google_secret_456",
+        developer_token: "developer_token_123",
+      },
+      redirectUrl: "https://mistle.example.com/oauth/callback",
+      intent: "create",
+      state: "state_abc",
+      pkce: {
+        challenge: "challenge_456",
+        challengeMethod: "S256",
+      },
+    });
 
     expect(result.authorizationUrl).toContain("https://accounts.google.com/o/oauth2/v2/auth");
+    expect(result.providerState).toEqual({
+      clientId: "google_client_123.apps.googleusercontent.com",
+      clientSecret: "google_secret_456",
+      developerToken: "developer_token_123",
+    });
+  });
+
+  it("starts reauthorization without requiring the existing encrypted developer token", async () => {
+    const result = await GoogleAdsOAuth2AuthorizationCodeCapability.startAuthorization({
+      organizationId: "org_123",
+      targetKey: "googleads-default",
+      target: {
+        familyId: "googleads",
+        variantId: "googleads-default",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      connectionConfig: {
+        client_id: "google_client_123.apps.googleusercontent.com",
+        client_secret: "google_secret_456",
+        developer_token: "existing_developer_token_123",
+      },
+      redirectUrl: "https://mistle.example.com/oauth/callback",
+      intent: "reauthorize",
+      state: "state_abc",
+      pkce: {
+        challenge: "challenge_456",
+        challengeMethod: "S256",
+      },
+    });
+
     expect(result.providerState).toEqual({
       clientId: "google_client_123.apps.googleusercontent.com",
       clientSecret: "google_secret_456",
@@ -106,12 +137,12 @@ describe("Google Search Console OAuth authorization code support", () => {
 
   it("requires PKCE when starting authorization", () => {
     expect(() =>
-      GoogleSearchConsoleMcpOAuth2AuthorizationCodeCapability.startAuthorization({
+      GoogleAdsOAuth2AuthorizationCodeCapability.startAuthorization({
         organizationId: "org_123",
-        targetKey: "google-search-console-mcp",
+        targetKey: "googleads-default",
         target: {
-          familyId: "google-search-console",
-          variantId: "google-search-console-mcp",
+          familyId: "googleads",
+          variantId: "googleads-default",
           enabled: true,
           config: {},
           secrets: {},
@@ -119,51 +150,52 @@ describe("Google Search Console OAuth authorization code support", () => {
         connectionConfig: {
           client_id: "google_client_123.apps.googleusercontent.com",
           client_secret: "google_secret_456",
+          developer_token: "developer_token_123",
         },
         redirectUrl: "https://mistle.example.com/oauth/callback",
         intent: "create",
         state: "state_abc",
       }),
-    ).toThrow("Google Search Console OAuth authorization requires PKCE.");
+    ).toThrow("Google Ads OAuth authorization requires PKCE.");
   });
 
   it("resolves callback authorization codes and provider errors", () => {
-    expect(
-      resolveGoogleSearchConsoleAuthorizationCodeOrThrow(new URLSearchParams("code=code_123")),
-    ).toBe("code_123");
-
-    expect(() =>
-      resolveGoogleSearchConsoleAuthorizationCodeOrThrow(
-        new URLSearchParams("error=access_denied&error_description=Denied"),
-      ),
-    ).toThrow(
-      "Google Search Console OAuth authorization failed with error 'access_denied': Denied",
+    expect(resolveGoogleAdsAuthorizationCodeOrThrow(new URLSearchParams("code=code_123"))).toBe(
+      "code_123",
     );
 
     expect(() =>
-      resolveGoogleSearchConsoleAuthorizationCodeOrThrow(new URLSearchParams("state=state_abc")),
-    ).toThrow("Google Search Console OAuth callback query must include `code`.");
+      resolveGoogleAdsAuthorizationCodeOrThrow(
+        new URLSearchParams("error=access_denied&error_description=Denied"),
+      ),
+    ).toThrow("Google Ads OAuth authorization failed with error 'access_denied': Denied");
+
+    expect(() =>
+      resolveGoogleAdsAuthorizationCodeOrThrow(new URLSearchParams("state=state_abc")),
+    ).toThrow("Google Ads OAuth callback query must include `code`.");
   });
 
   it("resolves grant and refresh results with token expiry and scope metadata", () => {
     const issuedAt = new Date("2026-06-23T00:00:00.000Z");
 
     expect(
-      resolveGoogleSearchConsoleCompleteGrantResult({
+      resolveGoogleAdsCompleteGrantResult({
         providerState: {
           clientId: "google_client_123.apps.googleusercontent.com",
           clientSecret: "google_secret_456",
+          developerToken: "developer_token_123",
         },
         response: {
           access_token: "access_123",
           refresh_token: "refresh_123",
           expires_in: "3600",
-          scope: "https://www.googleapis.com/auth/webmasters.readonly",
+          scope: "https://www.googleapis.com/auth/adwords",
         },
         issuedAt,
       }),
     ).toEqual({
       connectionConfig: {
+        connection_method: "oauth2-authorization-code",
         client_id: "google_client_123.apps.googleusercontent.com",
       },
       accessToken: "access_123",
@@ -171,17 +203,24 @@ describe("Google Search Console OAuth authorization code support", () => {
       refreshToken: "refresh_123",
       clientSecret: "google_secret_456",
       credentialMetadata: {
-        scope: "https://www.googleapis.com/auth/webmasters.readonly",
+        scope: "https://www.googleapis.com/auth/adwords",
       },
+      additionalCredentials: [
+        {
+          slotKey: "googleads.googleads-default.oauth2-authorization-code.developer-token",
+          secretKind: "api_key",
+          plaintext: "developer_token_123",
+        },
+      ],
     });
 
     expect(
-      resolveGoogleSearchConsoleRefreshResult({
+      resolveGoogleAdsRefreshResult({
         response: {
           access_token: "access_456",
           refresh_token: "refresh_456",
           expires_in: 120,
-          scope: "https://www.googleapis.com/auth/webmasters.readonly",
+          scope: "https://www.googleapis.com/auth/adwords",
         },
         issuedAt,
       }),
@@ -190,17 +229,18 @@ describe("Google Search Console OAuth authorization code support", () => {
       accessTokenExpiresAt: "2026-06-23T00:02:00.000Z",
       refreshToken: "refresh_456",
       credentialMetadata: {
-        scope: "https://www.googleapis.com/auth/webmasters.readonly",
+        scope: "https://www.googleapis.com/auth/adwords",
       },
     });
   });
 
   it("requires a refresh token when resolving the initial grant", () => {
     expect(() =>
-      resolveGoogleSearchConsoleCompleteGrantResult({
+      resolveGoogleAdsCompleteGrantResult({
         providerState: {
           clientId: "google_client_123.apps.googleusercontent.com",
           clientSecret: "google_secret_456",
+          developerToken: "developer_token_123",
         },
         response: {
           access_token: "access_123",
@@ -209,13 +249,39 @@ describe("Google Search Console OAuth authorization code support", () => {
         issuedAt: new Date("2026-06-23T00:00:00.000Z"),
       }),
     ).toThrow(
-      "Google Search Console OAuth authorization did not return a refresh token. Reconnect the integration and approve offline access.",
+      "Google Ads OAuth authorization did not return a refresh token. Reconnect the integration and approve offline access.",
     );
+  });
+
+  it("does not rotate the encrypted developer token when reauthorization state omits it", () => {
+    expect(
+      resolveGoogleAdsCompleteGrantResult({
+        providerState: {
+          clientId: "google_client_123.apps.googleusercontent.com",
+          clientSecret: "google_secret_456",
+        },
+        response: {
+          access_token: "access_123",
+          refresh_token: "refresh_123",
+          expires_in: "3600",
+        },
+        issuedAt: new Date("2026-06-23T00:00:00.000Z"),
+      }),
+    ).toEqual({
+      connectionConfig: {
+        connection_method: "oauth2-authorization-code",
+        client_id: "google_client_123.apps.googleusercontent.com",
+      },
+      accessToken: "access_123",
+      accessTokenExpiresAt: "2026-06-23T01:00:00.000Z",
+      refreshToken: "refresh_123",
+      clientSecret: "google_secret_456",
+    });
   });
 
   it("rejects non-positive token expiry values", () => {
     expect(() =>
-      resolveGoogleSearchConsoleAccessTokenExpiresAt({
+      resolveGoogleAdsAccessTokenExpiresAt({
         issuedAt: new Date("2026-06-23T00:00:00.000Z"),
         expiresIn: "0",
       }),
@@ -224,7 +290,7 @@ describe("Google Search Console OAuth authorization code support", () => {
 
   it("classifies refresh failures from Google OAuth status and error bodies", () => {
     expect(
-      classifyGoogleSearchConsoleRefreshFailure({
+      classifyGoogleAdsRefreshFailure({
         status: 429,
         body: '{"error":"rate_limit","error_description":"Too many requests"}',
       }),
@@ -236,7 +302,7 @@ describe("Google Search Console OAuth authorization code support", () => {
     });
 
     expect(
-      classifyGoogleSearchConsoleRefreshFailure({
+      classifyGoogleAdsRefreshFailure({
         status: 400,
         body: '{"error":"invalid_grant","error_description":"Bad refresh token"}',
       }),
@@ -248,19 +314,19 @@ describe("Google Search Console OAuth authorization code support", () => {
     });
 
     expect(
-      classifyGoogleSearchConsoleRefreshFailure({
+      classifyGoogleAdsRefreshFailure({
         status: 200,
         body: "",
       }),
     ).toEqual({
       classification:
         IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications.TEMPORARY,
-      message: "Google Search Console access token refresh failed with status 200.",
+      message: "Google Ads access token refresh failed with status 200.",
     });
   });
 
   it("wraps refresh transport errors as temporary refresh failures", () => {
-    const error = createGoogleSearchConsoleRefreshTransportFailure({
+    const error = createGoogleAdsRefreshTransportFailure({
       error: new Error("socket closed"),
     });
 
@@ -269,7 +335,7 @@ describe("Google Search Console OAuth authorization code support", () => {
       IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications.TEMPORARY,
     );
     expect(error.message).toBe(
-      "Google Search Console OAuth refresh request failed before a response was received: socket closed",
+      "Google Ads OAuth refresh request failed before a response was received: socket closed",
     );
   });
 });

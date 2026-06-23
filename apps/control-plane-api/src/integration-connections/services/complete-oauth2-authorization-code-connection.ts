@@ -3,6 +3,7 @@ import {
   IntegrationConnectionRedirectSessionIntents,
   IntegrationConnectionStatuses,
   IntegrationCredentialSecretKinds,
+  type IntegrationCredentialSecretKind,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
@@ -92,10 +93,7 @@ async function createAndLinkOAuth2Credential(input: {
   familyId: string;
   connectionId: string;
   slotKey: string;
-  secretKind:
-    | typeof IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN
-    | typeof IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN
-    | typeof IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET;
+  secretKind: IntegrationCredentialSecretKind;
   plaintext: string;
   organizationCredentialKeyVersion: number;
   organizationCredentialKey: Buffer;
@@ -437,6 +435,29 @@ export async function completeOAuth2AuthorizationCodeConnection(
                 }),
           });
         }
+
+        for (const additionalCredential of completedOAuth2AuthorizationCodeConnection.additionalCredentials ??
+          []) {
+          await createAndLinkOAuth2Credential({
+            tx,
+            organizationId: redirectSession.organizationId,
+            familyId: resolved.target.familyId,
+            connectionId: existingConnection.id,
+            slotKey: additionalCredential.slotKey,
+            secretKind: additionalCredential.secretKind,
+            plaintext: additionalCredential.plaintext,
+            organizationCredentialKeyVersion: organizationCredentialKey.version,
+            organizationCredentialKey: unwrappedOrganizationCredentialKey,
+            ...(additionalCredential.credentialMetadata === undefined
+              ? {}
+              : {
+                  credentialMetadata: additionalCredential.credentialMetadata,
+                }),
+            ...(additionalCredential.expiresAt === undefined
+              ? {}
+              : { expiresAt: additionalCredential.expiresAt }),
+          });
+        }
       } finally {
         unwrappedOrganizationCredentialKey.fill(0);
       }
@@ -688,6 +709,29 @@ export async function completeOAuth2AuthorizationCodeConnection(
             "Failed to link OAuth 2.0 (Authorization Code) client secret credential to the connection.",
           );
         }
+      }
+
+      for (const additionalCredential of completedOAuth2AuthorizationCodeConnection.additionalCredentials ??
+        []) {
+        await createAndLinkOAuth2Credential({
+          tx,
+          organizationId: redirectSession.organizationId,
+          familyId: resolved.target.familyId,
+          connectionId: createdConnection.id,
+          slotKey: additionalCredential.slotKey,
+          secretKind: additionalCredential.secretKind,
+          plaintext: additionalCredential.plaintext,
+          organizationCredentialKeyVersion: organizationCredentialKey.version,
+          organizationCredentialKey: unwrappedOrganizationCredentialKey,
+          ...(additionalCredential.credentialMetadata === undefined
+            ? {}
+            : {
+                credentialMetadata: additionalCredential.credentialMetadata,
+              }),
+          ...(additionalCredential.expiresAt === undefined
+            ? {}
+            : { expiresAt: additionalCredential.expiresAt }),
+        });
       }
     } finally {
       unwrappedOrganizationCredentialKey.fill(0);

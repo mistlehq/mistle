@@ -12,6 +12,7 @@ import {
   FireworksBrowserDefinition,
   GcpBrowserDefinition,
   GitHubCloudBrowserDefinition,
+  GoogleAdsBrowserDefinition,
   GoogleWorkspaceBrowserDefinition,
   InceptionBrowserDefinition,
   JiraBrowserDefinition,
@@ -263,6 +264,22 @@ describe("browser definitions", () => {
 
   it("keeps GCP browser definitions free of server-only OAuth handlers", () => {
     expect(GcpBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+  });
+
+  it("registers Google Ads in the browser-safe definitions bundle", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: GoogleAdsBrowserDefinition.familyId,
+      variantId: GoogleAdsBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "googleads",
+      variantId: "googleads-default",
+      kind: "connector",
+      displayName: "Google Ads",
+      logoKey: "googleads",
+    });
+    expect(definition?.oauth2AuthorizationCode).toBeUndefined();
   });
 
   it("keeps Google Workspace browser definitions free of server-only OAuth handlers", () => {

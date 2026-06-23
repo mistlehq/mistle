@@ -53,6 +53,10 @@ describe("integrations-definitions index", () => {
       familyId: "google-workspace",
       variantId: "google-workspace-mcp",
     });
+    const googleAdsDefinition = registry.getDefinition({
+      familyId: "googleads",
+      variantId: "googleads-default",
+    });
     const jiraDefinition = registry.getDefinition({
       familyId: "jira",
       variantId: "jira-default",
@@ -489,6 +493,20 @@ describe("integrations-definitions index", () => {
               slotKey: "metaads.metaads-default.api-key.access-token",
             },
           ],
+        },
+      ],
+    });
+    expect(googleAdsDefinition).toMatchObject({
+      familyId: "googleads",
+      variantId: "googleads-default",
+      kind: "connector",
+      displayName: "Google Ads",
+      logoKey: "googleads",
+      connectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "Google OAuth",
+          kind: "redirect",
         },
       ],
     });
@@ -1351,7 +1369,6 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(45);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -1367,6 +1384,7 @@ describe("integrations-definitions index", () => {
       "fireworks::fireworks-default",
       "gcp::gcp-mcp",
       "google-analytics::google-analytics-mcp",
+      "googleads::googleads-default",
       "google-search-console::google-search-console-mcp",
       "google-workspace::google-workspace-mcp",
       "inception::inception-default",
