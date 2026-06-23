@@ -12,29 +12,29 @@
         pkgs = import nixpkgs { inherit system; };
         nodejs = if pkgs ? nodejs_25 then pkgs.nodejs_25 else pkgs.nodejs;
         docsNodejs = if pkgs ? nodejs_22 then pkgs.nodejs_22 else pkgs.nodejs;
-        codexVersion = "0.142.0-alpha.12";
+        codexVersion = "0.143.0-alpha.9";
         opencodeVersion = "1.17.9";
         codexReleaseAsset =
           {
             x86_64-linux = {
               fileName = "codex-x86_64-unknown-linux-musl.tar.gz";
               binaryName = "codex-x86_64-unknown-linux-musl";
-              hash = "sha256-lRT05zjwmcg6WMUjHEVm1Crx1cWXko3hGRO5g2ZOPGI=";
+              hash = "sha256-EvFqsvtaQ2sPqBTkoE0ysDZLcj4Ok/xyfU03Q+KfTCY=";
             };
             aarch64-linux = {
               fileName = "codex-aarch64-unknown-linux-musl.tar.gz";
               binaryName = "codex-aarch64-unknown-linux-musl";
-              hash = "sha256-c1h7WoddWylYa84yFgADjd87zwxQ8FXvIJhV7wdPi5k=";
+              hash = "sha256-imC3rYUyEZmiPaekNHJitoNQGysdRve5p0NCLKyAbJY=";
             };
             x86_64-darwin = {
               fileName = "codex-x86_64-apple-darwin.tar.gz";
               binaryName = "codex-x86_64-apple-darwin";
-              hash = "sha256-VVQ3cnR+VHvVep9iprjjYvi1g2H7NB1cH5rJryVufJU=";
+              hash = "sha256-8lqJmgWb4djpCrJMphzBb5qwozGPFx5N7FQ3zX/i1YI=";
             };
             aarch64-darwin = {
               fileName = "codex-aarch64-apple-darwin.tar.gz";
               binaryName = "codex-aarch64-apple-darwin";
-              hash = "sha256-VvZgcnjEcgtR8fTVD1RejqngFa2O3MPOPfZ/JKKB+XE=";
+              hash = "sha256-6wL8GOPl1j7diFiUnPMt6F8rNaTwd5uitlKfXdZ6Vx4=";
             };
           }
           .${system}
