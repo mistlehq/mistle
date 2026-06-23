@@ -15,6 +15,8 @@ import {
   type GoogleAdsConnectionConfig,
   GoogleAdsConnectionConfigSchema,
   GoogleAdsConnectionStartConfigSchema,
+  GoogleAdsDeveloperTokenCredentialSlotKey,
+  GoogleAdsCredentialSecretTypes,
   GoogleAdsOAuthScopes,
 } from "./auth.js";
 
@@ -179,7 +181,6 @@ function resolveGoogleAdsConnectionConfig(
   return {
     connection_method: "oauth2-authorization-code",
     client_id: providerState.clientId,
-    developer_token: providerState.developerToken,
     ...(providerState.loginCustomerId === undefined
       ? {}
       : {
@@ -220,6 +221,13 @@ export function resolveGoogleAdsCompleteGrantResult(input: {
     refreshToken: input.response.refresh_token,
     clientSecret: input.providerState.clientSecret,
     ...(credentialMetadata === undefined ? {} : { credentialMetadata }),
+    additionalCredentials: [
+      {
+        slotKey: GoogleAdsDeveloperTokenCredentialSlotKey,
+        secretKind: GoogleAdsCredentialSecretTypes.API_KEY,
+        plaintext: input.providerState.developerToken,
+      },
+    ],
   };
 }
 

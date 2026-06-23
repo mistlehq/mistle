@@ -55,6 +55,7 @@ These targets only need to be enabled:
 - `google-analytics-mcp`
 - `google-search-console-mcp`
 - `google-workspace-mcp`
+- `googleads-default`
 - `inception-default`
 - `jira-default`
 - `kimi-default`
@@ -152,6 +153,22 @@ Set `graph_api_version` only when your deployment needs to pin a different suppo
   "enabled": true,
   "config": {
     "graph_api_version": "v25.0"
+  }
+}
+```
+
+### Google Ads
+
+`googleads-default` can use an empty config. By default, it routes through Google Ads API `v24`.
+
+Set `api_version` only when your deployment needs to pin a different supported Google Ads API version:
+
+```json
+{
+  "targetKey": "googleads-default",
+  "enabled": true,
+  "config": {
+    "api_version": "v24"
   }
 }
 ```

@@ -30,7 +30,6 @@ const BaseInput = {
     config: {
       connection_method: "oauth2-authorization-code",
       client_id: "google_client_123.apps.googleusercontent.com",
-      developer_token: "developer_token_123",
     },
   },
   binding: {

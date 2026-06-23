@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   GoogleAdsConnectionConfigSchema,
   GoogleAdsConnectionStartConfigSchema,
+  GoogleAdsDeveloperTokenCredentialSlotKey,
   GoogleAdsOAuthScopes,
 } from "./auth.js";
 
@@ -13,13 +14,11 @@ describe("GoogleAdsConnectionConfigSchema", () => {
       GoogleAdsConnectionConfigSchema.parse({
         connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
         client_id: "google_client_123.apps.googleusercontent.com",
-        developer_token: "developer_token_123",
         login_customer_id: "1234567890",
       }),
     ).toEqual({
       connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
       client_id: "google_client_123.apps.googleusercontent.com",
-      developer_token: "developer_token_123",
       login_customer_id: "1234567890",
     });
   });
@@ -42,5 +41,11 @@ describe("GoogleAdsConnectionConfigSchema", () => {
 
   it("requests the Google Ads OAuth scope", () => {
     expect(GoogleAdsOAuthScopes).toEqual(["https://www.googleapis.com/auth/adwords"]);
+  });
+
+  it("uses an OAuth-scoped credential slot for the developer token", () => {
+    expect(GoogleAdsDeveloperTokenCredentialSlotKey).toBe(
+      "googleads.googleads-default.oauth2-authorization-code.developer-token",
+    );
   });
 });

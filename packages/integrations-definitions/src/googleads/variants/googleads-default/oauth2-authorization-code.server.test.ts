@@ -167,7 +167,6 @@ describe("Google Ads OAuth authorization code support", () => {
       connectionConfig: {
         connection_method: "oauth2-authorization-code",
         client_id: "google_client_123.apps.googleusercontent.com",
-        developer_token: "developer_token_123",
         login_customer_id: "1234567890",
       },
       accessToken: "access_123",
@@ -177,6 +176,13 @@ describe("Google Ads OAuth authorization code support", () => {
       credentialMetadata: {
         scope: "https://www.googleapis.com/auth/adwords",
       },
+      additionalCredentials: [
+        {
+          slotKey: "googleads.googleads-default.oauth2-authorization-code.developer-token",
+          secretKind: "api_key",
+          plaintext: "developer_token_123",
+        },
+      ],
     });
 
     expect(

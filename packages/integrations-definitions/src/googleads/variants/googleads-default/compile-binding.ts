@@ -6,6 +6,7 @@ import type {
 
 import {
   GoogleAdsConnectionConfigSchema,
+  GoogleAdsDeveloperTokenCredentialSlotKey,
   GoogleAdsCredentialSecretTypes,
   GoogleAdsCredentialSlotKeys,
 } from "./auth.js";
@@ -110,15 +111,12 @@ function createGoogleAdsMcpRuntimeClient(googleAdsCliInstallPath: string): Runti
 
 function resolveGoogleAdsAdditionalHeaders(
   connectionConfig: ReturnType<typeof GoogleAdsConnectionConfigSchema.parse>,
-): Record<string, string> {
-  return {
-    "developer-token": connectionConfig.developer_token,
-    ...(connectionConfig.login_customer_id === undefined
-      ? {}
-      : {
-          "login-customer-id": connectionConfig.login_customer_id,
-        }),
-  };
+): Record<string, string> | undefined {
+  return connectionConfig.login_customer_id === undefined
+    ? undefined
+    : {
+        "login-customer-id": connectionConfig.login_customer_id,
+      };
 }
 
 export function compileGoogleAdsBinding(input: GoogleAdsCompileBindingInput): CompileBindingResult {
@@ -126,6 +124,7 @@ export function compileGoogleAdsBinding(input: GoogleAdsCompileBindingInput): Co
   const baseUrl = resolveGoogleAdsBaseUrl(targetConfig.api_version);
   const parsedBaseUrl = new URL(baseUrl);
   const connectionConfig = GoogleAdsConnectionConfigSchema.parse(input.connection.config);
+  const additionalHeaders = resolveGoogleAdsAdditionalHeaders(connectionConfig);
   const includesGoogleAdsCli = input.binding.config.tools.includes(GoogleAdsToolIds.GOOGLEADS_CLI);
   const includesGoogleAdsMcp = input.binding.config.tools.includes(GoogleAdsToolIds.GOOGLEADS_MCP);
   const includesGoogleAdsToolArtifact = includesGoogleAdsCli || includesGoogleAdsMcp;
@@ -150,7 +149,22 @@ export function compileGoogleAdsBinding(input: GoogleAdsCompileBindingInput): Co
           secretType: GoogleAdsCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
           slotKey: GoogleAdsCredentialSlotKeys.accessToken,
         },
-        additionalHeaders: resolveGoogleAdsAdditionalHeaders(connectionConfig),
+        additionalCredentialHeaders: [
+          {
+            header: "developer-token",
+            credentialResolver: {
+              kind: "integration_connection",
+              connectionId: input.connection.id,
+              secretType: GoogleAdsCredentialSecretTypes.API_KEY,
+              slotKey: GoogleAdsDeveloperTokenCredentialSlotKey,
+            },
+          },
+        ],
+        ...(additionalHeaders === undefined
+          ? {}
+          : {
+              additionalHeaders,
+            }),
       },
     ],
     artifacts: includesGoogleAdsToolArtifact ? [createGoogleAdsCliArtifact(baseUrl)] : [],

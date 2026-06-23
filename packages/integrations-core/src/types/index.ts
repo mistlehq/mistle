@@ -84,6 +84,14 @@ export function createOAuth2AuthorizationCodeCredentialSlotKeys(input: {
   };
 }
 
+export type IntegrationCredentialSecretKind =
+  | "api_key"
+  | "aws_secret_access_key"
+  | "oauth2_access_token"
+  | "oauth2_client_secret"
+  | "oauth2_refresh_token"
+  | "webhook_secret";
+
 export type IntegrationConnectionMethodKind = "form" | "redirect" | "device-authorization";
 
 export const IntegrationConnectionMethodKinds: {
@@ -1502,6 +1510,13 @@ export type IntegrationOAuth2AuthorizationCodeCompleteGrantResult = {
   refreshTokenExpiresAt?: string;
   clientSecret?: string;
   credentialMetadata?: Record<string, unknown>;
+  additionalCredentials?: ReadonlyArray<{
+    slotKey: string;
+    secretKind: IntegrationCredentialSecretKind;
+    plaintext: string;
+    credentialMetadata?: Record<string, unknown>;
+    expiresAt?: string;
+  }>;
 };
 
 export type IntegrationOAuth2AuthorizationCodeRefreshAccessTokenInput<

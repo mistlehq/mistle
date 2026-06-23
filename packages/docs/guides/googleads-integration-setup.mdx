@@ -1,0 +1,113 @@
+---
+title: Google Ads
+description: Connect Google Ads to Mistle
+icon: /icons/integrations/googleads.svg
+---
+
+## Overview
+
+Connect Google Ads by authorizing Mistle with a Google OAuth client and providing a Google Ads developer token.
+
+Mistle uses the OAuth authorization code flow to obtain Google access tokens. The local Google Ads CLI and MCP server run inside the sandbox runtime boundary and call the Google Ads API through Mistle-managed egress, where Mistle injects the refreshed OAuth access token and encrypted developer token into outbound requests.
+
+This integration is a thin wrapper around the Google Ads API. The connected Google user, OAuth scopes, developer token approval, and Google Ads account access determine what agents can read or change. Mistle does not grant, inspect, or enforce Google Ads permissions beyond storing connection credentials and routing tool traffic through managed egress.
+
+## Prerequisites
+
+Before connecting Google Ads:
+
+1. Create or choose a Google Ads manager or client account.
+2. Create or choose a Google Cloud project that will own the OAuth client.
+3. Enable the Google Ads API for that project.
+4. Make sure the Google account that authorizes Mistle has access to the Google Ads accounts agents should use.
+5. Create or choose a Google Ads developer token.
+6. If your Google Auth Platform app is in testing mode, add the authorizing Google account as a test user.
+
+## Configure OAuth Consent
+
+In Google Auth Platform, configure branding, audience, and data access for the OAuth app.
+
+Add this scope:
+
+- `https://www.googleapis.com/auth/adwords`
+
+For an internal Workspace rollout, select **Internal** audience when available. For an external app in testing mode, add every authorizing Google account as a test user before connecting.
+
+## Create A Google OAuth Client
+
+Create a Web application OAuth client in Google Auth Platform.
+
+1. In Mistle, open **Integrations** and choose **Google Ads**.
+2. Copy the **callback URL** shown by Mistle.
+3. In Google Cloud, open **Google Auth Platform > Clients**.
+4. Create an OAuth client with **Application type** set to **Web application**.
+5. Add the Mistle callback URL to **Authorized redirect URIs**.
+6. Create the client and copy its **Client ID** and **Client secret**.
+
+## Connect Google Ads In Mistle
+
+Return to Mistle and enter:
+
+| Field               | Value                                                                                         |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| OAuth client ID     | Google OAuth web client ID                                                                    |
+| OAuth client secret | Google OAuth web client secret                                                                |
+| Developer token     | Google Ads developer token                                                                    |
+| Login customer ID   | Optional manager account customer ID to send as the `login-customer-id` Google Ads API header |
+
+Then click **Connect Google Ads** and complete the Google consent flow with the Google account that should back the connection.
+
+Mistle stores the OAuth client secret, access token, refresh token, and developer token as encrypted connection credentials. The developer token is not stored in connection config.
+
+## Connect Google Ads To A Sandbox Profile
+
+After the Google Ads connection is active:
+
+1. Open the sandbox profile that should use Google Ads.
+2. Add the Google Ads integration connection to the profile.
+3. In **Resources & Tools**, select the Google Ads CLI, Google Ads MCP server, or both.
+4. Publish the profile version.
+
+Sessions using that published profile can use named Google Ads commands and MCP tools for common workflows, plus raw Google Ads API request tools for full endpoint coverage exposed by the Mistle Google Ads wrapper.
+
+## Local Wrapper Decision
+
+Google documents a Google Ads MCP server, but the Mistle integration uses the pinned `mistlehq/tools` Google Ads CLI/MCP binary. That keeps the runtime shape consistent with other Mistle thin-wrapper integrations, lets Mistle inject credentials through managed egress, and keeps full API coverage available through raw Google Ads API request commands/tools.
+
+## API Version
+
+The target defaults to Google Ads API `v24`. Operators can pin a different supported version with `api_version` in the integration target config.
+
+## Self-Hosted Target Config
+
+Self-hosted deployments can enable `googleads-default` with an empty config:
+
+```json
+{
+  "targetKey": "googleads-default",
+  "enabled": true,
+  "config": {}
+}
+```
+
+Set `api_version` only when your deployment needs to pin a different supported Google Ads API version:
+
+```json
+{
+  "targetKey": "googleads-default",
+  "enabled": true,
+  "config": {
+    "api_version": "v24"
+  }
+}
+```
+
+## Official References
+
+- [Google Ads API](https://developers.google.com/google-ads/api/docs/start)
+- [Google Ads API call structure](https://developers.google.com/google-ads/api/docs/concepts/call-structure)
+- [Google Ads API versioning](https://developers.google.com/google-ads/api/docs/concepts/versioning)
+- [Google Ads developer tokens](https://developers.google.com/google-ads/api/docs/api-policy/developer-token)
+- [Secure your Google Ads API credentials](https://developers.google.com/google-ads/api/docs/productionize/secure-credentials)
+- [OAuth 2.0 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server)
+- [Google Ads MCP server](https://developers.google.com/google-ads/api/docs/developer-toolkit/mcp-server)
