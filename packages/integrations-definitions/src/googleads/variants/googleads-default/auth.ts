@@ -31,7 +31,6 @@ export const GoogleAdsConnectionStartConfigSchema = z
     client_id: z.string().trim().min(1),
     client_secret: z.string().trim().min(1),
     developer_token: z.string().trim().min(1),
-    login_customer_id: z.string().trim().min(1).optional(),
   })
   .strict();
 
@@ -39,7 +38,6 @@ export const GoogleAdsConnectionConfigSchema = z
   .object({
     connection_method: z.literal(IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE),
     client_id: z.string().trim().min(1),
-    login_customer_id: z.string().trim().min(1).optional(),
   })
   .strict();
 

@@ -69,10 +69,6 @@ export const GoogleAdsBaseDefinition: GoogleAdsBaseIntegrationDefinition = {
               type: "string",
               title: "Developer token",
             },
-            login_customer_id: {
-              type: "string",
-              title: "Login customer ID",
-            },
           },
           required: ["client_id", "client_secret", "developer_token"],
         },
@@ -85,9 +81,6 @@ export const GoogleAdsBaseDefinition: GoogleAdsBaseIntegrationDefinition = {
           },
           developer_token: {
             "ui:widget": "password",
-          },
-          login_customer_id: {
-            "ui:placeholder": "1234567890",
           },
         },
       }),

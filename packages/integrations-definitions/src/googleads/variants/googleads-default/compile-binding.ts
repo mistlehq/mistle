@@ -37,9 +37,9 @@ const GoogleAdsMcpProcessStopTimeoutMs = 10_000;
 const GoogleAdsMcpProcessStopGracePeriodMs = 2_000;
 // Pin exact release tags for sandbox startup to avoid live upstream version
 // resolution and the associated rate-limit / availability failures.
-const GoogleAdsCliReleaseTag = "googleads/v0.1.0";
+const GoogleAdsCliReleaseTag = "googleads/v0.1.1";
 const GoogleAdsCliLinuxAmd64Sha256 =
-  "f67e15741e90bf450e3ded017cad74c6a3bad403f45ae3dfb6f24f0d7580b02a";
+  "746762382cc808232350eae87818e6d465724a9d070b5b604842be4a9b8c1920";
 
 function createGoogleAdsCliArtifact(baseUrl: string): CompileBindingResult["artifacts"][number] {
   return {
@@ -109,22 +109,11 @@ function createGoogleAdsMcpRuntimeClient(googleAdsCliInstallPath: string): Runti
   };
 }
 
-function resolveGoogleAdsAdditionalHeaders(
-  connectionConfig: ReturnType<typeof GoogleAdsConnectionConfigSchema.parse>,
-): Record<string, string> | undefined {
-  return connectionConfig.login_customer_id === undefined
-    ? undefined
-    : {
-        "login-customer-id": connectionConfig.login_customer_id,
-      };
-}
-
 export function compileGoogleAdsBinding(input: GoogleAdsCompileBindingInput): CompileBindingResult {
   const targetConfig = GoogleAdsTargetConfigSchema.parse(input.target.config);
   const baseUrl = resolveGoogleAdsBaseUrl(targetConfig.api_version);
   const parsedBaseUrl = new URL(baseUrl);
-  const connectionConfig = GoogleAdsConnectionConfigSchema.parse(input.connection.config);
-  const additionalHeaders = resolveGoogleAdsAdditionalHeaders(connectionConfig);
+  GoogleAdsConnectionConfigSchema.parse(input.connection.config);
   const includesGoogleAdsCli = input.binding.config.tools.includes(GoogleAdsToolIds.GOOGLEADS_CLI);
   const includesGoogleAdsMcp = input.binding.config.tools.includes(GoogleAdsToolIds.GOOGLEADS_MCP);
   const includesGoogleAdsToolArtifact = includesGoogleAdsCli || includesGoogleAdsMcp;
@@ -160,11 +149,6 @@ export function compileGoogleAdsBinding(input: GoogleAdsCompileBindingInput): Co
             },
           },
         ],
-        ...(additionalHeaders === undefined
-          ? {}
-          : {
-              additionalHeaders,
-            }),
       },
     ],
     artifacts: includesGoogleAdsToolArtifact ? [createGoogleAdsCliArtifact(baseUrl)] : [],

@@ -48,7 +48,6 @@ const GoogleAdsProviderStateSchema = z
     clientId: z.string().min(1),
     clientSecret: z.string().min(1),
     developerToken: z.string().min(1).optional(),
-    loginCustomerId: z.string().min(1).optional(),
   })
   .strict();
 
@@ -181,11 +180,6 @@ function resolveGoogleAdsConnectionConfig(
   return {
     connection_method: "oauth2-authorization-code",
     client_id: providerState.clientId,
-    ...(providerState.loginCustomerId === undefined
-      ? {}
-      : {
-          login_customer_id: providerState.loginCustomerId,
-        }),
   };
 }
 
@@ -396,11 +390,6 @@ export const GoogleAdsOAuth2AuthorizationCodeCapability: IntegrationOAuth2Author
         ...(input.intent === "reauthorize"
           ? {}
           : { developerToken: connectionConfig.developer_token }),
-        ...(connectionConfig.login_customer_id === undefined
-          ? {}
-          : {
-              loginCustomerId: connectionConfig.login_customer_id,
-            }),
       },
     };
   },

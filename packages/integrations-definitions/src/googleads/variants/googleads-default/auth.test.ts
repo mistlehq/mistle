@@ -9,17 +9,15 @@ import {
 } from "./auth.js";
 
 describe("GoogleAdsConnectionConfigSchema", () => {
-  it("accepts persisted OAuth connection config with developer and login customer IDs", () => {
+  it("accepts persisted OAuth connection config without request routing headers", () => {
     expect(
       GoogleAdsConnectionConfigSchema.parse({
         connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
         client_id: "google_client_123.apps.googleusercontent.com",
-        login_customer_id: "1234567890",
       }),
     ).toEqual({
       connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
       client_id: "google_client_123.apps.googleusercontent.com",
-      login_customer_id: "1234567890",
     });
   });
 
@@ -29,13 +27,11 @@ describe("GoogleAdsConnectionConfigSchema", () => {
         client_id: "google_client_123.apps.googleusercontent.com",
         client_secret: "google_secret_456",
         developer_token: "developer_token_123",
-        login_customer_id: "1234567890",
       }),
     ).toEqual({
       client_id: "google_client_123.apps.googleusercontent.com",
       client_secret: "google_secret_456",
       developer_token: "developer_token_123",
-      login_customer_id: "1234567890",
     });
   });
 

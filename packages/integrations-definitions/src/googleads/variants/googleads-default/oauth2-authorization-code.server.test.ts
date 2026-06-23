@@ -86,7 +86,6 @@ describe("Google Ads OAuth authorization code support", () => {
         client_id: "google_client_123.apps.googleusercontent.com",
         client_secret: "google_secret_456",
         developer_token: "developer_token_123",
-        login_customer_id: "1234567890",
       },
       redirectUrl: "https://mistle.example.com/oauth/callback",
       intent: "create",
@@ -102,7 +101,6 @@ describe("Google Ads OAuth authorization code support", () => {
       clientId: "google_client_123.apps.googleusercontent.com",
       clientSecret: "google_secret_456",
       developerToken: "developer_token_123",
-      loginCustomerId: "1234567890",
     });
   });
 
@@ -121,7 +119,6 @@ describe("Google Ads OAuth authorization code support", () => {
         client_id: "google_client_123.apps.googleusercontent.com",
         client_secret: "google_secret_456",
         developer_token: "existing_developer_token_123",
-        login_customer_id: "1234567890",
       },
       redirectUrl: "https://mistle.example.com/oauth/callback",
       intent: "reauthorize",
@@ -135,7 +132,6 @@ describe("Google Ads OAuth authorization code support", () => {
     expect(result.providerState).toEqual({
       clientId: "google_client_123.apps.googleusercontent.com",
       clientSecret: "google_secret_456",
-      loginCustomerId: "1234567890",
     });
   });
 
@@ -188,7 +184,6 @@ describe("Google Ads OAuth authorization code support", () => {
           clientId: "google_client_123.apps.googleusercontent.com",
           clientSecret: "google_secret_456",
           developerToken: "developer_token_123",
-          loginCustomerId: "1234567890",
         },
         response: {
           access_token: "access_123",
@@ -202,7 +197,6 @@ describe("Google Ads OAuth authorization code support", () => {
       connectionConfig: {
         connection_method: "oauth2-authorization-code",
         client_id: "google_client_123.apps.googleusercontent.com",
-        login_customer_id: "1234567890",
       },
       accessToken: "access_123",
       accessTokenExpiresAt: "2026-06-23T01:00:00.000Z",
@@ -265,7 +259,6 @@ describe("Google Ads OAuth authorization code support", () => {
         providerState: {
           clientId: "google_client_123.apps.googleusercontent.com",
           clientSecret: "google_secret_456",
-          loginCustomerId: "1234567890",
         },
         response: {
           access_token: "access_123",
@@ -278,7 +271,6 @@ describe("Google Ads OAuth authorization code support", () => {
       connectionConfig: {
         connection_method: "oauth2-authorization-code",
         client_id: "google_client_123.apps.googleusercontent.com",
-        login_customer_id: "1234567890",
       },
       accessToken: "access_123",
       accessTokenExpiresAt: "2026-06-23T01:00:00.000Z",

@@ -103,7 +103,6 @@ function compileWithTools(input: {
       config: {
         connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
         client_id: "google_client_123.apps.googleusercontent.com",
-        login_customer_id: "9876543210",
       },
     },
     binding: {
@@ -157,9 +156,6 @@ describe("compileGoogleAdsBinding", () => {
             },
           },
         ],
-        additionalHeaders: {
-          "login-customer-id": "9876543210",
-        },
       },
     ]);
 
@@ -181,13 +177,13 @@ describe("compileGoogleAdsBinding", () => {
           release: {
             kind: "tag",
             match: "exact",
-            tag: "googleads/v0.1.0",
+            tag: "googleads/v0.1.1",
           },
           asset: {
             kind: "exact",
             fileName: "googleads-linux-amd64",
             format: "binary",
-            sha256: "f67e15741e90bf450e3ded017cad74c6a3bad403f45ae3dfb6f24f0d7580b02a",
+            sha256: "746762382cc808232350eae87818e6d465724a9d070b5b604842be4a9b8c1920",
           },
           installPath: "/usr/local/bin/googleads",
           timeoutMs: 120_000,

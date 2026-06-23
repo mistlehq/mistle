@@ -48,12 +48,11 @@ Create a Web application OAuth client in Google Auth Platform.
 
 Return to Mistle and enter:
 
-| Field               | Value                                                                                         |
-| ------------------- | --------------------------------------------------------------------------------------------- |
-| OAuth client ID     | Google OAuth web client ID                                                                    |
-| OAuth client secret | Google OAuth web client secret                                                                |
-| Developer token     | Google Ads developer token                                                                    |
-| Login customer ID   | Optional manager account customer ID to send as the `login-customer-id` Google Ads API header |
+| Field               | Value                          |
+| ------------------- | ------------------------------ |
+| OAuth client ID     | Google OAuth web client ID     |
+| OAuth client secret | Google OAuth web client secret |
+| Developer token     | Google Ads developer token     |
 
 Then click **Connect Google Ads** and complete the Google consent flow with the Google account that should back the connection.
 
@@ -69,6 +68,8 @@ After the Google Ads connection is active:
 4. Publish the profile version.
 
 Sessions using that published profile can use named Google Ads commands and MCP tools for common workflows, plus raw Google Ads API request tools for full endpoint coverage exposed by the Mistle Google Ads wrapper.
+
+When a Google Ads call needs a manager account context, pass the manager customer ID on that specific CLI command or MCP tool call with `--login-customer-id` / `login_customer_id`. It is a request routing header, not an OAuth authorization setting.
 
 ## Local Wrapper Decision
 
