@@ -26,6 +26,7 @@ import { GoogleWorkspaceDefinition } from "./google-workspace/server.js";
 import { InceptionDefinition } from "./inception/index.js";
 import { JiraDefinition } from "./jira/index.js";
 import { KimiDefinition } from "./kimi/index.js";
+import { KlaviyoDefinition } from "./klaviyo/server.js";
 import { LinearDefinition } from "./linear/index.js";
 import { MetaAdsDefinition } from "./metaads/server.js";
 import { MiniMaxDefinition } from "./minimax/index.js";
@@ -76,6 +77,7 @@ export * from "./github/index.js";
 export * from "./github/shared/identity-linking.server.js";
 export * from "./inception/index.js";
 export * from "./kimi/index.js";
+export * from "./klaviyo/server.js";
 export * from "./linear/index.js";
 export * from "./metaads/server.js";
 export * from "./minimax/index.js";
@@ -123,6 +125,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   InceptionDefinition,
   JiraDefinition,
   KimiDefinition,
+  KlaviyoDefinition,
   GitHubCloudDefinition,
   GitHubEnterpriseServerDefinition,
   LinearDefinition,

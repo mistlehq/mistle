@@ -11,6 +11,9 @@ describe("resolveIntegrationLogoPath", () => {
     expect(resolveIntegrationLogoPath({ logoKey: "openai" })).toBe("/integration-logos/openai.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "github" })).toBe("/integration-logos/github.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "aws" })).toBe("/integration-logos/aws.svg");
+    expect(resolveIntegrationLogoPath({ logoKey: "klaviyo" })).toBe(
+      "/integration-logos/klaviyo.png",
+    );
     expect(resolveIntegrationLogoPath({ logoKey: "wasenderapi" })).toBe(
       "/integration-logos/wasenderapi.png",
     );
@@ -47,6 +50,9 @@ describe("resolveIntegrationLogoPath", () => {
     expect(resolveIntegrationLogoPath({ logoKey: "slack", colorScheme: "dark" })).toBe(
       "/integration-logos/slack.svg",
     );
+    expect(resolveIntegrationLogoPath({ logoKey: "klaviyo", colorScheme: "dark" })).toBe(
+      "/integration-logos/klaviyo.png",
+    );
     expect(resolveIntegrationLogoPath({ logoKey: "wasenderapi", colorScheme: "dark" })).toBe(
       "/integration-logos/wasenderapi.png",
     );
@@ -63,6 +69,10 @@ describe("resolveIntegrationLogoPath", () => {
     });
     expect(resolveIntegrationLogoPaths({ logoKey: "aws" })).toEqual({
       light: "/integration-logos/aws.svg",
+      dark: null,
+    });
+    expect(resolveIntegrationLogoPaths({ logoKey: "klaviyo" })).toEqual({
+      light: "/integration-logos/klaviyo.png",
       dark: null,
     });
     expect(resolveIntegrationLogoPaths({ logoKey: "wasenderapi" })).toEqual({

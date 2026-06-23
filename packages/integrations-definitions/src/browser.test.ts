@@ -16,6 +16,7 @@ import {
   InceptionBrowserDefinition,
   JiraBrowserDefinition,
   KimiBrowserDefinition,
+  KlaviyoBrowserDefinition,
   LinearBrowserDefinition,
   MiniMaxBrowserDefinition,
   NotionBrowserDefinition,
@@ -142,6 +143,24 @@ describe("browser definitions", () => {
     expect(KimiBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
     expect(KimiBrowserDefinition.webhookHandler).toBeUndefined();
     expect(KimiBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("registers Klaviyo in the browser-safe definitions bundle without server-only OAuth handlers", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: KlaviyoBrowserDefinition.familyId,
+      variantId: KlaviyoBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "klaviyo",
+      variantId: "klaviyo-mcp",
+      kind: "connector",
+      displayName: "Klaviyo",
+      logoKey: "klaviyo",
+    });
+    expect(KlaviyoBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(KlaviyoBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(KlaviyoBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("registers MiniMax in the browser-safe definitions bundle", () => {

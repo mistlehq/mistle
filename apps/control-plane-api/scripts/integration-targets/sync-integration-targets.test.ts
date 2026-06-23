@@ -143,6 +143,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "klaviyo-mcp",
+        familyId: "klaviyo",
+        variantId: "klaviyo-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "linear-default",
         familyId: "linear",
         variantId: "linear-default",

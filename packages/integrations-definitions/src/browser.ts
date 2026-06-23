@@ -23,6 +23,7 @@ import { GoogleWorkspaceMcpBaseDefinition } from "./google-workspace/variants/go
 import { InceptionDefinition } from "./inception/index.js";
 import { JiraBaseDefinition } from "./jira/variants/jira-default/base-definition.js";
 import { KimiDefinition } from "./kimi/index.js";
+import { KlaviyoMcpBaseDefinition } from "./klaviyo/variants/klaviyo-mcp/base-definition.js";
 import { LinearBaseDefinition } from "./linear/variants/linear-default/base-definition.js";
 import { MetaAdsBaseDefinition } from "./metaads/variants/metaads-default/base-definition.js";
 import { MiniMaxDefinition } from "./minimax/index.js";
@@ -69,6 +70,7 @@ export const GoogleWorkspaceBrowserDefinition = GoogleWorkspaceMcpBaseDefinition
 export const InceptionBrowserDefinition = InceptionDefinition;
 export const JiraBrowserDefinition = JiraBaseDefinition;
 export const KimiBrowserDefinition = KimiDefinition;
+export const KlaviyoBrowserDefinition = KlaviyoMcpBaseDefinition;
 export const LinearBrowserDefinition = LinearBaseDefinition;
 export const MetaAdsBrowserDefinition = MetaAdsBaseDefinition;
 export const MiniMaxBrowserDefinition = MiniMaxDefinition;
@@ -111,6 +113,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   InceptionBrowserDefinition,
   JiraBrowserDefinition,
   KimiBrowserDefinition,
+  KlaviyoBrowserDefinition,
   GitHubCloudBrowserDefinition,
   GitHubEnterpriseServerBrowserDefinition,
   LinearBrowserDefinition,
@@ -174,6 +177,7 @@ export * from "./github/browser.js";
 export * from "./inception/index.js";
 export * from "./jira/browser.js";
 export * from "./kimi/index.js";
+export * from "./klaviyo/browser.js";
 export * from "./linear/browser.js";
 export * from "./metaads/browser.js";
 export * from "./minimax/index.js";

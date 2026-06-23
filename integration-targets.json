@@ -109,6 +109,11 @@
       "config": {}
     },
     {
+      "targetKey": "klaviyo-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "linear-default",
       "enabled": true,
       "config": {}
