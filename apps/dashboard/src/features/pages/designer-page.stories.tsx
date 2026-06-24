@@ -223,6 +223,7 @@ function DesignerPageStory(input: {
       <DesignerPageView
         createErrorMessage={input.createErrorMessage ?? null}
         isCreating={input.isCreating ?? false}
+        onOpenSession={() => {}}
         onPromptChange={setPrompt}
         onSubmit={() => {}}
         prompt={prompt}

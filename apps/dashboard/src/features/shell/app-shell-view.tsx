@@ -24,7 +24,6 @@ export interface AppShellViewProps {
   sidebarContent: React.ReactNode;
   sidebarFooterContent: React.ReactNode;
   sidebarDefaultOpen?: boolean;
-  sidebarDefaultOpenKey?: string | null;
   contentInsetOwner: "app-shell" | "child";
   mainContent: React.ReactNode;
   renderSidebarTrigger: boolean;
@@ -38,11 +37,7 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
     viewportMode: input.viewportMode,
   });
   return (
-    <SidebarProvider
-      defaultOpen={input.sidebarDefaultOpen ?? true}
-      key={input.sidebarDefaultOpenKey ?? "default"}
-      style={SidebarWidthStyle}
-    >
+    <SidebarProvider defaultOpen={input.sidebarDefaultOpen ?? true} style={SidebarWidthStyle}>
       <Sidebar>
         {input.sidebarHeaderContent === null ? null : (
           <SidebarHeader className={input.sidebarHeaderClassName}>

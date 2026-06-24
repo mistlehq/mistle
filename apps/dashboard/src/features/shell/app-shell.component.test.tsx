@@ -232,6 +232,5 @@ describe("resolveAppShellFrame", () => {
     });
 
     expect(frame.sidebarDefaultOpen).toBe(false);
-    expect(frame.sidebarDefaultOpenKey).toBe(locationPathname);
   });
 });

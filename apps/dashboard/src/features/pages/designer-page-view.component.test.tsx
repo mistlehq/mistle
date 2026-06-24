@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { EditorView } from "@codemirror/view";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
@@ -34,6 +34,7 @@ const SampleDesignerSession = {
 
 function ControlledDesignerPageView(input: {
   initialDraft?: string;
+  onOpenSession?: () => void;
   sessions?: readonly DesignerSession[];
 }): React.JSX.Element {
   const [prompt, setPrompt] = useState(input.initialDraft ?? "");
@@ -43,6 +44,7 @@ function ControlledDesignerPageView(input: {
       <DesignerPageView
         createErrorMessage={null}
         isCreating={false}
+        onOpenSession={input.onOpenSession ?? (() => {})}
         onPromptChange={setPrompt}
         onSubmit={() => {}}
         prompt={prompt}
@@ -114,5 +116,29 @@ describe("DesignerPageView", () => {
     expect(screen.getByRole("link", { name: "Design triage agent" }).getAttribute("href")).toBe(
       "/designer/dsn_triage",
     );
+  });
+
+  it("notifies before opening a past Designer session", () => {
+    function DesignerPageViewOpenSessionHarness(): React.JSX.Element {
+      const [navigationState, setNavigationState] = useState("open");
+
+      return (
+        <>
+          <div>{navigationState}</div>
+          <ControlledDesignerPageView
+            onOpenSession={() => {
+              setNavigationState("closing");
+            }}
+            sessions={[SampleDesignerSession]}
+          />
+        </>
+      );
+    }
+
+    render(<DesignerPageViewOpenSessionHarness />);
+
+    fireEvent.click(screen.getByRole("link", { name: "Design triage agent" }));
+
+    expect(screen.getByText("closing")).toBeDefined();
   });
 });

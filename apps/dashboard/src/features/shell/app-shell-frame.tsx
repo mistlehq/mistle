@@ -53,7 +53,6 @@ export type AppShellFrame = Pick<
   | "renderSidebarTrigger"
   | "sidebarContent"
   | "sidebarDefaultOpen"
-  | "sidebarDefaultOpenKey"
   | "sidebarFooterContent"
   | "sidebarHeaderClassName"
   | "sidebarHeaderContent"
@@ -110,7 +109,6 @@ export function resolveAppShellFrame(input: {
       ? {}
       : {
           sidebarDefaultOpen: input.pageMeta.sidebarDefaultOpen,
-          sidebarDefaultOpenKey: input.locationPathname,
         }),
     sidebarContent: showDedicatedSessionsSidebar ? (
       <div className="animate-in fade-in-0 duration-200">
