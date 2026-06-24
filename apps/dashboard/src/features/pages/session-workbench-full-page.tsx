@@ -19,6 +19,7 @@ import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
+import type { SessionComposerBootstrapPhase } from "./session-composer/session-composer-runtime-contracts.js";
 import {
   SessionConversationBottomPanelController,
   SessionConversationMainContent,
@@ -133,6 +134,60 @@ export function shouldAutoStartWorkbenchTurn(input: {
   );
 }
 
+export function resolveSessionEntryPreparationState(input: {
+  activeConversationId: string | null;
+  activeTurnState: SessionWorkbenchActiveTurnState;
+  autoStartTurn: SessionWorkbenchFullPageProps["autoStartTurn"] | undefined;
+  bootstrapPhaseStatus: SessionComposerBootstrapPhase["status"];
+  chatEntries: readonly ChatEntry[];
+  isInitialConversationHydrated: boolean;
+  startupState: SessionStartupState | null;
+  transitionState: SessionWorkbenchPrimaryPanelTransitionState;
+}): SessionStartupState | null {
+  if (input.startupState !== null) {
+    return input.startupState;
+  }
+
+  if (input.transitionState !== "stable_chat") {
+    return null;
+  }
+
+  if (input.activeConversationId === null) {
+    return "preparing_conversation";
+  }
+
+  if (!input.isInitialConversationHydrated) {
+    return "loading_conversation";
+  }
+
+  if (
+    input.bootstrapPhaseStatus === "unavailable" ||
+    input.bootstrapPhaseStatus === "bootstrapping"
+  ) {
+    return "preparing_conversation";
+  }
+
+  if (input.bootstrapPhaseStatus === "failed") {
+    return null;
+  }
+
+  const autoStartTurn = input.autoStartTurn;
+  if (autoStartTurn === undefined) {
+    return null;
+  }
+
+  if (
+    input.activeTurnState === "running" ||
+    input.chatEntries.some(
+      (entry) => entry.kind === "user-message" && entry.text === autoStartTurn.prompt,
+    )
+  ) {
+    return null;
+  }
+
+  return "starting_first_turn";
+}
+
 export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
     requestedRuntimeConversationId: input.requestedRuntimeConversationId,
@@ -147,7 +202,7 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
       ? {}
       : { sandboxStatusReader: input.sandboxStatusReader }),
   });
-  const [hasEnteredReadyWorkbench, setHasEnteredReadyWorkbench] = useState(false);
+  const [hasEnteredReadyConversation, setHasEnteredReadyConversation] = useState(false);
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const previousActiveConversationIdRef = useRef<string | null>(null);
   const [composerDraft, setComposerDraft] = useState(createComposerDraft(""));
@@ -549,19 +604,35 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
           }
         : null;
 
-  useEffect(() => {
-    if (
-      workbench.connectionReadiness.canConnect &&
-      workbench.primaryPanelState.transitionState === "stable_chat"
-    ) {
-      setHasEnteredReadyWorkbench(true);
-    }
-  }, [workbench.connectionReadiness.canConnect, workbench.primaryPanelState.transitionState]);
-  const initialEntryStartupState =
-    !hasEnteredReadyWorkbench && alert === null ? workbench.initialEntryStartupState : null;
   const activeConversationId = conversationPane.activeConversationId;
   const turnControl = conversationPane.composerStateInput.turnControl;
   const isConversationTurnRunning = turnControl.activeTurnState === "running";
+  const initialConnectionStartupState =
+    !hasEnteredReadyConversation && alert === null ? workbench.initialEntryStartupState : null;
+  const entryPreparationState = resolveSessionEntryPreparationState({
+    activeConversationId,
+    activeTurnState: turnControl.activeTurnState,
+    autoStartTurn: input.autoStartTurn,
+    bootstrapPhaseStatus: conversationPane.composerStateInput.bootstrap.phase.status,
+    chatEntries: conversationPane.chatState.entries,
+    isInitialConversationHydrated: conversationPane.isInitialConversationHydrated,
+    startupState: initialConnectionStartupState,
+    transitionState: workbench.primaryPanelState.transitionState,
+  });
+
+  useEffect(() => {
+    if (
+      entryPreparationState === null &&
+      workbench.connectionReadiness.canConnect &&
+      workbench.primaryPanelState.transitionState === "stable_chat"
+    ) {
+      setHasEnteredReadyConversation(true);
+    }
+  }, [
+    entryPreparationState,
+    workbench.connectionReadiness.canConnect,
+    workbench.primaryPanelState.transitionState,
+  ]);
 
   useEffect(() => {
     const autoStartTurn = input.autoStartTurn;
@@ -575,7 +646,7 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
         activeTurnState: turnControl.activeTurnState,
         autoStartTurn,
         chatEntries: conversationPane.chatState.entries,
-        initialEntryStartupState,
+        initialEntryStartupState: initialConnectionStartupState,
         isInitialConversationHydrated: conversationPane.isInitialConversationHydrated,
         isStartingTurn: turnControl.isStarting,
         startedTurnKeys: new Set([
@@ -606,7 +677,7 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
     activeConversationId,
     conversationPane.chatState.entries,
     conversationPane.isInitialConversationHydrated,
-    initialEntryStartupState,
+    initialConnectionStartupState,
     input.autoStartTurn,
     turnControl.activeTurnState,
     turnControl.isStarting,
@@ -690,7 +761,7 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
         }
         mainContentLayout={
           workbench.primaryPanelState.transitionState === "stable_cli" ||
-          initialEntryStartupState !== null
+          entryPreparationState !== null
             ? { scroll: "contained", width: "full" }
             : { scroll: "page", width: "chat" }
         }
@@ -723,14 +794,14 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
             terminalContentInset: workbench.primaryPanelState.cliTerminalContentInset,
             terminalThemeMode: workbench.primaryPanelState.cliTerminalThemeMode,
           },
-          initialEntryStartupState,
+          entryPreparationState,
           sandboxInstanceId: input.sandboxInstanceId,
           startupOperation: workbench.sandboxStatusQuery.data?.startupOperation ?? null,
           transitionState: workbench.primaryPanelState.transitionState,
         })}
         mainContentScrollContainerRef={conversationScrollContainerRef}
         primaryBottomPanel={
-          workbench.primaryPanelState.showsChatComposer && initialEntryStartupState === null ? (
+          workbench.primaryPanelState.showsChatComposer && entryPreparationState === null ? (
             <SessionConversationBottomPanelController
               chatEntries={conversationPane.chatState.entries}
               composerStateInput={conversationPane.composerStateInput}
@@ -822,9 +893,7 @@ type PrimaryPanelCliContent = {
 function renderPrimaryPanelMainContent(input: {
   cli: PrimaryPanelCliContent;
   conversation: PrimaryPanelConversationContent;
-  initialEntryStartupState: ReturnType<
-    typeof useSessionWorkbenchController
-  >["workbench"]["initialEntryStartupState"];
+  entryPreparationState: SessionStartupState | null;
   sandboxInstanceId: string | null;
   startupOperation:
     | NonNullable<
@@ -835,18 +904,27 @@ function renderPrimaryPanelMainContent(input: {
     typeof useSessionWorkbenchController
   >["workbench"]["primaryPanelState"]["transitionState"];
 }): React.JSX.Element {
-  if (input.initialEntryStartupState !== null) {
+  if (input.entryPreparationState !== null) {
+    const showSandboxOperationProgress =
+      input.startupOperation?.operationId !== undefined &&
+      input.entryPreparationState !== "preparing_conversation" &&
+      input.entryPreparationState !== "loading_conversation" &&
+      input.entryPreparationState !== "starting_first_turn";
+
     return (
       <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-4 px-4 py-6">
-        <SessionStartupStatus state={input.initialEntryStartupState} />
-        <SandboxOperationProgress
-          displayMode="timeline"
-          emptyMessage="Waiting for session startup events."
-          operationId={input.startupOperation?.operationId ?? null}
-          sandboxInstanceId={input.sandboxInstanceId}
-          showBorder
-          showLoadError={false}
-        />
+        <SessionStartupStatus state={input.entryPreparationState} />
+        {showSandboxOperationProgress ? (
+          <SandboxOperationProgress
+            displayMode="timeline"
+            emptyMessage="Waiting for session startup events."
+            hideWhenEmpty
+            operationId={input.startupOperation?.operationId ?? null}
+            sandboxInstanceId={input.sandboxInstanceId}
+            showBorder
+            showLoadError={false}
+          />
+        ) : null}
       </div>
     );
   }

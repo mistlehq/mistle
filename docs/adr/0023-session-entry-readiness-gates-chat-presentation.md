@@ -1,0 +1,3 @@
+# Session entry readiness gates chat presentation
+
+Mistle session workbenches should keep the entry loading surface visible until **Session entry readiness** is reached, rather than switching to chat as soon as the sandbox is running or the runtime connection exists. The shared workbench owns this policy and uses **Active conversation readiness** signals from runtime adapters so transcript hydration, runtime bootstrap, and first-turn submission do not briefly expose an empty disabled composer as if the session were usable. This trades slightly later chat presentation for a clearer entry experience and avoids runtime-specific loading behavior drifting across Designer and ordinary sessions.

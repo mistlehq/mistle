@@ -181,6 +181,22 @@ function LifecycleStateMatrixStory(): React.JSX.Element {
   });
 }
 
+function EntryPreparationStatesStory(): React.JSX.Element {
+  return renderSessionWorkbenchContentStory({
+    headerStatusUi: resolveSandboxStatusBadgeUi("running"),
+    mainContent: (
+      <div className="mx-auto grid h-full w-full max-w-3xl place-items-center gap-4 px-4 py-6">
+        <div className="w-full rounded-md border border-border bg-background px-4 py-5">
+          <SessionStartupStatus state="preparing_conversation" />
+        </div>
+      </div>
+    ),
+    mainContentLayout: { scroll: "contained", width: "full" },
+    primaryBottomPanel: null,
+    sandboxInstanceId: "sbi_storybook_entry_preparation",
+  });
+}
+
 const meta = {
   title: "Dashboard/Sessions/SessionWorkbench/StartupStatus",
   component: LifecycleStateMatrixStory,
@@ -197,4 +213,9 @@ type Story = StoryObj<typeof meta>;
 
 export const LifecycleStateMatrix: Story = {
   render: () => <LifecycleStateMatrixStory />,
+};
+
+export const EntryPreparationStatesStorybook: Story = {
+  name: "Entry preparation",
+  render: () => <EntryPreparationStatesStory />,
 };

@@ -211,6 +211,14 @@ _Avoid_: Callback navigation, button navigation
 A sandbox session intentionally removed from ordinary user-visible session lists while its history remains available for audit and debugging.
 _Avoid_: Hard-deleted session, erased session
 
+**Session entry readiness**:
+The point at which a session can present its active conversation as usable chat, after transcript hydration or first-turn submission has produced visible conversation state.
+_Avoid_: Sandbox loading when runtime conversation preparation is still in progress, composer loading
+
+**Active conversation readiness**:
+The runtime-supplied evidence that the active conversation has enough synchronized state for the shared session workbench to decide **Session entry readiness**.
+_Avoid_: Composer readiness, runtime-specific loading state
+
 **Trigger**:
 A configured event or schedule that starts an agent response.
 _Avoid_: Automation
