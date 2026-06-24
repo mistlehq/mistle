@@ -88,22 +88,14 @@ describe.concurrent("designer sessions integration", () => {
     );
     expect(codexAgents?.content).toContain("Search Mistle docs with the `mistle_docs` MCP server");
     expect(codexAgents?.content).toContain(
-      "For open-ended workflow requests, show a Designer blueprint before inspecting or changing product resources.",
+      "Show a Designer blueprint before inspecting or changing product resources.",
     );
     expect(codexAgents?.content).toContain(
       "Use Mistle MCP tools for product state only after blueprint alignment, or when the user explicitly names an existing product resource to inspect or modify.",
     );
-    expect(codexAgents?.content).toContain(
-      "Ask one setup decision at a time with `dashboard_control.request_user_input`.",
-    );
-    expect(codexAgents?.content).toContain(
-      "Ask one focused clarification only when the request is too unclear to draft a high-level workflow.",
-    );
+    expect(codexAgents?.content).toContain("Resolve one setup decision at a time.");
     expect(codexAgents?.content).toContain(
       'When asking which sandbox profile should run or receive a workflow, always include "Create a new sandbox profile" alongside recommended existing profiles.',
-    );
-    expect(codexAgents?.content).toContain(
-      "Do not silently choose defaults for runtime, model, provider access, triggers, publishing, or target sandbox profile.",
     );
     expect(codexAgents?.content).toContain(
       "A Designer blueprint is a read-only workflow alignment artifact, not saved product configuration.",
