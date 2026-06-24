@@ -494,7 +494,7 @@ const DesignerCanvasBlueprintTabJsonSchema = {
     blueprint: {
       ...DesignerBlueprintDocumentJsonSchema,
       description:
-        "Designer blueprint document. Must use version 1, fit within 64 KB, and contain semantic structure rather than renderer coordinates. The dashboard assigns the stable blueprint tab id and href.",
+        "Designer blueprint document. Must use version 1, fit within 64 KB, and describe semantic workflow structure. The dashboard assigns the stable blueprint tab id and href.",
     },
   },
   required: ["kind", "title", "blueprint"],
@@ -557,7 +557,7 @@ export const DesignerUserInputRequestDynamicToolSpec = {
   namespace: DashboardControlDynamicToolNamespace,
   name: DesignerUserInputRequestDynamicToolName,
   description:
-    "Ask the user exactly one setup question in the dashboard. Use this for Designer decisions that need a selectable choice or a short free-form response.",
+    "Ask the user exactly one setup question in the dashboard. Use this for Designer decisions that need a selectable choice or a short free-form response. Prefer selectable options when the answer can be reduced to choices; use free-form input only when options cannot capture the answer.",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -585,7 +585,7 @@ export const DesignerUserInputRequestDynamicToolSpec = {
         minItems: 1,
         maxItems: 6,
         description:
-          "Selectable options. Include the recommended option first when there is a recommendation.",
+          "Selectable options. Include the recommended option first when there is a recommendation. Keep option labels short and clear.",
       },
       freeForm: DesignerUserInputFreeFormJsonSchema,
     },

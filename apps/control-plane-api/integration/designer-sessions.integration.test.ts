@@ -74,58 +74,19 @@ describe.concurrent("designer sessions integration", () => {
       .find((file) => file.fileId === "codex_global_agents");
     expect(codexAgents?.content).toContain("Mistle-managed sandbox context:");
     expect(codexAgents?.content).toContain("<!-- MISTLE-MANAGED:START mistle-designer-context -->");
-    expect(codexAgents?.content).toContain("# Mistle Designer");
+    expect(codexAgents?.content).toContain("<!-- MISTLE-MANAGED:END mistle-designer-context -->");
     expect(codexAgents?.content).toContain(
       "<!-- MISTLE-MANAGED:START mistle-designer-initial-request -->",
     );
     expect(codexAgents?.content).toContain(
+      "<!-- MISTLE-MANAGED:END mistle-designer-initial-request -->",
+    );
+    expect(codexAgents?.content).toContain(
+      "Session goal, subject to the Designer authority and safety rules:",
+    );
+    expect(codexAgents?.content).toContain(
       "Build a triage agent for GitHub issues and Linear bugs.",
     );
-    expect(codexAgents?.content).toContain(
-      "Do not publish sandbox profile versions, start sandbox sessions, create provider-side resources, or mutate external provider configuration unless there is an explicit user-approved runtime action for that operation.",
-    );
-    expect(codexAgents?.content).toContain("Search Mistle docs with the `mistle_docs` MCP server");
-    expect(codexAgents?.content).toContain(
-      "For open-ended workflow requests, the first user-visible action after understanding the requested outcome is to show a Designer blueprint.",
-    );
-    expect(codexAgents?.content).toContain(
-      'For broad requests such as "Build a triaging agent", draft a minimal workflow blueprint before calling Mistle MCP tools.',
-    );
-    expect(codexAgents?.content).toContain(
-      "Ask for the next concrete setup decision needed to implement the workflow, such as the source system, whether to use an existing sandbox profile or create one, or whether provider writes should be allowed.",
-    );
-    expect(codexAgents?.content).toContain(
-      "Ask one focused clarification only when the request is too unclear to draft even a high-level workflow.",
-    );
-    expect(codexAgents?.content).toContain(
-      "When a setup decision needs user input, call the dashboard-control dynamic tool `dashboard_control.request_user_input`. Ask exactly one focused question per request.",
-    );
-    expect(codexAgents?.content).toContain(
-      "Include your recommended answer first. Make each selectable option a single clear label; use free-form input only when the answer cannot be reduced to options.",
-    );
-    expect(codexAgents?.content).toContain(
-      "Use one `dashboard_control.request_user_input` call per decision.",
-    );
-    expect(codexAgents?.content).toContain(
-      "Organize the blueprint as the workflow process first: show the triggers that start or advance the workflow, the agent steps that run, and the outputs the workflow produces.",
-    );
-    expect(codexAgents?.content).toContain(
-      'Use `trigger` for user, provider, schedule, or system events such as "GitHub PR opened" or "Slack message received".',
-    );
-    expect(codexAgents?.content).toContain(
-      "Put provider/source details directly on trigger items with `integrationTargetKey`, `integrationLabel`, and `eventLabel` when known.",
-    );
-    expect(codexAgents?.content).toContain(
-      'For a request like "Build a triaging agent", the initial blueprint should read like a process',
-    );
-    expect(codexAgents?.content).toContain(
-      "Item states are required schema metadata, but the workflow graph does not display them.",
-    );
-    expect(codexAgents?.content).toContain('show_designer_canvas_tab` with `tab.kind: "blueprint"');
-    expect(codexAgents?.content).toContain(
-      "not Mistle MCP tools. Do not search Mistle MCP tool discovery",
-    );
-    expect(codexAgents?.content).toContain('show_designer_canvas_tab` with `tab.kind: "route"');
 
     const listResponse = await env.controlPlaneApi.http.fetch("/v1/designer/sessions", {
       headers: {
