@@ -1,0 +1,9 @@
+.session-workbench-main-group-animated > [data-panel] {
+  transition: flex 300ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-workbench-main-group-animated > [data-panel] {
+    transition: none;
+  }
+}

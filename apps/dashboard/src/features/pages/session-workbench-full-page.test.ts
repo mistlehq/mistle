@@ -266,7 +266,7 @@ describe("shouldShowSessionWorkbenchSecondaryPanel", () => {
     ).toBe(false);
   });
 
-  it("shows the secondary panel when the conversation navigator is open", () => {
+  it("does not let the conversation navigator open a hidden custom secondary panel", () => {
     expect(
       shouldShowSessionWorkbenchSecondaryPanel({
         sharedSecondaryPanelKind: "conversations",
@@ -279,7 +279,7 @@ describe("shouldShowSessionWorkbenchSecondaryPanel", () => {
           renderPanel: () => null,
         },
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("shows the secondary panel when the diff panel is open", () => {

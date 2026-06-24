@@ -475,14 +475,22 @@ function preventDesignerCanvasLayoutOverlay(event: DockviewWillShowOverlayLocati
 
 export function DesignerCanvasWorkspace(input: {
   activeTabHref: string | null;
+  mountDockviewWhenEmpty?: boolean;
   onApiReady?: (api: DockviewApi) => void;
   onActiveTabHrefChange: (href: string) => void;
   onTabClose: (tabId: string) => void;
   onTabsChange: (tabs: readonly DesignerCanvasTab[]) => void;
   tabs: readonly DesignerCanvasTab[];
 }): React.JSX.Element {
-  const { activeTabHref, onActiveTabHrefChange, onApiReady, onTabClose, onTabsChange, tabs } =
-    input;
+  const {
+    activeTabHref,
+    mountDockviewWhenEmpty = false,
+    onActiveTabHrefChange,
+    onApiReady,
+    onTabClose,
+    onTabsChange,
+    tabs,
+  } = input;
   const resolvedAppearance = useResolvedAppearance();
   const [dockviewApi, setDockviewApi] = useState<DockviewApi | null>(null);
   const tabById = useMemo(() => new Map(tabs.map((tab) => [tab.id, tab])), [tabs]);
@@ -565,7 +573,7 @@ export function DesignerCanvasWorkspace(input: {
     onApiReady?.(dockviewApi);
   }, [dockviewApi, onApiReady]);
 
-  if (tabs.length === 0) {
+  if (tabs.length === 0 && !mountDockviewWhenEmpty) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center bg-background p-4 text-sm text-muted-foreground">
         Canvas

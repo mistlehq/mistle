@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -205,6 +205,100 @@ describe("SessionWorkbenchPageView", () => {
     expect(within(container).queryByTestId("session-workbench-secondary-panel")).toBeNull();
   });
 
+  it("keeps persistent secondary panels mounted while collapsed", () => {
+    render(
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<div>Terminal workspace</div>}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible={false}
+        mainContent={<div>Conversation body</div>}
+        primaryBottomPanel={<div>Composer</div>}
+        sandboxInstanceId="sbi_test"
+        secondaryPanel={<div>Designer canvas</div>}
+        secondaryPanelMountMode="persistent-collapsible"
+      />,
+    );
+
+    expect(screen.getByTestId("session-workbench-secondary-panel")).toBeTruthy();
+    expect(screen.getByTestId("session-workbench-main-group").className).not.toContain(
+      "session-workbench-main-group-animated",
+    );
+    const mountedCanvas = screen.getByText("Designer canvas");
+    expect(mountedCanvas.closest("[aria-hidden]")?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("uses explicit default sizes for the primary and secondary panels", () => {
+    render(
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<div>Terminal workspace</div>}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible
+        mainContent={<div>Conversation body</div>}
+        primaryBottomPanel={<div>Composer</div>}
+        primaryPanelDefaultSize={40}
+        sandboxInstanceId="sbi_test"
+        secondaryPanel={<div>Designer canvas</div>}
+        secondaryPanelDefaultSize={60}
+        secondaryPanelLayoutKey="explicit-size"
+        secondaryPanelMountMode="persistent-collapsible"
+      />,
+    );
+
+    expect(screen.getByTestId("session-workbench-primary-panel").getAttribute("style")).toContain(
+      "flex: 40 1 0px;",
+    );
+    expect(screen.getByTestId("session-workbench-secondary-panel").getAttribute("style")).toContain(
+      "flex: 60 1 0px;",
+    );
+  });
+
+  it("opens a collapsed persistent secondary panel to its explicit default size", async () => {
+    const { rerender } = render(
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<div>Terminal workspace</div>}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible={false}
+        mainContent={<div>Conversation body</div>}
+        primaryBottomPanel={<div>Composer</div>}
+        primaryPanelDefaultSize={40}
+        sandboxInstanceId="sbi_test"
+        secondaryPanel={<div>Designer canvas</div>}
+        secondaryPanelDefaultSize={60}
+        secondaryPanelLayoutKey="explicit-size-transition"
+        secondaryPanelMountMode="persistent-collapsible"
+      />,
+    );
+
+    rerender(
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<div>Terminal workspace</div>}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible
+        mainContent={<div>Conversation body</div>}
+        primaryBottomPanel={<div>Composer</div>}
+        primaryPanelDefaultSize={40}
+        sandboxInstanceId="sbi_test"
+        secondaryPanel={<div>Designer canvas</div>}
+        secondaryPanelDefaultSize={60}
+        secondaryPanelLayoutKey="explicit-size-transition"
+        secondaryPanelMountMode="persistent-collapsible"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("session-workbench-primary-panel").getAttribute("style")).toContain(
+        "flex: 40 1 0px;",
+      );
+      expect(
+        screen.getByTestId("session-workbench-secondary-panel").getAttribute("style"),
+      ).toContain("flex: 60 1 0px;");
+    });
+  });
+
   it("does not remount the bottom panel when the shared right panel opens", () => {
     let nextMountId = 1;
 
@@ -240,7 +334,7 @@ describe("SessionWorkbenchPageView", () => {
         primaryBottomPanel={<div>Composer</div>}
         sandboxInstanceId="sbi_test"
         secondaryPanel={<div>Threads panel</div>}
-        secondaryPanelDefaultSize="20%"
+        secondaryPanelDefaultSize={20}
         secondaryPanelLayoutKey="right-panel"
         secondaryPanelMinSize="16rem"
       />,

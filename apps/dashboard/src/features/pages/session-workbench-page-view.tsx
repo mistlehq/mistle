@@ -1,4 +1,5 @@
 import {
+  cn,
   type PanelImperativeHandle,
   ResizableHandle,
   ResizablePanel,
@@ -7,13 +8,15 @@ import {
   Spinner,
   useDefaultLayout,
 } from "@mistle/ui";
-import { useLayoutEffect, useRef } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 import {
   getBestEffortBrowserStorage,
   readBrowserStorageItem,
   writeBrowserStorageItem,
 } from "../shared/browser-storage.js";
+
+import "./session-workbench-page-view.css";
 import { MIN_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 
 const MainPanelGroupIdPrefix = "dashboard:session-workbench:main";
@@ -22,6 +25,10 @@ const BottomPanelId = "session-workbench-bottom-panel";
 const PrimaryPanelId = "session-workbench-primary-panel";
 const SecondaryPanelId = "session-workbench-secondary-panel";
 const DefaultTerminalPanelHeightPx = 320;
+const ResizablePanelStorageKeyPrefix = "react-resizable-panels:";
+
+type SessionWorkbenchSecondaryPanelMountMode = "visible-only" | "persistent-collapsible";
+type PanelDefaultLayout = Record<string, number>;
 
 type SessionWorkbenchAlert = {
   title: string;
@@ -42,9 +49,11 @@ type SessionWorkbenchPageViewProps = {
   mainContentLayout?: SessionWorkbenchMainContentLayout;
   mainContentScrollbarGutter?: "stable" | "stable both-edges";
   mainContentScrollContainerRef?: React.Ref<HTMLDivElement>;
-  secondaryPanelDefaultSize?: string;
+  primaryPanelDefaultSize?: number;
+  secondaryPanelDefaultSize?: number;
   secondaryPanelLayoutKey?: string;
   secondaryPanelMinSize?: string;
+  secondaryPanelMountMode?: SessionWorkbenchSecondaryPanelMountMode;
   primaryPanelMinSize?: string;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
@@ -69,9 +78,11 @@ export function SessionWorkbenchPageView({
   mainContentLayout = { scroll: "page", width: "chat" },
   mainContentScrollbarGutter,
   mainContentScrollContainerRef,
+  primaryPanelDefaultSize,
   secondaryPanelDefaultSize,
   secondaryPanelLayoutKey = "default",
   secondaryPanelMinSize = "20%",
+  secondaryPanelMountMode = "visible-only",
   primaryPanelMinSize = "25%",
   mainContent,
   primaryBottomPanel,
@@ -81,10 +92,21 @@ export function SessionWorkbenchPageView({
   secondaryPanel,
   isSecondaryPanelVisible,
 }: SessionWorkbenchPageViewProps): React.JSX.Element {
+  const [isSecondaryPanelTransitioning, setSecondaryPanelTransitioning] = useState(false);
   const bottomPanelRef = useRef<PanelImperativeHandle | null>(null);
+  const secondaryPanelRef = useRef<PanelImperativeHandle | null>(null);
   const hasAppliedBottomPanelVisibilityRef = useRef(false);
+  const hasAppliedSecondaryPanelVisibilityRef = useRef(false);
+  const initialStoredLayoutByGroupRef = useRef(new Map<string, boolean>());
   const previousBottomPanelVisibilityRef = useRef<boolean | null>(null);
+  const previousSecondaryPanelVisibilityRef = useRef<boolean | null>(null);
   const sandboxInstanceKey = sandboxInstanceId ?? "missing-session";
+  const isSecondaryPanelMounted =
+    isSecondaryPanelVisible || secondaryPanelMountMode === "persistent-collapsible";
+  const mainPanelGroupId = `${MainPanelGroupIdPrefix}:${sandboxInstanceKey}:${secondaryPanelLayoutKey}`;
+  const mainPanelIds = isSecondaryPanelMounted
+    ? [PrimaryPanelId, SecondaryPanelId]
+    : [PrimaryPanelId];
   const layoutStorage = {
     getItem(key: string): string | null {
       return readBrowserStorageItem({
@@ -101,10 +123,34 @@ export function SessionWorkbenchPageView({
     },
   } satisfies Pick<Storage, "getItem" | "setItem">;
   const mainPanelLayoutPersistence = useDefaultLayout({
-    id: `${MainPanelGroupIdPrefix}:${sandboxInstanceKey}:${secondaryPanelLayoutKey}`,
-    panelIds: isSecondaryPanelVisible ? [PrimaryPanelId, SecondaryPanelId] : [PrimaryPanelId],
+    id: mainPanelGroupId,
+    panelIds: mainPanelIds,
     storage: layoutStorage,
   });
+  const hasInitialStoredMainPanelLayout = readInitialStoredPanelLayout({
+    cache: initialStoredLayoutByGroupRef.current,
+    id: mainPanelGroupId,
+    panelIds: mainPanelIds,
+    storage: layoutStorage,
+  });
+  const mainPanelDefaultLayout = resolveMainPanelDefaultLayout({
+    defaultLayout: mainPanelLayoutPersistence.defaultLayout,
+    isSecondaryPanelMounted,
+    primaryPanelDefaultSize,
+    secondaryPanelDefaultSize,
+    hasStoredLayout: hasStoredResizablePanelLayout({
+      id: mainPanelGroupId,
+      panelIds: mainPanelIds,
+      storage: layoutStorage,
+    }),
+  });
+  const handleMainPanelTransitionEnd = useCallback((event: React.TransitionEvent) => {
+    if (!isResizablePanelTransitionEnd(event)) {
+      return;
+    }
+
+    setSecondaryPanelTransitioning(false);
+  }, []);
 
   useLayoutEffect(() => {
     const bottomPanel = bottomPanelRef.current;
@@ -133,6 +179,58 @@ export function SessionWorkbenchPageView({
       bottomPanel.resize(`${String(DefaultTerminalPanelHeightPx)}px`);
     }
   }, [isBottomPanelVisible]);
+
+  useLayoutEffect(() => {
+    if (secondaryPanelMountMode !== "persistent-collapsible") {
+      return;
+    }
+
+    const secondaryPanelHandle = secondaryPanelRef.current;
+    if (secondaryPanelHandle === null) {
+      return;
+    }
+
+    const wasSecondaryPanelVisible = previousSecondaryPanelVisibilityRef.current;
+    previousSecondaryPanelVisibilityRef.current = isSecondaryPanelVisible;
+
+    if (
+      hasAppliedSecondaryPanelVisibilityRef.current &&
+      wasSecondaryPanelVisible === isSecondaryPanelVisible
+    ) {
+      return;
+    }
+    hasAppliedSecondaryPanelVisibilityRef.current = true;
+    if (wasSecondaryPanelVisible !== null) {
+      setSecondaryPanelTransitioning(true);
+    }
+
+    if (!isSecondaryPanelVisible) {
+      secondaryPanelHandle.collapse();
+      return;
+    }
+
+    secondaryPanelHandle.expand();
+    if (
+      wasSecondaryPanelVisible === true ||
+      hasInitialStoredMainPanelLayout ||
+      secondaryPanelDefaultSize === undefined
+    ) {
+      return;
+    }
+
+    const resizeFrame = resizePanelToPercentageOnNextFrame({
+      percentage: secondaryPanelDefaultSize,
+      panel: secondaryPanelHandle,
+    });
+    return () => {
+      window.cancelAnimationFrame(resizeFrame);
+    };
+  }, [
+    hasInitialStoredMainPanelLayout,
+    isSecondaryPanelVisible,
+    secondaryPanelDefaultSize,
+    secondaryPanelMountMode,
+  ]);
 
   if (sandboxInstanceId === null) {
     return (
@@ -242,29 +340,42 @@ export function SessionWorkbenchPageView({
       )}
 
       <ResizablePanelGroup
-        className="min-h-0 flex-1"
-        defaultLayout={mainPanelLayoutPersistence.defaultLayout}
+        className={cn(
+          "min-h-0 flex-1",
+          isSecondaryPanelTransitioning ? "session-workbench-main-group-animated" : null,
+        )}
+        defaultLayout={mainPanelDefaultLayout}
         id="session-workbench-main-group"
         key={`${sandboxInstanceKey}:${secondaryPanelLayoutKey}`}
         onLayoutChanged={mainPanelLayoutPersistence.onLayoutChanged}
+        onTransitionEnd={handleMainPanelTransitionEnd}
         orientation="horizontal"
       >
         <ResizablePanel
-          defaultSize={secondaryPanelDefaultSize === undefined ? undefined : "80%"}
+          defaultSize={primaryPanelDefaultSize}
           id={PrimaryPanelId}
           minSize={primaryPanelMinSize}
         >
           {workspaceWithBottomPanel}
         </ResizablePanel>
-        {!isSecondaryPanelVisible ? null : (
+        {!isSecondaryPanelMounted ? null : (
           <>
-            <ResizableHandle id="session-workbench-secondary-handle" />
+            <ResizableHandle
+              className={isSecondaryPanelVisible ? undefined : "hidden"}
+              id="session-workbench-secondary-handle"
+            />
             <ResizablePanel
+              collapsedSize={0}
+              collapsible={secondaryPanelMountMode === "persistent-collapsible"}
               defaultSize={secondaryPanelDefaultSize}
               id={SecondaryPanelId}
               minSize={secondaryPanelMinSize}
+              panelRef={secondaryPanelRef}
             >
-              <div className="bg-background/98 h-full min-h-0 overflow-hidden backdrop-blur-sm">
+              <div
+                aria-hidden={!isSecondaryPanelVisible}
+                className="bg-background/98 h-full min-h-0 overflow-hidden backdrop-blur-sm"
+              >
                 <div className="h-full w-full">{secondaryPanel}</div>
               </div>
             </ResizablePanel>
@@ -273,4 +384,140 @@ export function SessionWorkbenchPageView({
       </ResizablePanelGroup>
     </div>
   );
+}
+
+function hasStoredResizablePanelLayout(input: {
+  id: string;
+  panelIds: readonly string[];
+  storage: Pick<Storage, "getItem">;
+}): boolean {
+  const currentStorageKey = getResizablePanelStorageKey({
+    id: input.id,
+    panelIds: input.panelIds,
+  });
+  const currentStoredValue = input.storage.getItem(currentStorageKey);
+  if (currentStoredValue !== null && isStoredPanelLayoutObject(currentStoredValue)) {
+    return true;
+  }
+
+  const legacyStorageKey = getResizablePanelStorageKey({
+    id: input.id,
+    panelIds: [],
+  });
+  const legacyStoredValue = input.storage.getItem(legacyStorageKey);
+  if (legacyStoredValue === null) {
+    return false;
+  }
+
+  const legacyStoredLayout = parseJsonRecord(legacyStoredValue);
+  if (legacyStoredLayout === null) {
+    return false;
+  }
+
+  const legacyPanelLayout = legacyStoredLayout[input.panelIds.join(",")];
+  if (!isRecord(legacyPanelLayout)) {
+    return false;
+  }
+
+  const layout = legacyPanelLayout.layout;
+  return (
+    Array.isArray(layout) &&
+    layout.length === input.panelIds.length &&
+    layout.every((value) => typeof value === "number")
+  );
+}
+
+function resolveMainPanelDefaultLayout(input: {
+  defaultLayout: PanelDefaultLayout | undefined;
+  hasStoredLayout: boolean;
+  isSecondaryPanelMounted: boolean;
+  primaryPanelDefaultSize: number | undefined;
+  secondaryPanelDefaultSize: number | undefined;
+}): PanelDefaultLayout | undefined {
+  const explicitDefaultLayout = createExplicitMainPanelDefaultLayout(input);
+  if (explicitDefaultLayout !== undefined && !input.hasStoredLayout) {
+    return explicitDefaultLayout;
+  }
+
+  return input.defaultLayout;
+}
+
+function createExplicitMainPanelDefaultLayout(input: {
+  isSecondaryPanelMounted: boolean;
+  primaryPanelDefaultSize: number | undefined;
+  secondaryPanelDefaultSize: number | undefined;
+}): PanelDefaultLayout | undefined {
+  if (
+    input.primaryPanelDefaultSize === undefined ||
+    input.secondaryPanelDefaultSize === undefined ||
+    !input.isSecondaryPanelMounted
+  ) {
+    return undefined;
+  }
+
+  return {
+    [PrimaryPanelId]: input.primaryPanelDefaultSize,
+    [SecondaryPanelId]: input.secondaryPanelDefaultSize,
+  };
+}
+
+function readInitialStoredPanelLayout(input: {
+  cache: Map<string, boolean>;
+  id: string;
+  panelIds: readonly string[];
+  storage: Pick<Storage, "getItem">;
+}): boolean {
+  const cacheKey = getResizablePanelStorageKey({
+    id: input.id,
+    panelIds: input.panelIds,
+  });
+  const cachedValue = input.cache.get(cacheKey);
+  if (cachedValue !== undefined) {
+    return cachedValue;
+  }
+
+  const hasStoredLayout = hasStoredResizablePanelLayout(input);
+  input.cache.set(cacheKey, hasStoredLayout);
+  return hasStoredLayout;
+}
+
+function resizePanelToPercentageOnNextFrame(input: {
+  panel: PanelImperativeHandle;
+  percentage: number;
+}): number {
+  return window.requestAnimationFrame(() => {
+    input.panel.resize(`${String(input.percentage)}%`);
+  });
+}
+
+function isResizablePanelTransitionEnd(event: React.TransitionEvent): boolean {
+  return (
+    event.target instanceof HTMLElement &&
+    event.target.hasAttribute("data-panel") &&
+    event.propertyName.startsWith("flex")
+  );
+}
+
+function getResizablePanelStorageKey(input: { id: string; panelIds: readonly string[] }): string {
+  return `${ResizablePanelStorageKeyPrefix}${[input.id, ...input.panelIds].join(":")}`;
+}
+
+function isStoredPanelLayoutObject(value: string): boolean {
+  const parsedValue = parseJsonRecord(value);
+  return (
+    parsedValue !== null && Object.values(parsedValue).every((item) => typeof item === "number")
+  );
+}
+
+function parseJsonRecord(value: string): Record<string, unknown> | null {
+  try {
+    const parsedValue: unknown = JSON.parse(value);
+    return isRecord(parsedValue) ? parsedValue : null;
+  } catch {
+    return null;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

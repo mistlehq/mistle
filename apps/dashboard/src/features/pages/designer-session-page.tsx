@@ -385,15 +385,18 @@ function LoadedDesignerSessionPage(input: {
       dashboardControlActions={input.dashboardControlActions}
       secondaryPanel={{
         kind: "custom",
+        defaultSize: 60,
         diffControlTitle: "Changes are not shown in Designer.",
         isVisible: input.canvasTabs.length > 0,
-        layoutKey: "designer-canvas",
+        layoutKey: "designer-canvas-60",
+        mountMode: "persistent-collapsible",
         minSize: "20rem",
         renderPanel: () => (
           <div className="h-full min-h-0 min-w-0 overflow-hidden bg-background">
             <main className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
               <DesignerCanvasWorkspace
                 activeTabHref={input.activeTabHref}
+                mountDockviewWhenEmpty
                 onActiveTabHrefChange={input.setActiveTabHref}
                 onTabClose={input.removeCanvasTab}
                 onTabsChange={input.updateCanvasTabs}
