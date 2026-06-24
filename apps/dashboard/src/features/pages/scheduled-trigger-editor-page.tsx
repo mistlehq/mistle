@@ -12,6 +12,7 @@ import { ScheduledTriggerForm } from "../triggers/scheduled-trigger-form.js";
 import { getScheduledTrigger } from "../triggers/scheduled-triggers-service.js";
 import { TriggerActivitySection } from "../triggers/trigger-activity-section.js";
 import type { TriggerCreateSuccessPath } from "../triggers/trigger-editor-navigation.js";
+import { TriggerEditorTabs } from "../triggers/trigger-editor-tabs.js";
 import { TriggerTypeDisplayField } from "../triggers/trigger-type-field.js";
 import { scheduledTriggerDetailQueryKey } from "../triggers/triggers-query-keys.js";
 import { useLoadedScheduledTriggerEditorState } from "../triggers/use-scheduled-trigger-editor-state.js";
@@ -183,31 +184,37 @@ function LoadedScheduledTriggerEditor(input: {
   initialSandboxProfileVersion?: number;
 }): React.JSX.Element {
   const state = useLoadedScheduledTriggerEditorState(input);
+  const form = (
+    <ScheduledTriggerForm
+      fieldErrors={state.fieldErrors}
+      formError={state.formError}
+      validationSummaryError={state.validationSummaryError}
+      isDeleting={state.isDeleting}
+      isSaving={state.isSaving}
+      triggerTypeField={input.triggerTypeField}
+      mode={input.mode}
+      onDelete={state.onRequestDelete}
+      onSubmit={state.onSubmit}
+      onValueChange={state.onValueChange}
+      primaryRepositoryOptions={state.primaryRepositoryOptions}
+      sandboxProfileOptions={state.sandboxProfileOptions}
+      values={state.values}
+    />
+  );
 
   return (
     <>
-      <ScheduledTriggerForm
-        fieldErrors={state.fieldErrors}
-        formError={state.formError}
-        validationSummaryError={state.validationSummaryError}
-        isDeleting={state.isDeleting}
-        isSaving={state.isSaving}
-        triggerTypeField={input.triggerTypeField}
-        mode={input.mode}
-        onDelete={state.onRequestDelete}
-        onSubmit={state.onSubmit}
-        onValueChange={state.onValueChange}
-        primaryRepositoryOptions={state.primaryRepositoryOptions}
-        sandboxProfileOptions={state.sandboxProfileOptions}
-        values={state.values}
-      />
+      {input.mode === "edit" && input.triggerId !== undefined ? (
+        <TriggerEditorTabs
+          activity={<TriggerActivitySection triggerId={input.triggerId} />}
+          details={form}
+        />
+      ) : (
+        form
+      )}
 
       {input.mode === "edit" ? (
         <>
-          {input.triggerId === undefined ? null : (
-            <TriggerActivitySection triggerId={input.triggerId} />
-          )}
-
           <DeleteTriggerDialog
             triggerName={state.values.name}
             errorMessage={state.deleteError}

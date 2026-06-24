@@ -3,7 +3,7 @@
 import { GitHubCloudBrowserDefinition } from "@mistle/integrations-definitions/browser";
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
@@ -409,6 +409,8 @@ describe("TriggerEditorPage", () => {
     expect(screen.getByText("Trigger source")).toBeDefined();
     expect(screen.getAllByText("Schedule").length).toBeGreaterThan(0);
     expect(screen.getByText("Schedule Profile v1")).toBeDefined();
+    expect(screen.getByRole("tab", { name: "Details" })).toBeDefined();
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
     expect(screen.getByRole("heading", { name: "Recent activity" })).toBeDefined();
     expect(screen.getByText("2026-05-18 09:00")).toBeDefined();
     expect(screen.getByText("Dispatched")).toBeDefined();
@@ -448,6 +450,8 @@ describe("TriggerEditorPage", () => {
     expect(screen.getByText("Trigger source")).toBeDefined();
     expect(screen.getAllByText("Event").length).toBeGreaterThan(0);
     expect(screen.getByText("Schedule Profile v1")).toBeDefined();
+    expect(screen.getByRole("tab", { name: "Details" })).toBeDefined();
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
     expect(screen.getByRole("heading", { name: "Recent activity" })).toBeDefined();
     expect(screen.getByText("github.pull_request.opened")).toBeDefined();
     expect(screen.getByText("delivery-editor-recent")).toBeDefined();
