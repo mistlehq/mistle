@@ -2525,6 +2525,56 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
+  it("projects streaming dynamic tools as tool-call semantic items", () => {
+    const dynamicToolCallItem = {
+      type: "dynamicToolCall",
+      id: "tool_1",
+      tool: "summarize_document",
+      arguments: {
+        path: "docs/spec.md",
+      },
+      status: "inProgress",
+    };
+
+    const state = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "notification_received",
+      notification: {
+        method: "item/started",
+        params: {
+          turnId: "turn_123",
+          item: dynamicToolCallItem,
+        },
+      },
+    });
+
+    expect(state.entries).toEqual([
+      {
+        id: "turn_123:tool-call:tool_1",
+        turnId: "turn_123",
+        kind: "semantic-group",
+        semanticKind: "tool-call",
+        status: "streaming",
+        displayKeys: {
+          active: "tool-call.active",
+          completed: "tool-call.done",
+        },
+        counts: null,
+        items: [
+          {
+            id: "tool_1",
+            sourceKind: "tool-call",
+            label: "summarize_document",
+            detail: "dynamic",
+            detailKind: "plain",
+            command: null,
+            output: JSON.stringify(dynamicToolCallItem, null, 2),
+            status: "streaming",
+          },
+        ],
+      },
+    ]);
+  });
+
   it("renders a live userMessage lifecycle item as the turn user entry", () => {
     const state = receiveUserMessage(createInitialCodexChatState(), {
       id: "user_1",

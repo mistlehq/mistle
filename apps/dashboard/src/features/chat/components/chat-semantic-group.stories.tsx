@@ -95,6 +95,13 @@ export const ToolCall: Story = {
   },
 };
 
+export const StreamingToolCall: Story = {
+  args: {
+    block: CodexFixtureToolCallGroupEntry,
+    previewState: "active",
+  },
+};
+
 export const RunningCommands: Story = {
   args: {
     block: CodexFixtureRunningCommandsLongOutputGroupEntry,
