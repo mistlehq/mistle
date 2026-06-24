@@ -21,7 +21,7 @@ import {
   type DockviewWillShowOverlayLocationEvent,
   type IDockviewPanelProps,
 } from "dockview";
-import ELK from "elkjs";
+import ELK from "elkjs/lib/elk.bundled.js";
 import { useEffect, useMemo, useState, type FunctionComponent } from "react";
 
 import { useResolvedAppearance } from "../appearance/appearance-provider.js";
