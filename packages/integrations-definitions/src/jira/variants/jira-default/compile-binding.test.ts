@@ -153,13 +153,13 @@ describe("compileJiraBinding", () => {
           release: {
             kind: "tag",
             match: "exact",
-            tag: "jira/v0.7.0",
+            tag: "jira/v0.8.0",
           },
           asset: {
             kind: "exact",
             fileName: "jira-linux-amd64",
             format: "binary",
-            sha256: "a29d961ffa0470664d41829b612d98d4870bd8f73755260cd0d19b388dc7a457",
+            sha256: "e0aaf32acaba73dbee8e00b5584bf476947879b19400fcc438738b177691a40f",
           },
           installPath: "/usr/local/bin/jira",
           timeoutMs: 120_000,
