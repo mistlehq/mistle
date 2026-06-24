@@ -74,7 +74,9 @@ describe.concurrent("designer sessions integration", () => {
       .find((file) => file.fileId === "codex_global_agents");
     expect(codexAgents?.content).toContain("Mistle-managed sandbox context:");
     expect(codexAgents?.content).toContain("<!-- MISTLE-MANAGED:START mistle-designer-context -->");
-    expect(codexAgents?.content).toContain("# Mistle Designer");
+    expect(codexAgents?.content).toContain(
+      "You are Mistle Designer, an agent that helps users design, configure, review, and launch Mistle sandbox profiles and related product resources.",
+    );
     expect(codexAgents?.content).toContain(
       "<!-- MISTLE-MANAGED:START mistle-designer-initial-request -->",
     );
@@ -82,35 +84,31 @@ describe.concurrent("designer sessions integration", () => {
       "Build a triage agent for GitHub issues and Linear bugs.",
     );
     expect(codexAgents?.content).toContain(
-      "Do not publish sandbox profile versions, start sandbox sessions, create provider-side resources, or mutate external provider configuration unless there is an explicit user-approved runtime action for that operation.",
+      "Do not publish sandbox profile versions, start sandbox sessions, create provider-side resources, or mutate external provider configuration without explicit user-approved runtime action.",
     );
     expect(codexAgents?.content).toContain("Search Mistle docs with the `mistle_docs` MCP server");
     expect(codexAgents?.content).toContain(
-      "For open-ended workflow requests, the first user-visible action after understanding the requested outcome is to show a Designer blueprint.",
+      "For open-ended workflow requests, show a Designer blueprint before inspecting or changing product resources.",
     );
     expect(codexAgents?.content).toContain(
-      'For broad requests such as "Build a triaging agent", draft a minimal workflow blueprint before calling Mistle MCP tools.',
+      "Use Mistle MCP tools for product state only after blueprint alignment, or when the user explicitly names an existing product resource to inspect or modify.",
     );
     expect(codexAgents?.content).toContain(
-      "Ask for the next concrete setup decision needed to implement the workflow, such as the source system, which existing sandbox profile to use, whether to create a new sandbox profile, or whether provider writes should be allowed.",
+      "Ask one setup decision at a time with `dashboard_control.request_user_input`.",
     );
     expect(codexAgents?.content).toContain(
-      "Ask one focused clarification only when the request is too unclear to draft even a high-level workflow.",
+      "Ask one focused clarification only when the request is too unclear to draft a high-level workflow.",
+    );
+    expect(codexAgents?.content).toContain("Put the recommended selectable option first.");
+    expect(codexAgents?.content).toContain("Keep option labels short and clear.");
+    expect(codexAgents?.content).toContain(
+      'When asking which sandbox profile should run or receive a workflow, always include "Create a new sandbox profile" alongside recommended existing profiles.',
     );
     expect(codexAgents?.content).toContain(
-      "When a setup decision needs user input, call the dashboard-control dynamic tool `dashboard_control.request_user_input`. Ask exactly one focused question per request.",
+      "Do not silently choose defaults for runtime, model, provider access, triggers, publishing, or target sandbox profile.",
     );
     expect(codexAgents?.content).toContain(
-      "Include your recommended answer first. Make each selectable option a single clear label; use free-form input only when the answer cannot be reduced to options.",
-    );
-    expect(codexAgents?.content).toContain(
-      'When asking which sandbox profile should run or receive a new workflow, always include "Create a new sandbox profile" as a selectable option alongside recommended existing sandbox profiles.',
-    );
-    expect(codexAgents?.content).toContain(
-      "Use one `dashboard_control.request_user_input` call per decision.",
-    );
-    expect(codexAgents?.content).toContain(
-      "Organize the blueprint as the workflow process first: show the triggers that start or advance the workflow, the agent steps that run, and the outputs the workflow produces.",
+      "A Designer blueprint is a read-only workflow alignment artifact, not saved product configuration.",
     );
     expect(codexAgents?.content).toContain(
       'Use `trigger` for user, provider, schedule, or system events such as "GitHub PR opened" or "Slack message received".',
@@ -119,16 +117,18 @@ describe.concurrent("designer sessions integration", () => {
       "Put provider/source details directly on trigger items with `integrationTargetKey`, `integrationLabel`, and `eventLabel` when known.",
     );
     expect(codexAgents?.content).toContain(
-      'For a request like "Build a triaging agent", the initial blueprint should read like a process',
+      "Do not represent sandbox profile selection, integration setup, provider-resource selection, or confirmation as blueprint nodes.",
     );
     expect(codexAgents?.content).toContain(
       "Item states are required schema metadata, but the workflow graph does not display them.",
     );
     expect(codexAgents?.content).toContain('show_designer_canvas_tab` with `tab.kind: "blueprint"');
     expect(codexAgents?.content).toContain(
-      "not Mistle MCP tools. Do not search Mistle MCP tool discovery",
+      "dashboard-control tools supplied by the dashboard client, not Mistle MCP tools",
     );
-    expect(codexAgents?.content).toContain('show_designer_canvas_tab` with `tab.kind: "route"');
+    expect(codexAgents?.content).toContain(
+      "Open ordinary dashboard routes when the user needs to inspect integrations, triggers, profile versions, or launch state.",
+    );
 
     const listResponse = await env.controlPlaneApi.http.fetch("/v1/designer/sessions", {
       headers: {
