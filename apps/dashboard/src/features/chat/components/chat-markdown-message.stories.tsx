@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useEffect, useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
 
 import { ChatMarkdownMessage } from "./chat-markdown-message.js";
@@ -15,6 +16,84 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+const StreamingBurstChunks = [
+  "I found the places that need attention.",
+  [
+    "\n\n",
+    "- First bullet arrives in the burst",
+    "\n",
+    "- Second bullet arrives in the burst",
+    "\n",
+    "- Third bullet arrives in the burst",
+    "\n\n",
+    "The paragraph after the list should animate after the bullets, not alongside them.",
+  ].join(""),
+  [
+    "\n\n",
+    "A second paragraph follows quickly so the review surface includes multiple markdown block boundaries.",
+    "\n\n",
+    "- One more item",
+    "\n",
+    "- Final item",
+  ].join(""),
+] as const;
+
+const StreamingBurstFrameDelaysMs = [450, 1300, 2600] as const;
+const StreamingBurstResetDelayMs = 5200;
+
+function StreamingBurstReviewHarness(): React.JSX.Element {
+  const [frameIndex, setFrameIndex] = useState(0);
+
+  // Synchronizes this Storybook-only playback loop with the browser's RAF
+  // scheduler so the scheduled frame can be cancelled when the story rerenders.
+  useEffect(() => {
+    let animationFrameId = 0;
+    let startMs: number | null = null;
+    const frameDelayMs = getStreamingBurstFrameDelayMs(frameIndex);
+
+    function scheduleNextFrame(nowMs: number): void {
+      if (startMs === null) {
+        startMs = nowMs;
+      }
+      if (nowMs - startMs >= frameDelayMs) {
+        setFrameIndex((currentFrameIndex) =>
+          currentFrameIndex >= StreamingBurstChunks.length ? 0 : currentFrameIndex + 1,
+        );
+        return;
+      }
+
+      animationFrameId = requestAnimationFrame(scheduleNextFrame);
+    }
+
+    animationFrameId = requestAnimationFrame(scheduleNextFrame);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [frameIndex]);
+
+  const text = StreamingBurstChunks.slice(0, frameIndex).join("");
+
+  return (
+    <div className="max-w-[72ch]">
+      <ChatMarkdownMessage isStreaming={frameIndex < StreamingBurstChunks.length} text={text} />
+    </div>
+  );
+}
+
+function getStreamingBurstFrameDelayMs(frameIndex: number): number {
+  if (frameIndex >= StreamingBurstChunks.length) {
+    return StreamingBurstResetDelayMs;
+  }
+
+  const delayMs = StreamingBurstFrameDelaysMs[frameIndex];
+  if (delayMs === undefined) {
+    throw new Error(`Streaming burst frame ${String(frameIndex)} is missing a delay.`);
+  }
+
+  return delayMs;
+}
 
 /**
  * FormatGallery is the visual reference surface for chat markdown formatting.
@@ -91,6 +170,25 @@ export const FormatGallery: Story = {
       "```",
     ].join("\n"),
   },
+};
+
+export const StreamingBurst: Story = {
+  args: {
+    isStreaming: true,
+    text: "",
+  },
+  parameters: {
+    controls: {
+      disable: true,
+    },
+    docs: {
+      description: {
+        story:
+          "Loops a fast streaming burst with paragraphs and list items so transcript animation ordering can be inspected visually.",
+      },
+    },
+  },
+  render: StreamingBurstReviewHarness,
 };
 
 export const ExternalLinkSafety: Story = {
