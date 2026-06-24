@@ -7,7 +7,7 @@ export type SessionStartupState =
   | "resuming_sandbox"
   | "reconnecting_sandbox"
   | "stopping_sandbox"
-  | "connecting_chat"
+  | "preparing_chat"
   | "preparing_conversation"
   | "loading_conversation"
   | "starting_first_turn";
@@ -19,7 +19,7 @@ const SessionStartupLabels: Record<SessionStartupState, string> = {
   resuming_sandbox: "Resuming sandbox",
   reconnecting_sandbox: "Reconnecting sandbox",
   stopping_sandbox: "Stopping sandbox",
-  connecting_chat: "Preparing chat",
+  preparing_chat: "Preparing chat",
   preparing_conversation: "Preparing chat",
   loading_conversation: "Preparing chat",
   starting_first_turn: "Preparing chat",

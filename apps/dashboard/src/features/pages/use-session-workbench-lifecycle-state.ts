@@ -666,7 +666,7 @@ export function resolveInitialEntryStartupState(input: {
     input.sandboxLifecycleStatus === "running" &&
     (input.sessionSnapshot === null || input.mainPanelTransitionState !== "stable_chat")
   ) {
-    return "connecting_chat";
+    return "preparing_chat";
   }
 
   return null;

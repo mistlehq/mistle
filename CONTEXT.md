@@ -212,7 +212,7 @@ A sandbox session intentionally removed from ordinary user-visible session lists
 _Avoid_: Hard-deleted session, erased session
 
 **Session entry readiness**:
-The point at which a session can present its active conversation as usable chat, after transcript hydration or first-turn submission has produced visible conversation state.
+The point at which a session can present its active conversation as usable chat, after transcript hydration or first-turn submission has produced visible conversation state or has already been accepted for that entry turn.
 _Avoid_: Sandbox loading when runtime conversation preparation is still in progress, composer loading
 
 **Active conversation readiness**:

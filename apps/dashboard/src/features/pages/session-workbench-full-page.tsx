@@ -138,6 +138,7 @@ export function resolveSessionEntryPreparationState(input: {
   activeConversationId: string | null;
   activeTurnState: SessionWorkbenchActiveTurnState;
   autoStartTurn: SessionWorkbenchFullPageProps["autoStartTurn"] | undefined;
+  autoStartedTurnKeys: ReadonlySet<string>;
   bootstrapPhaseStatus: SessionComposerBootstrapPhase["status"];
   chatEntries: readonly ChatEntry[];
   isInitialConversationHydrated: boolean;
@@ -177,6 +178,7 @@ export function resolveSessionEntryPreparationState(input: {
   }
 
   if (
+    input.autoStartedTurnKeys.has(autoStartTurn.key) ||
     input.activeTurnState === "running" ||
     input.chatEntries.some(
       (entry) => entry.kind === "user-message" && entry.text === autoStartTurn.prompt,
@@ -208,6 +210,7 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
   const [composerDraft, setComposerDraft] = useState(createComposerDraft(""));
   const [isMobileConversationNavigatorOpen, setMobileConversationNavigatorOpen] = useState(false);
   const isMobileSecondaryPanelLayout = useIsBelowBreakpoint(CssBreakpointVariables.SM);
+  const [autoStartedTurnKeys, setAutoStartedTurnKeys] = useState<ReadonlySet<string>>(new Set());
   const autoStartedTurnKeysRef = useRef(new Set<string>());
   const autoStartingTurnKeysRef = useRef(new Set<string>());
   const [pendingDiffComments, setPendingDiffComments] = useState<
@@ -613,6 +616,7 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
     activeConversationId,
     activeTurnState: turnControl.activeTurnState,
     autoStartTurn: input.autoStartTurn,
+    autoStartedTurnKeys,
     bootstrapPhaseStatus: conversationPane.composerStateInput.bootstrap.phase.status,
     chatEntries: conversationPane.chatState.entries,
     isInitialConversationHydrated: conversationPane.isInitialConversationHydrated,
@@ -620,19 +624,13 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
     transitionState: workbench.primaryPanelState.transitionState,
   });
 
-  useEffect(() => {
-    if (
-      entryPreparationState === null &&
-      workbench.connectionReadiness.canConnect &&
-      workbench.primaryPanelState.transitionState === "stable_chat"
-    ) {
-      setHasEnteredReadyConversation(true);
-    }
-  }, [
-    entryPreparationState,
-    workbench.connectionReadiness.canConnect,
-    workbench.primaryPanelState.transitionState,
-  ]);
+  const hasReachedReadyConversation =
+    entryPreparationState === null &&
+    workbench.connectionReadiness.canConnect &&
+    workbench.primaryPanelState.transitionState === "stable_chat";
+  if (!hasEnteredReadyConversation && hasReachedReadyConversation) {
+    setHasEnteredReadyConversation(true);
+  }
 
   useEffect(() => {
     const autoStartTurn = input.autoStartTurn;
@@ -669,6 +667,7 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
       .then(() => {
         autoStartingTurnKeysRef.current.delete(autoStartTurn.key);
         autoStartedTurnKeysRef.current.add(autoStartTurn.key);
+        setAutoStartedTurnKeys(new Set(autoStartedTurnKeysRef.current));
       })
       .catch(() => {
         autoStartingTurnKeysRef.current.delete(autoStartTurn.key);

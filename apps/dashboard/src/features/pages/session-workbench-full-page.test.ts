@@ -44,6 +44,7 @@ function createReadyEntryPreparationInput(
     activeConversationId: "thread_designer",
     activeTurnState: "idle",
     autoStartTurn: undefined,
+    autoStartedTurnKeys: new Set(),
     bootstrapPhaseStatus: "ready",
     chatEntries: [],
     isInitialConversationHydrated: true,
@@ -202,6 +203,20 @@ describe("resolveSessionEntryPreparationState", () => {
             prompt: "Configure a Slack and WhatsApp agent.",
           },
           chatEntries: [createUserEntry("Configure a Slack and WhatsApp agent.")],
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("shows chat once the auto-start key has already started even when the prompt is not visible", () => {
+    expect(
+      resolveSessionEntryPreparationState(
+        createReadyEntryPreparationInput({
+          autoStartTurn: {
+            key: "designer:dsn_test:initial-prompt",
+            prompt: "Configure a Slack and WhatsApp agent.",
+          },
+          autoStartedTurnKeys: new Set(["designer:dsn_test:initial-prompt"]),
         }),
       ),
     ).toBeNull();
