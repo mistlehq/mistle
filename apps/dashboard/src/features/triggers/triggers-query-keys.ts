@@ -36,6 +36,12 @@ export function triggerDetailQueryKey(triggerId: string): readonly ["triggers", 
   return [TRIGGERS_QUERY_KEY_PREFIX[0], "detail", triggerId];
 }
 
+export function triggerActivityQueryKey(
+  triggerId: string,
+): readonly ["triggers", "activity", string] {
+  return [TRIGGERS_QUERY_KEY_PREFIX[0], "activity", triggerId];
+}
+
 export function scheduledTriggerDetailQueryKey(
   triggerId: string,
 ): readonly ["triggers", "schedules", "detail", string] {

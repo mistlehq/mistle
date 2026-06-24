@@ -3,7 +3,7 @@
 import { GitHubCloudBrowserDefinition } from "@mistle/integrations-definitions/browser";
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
@@ -15,11 +15,12 @@ import { sandboxProfileVersionTriggerConfigQueryKey } from "../sandbox-profiles/
 import { ScheduledTriggerSameConversationKeyTemplate } from "../triggers/scheduled-trigger-form-helpers.js";
 import type { ScheduledTrigger } from "../triggers/scheduled-triggers-types.js";
 import {
+  triggerActivityQueryKey,
   triggerDetailQueryKey,
   scheduledTriggerDetailQueryKey,
   webhookTriggerDetailQueryKey,
 } from "../triggers/triggers-query-keys.js";
-import type { TriggerListItem } from "../triggers/triggers-types.js";
+import type { TriggerActivityResult, TriggerListItem } from "../triggers/triggers-types.js";
 import { TRIGGER_SANDBOX_PROFILES_QUERY_KEY } from "../triggers/use-trigger-sandbox-profile-options.js";
 import {
   WEBHOOK_TRIGGER_INTEGRATION_DIRECTORY_QUERY_KEY,
@@ -147,6 +148,18 @@ function seedScheduledTriggerEditor(
 ): void {
   queryClient.setQueryData(triggerDetailQueryKey(triggerSummary.id), triggerSummary);
   queryClient.setQueryData(scheduledTriggerDetailQueryKey(triggerSummary.id), triggerDetail);
+  queryClient.setQueryData(triggerActivityQueryKey(triggerSummary.id), {
+    kind: "schedule",
+    items: [
+      {
+        id: "sca_editor_recent",
+        scheduledAt: "2026-05-18T01:00:00.000Z",
+        localScheduledDate: "2026-05-18",
+        localScheduledTime: "09:00",
+        status: "dispatched",
+      },
+    ],
+  } satisfies TriggerActivityResult);
   queryClient.setQueryData(TRIGGER_SANDBOX_PROFILES_QUERY_KEY, [
     {
       id: SandboxProfileId,
@@ -175,6 +188,20 @@ function seedWebhookTriggerEditor(
     webhookTriggerDetailQueryKey(triggerSummary.id),
     createWebhookTriggerDetail(),
   );
+  queryClient.setQueryData(triggerActivityQueryKey(triggerSummary.id), {
+    kind: "webhook",
+    items: [
+      {
+        id: "iwe_editor_recent",
+        sourceOccurredAt: "2026-05-18T01:00:00.000Z",
+        finalizedAt: null,
+        eventType: "github.pull_request.opened",
+        providerEventType: "pull_request",
+        externalDeliveryId: "delivery-editor-recent",
+        status: "received",
+      },
+    ],
+  } satisfies TriggerActivityResult);
   queryClient.setQueryData(TRIGGER_SANDBOX_PROFILES_QUERY_KEY, [
     {
       id: SandboxProfileId,
@@ -382,6 +409,11 @@ describe("TriggerEditorPage", () => {
     expect(screen.getByText("Trigger source")).toBeDefined();
     expect(screen.getAllByText("Schedule").length).toBeGreaterThan(0);
     expect(screen.getByText("Schedule Profile v1")).toBeDefined();
+    expect(screen.getByRole("tab", { name: "Details" })).toBeDefined();
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+    expect(screen.getByRole("heading", { name: "Recent activity" })).toBeDefined();
+    expect(screen.getByText("2026-05-18 09:00")).toBeDefined();
+    expect(screen.getByText("Dispatched")).toBeDefined();
   });
 
   it("shows an explicit unsupported state for one-off scheduled triggers", async () => {
@@ -418,6 +450,12 @@ describe("TriggerEditorPage", () => {
     expect(screen.getByText("Trigger source")).toBeDefined();
     expect(screen.getAllByText("Event").length).toBeGreaterThan(0);
     expect(screen.getByText("Schedule Profile v1")).toBeDefined();
+    expect(screen.getByRole("tab", { name: "Details" })).toBeDefined();
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+    expect(screen.getByRole("heading", { name: "Recent activity" })).toBeDefined();
+    expect(screen.getByText("github.pull_request.opened")).toBeDefined();
+    expect(screen.getByText("delivery-editor-recent")).toBeDefined();
+    expect(screen.getByText("Received")).toBeDefined();
   });
 
   it("shows standalone trigger 404 as the unavailable page without the edit header", async () => {

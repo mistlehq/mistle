@@ -7,7 +7,9 @@ import { isUnavailableResourceError } from "../api/http-api-error.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { UnavailableResourceState } from "../shared/unavailable-resource-state.js";
 import { DeleteTriggerDialog } from "../triggers/delete-trigger-dialog.js";
+import { TriggerActivitySection } from "../triggers/trigger-activity-section.js";
 import type { TriggerCreateSuccessPath } from "../triggers/trigger-editor-navigation.js";
+import { TriggerEditorTabs } from "../triggers/trigger-editor-tabs.js";
 import { TriggerTypeDisplayField } from "../triggers/trigger-type-field.js";
 import { webhookTriggerDetailQueryKey } from "../triggers/triggers-query-keys.js";
 import {
@@ -213,38 +215,50 @@ function LoadedWebhookTriggerEditor(input: {
   initialSandboxProfileVersion?: number;
 }): React.JSX.Element {
   const state = useLoadedWebhookTriggerEditorState(input);
+  const form = (
+    <WebhookTriggerForm
+      connectionOptions={state.connectionOptions}
+      fieldErrors={state.fieldErrors}
+      formError={state.formError}
+      validationSummaryError={state.validationSummaryError}
+      isDeleting={state.isDeleting}
+      isSaving={state.isSaving}
+      triggerTypeField={input.triggerTypeField}
+      mode={input.mode}
+      onDelete={state.onRequestDelete}
+      onSubmit={state.onSubmit}
+      onValueChange={state.onValueChange}
+      primaryRepositoryOptions={state.primaryRepositoryOptions}
+      sandboxProfileOptions={state.sandboxProfileOptions}
+      sandboxProfileStatusMessage={state.sandboxProfileStatusMessage}
+      triggerPickerDisabledState={state.triggerPickerDisabledState}
+      webhookEventOptions={state.webhookEventOptions}
+      values={state.values}
+    />
+  );
 
   return (
     <>
-      <WebhookTriggerForm
-        connectionOptions={state.connectionOptions}
-        fieldErrors={state.fieldErrors}
-        formError={state.formError}
-        validationSummaryError={state.validationSummaryError}
-        isDeleting={state.isDeleting}
-        isSaving={state.isSaving}
-        triggerTypeField={input.triggerTypeField}
-        mode={input.mode}
-        onDelete={state.onRequestDelete}
-        onSubmit={state.onSubmit}
-        onValueChange={state.onValueChange}
-        primaryRepositoryOptions={state.primaryRepositoryOptions}
-        sandboxProfileOptions={state.sandboxProfileOptions}
-        sandboxProfileStatusMessage={state.sandboxProfileStatusMessage}
-        triggerPickerDisabledState={state.triggerPickerDisabledState}
-        webhookEventOptions={state.webhookEventOptions}
-        values={state.values}
-      />
+      {input.mode === "edit" && input.triggerId !== undefined ? (
+        <TriggerEditorTabs
+          activity={<TriggerActivitySection triggerId={input.triggerId} />}
+          details={form}
+        />
+      ) : (
+        form
+      )}
 
       {input.mode === "edit" ? (
-        <DeleteTriggerDialog
-          triggerName={state.values.name}
-          errorMessage={state.deleteError}
-          isOpen={state.isDeleteDialogOpen}
-          isPending={state.isDeleting}
-          onConfirm={state.onConfirmDelete}
-          onOpenChange={state.onDeleteDialogOpenChange}
-        />
+        <>
+          <DeleteTriggerDialog
+            triggerName={state.values.name}
+            errorMessage={state.deleteError}
+            isOpen={state.isDeleteDialogOpen}
+            isPending={state.isDeleting}
+            onConfirm={state.onConfirmDelete}
+            onOpenChange={state.onDeleteDialogOpenChange}
+          />
+        </>
       ) : null}
     </>
   );

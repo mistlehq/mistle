@@ -86,7 +86,47 @@ export const TriggersListResultSchema = z
   })
   .strict();
 
+export const WebhookTriggerActivityItemSchema = z
+  .object({
+    id: z.string().min(1),
+    sourceOccurredAt: z.string().min(1).nullable(),
+    finalizedAt: z.string().min(1).nullable(),
+    eventType: z.string().min(1),
+    providerEventType: z.string().min(1),
+    externalDeliveryId: z.string().min(1).nullable(),
+    status: z.enum(["received", "processing", "processed", "failed", "ignored", "duplicate"]),
+  })
+  .strict();
+
+export const ScheduledTriggerActivityItemSchema = z
+  .object({
+    id: z.string().min(1),
+    scheduledAt: z.string().min(1),
+    localScheduledDate: z.string().min(1),
+    localScheduledTime: z.string().min(1),
+    status: z.enum(["pending", "dispatching", "dispatched", "failed", "skipped_late"]),
+  })
+  .strict();
+
+export const TriggerActivityResultSchema = z.union([
+  z
+    .object({
+      kind: z.literal("webhook"),
+      items: z.array(WebhookTriggerActivityItemSchema),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("schedule"),
+      items: z.array(ScheduledTriggerActivityItemSchema),
+    })
+    .strict(),
+]);
+
 export type TriggerListIssue = z.infer<typeof TriggerListIssueSchema>;
 export type TriggerListEvent = z.infer<typeof TriggerListEventSchema>;
 export type TriggerListItem = z.infer<typeof TriggerListItemSchema>;
 export type TriggersListResult = z.infer<typeof TriggersListResultSchema>;
+export type WebhookTriggerActivityItem = z.infer<typeof WebhookTriggerActivityItemSchema>;
+export type ScheduledTriggerActivityItem = z.infer<typeof ScheduledTriggerActivityItemSchema>;
+export type TriggerActivityResult = z.infer<typeof TriggerActivityResultSchema>;

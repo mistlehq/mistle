@@ -4,6 +4,7 @@ import { OpenApiValidationHook } from "@mistle/http/errors.js";
 import type { AppContextBindings, AppRoutes } from "../types.js";
 import { TRIGGERS_ROUTE_BASE_PATH } from "./constants.js";
 import * as getTrigger from "./get-trigger/index.js";
+import * as listTriggerActivity from "./list-trigger-activity/index.js";
 import * as listTriggers from "./list-triggers/index.js";
 
 export function createTriggersRoutes(): AppRoutes<typeof TRIGGERS_ROUTE_BASE_PATH> {
@@ -12,6 +13,7 @@ export function createTriggersRoutes(): AppRoutes<typeof TRIGGERS_ROUTE_BASE_PAT
   });
 
   routes.openapi(listTriggers.route, listTriggers.handler);
+  routes.openapi(listTriggerActivity.route, listTriggerActivity.handler);
   routes.openapi(getTrigger.route, getTrigger.handler);
 
   return {

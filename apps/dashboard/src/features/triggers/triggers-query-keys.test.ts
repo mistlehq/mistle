@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   TRIGGERS_QUERY_KEY_PREFIX,
+  triggerActivityQueryKey,
   triggerDetailQueryKey,
   triggersListQueryKey,
   scheduledTriggerDetailQueryKey,
@@ -56,6 +57,10 @@ describe("triggers query keys", () => {
 
   it("builds the trigger summary detail query key", () => {
     expect(triggerDetailQueryKey("trg_123")).toEqual(["triggers", "detail", "trg_123"]);
+  });
+
+  it("builds the trigger activity query key", () => {
+    expect(triggerActivityQueryKey("trg_123")).toEqual(["triggers", "activity", "trg_123"]);
   });
 
   it("builds the webhook detail query key", () => {
