@@ -360,11 +360,15 @@ export const designerSessionSchema = z
   })
   .strict();
 
+export const designerSessionListItemSchema = designerSessionSchema.omit({
+  canvasTabs: true,
+});
+
 export const createDesignerSessionResponseSchema = designerSessionSchema;
 
 export const listDesignerSessionsResponseSchema = z
   .object({
-    items: z.array(designerSessionSchema),
+    items: z.array(designerSessionListItemSchema),
   })
   .strict();
 
@@ -372,6 +376,7 @@ export const getDesignerSessionResponseSchema = designerSessionSchema;
 export const putDesignerSessionCanvasTabsResponseSchema = designerSessionSchema;
 
 export type DesignerSessionResponse = z.infer<typeof designerSessionSchema>;
+export type DesignerSessionListItemResponse = z.infer<typeof designerSessionListItemSchema>;
 export type CreateDesignerSessionBody = z.infer<typeof createDesignerSessionBodySchema>;
 export type PutDesignerSessionCanvasTabsBody = z.infer<
   typeof putDesignerSessionCanvasTabsBodySchema

@@ -4,7 +4,7 @@
 
 import { ApiKeyActorKinds } from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { generateApiKeySecret } from "../src/api-keys/services/api-key-secret.js";
@@ -137,6 +137,7 @@ describe.concurrent("designer sessions integration", () => {
       sandboxInstanceId: created.sandboxInstanceId,
       status: "pending",
     });
+    expect(list.items.find((item) => item.id === created.id)).not.toHaveProperty("canvasTabs");
 
     const getResponse = await env.controlPlaneApi.http.fetch(
       `/v1/designer/sessions/${encodeURIComponent(created.id)}`,
@@ -535,6 +536,79 @@ describe.concurrent("designer sessions integration", () => {
       where: (table, { eq }) => eq(table.id, "dsn_missing_backing_sandbox"),
     });
     expect(persistedDesignerSession?.canvasTabs).toEqual([]);
+  });
+
+  it("lists Designer sessions when a stored canvas tab uses an obsolete blueprint shape", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-designer-session-obsolete-canvas@example.com",
+    });
+
+    const createResponse = await env.controlPlaneApi.http.fetch("/v1/designer/sessions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        idempotencyKey: "designer-session-obsolete-canvas-list",
+        prompt: "Build a Designer obsolete canvas list regression.",
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const created = DesignerSessionSchema.parse(await createResponse.json());
+
+    await env.controlPlaneDb.execute(sql`
+      update control_plane.designer_sessions
+      set canvas_tabs = ${JSON.stringify([
+        {
+          kind: "blueprint",
+          id: "designer-blueprint-current",
+          title: "Blueprint",
+          href: "/designer/blueprints/current",
+          blueprint: {
+            version: 1,
+            title: "Legacy setup blueprint",
+            outcome: {
+              label: "Classified and routed incoming work",
+            },
+            items: [
+              {
+                id: "source_decision",
+                kind: "confirmation",
+                label: "Choose triage source",
+                state: "blocked",
+              },
+              {
+                id: "triage_instructions",
+                kind: "sandbox_profile_change",
+                label: "Triage runtime instructions",
+                state: "blocked",
+              },
+            ],
+            links: [],
+            actions: [],
+          },
+        },
+      ])}::jsonb
+      where id = ${created.id}
+    `);
+
+    const listResponse = await env.controlPlaneApi.http.fetch("/v1/designer/sessions", {
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+    expect(listResponse.status).toBe(200);
+    const list = ListDesignerSessionsResponseSchema.parse(await listResponse.json());
+    const listedSession = list.items.find((item) => item.id === created.id);
+    expect(listedSession).toMatchObject({
+      id: created.id,
+      sandboxInstanceId: created.sandboxInstanceId,
+      initialPrompt: "Build a Designer obsolete canvas list regression.",
+    });
+    expect(listedSession).not.toHaveProperty("canvasTabs");
   });
 
   it("rejects API key actors on Designer routes", async ({ env }) => {

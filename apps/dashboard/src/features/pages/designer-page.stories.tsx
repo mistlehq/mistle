@@ -7,7 +7,7 @@ import {
   DesignerBlueprintCurrentTabHref,
   DesignerBlueprintCurrentTabId,
 } from "../designer/designer-blueprint-schema.js";
-import type { DesignerSession } from "../designer/designer-service.js";
+import type { DesignerSession, DesignerSessionListItem } from "../designer/designer-service.js";
 import { DesignerPageView } from "./designer-page-view.js";
 import { DesignerCanvasWorkspace } from "./designer-session-page-view.js";
 
@@ -213,7 +213,7 @@ function DesignerPageStory(input: {
   createErrorMessage?: string | null;
   initialDraft?: string;
   isCreating?: boolean;
-  sessions?: readonly DesignerSession[];
+  sessions?: readonly DesignerSessionListItem[];
   sessionsErrorMessage?: string | null;
 }): React.JSX.Element {
   const [prompt, setPrompt] = useState(input.initialDraft ?? "");

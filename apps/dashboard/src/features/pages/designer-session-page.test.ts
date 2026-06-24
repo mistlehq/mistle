@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   mergeDesignerCanvasTabSnapshotIntoLatestTabs,
   removeDesignerCanvasTabFromLatestTabs,
-} from "./designer-session-page.js";
+} from "./designer-canvas-tabs.js";
 
 describe("mergeDesignerCanvasTabSnapshotIntoLatestTabs", () => {
   it("rebases canvas tab snapshots onto tabs opened by earlier queued saves", () => {

@@ -87,7 +87,7 @@ const DesignerSessionSchema = z
 
 const ListDesignerSessionsResponseSchema = z
   .object({
-    items: z.array(DesignerSessionSchema),
+    items: z.array(DesignerSessionSchema.omit({ canvasTabs: true })),
   })
   .strict();
 
@@ -101,6 +101,9 @@ const DesignerSessionConnectionTokenSchema = z
   .strict();
 
 export type DesignerSession = z.output<typeof DesignerSessionSchema>;
+export type DesignerSessionListItem = z.output<
+  typeof ListDesignerSessionsResponseSchema
+>["items"][number];
 export type DesignerSessionCanvasTab = z.output<typeof DesignerSessionCanvasTabSchema>;
 
 export const designerSessionsQueryKey = ["designer", "sessions"] as const;
@@ -118,7 +121,7 @@ export function createPutDesignerSessionCanvasTabsRequestBody(input: {
 
 export async function listDesignerSessions(input?: {
   signal?: AbortSignal;
-}): Promise<readonly DesignerSession[]> {
+}): Promise<readonly DesignerSessionListItem[]> {
   try {
     const response = await requestControlPlane({
       operation: "listDesignerSessions",

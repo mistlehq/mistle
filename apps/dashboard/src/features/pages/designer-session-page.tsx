@@ -27,6 +27,10 @@ import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.j
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
+import {
+  mergeDesignerCanvasTabSnapshotIntoLatestTabs,
+  removeDesignerCanvasTabFromLatestTabs,
+} from "./designer-canvas-tabs.js";
 import { DesignerCanvasWorkspace } from "./designer-session-page-view.js";
 import { SessionWorkbenchFullPage } from "./session-workbench-full-page.js";
 
@@ -105,26 +109,6 @@ function upsertDesignerBlueprintCanvasTab(input: {
   return input.currentTabs.map((tab) =>
     tab.id === DesignerBlueprintCurrentTabId ? blueprintTab : tab,
   );
-}
-
-export function mergeDesignerCanvasTabSnapshotIntoLatestTabs(input: {
-  latestTabs: readonly DesignerSessionCanvasTab[];
-  snapshotTabs: readonly DesignerSessionCanvasTab[];
-}): readonly DesignerSessionCanvasTab[] {
-  const snapshotTabById = new Map(input.snapshotTabs.map((tab) => [tab.id, tab]));
-  const latestTabIds = new Set(input.latestTabs.map((tab) => tab.id));
-
-  return [
-    ...input.latestTabs.map((tab) => snapshotTabById.get(tab.id) ?? tab),
-    ...input.snapshotTabs.filter((tab) => !latestTabIds.has(tab.id)),
-  ];
-}
-
-export function removeDesignerCanvasTabFromLatestTabs(input: {
-  latestTabs: readonly DesignerSessionCanvasTab[];
-  tabId: string;
-}): readonly DesignerSessionCanvasTab[] {
-  return input.latestTabs.filter((tab) => tab.id !== input.tabId);
 }
 
 function mapDesignerSessionToSandboxStatus(
@@ -219,20 +203,21 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
       const nextSave = canvasTabSaveQueueRef.current
         .catch(() => {})
         .then(async () => {
-          const nextTabs =
-            request.action === DesignerCanvasTabOpenAction
-              ? upsertDesignerCanvasTab({
-                  currentTabs: latestPersistedCanvasTabsRef.current,
-                  requestedTab: request.input,
-                })
-              : upsertDesignerBlueprintCanvasTab({
-                  currentTabs: latestPersistedCanvasTabsRef.current,
-                  requestedTab: request.input,
-                });
-          const activeHref =
-            request.action === DesignerCanvasTabOpenAction
-              ? request.input.href
-              : DesignerBlueprintCurrentTabHref;
+          let nextTabs: readonly DesignerSessionCanvasTab[];
+          let activeHref: string;
+          if (request.action === DesignerCanvasTabOpenAction) {
+            nextTabs = upsertDesignerCanvasTab({
+              currentTabs: latestPersistedCanvasTabsRef.current,
+              requestedTab: request.input,
+            });
+            activeHref = request.input.href;
+          } else {
+            nextTabs = upsertDesignerBlueprintCanvasTab({
+              currentTabs: latestPersistedCanvasTabsRef.current,
+              requestedTab: request.input,
+            });
+            activeHref = DesignerBlueprintCurrentTabHref;
+          }
           await persistCanvasTabs(nextTabs);
           latestPersistedCanvasTabsRef.current = nextTabs;
           setCanvasTabs(nextTabs);

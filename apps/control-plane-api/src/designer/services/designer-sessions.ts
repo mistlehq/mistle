@@ -50,6 +50,7 @@ import {
 import { DesignerBadRequestError, DesignerNotFoundError } from "../errors.js";
 import type {
   CreateDesignerSessionBody,
+  DesignerSessionListItemResponse,
   DesignerSessionResponse,
   PutDesignerSessionCanvasTabsBody,
 } from "../schemas.js";
@@ -499,6 +500,31 @@ function mapDesignerSession(
   };
 }
 
+function mapDesignerSessionListItem(
+  designerSession: DesignerSession,
+  sandboxInstance: ExistingDesignerSandboxInstance,
+): DesignerSessionListItemResponse {
+  return {
+    id: designerSession.id,
+    organizationId: designerSession.organizationId,
+    sandboxInstanceId: designerSession.sandboxInstanceId,
+    sandboxProfileId: sandboxInstance.sandboxProfileId,
+    sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+    title: sandboxInstance.title,
+    status: sandboxInstance.status,
+    connectable: sandboxInstance.connectable,
+    failureCode: sandboxInstance.failureCode,
+    failureMessage: sandboxInstance.failureMessage,
+    runtimeContext: resolveSandboxInstanceRuntimeContext({
+      runtimePlan: sandboxInstance.runtimePlan,
+    }),
+    startupOperation: sandboxInstance.startupOperation,
+    initialPrompt: designerSession.initialPrompt,
+    createdAt: designerSession.createdAt,
+    updatedAt: designerSession.updatedAt,
+  };
+}
+
 function createDesignerSessionNotFoundError(
   selector: DesignerSessionSelector,
 ): DesignerNotFoundError {
@@ -731,7 +757,7 @@ export async function listDesignerSessions(
     organizationId: string;
     limit: number;
   },
-): Promise<{ items: DesignerSessionResponse[] }> {
+): Promise<{ items: DesignerSessionListItemResponse[] }> {
   const tables = getControlPlaneDatabaseSchema(ctx.db);
   const designerSessions = await ctx.db.query.designerSessions.findMany({
     where: (table, { eq: whereEq }) => whereEq(table.organizationId, input.organizationId),
@@ -739,14 +765,14 @@ export async function listDesignerSessions(
     limit: input.limit,
   });
 
-  const items: DesignerSessionResponse[] = [];
+  const items: DesignerSessionListItemResponse[] = [];
   for (const designerSession of designerSessions) {
-    items.push(
-      await mapDesignerSessionWithCurrentSandbox(ctx, {
-        organizationId: input.organizationId,
-        designerSession,
-      }),
-    );
+    const sandboxInstance = await getDesignerSandboxInstance(ctx.dataPlaneClient, {
+      organizationId: input.organizationId,
+      sandboxInstanceId: designerSession.sandboxInstanceId,
+    });
+
+    items.push(mapDesignerSessionListItem(designerSession, sandboxInstance));
   }
 
   return { items };
