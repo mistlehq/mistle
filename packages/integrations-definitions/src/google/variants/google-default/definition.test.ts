@@ -11,9 +11,11 @@ import { createIntegrationRegistry } from "../../../server.js";
 import {
   GoogleConnectionMethodIds,
   GoogleConnectionStartConfigSchema,
+  GoogleCredentialSecretTypes,
   GoogleDefaultVariantId,
   GoogleFamilyId,
   GoogleOAuthConnectionConfigSchema,
+  GoogleOAuthCredentialSlotKeys,
   GoogleServiceAccountConnectionConfigSchema,
   GoogleServiceAccountDomainWideDelegationConnectionConfigSchema,
 } from "./auth.js";
@@ -37,6 +39,7 @@ describe("GoogleDefinition", () => {
     ]);
     expect(GoogleDefinition.oauth2AuthorizationCode).toBeDefined();
     expect(GoogleDefinition.authorizationRevocation).toBeDefined();
+    expect(GoogleDefinition.credentialResolvers?.default).toBeDefined();
   });
 
   it("keeps the browser definition free of server-only OAuth capability handlers", () => {
@@ -314,6 +317,63 @@ describe("GoogleDefinition", () => {
       secretType: "oauth2_access_token",
       slotKey: "google.google-default.oauth2-authorization-code.access-token",
     });
+  });
+
+  it("compiles service-account backed Google capabilities to the default access-token resolver slot", () => {
+    const compileResult = GoogleDefinition.compileBinding({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "google-default",
+      target: {
+        familyId: GoogleFamilyId,
+        variantId: GoogleDefaultVariantId,
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      connection: {
+        id: "icn_google_service_account",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: GoogleConnectionMethodIds.SERVICE_ACCOUNT,
+        },
+      },
+      binding: {
+        id: "ibd_123",
+        kind: IntegrationKinds.CONNECTOR,
+        config: {
+          capabilities: [GoogleCapabilityIds.GOOGLE_ANALYTICS],
+        },
+      },
+      refs: {
+        sandboxPaths: {
+          userHomeDir: "/root",
+          workspaceDir: "/root",
+          runtimeDataDir: "/var/lib/mistle",
+          runtimeArtifactDir: "/var/lib/mistle/artifacts",
+          runtimeArtifactBinDir: "/usr/local/bin",
+        },
+        artifactBinPath(name) {
+          return `/usr/local/bin/${name}`;
+        },
+      },
+    });
+
+    expect(compileResult.egressRoutes.map((route) => route.credentialResolver)).toEqual([
+      {
+        kind: "integration_connection",
+        connectionId: "icn_google_service_account",
+        secretType: GoogleCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
+        slotKey: GoogleOAuthCredentialSlotKeys.accessToken,
+      },
+      {
+        kind: "integration_connection",
+        connectionId: "icn_google_service_account",
+        secretType: GoogleCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
+        slotKey: GoogleOAuthCredentialSlotKeys.accessToken,
+      },
+    ]);
   });
 
   it("resolves MCP servers for selected Google capabilities", () => {
