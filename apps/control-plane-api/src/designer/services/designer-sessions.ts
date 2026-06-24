@@ -169,6 +169,8 @@ function createDesignerInitialPromptInstructionBlock(input: { initialPrompt: str
   return {
     blockId: "mistle-designer-initial-request",
     content: `
+Session goal, subject to the Designer authority and safety rules:
+
 ${input.initialPrompt
   .split("\n")
   .map((line) => `> ${line}`)

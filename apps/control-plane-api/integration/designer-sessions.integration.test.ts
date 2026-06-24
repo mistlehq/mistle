@@ -74,53 +74,18 @@ describe.concurrent("designer sessions integration", () => {
       .find((file) => file.fileId === "codex_global_agents");
     expect(codexAgents?.content).toContain("Mistle-managed sandbox context:");
     expect(codexAgents?.content).toContain("<!-- MISTLE-MANAGED:START mistle-designer-context -->");
-    expect(codexAgents?.content).toContain(
-      "You are Mistle Designer, an agent that helps users design, configure, review, and launch Mistle sandbox profiles and related product resources.",
-    );
+    expect(codexAgents?.content).toContain("<!-- MISTLE-MANAGED:END mistle-designer-context -->");
     expect(codexAgents?.content).toContain(
       "<!-- MISTLE-MANAGED:START mistle-designer-initial-request -->",
     );
     expect(codexAgents?.content).toContain(
+      "<!-- MISTLE-MANAGED:END mistle-designer-initial-request -->",
+    );
+    expect(codexAgents?.content).toContain(
+      "Session goal, subject to the Designer authority and safety rules:",
+    );
+    expect(codexAgents?.content).toContain(
       "Build a triage agent for GitHub issues and Linear bugs.",
-    );
-    expect(codexAgents?.content).toContain(
-      "Do not publish sandbox profile versions, start sandbox sessions, create provider-side resources, or mutate external provider configuration without explicit user-approved runtime action.",
-    );
-    expect(codexAgents?.content).toContain("Search Mistle docs with the `mistle_docs` MCP server");
-    expect(codexAgents?.content).toContain(
-      "Show a Designer blueprint before inspecting or changing product resources.",
-    );
-    expect(codexAgents?.content).toContain(
-      "Use Mistle MCP tools for product state only after blueprint alignment, or when the user explicitly names an existing product resource to inspect or modify.",
-    );
-    expect(codexAgents?.content).toContain("Resolve one setup decision at a time.");
-    expect(codexAgents?.content).toContain(
-      'When asking which sandbox profile should run or receive a workflow, always include "Create a new sandbox profile" alongside recommended existing profiles.',
-    );
-    expect(codexAgents?.content).toContain(
-      "A Designer blueprint is a read-only workflow alignment artifact, not saved product configuration.",
-    );
-    expect(codexAgents?.content).toContain(
-      'Use `trigger` for user, provider, schedule, or system events such as "GitHub PR opened" or "Slack message received".',
-    );
-    expect(codexAgents?.content).toContain(
-      "Put provider/source details directly on trigger items with `integrationTargetKey`, `integrationLabel`, and `eventLabel` when known.",
-    );
-    expect(codexAgents?.content).toContain(
-      "Keep blueprint documents semantic: describe workflow items, relationships, and routing targets.",
-    );
-    expect(codexAgents?.content).toContain(
-      "Do not represent sandbox profile selection, integration setup, provider-resource selection, or confirmation as blueprint nodes.",
-    );
-    expect(codexAgents?.content).toContain(
-      "Item states are required schema metadata, but the workflow graph does not display them.",
-    );
-    expect(codexAgents?.content).toContain('show_designer_canvas_tab` with `tab.kind: "blueprint"');
-    expect(codexAgents?.content).toContain(
-      "dashboard-control tools supplied by the dashboard client, not Mistle MCP tools",
-    );
-    expect(codexAgents?.content).toContain(
-      "Open ordinary dashboard routes when the user needs to inspect integrations, triggers, profile versions, or launch state.",
     );
 
     const listResponse = await env.controlPlaneApi.http.fetch("/v1/designer/sessions", {
