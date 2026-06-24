@@ -10,6 +10,7 @@ import {
   CodexFixtureRunningCommandsGroupEntry,
   CodexFixtureSearchingWebGroupEntry,
   CodexFixtureThinkingGroupEntry,
+  CodexFixtureToolCallGroupEntry,
 } from "../../session-agents/codex/fixtures/chat-fixtures.js";
 import type { ChatSemanticGroupEntry } from "../chat-types.js";
 import { ChatSemanticGroup } from "./chat-semantic-group.js";
@@ -162,6 +163,47 @@ describe("ChatSemanticGroup", () => {
     );
 
     expect(groupDisclosure.hasAttribute("open")).toBe(false);
+  });
+
+  it("keeps streaming tool-call item details collapsed", () => {
+    const streamingToolCallBlock: ChatSemanticGroupEntry = {
+      ...CodexFixtureToolCallGroupEntry,
+      status: "streaming",
+      items: CodexFixtureToolCallGroupEntry.items.map((item, index) =>
+        index === 0
+          ? {
+              ...item,
+              status: "streaming",
+            }
+          : item,
+      ),
+    };
+
+    const { container } = render(
+      <ChatSemanticGroup
+        block={streamingToolCallBlock}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
+
+    const disclosures = container.querySelectorAll("details");
+    const groupDisclosure = disclosures.item(0);
+    const itemDisclosure = disclosures.item(1);
+
+    expect(groupDisclosure.hasAttribute("open")).toBe(true);
+    expect(itemDisclosure.hasAttribute("open")).toBe(false);
+    expect(screen.getByText("Review PR")).toBeTruthy();
+    expect(screen.getByText("Running")).toBeTruthy();
+
+    const itemSummary = itemDisclosure.querySelector("summary");
+    if (itemSummary === null) {
+      throw new Error("Expected a semantic group item summary.");
+    }
+    fireEvent.click(itemSummary);
+
+    expect(itemDisclosure.hasAttribute("open")).toBe(true);
   });
 
   it("renders making-edits output with the diff viewer", () => {

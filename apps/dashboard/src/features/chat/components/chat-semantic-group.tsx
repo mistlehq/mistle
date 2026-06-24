@@ -229,6 +229,11 @@ export function ChatSemanticGroup({
           const hasExpandableOutput =
             (item.output !== null && item.output.length > 0) ||
             (block.semanticKind === "generic" && item.detail !== null && item.detail.length > 0);
+          const shouldAutoOpenItem =
+            item.sourceKind !== "tool-call" &&
+            (item.status === "streaming" ||
+              commandApprovalRequest !== null ||
+              fileChangeApprovalRequest !== null);
 
           return (
             <details
@@ -238,11 +243,7 @@ export function ChatSemanticGroup({
               data-chat-semantic-group-item
               data-chat-semantic-group-item-has-output={hasExpandableOutput ? "true" : "false"}
               key={item.id}
-              open={
-                item.status === "streaming" ||
-                commandApprovalRequest !== null ||
-                fileChangeApprovalRequest !== null
-              }
+              open={shouldAutoOpenItem}
               style={{
                 gap: "var(--chat-semantic-group-item-detail-gap, 0.25rem)",
               }}
