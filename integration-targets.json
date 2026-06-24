@@ -79,11 +79,6 @@
       "config": {}
     },
     {
-      "targetKey": "google-default",
-      "enabled": true,
-      "config": {}
-    },
-    {
       "targetKey": "google-analytics-mcp",
       "enabled": true,
       "config": {}

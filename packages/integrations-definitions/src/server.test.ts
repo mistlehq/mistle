@@ -577,7 +577,6 @@ describe("integrations-definitions server", () => {
         "deepseek::deepseek-default",
         "expo::expo-mcp",
         "fireworks::fireworks-default",
-        "google::google-default",
         "google-analytics::google-analytics-mcp",
         "googleads::googleads-default",
         "google-business-profile::google-business-profile-mcp",
