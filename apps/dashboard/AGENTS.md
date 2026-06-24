@@ -10,6 +10,15 @@
 
 - The dashboard uses a shared top loading bar. Do not create loading UI for pages.
 
+## Mistle Designer
+
+- For open-ended build requests, Mistle Designer should show a workflow blueprint before asking the user to choose or create product resources.
+- After the workflow is visible, Designer may inspect sandbox profiles and recommend suitable existing profiles instead of presenting an unranked picker.
+- Profile recommendations should explain the concrete fit: required integration access, trigger compatibility, published/readiness state, and whether the profile purpose appears aligned with the requested workflow.
+- Always keep "create a new sandbox profile" as a first-class option alongside recommended existing profiles.
+- If many profiles exist, show the recommended shortlist first. Offer "Show all profiles" as a secondary path for users who know a specific profile or want to inspect the complete list.
+- Do not represent sandbox profile selection, integration setup, provider-resource selection, or confirmation as blueprint graph nodes. Keep those decisions in chat or ordinary dashboard route tabs after workflow alignment.
+
 ## React Effects
 
 - Do not add `useEffect` for app-internal state flow.
