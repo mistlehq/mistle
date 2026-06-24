@@ -5,7 +5,11 @@ import { expect, userEvent, waitFor, within } from "storybook/test";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
-import { StoryManySlackChannelResources } from "../integrations/slack-channel-resource-story-support.js";
+import {
+  createSlackUserGroupResource,
+  createSlackUserGroupResources,
+  StoryManySlackChannelResources,
+} from "../integrations/slack-channel-resource-story-support.js";
 import { WebhookTriggerEventPicker } from "./webhook-trigger-event-picker.js";
 import type {
   WebhookTriggerEventOption,
@@ -61,6 +65,41 @@ const StorySlackAppMentionConditionId = conditionId(StorySlackAppMentionTriggerI
 const StorySlackMessageConditionId = conditionId(StorySlackMessageTriggerId);
 const StorySlackReactionAddedConditionId = conditionId(StorySlackReactionAddedTriggerId);
 const StorySlackReactionRemovedConditionId = conditionId(StorySlackReactionRemovedTriggerId);
+const SlackUserGroupAccessErrorMessage =
+  "Slack returned missing_scope while listing user groups. Reinstall the Slack app with usergroups:read.";
+
+const StorySlackUserGroupResourcesEmptyReady = createSlackUserGroupResources({
+  connectionId: StorySlackConnectionId,
+  items: [],
+});
+
+const StorySlackUserGroupResourcesSyncingEmpty: IntegrationConnectionResources = {
+  ...StorySlackUserGroupResourcesEmptyReady,
+  syncState: "syncing",
+};
+
+const StorySlackUserGroupResourcesSyncFailedEmpty: IntegrationConnectionResources = {
+  ...StorySlackUserGroupResourcesEmptyReady,
+  syncState: "error",
+  lastErrorMessage: SlackUserGroupAccessErrorMessage,
+};
+
+const StorySlackUserGroupResourcesSyncFailedWithSnapshot: IntegrationConnectionResources = {
+  ...createSlackUserGroupResources({
+    connectionId: StorySlackConnectionId,
+    items: [
+      createSlackUserGroupResource({
+        index: 1,
+        externalId: "S_ENG",
+        handle: "eng-oncall",
+        displayName: "@eng-oncall",
+        userCount: 14,
+      }),
+    ],
+  }),
+  syncState: "error",
+  lastErrorMessage: SlackUserGroupAccessErrorMessage,
+};
 
 function conditionId(eventOptionId: string, index = 0): string {
   return createWebhookTriggerEventConditionId({ eventOptionId, index });
@@ -84,6 +123,7 @@ function StoryHarness(input: {
   showGitHubTeamSyncError?: boolean;
   showSlackChannelSyncing?: boolean;
   slackChannelResources?: IntegrationConnectionResources;
+  slackUserGroupResources?: IntegrationConnectionResources;
 }): React.JSX.Element {
   const [queryClient] = useState(() =>
     createWebhookTriggerStoryQueryClient({
@@ -95,6 +135,9 @@ function StoryHarness(input: {
         : input.slackChannelResources === undefined
           ? {}
           : { slackChannelResources: input.slackChannelResources }),
+      ...(input.slackUserGroupResources === undefined
+        ? {}
+        : { slackUserGroupResources: input.slackUserGroupResources }),
     }),
   );
   const [selectedEventIds, setSelectedEventIds] = useState([...input.selectedEventIds]);
@@ -178,6 +221,36 @@ async function openMultiResourcePickerByLabel(
   }
 
   await userEvent.click(chipToolbar);
+}
+
+function createSlackUserGroupMentionArgs(input: {
+  slackUserGroupResources?: IntegrationConnectionResources;
+  eventParameterRules?: WebhookTriggerEventParameterRuleMap;
+}) {
+  return {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: StorySlackConnectionId,
+    selectedEventIds: [StorySlackAppMentionConditionId],
+    eventParameterRules: input.eventParameterRules ?? {
+      [StorySlackAppMentionConditionId]: {
+        channel: isAnyOfRule(["C_ALERTS_001"]),
+      },
+    },
+    eventOptions: StorySlackEventOptions,
+    ...(input.slackUserGroupResources === undefined
+      ? {}
+      : { slackUserGroupResources: input.slackUserGroupResources }),
+  };
+}
+
+async function openSlackUserGroupMentionPicker(
+  canvasElement: HTMLElement,
+): Promise<ReturnType<typeof within>> {
+  const body = within(canvasElement.ownerDocument.body);
+
+  await openMultiResourcePickerByLabel(body, "user group mention");
+
+  return body;
 }
 
 export const Default: Story = {
@@ -459,6 +532,85 @@ export const SlackAppMentionUserGroupMention: Story = {
       },
     },
     eventOptions: StorySlackEventOptions,
+  },
+};
+
+export const SlackUserGroupMentionReadyEmpty: Story = {
+  name: "Slack user group mention - ready empty",
+  args: createSlackUserGroupMentionArgs({
+    slackUserGroupResources: StorySlackUserGroupResourcesEmptyReady,
+  }),
+  play: async ({ canvasElement }): Promise<void> => {
+    const body = await openSlackUserGroupMentionPicker(canvasElement);
+
+    await expect(
+      body.getByText("No user group mentions available for this connection."),
+    ).toBeVisible();
+  },
+};
+
+export const SlackUserGroupMentionSyncingEmpty: Story = {
+  name: "Slack user group mention - syncing empty",
+  args: createSlackUserGroupMentionArgs({
+    slackUserGroupResources: StorySlackUserGroupResourcesSyncingEmpty,
+  }),
+  play: async ({ canvasElement }): Promise<void> => {
+    const body = await openSlackUserGroupMentionPicker(canvasElement);
+
+    await expect(await findVisibleButtonByName(body, "Refresh user group mentions")).toBeDisabled();
+    await expect(
+      body.getByText("No user group mentions available for this connection."),
+    ).toBeVisible();
+  },
+};
+
+export const SlackUserGroupMentionSyncFailedEmpty: Story = {
+  name: "Slack user group mention - sync failed empty",
+  args: createSlackUserGroupMentionArgs({
+    slackUserGroupResources: StorySlackUserGroupResourcesSyncFailedEmpty,
+  }),
+  play: async ({ canvasElement }): Promise<void> => {
+    const body = await openSlackUserGroupMentionPicker(canvasElement);
+
+    await expect(body.getByText(SlackUserGroupAccessErrorMessage)).toBeVisible();
+  },
+};
+
+export const SlackUserGroupMentionSyncFailedWithSnapshot: Story = {
+  name: "Slack user group mention - sync failed with snapshot",
+  args: createSlackUserGroupMentionArgs({
+    eventParameterRules: {
+      [StorySlackAppMentionConditionId]: {
+        channel: isAnyOfRule(["C_ALERTS_001"]),
+        userGroupMention: isAnyOfRule(["S_ENG"]),
+      },
+    },
+    slackUserGroupResources: StorySlackUserGroupResourcesSyncFailedWithSnapshot,
+  }),
+  play: async ({ canvasElement }): Promise<void> => {
+    const body = await openSlackUserGroupMentionPicker(canvasElement);
+
+    await expect(body.getByText("@eng-oncall")).toBeVisible();
+    await expect(body.getByText(SlackUserGroupAccessErrorMessage)).toBeVisible();
+  },
+};
+
+export const SlackUserGroupMentionUnavailableSavedValue: Story = {
+  name: "Slack user group mention - unavailable saved value",
+  args: createSlackUserGroupMentionArgs({
+    eventParameterRules: {
+      [StorySlackAppMentionConditionId]: {
+        channel: isAnyOfRule(["C_ALERTS_001"]),
+        userGroupMention: isAnyOfRule(["S_LEGACY"]),
+      },
+    },
+    slackUserGroupResources: StorySlackUserGroupResourcesEmptyReady,
+  }),
+  play: async ({ canvasElement }): Promise<void> => {
+    const body = await openSlackUserGroupMentionPicker(canvasElement);
+
+    await expect(body.getByText("The selected resources are no longer available:")).toBeVisible();
+    await expect(body.getByText("S_LEGACY")).toBeVisible();
   },
 };
 

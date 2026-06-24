@@ -134,4 +134,42 @@ describe("IntegrationConnectionResourcePickerView", () => {
       "mistle/control-plane-api",
     ]);
   });
+
+  it("keeps the empty picker popover focused on the refresh action and one empty message", () => {
+    render(
+      <IntegrationConnectionResourcePickerView
+        emptyMessage="No repositories available for this connection."
+        id="resource-picker"
+        isRefreshing={false}
+        label="Repositories"
+        listState={{
+          mode: "ready",
+        }}
+        onBlur={() => {}}
+        onFocus={() => {}}
+        onRefresh={() => {}}
+        onSearchChange={() => {}}
+        onSelectionChange={() => {}}
+        refreshErrorMessage={null}
+        refreshLabel="Refresh repositories"
+        refreshTooltip="Refresh repositories"
+        search=""
+        searchPlaceholder="No repositories available"
+        selectedValues={[]}
+        unavailableSelectedValues={[]}
+        visibleItems={[]}
+      />,
+    );
+
+    const combobox = screen.getByLabelText("Repositories");
+    const chipToolbar = combobox.closest('[data-slot="combobox-chips"]');
+    if (chipToolbar === null) {
+      throw new Error("Expected combobox chips toolbar.");
+    }
+    fireEvent.click(chipToolbar);
+
+    expect(screen.queryByLabelText("Select all")).toBeNull();
+    expect(screen.getByRole("button", { name: "Refresh repositories" })).toBeDefined();
+    expect(screen.getAllByText("No repositories available for this connection.")).toHaveLength(1);
+  });
 });

@@ -16,6 +16,7 @@ import { useCallback, useState } from "react";
 import {
   buildIntegrationResourcePickerViewModel,
   type IntegrationResourceListViewState,
+  type IntegrationResourcePickerViewModel,
 } from "./integration-resource-picker-view-model.js";
 
 export type IntegrationConnectionResourcePickerItem = {
@@ -83,7 +84,7 @@ function IntegrationResourceMessageSection(input: {
 }
 
 function ResourceMessages(input: {
-  viewModel: ReturnType<typeof buildIntegrationResourcePickerViewModel>;
+  viewModel: IntegrationResourcePickerViewModel;
   variant?: "default" | "alert";
 }): React.JSX.Element | null {
   const messageSections =
@@ -119,7 +120,7 @@ function ResourceMessages(input: {
 
 function ComboboxLayout(input: {
   props: IntegrationConnectionResourcePickerViewProps;
-  viewModel: ReturnType<typeof buildIntegrationResourcePickerViewModel>;
+  viewModel: IntegrationResourcePickerViewModel;
   allVisibleSelected: boolean;
   someVisibleSelected: boolean;
 }): React.JSX.Element {
@@ -144,6 +145,7 @@ function ComboboxLayout(input: {
   const listWrapperClassName =
     density === "compact" ? "max-h-64 overflow-y-auto p-2" : "max-h-72 overflow-y-auto p-2";
   const listClassName = density === "compact" ? "max-h-48" : "max-h-56";
+  const hasVisibleItems = input.props.visibleItems.length > 0;
 
   function toggleAllVisibleItems(): void {
     const visibleValues = input.props.visibleItems.map((item) => item.value);
@@ -236,18 +238,22 @@ function ComboboxLayout(input: {
         <ComboboxContent anchor={anchorRef} className={contentClassName}>
           <div className="border-b px-2 py-1.5">
             <div className="flex items-center justify-between gap-2">
-              <label className="hover:bg-muted text-foreground inline-flex min-w-0 items-center gap-2 rounded-sm px-2 py-1 text-sm">
-                <input
-                  checked={input.allVisibleSelected}
-                  disabled={input.props.disabled === true}
-                  onChange={() => {
-                    toggleAllVisibleItems();
-                  }}
-                  ref={selectAllRef}
-                  type="checkbox"
-                />
-                <span>Select all</span>
-              </label>
+              {hasVisibleItems ? (
+                <label className="hover:bg-muted text-foreground inline-flex min-w-0 items-center gap-2 rounded-sm px-2 py-1 text-sm">
+                  <input
+                    checked={input.allVisibleSelected}
+                    disabled={input.props.disabled === true}
+                    onChange={() => {
+                      toggleAllVisibleItems();
+                    }}
+                    ref={selectAllRef}
+                    type="checkbox"
+                  />
+                  <span>Select all</span>
+                </label>
+              ) : (
+                <span aria-hidden className="min-w-0" />
+              )}
               <div className="flex items-center gap-2">
                 {input.viewModel.selectedCountLabel === null ? null : (
                   <span className="text-muted-foreground shrink-0 text-xs">
@@ -275,7 +281,9 @@ function ComboboxLayout(input: {
             </div>
           </div>
           <div className={listWrapperClassName}>
-            <ResourceMessages variant="default" viewModel={input.viewModel} />
+            {hasVisibleItems ? (
+              <ResourceMessages variant="default" viewModel={input.viewModel} />
+            ) : null}
             <ComboboxList className={listClassName}>
               {input.props.visibleItems.map((resource) => (
                 <ComboboxItem key={resource.id} value={resource.value}>
@@ -283,7 +291,7 @@ function ComboboxLayout(input: {
                 </ComboboxItem>
               ))}
             </ComboboxList>
-            {input.props.visibleItems.length === 0 ? (
+            {!hasVisibleItems ? (
               <div className="text-muted-foreground py-2 text-center text-sm">
                 {input.viewModel.emptyMessage}
               </div>
@@ -310,12 +318,7 @@ export function IntegrationConnectionResourcePickerView(
     selectedCount: props.selectedValues.length,
     refreshErrorMessage: props.refreshErrorMessage,
     unavailableSelectedHandles: props.unavailableSelectedValues,
-    listState:
-      props.listState.mode === "ready"
-        ? { mode: "ready" }
-        : props.listState.mode === "loading"
-          ? { mode: "loading" }
-          : { mode: "error", message: props.listState.message },
+    listState: props.listState,
     visibleItemsCount: props.visibleItems.length,
   });
 
