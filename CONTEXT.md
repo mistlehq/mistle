@@ -65,6 +65,10 @@ A sandbox-backed **Mistle Designer** workspace backed one-to-one by a sandbox in
 _Avoid_: Sandbox session when referring to the guided setup workspace rather than the configured agent runtime session
 _Code name_: designer
 
+**Designer managed instructions**:
+Mistle-owned instructions that guide **Mistle Designer** behavior inside a **Mistle Designer session**.
+_Avoid_: Repo guidance, contributor instructions, Designer instructions when the source of authority is ambiguous
+
 **Designer recommendation**:
 A structured setup recommendation produced by **Mistle Designer** for integrations, triggers, provider configuration resources, or sandbox profile configuration.
 _Avoid_: Chat suggestion when the recommendation has selectable product state

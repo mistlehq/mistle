@@ -92,7 +92,7 @@ describe.concurrent("designer sessions integration", () => {
       'For broad requests such as "Build a triaging agent", draft a minimal workflow blueprint before calling Mistle MCP tools.',
     );
     expect(codexAgents?.content).toContain(
-      "Ask for the next concrete setup decision needed to implement the workflow, such as the source system, whether to use an existing sandbox profile or create one, or whether provider writes should be allowed.",
+      "Ask for the next concrete setup decision needed to implement the workflow, such as the source system, which existing sandbox profile to use, whether to create a new sandbox profile, or whether provider writes should be allowed.",
     );
     expect(codexAgents?.content).toContain(
       "Ask one focused clarification only when the request is too unclear to draft even a high-level workflow.",
@@ -102,6 +102,9 @@ describe.concurrent("designer sessions integration", () => {
     );
     expect(codexAgents?.content).toContain(
       "Include your recommended answer first. Make each selectable option a single clear label; use free-form input only when the answer cannot be reduced to options.",
+    );
+    expect(codexAgents?.content).toContain(
+      'When asking which sandbox profile should run or receive a new workflow, always include "Create a new sandbox profile" as a selectable option alongside recommended existing sandbox profiles.',
     );
     expect(codexAgents?.content).toContain(
       "Use one `dashboard_control.request_user_input` call per decision.",
