@@ -1,6 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import { createPutDesignerSessionCanvasTabsRequestBody } from "./designer-service.js";
+import {
+  createPutDesignerSessionCanvasTabsRequestBody,
+  normalizeDesignerSessionCanvasTabs,
+} from "./designer-service.js";
+
+describe("normalizeDesignerSessionCanvasTabs", () => {
+  it("normalizes legacy route canvas tabs saved before tab kinds were persisted", () => {
+    const tabs = normalizeDesignerSessionCanvasTabs([
+      {
+        id: "integrations",
+        title: "Integrations",
+        href: "/integrations",
+      },
+    ]);
+
+    expect(tabs).toEqual([
+      {
+        kind: "route",
+        id: "integrations",
+        title: "Integrations",
+        href: "/integrations",
+      },
+    ]);
+  });
+});
 
 describe("createPutDesignerSessionCanvasTabsRequestBody", () => {
   it("preserves blueprint canvas tab payloads when saving Designer tabs", () => {

@@ -101,7 +101,7 @@ describe.concurrent("designer sessions integration", () => {
       "When a setup decision needs user input, call the dashboard-control dynamic tool `dashboard_control.request_user_input`. Ask exactly one focused question per request.",
     );
     expect(codexAgents?.content).toContain(
-      "Include your recommended answer first and explain the trade-off in that option's description. Provide selectable options when choices are clear; use free-form input only when the answer cannot be reduced to options.",
+      "Include your recommended answer first. Make each selectable option a single clear label; use free-form input only when the answer cannot be reduced to options.",
     );
     expect(codexAgents?.content).toContain(
       "Use one `dashboard_control.request_user_input` call per decision.",

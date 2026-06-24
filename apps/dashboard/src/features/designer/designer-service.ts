@@ -22,6 +22,19 @@ const DesignerSessionRouteCanvasTabSchema = z
   })
   .strict();
 
+const DesignerSessionLegacyRouteCanvasTabBaseSchema = z
+  .object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    href: z.string().min(1),
+  })
+  .strict();
+
+const DesignerSessionLegacyRouteCanvasTabSchema =
+  DesignerSessionLegacyRouteCanvasTabBaseSchema.transform(
+    normalizeLegacyDesignerSessionRouteCanvasTab,
+  );
+
 const DesignerSessionBlueprintCanvasTabSchema = z
   .object({
     kind: z.literal("blueprint"),
@@ -32,10 +45,13 @@ const DesignerSessionBlueprintCanvasTabSchema = z
   })
   .strict();
 
-const DesignerSessionCanvasTabSchema = z.discriminatedUnion("kind", [
+const DesignerSessionCanvasTabSchema = z.union([
   DesignerSessionRouteCanvasTabSchema,
   DesignerSessionBlueprintCanvasTabSchema,
+  DesignerSessionLegacyRouteCanvasTabSchema,
 ]);
+
+const DesignerSessionCanvasTabsSchema = z.array(DesignerSessionCanvasTabSchema);
 
 const DesignerSessionStartupOperationSchema = z
   .object({
@@ -79,7 +95,7 @@ const DesignerSessionSchema = z
       .nullable(),
     startupOperation: DesignerSessionStartupOperationSchema.nullable(),
     initialPrompt: z.string().min(1).nullable(),
-    canvasTabs: z.array(DesignerSessionCanvasTabSchema),
+    canvasTabs: DesignerSessionCanvasTabsSchema,
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),
   })
@@ -116,6 +132,23 @@ export function createPutDesignerSessionCanvasTabsRequestBody(input: {
 }): { tabs: readonly DesignerSessionCanvasTab[] } {
   return {
     tabs: input.tabs,
+  };
+}
+
+export function normalizeDesignerSessionCanvasTabs(
+  input: unknown,
+): readonly DesignerSessionCanvasTab[] {
+  return DesignerSessionCanvasTabsSchema.parse(input);
+}
+
+function normalizeLegacyDesignerSessionRouteCanvasTab(
+  tab: z.output<typeof DesignerSessionLegacyRouteCanvasTabBaseSchema>,
+): z.output<typeof DesignerSessionRouteCanvasTabSchema> {
+  return {
+    kind: "route",
+    id: tab.id,
+    title: tab.title,
+    href: tab.href,
   };
 }
 
