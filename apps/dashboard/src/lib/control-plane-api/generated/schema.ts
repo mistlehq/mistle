@@ -15554,6 +15554,129 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/triggers/{triggerId}/activity": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          limit?: number;
+        };
+        header?: never;
+        path: {
+          triggerId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description List recent trigger source activity. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  items: {
+                    eventType: string;
+                    externalDeliveryId: string | null;
+                    finalizedAt: string | null;
+                    id: string;
+                    providerEventType: string;
+                    sourceOccurredAt: string | null;
+                    /** @enum {string} */
+                    status:
+                      | "received"
+                      | "processing"
+                      | "processed"
+                      | "failed"
+                      | "ignored"
+                      | "duplicate";
+                  }[];
+                  /** @enum {string} */
+                  kind: "webhook";
+                }
+              | {
+                  items: {
+                    id: string;
+                    localScheduledDate: string;
+                    localScheduledTime: string;
+                    scheduledAt: string;
+                    /** @enum {string} */
+                    status: "pending" | "dispatching" | "dispatched" | "failed" | "skipped_late";
+                  }[];
+                  /** @enum {string} */
+                  kind: "schedule";
+                };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Trigger was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/triggers/schedules": {
     parameters: {
       query?: never;

@@ -5339,6 +5339,251 @@
         }
       }
     },
+    "/v1/triggers/{triggerId}/activity": {
+      "get": {
+        "tags": ["Triggers"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?:atm|trg)_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "triggerId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List recent trigger source activity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["webhook"]
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "sourceOccurredAt": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
+                              "finalizedAt": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
+                              "eventType": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "providerEventType": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "externalDeliveryId": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "received",
+                                  "processing",
+                                  "processed",
+                                  "failed",
+                                  "ignored",
+                                  "duplicate"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "sourceOccurredAt",
+                              "finalizedAt",
+                              "eventType",
+                              "providerEventType",
+                              "externalDeliveryId",
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["kind", "items"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["schedule"]
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "scheduledAt": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "localScheduledDate": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "localScheduledTime": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "dispatching",
+                                  "dispatched",
+                                  "failed",
+                                  "skipped_late"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "scheduledAt",
+                              "localScheduledDate",
+                              "localScheduledTime",
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["kind", "items"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Trigger was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/triggers/{triggerId}": {
       "get": {
         "tags": ["Triggers"],

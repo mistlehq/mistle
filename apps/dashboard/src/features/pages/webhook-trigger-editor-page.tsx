@@ -7,6 +7,7 @@ import { isUnavailableResourceError } from "../api/http-api-error.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { UnavailableResourceState } from "../shared/unavailable-resource-state.js";
 import { DeleteTriggerDialog } from "../triggers/delete-trigger-dialog.js";
+import { TriggerActivitySection } from "../triggers/trigger-activity-section.js";
 import type { TriggerCreateSuccessPath } from "../triggers/trigger-editor-navigation.js";
 import { TriggerTypeDisplayField } from "../triggers/trigger-type-field.js";
 import { webhookTriggerDetailQueryKey } from "../triggers/triggers-query-keys.js";
@@ -237,14 +238,20 @@ function LoadedWebhookTriggerEditor(input: {
       />
 
       {input.mode === "edit" ? (
-        <DeleteTriggerDialog
-          triggerName={state.values.name}
-          errorMessage={state.deleteError}
-          isOpen={state.isDeleteDialogOpen}
-          isPending={state.isDeleting}
-          onConfirm={state.onConfirmDelete}
-          onOpenChange={state.onDeleteDialogOpenChange}
-        />
+        <>
+          {input.triggerId === undefined ? null : (
+            <TriggerActivitySection triggerId={input.triggerId} />
+          )}
+
+          <DeleteTriggerDialog
+            triggerName={state.values.name}
+            errorMessage={state.deleteError}
+            isOpen={state.isDeleteDialogOpen}
+            isPending={state.isDeleting}
+            onConfirm={state.onConfirmDelete}
+            onOpenChange={state.onDeleteDialogOpenChange}
+          />
+        </>
       ) : null}
     </>
   );

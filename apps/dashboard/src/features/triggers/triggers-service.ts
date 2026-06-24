@@ -8,8 +8,10 @@ import {
 } from "./triggers-api-errors.js";
 import {
   TriggerListItemSchema,
+  TriggerActivityResultSchema,
   type ListTriggersQuery,
   type TriggerListItem,
+  type TriggerActivityResult,
   TriggersListResultSchema,
   type TriggersListResult,
 } from "./triggers-types.js";
@@ -104,6 +106,35 @@ export async function getTrigger(input: {
       operation: "getTrigger",
       error,
       fallbackMessage: "Could not load trigger.",
+    });
+  }
+}
+
+export async function listTriggerActivity(input: {
+  triggerId: string;
+  signal?: AbortSignal;
+}): Promise<TriggerActivityResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "listTriggerActivity",
+      method: "GET",
+      pathname: `/v1/triggers/${encodeURIComponent(input.triggerId)}/activity`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not load trigger activity.",
+      errorFactory: createTriggersApiError,
+    });
+
+    return await readJsonWithSchema({
+      response,
+      schema: TriggerActivityResultSchema,
+      operation: "listTriggerActivity",
+      invalidMessage: "Trigger activity response payload is invalid.",
+    });
+  } catch (error) {
+    throw toTriggersApiError({
+      operation: "listTriggerActivity",
+      error,
+      fallbackMessage: "Could not load trigger activity.",
     });
   }
 }

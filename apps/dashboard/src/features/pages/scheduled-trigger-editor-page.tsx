@@ -10,6 +10,7 @@ import { DeleteTriggerDialog } from "../triggers/delete-trigger-dialog.js";
 import { toScheduledTriggerFormValues } from "../triggers/scheduled-trigger-form-helpers.js";
 import { ScheduledTriggerForm } from "../triggers/scheduled-trigger-form.js";
 import { getScheduledTrigger } from "../triggers/scheduled-triggers-service.js";
+import { TriggerActivitySection } from "../triggers/trigger-activity-section.js";
 import type { TriggerCreateSuccessPath } from "../triggers/trigger-editor-navigation.js";
 import { TriggerTypeDisplayField } from "../triggers/trigger-type-field.js";
 import { scheduledTriggerDetailQueryKey } from "../triggers/triggers-query-keys.js";
@@ -202,14 +203,20 @@ function LoadedScheduledTriggerEditor(input: {
       />
 
       {input.mode === "edit" ? (
-        <DeleteTriggerDialog
-          triggerName={state.values.name}
-          errorMessage={state.deleteError}
-          isOpen={state.isDeleteDialogOpen}
-          isPending={state.isDeleting}
-          onConfirm={state.onConfirmDelete}
-          onOpenChange={state.onDeleteDialogOpenChange}
-        />
+        <>
+          {input.triggerId === undefined ? null : (
+            <TriggerActivitySection triggerId={input.triggerId} />
+          )}
+
+          <DeleteTriggerDialog
+            triggerName={state.values.name}
+            errorMessage={state.deleteError}
+            isOpen={state.isDeleteDialogOpen}
+            isPending={state.isDeleting}
+            onConfirm={state.onConfirmDelete}
+            onOpenChange={state.onDeleteDialogOpenChange}
+          />
+        </>
       ) : null}
     </>
   );

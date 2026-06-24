@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+import { IntegrationWebhookEventStatuses, ScheduledActionStatuses } from "@mistle/db/control-plane";
 
 export const TriggerListIssueSchema = z
   .object({
@@ -69,3 +70,53 @@ export const TriggerParamsSchema = z
       }),
   })
   .strict();
+
+export const WebhookTriggerActivityItemSchema = z
+  .object({
+    id: z.string().min(1),
+    sourceOccurredAt: z.string().min(1).nullable(),
+    finalizedAt: z.string().min(1).nullable(),
+    eventType: z.string().min(1),
+    providerEventType: z.string().min(1),
+    externalDeliveryId: z.string().min(1).nullable(),
+    status: z.enum([
+      IntegrationWebhookEventStatuses.RECEIVED,
+      IntegrationWebhookEventStatuses.PROCESSING,
+      IntegrationWebhookEventStatuses.PROCESSED,
+      IntegrationWebhookEventStatuses.FAILED,
+      IntegrationWebhookEventStatuses.IGNORED,
+      IntegrationWebhookEventStatuses.DUPLICATE,
+    ]),
+  })
+  .strict();
+
+export const ScheduledTriggerActivityItemSchema = z
+  .object({
+    id: z.string().min(1),
+    scheduledAt: z.string().min(1),
+    localScheduledDate: z.string().min(1),
+    localScheduledTime: z.string().min(1),
+    status: z.enum([
+      ScheduledActionStatuses.PENDING,
+      ScheduledActionStatuses.DISPATCHING,
+      ScheduledActionStatuses.DISPATCHED,
+      ScheduledActionStatuses.FAILED,
+      ScheduledActionStatuses.SKIPPED_LATE,
+    ]),
+  })
+  .strict();
+
+export const TriggerActivityResponseSchema = z.union([
+  z
+    .object({
+      kind: z.literal("webhook"),
+      items: z.array(WebhookTriggerActivityItemSchema),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("schedule"),
+      items: z.array(ScheduledTriggerActivityItemSchema),
+    })
+    .strict(),
+]);
