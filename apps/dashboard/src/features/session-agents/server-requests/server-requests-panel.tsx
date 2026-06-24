@@ -20,8 +20,6 @@ type ToolUserInputQuestion = Extract<
 >["questions"][number];
 type ToolUserInputOption = ToolUserInputQuestion["options"][number];
 
-const CompactOptionLabelMaxLength = 32;
-
 function createRequestKey(requestId: string | number): string {
   return String(requestId);
 }
@@ -78,12 +76,6 @@ function createUserInputResponse(input: {
   };
 }
 
-function shouldRenderOptionRows(options: readonly ToolUserInputOption[]): boolean {
-  return options.some(
-    (option) => !option.isOther && option.label.length > CompactOptionLabelMaxLength,
-  );
-}
-
 function UserInputOptions(input: {
   answerKey: string;
   disabled: boolean;
@@ -95,30 +87,6 @@ function UserInputOptions(input: {
   const selectableOptions = input.options.filter((option) => !option.isOther);
   if (selectableOptions.length === 0) {
     return null;
-  }
-
-  if (!shouldRenderOptionRows(selectableOptions)) {
-    return (
-      <div className="mx-4 flex flex-wrap gap-2">
-        {selectableOptions.map((option) => (
-          <Button
-            disabled={input.disabled}
-            key={option.label}
-            onClick={() => {
-              input.setUserInputAnswers((current) => ({
-                ...current,
-                [input.answerKey]: option.label,
-              }));
-              input.onSelectOption(option);
-            }}
-            type="button"
-            variant={input.selectedAnswer === option.label ? "default" : "outline"}
-          >
-            {option.label}
-          </Button>
-        ))}
-      </div>
-    );
   }
 
   return (

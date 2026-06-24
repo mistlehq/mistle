@@ -46,7 +46,7 @@ describe("resolveInitialEntryStartupState", () => {
     ["degraded", "reconnecting_sandbox"],
     ["reconnecting", "reconnecting_sandbox"],
     ["stopping", "stopping_sandbox"],
-    ["running", "connecting_chat"],
+    ["running", "preparing_chat"],
     ["stopped", null],
     ["failed", null],
   ] as const)(

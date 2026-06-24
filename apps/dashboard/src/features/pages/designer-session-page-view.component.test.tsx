@@ -11,7 +11,10 @@ import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { ResolvedAppearanceProvider } from "../appearance/appearance-provider.js";
 import { DesignerBlueprintCurrentTabHref } from "../designer/designer-blueprint-schema.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
-import { DesignerCanvasWorkspace } from "./designer-session-page-view.js";
+import {
+  DesignerCanvasWorkspace,
+  resolveDesignerBlueprintInitialFocusViewport,
+} from "./designer-session-page-view.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 type DesignerCanvasWorkspaceProps = React.ComponentProps<typeof DesignerCanvasWorkspace>;
@@ -256,6 +259,19 @@ describe("DesignerCanvasWorkspace", () => {
     expect(await screen.findByText("Triage summary")).toBeDefined();
     expect(screen.getByRole("region", { name: "Designer blueprint graph" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "Create trigger" })).toBeNull();
+  });
+
+  it("centers the first blueprint node horizontally near the top of the canvas viewport", () => {
+    expect(
+      resolveDesignerBlueprintInitialFocusViewport({
+        nodePosition: { x: 120, y: 24 },
+        width: 1000,
+      }),
+    ).toEqual({
+      x: 253,
+      y: 33.2,
+      zoom: 0.95,
+    });
   });
 
   it("resolves integration detail tab titles from the integration directory data", async () => {

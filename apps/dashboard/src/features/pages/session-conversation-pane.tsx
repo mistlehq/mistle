@@ -147,6 +147,8 @@ export function SessionConversationBottomPanel({
   showWorkingIndicator = false,
   statusMessage,
 }: SessionConversationBottomPanelProps): React.JSX.Element {
+  const shouldShowWorkingIndicator = showWorkingIndicator && serverRequestPanelEntries.length === 0;
+
   return (
     <>
       <ServerRequestsPanel
@@ -155,7 +157,7 @@ export function SessionConversationBottomPanel({
         onRespondToServerRequest={onRespondToServerRequest}
       />
       {statusMessage === null ? null : <ComposerStatusBanner statusMessage={statusMessage} />}
-      {showWorkingIndicator ? (
+      {shouldShowWorkingIndicator ? (
         <SessionComposerActivityRow active ariaLabel="Working" text="Working..." />
       ) : null}
       {queuedPrompts.length === 0 ? null : (

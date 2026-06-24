@@ -30,6 +30,7 @@ import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 type SandboxOperationProgressProps = {
   displayMode?: SandboxOperationProgressDisplayMode;
   emptyMessage?: string;
+  hideWhenEmpty?: boolean | undefined;
   operationId: string | null;
   sandboxInstanceId: string | null;
   showBorder?: boolean | undefined;
@@ -43,6 +44,7 @@ type SandboxOperationProgressViewProps = {
   emptyMessage?: string | undefined;
   errorMessage?: string | null | undefined;
   events: readonly SandboxOperationEvent[];
+  hideWhenEmpty?: boolean | undefined;
   isLoading?: boolean | undefined;
   nowMs?: number | undefined;
   scheduler?: Scheduler | undefined;
@@ -149,6 +151,7 @@ export function SandboxOperationProgress(input: SandboxOperationProgressProps): 
       errorMessage={errorMessage}
       events={events}
       displayMode={input.displayMode ?? "both"}
+      hideWhenEmpty={input.hideWhenEmpty}
       isLoading={operationEventsQuery.isLoading || operationEventsQuery.isFetching}
       showBorder={input.showBorder}
       showLoadError={input.showLoadError ?? true}
@@ -223,6 +226,16 @@ export function SandboxOperationProgressView(
   const containerClassName = shouldShowBorder
     ? "overflow-hidden rounded-md border border-border bg-background"
     : "overflow-hidden bg-background";
+  const hasVisibleEvents =
+    (shouldShowTimeline && lifecycleItems.length > 0) ||
+    (shouldShowTranscript && transcriptEvents.length > 0);
+  const hasVisibleLoadError =
+    (input.showLoadError ?? true) === true &&
+    input.errorMessage !== null &&
+    input.errorMessage !== undefined;
+  if (input.hideWhenEmpty === true && !hasVisibleEvents && !hasVisibleLoadError) {
+    return <></>;
+  }
 
   return (
     <section className={containerClassName}>
@@ -242,9 +255,7 @@ export function SandboxOperationProgressView(
         </div>
       ) : null}
 
-      {(input.showLoadError ?? true) === false ||
-      input.errorMessage === null ||
-      input.errorMessage === undefined ? null : (
+      {!hasVisibleLoadError ? null : (
         <div className="border-b border-border p-3">
           <Notice title="Progress unavailable" variant="warning">
             {input.errorMessage}

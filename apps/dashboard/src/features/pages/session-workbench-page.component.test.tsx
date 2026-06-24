@@ -387,7 +387,7 @@ describe("SessionWorkbenchPage", () => {
     expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
   });
 
-  it("shows connecting chat while the sandbox is running but chat is not connected yet", async () => {
+  it("shows preparing chat while the sandbox is running but chat is not connected yet", async () => {
     const sandboxInstanceId = "sbi_test";
     const view = renderSessionWorkbenchPage({
       sandboxInstanceId,
@@ -419,7 +419,7 @@ describe("SessionWorkbenchPage", () => {
       view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), status);
     });
 
-    expect(await screen.findByRole("status", { name: "Connecting chat" })).toBeTruthy();
+    expect(await screen.findByRole("status", { name: "Preparing chat" })).toBeTruthy();
   });
 
   it("uses the requested runtime conversation as the composer scope before active conversation catches up", () => {

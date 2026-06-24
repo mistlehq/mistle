@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { ChatEntry } from "../chat/chat-types.js";
-import { shouldAutoStartWorkbenchTurn } from "./session-workbench-full-page.js";
+import {
+  resolveSessionEntryPreparationState,
+  shouldAutoStartWorkbenchTurn,
+} from "./session-workbench-full-page.js";
 
 type AutoStartInput = Parameters<typeof shouldAutoStartWorkbenchTurn>[0];
+type EntryPreparationInput = Parameters<typeof resolveSessionEntryPreparationState>[0];
 
 function createUserEntry(text: string): ChatEntry {
   return {
@@ -28,6 +32,23 @@ function createReadyAutoStartInput(overrides: Partial<AutoStartInput> = {}): Aut
     isInitialConversationHydrated: true,
     isStartingTurn: false,
     startedTurnKeys: new Set(),
+    transitionState: "stable_chat",
+    ...overrides,
+  };
+}
+
+function createReadyEntryPreparationInput(
+  overrides: Partial<EntryPreparationInput> = {},
+): EntryPreparationInput {
+  return {
+    activeConversationId: "thread_designer",
+    activeTurnState: "idle",
+    autoStartTurn: undefined,
+    autoStartedTurnKeys: new Set(),
+    bootstrapPhaseStatus: "ready",
+    chatEntries: [],
+    isInitialConversationHydrated: true,
+    startupState: null,
     transitionState: "stable_chat",
     ...overrides,
   };
@@ -116,5 +137,98 @@ describe("shouldAutoStartWorkbenchTurn", () => {
         }),
       ),
     ).toBe(false);
+  });
+});
+
+describe("resolveSessionEntryPreparationState", () => {
+  it("keeps showing sandbox startup state before conversation readiness checks", () => {
+    expect(
+      resolveSessionEntryPreparationState(
+        createReadyEntryPreparationInput({
+          startupState: "preparing_sandbox",
+        }),
+      ),
+    ).toBe("preparing_sandbox");
+  });
+
+  it("prepares the conversation while no active runtime conversation is available", () => {
+    expect(
+      resolveSessionEntryPreparationState(
+        createReadyEntryPreparationInput({
+          activeConversationId: null,
+        }),
+      ),
+    ).toBe("preparing_conversation");
+  });
+
+  it("loads the conversation until the active transcript has hydrated", () => {
+    expect(
+      resolveSessionEntryPreparationState(
+        createReadyEntryPreparationInput({
+          isInitialConversationHydrated: false,
+        }),
+      ),
+    ).toBe("loading_conversation");
+  });
+
+  it("prepares the conversation while runtime composer bootstrap is still running", () => {
+    expect(
+      resolveSessionEntryPreparationState(
+        createReadyEntryPreparationInput({
+          bootstrapPhaseStatus: "bootstrapping",
+        }),
+      ),
+    ).toBe("preparing_conversation");
+  });
+
+  it("keeps the entry surface visible while an auto-start turn is ready but not visible", () => {
+    expect(
+      resolveSessionEntryPreparationState(
+        createReadyEntryPreparationInput({
+          autoStartTurn: {
+            key: "designer:dsn_test:initial-prompt",
+            prompt: "Configure a Slack and WhatsApp agent.",
+          },
+        }),
+      ),
+    ).toBe("starting_first_turn");
+  });
+
+  it("shows chat once the auto-start prompt is represented by a user message", () => {
+    expect(
+      resolveSessionEntryPreparationState(
+        createReadyEntryPreparationInput({
+          autoStartTurn: {
+            key: "designer:dsn_test:initial-prompt",
+            prompt: "Configure a Slack and WhatsApp agent.",
+          },
+          chatEntries: [createUserEntry("Configure a Slack and WhatsApp agent.")],
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("shows chat once the auto-start key has already started even when the prompt is not visible", () => {
+    expect(
+      resolveSessionEntryPreparationState(
+        createReadyEntryPreparationInput({
+          autoStartTurn: {
+            key: "designer:dsn_test:initial-prompt",
+            prompt: "Configure a Slack and WhatsApp agent.",
+          },
+          autoStartedTurnKeys: new Set(["designer:dsn_test:initial-prompt"]),
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("shows chat when bootstrap fails so the composer can present the blocking error", () => {
+    expect(
+      resolveSessionEntryPreparationState(
+        createReadyEntryPreparationInput({
+          bootstrapPhaseStatus: "failed",
+        }),
+      ),
+    ).toBeNull();
   });
 });

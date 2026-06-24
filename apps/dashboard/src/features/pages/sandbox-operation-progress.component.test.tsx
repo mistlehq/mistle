@@ -755,6 +755,49 @@ describe("SandboxOperationProgressView", () => {
     expect(screen.queryByText("Could not load sandbox operation progress.")).toBeNull();
     expect(screen.getByText("Sandbox daemon")).toBeDefined();
   });
+
+  it("can hide the progress surface when no events have been returned", () => {
+    const { container } = render(
+      <SandboxOperationProgressView events={[]} hideWhenEmpty title="Session startup progress" />,
+    );
+
+    expect(container.textContent).toBe("");
+  });
+
+  it("hides the progress surface when empty load errors are suppressed", () => {
+    const { container } = render(
+      <SandboxOperationProgressView
+        errorMessage="Could not load sandbox operation progress."
+        events={[]}
+        hideWhenEmpty
+        showLoadError={false}
+        title="Session startup progress"
+      />,
+    );
+
+    expect(container.textContent).toBe("");
+  });
+
+  it("hides the progress surface when timeline mode has only transcript events", () => {
+    const { container } = render(
+      <SandboxOperationProgressView
+        displayMode="timeline"
+        events={[
+          createTranscriptEvent({
+            id: "soe_transcript_stdout",
+            payload: "Installing dependencies",
+            phase: "runtime_plan",
+            sequence: 1,
+            stream: "stdout",
+          }),
+        ]}
+        hideWhenEmpty
+        title="Session startup progress"
+      />,
+    );
+
+    expect(container.textContent).toBe("");
+  });
 });
 
 function createLifecycleEvent(input: {

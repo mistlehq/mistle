@@ -13,6 +13,9 @@ import {
   type Node,
   type NodeProps,
   type NodeTypes,
+  type Viewport,
+  useReactFlow,
+  useStore,
 } from "@xyflow/react";
 import {
   DockviewReact,
@@ -753,6 +756,7 @@ const DesignerBlueprintNodeDescriptionLineHeight = 16;
 const DesignerBlueprintNodeDescriptionCharsPerLine = 34;
 const DesignerBlueprintNodeRoutingSummaryHeight = 28;
 const DesignerBlueprintInitialViewport = { x: 48, y: 32, zoom: 0.95 };
+const DesignerBlueprintInitialFocusTopPadding = 56;
 let designerBlueprintElk: InstanceType<typeof ELK> | null = null;
 
 type DesignerBlueprintVisualNodeData = {
@@ -772,6 +776,7 @@ type DesignerBlueprintGraphEdge = Edge;
 
 type DesignerBlueprintGraph = {
   edges: DesignerBlueprintGraphEdge[];
+  initialFocusNodeId?: string;
   nodes: DesignerBlueprintVisualNode[];
 };
 
@@ -850,6 +855,7 @@ function DesignerBlueprintCanvasPanel(input: {
             panOnScroll
             proOptions={{ hideAttribution: true }}
           >
+            <DesignerBlueprintInitialFocus graph={graph} />
             <Background gap={24} size={1} />
             <Controls showInteractive={false} />
           </ReactFlow>
@@ -862,6 +868,35 @@ function DesignerBlueprintCanvasPanel(input: {
       </section>
     </div>
   );
+}
+
+function DesignerBlueprintInitialFocus(input: {
+  graph: DesignerBlueprintGraph;
+}): React.JSX.Element | null {
+  const reactFlow = useReactFlow<DesignerBlueprintVisualNode, DesignerBlueprintGraphEdge>();
+  const width = useStore((state) => state.width);
+  const initialFocusNode =
+    input.graph.initialFocusNodeId === undefined
+      ? undefined
+      : input.graph.nodes.find((node) => node.id === input.graph.initialFocusNodeId);
+
+  // ReactFlow owns the viewport imperatively; render props and remounting cannot
+  // focus the measured canvas once its store reports a usable width.
+  useEffect(() => {
+    if (initialFocusNode === undefined || width <= 0) {
+      return;
+    }
+
+    void reactFlow.setViewport(
+      resolveDesignerBlueprintInitialFocusViewport({
+        nodePosition: initialFocusNode.position,
+        width,
+      }),
+      { duration: 0 },
+    );
+  }, [initialFocusNode, reactFlow, width]);
+
+  return null;
 }
 
 function DesignerBlueprintVisualNodeComponent(
@@ -967,6 +1002,25 @@ async function buildDesignerBlueprintGraph(input: {
       position: positionByNodeId.get(node.id) ?? node.position,
     })),
     edges: displayEdges,
+    ...(input.blueprint.items[0] === undefined
+      ? {}
+      : { initialFocusNodeId: input.blueprint.items[0].id }),
+  };
+}
+
+export function resolveDesignerBlueprintInitialFocusViewport(input: {
+  nodePosition: { x: number; y: number };
+  width: number;
+}): Viewport {
+  return {
+    x:
+      input.width / 2 -
+      (input.nodePosition.x + DesignerBlueprintNodeWidth / 2) *
+        DesignerBlueprintInitialViewport.zoom,
+    y:
+      DesignerBlueprintInitialFocusTopPadding -
+      input.nodePosition.y * DesignerBlueprintInitialViewport.zoom,
+    zoom: DesignerBlueprintInitialViewport.zoom,
   };
 }
 

@@ -12,14 +12,14 @@ export type ComposerActionPanelStackProps = {
 };
 
 export function ComposerActionPanelStack(input: ComposerActionPanelStackProps): React.JSX.Element {
-  return <div className="mb-4 max-h-72 space-y-2 overflow-y-auto px-1 pr-2">{input.children}</div>;
+  return <div className="mb-4 max-h-72 space-y-2 overflow-y-auto">{input.children}</div>;
 }
 
 export function ComposerActionPanel(input: ComposerActionPanelProps): React.JSX.Element {
   return (
     <article
       className={[
-        "rounded-xl border bg-background pt-4 pb-2 shadow-sm",
+        "rounded-md border bg-background pt-4 pb-2",
         input.padding === "flush-x" ? "px-0" : "px-4",
       ].join(" ")}
     >

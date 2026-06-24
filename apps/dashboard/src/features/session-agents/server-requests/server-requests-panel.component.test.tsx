@@ -107,7 +107,71 @@ describe("ServerRequestsPanel", () => {
     ]);
   });
 
-  it("renders long user input options as numbered selectable rows", () => {
+  it("renders short selectable user input options as numbered rows", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: "triage-source-choice-request-1",
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [
+              {
+                header: "Intake source",
+                id: "triage-source-choice",
+                question: "What should the triaging agent watch first?",
+                options: [
+                  {
+                    label: "GitHub issues/PRs",
+                    isOther: false,
+                  },
+                  {
+                    label: "Slack messages",
+                    isOther: false,
+                  },
+                  {
+                    label: "Support tickets",
+                    isOther: false,
+                  },
+                ],
+              },
+            ],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+      />,
+    );
+
+    expect(screen.getByText("What should the triaging agent watch first?").textContent).toBe(
+      "What should the triaging agent watch first?",
+    );
+    expect(screen.queryByRole("button", { name: "Submit responses" })).toBeNull();
+    expect(screen.getByText("1").textContent).toBe("1");
+    expect(screen.getByText("2").textContent).toBe("2");
+    expect(screen.getByText("3").textContent).toBe("3");
+
+    fireEvent.click(screen.getByRole("button", { name: /Slack messages/u }));
+
+    expect(submittedResults).toEqual([
+      {
+        answers: [
+          {
+            id: "triage-source-choice",
+            value: "Slack messages",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("renders long selectable user input options as numbered rows", () => {
     const submittedResults: unknown[] = [];
 
     render(
