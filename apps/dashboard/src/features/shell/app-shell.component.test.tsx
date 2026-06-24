@@ -39,6 +39,7 @@ describe("resolveAppShellFrame", () => {
       pageMeta: {
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
+        sidebarDefaultOpen: null,
         sidebarTriggerOwner: "workspace",
         title: "Sessions",
         headerIcon: null,
@@ -91,6 +92,7 @@ describe("resolveAppShellFrame", () => {
       pageMeta: {
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
+        sidebarDefaultOpen: null,
         sidebarTriggerOwner: "workspace",
         title: "Sessions",
         headerIcon: null,
@@ -137,6 +139,7 @@ describe("resolveAppShellFrame", () => {
       pageMeta: {
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
+        sidebarDefaultOpen: null,
         sidebarTriggerOwner: "page-frame",
         title: "Home",
         headerIcon: null,
@@ -180,6 +183,7 @@ describe("resolveAppShellFrame", () => {
       pageMeta: {
         appShellInsetOwner: "child",
         appShellViewportMode: "document",
+        sidebarDefaultOpen: null,
         sidebarTriggerOwner: "page-frame",
         title: "Integrations",
         headerIcon: null,
@@ -191,5 +195,43 @@ describe("resolveAppShellFrame", () => {
     });
 
     expect(frame.renderSidebarTrigger).toBe(true);
+  });
+
+  it("passes explicit route sidebar defaults into the shell view frame", () => {
+    const locationPathname = "/designer/dsn_123";
+    const routeState = resolveAppShellRouteState(locationPathname);
+    const frame = resolveAppShellFrame({
+      handleBackToApp: () => {},
+      handleNavigateToSettings: () => {},
+      handleSignOut: () => {},
+      handleSwitchOrganization: () => {},
+      inSessions: routeState.inSessions,
+      inSettings: routeState.inSettings,
+      isSigningOut: false,
+      isSwitchingOrganization: false,
+      locationPathname,
+      organizationOptions: [],
+      organizationSummaryErrorMessage: null,
+      organizationSwitcherErrorMessage: null,
+      organizationImageUrl: null,
+      activeOrganizationId: "org_123",
+      dashboardBuildDriftStatus: CurrentDashboardBuildDriftStatus,
+      organizationName: "Acme",
+      pageMeta: {
+        appShellInsetOwner: "app-shell",
+        appShellViewportMode: "workspace",
+        sidebarDefaultOpen: false,
+        sidebarTriggerOwner: "workspace",
+        title: "Designer",
+        headerIcon: null,
+        supportingText: "",
+      },
+      signOutError: null,
+      showSessionsSidebar: false,
+      onShowSessionsSidebarChange: () => {},
+    });
+
+    expect(frame.sidebarDefaultOpen).toBe(false);
+    expect(frame.sidebarDefaultOpenKey).toBe(locationPathname);
   });
 });

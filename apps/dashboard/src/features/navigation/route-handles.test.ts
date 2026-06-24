@@ -49,6 +49,7 @@ describe("route handles", () => {
 
   it("documents non-PageFrame sidebar trigger ownership exceptions", () => {
     expect(ROUTE_HANDLES.designerDetail.sidebarTriggerOwner).toBe("workspace");
+    expect(ROUTE_HANDLES.designerDetail.sidebarDefaultOpen).toBe(false);
     expect(ROUTE_HANDLES.sessionsDetail.sidebarTriggerOwner).toBe("workspace");
     expect(ROUTE_HANDLES.experimentalTerminal.sidebarTriggerOwner).toBe("none");
     expect(ROUTE_HANDLES.settings.sidebarTriggerOwner).toBe("none");
