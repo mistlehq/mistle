@@ -102,6 +102,7 @@ export function shouldAutoStartWorkbenchTurn(input: {
   autoStartTurn: SessionWorkbenchFullPageProps["autoStartTurn"] | undefined;
   chatEntries: readonly ChatEntry[];
   initialEntryStartupState: SessionStartupState | null;
+  isInitialConversationHydrated: boolean;
   isStartingTurn: boolean;
   startedTurnKeys: ReadonlySet<string>;
   transitionState: SessionWorkbenchPrimaryPanelTransitionState;
@@ -119,6 +120,7 @@ export function shouldAutoStartWorkbenchTurn(input: {
   if (
     input.activeConversationId === null ||
     input.transitionState !== "stable_chat" ||
+    !input.isInitialConversationHydrated ||
     input.initialEntryStartupState !== null ||
     input.activeTurnState !== "idle" ||
     input.isStartingTurn
@@ -574,6 +576,7 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
         autoStartTurn,
         chatEntries: conversationPane.chatState.entries,
         initialEntryStartupState,
+        isInitialConversationHydrated: conversationPane.isInitialConversationHydrated,
         isStartingTurn: turnControl.isStarting,
         startedTurnKeys: new Set([
           ...autoStartedTurnKeysRef.current,
@@ -602,6 +605,7 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
   }, [
     activeConversationId,
     conversationPane.chatState.entries,
+    conversationPane.isInitialConversationHydrated,
     initialEntryStartupState,
     input.autoStartTurn,
     turnControl.activeTurnState,

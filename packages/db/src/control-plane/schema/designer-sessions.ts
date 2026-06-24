@@ -4,13 +4,118 @@ import { typeid } from "typeid-js";
 import { controlPlaneSchema } from "./namespace.js";
 import { organizations } from "./organizations.js";
 
-export type DesignerSessionCanvasTab = {
+export type DesignerBlueprintItemState =
+  | "proposed"
+  | "needs_setup"
+  | "ready_to_confirm"
+  | "applied"
+  | "blocked";
+
+export type DesignerBlueprintStandardItemKind = "agent_step" | "workflow_output";
+
+export type DesignerBlueprintRoutingCondition = {
+  field: string;
+  operator: "equals" | "not_equals" | "includes" | "excludes" | "in" | "empty" | "not_empty";
+  value?: string | string[] | number | boolean | undefined;
+};
+
+export type DesignerBlueprintRoutingRule = {
+  label?: string | undefined;
+  when: DesignerBlueprintRoutingCondition[];
+  routeTo?: string | undefined;
+};
+
+export type DesignerBlueprintStandardItem = {
+  id: string;
+  kind: DesignerBlueprintStandardItemKind;
+  label: string;
+  description?: string | undefined;
+  parentId?: string | undefined;
+  state: DesignerBlueprintItemState;
+};
+
+export type DesignerBlueprintTriggerItem = {
+  id: string;
+  kind: "trigger";
+  label: string;
+  description?: string | undefined;
+  parentId?: string | undefined;
+  state: DesignerBlueprintItemState;
+  integrationTargetKey?: string | undefined;
+  integrationLabel?: string | undefined;
+  eventLabel?: string | undefined;
+};
+
+export type DesignerBlueprintRoutingPolicyItem = {
+  id: string;
+  kind: "routing_policy";
+  label: string;
+  description?: string | undefined;
+  parentId?: string | undefined;
+  state: DesignerBlueprintItemState;
+  rules: DesignerBlueprintRoutingRule[];
+};
+
+export type DesignerBlueprintItem =
+  | DesignerBlueprintStandardItem
+  | DesignerBlueprintTriggerItem
+  | DesignerBlueprintRoutingPolicyItem;
+
+export type DesignerBlueprintDocument = {
+  version: 1;
+  title: string;
+  outcome: {
+    label: string;
+    description?: string | undefined;
+  };
+  items: DesignerBlueprintItem[];
+  links: {
+    from: string;
+    to: string;
+    kind:
+      | "requires"
+      | "triggers"
+      | "configures"
+      | "produces"
+      | "confirms"
+      | "routes_to"
+      | "hands_off_to"
+      | "uses";
+  }[];
+  actions: {
+    id: string;
+    itemId: string;
+    kind:
+      | "open_integration_setup"
+      | "open_trigger_create"
+      | "open_trigger_edit"
+      | "open_sandbox_profile"
+      | "open_sandbox_profile_section";
+    label: string;
+    href: string;
+  }[];
+};
+
+export type DesignerSessionRouteCanvasTab = {
+  kind: "route";
   id: string;
   title: string;
   href: string;
 };
 
-export type DesignerSessionCanvasTabs = readonly DesignerSessionCanvasTab[];
+export type DesignerSessionBlueprintCanvasTab = {
+  kind: "blueprint";
+  id: "designer-blueprint-current";
+  title: string;
+  href: "/designer/blueprints/current";
+  blueprint: DesignerBlueprintDocument;
+};
+
+export type DesignerSessionCanvasTab =
+  | DesignerSessionRouteCanvasTab
+  | DesignerSessionBlueprintCanvasTab;
+
+export type DesignerSessionCanvasTabs = DesignerSessionCanvasTab[];
 
 export function defineDesignerSessions(schema: PgSchema) {
   return schema.table(

@@ -1,5 +1,5 @@
-import { Button, Input, Textarea } from "@mistle/ui";
-import { useState } from "react";
+import { Button, cn, Input, Textarea } from "@mistle/ui";
+import { useState, type Dispatch, type SetStateAction } from "react";
 
 import {
   ComposerActionPanel,
@@ -14,6 +14,14 @@ type ServerRequestsPanelProps = {
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
 };
 
+type ToolUserInputQuestion = Extract<
+  ServerRequestEntry,
+  { kind: "tool-user-input" }
+>["questions"][number];
+type ToolUserInputOption = ToolUserInputQuestion["options"][number];
+
+const CompactOptionLabelMaxLength = 32;
+
 function createRequestKey(requestId: string | number): string {
   return String(requestId);
 }
@@ -24,15 +32,136 @@ function assertUnsupportedServerRequestEntry(_entry: never): never {
 
 function readUserInputAnswer(input: {
   answerKey: string;
-  otherOption:
-    | Extract<
-        ServerRequestEntry,
-        { kind: "tool-user-input" }
-      >["questions"][number]["options"][number]
-    | undefined;
+  otherOption: ToolUserInputOption | undefined;
   userInputAnswers: Readonly<Record<string, string>>;
 }): string {
   return input.userInputAnswers[input.answerKey] ?? input.otherOption?.defaultValue ?? "";
+}
+
+function canSubmitUserInputOnOptionSelect(
+  entry: Extract<ServerRequestEntry, { kind: "tool-user-input" }>,
+): boolean {
+  return (
+    entry.questions.length === 1 &&
+    entry.questions[0] !== undefined &&
+    entry.questions[0].options.some((option) => !option.isOther) &&
+    entry.questions[0].options.every((option) => !option.isOther)
+  );
+}
+
+function createUserInputResponse(input: {
+  entry: Extract<ServerRequestEntry, { kind: "tool-user-input" }>;
+  requestKey: string;
+  selectedAnswer?: { questionId: string; value: string };
+  userInputAnswers: Readonly<Record<string, string>>;
+}): { answers: { id: string; value: string }[] } {
+  return {
+    answers: input.entry.questions.map((question) => {
+      if (input.selectedAnswer?.questionId === question.id) {
+        return {
+          id: question.id,
+          value: input.selectedAnswer.value,
+        };
+      }
+
+      const answerKey = `${input.requestKey}:${question.id}`;
+      const otherOption = question.options.find((option) => option.isOther);
+      return {
+        id: question.id,
+        value: readUserInputAnswer({
+          answerKey,
+          otherOption,
+          userInputAnswers: input.userInputAnswers,
+        }),
+      };
+    }),
+  };
+}
+
+function shouldRenderOptionRows(options: readonly ToolUserInputOption[]): boolean {
+  return options.some(
+    (option) => !option.isOther && option.label.length > CompactOptionLabelMaxLength,
+  );
+}
+
+function UserInputOptions(input: {
+  answerKey: string;
+  disabled: boolean;
+  onSelectOption: (option: ToolUserInputOption) => void;
+  options: readonly ToolUserInputOption[];
+  selectedAnswer: string;
+  setUserInputAnswers: Dispatch<SetStateAction<Record<string, string>>>;
+}): React.JSX.Element | null {
+  const selectableOptions = input.options.filter((option) => !option.isOther);
+  if (selectableOptions.length === 0) {
+    return null;
+  }
+
+  if (!shouldRenderOptionRows(selectableOptions)) {
+    return (
+      <div className="mx-4 flex flex-wrap gap-2">
+        {selectableOptions.map((option) => (
+          <Button
+            disabled={input.disabled}
+            key={option.label}
+            onClick={() => {
+              input.setUserInputAnswers((current) => ({
+                ...current,
+                [input.answerKey]: option.label,
+              }));
+              input.onSelectOption(option);
+            }}
+            type="button"
+            variant={input.selectedAnswer === option.label ? "default" : "outline"}
+          >
+            {option.label}
+          </Button>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-border/60 mx-4 divide-y">
+      {selectableOptions.map((option, index) => {
+        const isSelected = input.selectedAnswer === option.label;
+
+        return (
+          <button
+            aria-pressed={isSelected}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-md px-2 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+              isSelected ? "bg-muted" : "bg-background hover:bg-muted/60",
+            )}
+            disabled={input.disabled}
+            key={`${option.label}:${String(index)}`}
+            onClick={() => {
+              input.setUserInputAnswers((current) => ({
+                ...current,
+                [input.answerKey]: option.label,
+              }));
+              input.onSelectOption(option);
+            }}
+            type="button"
+          >
+            <span
+              className={cn(
+                "flex size-6 shrink-0 items-center justify-center rounded-full border text-xs",
+                isSelected
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-muted text-muted-foreground",
+              )}
+            >
+              {index + 1}
+            </span>
+            <span className="block min-w-0 text-sm leading-5 font-medium text-foreground">
+              {option.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export function ServerRequestsPanel({
@@ -126,48 +255,45 @@ export function ServerRequestsPanel({
           }
 
           if (entry.kind === "tool-user-input") {
+            const submitOnOptionSelect = canSubmitUserInputOnOptionSelect(entry);
+
             return (
               <ComposerActionPanel
                 actions={
-                  <Button
-                    disabled={
-                      isRespondingToServerRequest ||
-                      entry.questions.some((question) => {
-                        const answerKey = `${requestKey}:${question.id}`;
-                        const otherOption = question.options.find((option) => option.isOther);
-                        return (
-                          readUserInputAnswer({
-                            answerKey,
-                            otherOption,
-                            userInputAnswers,
-                          }).trim().length === 0
-                        );
-                      })
-                    }
-                    onClick={() => {
-                      onRespondToServerRequest(entry.requestId, {
-                        answers: entry.questions.map((question) => {
+                  submitOnOptionSelect ? null : (
+                    <Button
+                      disabled={
+                        isRespondingToServerRequest ||
+                        entry.questions.some((question) => {
                           const answerKey = `${requestKey}:${question.id}`;
                           const otherOption = question.options.find((option) => option.isOther);
-                          return {
-                            id: question.id,
-                            value: readUserInputAnswer({
+                          return (
+                            readUserInputAnswer({
                               answerKey,
                               otherOption,
                               userInputAnswers,
-                            }),
-                          };
-                        }),
-                      });
-                    }}
-                    type="button"
-                  >
-                    Submit responses
-                  </Button>
+                            }).trim().length === 0
+                          );
+                        })
+                      }
+                      onClick={() => {
+                        onRespondToServerRequest(
+                          entry.requestId,
+                          createUserInputResponse({
+                            entry,
+                            requestKey,
+                            userInputAnswers,
+                          }),
+                        );
+                      }}
+                      type="button"
+                    >
+                      Submit responses
+                    </Button>
+                  )
                 }
                 details={
-                  <div className="space-y-4">
-                    <p className="text-muted-foreground text-xs">{entry.method}</p>
+                  <div className="space-y-3">
                     {entry.questions.map((question) => {
                       const answerKey = `${requestKey}:${question.id}`;
                       const otherOption = question.options.find((option) => option.isOther);
@@ -179,62 +305,69 @@ export function ServerRequestsPanel({
 
                       return (
                         <div className="space-y-2" key={question.id}>
-                          {question.header === null ? null : (
-                            <p className="text-muted-foreground text-xs uppercase tracking-[0.18em]">
+                          {entry.questions.length === 1 || question.header === null ? null : (
+                            <p className="text-muted-foreground mx-4 text-xs font-medium">
                               {question.header}
                             </p>
                           )}
-                          <p className="text-sm leading-6">{question.question}</p>
-                          {question.options.length === 0 ? null : (
-                            <div className="flex flex-wrap gap-2">
-                              {question.options
-                                .filter((option) => !option.isOther)
-                                .map((option) => (
-                                  <Button
-                                    disabled={isRespondingToServerRequest}
-                                    key={option.label}
-                                    onClick={() => {
-                                      setUserInputAnswers((current) => ({
-                                        ...current,
-                                        [answerKey]: option.label,
-                                      }));
-                                    }}
-                                    type="button"
-                                    variant={
-                                      selectedAnswer === option.label ? "default" : "outline"
-                                    }
-                                  >
-                                    {option.label}
-                                  </Button>
-                                ))}
-                            </div>
-                          )}
+                          <p className="text-muted-foreground mr-4 ml-6 text-sm leading-5">
+                            {question.question}
+                          </p>
+                          <UserInputOptions
+                            answerKey={answerKey}
+                            disabled={isRespondingToServerRequest}
+                            onSelectOption={(option) => {
+                              if (!submitOnOptionSelect) {
+                                return;
+                              }
+
+                              onRespondToServerRequest(
+                                entry.requestId,
+                                createUserInputResponse({
+                                  entry,
+                                  requestKey,
+                                  selectedAnswer: {
+                                    questionId: question.id,
+                                    value: option.label,
+                                  },
+                                  userInputAnswers,
+                                }),
+                              );
+                            }}
+                            options={question.options}
+                            selectedAnswer={selectedAnswer}
+                            setUserInputAnswers={setUserInputAnswers}
+                          />
                           {otherOption === undefined ? null : otherOption.inputKind ===
                             "textarea" ? (
-                            <Textarea
-                              className="min-h-32"
-                              disabled={isRespondingToServerRequest}
-                              onChange={(event) => {
-                                setUserInputAnswers((current) => ({
-                                  ...current,
-                                  [answerKey]: event.target.value,
-                                }));
-                              }}
-                              placeholder={otherOption.label}
-                              value={selectedAnswer}
-                            />
+                            <div className="mx-4">
+                              <Textarea
+                                className="min-h-32"
+                                disabled={isRespondingToServerRequest}
+                                onChange={(event) => {
+                                  setUserInputAnswers((current) => ({
+                                    ...current,
+                                    [answerKey]: event.target.value,
+                                  }));
+                                }}
+                                placeholder={otherOption.label}
+                                value={selectedAnswer}
+                              />
+                            </div>
                           ) : (
-                            <Input
-                              disabled={isRespondingToServerRequest}
-                              onChange={(event) => {
-                                setUserInputAnswers((current) => ({
-                                  ...current,
-                                  [answerKey]: event.target.value,
-                                }));
-                              }}
-                              placeholder={otherOption.label}
-                              value={selectedAnswer}
-                            />
+                            <div className="mx-4">
+                              <Input
+                                disabled={isRespondingToServerRequest}
+                                onChange={(event) => {
+                                  setUserInputAnswers((current) => ({
+                                    ...current,
+                                    [answerKey]: event.target.value,
+                                  }));
+                                }}
+                                placeholder={otherOption.label}
+                                value={selectedAnswer}
+                              />
+                            </div>
                           )}
                         </div>
                       );
@@ -245,7 +378,8 @@ export function ServerRequestsPanel({
                   </div>
                 }
                 key={requestKey}
-                title="User input requested"
+                padding="flush-x"
+                title={null}
               />
             );
           }

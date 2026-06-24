@@ -3,6 +3,7 @@ export { createDesignerRoutes } from "./routes.js";
 export {
   createDesignerSessionBodySchema as CreateDesignerSessionBodySchema,
   createDesignerSessionResponseSchema as CreateDesignerSessionResponseSchema,
+  designerSessionListItemSchema as DesignerSessionListItemSchema,
   designerSessionSchema as DesignerSessionSchema,
   getDesignerSessionResponseSchema as GetDesignerSessionResponseSchema,
   listDesignerSessionsQuerySchema as ListDesignerSessionsQuerySchema,

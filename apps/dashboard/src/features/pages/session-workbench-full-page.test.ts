@@ -25,6 +25,7 @@ function createReadyAutoStartInput(overrides: Partial<AutoStartInput> = {}): Aut
     },
     chatEntries: [],
     initialEntryStartupState: null,
+    isInitialConversationHydrated: true,
     isStartingTurn: false,
     startedTurnKeys: new Set(),
     transitionState: "stable_chat",
@@ -52,6 +53,16 @@ describe("shouldAutoStartWorkbenchTurn", () => {
       shouldAutoStartWorkbenchTurn(
         createReadyAutoStartInput({
           transitionState: "restoring_chat",
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("does not start an auto turn before the initial conversation is hydrated", () => {
+    expect(
+      shouldAutoStartWorkbenchTurn(
+        createReadyAutoStartInput({
+          isInitialConversationHydrated: false,
         }),
       ),
     ).toBe(false);

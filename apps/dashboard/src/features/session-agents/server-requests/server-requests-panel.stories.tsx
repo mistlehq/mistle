@@ -47,28 +47,14 @@ const MixedServerRequestEntries: readonly ServerRequestEntry[] = [
         options: [
           {
             label: "GPT-5",
-            description: "Higher quality output for review-heavy work.",
             isOther: false,
           },
           {
             label: "GPT-5 Mini",
-            description: "Lower latency for incremental iteration.",
             isOther: false,
           },
         ],
         question: "Which default model should Storybook examples mention?",
-      },
-      {
-        header: "Notes",
-        id: "additional-notes",
-        options: [
-          {
-            label: "Add a note",
-            description: "Provide any dashboard-specific caveats.",
-            isOther: true,
-          },
-        ],
-        question: "Add any review notes for the Storybook rollout.",
       },
     ],
     status: "pending",
@@ -108,6 +94,38 @@ const MixedServerRequestEntries: readonly ServerRequestEntry[] = [
   },
 ];
 
+const SuggestedNextActionEntries: readonly ServerRequestEntry[] = [
+  {
+    requestId: "suggested-next-action-request-1",
+    method: "tool/requestUserInput",
+    kind: "tool-user-input",
+    questions: [
+      {
+        header: "Suggested next actions",
+        id: "suggested-next-action",
+        options: [
+          {
+            label: "Stop all sequences - let's start fresh with new messaging",
+            isOther: false,
+          },
+          {
+            label:
+              "Don't stop yet - show me who accepted my LinkedIn connection so I can follow up manually",
+            isOther: false,
+          },
+          {
+            label: "Keep the sequences running - I want to workshop new copy first, then update",
+            isOther: false,
+          },
+        ],
+        question: "Which next action should Designer take?",
+      },
+    ],
+    status: "pending",
+    responseErrorMessage: null,
+  },
+];
+
 function createMixedServerRequestEntriesWithResponseErrors(): readonly ServerRequestEntry[] {
   return MixedServerRequestEntries.map((entry) => {
     return {
@@ -137,6 +155,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const MixedRequests: Story = {};
+
+export const SuggestedNextActions: Story = {
+  args: {
+    entries: SuggestedNextActionEntries,
+  },
+};
 
 export const ResponseErrors: Story = {
   args: {

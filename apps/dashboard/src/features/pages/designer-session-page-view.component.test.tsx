@@ -9,6 +9,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { ResolvedAppearanceProvider } from "../appearance/appearance-provider.js";
+import { DesignerBlueprintCurrentTabHref } from "../designer/designer-blueprint-schema.js";
+import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { DesignerCanvasWorkspace } from "./designer-session-page-view.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
@@ -139,11 +141,13 @@ describe("DesignerCanvasWorkspace", () => {
     renderDesignerCanvasWorkspace({
       tabs: [
         {
+          kind: "route",
           id: "first-panel",
           title: "First Panel",
           href: "/designer-canvas-test-one",
         },
         {
+          kind: "route",
           id: "second-panel",
           title: "Second Panel",
           href: "/designer-canvas-test-two",
@@ -153,6 +157,105 @@ describe("DesignerCanvasWorkspace", () => {
 
     expect(await screen.findByText("First Panel")).toBeDefined();
     expect(await screen.findByText("Second Panel")).toBeDefined();
+  });
+
+  it("renders blueprint tabs as a visual-only React Flow graph", async () => {
+    renderDesignerCanvasWorkspace({
+      activeTabHref: DesignerBlueprintCurrentTabHref,
+      configureQueryClient: (queryClient) => {
+        queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+          targets: [
+            {
+              targetKey: "github-cloud",
+              familyId: "github",
+              variantId: "github-cloud",
+              kind: "git",
+              enabled: true,
+              config: {},
+              displayName: "GitHub",
+              description: "Connect GitHub.",
+              logoKey: "github",
+              targetHealth: {
+                configStatus: "valid",
+              },
+            },
+          ],
+          connections: [],
+        });
+      },
+      tabs: [
+        {
+          kind: "blueprint",
+          id: "designer-blueprint-current",
+          title: "Blueprint",
+          href: DesignerBlueprintCurrentTabHref,
+          blueprint: {
+            version: 1,
+            title: "Issue triage blueprint",
+            outcome: {
+              label: "Route incoming issues into the right queue",
+            },
+            items: [
+              {
+                id: "issue-opened",
+                kind: "trigger",
+                label: "GitHub issue trigger",
+                integrationTargetKey: "github-cloud",
+                integrationLabel: "GitHub",
+                eventLabel: "Issue opened",
+                state: "proposed",
+              },
+              {
+                id: "classify-issue",
+                kind: "agent_step",
+                label: "Classify issue",
+                description: "Determine type, priority, owner, and missing information.",
+                state: "needs_setup",
+              },
+              {
+                id: "triage-summary",
+                kind: "workflow_output",
+                label: "Triage summary",
+                state: "proposed",
+              },
+            ],
+            links: [
+              {
+                from: "issue-opened",
+                to: "classify-issue",
+                kind: "triggers",
+              },
+              {
+                from: "classify-issue",
+                to: "triage-summary",
+                kind: "produces",
+              },
+            ],
+            actions: [
+              {
+                id: "create-trigger",
+                itemId: "issue-opened",
+                kind: "open_trigger_create",
+                label: "Create trigger",
+                href: "/triggers/new",
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(await screen.findByText("Issue opened")).toBeDefined();
+    expect(await screen.findByLabelText("GitHub · Trigger")).toBeDefined();
+    await waitFor(() => {
+      expect(
+        document.querySelector(`img[src="${resolveIntegrationLogoPath({ logoKey: "github" })}"]`),
+      ).toBeDefined();
+    });
+    expect(await screen.findByText("Classify issue")).toBeDefined();
+    expect(await screen.findByText("Triage summary")).toBeDefined();
+    expect(screen.getByRole("region", { name: "Designer blueprint graph" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Create trigger" })).toBeNull();
   });
 
   it("resolves integration detail tab titles from the integration directory data", async () => {
@@ -183,6 +286,7 @@ describe("DesignerCanvasWorkspace", () => {
       },
       tabs: [
         {
+          kind: "route",
           id: "integrations",
           title: "Integrations",
           href: "/integrations/slack",
@@ -193,6 +297,7 @@ describe("DesignerCanvasWorkspace", () => {
     await waitFor(() => {
       expect(nextTabs.at(-1)).toEqual([
         {
+          kind: "route",
           id: "integrations",
           title: "Slack",
           href: "/integrations/slack",
@@ -205,6 +310,7 @@ describe("DesignerCanvasWorkspace", () => {
     renderDesignerCanvasWorkspace({
       tabs: [
         {
+          kind: "route",
           id: "malformed-integration",
           title: "Malformed integration",
           href: "/integrations/%E0%A4%A",
@@ -226,6 +332,7 @@ describe("DesignerCanvasWorkspace", () => {
       },
       tabs: [
         {
+          kind: "route",
           id: "triggers",
           title: "Triggers",
           href: "/triggers",
@@ -238,6 +345,7 @@ describe("DesignerCanvasWorkspace", () => {
 
     expect(nextTabs.at(-1)).toEqual([
       {
+        kind: "route",
         id: "triggers",
         title: "Create trigger",
         href: "/triggers/new",
@@ -250,6 +358,7 @@ describe("DesignerCanvasWorkspace", () => {
       activeTabHref: "/triggers/new",
       tabs: [
         {
+          kind: "route",
           id: "create-trigger",
           title: "Create trigger",
           href: "/triggers/new",
@@ -265,6 +374,7 @@ describe("DesignerCanvasWorkspace", () => {
       activeTabHref: "/triggers",
       tabs: [
         {
+          kind: "route",
           id: "triggers",
           title: "Triggers",
           href: "/triggers",
@@ -295,11 +405,13 @@ describe("DesignerCanvasWorkspace", () => {
       },
       tabs: [
         {
+          kind: "route",
           id: "integrations",
           title: "Integrations",
           href: "/integrations",
         },
         {
+          kind: "route",
           id: "triggers",
           title: "Triggers",
           href: "/triggers",

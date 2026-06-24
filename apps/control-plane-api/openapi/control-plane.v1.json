@@ -792,26 +792,392 @@
                     "canvasTabs": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 128
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["route"]
+                              },
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "href": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2048
+                              }
+                            },
+                            "required": ["kind", "id", "title", "href"],
+                            "additionalProperties": false
                           },
-                          "title": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 120
-                          },
-                          "href": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 2048
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["blueprint"]
+                              },
+                              "id": {
+                                "type": "string",
+                                "enum": ["designer-blueprint-current"]
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "href": {
+                                "type": "string",
+                                "enum": ["/designer/blueprints/current"]
+                              },
+                              "blueprint": {
+                                "type": "object",
+                                "properties": {
+                                  "version": {
+                                    "type": "number",
+                                    "enum": [1]
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "outcome": {
+                                    "type": "object",
+                                    "properties": {
+                                      "label": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 160
+                                      },
+                                      "description": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 2000
+                                      }
+                                    },
+                                    "required": ["label"],
+                                    "additionalProperties": false
+                                  },
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "oneOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["agent_step", "workflow_output"]
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["trigger"]
+                                            },
+                                            "integrationTargetKey": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "integrationLabel": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 80
+                                            },
+                                            "eventLabel": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["routing_policy"]
+                                            },
+                                            "rules": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 160
+                                                  },
+                                                  "when": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "field": {
+                                                          "type": "string",
+                                                          "minLength": 1,
+                                                          "maxLength": 128
+                                                        },
+                                                        "operator": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "equals",
+                                                            "not_equals",
+                                                            "includes",
+                                                            "excludes",
+                                                            "in",
+                                                            "empty",
+                                                            "not_empty"
+                                                          ]
+                                                        },
+                                                        "value": {
+                                                          "anyOf": [
+                                                            {
+                                                              "type": "string"
+                                                            },
+                                                            {
+                                                              "type": "array",
+                                                              "items": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              },
+                                                              "minItems": 1,
+                                                              "maxItems": 50
+                                                            },
+                                                            {
+                                                              "type": "number"
+                                                            },
+                                                            {
+                                                              "type": "boolean"
+                                                            }
+                                                          ]
+                                                        }
+                                                      },
+                                                      "required": ["field", "operator"],
+                                                      "additionalProperties": false
+                                                    },
+                                                    "minItems": 1,
+                                                    "maxItems": 20
+                                                  },
+                                                  "routeTo": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 128
+                                                  }
+                                                },
+                                                "required": ["when"],
+                                                "additionalProperties": false
+                                              },
+                                              "minItems": 1,
+                                              "maxItems": 20
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind", "rules"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
+                                    "maxItems": 100
+                                  },
+                                  "links": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "from": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "to": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "requires",
+                                            "triggers",
+                                            "configures",
+                                            "produces",
+                                            "confirms",
+                                            "routes_to",
+                                            "hands_off_to",
+                                            "uses"
+                                          ]
+                                        }
+                                      },
+                                      "required": ["from", "to", "kind"],
+                                      "additionalProperties": false
+                                    },
+                                    "maxItems": 200
+                                  },
+                                  "actions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "itemId": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "open_integration_setup",
+                                            "open_trigger_create",
+                                            "open_trigger_edit",
+                                            "open_sandbox_profile",
+                                            "open_sandbox_profile_section"
+                                          ]
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "href": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 2048
+                                        }
+                                      },
+                                      "required": ["id", "itemId", "kind", "label", "href"],
+                                      "additionalProperties": false
+                                    },
+                                    "maxItems": 50
+                                  }
+                                },
+                                "required": [
+                                  "version",
+                                  "title",
+                                  "outcome",
+                                  "items",
+                                  "links",
+                                  "actions"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": ["kind", "id", "title", "href", "blueprint"],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": ["id", "title", "href"],
-                        "additionalProperties": false
+                        ]
                       }
                     },
                     "createdAt": {
@@ -1061,31 +1427,6 @@
                             "type": ["string", "null"],
                             "minLength": 1
                           },
-                          "canvasTabs": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 128
-                                },
-                                "title": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 120
-                                },
-                                "href": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 2048
-                                }
-                              },
-                              "required": ["id", "title", "href"],
-                              "additionalProperties": false
-                            }
-                          },
                           "createdAt": {
                             "type": "string",
                             "minLength": 1
@@ -1109,7 +1450,6 @@
                           "runtimeContext",
                           "startupOperation",
                           "initialPrompt",
-                          "canvasTabs",
                           "createdAt",
                           "updatedAt"
                         ],
@@ -1482,26 +1822,392 @@
                     "canvasTabs": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 128
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["route"]
+                              },
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "href": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2048
+                              }
+                            },
+                            "required": ["kind", "id", "title", "href"],
+                            "additionalProperties": false
                           },
-                          "title": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 120
-                          },
-                          "href": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 2048
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["blueprint"]
+                              },
+                              "id": {
+                                "type": "string",
+                                "enum": ["designer-blueprint-current"]
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "href": {
+                                "type": "string",
+                                "enum": ["/designer/blueprints/current"]
+                              },
+                              "blueprint": {
+                                "type": "object",
+                                "properties": {
+                                  "version": {
+                                    "type": "number",
+                                    "enum": [1]
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "outcome": {
+                                    "type": "object",
+                                    "properties": {
+                                      "label": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 160
+                                      },
+                                      "description": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 2000
+                                      }
+                                    },
+                                    "required": ["label"],
+                                    "additionalProperties": false
+                                  },
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "oneOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["agent_step", "workflow_output"]
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["trigger"]
+                                            },
+                                            "integrationTargetKey": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "integrationLabel": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 80
+                                            },
+                                            "eventLabel": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["routing_policy"]
+                                            },
+                                            "rules": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 160
+                                                  },
+                                                  "when": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "field": {
+                                                          "type": "string",
+                                                          "minLength": 1,
+                                                          "maxLength": 128
+                                                        },
+                                                        "operator": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "equals",
+                                                            "not_equals",
+                                                            "includes",
+                                                            "excludes",
+                                                            "in",
+                                                            "empty",
+                                                            "not_empty"
+                                                          ]
+                                                        },
+                                                        "value": {
+                                                          "anyOf": [
+                                                            {
+                                                              "type": "string"
+                                                            },
+                                                            {
+                                                              "type": "array",
+                                                              "items": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              },
+                                                              "minItems": 1,
+                                                              "maxItems": 50
+                                                            },
+                                                            {
+                                                              "type": "number"
+                                                            },
+                                                            {
+                                                              "type": "boolean"
+                                                            }
+                                                          ]
+                                                        }
+                                                      },
+                                                      "required": ["field", "operator"],
+                                                      "additionalProperties": false
+                                                    },
+                                                    "minItems": 1,
+                                                    "maxItems": 20
+                                                  },
+                                                  "routeTo": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 128
+                                                  }
+                                                },
+                                                "required": ["when"],
+                                                "additionalProperties": false
+                                              },
+                                              "minItems": 1,
+                                              "maxItems": 20
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind", "rules"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
+                                    "maxItems": 100
+                                  },
+                                  "links": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "from": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "to": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "requires",
+                                            "triggers",
+                                            "configures",
+                                            "produces",
+                                            "confirms",
+                                            "routes_to",
+                                            "hands_off_to",
+                                            "uses"
+                                          ]
+                                        }
+                                      },
+                                      "required": ["from", "to", "kind"],
+                                      "additionalProperties": false
+                                    },
+                                    "maxItems": 200
+                                  },
+                                  "actions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "itemId": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "open_integration_setup",
+                                            "open_trigger_create",
+                                            "open_trigger_edit",
+                                            "open_sandbox_profile",
+                                            "open_sandbox_profile_section"
+                                          ]
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "href": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 2048
+                                        }
+                                      },
+                                      "required": ["id", "itemId", "kind", "label", "href"],
+                                      "additionalProperties": false
+                                    },
+                                    "maxItems": 50
+                                  }
+                                },
+                                "required": [
+                                  "version",
+                                  "title",
+                                  "outcome",
+                                  "items",
+                                  "links",
+                                  "actions"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": ["kind", "id", "title", "href", "blueprint"],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": ["id", "title", "href"],
-                        "additionalProperties": false
+                        ]
                       }
                     },
                     "createdAt": {
@@ -1641,26 +2347,392 @@
                   "tabs": {
                     "type": "array",
                     "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 128
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["route"]
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 128
+                            },
+                            "title": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 120
+                            },
+                            "href": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 2048
+                            }
+                          },
+                          "required": ["kind", "id", "title", "href"],
+                          "additionalProperties": false
                         },
-                        "title": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 120
-                        },
-                        "href": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 2048
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["blueprint"]
+                            },
+                            "id": {
+                              "type": "string",
+                              "enum": ["designer-blueprint-current"]
+                            },
+                            "title": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 120
+                            },
+                            "href": {
+                              "type": "string",
+                              "enum": ["/designer/blueprints/current"]
+                            },
+                            "blueprint": {
+                              "type": "object",
+                              "properties": {
+                                "version": {
+                                  "type": "number",
+                                  "enum": [1]
+                                },
+                                "title": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "outcome": {
+                                  "type": "object",
+                                  "properties": {
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "description": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": ["label"],
+                                  "additionalProperties": false
+                                },
+                                "items": {
+                                  "type": "array",
+                                  "items": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 160
+                                          },
+                                          "description": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 2000
+                                          },
+                                          "parentId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "state": {
+                                            "type": "string",
+                                            "enum": [
+                                              "proposed",
+                                              "needs_setup",
+                                              "ready_to_confirm",
+                                              "applied",
+                                              "blocked"
+                                            ]
+                                          },
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["agent_step", "workflow_output"]
+                                          }
+                                        },
+                                        "required": ["id", "label", "state", "kind"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 160
+                                          },
+                                          "description": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 2000
+                                          },
+                                          "parentId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "state": {
+                                            "type": "string",
+                                            "enum": [
+                                              "proposed",
+                                              "needs_setup",
+                                              "ready_to_confirm",
+                                              "applied",
+                                              "blocked"
+                                            ]
+                                          },
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["trigger"]
+                                          },
+                                          "integrationTargetKey": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "integrationLabel": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 80
+                                          },
+                                          "eventLabel": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 160
+                                          }
+                                        },
+                                        "required": ["id", "label", "state", "kind"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 160
+                                          },
+                                          "description": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 2000
+                                          },
+                                          "parentId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "state": {
+                                            "type": "string",
+                                            "enum": [
+                                              "proposed",
+                                              "needs_setup",
+                                              "ready_to_confirm",
+                                              "applied",
+                                              "blocked"
+                                            ]
+                                          },
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["routing_policy"]
+                                          },
+                                          "rules": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "label": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 160
+                                                },
+                                                "when": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "field": {
+                                                        "type": "string",
+                                                        "minLength": 1,
+                                                        "maxLength": 128
+                                                      },
+                                                      "operator": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "equals",
+                                                          "not_equals",
+                                                          "includes",
+                                                          "excludes",
+                                                          "in",
+                                                          "empty",
+                                                          "not_empty"
+                                                        ]
+                                                      },
+                                                      "value": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "type": "array",
+                                                            "items": {
+                                                              "type": "string",
+                                                              "minLength": 1
+                                                            },
+                                                            "minItems": 1,
+                                                            "maxItems": 50
+                                                          },
+                                                          {
+                                                            "type": "number"
+                                                          },
+                                                          {
+                                                            "type": "boolean"
+                                                          }
+                                                        ]
+                                                      }
+                                                    },
+                                                    "required": ["field", "operator"],
+                                                    "additionalProperties": false
+                                                  },
+                                                  "minItems": 1,
+                                                  "maxItems": 20
+                                                },
+                                                "routeTo": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 128
+                                                }
+                                              },
+                                              "required": ["when"],
+                                              "additionalProperties": false
+                                            },
+                                            "minItems": 1,
+                                            "maxItems": 20
+                                          }
+                                        },
+                                        "required": ["id", "label", "state", "kind", "rules"],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "maxItems": 100
+                                },
+                                "links": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "from": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      },
+                                      "to": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      },
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "requires",
+                                          "triggers",
+                                          "configures",
+                                          "produces",
+                                          "confirms",
+                                          "routes_to",
+                                          "hands_off_to",
+                                          "uses"
+                                        ]
+                                      }
+                                    },
+                                    "required": ["from", "to", "kind"],
+                                    "additionalProperties": false
+                                  },
+                                  "maxItems": 200
+                                },
+                                "actions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      },
+                                      "itemId": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      },
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "open_integration_setup",
+                                          "open_trigger_create",
+                                          "open_trigger_edit",
+                                          "open_sandbox_profile",
+                                          "open_sandbox_profile_section"
+                                        ]
+                                      },
+                                      "label": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 160
+                                      },
+                                      "href": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 2048
+                                      }
+                                    },
+                                    "required": ["id", "itemId", "kind", "label", "href"],
+                                    "additionalProperties": false
+                                  },
+                                  "maxItems": 50
+                                }
+                              },
+                              "required": [
+                                "version",
+                                "title",
+                                "outcome",
+                                "items",
+                                "links",
+                                "actions"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": ["kind", "id", "title", "href", "blueprint"],
+                          "additionalProperties": false
                         }
-                      },
-                      "required": ["id", "title", "href"],
-                      "additionalProperties": false
+                      ]
                     }
                   }
                 },
@@ -1770,26 +2842,392 @@
                     "canvasTabs": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 128
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["route"]
+                              },
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "href": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2048
+                              }
+                            },
+                            "required": ["kind", "id", "title", "href"],
+                            "additionalProperties": false
                           },
-                          "title": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 120
-                          },
-                          "href": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 2048
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["blueprint"]
+                              },
+                              "id": {
+                                "type": "string",
+                                "enum": ["designer-blueprint-current"]
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "href": {
+                                "type": "string",
+                                "enum": ["/designer/blueprints/current"]
+                              },
+                              "blueprint": {
+                                "type": "object",
+                                "properties": {
+                                  "version": {
+                                    "type": "number",
+                                    "enum": [1]
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "outcome": {
+                                    "type": "object",
+                                    "properties": {
+                                      "label": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 160
+                                      },
+                                      "description": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 2000
+                                      }
+                                    },
+                                    "required": ["label"],
+                                    "additionalProperties": false
+                                  },
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "oneOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["agent_step", "workflow_output"]
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["trigger"]
+                                            },
+                                            "integrationTargetKey": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "integrationLabel": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 80
+                                            },
+                                            "eventLabel": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["routing_policy"]
+                                            },
+                                            "rules": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 160
+                                                  },
+                                                  "when": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "field": {
+                                                          "type": "string",
+                                                          "minLength": 1,
+                                                          "maxLength": 128
+                                                        },
+                                                        "operator": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "equals",
+                                                            "not_equals",
+                                                            "includes",
+                                                            "excludes",
+                                                            "in",
+                                                            "empty",
+                                                            "not_empty"
+                                                          ]
+                                                        },
+                                                        "value": {
+                                                          "anyOf": [
+                                                            {
+                                                              "type": "string"
+                                                            },
+                                                            {
+                                                              "type": "array",
+                                                              "items": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              },
+                                                              "minItems": 1,
+                                                              "maxItems": 50
+                                                            },
+                                                            {
+                                                              "type": "number"
+                                                            },
+                                                            {
+                                                              "type": "boolean"
+                                                            }
+                                                          ]
+                                                        }
+                                                      },
+                                                      "required": ["field", "operator"],
+                                                      "additionalProperties": false
+                                                    },
+                                                    "minItems": 1,
+                                                    "maxItems": 20
+                                                  },
+                                                  "routeTo": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 128
+                                                  }
+                                                },
+                                                "required": ["when"],
+                                                "additionalProperties": false
+                                              },
+                                              "minItems": 1,
+                                              "maxItems": 20
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind", "rules"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
+                                    "maxItems": 100
+                                  },
+                                  "links": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "from": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "to": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "requires",
+                                            "triggers",
+                                            "configures",
+                                            "produces",
+                                            "confirms",
+                                            "routes_to",
+                                            "hands_off_to",
+                                            "uses"
+                                          ]
+                                        }
+                                      },
+                                      "required": ["from", "to", "kind"],
+                                      "additionalProperties": false
+                                    },
+                                    "maxItems": 200
+                                  },
+                                  "actions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "itemId": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "open_integration_setup",
+                                            "open_trigger_create",
+                                            "open_trigger_edit",
+                                            "open_sandbox_profile",
+                                            "open_sandbox_profile_section"
+                                          ]
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "href": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 2048
+                                        }
+                                      },
+                                      "required": ["id", "itemId", "kind", "label", "href"],
+                                      "additionalProperties": false
+                                    },
+                                    "maxItems": 50
+                                  }
+                                },
+                                "required": [
+                                  "version",
+                                  "title",
+                                  "outcome",
+                                  "items",
+                                  "links",
+                                  "actions"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": ["kind", "id", "title", "href", "blueprint"],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": ["id", "title", "href"],
-                        "additionalProperties": false
+                        ]
                       }
                     },
                     "createdAt": {
@@ -2019,26 +3457,392 @@
                     "canvasTabs": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 128
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["route"]
+                              },
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "href": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2048
+                              }
+                            },
+                            "required": ["kind", "id", "title", "href"],
+                            "additionalProperties": false
                           },
-                          "title": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 120
-                          },
-                          "href": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 2048
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["blueprint"]
+                              },
+                              "id": {
+                                "type": "string",
+                                "enum": ["designer-blueprint-current"]
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "href": {
+                                "type": "string",
+                                "enum": ["/designer/blueprints/current"]
+                              },
+                              "blueprint": {
+                                "type": "object",
+                                "properties": {
+                                  "version": {
+                                    "type": "number",
+                                    "enum": [1]
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "outcome": {
+                                    "type": "object",
+                                    "properties": {
+                                      "label": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 160
+                                      },
+                                      "description": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 2000
+                                      }
+                                    },
+                                    "required": ["label"],
+                                    "additionalProperties": false
+                                  },
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "oneOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["agent_step", "workflow_output"]
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["trigger"]
+                                            },
+                                            "integrationTargetKey": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "integrationLabel": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 80
+                                            },
+                                            "eventLabel": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["routing_policy"]
+                                            },
+                                            "rules": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 160
+                                                  },
+                                                  "when": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "field": {
+                                                          "type": "string",
+                                                          "minLength": 1,
+                                                          "maxLength": 128
+                                                        },
+                                                        "operator": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "equals",
+                                                            "not_equals",
+                                                            "includes",
+                                                            "excludes",
+                                                            "in",
+                                                            "empty",
+                                                            "not_empty"
+                                                          ]
+                                                        },
+                                                        "value": {
+                                                          "anyOf": [
+                                                            {
+                                                              "type": "string"
+                                                            },
+                                                            {
+                                                              "type": "array",
+                                                              "items": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              },
+                                                              "minItems": 1,
+                                                              "maxItems": 50
+                                                            },
+                                                            {
+                                                              "type": "number"
+                                                            },
+                                                            {
+                                                              "type": "boolean"
+                                                            }
+                                                          ]
+                                                        }
+                                                      },
+                                                      "required": ["field", "operator"],
+                                                      "additionalProperties": false
+                                                    },
+                                                    "minItems": 1,
+                                                    "maxItems": 20
+                                                  },
+                                                  "routeTo": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 128
+                                                  }
+                                                },
+                                                "required": ["when"],
+                                                "additionalProperties": false
+                                              },
+                                              "minItems": 1,
+                                              "maxItems": 20
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind", "rules"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
+                                    "maxItems": 100
+                                  },
+                                  "links": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "from": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "to": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "requires",
+                                            "triggers",
+                                            "configures",
+                                            "produces",
+                                            "confirms",
+                                            "routes_to",
+                                            "hands_off_to",
+                                            "uses"
+                                          ]
+                                        }
+                                      },
+                                      "required": ["from", "to", "kind"],
+                                      "additionalProperties": false
+                                    },
+                                    "maxItems": 200
+                                  },
+                                  "actions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "itemId": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "open_integration_setup",
+                                            "open_trigger_create",
+                                            "open_trigger_edit",
+                                            "open_sandbox_profile",
+                                            "open_sandbox_profile_section"
+                                          ]
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "href": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 2048
+                                        }
+                                      },
+                                      "required": ["id", "itemId", "kind", "label", "href"],
+                                      "additionalProperties": false
+                                    },
+                                    "maxItems": 50
+                                  }
+                                },
+                                "required": [
+                                  "version",
+                                  "title",
+                                  "outcome",
+                                  "items",
+                                  "links",
+                                  "actions"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": ["kind", "id", "title", "href", "blueprint"],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": ["id", "title", "href"],
-                        "additionalProperties": false
+                        ]
                       }
                     },
                     "createdAt": {
@@ -2178,26 +3982,392 @@
                   "tabs": {
                     "type": "array",
                     "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 128
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["route"]
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 128
+                            },
+                            "title": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 120
+                            },
+                            "href": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 2048
+                            }
+                          },
+                          "required": ["kind", "id", "title", "href"],
+                          "additionalProperties": false
                         },
-                        "title": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 120
-                        },
-                        "href": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 2048
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["blueprint"]
+                            },
+                            "id": {
+                              "type": "string",
+                              "enum": ["designer-blueprint-current"]
+                            },
+                            "title": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 120
+                            },
+                            "href": {
+                              "type": "string",
+                              "enum": ["/designer/blueprints/current"]
+                            },
+                            "blueprint": {
+                              "type": "object",
+                              "properties": {
+                                "version": {
+                                  "type": "number",
+                                  "enum": [1]
+                                },
+                                "title": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "outcome": {
+                                  "type": "object",
+                                  "properties": {
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "description": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": ["label"],
+                                  "additionalProperties": false
+                                },
+                                "items": {
+                                  "type": "array",
+                                  "items": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 160
+                                          },
+                                          "description": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 2000
+                                          },
+                                          "parentId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "state": {
+                                            "type": "string",
+                                            "enum": [
+                                              "proposed",
+                                              "needs_setup",
+                                              "ready_to_confirm",
+                                              "applied",
+                                              "blocked"
+                                            ]
+                                          },
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["agent_step", "workflow_output"]
+                                          }
+                                        },
+                                        "required": ["id", "label", "state", "kind"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 160
+                                          },
+                                          "description": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 2000
+                                          },
+                                          "parentId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "state": {
+                                            "type": "string",
+                                            "enum": [
+                                              "proposed",
+                                              "needs_setup",
+                                              "ready_to_confirm",
+                                              "applied",
+                                              "blocked"
+                                            ]
+                                          },
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["trigger"]
+                                          },
+                                          "integrationTargetKey": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "integrationLabel": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 80
+                                          },
+                                          "eventLabel": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 160
+                                          }
+                                        },
+                                        "required": ["id", "label", "state", "kind"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 160
+                                          },
+                                          "description": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 2000
+                                          },
+                                          "parentId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
+                                          },
+                                          "state": {
+                                            "type": "string",
+                                            "enum": [
+                                              "proposed",
+                                              "needs_setup",
+                                              "ready_to_confirm",
+                                              "applied",
+                                              "blocked"
+                                            ]
+                                          },
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["routing_policy"]
+                                          },
+                                          "rules": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "label": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 160
+                                                },
+                                                "when": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "field": {
+                                                        "type": "string",
+                                                        "minLength": 1,
+                                                        "maxLength": 128
+                                                      },
+                                                      "operator": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                          "equals",
+                                                          "not_equals",
+                                                          "includes",
+                                                          "excludes",
+                                                          "in",
+                                                          "empty",
+                                                          "not_empty"
+                                                        ]
+                                                      },
+                                                      "value": {
+                                                        "anyOf": [
+                                                          {
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "type": "array",
+                                                            "items": {
+                                                              "type": "string",
+                                                              "minLength": 1
+                                                            },
+                                                            "minItems": 1,
+                                                            "maxItems": 50
+                                                          },
+                                                          {
+                                                            "type": "number"
+                                                          },
+                                                          {
+                                                            "type": "boolean"
+                                                          }
+                                                        ]
+                                                      }
+                                                    },
+                                                    "required": ["field", "operator"],
+                                                    "additionalProperties": false
+                                                  },
+                                                  "minItems": 1,
+                                                  "maxItems": 20
+                                                },
+                                                "routeTo": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 128
+                                                }
+                                              },
+                                              "required": ["when"],
+                                              "additionalProperties": false
+                                            },
+                                            "minItems": 1,
+                                            "maxItems": 20
+                                          }
+                                        },
+                                        "required": ["id", "label", "state", "kind", "rules"],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "maxItems": 100
+                                },
+                                "links": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "from": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      },
+                                      "to": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      },
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "requires",
+                                          "triggers",
+                                          "configures",
+                                          "produces",
+                                          "confirms",
+                                          "routes_to",
+                                          "hands_off_to",
+                                          "uses"
+                                        ]
+                                      }
+                                    },
+                                    "required": ["from", "to", "kind"],
+                                    "additionalProperties": false
+                                  },
+                                  "maxItems": 200
+                                },
+                                "actions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      },
+                                      "itemId": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 128
+                                      },
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "open_integration_setup",
+                                          "open_trigger_create",
+                                          "open_trigger_edit",
+                                          "open_sandbox_profile",
+                                          "open_sandbox_profile_section"
+                                        ]
+                                      },
+                                      "label": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 160
+                                      },
+                                      "href": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 2048
+                                      }
+                                    },
+                                    "required": ["id", "itemId", "kind", "label", "href"],
+                                    "additionalProperties": false
+                                  },
+                                  "maxItems": 50
+                                }
+                              },
+                              "required": [
+                                "version",
+                                "title",
+                                "outcome",
+                                "items",
+                                "links",
+                                "actions"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": ["kind", "id", "title", "href", "blueprint"],
+                          "additionalProperties": false
                         }
-                      },
-                      "required": ["id", "title", "href"],
-                      "additionalProperties": false
+                      ]
                     }
                   }
                 },
@@ -2307,26 +4477,392 @@
                     "canvasTabs": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 128
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["route"]
+                              },
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "href": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 2048
+                              }
+                            },
+                            "required": ["kind", "id", "title", "href"],
+                            "additionalProperties": false
                           },
-                          "title": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 120
-                          },
-                          "href": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 2048
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["blueprint"]
+                              },
+                              "id": {
+                                "type": "string",
+                                "enum": ["designer-blueprint-current"]
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "href": {
+                                "type": "string",
+                                "enum": ["/designer/blueprints/current"]
+                              },
+                              "blueprint": {
+                                "type": "object",
+                                "properties": {
+                                  "version": {
+                                    "type": "number",
+                                    "enum": [1]
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "outcome": {
+                                    "type": "object",
+                                    "properties": {
+                                      "label": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 160
+                                      },
+                                      "description": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 2000
+                                      }
+                                    },
+                                    "required": ["label"],
+                                    "additionalProperties": false
+                                  },
+                                  "items": {
+                                    "type": "array",
+                                    "items": {
+                                      "oneOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["agent_step", "workflow_output"]
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["trigger"]
+                                            },
+                                            "integrationTargetKey": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "integrationLabel": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 80
+                                            },
+                                            "eventLabel": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 2000
+                                            },
+                                            "parentId": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
+                                            },
+                                            "state": {
+                                              "type": "string",
+                                              "enum": [
+                                                "proposed",
+                                                "needs_setup",
+                                                "ready_to_confirm",
+                                                "applied",
+                                                "blocked"
+                                              ]
+                                            },
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["routing_policy"]
+                                            },
+                                            "rules": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 160
+                                                  },
+                                                  "when": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "field": {
+                                                          "type": "string",
+                                                          "minLength": 1,
+                                                          "maxLength": 128
+                                                        },
+                                                        "operator": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "equals",
+                                                            "not_equals",
+                                                            "includes",
+                                                            "excludes",
+                                                            "in",
+                                                            "empty",
+                                                            "not_empty"
+                                                          ]
+                                                        },
+                                                        "value": {
+                                                          "anyOf": [
+                                                            {
+                                                              "type": "string"
+                                                            },
+                                                            {
+                                                              "type": "array",
+                                                              "items": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              },
+                                                              "minItems": 1,
+                                                              "maxItems": 50
+                                                            },
+                                                            {
+                                                              "type": "number"
+                                                            },
+                                                            {
+                                                              "type": "boolean"
+                                                            }
+                                                          ]
+                                                        }
+                                                      },
+                                                      "required": ["field", "operator"],
+                                                      "additionalProperties": false
+                                                    },
+                                                    "minItems": 1,
+                                                    "maxItems": 20
+                                                  },
+                                                  "routeTo": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 128
+                                                  }
+                                                },
+                                                "required": ["when"],
+                                                "additionalProperties": false
+                                              },
+                                              "minItems": 1,
+                                              "maxItems": 20
+                                            }
+                                          },
+                                          "required": ["id", "label", "state", "kind", "rules"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
+                                    "maxItems": 100
+                                  },
+                                  "links": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "from": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "to": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "requires",
+                                            "triggers",
+                                            "configures",
+                                            "produces",
+                                            "confirms",
+                                            "routes_to",
+                                            "hands_off_to",
+                                            "uses"
+                                          ]
+                                        }
+                                      },
+                                      "required": ["from", "to", "kind"],
+                                      "additionalProperties": false
+                                    },
+                                    "maxItems": 200
+                                  },
+                                  "actions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "itemId": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "open_integration_setup",
+                                            "open_trigger_create",
+                                            "open_trigger_edit",
+                                            "open_sandbox_profile",
+                                            "open_sandbox_profile_section"
+                                          ]
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "href": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 2048
+                                        }
+                                      },
+                                      "required": ["id", "itemId", "kind", "label", "href"],
+                                      "additionalProperties": false
+                                    },
+                                    "maxItems": 50
+                                  }
+                                },
+                                "required": [
+                                  "version",
+                                  "title",
+                                  "outcome",
+                                  "items",
+                                  "links",
+                                  "actions"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": ["kind", "id", "title", "href", "blueprint"],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": ["id", "title", "href"],
-                        "additionalProperties": false
+                        ]
                       }
                     },
                     "createdAt": {

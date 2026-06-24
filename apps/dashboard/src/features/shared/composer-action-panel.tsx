@@ -3,7 +3,8 @@ import type React from "react";
 export type ComposerActionPanelProps = {
   actions: React.ReactNode;
   details: React.ReactNode;
-  title: string;
+  padding?: "flush-x";
+  title: React.ReactNode | null;
 };
 
 export type ComposerActionPanelStackProps = {
@@ -16,11 +17,24 @@ export function ComposerActionPanelStack(input: ComposerActionPanelStackProps): 
 
 export function ComposerActionPanel(input: ComposerActionPanelProps): React.JSX.Element {
   return (
-    <article className="rounded-xl border bg-background p-4 shadow-sm">
+    <article
+      className={[
+        "rounded-xl border bg-background pt-4 pb-2 shadow-sm",
+        input.padding === "flush-x" ? "px-0" : "px-4",
+      ].join(" ")}
+    >
       <div className="space-y-3">
-        <p className="font-medium text-base">{input.title}</p>
+        {input.title === null ? null : <p className="font-medium text-base">{input.title}</p>}
         <div>{input.details}</div>
-        <div className="flex flex-wrap gap-2">{input.actions}</div>
+        {input.actions === null ? null : (
+          <div
+            className={["flex flex-wrap gap-2", input.padding === "flush-x" ? "px-4" : ""].join(
+              " ",
+            )}
+          >
+            {input.actions}
+          </div>
+        )}
       </div>
     </article>
   );

@@ -13,7 +13,7 @@ import { Link as RouterLink } from "react-router";
 
 import { ErrorNotice } from "../auth/error-notice.js";
 import { ChatComposer } from "../chat/components/chat-composer.js";
-import type { DesignerSession } from "../designer/designer-service.js";
+import type { DesignerSessionListItem } from "../designer/designer-service.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
@@ -25,11 +25,11 @@ export type DesignerPageViewProps = {
   onPromptChange: (prompt: string) => void;
   onSubmit: () => void;
   prompt: string;
-  sessions: readonly DesignerSession[];
+  sessions: readonly DesignerSessionListItem[];
   sessionsErrorMessage: string | null;
 };
 
-function formatDesignerSessionTitle(session: DesignerSession): string {
+function formatDesignerSessionTitle(session: DesignerSessionListItem): string {
   return session.title ?? `Designer session ${session.id.slice(-6)}`;
 }
 

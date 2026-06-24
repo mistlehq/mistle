@@ -69,6 +69,8 @@ export async function authenticateMcpToken(input: {
         OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_UPDATE,
         OrganizationPermissions.CREDENTIAL_KEY_READ,
         OrganizationPermissions.TRIGGER_READ,
+        OrganizationPermissions.TRIGGER_CREATE,
+        OrganizationPermissions.TRIGGER_UPDATE,
       ],
     };
   }

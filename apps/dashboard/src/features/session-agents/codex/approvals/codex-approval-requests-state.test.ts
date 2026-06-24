@@ -164,7 +164,6 @@ describe("reduceCodexApprovalRequestsState", () => {
               options: [
                 {
                   label: "A",
-                  description: "First option",
                   isOther: false,
                 },
                 {
@@ -191,13 +190,60 @@ describe("reduceCodexApprovalRequestsState", () => {
             options: [
               {
                 label: "A",
-                description: "First option",
                 isOther: false,
               },
               {
                 label: "B",
-                description: null,
                 isOther: true,
+              },
+            ],
+          },
+        ],
+        status: "pending",
+        responseErrorMessage: null,
+      },
+    ]);
+  });
+
+  it("captures already-normalized user input server request entries", () => {
+    const state = reduceCodexApprovalRequestsState(createInitialCodexApprovalRequestsState(), {
+      type: "server_request_entry_received",
+      entry: {
+        requestId: "dashboard-input-1",
+        method: "tool/requestUserInput",
+        kind: "tool-user-input",
+        questions: [
+          {
+            header: "Sandbox profile",
+            id: "profile-choice",
+            question: "Which sandbox profile should run the triaging agent?",
+            options: [
+              {
+                label: "ABC",
+                isOther: false,
+              },
+            ],
+          },
+        ],
+        status: "pending",
+        responseErrorMessage: null,
+      },
+    });
+
+    expect(state.entries).toEqual([
+      {
+        requestId: "dashboard-input-1",
+        method: "tool/requestUserInput",
+        kind: "tool-user-input",
+        questions: [
+          {
+            header: "Sandbox profile",
+            id: "profile-choice",
+            question: "Which sandbox profile should run the triaging agent?",
+            options: [
+              {
+                label: "ABC",
+                isOther: false,
               },
             ],
           },
@@ -282,6 +328,39 @@ describe("reduceCodexApprovalRequestsState", () => {
           requestId: 11,
         },
       },
+    });
+
+    expect(resolved.entries).toEqual([]);
+  });
+
+  it("removes a synthetic user input request after a successful response", () => {
+    const pending = reduceCodexApprovalRequestsState(createInitialCodexApprovalRequestsState(), {
+      type: "server_request_entry_received",
+      entry: {
+        requestId: "dashboard-input-1",
+        method: "tool/requestUserInput",
+        kind: "tool-user-input",
+        questions: [
+          {
+            header: "Intake source",
+            id: "source-choice",
+            question: "Which intake source should Designer use?",
+            options: [
+              {
+                label: "Slack messages",
+                isOther: false,
+              },
+            ],
+          },
+        ],
+        status: "pending",
+        responseErrorMessage: null,
+      },
+    });
+
+    const resolved = reduceCodexApprovalRequestsState(pending, {
+      type: "server_request_response_succeeded",
+      requestId: "dashboard-input-1",
     });
 
     expect(resolved.entries).toEqual([]);

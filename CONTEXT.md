@@ -69,6 +69,44 @@ _Code name_: designer
 A structured setup recommendation produced by **Mistle Designer** for integrations, triggers, provider configuration resources, or sandbox profile configuration.
 _Avoid_: Chat suggestion when the recommendation has selectable product state
 
+**Designer blueprint**:
+A read-only visualization of a **Designer recommendation** before the user confirms product configuration changes.
+_Avoid_: Design plan, draft configuration when no product configuration has been saved
+
+**Designer blueprint source file**:
+A sandbox file that **Mistle Designer** may use to author a **Designer blueprint** before pushing its contents to the dashboard.
+_Avoid_: Designer blueprint when referring to the sandbox-side authoring file
+_Default path_: `.mistle/designer/blueprint.json`
+
+**Designer blueprint source document**:
+The JSON document stored in a **Designer blueprint source file**.
+_Avoid_: Markdown blueprint when the document must be validated before rendering
+
+**Designer blueprint outcome**:
+The intended background-agent behavior that a **Designer blueprint** organizes around.
+_Avoid_: Step, setup task
+
+**Designer blueprint trigger**:
+A trigger represented in a **Designer blueprint** that starts or advances the proposed workflow.
+_Avoid_: Workflow event when the concept is the same as the trigger that starts the workflow
+_Properties_: May include a **Designer blueprint integration target**, integration label, and event label when known
+
+**Designer blueprint integration target**:
+The stable integration target identity attached to a **Designer blueprint trigger** when the proposed trigger source maps to a real Mistle integration target.
+_Avoid_: Integration label when the value must resolve product metadata such as the integration logo
+
+**Designer blueprint agent step**:
+An agent-performed unit of work represented in a **Designer blueprint**.
+_Avoid_: Sandbox profile change when referring to what the agent will do rather than how the profile is configured
+
+**Designer blueprint workflow output**:
+A visible result produced by a **Designer blueprint** workflow.
+_Avoid_: Provider write when the output is only proposed or may require approval
+
+**Designer blueprint item state**:
+The progress state metadata for one item in a **Designer blueprint** source document.
+_Avoid_: Live product state when the state is maintained by Mistle Designer
+
 **Runtime approval request**:
 A runtime tool call surfaced to the user for approval before the runtime may perform a side-effecting action.
 _Avoid_: Provider configuration change when the change has not been approved or applied
@@ -82,7 +120,7 @@ A side-effecting action that may run only after an explicit **Runtime approval r
 _Avoid_: Provider write when no explicit operation handler has executed
 
 **User input request**:
-A runtime request that asks the user to answer one or more structured questions before the agent continues.
+A runtime request that asks the user to answer a structured question before the agent continues.
 _Avoid_: Approval request when the user is choosing configuration rather than granting permission
 
 **Dashboard control action**:
@@ -658,6 +696,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - First-pass **Mistle Designer sessions** reuse the normal sandbox session workbench transport against the designer sandbox instance.
 - Designer-specific control-plane APIs own **Mistle Designer session** metadata, connection-token minting, and **Designer canvas tab** persistence.
 - **Designer canvas tabs** are persisted as **Mistle Designer session** workspace state.
+- A **Designer blueprint** is opened and reviewed through a **Designer canvas tab**.
 - **Designer canvas tabs** do not have a product-defined count limit.
 - A **Designer canvas** should not contain multiple **Designer canvas tabs** with the same route.
 - A **Dashboard control action** may open one **Designer canvas tab** without taking ownership of the whole **Designer canvas** tab list.
@@ -679,6 +718,38 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Mistle Designer session** setup changes do not automatically change the target **Sandbox profile version configuration**.
 - **Mistle Designer** may route a user to an existing integration setup flow rather than creating an **Integration connection** directly.
 - Future **Mistle Designer** work should treat **Integration connection** setup as complete when the relevant control-plane resource state exists.
+- A **Designer blueprint** may show the intended workflow that future triggers and sandbox profile behavior will implement, but it does not itself save **Sandbox profile version configuration**.
+- First-pass **Mistle Designer sessions** have at most one current **Designer blueprint**.
+- A **Designer blueprint** may be regenerated or replaced as **Mistle Designer** changes its **Designer recommendation**.
+- A **Designer blueprint source document** uses JSON.
+- First-pass **Mistle Designer sessions** may use `.mistle/designer/blueprint.json` as the default sandbox-side **Designer blueprint source file** path.
+- First-pass **Mistle Designer sessions** define the current **Designer blueprint** from the persisted **Designer canvas tab** entry that contains the pushed **Designer blueprint source document**.
+- First-pass **Designer blueprint** updates are pushed to the dashboard as JSON contents rather than read by the dashboard from an arbitrary sandbox path.
+- **Designer blueprint** update fails without changing **Designer canvas tab** state when the pushed **Designer blueprint source document** is invalid.
+- **Mistle Designer sessions** should not watch or poll a **Designer blueprint source file** for automatic updates.
+- A **Designer blueprint** is stored as Mistle-owned product-domain structure, not renderer-specific graph state.
+- A first-pass **Designer blueprint source document** describes version, title, outcome, items, links, and actions.
+- A first-pass **Designer blueprint source document** describes semantic structure rather than visual coordinates.
+- A **Designer blueprint** renderer may derive its visual nodes and edges from the stored **Designer blueprint**.
+- A first-pass **Designer blueprint** renderer is visual-only and read-only, with pan and zoom but without visible action buttons, node dragging, or graph editing.
+- A **Designer blueprint** is organized process-first: it shows **Designer blueprint triggers**, **Designer blueprint agent steps**, and **Designer blueprint workflow outputs** as the main workflow.
+- Trigger source details such as the integration/provider and event should be shown on the trigger item when known.
+- A **Designer blueprint integration target** uses the same stable target key as an **Integration target** and may be used by the dashboard to resolve product metadata such as the integration logo.
+- **Integration labels** in **Designer blueprint triggers** are display text and should not be used as product identity.
+- A **Designer blueprint** supports only workflow item kinds: trigger, agent step, routing policy, and workflow output.
+- Product resources such as integrations, provider resources, sandbox profiles, sandbox profile changes, and confirmations are not **Designer blueprint** item kinds. Those decisions belong in chat or later setup-focused canvas tabs after the user aligns on the workflow.
+- A **Designer blueprint** may represent multiple triggers entering the same workflow.
+- A **Designer blueprint** is explanatory and actionable, but it is not authoritative product state.
+- For open-ended build requests, **Mistle Designer** should propose and show a **Designer blueprint** before selecting or mutating specific product resources.
+- **Mistle Designer** should not start open-ended design work by inventorying existing **Sandbox profiles** unless the user's request is explicitly about modifying an existing profile or the proposed **Designer blueprint** needs live resource state to be accurate.
+- When the target **Sandbox profile** is ambiguous, **Mistle Designer** should discuss "use an existing Sandbox profile" versus "create a new Sandbox profile" in chat after showing the workflow blueprint.
+- **Mistle Designer** should use the dashboard control tool to show the **Designer blueprint** for alignment before creating triggers, updating trigger instructions, saving sandbox profile draft changes, or asking narrowly about implementation resources.
+- Setup confirmation may apply integration setup or selection, trigger configuration, sandbox profile draft changes, publish, or session launch only through the corresponding supported product action; it is not represented as a **Designer blueprint** item.
+- First-pass **Designer blueprint** actions open existing product surfaces with prefilled state where supported, rather than executing product changes directly from the blueprint.
+- A **Designer blueprint** remains useful after confirmation by updating **Designer blueprint item state** metadata such as proposed, needs setup, ready to confirm, applied, or blocked.
+- **Designer blueprint item states** are maintained by **Mistle Designer** rather than inferred as a strict live projection of product state.
+- First-pass **Designer blueprint** rendering does not show **Designer blueprint item states** in the graph because the canvas is a workflow visualization, not an implementation progress board.
+- Future **Mistle Designer** work may support multiple **Designer blueprints** in one **Mistle Designer session**.
 - Some **Draft integration connections** need a webhook callback URL before the provider-side **Provider configuration resource** can be created.
 - **Provider configuration setup** is generic product flow while its provider-specific fields and instructions belong to the integration definition.
 - **Provider configuration setup** reuses **Integration connection setup completion** rules instead of defining a separate completion model.
@@ -686,6 +757,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A WasenderAPI **Integration connection setup completion** does not require a remote provider session health check in the first pass.
 - First-pass WasenderAPI **Provider configuration setup** guides the user through provider-side configuration rather than creating or updating the provider resource from Mistle.
 - Future **Mistle Designer** work may use **User input requests** to collect structured choices before updating a draft **Sandbox profile version**.
+- **Mistle Designer** should use **User input requests** one question at a time, even when the underlying runtime can represent multiple questions.
 - Future **Mistle Designer** work may save incomplete draft **Sandbox profile version configuration**, but publishing still requires a publishable target **Agent runtime** configuration.
 - Future **Mistle Designer** work should present setup guidance as **Designer recommendations** when the user needs to choose, set up, or review product configuration.
 - Future **Designer recommendations** should be structured **Mistle Designer session** chat history entries rather than separate recommendation records.

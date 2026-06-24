@@ -42,11 +42,14 @@ import {
   listSkillMentions,
 } from "../../../pages/session-composer/session-composer-trigger-detection.js";
 import {
+  createDashboardControlUserInputResponse,
+  createDashboardControlUserInputServerRequest,
   createDashboardControlDynamicToolCallResponse,
-  DesignerCanvasTabOpenDynamicToolSpec,
+  DashboardControlDynamicToolSpecs,
+  DesignerUserInputRequestAction,
   isDashboardControlDynamicToolCallRequest,
   parseDashboardControlDynamicToolCall,
-  type DashboardControlActionRequest,
+  type DashboardControlCanvasActionRequest,
   type DashboardControlActionSupport,
 } from "../../dashboard-control-actions.js";
 import {
@@ -206,7 +209,7 @@ function readCompletedTurnId(notification: CodexJsonRpcNotification): string | n
 
 async function respondToDashboardControlAction(input: {
   action: DashboardControlActionSupport;
-  parsedRequest: DashboardControlActionRequest;
+  parsedRequest: DashboardControlCanvasActionRequest;
   request: CodexJsonRpcServerRequest;
   rpcClient: CodexJsonRpcClient;
 }): Promise<void> {
@@ -328,6 +331,7 @@ export function useCodexSessionState(input: {
   const connectionGenerationRef = useRef(0);
   const threadNavigationMutationRequestRef = useRef(0);
   const reviewTargetLoadRequestRef = useRef(0);
+  const dashboardControlUserInputRequestIdsRef = useRef<Set<string>>(new Set());
   const [repositoryStatusRefreshEpoch, setRepositoryStatusRefreshEpoch] = useState(0);
   const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
   const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
@@ -485,6 +489,18 @@ export function useCodexSessionState(input: {
         return;
       }
 
+      if (parsedRequest.action === DesignerUserInputRequestAction) {
+        dashboardControlUserInputRequestIdsRef.current.add(String(request.id));
+        dispatchServerRequestsAction({
+          type: "server_request_entry_received",
+          entry: createDashboardControlUserInputServerRequest({
+            requestId: request.id,
+            userInput: parsedRequest.input,
+          }),
+        });
+        return;
+      }
+
       if (
         input.dashboardControlActions === undefined ||
         !input.dashboardControlActions.supportedActions.includes(parsedRequest.action)
@@ -537,8 +553,7 @@ export function useCodexSessionState(input: {
   );
 
   const dashboardControlDynamicTools = useMemo(
-    () =>
-      input.dashboardControlActions === undefined ? [] : [DesignerCanvasTabOpenDynamicToolSpec],
+    () => (input.dashboardControlActions === undefined ? [] : DashboardControlDynamicToolSpecs),
     [input.dashboardControlActions],
   );
 
@@ -820,7 +835,20 @@ export function useCodexSessionState(input: {
       });
 
       try {
-        await rpcClient.respond(input.requestId, input.result);
+        const requestId = String(input.requestId);
+        const isDashboardControlUserInputRequest =
+          dashboardControlUserInputRequestIdsRef.current.has(requestId);
+        const result = isDashboardControlUserInputRequest
+          ? createDashboardControlUserInputResponse({ result: input.result })
+          : input.result;
+        await rpcClient.respond(input.requestId, result);
+        if (isDashboardControlUserInputRequest) {
+          dashboardControlUserInputRequestIdsRef.current.delete(requestId);
+          dispatchServerRequestsAction({
+            type: "server_request_response_succeeded",
+            requestId: input.requestId,
+          });
+        }
       } catch (error) {
         dispatchServerRequestsAction({
           type: "server_request_response_failed",

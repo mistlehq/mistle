@@ -57,12 +57,10 @@ describe("Pi extension UI request presentation", () => {
             options: [
               {
                 label: "GPT-5",
-                description: null,
                 isOther: false,
               },
               {
                 label: "Claude",
-                description: null,
                 isOther: false,
               },
             ],
@@ -98,7 +96,6 @@ describe("Pi extension UI request presentation", () => {
             options: [
               {
                 label: "Response",
-                description: null,
                 defaultValue: "Keep this text",
                 inputKind: "textarea",
                 isOther: true,

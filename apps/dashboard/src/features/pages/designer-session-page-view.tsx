@@ -1,6 +1,19 @@
 import "dockview/dist/styles/dockview.css";
+import "@xyflow/react/dist/style.css";
 import "./session-terminal-workspace.css";
+import { ArrowsSplitIcon, AtomIcon, LightningIcon, RobotIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
+import {
+  Background,
+  Controls,
+  Handle,
+  Position,
+  ReactFlow,
+  type Edge,
+  type Node,
+  type NodeProps,
+  type NodeTypes,
+} from "@xyflow/react";
 import {
   DockviewReact,
   type DockviewApi,
@@ -8,11 +21,19 @@ import {
   type DockviewWillShowOverlayLocationEvent,
   type IDockviewPanelProps,
 } from "dockview";
+import ELK from "elkjs/lib/elk.bundled.js";
 import { useEffect, useMemo, useState, type FunctionComponent } from "react";
 
 import { useResolvedAppearance } from "../appearance/appearance-provider.js";
+import {
+  DesignerBlueprintCurrentTabHref,
+  DesignerBlueprintDocumentSchema,
+  type DesignerBlueprintDocument,
+  type DesignerBlueprintItem,
+} from "../designer/designer-blueprint-schema.js";
 import type { DesignerSession } from "../designer/designer-service.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
+import { IntegrationLogo } from "../integrations/integration-logo.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import { sandboxProfileDetailQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
@@ -28,12 +49,16 @@ type DesignerCanvasDockviewParams = {
   id: string;
   href: string;
   title: string;
+  blueprint?: DesignerBlueprintDocument;
   onNavigate: (input: { id: string; href: string; title: string }) => void;
 };
 
 type DesignerCanvasDockviewPanelProps = IDockviewPanelProps<DesignerCanvasDockviewParams>;
 
 type DesignerCanvasEmbeddedRoute =
+  | {
+      kind: "blueprint";
+    }
   | {
       kind: "integrations";
       searchParams: URLSearchParams;
@@ -124,6 +149,10 @@ function navigateDesignerCanvasTab(input: {
 function resolveDesignerCanvasStaticTitle(input: { currentTitle: string; href: string }): string {
   const url = new URL(input.href, DesignerCanvasUrlOrigin);
   const pathSegments = url.pathname.split("/").filter((segment) => segment.length > 0);
+  if (input.href === DesignerBlueprintCurrentTabHref) {
+    return "Blueprint";
+  }
+
   if (pathSegments[0] === "integrations") {
     return "Integrations";
   }
@@ -286,6 +315,14 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
     });
   }, [href, params, title]);
 
+  if (route.kind === "blueprint") {
+    if (params.blueprint === undefined) {
+      throw new Error("Designer blueprint canvas tab is missing blueprint data.");
+    }
+
+    return <DesignerBlueprintCanvasPanel blueprint={params.blueprint} params={params} />;
+  }
+
   if (route.kind === "integrations") {
     return (
       <DesignerCanvasEmbeddedSurface params={params}>
@@ -388,6 +425,7 @@ function readRequiredDesignerCanvasParams(parameters: unknown): DesignerCanvasDo
   const id = Reflect.get(parameters, "id");
   const href = Reflect.get(parameters, "href");
   const title = Reflect.get(parameters, "title");
+  const blueprint = Reflect.get(parameters, "blueprint");
   const onNavigate = Reflect.get(parameters, "onNavigate");
   if (
     typeof id !== "string" ||
@@ -405,6 +443,9 @@ function readRequiredDesignerCanvasParams(parameters: unknown): DesignerCanvasDo
     id,
     href,
     title,
+    ...(blueprint === undefined
+      ? {}
+      : { blueprint: DesignerBlueprintDocumentSchema.parse(blueprint) }),
     onNavigate,
   };
 }
@@ -456,11 +497,10 @@ export function DesignerCanvasWorkspace(input: {
         const hrefChanged = currentTab.href !== navigation.href;
         const nextTabs = tabs.map((tab) =>
           tab.id === navigation.id
-            ? {
-                ...tab,
-                href: navigation.href,
-                title: navigation.title,
-              }
+            ? buildDesignerCanvasTabFromNavigation({
+                currentTab: tab,
+                navigation,
+              })
             : tab,
         );
         if (hrefChanged) {
@@ -583,6 +623,7 @@ function syncDesignerCanvasPanels(input: {
           id: tab.id,
           href: tab.href,
           title: tab.title,
+          ...(tab.kind === "blueprint" ? { blueprint: tab.blueprint } : {}),
           onNavigate: input.onNavigate,
         },
         renderer: "always",
@@ -595,6 +636,7 @@ function syncDesignerCanvasPanels(input: {
       id: tab.id,
       href: tab.href,
       title: tab.title,
+      ...(tab.kind === "blueprint" ? { blueprint: tab.blueprint } : {}),
       onNavigate: input.onNavigate,
     });
   }
@@ -628,6 +670,10 @@ function decodeDesignerCanvasPathSegment(pathSegment: string): string | null {
 }
 
 function resolveDesignerCanvasEmbeddedRoute(href: string): DesignerCanvasEmbeddedRoute {
+  if (href === DesignerBlueprintCurrentTabHref) {
+    return { kind: "blueprint" };
+  }
+
   const url = new URL(href, DesignerCanvasUrlOrigin);
   const pathSegments = url.pathname.split("/").filter((segment) => segment.length > 0);
   if (pathSegments[0] === "sandbox-profiles") {
@@ -677,6 +723,444 @@ function resolveDesignerCanvasEmbeddedRoute(href: string): DesignerCanvasEmbedde
     searchParams: url.searchParams,
     targetKey,
   };
+}
+
+function buildDesignerCanvasTabFromNavigation(input: {
+  currentTab: DesignerCanvasTab;
+  navigation: { id: string; href: string; title: string };
+}): DesignerCanvasTab {
+  if (
+    input.currentTab.kind === "blueprint" &&
+    input.navigation.href === DesignerBlueprintCurrentTabHref
+  ) {
+    return {
+      ...input.currentTab,
+      title: input.navigation.title,
+    };
+  }
+
+  return {
+    kind: "route",
+    id: input.currentTab.id,
+    title: input.navigation.title,
+    href: input.navigation.href,
+  };
+}
+
+const DesignerBlueprintNodeWidth = 280;
+const DesignerBlueprintNodeBaseHeight = 126;
+const DesignerBlueprintNodeDescriptionLineHeight = 16;
+const DesignerBlueprintNodeDescriptionCharsPerLine = 34;
+const DesignerBlueprintNodeRoutingSummaryHeight = 28;
+const DesignerBlueprintInitialViewport = { x: 48, y: 32, zoom: 0.95 };
+let designerBlueprintElk: InstanceType<typeof ELK> | null = null;
+
+type DesignerBlueprintVisualNodeData = {
+  description?: string;
+  integrationLogo?: {
+    displayName: string;
+    logoKey: string;
+  };
+  kind: DesignerBlueprintItem["kind"];
+  kindLabel: string;
+  label: string;
+  routingSummary?: string;
+};
+
+type DesignerBlueprintVisualNode = Node<DesignerBlueprintVisualNodeData, "blueprint">;
+type DesignerBlueprintGraphEdge = Edge;
+
+type DesignerBlueprintGraph = {
+  edges: DesignerBlueprintGraphEdge[];
+  nodes: DesignerBlueprintVisualNode[];
+};
+
+const DesignerBlueprintNodeTypes = {
+  blueprint: DesignerBlueprintVisualNodeComponent,
+} satisfies NodeTypes;
+
+function DesignerBlueprintCanvasPanel(input: {
+  blueprint: DesignerBlueprintDocument;
+  params: DesignerCanvasDockviewParams;
+}): React.JSX.Element {
+  const integrationsQuery = useQuery({
+    queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
+    queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
+    retry: false,
+  });
+  const integrationMetadataByTargetKey = useMemo(
+    () => buildDesignerBlueprintIntegrationMetadataByTargetKey(integrationsQuery.data?.targets),
+    [integrationsQuery.data?.targets],
+  );
+  const [graph, setGraph] = useState<DesignerBlueprintGraph | null>(null);
+  const [layoutError, setLayoutError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setGraph(null);
+    setLayoutError(null);
+
+    buildDesignerBlueprintGraph({
+      blueprint: input.blueprint,
+      integrationMetadataByTargetKey,
+    })
+      .then((nextGraph) => {
+        if (!cancelled) {
+          setGraph(nextGraph);
+        }
+      })
+      .catch((error: unknown) => {
+        if (cancelled) {
+          return;
+        }
+        setLayoutError(
+          error instanceof Error ? error.message : "Designer blueprint graph layout failed.",
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [input.blueprint, integrationMetadataByTargetKey]);
+
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
+      <section
+        className="min-h-0 flex-1 overflow-hidden bg-muted/20"
+        aria-label="Designer blueprint graph"
+      >
+        {layoutError === null ? null : (
+          <div className="flex h-full items-center justify-center p-6 text-sm text-destructive">
+            {layoutError}
+          </div>
+        )}
+        {layoutError !== null || graph === null ? null : (
+          <ReactFlow
+            nodes={graph.nodes}
+            edges={graph.edges}
+            nodeTypes={DesignerBlueprintNodeTypes}
+            defaultViewport={DesignerBlueprintInitialViewport}
+            minZoom={0.45}
+            maxZoom={1.4}
+            elementsSelectable={false}
+            nodesDraggable={false}
+            nodesConnectable={false}
+            nodesFocusable={false}
+            edgesFocusable={false}
+            panOnScroll
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background gap={24} size={1} />
+            <Controls showInteractive={false} />
+          </ReactFlow>
+        )}
+        {layoutError === null && graph === null ? (
+          <div className="flex h-full items-center justify-center p-6 text-sm text-muted-foreground">
+            Laying out blueprint.
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+function DesignerBlueprintVisualNodeComponent(
+  input: NodeProps<DesignerBlueprintVisualNode>,
+): React.JSX.Element {
+  return (
+    <div className="relative w-[280px] rounded-md border border-border bg-background p-2.5 text-foreground shadow-sm">
+      <Handle className="opacity-0" isConnectable={false} position={Position.Top} type="target" />
+      <div className="flex items-start gap-2.5">
+        <span
+          aria-label={input.data.kindLabel}
+          className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-sm border border-border bg-muted text-muted-foreground"
+        >
+          <DesignerBlueprintNodeKindIcon data={input.data} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="break-words text-sm font-medium leading-snug">{input.data.label}</h3>
+          {input.data.description === undefined ? null : (
+            <p className="mt-1 break-words text-xs leading-snug text-muted-foreground">
+              {input.data.description}
+            </p>
+          )}
+          {input.data.routingSummary === undefined ? null : (
+            <p className="mt-2 rounded-sm bg-muted px-2 py-1 text-xs leading-relaxed text-muted-foreground">
+              {input.data.routingSummary}
+            </p>
+          )}
+        </div>
+      </div>
+      <Handle
+        className="opacity-0"
+        isConnectable={false}
+        position={Position.Bottom}
+        type="source"
+      />
+    </div>
+  );
+}
+
+function DesignerBlueprintNodeKindIcon(input: {
+  data: DesignerBlueprintVisualNodeData;
+}): React.JSX.Element {
+  const className = "size-4";
+
+  if (input.data.kind === "trigger" && input.data.integrationLogo !== undefined) {
+    return (
+      <IntegrationLogo alt="" className={className} logoKey={input.data.integrationLogo.logoKey} />
+    );
+  }
+
+  switch (input.data.kind) {
+    case "trigger":
+      return <LightningIcon aria-hidden="true" className={className} weight="fill" />;
+    case "agent_step":
+      return <RobotIcon aria-hidden="true" className={className} />;
+    case "routing_policy":
+      return <ArrowsSplitIcon aria-hidden="true" className={className} />;
+    case "workflow_output":
+      return <AtomIcon aria-hidden="true" className={className} />;
+  }
+}
+
+async function buildDesignerBlueprintGraph(input: {
+  blueprint: DesignerBlueprintDocument;
+  integrationMetadataByTargetKey: ReadonlyMap<string, DesignerBlueprintIntegrationMetadata>;
+}): Promise<DesignerBlueprintGraph> {
+  const unresolvedNodes = buildDesignerBlueprintUnresolvedNodes(input);
+  const displayEdges = buildDesignerBlueprintDisplayEdges(input.blueprint);
+  const layout = await getDesignerBlueprintElk().layout({
+    id: "designer-blueprint",
+    layoutOptions: {
+      "elk.algorithm": "layered",
+      "elk.direction": "DOWN",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "12",
+      "elk.spacing.nodeNode": "24",
+      "elk.edgeRouting": "SPLINES",
+    },
+    children: unresolvedNodes.map((node) => ({
+      id: node.id,
+      width: DesignerBlueprintNodeWidth,
+      height: getDesignerBlueprintNodeHeight(node.data),
+    })),
+    edges: displayEdges.map((edge) => ({
+      id: edge.id,
+      sources: [edge.source],
+      targets: [edge.target],
+    })),
+  });
+
+  const positionByNodeId = new Map(
+    (layout.children ?? []).map((node) => [
+      node.id,
+      {
+        x: node.x ?? 0,
+        y: node.y ?? 0,
+      },
+    ]),
+  );
+
+  return {
+    nodes: unresolvedNodes.map((node) => ({
+      ...node,
+      position: positionByNodeId.get(node.id) ?? node.position,
+    })),
+    edges: displayEdges,
+  };
+}
+
+function getDesignerBlueprintElk(): InstanceType<typeof ELK> {
+  designerBlueprintElk ??= new ELK();
+  return designerBlueprintElk;
+}
+
+function buildDesignerBlueprintUnresolvedNodes(input: {
+  blueprint: DesignerBlueprintDocument;
+  integrationMetadataByTargetKey: ReadonlyMap<string, DesignerBlueprintIntegrationMetadata>;
+}): DesignerBlueprintVisualNode[] {
+  return input.blueprint.items.map((item) =>
+    createDesignerBlueprintVisualNode({
+      id: item.id,
+      data: createDesignerBlueprintVisualNodeData({
+        ...(item.description === undefined ? {} : { description: item.description }),
+        ...createDesignerBlueprintIntegrationLogoData({
+          item,
+          integrationMetadataByTargetKey: input.integrationMetadataByTargetKey,
+        }),
+        kind: item.kind,
+        kindLabel: formatDesignerBlueprintKindLabel({
+          item,
+          integrationMetadataByTargetKey: input.integrationMetadataByTargetKey,
+        }),
+        label: formatDesignerBlueprintNodeLabel(item),
+        ...createDesignerBlueprintRoutingSummaryData(item),
+      }),
+    }),
+  );
+}
+
+function createDesignerBlueprintVisualNode(input: {
+  data: DesignerBlueprintVisualNodeData;
+  id: string;
+}): DesignerBlueprintVisualNode {
+  return {
+    id: input.id,
+    type: "blueprint",
+    data: input.data,
+    position: { x: 0, y: 0 },
+  };
+}
+
+function createDesignerBlueprintVisualNodeData(
+  input: DesignerBlueprintVisualNodeData,
+): DesignerBlueprintVisualNodeData {
+  return input;
+}
+
+function buildDesignerBlueprintDisplayEdges(
+  input: DesignerBlueprintDocument,
+): DesignerBlueprintGraphEdge[] {
+  return [
+    ...input.links.map((link) => ({
+      id: `${link.from}:${link.kind}:${link.to}`,
+      source: link.from,
+      target: link.to,
+      animated: false,
+    })),
+  ];
+}
+
+function getDesignerBlueprintNodeHeight(data: DesignerBlueprintVisualNodeData): number {
+  return (
+    DesignerBlueprintNodeBaseHeight +
+    getDesignerBlueprintDescriptionHeight(data.description) +
+    (data.routingSummary === undefined ? 0 : DesignerBlueprintNodeRoutingSummaryHeight)
+  );
+}
+
+function getDesignerBlueprintDescriptionHeight(description: string | undefined): number {
+  if (description === undefined) {
+    return 0;
+  }
+
+  const lineCount = Math.ceil(description.length / DesignerBlueprintNodeDescriptionCharsPerLine);
+  return Math.max(lineCount, 1) * DesignerBlueprintNodeDescriptionLineHeight;
+}
+
+type DesignerBlueprintIntegrationMetadata = {
+  displayName: string;
+  logoKey?: string | undefined;
+};
+
+function buildDesignerBlueprintIntegrationMetadataByTargetKey(
+  targets: Awaited<ReturnType<typeof listIntegrationDirectory>>["targets"] | undefined,
+): ReadonlyMap<string, DesignerBlueprintIntegrationMetadata> {
+  if (targets === undefined) {
+    return new Map();
+  }
+
+  return new Map(
+    targets.map((target) => [
+      target.targetKey,
+      {
+        displayName: target.displayName,
+        ...(target.logoKey === undefined ? {} : { logoKey: target.logoKey }),
+      },
+    ]),
+  );
+}
+
+function createDesignerBlueprintIntegrationLogoData(input: {
+  item: DesignerBlueprintItem;
+  integrationMetadataByTargetKey: ReadonlyMap<string, DesignerBlueprintIntegrationMetadata>;
+}): Pick<DesignerBlueprintVisualNodeData, "integrationLogo"> | Record<string, never> {
+  if (input.item.kind !== "trigger" || input.item.integrationTargetKey === undefined) {
+    return {};
+  }
+
+  const integrationMetadata = input.integrationMetadataByTargetKey.get(
+    input.item.integrationTargetKey,
+  );
+  if (integrationMetadata?.logoKey === undefined) {
+    return {};
+  }
+
+  return {
+    integrationLogo: {
+      displayName: integrationMetadata.displayName,
+      logoKey: integrationMetadata.logoKey,
+    },
+  };
+}
+
+function formatDesignerBlueprintKindLabel(input: {
+  item: DesignerBlueprintItem;
+  integrationMetadataByTargetKey: ReadonlyMap<string, DesignerBlueprintIntegrationMetadata>;
+}): string {
+  const item = input.item;
+  if (item.kind === "trigger") {
+    const integrationLabel =
+      item.integrationLabel ??
+      (item.integrationTargetKey === undefined
+        ? undefined
+        : input.integrationMetadataByTargetKey.get(item.integrationTargetKey)?.displayName);
+    return integrationLabel === undefined ? "Trigger" : `${integrationLabel} · Trigger`;
+  }
+
+  return formatDesignerBlueprintKind(item.kind);
+}
+
+function formatDesignerBlueprintKind(kind: DesignerBlueprintItem["kind"]): string {
+  return kind
+    .split("_")
+    .map((segment) => `${segment.slice(0, 1).toUpperCase()}${segment.slice(1)}`)
+    .join(" ");
+}
+
+function formatDesignerBlueprintNodeLabel(item: DesignerBlueprintItem): string {
+  if (item.kind !== "trigger") {
+    return item.label;
+  }
+
+  return item.eventLabel ?? "Trigger";
+}
+
+function formatDesignerBlueprintRoutingRule(
+  rule: Extract<DesignerBlueprintItem, { kind: "routing_policy" }>["rules"][number],
+): string {
+  const conditions = rule.when
+    .map((condition) => {
+      const value = condition.value;
+      const formattedValue =
+        value === undefined ? "" : ` ${Array.isArray(value) ? value.join(", ") : String(value)}`;
+      return `${condition.field} ${condition.operator.replaceAll("_", " ")}${formattedValue}`;
+    })
+    .join("; ");
+  const routeTo = rule.routeTo === undefined ? "" : ` -> ${rule.routeTo}`;
+  return `${rule.label ?? "When"}: ${conditions}${routeTo}`;
+}
+
+function formatDesignerBlueprintRoutingSummary(item: DesignerBlueprintItem): string | undefined {
+  if (item.kind !== "routing_policy") {
+    return undefined;
+  }
+
+  if (item.rules.length === 1) {
+    const rule = item.rules[0];
+    if (rule !== undefined) {
+      return formatDesignerBlueprintRoutingRule(rule);
+    }
+  }
+
+  return `${item.rules.length} routing rules`;
+}
+
+function createDesignerBlueprintRoutingSummaryData(
+  item: DesignerBlueprintItem,
+): Pick<DesignerBlueprintVisualNodeData, "routingSummary"> | Record<string, never> {
+  const routingSummary = formatDesignerBlueprintRoutingSummary(item);
+  return routingSummary === undefined ? {} : { routingSummary };
 }
 
 function UnsupportedDesignerCanvasRoute(): React.JSX.Element {

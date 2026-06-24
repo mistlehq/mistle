@@ -4,6 +4,10 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import {
+  DesignerBlueprintCurrentTabHref,
+  DesignerBlueprintCurrentTabId,
+} from "../designer/designer-blueprint-schema.js";
+import {
   designerSessionQueryKey,
   getDesignerSession,
   mintDesignerSessionConnectionToken,
@@ -12,15 +16,21 @@ import {
   type DesignerSessionCanvasTab,
 } from "../designer/designer-service.js";
 import {
+  DesignerBlueprintTabUpsertAction,
   DesignerCanvasTabOpenAction,
   type DashboardControlActionHandler,
   type DashboardControlActionSupport,
-  type DesignerCanvasTabOpenInput,
+  type DesignerBlueprintTabShowInput,
+  type DesignerCanvasRouteTabShowInput,
 } from "../session-agents/dashboard-control-actions.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
+import {
+  mergeDesignerCanvasTabSnapshotIntoLatestTabs,
+  removeDesignerCanvasTabFromLatestTabs,
+} from "./designer-canvas-tabs.js";
 import { DesignerCanvasWorkspace } from "./designer-session-page-view.js";
 import { SessionWorkbenchFullPage } from "./session-workbench-full-page.js";
 
@@ -36,27 +46,18 @@ function useDesignerSessionId(): string {
 
 function upsertDesignerCanvasTab(input: {
   currentTabs: readonly DesignerSessionCanvasTab[];
-  requestedTab: DesignerCanvasTabOpenInput;
+  requestedTab: DesignerCanvasRouteTabShowInput;
 }): readonly DesignerSessionCanvasTab[] {
-  const matchingHrefTab = input.currentTabs.find((tab) => tab.href === input.requestedTab.href);
-  if (matchingHrefTab !== undefined) {
+  const hasMatchingRouteTab = input.currentTabs.some(
+    (tab) => tab.kind === "route" && tab.id === input.requestedTab.id,
+  );
+  if (hasMatchingRouteTab) {
     return input.currentTabs.map((tab) =>
-      tab.href !== input.requestedTab.href
+      tab.kind !== "route" || tab.id !== input.requestedTab.id
         ? tab
         : {
-            ...tab,
-            title: input.requestedTab.title,
-          },
-    );
-  }
-
-  const matchingIdTab = input.currentTabs.find((tab) => tab.id === input.requestedTab.id);
-  if (matchingIdTab !== undefined) {
-    return input.currentTabs.map((tab) =>
-      tab.id !== input.requestedTab.id
-        ? tab
-        : {
-            id: tab.id,
+            kind: "route",
+            id: input.requestedTab.id,
             title: input.requestedTab.title,
             href: input.requestedTab.href,
           },
@@ -66,6 +67,7 @@ function upsertDesignerCanvasTab(input: {
   return [
     ...input.currentTabs,
     {
+      kind: "route",
       id: input.requestedTab.id,
       title: input.requestedTab.title,
       href: input.requestedTab.href,
@@ -73,24 +75,28 @@ function upsertDesignerCanvasTab(input: {
   ];
 }
 
-export function mergeDesignerCanvasTabSnapshotIntoLatestTabs(input: {
-  latestTabs: readonly DesignerSessionCanvasTab[];
-  snapshotTabs: readonly DesignerSessionCanvasTab[];
+function upsertDesignerBlueprintCanvasTab(input: {
+  currentTabs: readonly DesignerSessionCanvasTab[];
+  requestedTab: DesignerBlueprintTabShowInput;
 }): readonly DesignerSessionCanvasTab[] {
-  const snapshotTabById = new Map(input.snapshotTabs.map((tab) => [tab.id, tab]));
-  const latestTabIds = new Set(input.latestTabs.map((tab) => tab.id));
+  const blueprintTab: DesignerSessionCanvasTab = {
+    kind: "blueprint",
+    id: DesignerBlueprintCurrentTabId,
+    title: input.requestedTab.title,
+    href: DesignerBlueprintCurrentTabHref,
+    blueprint: input.requestedTab.blueprint,
+  };
+  const hasExistingBlueprintTab = input.currentTabs.some(
+    (tab) => tab.id === DesignerBlueprintCurrentTabId,
+  );
 
-  return [
-    ...input.latestTabs.map((tab) => snapshotTabById.get(tab.id) ?? tab),
-    ...input.snapshotTabs.filter((tab) => !latestTabIds.has(tab.id)),
-  ];
-}
+  if (!hasExistingBlueprintTab) {
+    return [...input.currentTabs, blueprintTab];
+  }
 
-export function removeDesignerCanvasTabFromLatestTabs(input: {
-  latestTabs: readonly DesignerSessionCanvasTab[];
-  tabId: string;
-}): readonly DesignerSessionCanvasTab[] {
-  return input.latestTabs.filter((tab) => tab.id !== input.tabId);
+  return input.currentTabs.map((tab) =>
+    tab.id === DesignerBlueprintCurrentTabId ? blueprintTab : tab,
+  );
 }
 
 function mapDesignerSessionToSandboxStatus(
@@ -185,14 +191,25 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
       const nextSave = canvasTabSaveQueueRef.current
         .catch(() => {})
         .then(async () => {
-          const nextTabs = upsertDesignerCanvasTab({
-            currentTabs: latestPersistedCanvasTabsRef.current,
-            requestedTab: request.input,
-          });
+          let nextTabs: readonly DesignerSessionCanvasTab[];
+          let activeHref: string;
+          if (request.action === DesignerCanvasTabOpenAction) {
+            nextTabs = upsertDesignerCanvasTab({
+              currentTabs: latestPersistedCanvasTabsRef.current,
+              requestedTab: request.input,
+            });
+            activeHref = request.input.href;
+          } else {
+            nextTabs = upsertDesignerBlueprintCanvasTab({
+              currentTabs: latestPersistedCanvasTabsRef.current,
+              requestedTab: request.input,
+            });
+            activeHref = DesignerBlueprintCurrentTabHref;
+          }
           await persistCanvasTabs(nextTabs);
           latestPersistedCanvasTabsRef.current = nextTabs;
           setCanvasTabs(nextTabs);
-          setActiveTabHref(request.input.href);
+          setActiveTabHref(activeHref);
         });
       canvasTabSaveQueueRef.current = nextSave;
       await nextSave;
@@ -202,7 +219,7 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
 
   const dashboardControlActions = useMemo<DashboardControlActionSupport>(
     () => ({
-      supportedActions: [DesignerCanvasTabOpenAction],
+      supportedActions: [DesignerCanvasTabOpenAction, DesignerBlueprintTabUpsertAction],
       handleAction: handleDashboardControlAction,
     }),
     [handleDashboardControlAction],

@@ -52,6 +52,7 @@ export type SessionWorkbenchRuntimeAdapter = {
     activeConversationId: string | null;
     attachmentTargetId: string | null;
     chatState: SessionConversationChatState;
+    isInitialConversationHydrated: boolean;
     dismissUserMessageAction?: UseCodexSessionStateResult["chat"]["dismissUserMessageAction"];
   };
   composerRuntimeInput: SessionComposerRuntimeInput;
@@ -134,6 +135,7 @@ export function buildCodexConversationRuntime(input: {
       activeConversationId: input.activeConversationId,
       attachmentTargetId: input.activeConversationId,
       chatState: input.chat.chatState,
+      isInitialConversationHydrated: input.bootstrap.isActiveThreadSynced,
       dismissUserMessageAction: input.chat.dismissUserMessageAction,
     },
     composerRuntimeInput: {
@@ -317,6 +319,7 @@ export function buildOpenCodeConversationRuntime(input: {
       activeConversationId: input.sessionSnapshot?.activeSessionId ?? null,
       attachmentTargetId: input.sessionSnapshot?.activeSessionId ?? null,
       chatState: mapOpenCodeChatStateForConversation(input.chat.chatState),
+      isInitialConversationHydrated: true,
     },
     composerRuntimeInput: {
       bootstrap: input.bootstrap,
@@ -417,6 +420,7 @@ export function buildClaudeCodeConversationRuntime(input: {
       activeConversationId: activeSessionId,
       attachmentTargetId: activeSessionId,
       chatState: mapClaudeCodeChatStateForConversation(input.chat.chatState),
+      isInitialConversationHydrated: true,
     },
     composerRuntimeInput: {
       bootstrap: input.bootstrap,
@@ -527,6 +531,7 @@ export function buildPiConversationRuntime(input: {
           ? null
           : resolvePiAttachmentTargetId(input.sessionSnapshot.activeSessionFile),
       chatState: mapPiChatStateForConversation(input.chat.chatState),
+      isInitialConversationHydrated: true,
     },
     composerRuntimeInput: {
       bootstrap: input.bootstrap,

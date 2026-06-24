@@ -3,7 +3,11 @@ import { useState } from "react";
 import { MemoryRouter } from "react-router";
 
 import { withDashboardPageStory, withDashboardWorkspaceStory } from "../../storybook/decorators.js";
-import type { DesignerSession } from "../designer/designer-service.js";
+import {
+  DesignerBlueprintCurrentTabHref,
+  DesignerBlueprintCurrentTabId,
+} from "../designer/designer-blueprint-schema.js";
+import type { DesignerSession, DesignerSessionListItem } from "../designer/designer-service.js";
 import { DesignerPageView } from "./designer-page-view.js";
 import { DesignerCanvasWorkspace } from "./designer-session-page-view.js";
 
@@ -35,11 +39,113 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
     initialPrompt: "Build a triage agent for incoming GitHub issues and Linear bugs.",
     canvasTabs: [
       {
+        kind: "blueprint",
+        id: DesignerBlueprintCurrentTabId,
+        title: "Blueprint",
+        href: DesignerBlueprintCurrentTabHref,
+        blueprint: {
+          version: 1,
+          title: "Triage agent blueprint",
+          outcome: {
+            label: "Classify Linear and GitHub work and route the next action",
+            description: "Shows the workflow from inbound work to triage outcomes.",
+          },
+          items: [
+            {
+              id: "linear-trigger",
+              kind: "trigger",
+              label: "Linear work trigger",
+              integrationTargetKey: "linear-default",
+              integrationLabel: "Linear",
+              eventLabel: "Issue label or state changed",
+              state: "proposed",
+            },
+            {
+              id: "github-trigger",
+              kind: "trigger",
+              label: "GitHub work trigger",
+              integrationTargetKey: "github-cloud",
+              integrationLabel: "GitHub",
+              eventLabel: "PR or issue activity",
+              state: "proposed",
+            },
+            {
+              id: "normalize-context",
+              kind: "agent_step",
+              label: "Normalize context",
+              description: "Collect item text, metadata, requester, linked resources, and history.",
+              state: "proposed",
+            },
+            {
+              id: "routing",
+              kind: "routing_policy",
+              label: "Routing policy",
+              state: "proposed",
+              rules: [
+                {
+                  label: "Escalations",
+                  when: [
+                    {
+                      field: "severity",
+                      operator: "includes",
+                      value: "urgent",
+                    },
+                  ],
+                  routeTo: "escalate",
+                },
+              ],
+            },
+            {
+              id: "triage-update",
+              kind: "workflow_output",
+              label: "Write triage update",
+              state: "proposed",
+            },
+            {
+              id: "escalate",
+              kind: "workflow_output",
+              label: "Escalate urgent item",
+              state: "proposed",
+            },
+          ],
+          links: [
+            {
+              from: "linear-trigger",
+              to: "normalize-context",
+              kind: "triggers",
+            },
+            {
+              from: "github-trigger",
+              to: "normalize-context",
+              kind: "triggers",
+            },
+            {
+              from: "normalize-context",
+              to: "routing",
+              kind: "routes_to",
+            },
+            {
+              from: "routing",
+              to: "triage-update",
+              kind: "routes_to",
+            },
+            {
+              from: "routing",
+              to: "escalate",
+              kind: "routes_to",
+            },
+          ],
+          actions: [],
+        },
+      },
+      {
+        kind: "route",
         id: "integrations",
         title: "Integrations",
         href: "/integrations",
       },
       {
+        kind: "route",
         id: "sandbox-profile",
         title: "Sandbox Profile",
         href: "/sandbox-profiles/sbp_story/draft",
@@ -107,7 +213,7 @@ function DesignerPageStory(input: {
   createErrorMessage?: string | null;
   initialDraft?: string;
   isCreating?: boolean;
-  sessions?: readonly DesignerSession[];
+  sessions?: readonly DesignerSessionListItem[];
   sessionsErrorMessage?: string | null;
 }): React.JSX.Element {
   const [prompt, setPrompt] = useState(input.initialDraft ?? "");

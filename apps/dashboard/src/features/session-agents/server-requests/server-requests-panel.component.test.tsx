@@ -64,12 +64,10 @@ describe("ServerRequestsPanel", () => {
                 options: [
                   {
                     label: "A",
-                    description: "First option",
                     isOther: false,
                   },
                   {
                     label: "Other",
-                    description: null,
                     isOther: true,
                   },
                 ],
@@ -86,6 +84,10 @@ describe("ServerRequestsPanel", () => {
       />,
     );
 
+    expect(screen.queryByText("Choice")).toBeNull();
+    expect(screen.getByText("Which option?").textContent).toBe("Which option?");
+    expect(screen.queryByText("First option")).toBeNull();
+
     fireEvent.change(screen.getByPlaceholderText("Other"), {
       target: {
         value: "Custom answer",
@@ -99,6 +101,82 @@ describe("ServerRequestsPanel", () => {
           {
             id: "q1",
             value: "Custom answer",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("renders long user input options as numbered selectable rows", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: "next-action-request-1",
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [
+              {
+                header: "Suggested next actions",
+                id: "next-action",
+                question: "What should Designer do next?",
+                options: [
+                  {
+                    label: "Stop all sequences - let's start fresh with new messaging",
+                    isOther: false,
+                  },
+                  {
+                    label:
+                      "Don't stop yet - show me who accepted my LinkedIn connection so I can follow up manually",
+                    isOther: false,
+                  },
+                  {
+                    label:
+                      "Keep the sequences running - I want to workshop new copy first, then update",
+                    isOther: false,
+                  },
+                ],
+              },
+            ],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+      />,
+    );
+
+    expect(screen.queryByText("Suggested next actions")).toBeNull();
+    expect(screen.getByText("What should Designer do next?").textContent).toBe(
+      "What should Designer do next?",
+    );
+    expect(screen.queryByText("User input requested")).toBeNull();
+    expect(screen.queryByText("Input needed")).toBeNull();
+    expect(screen.queryByText("tool/requestUserInput")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Submit responses" })).toBeNull();
+    expect(screen.getByText("1").textContent).toBe("1");
+    expect(
+      screen.queryByText("Keeps outreach active while surfacing manual follow-up targets."),
+    ).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Don't stop yet - show me who accepted my LinkedIn connection/u,
+      }),
+    );
+
+    expect(submittedResults).toEqual([
+      {
+        answers: [
+          {
+            id: "next-action",
+            value:
+              "Don't stop yet - show me who accepted my LinkedIn connection so I can follow up manually",
           },
         ],
       },
@@ -123,7 +201,6 @@ describe("ServerRequestsPanel", () => {
                 options: [
                   {
                     label: "Response",
-                    description: null,
                     defaultValue: "Keep this text",
                     inputKind: "textarea",
                     isOther: true,

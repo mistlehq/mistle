@@ -29,6 +29,7 @@ export type SessionBootstrapPhase =
 
 export type SessionBootstrapResult = {
   phase: SessionBootstrapPhase;
+  isActiveThreadSynced: boolean;
   composerCapabilities: readonly ComposerCapability[];
   establishedSnapshot: {
     availableModels: readonly CodexModelSummary[];
@@ -491,6 +492,7 @@ export function useSessionBootstrap(input: {
 
   return {
     phase: state,
+    isActiveThreadSynced: threadSyncReadyForCurrentThread,
     composerCapabilities,
     establishedSnapshot: {
       availableModels,

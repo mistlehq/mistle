@@ -1039,11 +1039,127 @@ export interface paths {
           };
           content: {
             "application/json": {
-              canvasTabs: {
-                href: string;
-                id: string;
-                title: string;
-              }[];
+              canvasTabs: (
+                | {
+                    href: string;
+                    id: string;
+                    /** @enum {string} */
+                    kind: "route";
+                    title: string;
+                  }
+                | {
+                    blueprint: {
+                      actions: {
+                        href: string;
+                        id: string;
+                        itemId: string;
+                        /** @enum {string} */
+                        kind:
+                          | "open_integration_setup"
+                          | "open_trigger_create"
+                          | "open_trigger_edit"
+                          | "open_sandbox_profile"
+                          | "open_sandbox_profile_section";
+                        label: string;
+                      }[];
+                      items: (
+                        | {
+                            description?: string;
+                            id: string;
+                            /** @enum {string} */
+                            kind: "agent_step" | "workflow_output";
+                            label: string;
+                            parentId?: string;
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                        | {
+                            description?: string;
+                            eventLabel?: string;
+                            id: string;
+                            integrationLabel?: string;
+                            integrationTargetKey?: string;
+                            /** @enum {string} */
+                            kind: "trigger";
+                            label: string;
+                            parentId?: string;
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                        | {
+                            description?: string;
+                            id: string;
+                            /** @enum {string} */
+                            kind: "routing_policy";
+                            label: string;
+                            parentId?: string;
+                            rules: {
+                              label?: string;
+                              routeTo?: string;
+                              when: {
+                                field: string;
+                                /** @enum {string} */
+                                operator:
+                                  | "equals"
+                                  | "not_equals"
+                                  | "includes"
+                                  | "excludes"
+                                  | "in"
+                                  | "empty"
+                                  | "not_empty";
+                                value?: string | string[] | number | boolean;
+                              }[];
+                            }[];
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                      )[];
+                      links: {
+                        from: string;
+                        /** @enum {string} */
+                        kind:
+                          | "requires"
+                          | "triggers"
+                          | "configures"
+                          | "produces"
+                          | "confirms"
+                          | "routes_to"
+                          | "hands_off_to"
+                          | "uses";
+                        to: string;
+                      }[];
+                      outcome: {
+                        description?: string;
+                        label: string;
+                      };
+                      title: string;
+                      /** @enum {number} */
+                      version: 1;
+                    };
+                    /** @enum {string} */
+                    href: "/designer/blueprints/current";
+                    /** @enum {string} */
+                    id: "designer-blueprint-current";
+                    /** @enum {string} */
+                    kind: "blueprint";
+                    title: string;
+                  }
+              )[];
               connectable: boolean;
               createdAt: string;
               failureCode: string | null;
@@ -1161,11 +1277,127 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
-            tabs: {
-              href: string;
-              id: string;
-              title: string;
-            }[];
+            tabs: (
+              | {
+                  href: string;
+                  id: string;
+                  /** @enum {string} */
+                  kind: "route";
+                  title: string;
+                }
+              | {
+                  blueprint: {
+                    actions: {
+                      href: string;
+                      id: string;
+                      itemId: string;
+                      /** @enum {string} */
+                      kind:
+                        | "open_integration_setup"
+                        | "open_trigger_create"
+                        | "open_trigger_edit"
+                        | "open_sandbox_profile"
+                        | "open_sandbox_profile_section";
+                      label: string;
+                    }[];
+                    items: (
+                      | {
+                          description?: string;
+                          id: string;
+                          /** @enum {string} */
+                          kind: "agent_step" | "workflow_output";
+                          label: string;
+                          parentId?: string;
+                          /** @enum {string} */
+                          state:
+                            | "proposed"
+                            | "needs_setup"
+                            | "ready_to_confirm"
+                            | "applied"
+                            | "blocked";
+                        }
+                      | {
+                          description?: string;
+                          eventLabel?: string;
+                          id: string;
+                          integrationLabel?: string;
+                          integrationTargetKey?: string;
+                          /** @enum {string} */
+                          kind: "trigger";
+                          label: string;
+                          parentId?: string;
+                          /** @enum {string} */
+                          state:
+                            | "proposed"
+                            | "needs_setup"
+                            | "ready_to_confirm"
+                            | "applied"
+                            | "blocked";
+                        }
+                      | {
+                          description?: string;
+                          id: string;
+                          /** @enum {string} */
+                          kind: "routing_policy";
+                          label: string;
+                          parentId?: string;
+                          rules: {
+                            label?: string;
+                            routeTo?: string;
+                            when: {
+                              field: string;
+                              /** @enum {string} */
+                              operator:
+                                | "equals"
+                                | "not_equals"
+                                | "includes"
+                                | "excludes"
+                                | "in"
+                                | "empty"
+                                | "not_empty";
+                              value?: string | string[] | number | boolean;
+                            }[];
+                          }[];
+                          /** @enum {string} */
+                          state:
+                            | "proposed"
+                            | "needs_setup"
+                            | "ready_to_confirm"
+                            | "applied"
+                            | "blocked";
+                        }
+                    )[];
+                    links: {
+                      from: string;
+                      /** @enum {string} */
+                      kind:
+                        | "requires"
+                        | "triggers"
+                        | "configures"
+                        | "produces"
+                        | "confirms"
+                        | "routes_to"
+                        | "hands_off_to"
+                        | "uses";
+                      to: string;
+                    }[];
+                    outcome: {
+                      description?: string;
+                      label: string;
+                    };
+                    title: string;
+                    /** @enum {number} */
+                    version: 1;
+                  };
+                  /** @enum {string} */
+                  href: "/designer/blueprints/current";
+                  /** @enum {string} */
+                  id: "designer-blueprint-current";
+                  /** @enum {string} */
+                  kind: "blueprint";
+                  title: string;
+                }
+            )[];
           };
         };
       };
@@ -1177,11 +1409,127 @@ export interface paths {
           };
           content: {
             "application/json": {
-              canvasTabs: {
-                href: string;
-                id: string;
-                title: string;
-              }[];
+              canvasTabs: (
+                | {
+                    href: string;
+                    id: string;
+                    /** @enum {string} */
+                    kind: "route";
+                    title: string;
+                  }
+                | {
+                    blueprint: {
+                      actions: {
+                        href: string;
+                        id: string;
+                        itemId: string;
+                        /** @enum {string} */
+                        kind:
+                          | "open_integration_setup"
+                          | "open_trigger_create"
+                          | "open_trigger_edit"
+                          | "open_sandbox_profile"
+                          | "open_sandbox_profile_section";
+                        label: string;
+                      }[];
+                      items: (
+                        | {
+                            description?: string;
+                            id: string;
+                            /** @enum {string} */
+                            kind: "agent_step" | "workflow_output";
+                            label: string;
+                            parentId?: string;
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                        | {
+                            description?: string;
+                            eventLabel?: string;
+                            id: string;
+                            integrationLabel?: string;
+                            integrationTargetKey?: string;
+                            /** @enum {string} */
+                            kind: "trigger";
+                            label: string;
+                            parentId?: string;
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                        | {
+                            description?: string;
+                            id: string;
+                            /** @enum {string} */
+                            kind: "routing_policy";
+                            label: string;
+                            parentId?: string;
+                            rules: {
+                              label?: string;
+                              routeTo?: string;
+                              when: {
+                                field: string;
+                                /** @enum {string} */
+                                operator:
+                                  | "equals"
+                                  | "not_equals"
+                                  | "includes"
+                                  | "excludes"
+                                  | "in"
+                                  | "empty"
+                                  | "not_empty";
+                                value?: string | string[] | number | boolean;
+                              }[];
+                            }[];
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                      )[];
+                      links: {
+                        from: string;
+                        /** @enum {string} */
+                        kind:
+                          | "requires"
+                          | "triggers"
+                          | "configures"
+                          | "produces"
+                          | "confirms"
+                          | "routes_to"
+                          | "hands_off_to"
+                          | "uses";
+                        to: string;
+                      }[];
+                      outcome: {
+                        description?: string;
+                        label: string;
+                      };
+                      title: string;
+                      /** @enum {number} */
+                      version: 1;
+                    };
+                    /** @enum {string} */
+                    href: "/designer/blueprints/current";
+                    /** @enum {string} */
+                    id: "designer-blueprint-current";
+                    /** @enum {string} */
+                    kind: "blueprint";
+                    title: string;
+                  }
+              )[];
               connectable: boolean;
               createdAt: string;
               failureCode: string | null;
@@ -1304,11 +1652,6 @@ export interface paths {
           content: {
             "application/json": {
               items: {
-                canvasTabs: {
-                  href: string;
-                  id: string;
-                  title: string;
-                }[];
                 connectable: boolean;
                 createdAt: string;
                 failureCode: string | null;
@@ -1410,11 +1753,127 @@ export interface paths {
           };
           content: {
             "application/json": {
-              canvasTabs: {
-                href: string;
-                id: string;
-                title: string;
-              }[];
+              canvasTabs: (
+                | {
+                    href: string;
+                    id: string;
+                    /** @enum {string} */
+                    kind: "route";
+                    title: string;
+                  }
+                | {
+                    blueprint: {
+                      actions: {
+                        href: string;
+                        id: string;
+                        itemId: string;
+                        /** @enum {string} */
+                        kind:
+                          | "open_integration_setup"
+                          | "open_trigger_create"
+                          | "open_trigger_edit"
+                          | "open_sandbox_profile"
+                          | "open_sandbox_profile_section";
+                        label: string;
+                      }[];
+                      items: (
+                        | {
+                            description?: string;
+                            id: string;
+                            /** @enum {string} */
+                            kind: "agent_step" | "workflow_output";
+                            label: string;
+                            parentId?: string;
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                        | {
+                            description?: string;
+                            eventLabel?: string;
+                            id: string;
+                            integrationLabel?: string;
+                            integrationTargetKey?: string;
+                            /** @enum {string} */
+                            kind: "trigger";
+                            label: string;
+                            parentId?: string;
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                        | {
+                            description?: string;
+                            id: string;
+                            /** @enum {string} */
+                            kind: "routing_policy";
+                            label: string;
+                            parentId?: string;
+                            rules: {
+                              label?: string;
+                              routeTo?: string;
+                              when: {
+                                field: string;
+                                /** @enum {string} */
+                                operator:
+                                  | "equals"
+                                  | "not_equals"
+                                  | "includes"
+                                  | "excludes"
+                                  | "in"
+                                  | "empty"
+                                  | "not_empty";
+                                value?: string | string[] | number | boolean;
+                              }[];
+                            }[];
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                      )[];
+                      links: {
+                        from: string;
+                        /** @enum {string} */
+                        kind:
+                          | "requires"
+                          | "triggers"
+                          | "configures"
+                          | "produces"
+                          | "confirms"
+                          | "routes_to"
+                          | "hands_off_to"
+                          | "uses";
+                        to: string;
+                      }[];
+                      outcome: {
+                        description?: string;
+                        label: string;
+                      };
+                      title: string;
+                      /** @enum {number} */
+                      version: 1;
+                    };
+                    /** @enum {string} */
+                    href: "/designer/blueprints/current";
+                    /** @enum {string} */
+                    id: "designer-blueprint-current";
+                    /** @enum {string} */
+                    kind: "blueprint";
+                    title: string;
+                  }
+              )[];
               connectable: boolean;
               createdAt: string;
               failureCode: string | null;
@@ -1541,11 +2000,127 @@ export interface paths {
           };
           content: {
             "application/json": {
-              canvasTabs: {
-                href: string;
-                id: string;
-                title: string;
-              }[];
+              canvasTabs: (
+                | {
+                    href: string;
+                    id: string;
+                    /** @enum {string} */
+                    kind: "route";
+                    title: string;
+                  }
+                | {
+                    blueprint: {
+                      actions: {
+                        href: string;
+                        id: string;
+                        itemId: string;
+                        /** @enum {string} */
+                        kind:
+                          | "open_integration_setup"
+                          | "open_trigger_create"
+                          | "open_trigger_edit"
+                          | "open_sandbox_profile"
+                          | "open_sandbox_profile_section";
+                        label: string;
+                      }[];
+                      items: (
+                        | {
+                            description?: string;
+                            id: string;
+                            /** @enum {string} */
+                            kind: "agent_step" | "workflow_output";
+                            label: string;
+                            parentId?: string;
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                        | {
+                            description?: string;
+                            eventLabel?: string;
+                            id: string;
+                            integrationLabel?: string;
+                            integrationTargetKey?: string;
+                            /** @enum {string} */
+                            kind: "trigger";
+                            label: string;
+                            parentId?: string;
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                        | {
+                            description?: string;
+                            id: string;
+                            /** @enum {string} */
+                            kind: "routing_policy";
+                            label: string;
+                            parentId?: string;
+                            rules: {
+                              label?: string;
+                              routeTo?: string;
+                              when: {
+                                field: string;
+                                /** @enum {string} */
+                                operator:
+                                  | "equals"
+                                  | "not_equals"
+                                  | "includes"
+                                  | "excludes"
+                                  | "in"
+                                  | "empty"
+                                  | "not_empty";
+                                value?: string | string[] | number | boolean;
+                              }[];
+                            }[];
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                      )[];
+                      links: {
+                        from: string;
+                        /** @enum {string} */
+                        kind:
+                          | "requires"
+                          | "triggers"
+                          | "configures"
+                          | "produces"
+                          | "confirms"
+                          | "routes_to"
+                          | "hands_off_to"
+                          | "uses";
+                        to: string;
+                      }[];
+                      outcome: {
+                        description?: string;
+                        label: string;
+                      };
+                      title: string;
+                      /** @enum {number} */
+                      version: 1;
+                    };
+                    /** @enum {string} */
+                    href: "/designer/blueprints/current";
+                    /** @enum {string} */
+                    id: "designer-blueprint-current";
+                    /** @enum {string} */
+                    kind: "blueprint";
+                    title: string;
+                  }
+              )[];
               connectable: boolean;
               createdAt: string;
               failureCode: string | null;
@@ -1663,11 +2238,127 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
-            tabs: {
-              href: string;
-              id: string;
-              title: string;
-            }[];
+            tabs: (
+              | {
+                  href: string;
+                  id: string;
+                  /** @enum {string} */
+                  kind: "route";
+                  title: string;
+                }
+              | {
+                  blueprint: {
+                    actions: {
+                      href: string;
+                      id: string;
+                      itemId: string;
+                      /** @enum {string} */
+                      kind:
+                        | "open_integration_setup"
+                        | "open_trigger_create"
+                        | "open_trigger_edit"
+                        | "open_sandbox_profile"
+                        | "open_sandbox_profile_section";
+                      label: string;
+                    }[];
+                    items: (
+                      | {
+                          description?: string;
+                          id: string;
+                          /** @enum {string} */
+                          kind: "agent_step" | "workflow_output";
+                          label: string;
+                          parentId?: string;
+                          /** @enum {string} */
+                          state:
+                            | "proposed"
+                            | "needs_setup"
+                            | "ready_to_confirm"
+                            | "applied"
+                            | "blocked";
+                        }
+                      | {
+                          description?: string;
+                          eventLabel?: string;
+                          id: string;
+                          integrationLabel?: string;
+                          integrationTargetKey?: string;
+                          /** @enum {string} */
+                          kind: "trigger";
+                          label: string;
+                          parentId?: string;
+                          /** @enum {string} */
+                          state:
+                            | "proposed"
+                            | "needs_setup"
+                            | "ready_to_confirm"
+                            | "applied"
+                            | "blocked";
+                        }
+                      | {
+                          description?: string;
+                          id: string;
+                          /** @enum {string} */
+                          kind: "routing_policy";
+                          label: string;
+                          parentId?: string;
+                          rules: {
+                            label?: string;
+                            routeTo?: string;
+                            when: {
+                              field: string;
+                              /** @enum {string} */
+                              operator:
+                                | "equals"
+                                | "not_equals"
+                                | "includes"
+                                | "excludes"
+                                | "in"
+                                | "empty"
+                                | "not_empty";
+                              value?: string | string[] | number | boolean;
+                            }[];
+                          }[];
+                          /** @enum {string} */
+                          state:
+                            | "proposed"
+                            | "needs_setup"
+                            | "ready_to_confirm"
+                            | "applied"
+                            | "blocked";
+                        }
+                    )[];
+                    links: {
+                      from: string;
+                      /** @enum {string} */
+                      kind:
+                        | "requires"
+                        | "triggers"
+                        | "configures"
+                        | "produces"
+                        | "confirms"
+                        | "routes_to"
+                        | "hands_off_to"
+                        | "uses";
+                      to: string;
+                    }[];
+                    outcome: {
+                      description?: string;
+                      label: string;
+                    };
+                    title: string;
+                    /** @enum {number} */
+                    version: 1;
+                  };
+                  /** @enum {string} */
+                  href: "/designer/blueprints/current";
+                  /** @enum {string} */
+                  id: "designer-blueprint-current";
+                  /** @enum {string} */
+                  kind: "blueprint";
+                  title: string;
+                }
+            )[];
           };
         };
       };
@@ -1679,11 +2370,127 @@ export interface paths {
           };
           content: {
             "application/json": {
-              canvasTabs: {
-                href: string;
-                id: string;
-                title: string;
-              }[];
+              canvasTabs: (
+                | {
+                    href: string;
+                    id: string;
+                    /** @enum {string} */
+                    kind: "route";
+                    title: string;
+                  }
+                | {
+                    blueprint: {
+                      actions: {
+                        href: string;
+                        id: string;
+                        itemId: string;
+                        /** @enum {string} */
+                        kind:
+                          | "open_integration_setup"
+                          | "open_trigger_create"
+                          | "open_trigger_edit"
+                          | "open_sandbox_profile"
+                          | "open_sandbox_profile_section";
+                        label: string;
+                      }[];
+                      items: (
+                        | {
+                            description?: string;
+                            id: string;
+                            /** @enum {string} */
+                            kind: "agent_step" | "workflow_output";
+                            label: string;
+                            parentId?: string;
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                        | {
+                            description?: string;
+                            eventLabel?: string;
+                            id: string;
+                            integrationLabel?: string;
+                            integrationTargetKey?: string;
+                            /** @enum {string} */
+                            kind: "trigger";
+                            label: string;
+                            parentId?: string;
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                        | {
+                            description?: string;
+                            id: string;
+                            /** @enum {string} */
+                            kind: "routing_policy";
+                            label: string;
+                            parentId?: string;
+                            rules: {
+                              label?: string;
+                              routeTo?: string;
+                              when: {
+                                field: string;
+                                /** @enum {string} */
+                                operator:
+                                  | "equals"
+                                  | "not_equals"
+                                  | "includes"
+                                  | "excludes"
+                                  | "in"
+                                  | "empty"
+                                  | "not_empty";
+                                value?: string | string[] | number | boolean;
+                              }[];
+                            }[];
+                            /** @enum {string} */
+                            state:
+                              | "proposed"
+                              | "needs_setup"
+                              | "ready_to_confirm"
+                              | "applied"
+                              | "blocked";
+                          }
+                      )[];
+                      links: {
+                        from: string;
+                        /** @enum {string} */
+                        kind:
+                          | "requires"
+                          | "triggers"
+                          | "configures"
+                          | "produces"
+                          | "confirms"
+                          | "routes_to"
+                          | "hands_off_to"
+                          | "uses";
+                        to: string;
+                      }[];
+                      outcome: {
+                        description?: string;
+                        label: string;
+                      };
+                      title: string;
+                      /** @enum {number} */
+                      version: 1;
+                    };
+                    /** @enum {string} */
+                    href: "/designer/blueprints/current";
+                    /** @enum {string} */
+                    id: "designer-blueprint-current";
+                    /** @enum {string} */
+                    kind: "blueprint";
+                    title: string;
+                  }
+              )[];
               connectable: boolean;
               createdAt: string;
               failureCode: string | null;

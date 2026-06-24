@@ -5,16 +5,39 @@ import { normalizeHttpApiError } from "../api/http-api-error.js";
 import { requestControlPlane } from "../api/request-control-plane.js";
 import type { MintSandboxConnectionTokenResult } from "../sessions/sessions-service.js";
 import { DesignerApiError } from "./designer-api-errors.js";
+import {
+  DesignerBlueprintCurrentTabHref,
+  DesignerBlueprintCurrentTabId,
+  DesignerBlueprintDocumentSchema,
+} from "./designer-blueprint-schema.js";
 
 const AgentRuntimeIdSchema = z.enum(["claude-code", "codex", "opencode", "pi"]);
 
-const DesignerSessionCanvasTabSchema = z
+const DesignerSessionRouteCanvasTabSchema = z
   .object({
+    kind: z.literal("route"),
     id: z.string().min(1),
     title: z.string().min(1),
     href: z.string().min(1),
   })
   .strict();
+
+const DesignerSessionBlueprintCanvasTabSchema = z
+  .object({
+    kind: z.literal("blueprint"),
+    id: z.literal(DesignerBlueprintCurrentTabId),
+    title: z.string().min(1),
+    href: z.literal(DesignerBlueprintCurrentTabHref),
+    blueprint: DesignerBlueprintDocumentSchema,
+  })
+  .strict();
+
+const DesignerSessionCanvasTabSchema = z.union([
+  DesignerSessionRouteCanvasTabSchema,
+  DesignerSessionBlueprintCanvasTabSchema,
+]);
+
+const DesignerSessionCanvasTabsSchema = z.array(DesignerSessionCanvasTabSchema);
 
 const DesignerSessionStartupOperationSchema = z
   .object({
@@ -58,7 +81,7 @@ const DesignerSessionSchema = z
       .nullable(),
     startupOperation: DesignerSessionStartupOperationSchema.nullable(),
     initialPrompt: z.string().min(1).nullable(),
-    canvasTabs: z.array(DesignerSessionCanvasTabSchema),
+    canvasTabs: DesignerSessionCanvasTabsSchema,
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),
   })
@@ -66,7 +89,7 @@ const DesignerSessionSchema = z
 
 const ListDesignerSessionsResponseSchema = z
   .object({
-    items: z.array(DesignerSessionSchema),
+    items: z.array(DesignerSessionSchema.omit({ canvasTabs: true })),
   })
   .strict();
 
@@ -80,6 +103,9 @@ const DesignerSessionConnectionTokenSchema = z
   .strict();
 
 export type DesignerSession = z.output<typeof DesignerSessionSchema>;
+export type DesignerSessionListItem = z.output<
+  typeof ListDesignerSessionsResponseSchema
+>["items"][number];
 export type DesignerSessionCanvasTab = z.output<typeof DesignerSessionCanvasTabSchema>;
 
 export const designerSessionsQueryKey = ["designer", "sessions"] as const;
@@ -89,7 +115,7 @@ export function designerSessionQueryKey(sessionId: string) {
 
 export async function listDesignerSessions(input?: {
   signal?: AbortSignal;
-}): Promise<readonly DesignerSession[]> {
+}): Promise<readonly DesignerSessionListItem[]> {
   try {
     const response = await requestControlPlane({
       operation: "listDesignerSessions",
@@ -254,11 +280,7 @@ export async function putDesignerSessionCanvasTabs(input: {
       method: "PUT",
       pathname: `/v1/designer/sessions/${encodeURIComponent(input.sessionId)}/canvas-tabs`,
       body: {
-        tabs: input.tabs.map((tab) => ({
-          id: tab.id,
-          title: tab.title,
-          href: tab.href,
-        })),
+        tabs: input.tabs,
       },
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not save Designer canvas tabs.",
