@@ -187,23 +187,24 @@ export const UserInput: Story = {
         <ComposerActionPanel
           actions={<Button type="button">Submit response</Button>}
           details={
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <p className="text-sm leading-6">Which repository should Designer configure?</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline">
-                    mistle
-                  </Button>
-                  <Button type="button">mistle-dashboard</Button>
-                  <Button type="button" variant="outline">
-                    mistle-docs
-                  </Button>
-                </div>
+            <div className="mx-4 space-y-4">
+              <p className="ml-6 text-muted-foreground text-sm leading-6">
+                Which repository should Designer configure?
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline">
+                  mistle
+                </Button>
+                <Button type="button">mistle-dashboard</Button>
+                <Button type="button" variant="outline">
+                  mistle-docs
+                </Button>
               </div>
               <Input placeholder="Use another repository..." />
             </div>
           }
-          title="User input requested"
+          padding="flush-x"
+          title={null}
         />
       </div>
     );

@@ -3,7 +3,7 @@ import type React from "react";
 export type ComposerActionPanelProps = {
   actions: React.ReactNode;
   details: React.ReactNode;
-  padding?: "default" | "flush-x";
+  padding?: "flush-x";
   title: React.ReactNode | null;
 };
 

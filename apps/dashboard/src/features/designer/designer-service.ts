@@ -127,14 +127,6 @@ export function designerSessionQueryKey(sessionId: string) {
   return ["designer", "sessions", sessionId] as const;
 }
 
-export function createPutDesignerSessionCanvasTabsRequestBody(input: {
-  tabs: readonly DesignerSessionCanvasTab[];
-}): { tabs: readonly DesignerSessionCanvasTab[] } {
-  return {
-    tabs: input.tabs,
-  };
-}
-
 export function normalizeDesignerSessionCanvasTabs(
   input: unknown,
 ): readonly DesignerSessionCanvasTab[] {
@@ -318,9 +310,9 @@ export async function putDesignerSessionCanvasTabs(input: {
       operation: "putDesignerSessionCanvasTabs",
       method: "PUT",
       pathname: `/v1/designer/sessions/${encodeURIComponent(input.sessionId)}/canvas-tabs`,
-      body: createPutDesignerSessionCanvasTabsRequestBody({
+      body: {
         tabs: input.tabs,
-      }),
+      },
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not save Designer canvas tabs.",
     });

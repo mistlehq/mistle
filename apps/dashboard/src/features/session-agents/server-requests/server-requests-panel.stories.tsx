@@ -56,17 +56,6 @@ const MixedServerRequestEntries: readonly ServerRequestEntry[] = [
         ],
         question: "Which default model should Storybook examples mention?",
       },
-      {
-        header: "Notes",
-        id: "additional-notes",
-        options: [
-          {
-            label: "Add a note",
-            isOther: true,
-          },
-        ],
-        question: "Add any review notes for the Storybook rollout.",
-      },
     ],
     status: "pending",
     responseErrorMessage: null,
