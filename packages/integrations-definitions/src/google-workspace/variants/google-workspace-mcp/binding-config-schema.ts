@@ -8,7 +8,10 @@ export const GoogleWorkspaceBindingConfigSchema = z
     mcpServers: createRemoteMcpServerSelectionSchema({
       catalog: GoogleWorkspaceMcpServerCatalog,
     }),
-    workspaceUserEmail: z.string().trim().pipe(z.email()).optional(),
+    workspaceUserEmail: z.preprocess(
+      (value) => (typeof value === "string" && value.trim().length === 0 ? undefined : value),
+      z.string().trim().pipe(z.email()).optional(),
+    ),
   })
   .strict();
 

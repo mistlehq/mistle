@@ -19,7 +19,7 @@ describe("GoogleWorkspaceDefinition", () => {
           kind: "redirect",
         },
         {
-          id: "google-workspace-service-account-domain-wide-delegation",
+          id: "google-workspace-service-account",
           label: "Service account",
           kind: "form",
         },

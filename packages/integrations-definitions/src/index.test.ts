@@ -346,7 +346,7 @@ describe("integrations-definitions index", () => {
           },
         },
         {
-          id: "google-workspace-service-account-domain-wide-delegation",
+          id: "google-workspace-service-account",
           label: "Service account",
           kind: "form",
           secretFields: [

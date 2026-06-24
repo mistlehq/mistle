@@ -6,7 +6,7 @@ export const GoogleWorkspaceServiceAccountConnectionConfigForm: ResolvedIntegrat
   schema: {
     properties: {
       connection_method: {
-        default: GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION,
+        default: GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT,
       },
     },
   },

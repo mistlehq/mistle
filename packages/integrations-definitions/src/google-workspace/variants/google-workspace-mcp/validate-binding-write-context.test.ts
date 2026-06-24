@@ -45,29 +45,19 @@ describe("validateGoogleWorkspaceBindingWriteContext", () => {
     ).toEqual({ ok: true });
   });
 
-  it("requires Workspace user email for service account bindings", () => {
+  it("allows service account bindings without a Workspace user email", () => {
     expect(
       validateGoogleWorkspaceBindingWriteContext(
         createValidationInput({
           connectionConfig: {
-            connection_method: "google-workspace-service-account-domain-wide-delegation",
+            connection_method: "google-workspace-service-account",
           },
           bindingConfig: {
             mcpServers: ["gmail"],
           },
         }),
       ),
-    ).toEqual({
-      ok: false,
-      issues: [
-        {
-          code: "google_workspace.missing_workspace_user_email",
-          field: "binding.config.workspaceUserEmail",
-          safeMessage:
-            "Workspace user email is required when a Google Workspace service account connection is bound to a sandbox profile.",
-        },
-      ],
-    });
+    ).toEqual({ ok: true });
   });
 
   it("allows service account bindings with a Workspace user email", () => {
@@ -75,7 +65,7 @@ describe("validateGoogleWorkspaceBindingWriteContext", () => {
       validateGoogleWorkspaceBindingWriteContext(
         createValidationInput({
           connectionConfig: {
-            connection_method: "google-workspace-service-account-domain-wide-delegation",
+            connection_method: "google-workspace-service-account",
           },
           bindingConfig: {
             mcpServers: ["gmail"],

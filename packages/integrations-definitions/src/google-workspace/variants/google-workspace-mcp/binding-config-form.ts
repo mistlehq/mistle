@@ -38,7 +38,7 @@ export function resolveGoogleWorkspaceBindingConfigForm(
 
   if (
     input.connection.config["connection_method"] !==
-    GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION
+    GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT
   ) {
     return remoteMcpServerForm;
   }
@@ -53,10 +53,9 @@ export function resolveGoogleWorkspaceBindingConfigForm(
           type: "string",
           title: "Workspace user email",
           description:
-            "Used as the Google Workspace user subject when minting access tokens with this service account. The Workspace admin must authorize the service account for the required scopes.",
+            "Optional delegated Workspace user subject for domain-wide delegation. Leave blank to mint tokens as the service account itself.",
         },
       },
-      required: ["workspaceUserEmail"],
     },
     uiSchema: {
       ...remoteMcpServerForm.uiSchema,
