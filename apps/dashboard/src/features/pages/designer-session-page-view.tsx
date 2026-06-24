@@ -880,6 +880,8 @@ function DesignerBlueprintInitialFocus(input: {
       ? undefined
       : input.graph.nodes.find((node) => node.id === input.graph.initialFocusNodeId);
 
+  // ReactFlow owns the viewport imperatively; render props and remounting cannot
+  // focus the measured canvas once its store reports a usable width.
   useEffect(() => {
     if (initialFocusNode === undefined || width <= 0) {
       return;

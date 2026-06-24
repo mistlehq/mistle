@@ -628,9 +628,17 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
     entryPreparationState === null &&
     workbench.connectionReadiness.canConnect &&
     workbench.primaryPanelState.transitionState === "stable_chat";
-  if (!hasEnteredReadyConversation && hasReachedReadyConversation) {
+
+  useEffect(() => {
+    if (!hasReachedReadyConversation) {
+      return;
+    }
+
+    // The sandbox/runtime lifecycle can transiently report startup states after
+    // chat first becomes usable; keep the entry latch in an effect so render
+    // stays pure while preserving composer and diff state across that transition.
     setHasEnteredReadyConversation(true);
-  }
+  }, [hasReachedReadyConversation]);
 
   useEffect(() => {
     const autoStartTurn = input.autoStartTurn;
