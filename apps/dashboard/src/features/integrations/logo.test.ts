@@ -11,6 +11,9 @@ describe("resolveIntegrationLogoPath", () => {
     expect(resolveIntegrationLogoPath({ logoKey: "openai" })).toBe("/integration-logos/openai.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "github" })).toBe("/integration-logos/github.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "aws" })).toBe("/integration-logos/aws.svg");
+    expect(resolveIntegrationLogoPath({ logoKey: "dataforseo" })).toBe(
+      "/integration-logos/dataforseo.png",
+    );
     expect(resolveIntegrationLogoPath({ logoKey: "klaviyo" })).toBe(
       "/integration-logos/klaviyo.png",
     );
@@ -52,6 +55,9 @@ describe("resolveIntegrationLogoPath", () => {
     );
     expect(resolveIntegrationLogoPath({ logoKey: "klaviyo", colorScheme: "dark" })).toBe(
       "/integration-logos/klaviyo.png",
+    );
+    expect(resolveIntegrationLogoPath({ logoKey: "dataforseo", colorScheme: "dark" })).toBe(
+      "/integration-logos/dataforseo.png",
     );
     expect(resolveIntegrationLogoPath({ logoKey: "wasenderapi", colorScheme: "dark" })).toBe(
       "/integration-logos/wasenderapi.png",

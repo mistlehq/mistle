@@ -5,6 +5,7 @@ import {
   AwsBrowserDefinition,
   BugSnagBrowserDefinition,
   createBrowserDefinitionsBundle,
+  DataForSeoBrowserDefinition,
   DatadogBrowserDefinition,
   DeepSeekBrowserDefinition,
   E2BSandboxRuntimeBrowserDefinition,
@@ -108,6 +109,12 @@ describe("browser definitions", () => {
     expect(DatadogBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
     expect(DatadogBrowserDefinition.webhookHandler).toBeUndefined();
     expect(DatadogBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("keeps DataForSEO browser definitions free of server-only OAuth handlers", () => {
+    expect(DataForSeoBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(DataForSeoBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(DataForSeoBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("registers DeepSeek in the browser-safe definitions bundle", () => {

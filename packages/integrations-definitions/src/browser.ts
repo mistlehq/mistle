@@ -12,6 +12,7 @@ import { AwsBaseDefinition } from "./aws/variants/aws-cli-default/base-definitio
 import { BugSnagMcpBaseDefinition } from "./bugsnag/variants/bugsnag-mcp/base-definition.js";
 import { CloudflareDefinition } from "./cloudflare/variants/cloudflare-mcp/definition.js";
 import { DatadogDefinition } from "./datadog/index.js";
+import { DataForSeoMcpBaseDefinition } from "./dataforseo/variants/dataforseo-mcp/base-definition.js";
 import { DeepSeekDefinition } from "./deepseek/index.js";
 import { ExpoMcpBaseDefinition } from "./expo/variants/expo-mcp/base-definition.js";
 import { FireworksDefinition } from "./fireworks/index.js";
@@ -61,6 +62,7 @@ export const AutumnBrowserDefinition = AutumnDefinition;
 export const AwsBrowserDefinition = AwsBaseDefinition;
 export const BugSnagBrowserDefinition = BugSnagMcpBaseDefinition;
 export const CloudflareBrowserDefinition = CloudflareDefinition;
+export const DataForSeoBrowserDefinition = DataForSeoMcpBaseDefinition;
 export const DatadogBrowserDefinition = DatadogDefinition;
 export const DeepSeekBrowserDefinition = DeepSeekDefinition;
 export const ExpoBrowserDefinition = ExpoMcpBaseDefinition;
@@ -109,6 +111,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   AwsBrowserDefinition,
   BugSnagBrowserDefinition,
   CloudflareBrowserDefinition,
+  DataForSeoBrowserDefinition,
   DatadogBrowserDefinition,
   DeepSeekBrowserDefinition,
   ExpoBrowserDefinition,
@@ -175,6 +178,7 @@ export * from "./agent-runtimes/provider-selection.js";
 export * from "./autumn/browser.js";
 export * from "./bugsnag/browser.js";
 export * from "./cloudflare/browser.js";
+export * from "./dataforseo/browser.js";
 export * from "./datadog/index.js";
 export * from "./deepseek/index.js";
 export * from "./expo/browser.js";

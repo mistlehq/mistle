@@ -134,6 +134,11 @@
       "config": {}
     },
     {
+      "targetKey": "dataforseo-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "metaads-default",
       "enabled": true,
       "config": {}

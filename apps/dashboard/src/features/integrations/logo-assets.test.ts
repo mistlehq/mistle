@@ -132,6 +132,14 @@ describe("dashboard integration logo assets", () => {
     expect(height).toBe(24);
   });
 
+  it("keeps the DataForSEO logo square so it does not regress to the wordmark", () => {
+    const { colorType, height, width } = readPngHeader("dataforseo.png");
+
+    expect(width).toBe(192);
+    expect(height).toBe(192);
+    expect(colorType).toBe(6);
+  });
+
   it("keeps the Klaviyo logo square so it does not regress to the wordmark", () => {
     const { colorType, height, width } = readPngHeader("klaviyo.png");
 

@@ -41,6 +41,7 @@
               "guides/aws-integration-setup",
               "guides/bugsnag-integration-setup",
               "guides/cloudflare-integration-setup",
+              "guides/dataforseo-integration-setup",
               "guides/datadog-integration-setup",
               "guides/deepseek-integration-setup",
               "guides/e2b-integration-setup",

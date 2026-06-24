@@ -59,7 +59,7 @@ function normalizeIntegrationLogoKey(logoKeyInput: string): string {
 function resolveIntegrationLogoFileExtension(input: { logoKey: string }): "png" | "svg" {
   const logoKey = normalizeIntegrationLogoKey(input.logoKey);
 
-  if (logoKey === "klaviyo" || logoKey === "wasenderapi") {
+  if (logoKey === "dataforseo" || logoKey === "klaviyo" || logoKey === "wasenderapi") {
     return "png";
   }
 

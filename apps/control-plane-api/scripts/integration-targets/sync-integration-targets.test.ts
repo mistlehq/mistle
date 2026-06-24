@@ -59,6 +59,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "dataforseo-mcp",
+        familyId: "dataforseo",
+        variantId: "dataforseo-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "deepseek-default",
         familyId: "deepseek",
         variantId: "deepseek-default",
