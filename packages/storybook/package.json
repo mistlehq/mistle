@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "storybook": "storybook dev -p 6006 --ci",
+    "storybook": "WATCHPACK_POLLING=1000 CHOKIDAR_USEPOLLING=1 CHOKIDAR_INTERVAL=1000 storybook dev -p 6006 --ci",
     "build-storybook": "storybook build",
     "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsgo --noEmit --project ./tsconfig.json",
