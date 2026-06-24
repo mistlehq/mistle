@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyOpenAiRefreshFailure,
   extractOpenAiRefreshFailureCode,
+  OpenAiDeviceAuthorizationOAuth2Capability,
   parseJwtClaimsOrThrow,
   parseOpenAiRefreshResponse,
   parseOpenAiTokenExchangeResponse,
@@ -209,20 +210,21 @@ describe("OpenAI device authorization", () => {
   });
 
   it("accepts additional oauth fields on the token exchange response", () => {
-    expect(
-      parseOpenAiTokenExchangeResponse({
-        id_token: "id-token",
-        access_token: "access-token",
-        refresh_token: "refresh-token",
-        expires_in: 3600,
-        scope: "openid profile offline_access",
-        token_type: "Bearer",
-      }),
-    ).toEqual({
+    const response = {
+      id_token: "id-token",
+      access_token: "access-token",
+      refresh_token: "refresh-token",
+      expires_in: 3600,
+      scope: "openid profile offline_access",
+      token_type: "Bearer",
+    };
+
+    expect(parseOpenAiTokenExchangeResponse(response)).toEqual({
       idToken: "id-token",
       accessToken: "access-token",
       refreshToken: "refresh-token",
       expiresIn: 3600,
+      refreshSchedulingResponse: response,
     });
   });
 
@@ -241,5 +243,30 @@ describe("OpenAI device authorization", () => {
       access_token: "next-access-token",
       refresh_token: "next-refresh-token",
     });
+  });
+
+  it("resolves the next refresh from OpenAI earliest_refresh_at when present", () => {
+    expect(
+      OpenAiDeviceAuthorizationOAuth2Capability.resolveNextRefresh?.({
+        buffer: 5 * 60 * 1_000,
+        now: () => new Date("2026-06-24T03:00:00.000Z"),
+        response: {
+          expires_in: 3600,
+          earliest_refresh_at: "2026-06-24T03:30:00.000Z",
+        },
+      }),
+    ).toEqual(new Date("2026-06-24T03:30:00.000Z"));
+  });
+
+  it("resolves the next refresh from OpenAI expires_in when earliest_refresh_at is missing", () => {
+    expect(
+      OpenAiDeviceAuthorizationOAuth2Capability.resolveNextRefresh?.({
+        buffer: 5 * 60 * 1_000,
+        now: () => new Date("2026-06-24T03:00:00.000Z"),
+        response: {
+          expires_in: 3600,
+        },
+      }),
+    ).toEqual(new Date("2026-06-24T03:55:00.000Z"));
   });
 });

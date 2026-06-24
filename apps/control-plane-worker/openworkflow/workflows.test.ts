@@ -4,6 +4,7 @@ import {
   HandleIntegrationWebhookEventWorkflowSpec,
   HandleProviderResourceAssociationDeliveryWorkflowSpec,
   ProvisionStripeCustomerWorkflowSpec,
+  RefreshIntegrationConnectionOAuth2CredentialWorkflowSpec,
   RequestDeleteSandboxProfileWorkflowSpec,
   ScheduleDispatchBatchWorkflowSpec,
   ScheduleDispatchWorkflowSpec,
@@ -86,6 +87,12 @@ describe("control-plane worker openworkflow entrypoints", () => {
     expect(readWorkflowSpec(SyncIntegrationConnectionResourcesWorkflowSpec.name)).toMatchObject(
       SyncIntegrationConnectionResourcesWorkflowSpec,
     );
+  });
+
+  it("preserves the refresh integration connection OAuth 2.0 credential workflow identity", () => {
+    expect(
+      readWorkflowSpec(RefreshIntegrationConnectionOAuth2CredentialWorkflowSpec.name),
+    ).toMatchObject(RefreshIntegrationConnectionOAuth2CredentialWorkflowSpec);
   });
 
   it("preserves the schedule dispatch workflow identity", () => {

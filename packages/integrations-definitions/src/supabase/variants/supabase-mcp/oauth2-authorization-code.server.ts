@@ -5,6 +5,7 @@ import type {
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult,
 } from "@mistle/integrations-core";
 import {
+  resolveOAuth2NextRefreshAtFromExpiresIn,
   IntegrationConnectionMethodIds,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications,
@@ -224,6 +225,7 @@ export function resolveSupabaseCompleteGrantResult(input: {
       client_id: input.providerState.clientId,
     },
     accessToken: input.response.access_token,
+    refreshSchedulingResponse: input.response,
     ...(input.response.expires_in === undefined
       ? {}
       : {
@@ -253,6 +255,7 @@ export function resolveSupabaseRefreshResult(input: {
 
   return {
     accessToken: input.response.access_token,
+    refreshSchedulingResponse: input.response,
     ...(input.response.expires_in === undefined
       ? {}
       : {
@@ -461,6 +464,26 @@ export const SupabaseMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Auth
     return resolveSupabaseRefreshResult({
       response: SupabaseTokenResponseSchema.parse(JSON.parse(tokenBody)),
       issuedAt: new Date(),
+    });
+  },
+
+  resolveNextRefresh(input) {
+    const parsedResponse = SupabaseTokenResponseSchema.safeParse(input.response);
+    if (!parsedResponse.success) {
+      input.logger?.warn(
+        {
+          issues: parsedResponse.error.issues,
+        },
+        "OAuth 2.0 next refresh resolution skipped because token response is invalid",
+      );
+      return undefined;
+    }
+
+    return resolveOAuth2NextRefreshAtFromExpiresIn({
+      buffer: input.buffer,
+      logger: input.logger,
+      now: input.now,
+      expiresIn: parsedResponse.data.expires_in,
     });
   },
 };

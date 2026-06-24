@@ -11,6 +11,7 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
   const dataPlaneClient = ctx.get("dataPlaneClient");
   const db = ctx.get("db");
   const integrationRegistry = ctx.get("integrationRegistry");
+  const openWorkflow = ctx.get("openWorkflow");
   const { targetKey } = ctx.req.valid("param");
   const query = ctx.req.valid("query");
 
@@ -20,6 +21,7 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
       dataPlaneClient,
       integrationRegistry,
       integrationsConfig: config.integrations,
+      openWorkflow,
     },
     {
       targetKey,

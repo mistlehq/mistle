@@ -142,7 +142,7 @@ describe("Sentry OAuth 2.0 authorization code", () => {
         },
         issuedAt: new Date("2026-04-11T00:00:00.000Z"),
       }),
-    ).toEqual({
+    ).toMatchObject({
       connectionConfig: {
         client_id: "sentry_client_123",
       },
@@ -166,7 +166,7 @@ describe("Sentry OAuth 2.0 authorization code", () => {
         },
         issuedAt: new Date("2026-04-11T00:00:00.000Z"),
       }),
-    ).toEqual({
+    ).toMatchObject({
       accessToken: "access_789",
       accessTokenExpiresAt: "2026-04-11T00:30:00.000Z",
       refreshToken: "refresh_789",

@@ -339,6 +339,7 @@ export interface paths {
           "application/json": {
             bindingId?: string;
             connectionId: string;
+            forceRefresh?: boolean;
             resolverKey?: string;
             secretType: string;
             slotKey?: string;

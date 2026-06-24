@@ -20,6 +20,7 @@ import {
 } from "@mistle/integrations-core";
 import { SpanStatusCode, type Span, trace } from "@opentelemetry/api";
 import { and, eq, isNull, sql } from "drizzle-orm";
+import type { OpenWorkflow } from "openworkflow";
 import { z } from "zod";
 
 import {
@@ -35,10 +36,15 @@ import {
   InternalIntegrationCredentialsError,
   InternalIntegrationCredentialsErrorCodes,
 } from "./errors.js";
+import {
+  resolveScheduledOAuth2CredentialRefreshAt,
+  scheduleOAuth2CredentialRefresh,
+} from "./oauth2-refresh-scheduling.js";
 
 export type ResolveIntegrationCredentialInput = {
   connectionId: string;
   bindingId?: string;
+  forceRefresh?: boolean;
   secretType: string;
   slotKey?: string | undefined;
   resolverKey?: string | undefined;
@@ -90,6 +96,7 @@ type OAuth2AuthorizationCodeManagedCredentialResolution =
       kind: "resolved";
       refreshedCredential: boolean;
       credential: ResolvedIntegrationCredential;
+      nextRefreshAt?: Date | undefined;
     }
   | {
       kind: "refresh-failed";
@@ -580,6 +587,8 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
     DataPlaneSandboxInstancesClient,
     "invalidateIntegrationConnectionCredentialCache"
   >;
+  forceRefresh?: boolean;
+  openWorkflow?: Pick<OpenWorkflow, "runWorkflow">;
 }): Promise<ResolvedIntegrationCredential> {
   if (input.secretType === IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN) {
     return resolvePersistedCredential({
@@ -653,7 +662,11 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
         secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
       });
 
-      if (accessCredential !== undefined && !isCredentialExpired(accessCredential.expiresAt)) {
+      if (
+        input.forceRefresh !== true &&
+        accessCredential !== undefined &&
+        !isCredentialExpired(accessCredential.expiresAt)
+      ) {
         return {
           kind: "resolved",
           refreshedCredential: false,
@@ -904,6 +917,14 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
             ? {}
             : { expiresAt: refreshedAccessToken.accessTokenExpiresAt }),
         }),
+        ...(refreshedAccessToken.refreshSchedulingResponse === undefined
+          ? {}
+          : {
+              nextRefreshAt: resolveScheduledOAuth2CredentialRefreshAt({
+                oauth2AuthorizationCode: input.oauth2AuthorizationCode,
+                refreshSchedulingResponse: refreshedAccessToken.refreshSchedulingResponse,
+              }),
+            }),
       };
     },
   );
@@ -927,6 +948,15 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
           "Failed to invalidate gateway credential cache",
         );
       });
+  }
+
+  if (resolution.refreshedCredential && input.openWorkflow !== undefined) {
+    await scheduleOAuth2CredentialRefresh({
+      openWorkflow: input.openWorkflow,
+      organizationId: input.connection.organizationId,
+      connectionId: input.connection.id,
+      nextRefreshAt: resolution.nextRefreshAt,
+    });
   }
 
   return resolution.credential;
@@ -1281,6 +1311,7 @@ export async function resolveIntegrationCredential(
     >;
     integrationRegistry: AppContext["var"]["integrationRegistry"];
     integrationsConfig: AppContext["var"]["config"]["integrations"];
+    openWorkflow?: Pick<OpenWorkflow, "runWorkflow">;
   },
   input: ResolveIntegrationCredentialInput,
 ): Promise<ResolvedIntegrationCredential> {
@@ -1506,6 +1537,8 @@ export async function resolveIntegrationCredential(
             refreshTokenSlotKey: oauth2AuthorizationCodeSlotKeys.refreshToken,
             clientSecretSlotKey: oauth2AuthorizationCodeSlotKeys.clientSecret,
             ...(ctx.dataPlaneClient === undefined ? {} : { dataPlaneClient: ctx.dataPlaneClient }),
+            ...(input.forceRefresh === undefined ? {} : { forceRefresh: input.forceRefresh }),
+            ...(ctx.openWorkflow === undefined ? {} : { openWorkflow: ctx.openWorkflow }),
           });
           span.setAttribute("mistle.integration.credential.result_kind", resolvedCredential.kind);
 

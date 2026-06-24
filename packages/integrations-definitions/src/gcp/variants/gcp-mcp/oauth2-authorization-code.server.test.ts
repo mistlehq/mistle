@@ -122,7 +122,7 @@ describe("GCP OAuth authorization code helpers", () => {
         },
         issuedAt: new Date("2026-01-01T00:00:00.000Z"),
       }),
-    ).toEqual({
+    ).toMatchObject({
       connectionConfig: {
         client_id: "google_client_123.apps.googleusercontent.com",
       },
@@ -143,7 +143,7 @@ describe("GCP OAuth authorization code helpers", () => {
         },
         issuedAt: new Date("2026-01-01T00:00:00.000Z"),
       }),
-    ).toEqual({
+    ).toMatchObject({
       accessToken: "access_456",
       accessTokenExpiresAt: "2026-01-01T00:30:00.000Z",
     });
@@ -173,7 +173,7 @@ describe("GCP OAuth authorization code helpers", () => {
         status: 400,
         body: '{"error":"invalid_grant","error_description":"Bad refresh token"}',
       }),
-    ).toEqual({
+    ).toMatchObject({
       classification: "permanent",
       message: "Bad refresh token",
       code: "invalid_grant",

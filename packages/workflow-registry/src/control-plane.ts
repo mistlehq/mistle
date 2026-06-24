@@ -223,6 +223,29 @@ export const SyncIntegrationConnectionResourcesWorkflowSpec = defineWorkflowSpec
   version: SyncIntegrationConnectionResourcesWorkflowVersion,
 });
 
+export const RefreshIntegrationConnectionOAuth2CredentialWorkflowName =
+  "control-plane.integration-connections.refresh-oauth2-credential";
+export const RefreshIntegrationConnectionOAuth2CredentialWorkflowVersion = "1";
+
+export type RefreshIntegrationConnectionOAuth2CredentialWorkflowInput = {
+  organizationId: string;
+  connectionId: string;
+};
+
+export type RefreshIntegrationConnectionOAuth2CredentialWorkflowOutput = {
+  organizationId: string;
+  connectionId: string;
+  refreshedAt: string;
+};
+
+export const RefreshIntegrationConnectionOAuth2CredentialWorkflowSpec = defineWorkflowSpec<
+  RefreshIntegrationConnectionOAuth2CredentialWorkflowInput,
+  RefreshIntegrationConnectionOAuth2CredentialWorkflowOutput
+>({
+  name: RefreshIntegrationConnectionOAuth2CredentialWorkflowName,
+  version: RefreshIntegrationConnectionOAuth2CredentialWorkflowVersion,
+});
+
 export const HandleTriggerRunWorkflowName = "control-plane.automations.handle-run";
 export const HandleTriggerRunWorkflowVersion = "1";
 

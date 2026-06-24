@@ -140,7 +140,7 @@ describe("Notion OAuth 2.0 authorization code", () => {
         },
         issuedAt: new Date("2026-04-11T00:00:00.000Z"),
       }),
-    ).toEqual({
+    ).toMatchObject({
       connectionConfig: {
         connection_method: "oauth2-authorization-code",
         client_id: "notion_client_123",
@@ -165,7 +165,7 @@ describe("Notion OAuth 2.0 authorization code", () => {
         },
         issuedAt: new Date("2026-04-11T00:00:00.000Z"),
       }),
-    ).toEqual({
+    ).toMatchObject({
       accessToken: "access_789",
       accessTokenExpiresAt: "2026-04-11T00:30:00.000Z",
       refreshToken: "refresh_789",

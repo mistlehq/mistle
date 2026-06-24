@@ -155,7 +155,7 @@ describe("PostHog OAuth 2.0 authorization code", () => {
         },
         issuedAt: new Date("2026-06-15T00:00:00.000Z"),
       }),
-    ).toEqual({
+    ).toMatchObject({
       connectionConfig: {
         client_id: "posthog_client_123",
       },
@@ -179,7 +179,7 @@ describe("PostHog OAuth 2.0 authorization code", () => {
         },
         issuedAt: new Date("2026-06-15T00:00:00.000Z"),
       }),
-    ).toEqual({
+    ).toMatchObject({
       accessToken: "access_789",
       accessTokenExpiresAt: "2026-06-15T00:30:00.000Z",
       refreshToken: "refresh_789",

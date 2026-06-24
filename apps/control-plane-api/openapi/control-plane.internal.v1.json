@@ -206,6 +206,9 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "forceRefresh": {
+                    "type": "boolean"
+                  },
                   "secretType": {
                     "type": "string",
                     "minLength": 1

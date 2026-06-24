@@ -5,6 +5,7 @@ import type {
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult,
 } from "@mistle/integrations-core";
 import {
+  resolveOAuth2NextRefreshAtFromExpiresIn,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications,
 } from "@mistle/integrations-core";
@@ -200,6 +201,7 @@ function resolveBugSnagTokenResultFields(input: {
 
   return {
     accessToken: input.response.access_token,
+    refreshSchedulingResponse: input.response,
     ...(input.response.expires_in === undefined
       ? {}
       : {
@@ -429,6 +431,26 @@ export const BugSnagMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Autho
     return resolveBugSnagRefreshResult({
       response: BugSnagTokenResponseSchema.parse(JSON.parse(tokenBody)),
       issuedAt: new Date(),
+    });
+  },
+
+  resolveNextRefresh(input) {
+    const parsedResponse = BugSnagTokenResponseSchema.safeParse(input.response);
+    if (!parsedResponse.success) {
+      input.logger?.warn(
+        {
+          issues: parsedResponse.error.issues,
+        },
+        "OAuth 2.0 next refresh resolution skipped because token response is invalid",
+      );
+      return undefined;
+    }
+
+    return resolveOAuth2NextRefreshAtFromExpiresIn({
+      buffer: input.buffer,
+      logger: input.logger,
+      now: input.now,
+      expiresIn: parsedResponse.data.expires_in,
     });
   },
 };

@@ -14,7 +14,12 @@ import {
 } from "@mistle/integrations-core";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { and, eq, isNull, sql } from "drizzle-orm";
+import type { OpenWorkflow } from "openworkflow";
 
+import {
+  resolveScheduledOAuth2CredentialRefreshAt,
+  scheduleOAuth2CredentialRefresh,
+} from "../../internal/integration-credentials/services/oauth2-refresh-scheduling.js";
 import {
   decryptRedirectSessionSecretUtf8,
   encryptCredentialUtf8,
@@ -233,6 +238,7 @@ export async function completeOAuth2AuthorizationCodeConnection(
       activeMasterEncryptionKeyVersion: number;
       masterEncryptionKeys: Record<string, string>;
     };
+    openWorkflow: Pick<OpenWorkflow, "runWorkflow">;
   },
   input: CompleteOAuth2AuthorizationCodeConnectionInput,
 ): Promise<CompletedConnection> {
@@ -770,6 +776,19 @@ export async function completeOAuth2AuthorizationCodeConnection(
           "Failed to invalidate gateway credential cache",
         );
       });
+  }
+
+  if (completedOAuth2AuthorizationCodeConnection.refreshSchedulingResponse !== undefined) {
+    await scheduleOAuth2CredentialRefresh({
+      openWorkflow: ctx.openWorkflow,
+      organizationId: redirectSession.organizationId,
+      connectionId: completedConnection.id,
+      nextRefreshAt: resolveScheduledOAuth2CredentialRefreshAt({
+        oauth2AuthorizationCode: resolved.oauth2AuthorizationCode,
+        refreshSchedulingResponse:
+          completedOAuth2AuthorizationCodeConnection.refreshSchedulingResponse,
+      }),
+    });
   }
 
   return completedConnection;

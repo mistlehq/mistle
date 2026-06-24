@@ -4,6 +4,7 @@ export const ResolveIntegrationCredentialRequestSchema = z
   .object({
     connectionId: z.string().min(1),
     bindingId: z.string().min(1).optional(),
+    forceRefresh: z.boolean().optional(),
     secretType: z.string().min(1),
     slotKey: z.string().min(1).optional(),
     resolverKey: z.string().min(1).optional(),
