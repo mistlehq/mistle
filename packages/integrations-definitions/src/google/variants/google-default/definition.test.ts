@@ -1,11 +1,5 @@
-import {
-  IntegrationConnectionStatuses,
-  IntegrationKinds,
-  resolveIntegrationForm,
-} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { createBrowserDefinitionsBundle } from "../../../browser.js";
 import { createBrowserIntegrationRegistry } from "../../../browser.js";
 import { createIntegrationRegistry } from "../../../server.js";
 import {
@@ -18,7 +12,6 @@ import {
   GoogleServiceAccountDomainWideDelegationConnectionConfigSchema,
 } from "./auth.js";
 import { GoogleBaseDefinition } from "./base-definition.js";
-import { GoogleCapabilityIds, listRequiredGoogleCapabilityScopes } from "./capabilities/catalog.js";
 import { GoogleDefinition } from "./definition.js";
 
 describe("GoogleDefinition", () => {
@@ -94,8 +87,8 @@ describe("GoogleDefinition", () => {
     });
   });
 
-  it("does not expose runtime resources when no Google capabilities are selected", () => {
-    expect(GoogleDefinition.mcp).toBeDefined();
+  it("does not expose tools or runtime resources by itself", () => {
+    expect(GoogleDefinition.mcp).toBeUndefined();
     expect(
       GoogleDefinition.compileBinding({
         organizationId: "org_123",
@@ -121,9 +114,7 @@ describe("GoogleDefinition", () => {
         binding: {
           id: "ibd_123",
           kind: "connector",
-          config: {
-            capabilities: [],
-          },
+          config: {},
         },
         refs: {
           sandboxPaths: {
@@ -143,238 +134,6 @@ describe("GoogleDefinition", () => {
       artifacts: [],
       runtimeClients: [],
     });
-  });
-
-  it("defines a grouped binding form for Google sandbox capabilities", () => {
-    const form = resolveIntegrationForm({
-      schema: GoogleDefinition.bindingConfigSchema,
-      form: GoogleDefinition.bindingConfigForm,
-      context: {
-        familyId: GoogleFamilyId,
-        variantId: GoogleDefaultVariantId,
-        kind: "connector",
-        target: {
-          rawConfig: {},
-          config: {},
-        },
-        connection: {
-          id: "icn_google",
-          rawConfig: {
-            connection_method: GoogleConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
-            client_id: "google-client.apps.googleusercontent.com",
-            scopes: ["https://www.googleapis.com/auth/cloud-platform"],
-          },
-          config: {
-            connection_method: GoogleConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
-            client_id: "google-client.apps.googleusercontent.com",
-            scopes: ["https://www.googleapis.com/auth/cloud-platform"],
-          },
-        },
-        currentValue: {},
-        definitions: createBrowserDefinitionsBundle(),
-      },
-    });
-
-    expect(form).toMatchObject({
-      schema: {
-        properties: {
-          capabilities: {
-            title: "Google tools",
-            type: "array",
-          },
-        },
-      },
-      uiSchema: {
-        capabilities: {
-          "ui:widget": "grouped-checkboxes",
-          "ui:options": {
-            groups: [
-              {
-                label: "Marketing & analytics",
-                values: [
-                  GoogleCapabilityIds.GOOGLE_ANALYTICS,
-                  GoogleCapabilityIds.GOOGLE_SEARCH_CONSOLE,
-                  GoogleCapabilityIds.GOOGLE_BUSINESS_PROFILE,
-                ],
-              },
-              {
-                label: "Google Cloud",
-                values: [
-                  GoogleCapabilityIds.GCP_CLOUD_LOGGING,
-                  GoogleCapabilityIds.GCP_CLOUD_RUN,
-                  GoogleCapabilityIds.GCP_CLOUD_STORAGE,
-                  GoogleCapabilityIds.GCP_CLOUD_RESOURCE_MANAGER,
-                  GoogleCapabilityIds.GCP_GKE,
-                ],
-              },
-            ],
-          },
-        },
-      },
-    });
-  });
-
-  it("rejects unknown and duplicate Google sandbox capability ids", () => {
-    expect(() =>
-      GoogleDefinition.bindingConfigSchema.parse({
-        capabilities: ["unknown_google_tool"],
-      }),
-    ).toThrow(/Unsupported Google capability id 'unknown_google_tool'/);
-
-    expect(() =>
-      GoogleDefinition.bindingConfigSchema.parse({
-        capabilities: [GoogleCapabilityIds.GOOGLE_ANALYTICS, GoogleCapabilityIds.GOOGLE_ANALYTICS],
-      }),
-    ).toThrow(/Duplicate Google capability id 'google_analytics'/);
-  });
-
-  it("lists required scopes as informational metadata without enforcing them", () => {
-    expect(
-      listRequiredGoogleCapabilityScopes([
-        GoogleCapabilityIds.GOOGLE_ANALYTICS,
-        GoogleCapabilityIds.GCP_CLOUD_RUN,
-      ]),
-    ).toEqual([
-      "https://www.googleapis.com/auth/analytics.readonly",
-      "https://www.googleapis.com/auth/cloud-platform",
-    ]);
-  });
-
-  it("compiles selected Google Analytics, Search Console, Business Profile, and Cloud capabilities", () => {
-    const compileResult = GoogleDefinition.compileBinding({
-      organizationId: "org_123",
-      sandboxProfileId: "sbp_123",
-      version: 1,
-      targetKey: "google-default",
-      target: {
-        familyId: GoogleFamilyId,
-        variantId: GoogleDefaultVariantId,
-        enabled: true,
-        config: {},
-        secrets: {},
-      },
-      connection: {
-        id: "icn_google",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: GoogleConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
-          client_id: "google-client.apps.googleusercontent.com",
-          scopes: ["openid"],
-        },
-      },
-      binding: {
-        id: "ibd_123",
-        kind: IntegrationKinds.CONNECTOR,
-        config: {
-          capabilities: [
-            GoogleCapabilityIds.GOOGLE_ANALYTICS,
-            GoogleCapabilityIds.GOOGLE_SEARCH_CONSOLE,
-            GoogleCapabilityIds.GOOGLE_BUSINESS_PROFILE,
-            GoogleCapabilityIds.GCP_CLOUD_RUN,
-          ],
-        },
-      },
-      refs: {
-        sandboxPaths: {
-          userHomeDir: "/root",
-          workspaceDir: "/root",
-          runtimeDataDir: "/var/lib/mistle",
-          runtimeArtifactDir: "/var/lib/mistle/artifacts",
-          runtimeArtifactBinDir: "/usr/local/bin",
-        },
-        artifactBinPath(name) {
-          return `/usr/local/bin/${name}`;
-        },
-      },
-    });
-
-    expect(compileResult.artifacts.map((artifact) => artifact.artifactKey)).toEqual([
-      "google-analytics-cli",
-      "google-search-console-cli",
-      "google-business-profile-cli",
-    ]);
-    expect(compileResult.runtimeClients.map((client) => client.clientId)).toEqual([
-      "google-analytics-mcp",
-      "google-search-console-mcp",
-      "google-business-profile-mcp",
-    ]);
-    expect(compileResult.egressRoutes.map((route) => route.match.hosts)).toEqual([
-      ["analyticsadmin.googleapis.com"],
-      ["analyticsdata.googleapis.com"],
-      ["searchconsole.googleapis.com"],
-      ["mybusinessaccountmanagement.googleapis.com"],
-      ["mybusinessbusinessinformation.googleapis.com"],
-      ["businessprofileperformance.googleapis.com"],
-      ["mybusiness.googleapis.com"],
-      ["run.googleapis.com"],
-    ]);
-    expect(compileResult.egressRoutes.map((route) => route.credentialResolver)).toContainEqual({
-      kind: "integration_connection",
-      connectionId: "icn_google",
-      secretType: "oauth2_access_token",
-      slotKey: "google.google-default.oauth2-authorization-code.access-token",
-    });
-  });
-
-  it("resolves MCP servers for selected Google capabilities", () => {
-    const mcpInput = {
-      organizationId: "org_123",
-      sandboxProfileId: "sbp_123",
-      version: 1,
-      targetKey: "google-default",
-      target: {
-        familyId: GoogleFamilyId,
-        variantId: GoogleDefaultVariantId,
-        enabled: true,
-        config: {},
-        secrets: {},
-      },
-      connection: {
-        id: "icn_google",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: GoogleConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
-          client_id: "google-client.apps.googleusercontent.com",
-          scopes: ["openid"],
-        },
-      },
-      binding: {
-        id: "ibd_123",
-        kind: IntegrationKinds.CONNECTOR,
-        config: {
-          capabilities: [
-            GoogleCapabilityIds.GOOGLE_ANALYTICS,
-            GoogleCapabilityIds.GCP_CLOUD_STORAGE,
-          ],
-        },
-      },
-      refs: {
-        sandboxPaths: {
-          userHomeDir: "/root",
-          workspaceDir: "/root",
-          runtimeDataDir: "/var/lib/mistle",
-          runtimeArtifactDir: "/var/lib/mistle/artifacts",
-          runtimeArtifactBinDir: "/usr/local/bin",
-        },
-        artifactBinPath(name: string) {
-          return `/usr/local/bin/${name}`;
-        },
-      },
-    };
-    const mcpDefinition = GoogleDefinition.mcp;
-    if (mcpDefinition === undefined) {
-      throw new Error("Expected Google MCP definition to be present.");
-    }
-    const mcpDefinitionValue =
-      typeof mcpDefinition === "function" ? mcpDefinition(mcpInput) : mcpDefinition;
-    const mcpServers = Array.isArray(mcpDefinitionValue)
-      ? mcpDefinitionValue
-      : [mcpDefinitionValue];
-
-    expect(mcpServers.map((server) => server.serverName)).toEqual([
-      "google_analytics",
-      "cloud_storage",
-    ]);
   });
 
   it("registers Google in browser and server integration registries", () => {

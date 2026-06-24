@@ -12,9 +12,7 @@ import {
   GoogleServiceAccountCredentialSlotKeys,
   GoogleServiceAccountDomainWideDelegationConnectionConfigSchema,
 } from "./auth.js";
-import { resolveGoogleBindingConfigForm } from "./binding-config-form.js";
 import { GoogleBindingConfigSchema } from "./binding-config-schema.js";
-import { resolveGoogleCapabilityMcpServers } from "./capabilities/compile.js";
 import { compileGoogleBinding } from "./compile-binding.js";
 import {
   GoogleServiceAccountConnectionConfigForm,
@@ -40,7 +38,6 @@ export const GoogleBaseDefinition: GoogleBaseIntegrationDefinition = {
   targetConfigSchema: GoogleTargetConfigSchema,
   targetSecretSchema: GoogleTargetSecretSchema,
   bindingConfigSchema: GoogleBindingConfigSchema,
-  bindingConfigForm: resolveGoogleBindingConfigForm,
   connectionMethods: [
     {
       id: GoogleConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
@@ -134,6 +131,5 @@ export const GoogleBaseDefinition: GoogleBaseIntegrationDefinition = {
       configForm: GoogleServiceAccountDomainWideDelegationConnectionConfigForm,
     },
   ],
-  mcp: resolveGoogleCapabilityMcpServers,
   compileBinding: compileGoogleBinding,
 };
