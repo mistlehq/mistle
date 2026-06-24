@@ -1,4 +1,8 @@
-import { SandboxProfileVersionAgentRuntimeIds, TriggerKinds } from "@mistle/db/control-plane";
+import {
+  IntegrationBindingKinds,
+  SandboxProfileVersionAgentRuntimeIds,
+  TriggerKinds,
+} from "@mistle/db/control-plane";
 import { MistleSupportedCapabilityKinds } from "@mistle/integrations-definitions/server";
 import { z } from "zod";
 
@@ -50,6 +54,12 @@ export const mcpListSupportedCapabilitiesInputSchema = z
   })
   .strict();
 
+export const mcpUpdateSandboxProfileInputSchema = mcpSandboxProfileIdParamsSchema
+  .extend({
+    displayName: z.string().min(1),
+  })
+  .strict();
+
 export const mcpProfileDraftSetupScriptPutInputSchema = mcpSandboxProfileVersionParamsSchema
   .extend({
     setupScript: z.string().min(1).nullable(),
@@ -67,6 +77,89 @@ const mcpSandboxProfileVersionResourcesSchema = z
     vcpuCount: z.number().int().min(1),
     memoryMb: z.number().int().min(1),
     diskMb: z.number().int().min(1).optional(),
+  })
+  .strict();
+
+export const mcpCreateSandboxProfileInputSchema = z
+  .object({
+    displayName: z.string().min(1),
+    sandboxProvider: z.string().min(1).optional(),
+    sandboxResources: mcpSandboxProfileVersionResourcesSchema.nullable().optional(),
+  })
+  .strict();
+
+const mcpSandboxProfileSkillsConfigSchema = z
+  .object({
+    originUrl: z.url(),
+    selectedSkills: z.array(
+      z
+        .object({
+          name: z.string().min(1),
+          relativePath: z.string().min(1),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+const mcpAssociatedResourceEventRoutingResourceRuleSchema = z
+  .object({
+    resourceKind: z.string().min(1),
+    eventTypes: z.array(z.string().min(1)).min(1),
+    messageMode: z.enum(["all", "app_mentions_only"]).optional(),
+    payloadFilter: z.record(z.string(), z.unknown()).optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+
+const mcpAssociatedResourceEventRoutingConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    resources: z.array(mcpAssociatedResourceEventRoutingResourceRuleSchema).optional(),
+  })
+  .strict();
+
+const mcpSandboxProfileVersionIntegrationBindingsWriteSchema = z
+  .object({
+    bindings: z.array(
+      z
+        .object({
+          id: z.string().min(1).optional(),
+          clientRef: z.string().min(1).optional(),
+          connectionId: z.string().min(1),
+          kind: z.enum([
+            IntegrationBindingKinds.AGENT,
+            IntegrationBindingKinds.GIT,
+            IntegrationBindingKinds.CONNECTOR,
+            IntegrationBindingKinds.SANDBOX,
+          ]),
+          config: z.record(z.string(), z.unknown()),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+export const mcpSandboxProfileDraftUpdateInputSchema = mcpSandboxProfileVersionParamsSchema
+  .extend({
+    setupScript: z.string().min(1).nullable().optional(),
+    agentRuntimeId: z
+      .enum([
+        SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE,
+        SandboxProfileVersionAgentRuntimeIds.CODEX,
+        SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+        SandboxProfileVersionAgentRuntimeIds.PI,
+      ])
+      .optional(),
+    gitCommitSigningIntegrationConnectionId: z.string().min(1).nullable().optional(),
+    mistleMcpEnabled: z.boolean().optional(),
+    mistleMcpApiKeyId: z.string().min(1).nullable().optional(),
+    sandboxProvider: z.string().min(1).optional(),
+    sandboxConnectionId: z.string().min(1).nullable().optional(),
+    sandboxResources: mcpSandboxProfileVersionResourcesSchema.nullable().optional(),
+    skillsConfig: mcpSandboxProfileSkillsConfigSchema.nullable().optional(),
+    associatedResourceEventRoutingConfig: mcpAssociatedResourceEventRoutingConfigSchema.optional(),
+    integrationBindings: mcpSandboxProfileVersionIntegrationBindingsWriteSchema.optional(),
   })
   .strict();
 

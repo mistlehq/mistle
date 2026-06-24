@@ -53,7 +53,7 @@ The saved state of a draft **Sandbox profile version**, excluding unsaved editor
 _Avoid_: Current draft, local draft
 
 **Setup Assistant**:
-A guided agent workspace for helping author a **Setup script** or **Snapshot maintenance script** for a **Sandbox profile version**.
+A guided agent workspace for helping set up a scoped draft **Sandbox profile version**, especially by authoring and validating a **Setup script** or **Snapshot maintenance script**.
 _Avoid_: Setup script test, setup check
 
 **Mistle Designer**:
@@ -756,6 +756,12 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Mistle Designer** should not start open-ended design work by inventorying existing **Sandbox profiles** unless the user's request is explicitly about modifying an existing profile or the proposed **Designer blueprint** needs live resource state to be accurate.
 - When the target **Sandbox profile** is ambiguous, **Mistle Designer** should discuss "use an existing Sandbox profile" versus "create a new Sandbox profile" in chat after showing the workflow blueprint.
 - **Mistle Designer** should use the dashboard control tool to show the **Designer blueprint** for alignment before creating triggers, updating trigger instructions, saving sandbox profile draft changes, or asking narrowly about implementation resources.
+- User alignment on a **Designer blueprint** may authorize **Mistle Designer** to create or update the matching saved draft **Sandbox profile version** without a separate per-field confirmation.
+- **Mistle Designer** applies aligned **Sandbox profile version configuration** as one draft update, preserving unrelated saved draft configuration on existing drafts.
+- When **Mistle Designer** changes **Integration bindings** on a saved draft **Sandbox profile version**, the resulting saved configuration should include the complete intended binding set, including unrelated bindings that remain part of the draft.
+- After **Designer blueprint** alignment, **Mistle Designer** may publish a saved draft **Sandbox profile version** when the aligned outcome requires a launchable agent.
+- Publishing a **Sandbox profile version** through **Mistle Designer** does not imply starting a **Sandbox session**.
+- **Mistle Designer** may discard a saved draft **Sandbox profile version** when discarding that draft is the aligned outcome.
 - Setup confirmation may apply integration setup or selection, trigger configuration, sandbox profile draft changes, publish, or session launch only through the corresponding supported product action; it is not represented as a **Designer blueprint** item.
 - First-pass **Designer blueprint** actions open existing product surfaces with prefilled state where supported, rather than executing product changes directly from the blueprint.
 - A **Designer blueprint** remains useful after confirmation by updating **Designer blueprint item state** metadata such as proposed, needs setup, ready to confirm, applied, or blocked.
@@ -840,6 +846,8 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Setup Assistant** requires the **Latest saved draft** to have a saved **Agent runtime connection** that is compatible with the selected **Agent runtime**.
 - **Setup Assistant** start eligibility is a product contract, not only dashboard guidance.
 - **Setup Assistant** is scoped to draft editing and cannot remain open after its **Sandbox profile version** is published.
+- **Setup Assistant** may save broader **Sandbox profile version configuration** changes needed for setup, such as integration bindings or runtime configuration, rather than only saving script text.
+- **Setup Assistant** changes remain bounded by the scoped **Sandbox profile** and **Sandbox profile version** it was opened for.
 - Publishing a **Sandbox profile version** requires closing any open **Setup Assistant** before the profile version changes state.
 - Publishing a **Sandbox profile version** still saves ordinary profile editor draft changes, but does not preserve Setup Assistant work that has not been saved back to the draft.
 - When unsaved editor changes would make an ineligible **Latest saved draft** eligible for **Setup Assistant**, the user must save the draft before starting **Setup Assistant**.

@@ -32,6 +32,12 @@ import {
 } from "../src/sandbox-instances/index.js";
 import {
   ListSandboxProfilesResponseSchema,
+  CreateSandboxProfileVersionResponseSchema,
+  DiscardSandboxProfileVersionDraftResponseSchema,
+  GetSandboxProfileVersionDraftTriggerImpactResponseSchema,
+  GetSandboxProfileVersionIntegrationBindingsResponseSchema,
+  GetSandboxProfileVersionPublishabilityResponseSchema,
+  PublishSandboxProfileVersionResponseSchema,
   PutSandboxProfileVersionDraftResponseSchema,
   SandboxProfileSchema,
   SandboxProfileVersionMaintenanceScriptSchema,
@@ -51,6 +57,18 @@ import {
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
+});
+
+const itManagedE2BDeployment = createIntegrationTest({
+  services: ["control-plane-api", "data-plane-api"],
+  __serviceOptions: {
+    sandbox: {
+      provider: "e2b",
+      e2b: {
+        apiKey: "integration-managed-e2b-api-key",
+      },
+    },
+  },
 });
 
 const McpTokenConfig = {
@@ -78,6 +96,7 @@ describe.concurrent("MCP profile tools integration", () => {
       name: "MCP tools lister",
       permissions: [
         OrganizationPermissions.SANDBOX_PROFILE_READ,
+        OrganizationPermissions.SANDBOX_PROFILE_CREATE,
         OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
         OrganizationPermissions.SANDBOX_SESSION_CREATE,
         OrganizationPermissions.SANDBOX_SESSION_READ,
@@ -94,7 +113,11 @@ describe.concurrent("MCP profile tools integration", () => {
       "list_supported_capabilities",
       "list_trigger_webhook_events",
       "list_triggers",
+      "profile_create",
+      "profile_draft_create",
+      "profile_draft_discard",
       "profile_draft_setup_script_put",
+      "profile_draft_update",
       "profile_get",
       "profile_list",
       "profile_maintenance_script_get",
@@ -102,6 +125,11 @@ describe.concurrent("MCP profile tools integration", () => {
       "profile_maintenance_script_test_start",
       "profile_setup_script_get",
       "profile_setup_script_test_start",
+      "profile_update",
+      "profile_version_draft_trigger_impact_get",
+      "profile_version_integration_bindings_get",
+      "profile_version_publish",
+      "profile_version_publishability_get",
       "rename_trigger",
       "sandbox_instance_get",
       "sandbox_instance_port_access_create",
@@ -208,6 +236,518 @@ describe.concurrent("MCP profile tools integration", () => {
     expect(profile.id).toBe("sbp_mcp_get");
     expect(profile.organizationId).toBe(session.organizationId);
     expect(profile.displayName).toBe("MCP Get Profile");
+  });
+
+  it("creates a profile, updates metadata, and updates draft configuration with bindings", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-profile-draft-full-update@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP profile draft full writer",
+      permissions: [
+        OrganizationPermissions.SANDBOX_PROFILE_CREATE,
+        OrganizationPermissions.SANDBOX_PROFILE_READ,
+        OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+      ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-mcp-profile-draft-full-update",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_mcp_profile_draft_full_update_agent",
+        organizationId: session.organizationId,
+        targetKey: "openai-mcp-profile-draft-full-update",
+        displayName: "MCP profile draft full update agent connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+    );
+
+    const createResult = await callMcpTool({
+      env,
+      token,
+      name: "profile_create",
+      arguments: {
+        displayName: "MCP Created Profile",
+        sandboxProvider: SandboxProvider.DOCKER,
+      },
+    });
+    expect(createResult.isError).toBeUndefined();
+    const createdProfile = SandboxProfileSchema.parse(createResult.structuredContent);
+    expect(createdProfile.displayName).toBe("MCP Created Profile");
+    expect(createdProfile.activeVersion).toBeNull();
+
+    const updateProfileResult = await callMcpTool({
+      env,
+      token,
+      name: "profile_update",
+      arguments: {
+        profileId: createdProfile.id,
+        displayName: "MCP Updated Profile",
+      },
+    });
+    expect(updateProfileResult.isError).toBeUndefined();
+    expect(SandboxProfileSchema.parse(updateProfileResult.structuredContent).displayName).toBe(
+      "MCP Updated Profile",
+    );
+
+    const draftUpdateResult = await callMcpTool({
+      env,
+      token,
+      name: "profile_draft_update",
+      arguments: {
+        profileId: createdProfile.id,
+        version: 1,
+        setupScript: "echo install dependencies",
+        sandboxProvider: SandboxProvider.DOCKER,
+        integrationBindings: {
+          bindings: [
+            {
+              clientRef: "agent",
+              connectionId: "icn_mcp_profile_draft_full_update_agent",
+              kind: IntegrationBindingKinds.AGENT,
+              config: {},
+            },
+          ],
+        },
+      },
+    });
+    expect(draftUpdateResult.isError).toBeUndefined();
+    const updatedDraft = PutSandboxProfileVersionDraftResponseSchema.parse(
+      draftUpdateResult.structuredContent,
+    );
+    expect(updatedDraft).toMatchObject({
+      sandboxProfileId: createdProfile.id,
+      version: 1,
+      setupScript: "echo install dependencies",
+      sandboxProvider: SandboxProvider.DOCKER,
+      sandboxResources: null,
+    });
+    expect(updatedDraft.integrationBindings.bindings).toEqual([
+      expect.objectContaining({
+        connectionId: "icn_mcp_profile_draft_full_update_agent",
+        kind: IntegrationBindingKinds.AGENT,
+      }),
+    ]);
+
+    const bindingsResult = await callMcpTool({
+      env,
+      token,
+      name: "profile_version_integration_bindings_get",
+      arguments: {
+        profileId: createdProfile.id,
+        version: 1,
+      },
+    });
+    expect(bindingsResult.isError).toBeUndefined();
+    const bindings = GetSandboxProfileVersionIntegrationBindingsResponseSchema.parse(
+      bindingsResult.structuredContent,
+    );
+    expect(bindings.bindings.map((binding) => binding.connectionId)).toEqual([
+      "icn_mcp_profile_draft_full_update_agent",
+    ]);
+
+    const publishabilityResult = await callMcpTool({
+      env,
+      token,
+      name: "profile_version_publishability_get",
+      arguments: {
+        profileId: createdProfile.id,
+        version: 1,
+      },
+    });
+    expect(publishabilityResult.isError).toBeUndefined();
+    expect(
+      GetSandboxProfileVersionPublishabilityResponseSchema.parse(
+        publishabilityResult.structuredContent,
+      ).publishable,
+    ).toBe(true);
+
+    const triggerImpactResult = await callMcpTool({
+      env,
+      token,
+      name: "profile_version_draft_trigger_impact_get",
+      arguments: {
+        profileId: createdProfile.id,
+        version: 1,
+      },
+    });
+    expect(triggerImpactResult.isError).toBeUndefined();
+    expect(
+      GetSandboxProfileVersionDraftTriggerImpactResponseSchema.parse(
+        triggerImpactResult.structuredContent,
+      ),
+    ).toEqual({
+      hasBreakingChanges: false,
+      affectedTriggers: [],
+    });
+  });
+
+  it("creates and discards an existing profile draft", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-profile-draft-create-discard@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP profile draft lifecycle writer",
+      permissions: [
+        OrganizationPermissions.SANDBOX_PROFILE_READ,
+        OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+      ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_mcp_draft_create_discard",
+        organizationId: session.organizationId,
+        displayName: "MCP Draft Create Discard Profile",
+        activeVersion: 1,
+        createdAt: "2026-05-03T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_mcp_draft_create_discard",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        setupScript: "echo published",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const createDraftResult = await callMcpTool({
+      env,
+      token,
+      name: "profile_draft_create",
+      arguments: {
+        profileId: "sbp_mcp_draft_create_discard",
+      },
+    });
+    expect(createDraftResult.isError).toBeUndefined();
+    const createdDraft = CreateSandboxProfileVersionResponseSchema.parse(
+      createDraftResult.structuredContent,
+    );
+    expect(createdDraft).toMatchObject({
+      sandboxProfileId: "sbp_mcp_draft_create_discard",
+      version: 2,
+      state: SandboxProfileVersionStates.DRAFT,
+    });
+    const persistedCreatedDraft = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        setupScript: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_mcp_draft_create_discard"), eq(table.version, 2)),
+    });
+    expect(persistedCreatedDraft?.setupScript).toBe("echo published");
+
+    const discardResult = await callMcpTool({
+      env,
+      token,
+      name: "profile_draft_discard",
+      arguments: {
+        profileId: "sbp_mcp_draft_create_discard",
+        version: 2,
+      },
+    });
+    expect(discardResult.isError).toBeUndefined();
+    expect(
+      DiscardSandboxProfileVersionDraftResponseSchema.parse(discardResult.structuredContent),
+    ).toEqual({
+      discardedVersion: 2,
+      hasDraft: false,
+    });
+
+    const remainingDraft = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        version: true,
+      },
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.sandboxProfileId, "sbp_mcp_draft_create_discard"),
+          eq(table.state, SandboxProfileVersionStates.DRAFT),
+        ),
+    });
+    expect(remainingDraft).toBeUndefined();
+  });
+
+  it("canonicalizes sandbox profile draft skills config origin URLs before persistence", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-profile-draft-skills-canonical@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP profile draft skills writer",
+      permissions: [
+        OrganizationPermissions.SANDBOX_PROFILE_READ,
+        OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+      ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_mcp_draft_skills_canonical",
+        organizationId: session.organizationId,
+        displayName: "MCP Draft Skills Canonical Profile",
+        createdAt: "2026-05-03T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_mcp_draft_skills_canonical",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo skills",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "profile_draft_update",
+      arguments: {
+        profileId: "sbp_mcp_draft_skills_canonical",
+        version: 1,
+        skillsConfig: {
+          originUrl: "https://github.com/acme/skills",
+          selectedSkills: [],
+        },
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const updatedDraft = PutSandboxProfileVersionDraftResponseSchema.parse(
+      result.structuredContent,
+    );
+    expect(updatedDraft.skillsConfig).toEqual({
+      originUrl: "https://github.com/acme/skills.git",
+      selectedSkills: [],
+    });
+
+    const persistedDraft = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        skillsConfig: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_mcp_draft_skills_canonical"), eq(table.version, 1)),
+    });
+    expect(persistedDraft?.skillsConfig).toEqual({
+      originUrl: "https://github.com/acme/skills.git",
+      selectedSkills: [],
+    });
+  });
+
+  it("rejects invalid sandbox profile draft associated-resource payload filters", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-profile-draft-associated-filter-invalid@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP profile draft associated filter writer",
+      permissions: [
+        OrganizationPermissions.SANDBOX_PROFILE_READ,
+        OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+      ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_mcp_draft_associated_filter_invalid",
+        organizationId: session.organizationId,
+        displayName: "MCP Draft Associated Filter Invalid Profile",
+        createdAt: "2026-05-03T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_mcp_draft_associated_filter_invalid",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo associated",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "profile_draft_update",
+      arguments: {
+        profileId: "sbp_mcp_draft_associated_filter_invalid",
+        version: 1,
+        associatedResourceEventRoutingConfig: {
+          resources: [
+            {
+              resourceKind: "github.pull_request",
+              eventTypes: ["github.pull_request.opened"],
+              payloadFilter: {
+                "github.pull_request.closed": {
+                  op: "eq",
+                  path: ["action"],
+                  value: "closed",
+                },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    const persistedDraft = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        associatedResourceEventRoutingConfig: true,
+      },
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.sandboxProfileId, "sbp_mcp_draft_associated_filter_invalid"),
+          eq(table.version, 1),
+        ),
+    });
+    expect(persistedDraft?.associatedResourceEventRoutingConfig).toEqual({});
+  });
+
+  itManagedE2BDeployment(
+    "updates sandbox profile draft resources without resending the existing provider",
+    async ({ env }) => {
+      const session = await env.auth.createSession({
+        email: "integration-new-mcp-profile-draft-resource-only@example.com",
+      });
+      const token = await createApiKeyToken({
+        cookie: session.cookie,
+        env,
+        name: "MCP profile draft resource writer",
+        permissions: [
+          OrganizationPermissions.SANDBOX_PROFILE_READ,
+          OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+        ],
+      });
+
+      await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+        sandboxProfileRow({
+          id: "sbp_mcp_draft_resource_only",
+          organizationId: session.organizationId,
+          displayName: "MCP Draft Resource Only Profile",
+          createdAt: "2026-05-03T00:00:00.000Z",
+        }),
+      );
+      await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+        sandboxProfileVersionRow({
+          sandboxProfileId: "sbp_mcp_draft_resource_only",
+          version: 1,
+          state: SandboxProfileVersionStates.DRAFT,
+          setupScript: "echo resources",
+          sandboxProvider: SandboxProvider.E2B,
+          sandboxVcpuCount: 2,
+          sandboxMemoryMb: 4096,
+        }),
+      );
+
+      const result = await callMcpTool({
+        env,
+        token,
+        name: "profile_draft_update",
+        arguments: {
+          profileId: "sbp_mcp_draft_resource_only",
+          version: 1,
+          sandboxResources: {
+            vcpuCount: 4,
+            memoryMb: 8192,
+          },
+        },
+      });
+
+      expect(result.isError).toBeUndefined();
+      const updatedDraft = PutSandboxProfileVersionDraftResponseSchema.parse(
+        result.structuredContent,
+      );
+      expect(updatedDraft.sandboxProvider).toBe(SandboxProvider.E2B);
+      expect(updatedDraft.sandboxResources).toEqual({
+        vcpuCount: 4,
+        memoryMb: 8192,
+      });
+    },
+  );
+
+  it("publishes a draft profile version without starting a sandbox session", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-profile-publish@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP profile publisher",
+      permissions: [
+        OrganizationPermissions.SANDBOX_PROFILE_READ,
+        OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+      ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_mcp_profile_publish",
+        organizationId: session.organizationId,
+        displayName: "MCP Profile Publish",
+        createdAt: "2026-05-04T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_mcp_profile_publish",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo publish",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const publishResult = await callMcpTool({
+      env,
+      token,
+      name: "profile_version_publish",
+      arguments: {
+        profileId: "sbp_mcp_profile_publish",
+        version: 1,
+      },
+    });
+    expect(publishResult.isError).toBeUndefined();
+    const published = PublishSandboxProfileVersionResponseSchema.parse(
+      publishResult.structuredContent,
+    );
+    expect(published.version).toMatchObject({
+      sandboxProfileId: "sbp_mcp_profile_publish",
+      version: 1,
+      state: SandboxProfileVersionStates.PUBLISHED,
+    });
+    expect(published.snapshotAction.kind).toBe("created");
+
+    const profile = await env.controlPlaneDb.query.sandboxProfiles.findFirst({
+      columns: {
+        activeVersion: true,
+      },
+      where: (table, { eq }) => eq(table.id, "sbp_mcp_profile_publish"),
+    });
+    expect(profile?.activeVersion).toBeNull();
   });
 
   it("gets sandbox profile setup and maintenance scripts with REST response shapes", async ({
@@ -1373,6 +1913,145 @@ describe.concurrent("MCP profile tools integration", () => {
       id: sandboxInstanceId,
     });
     expect(queuedWorkflowInput.runtimePlan.setupScript).toBe(setupScript);
+  });
+
+  it("authorizes setup assistant MCP tokens for scoped full sandbox profile draft tools", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-setup-assistant-full-draft-tools@example.com",
+    });
+    const profileId = "sbp_mcp_setup_assistant_full_draft_tools";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-mcp-setup-assistant-full-draft-tools",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_mcp_setup_assistant_full_draft_tools_agent",
+        organizationId: session.organizationId,
+        targetKey: "openai-mcp-setup-assistant-full-draft-tools",
+        displayName: "MCP setup assistant full draft tools agent connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: profileId,
+        organizationId: session.organizationId,
+        displayName: "MCP Setup Assistant Full Draft Tools Profile",
+        createdAt: "2026-05-03T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: profileId,
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo persisted",
+        ...DockerSandboxRuntimeColumns,
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_mcp_setup_assistant_full_draft_tools_agent",
+          sandboxProfileId: profileId,
+          sandboxProfileVersion: 1,
+          connectionId: "icn_mcp_setup_assistant_full_draft_tools_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+      );
+
+    const token = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "setup_assistant",
+        sub: "sbi_mcp_setup_assistant_full_draft_tools",
+        organizationId: session.organizationId,
+        sandboxProfileId: profileId,
+        sandboxProfileVersion: 1,
+      },
+      ttlSeconds: 300,
+    });
+
+    const result = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_draft_update",
+      arguments: {
+        profileId,
+        version: 1,
+        setupScript: "echo allowed",
+      },
+    });
+    const bindingsResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_version_integration_bindings_get",
+      arguments: {
+        profileId,
+        version: 1,
+      },
+    });
+    const publishabilityResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_version_publishability_get",
+      arguments: {
+        profileId,
+        version: 1,
+      },
+    });
+    const triggerImpactResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_version_draft_trigger_impact_get",
+      arguments: {
+        profileId,
+        version: 1,
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(bindingsResult.isError).toBeUndefined();
+    expect(publishabilityResult.isError).toBeUndefined();
+    expect(triggerImpactResult.isError).toBeUndefined();
+    expect(
+      GetSandboxProfileVersionIntegrationBindingsResponseSchema.parse(
+        bindingsResult.structuredContent,
+      ).bindings.map((binding) => binding.connectionId),
+    ).toEqual(["icn_mcp_setup_assistant_full_draft_tools_agent"]);
+    expect(
+      GetSandboxProfileVersionPublishabilityResponseSchema.parse(
+        publishabilityResult.structuredContent,
+      ).publishable,
+    ).toBe(true);
+    expect(
+      GetSandboxProfileVersionDraftTriggerImpactResponseSchema.parse(
+        triggerImpactResult.structuredContent,
+      ),
+    ).toEqual({
+      hasBreakingChanges: false,
+      affectedTriggers: [],
+    });
+    const draft = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        setupScript: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, profileId), eq(table.version, 1)),
+    });
+    expect(draft?.setupScript).toBe("echo allowed");
   });
 
   it("authorizes setup assistant MCP tokens to read only the scoped sandbox profile", async ({

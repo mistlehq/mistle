@@ -58,6 +58,7 @@ export async function authenticateMcpToken(input: {
         sandboxInstanceId: verifiedToken.sub,
       },
       permissions: [
+        OrganizationPermissions.SANDBOX_PROFILE_CREATE,
         OrganizationPermissions.SANDBOX_PROFILE_READ,
         OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
         OrganizationPermissions.SANDBOX_SESSION_READ,
