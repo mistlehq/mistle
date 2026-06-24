@@ -22,7 +22,6 @@ import { GoogleAnalyticsDefinition } from "./google-analytics/browser.js";
 import { GoogleBusinessProfileDefinition } from "./google-business-profile/browser.js";
 import { GoogleSearchConsoleDefinition } from "./google-search-console/browser.js";
 import { GoogleWorkspaceDefinition } from "./google-workspace/browser.js";
-import { GoogleDefinition } from "./google/browser.js";
 import { GoogleAdsDefinition } from "./googleads/browser.js";
 import { InceptionDefinition } from "./inception/index.js";
 import { JiraDefinition } from "./jira/browser.js";
@@ -69,7 +68,6 @@ export * from "./deepseek/index.js";
 export * from "./expo/browser.js";
 export * from "./fireworks/index.js";
 export * from "./gcp/browser.js";
-export * from "./google/browser.js";
 export * from "./googleads/browser.js";
 export * from "./google-analytics/browser.js";
 export * from "./google-business-profile/browser.js";
@@ -121,7 +119,6 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   ExpoDefinition,
   FireworksDefinition,
   GcpDefinition,
-  GoogleDefinition,
   GoogleAnalyticsDefinition,
   GoogleAdsDefinition,
   GoogleBusinessProfileDefinition,
