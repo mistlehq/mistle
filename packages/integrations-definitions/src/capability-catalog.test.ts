@@ -46,14 +46,14 @@ describe("Mistle capability catalog", () => {
     });
   });
 
-  it("excludes auth-only Google connections from runtime tool discovery", () => {
+  it("includes Google in runtime tool discovery once Google owns selectable capabilities", () => {
     const catalog = listSupportedCapabilities(createIntegrationRegistry(), {
       capabilityKind: MistleSupportedCapabilityKinds.RUNTIME_TOOL,
     });
 
     expect(catalog.items.length).toBeGreaterThan(0);
     expect(catalog.items.every((item) => item.capabilities.runtimeTools.mcpSupported)).toBe(true);
-    expect(catalog.items.map((item) => item.familyId)).not.toContain("google");
+    expect(catalog.items.map((item) => item.familyId)).toContain("google");
   });
 
   it("includes trigger event and provider resource details when requested", () => {

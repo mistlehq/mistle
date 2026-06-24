@@ -81,6 +81,40 @@ const CommaSeparatedStringArrayUiSchema: UiSchema<JsonObject, RJSFSchema, Schema
   },
 };
 
+const GroupedCheckboxesSchema: RJSFSchema = {
+  type: "object",
+  properties: {
+    capabilities: {
+      title: "Google tools",
+      type: "array",
+      uniqueItems: true,
+      items: {
+        type: "string",
+        enum: ["google_analytics", "google_search_console", "gcp_cloud_run"],
+      },
+    },
+  },
+};
+
+const GroupedCheckboxesUiSchema: UiSchema<JsonObject, RJSFSchema, SchemaFormContext> = {
+  capabilities: {
+    "ui:enumNames": ["Google Analytics", "Google Search Console", "Cloud Run"],
+    "ui:widget": "grouped-checkboxes",
+    "ui:options": {
+      groups: [
+        {
+          label: "Marketing & analytics",
+          values: ["google_analytics", "google_search_console"],
+        },
+        {
+          label: "Google Cloud",
+          values: ["gcp_cloud_run"],
+        },
+      ],
+    },
+  },
+};
+
 function SingleSelectHarness(input: { formData: JsonObject }): React.JSX.Element {
   return (
     <SchemaFormWithoutSubmit
@@ -215,6 +249,16 @@ function DescriptionOnlyObjectHarness(): React.JSX.Element {
       validator={validator}
     />
   );
+}
+
+function getVisibleCheckboxByLabel(label: string): HTMLElement {
+  const matchingElements = screen.getAllByLabelText(label);
+  const checkbox = matchingElements.find((element) => element.getAttribute("role") === "checkbox");
+  if (checkbox === undefined) {
+    throw new Error(`Visible checkbox '${label}' was not found.`);
+  }
+
+  return checkbox;
 }
 
 describe("SchemaFormWithoutSubmit", () => {
@@ -388,6 +432,67 @@ describe("SchemaFormWithoutSubmit", () => {
     expect(changedFormData).toEqual({
       replyToEmailAddresses: ["support@example.com", "sales@example.com"],
     });
+  });
+
+  it("renders grouped checkbox arrays from generic ui schema metadata", () => {
+    let changedFormData: JsonObject | null = null;
+
+    render(
+      <SchemaFormWithoutSubmit
+        formContext={{}}
+        formData={{
+          capabilities: ["google_analytics"],
+        }}
+        noHtml5Validate
+        onChange={(event: IChangeEvent<JsonObject, RJSFSchema>) => {
+          changedFormData = event.formData ?? null;
+        }}
+        schema={GroupedCheckboxesSchema}
+        showErrorList={false}
+        uiSchema={GroupedCheckboxesUiSchema}
+        validator={validator}
+      />,
+    );
+
+    expect(screen.getByText("Marketing & analytics")).toBeDefined();
+    expect(screen.getByText("Google Cloud")).toBeDefined();
+    expect(getVisibleCheckboxByLabel("Google Analytics").getAttribute("aria-checked")).toBe("true");
+    expect(getVisibleCheckboxByLabel("Cloud Run").getAttribute("aria-checked")).toBe("false");
+
+    fireEvent.click(getVisibleCheckboxByLabel("Cloud Run"));
+
+    expect(changedFormData).toEqual({
+      capabilities: ["google_analytics", "gcp_cloud_run"],
+    });
+  });
+
+  it("fails fast when grouped checkbox metadata omits an enum option", () => {
+    expect(() =>
+      render(
+        <SchemaFormWithoutSubmit
+          formContext={{}}
+          formData={{}}
+          noHtml5Validate
+          onChange={() => {}}
+          schema={GroupedCheckboxesSchema}
+          showErrorList={false}
+          uiSchema={{
+            capabilities: {
+              "ui:widget": "grouped-checkboxes",
+              "ui:options": {
+                groups: [
+                  {
+                    label: "Marketing & analytics",
+                    values: ["google_analytics"],
+                  },
+                ],
+              },
+            },
+          }}
+          validator={validator}
+        />,
+      ),
+    ).toThrow("Grouped checkboxes option 'google_search_console' is missing from groups.");
   });
 
   it("fails fast when an affixed text widget is missing affix options", () => {
