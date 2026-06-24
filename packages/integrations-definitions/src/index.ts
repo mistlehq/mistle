@@ -12,6 +12,7 @@ import { AwsDefinition } from "./aws/browser.js";
 import { BugSnagDefinition } from "./bugsnag/browser.js";
 import { CloudflareDefinition } from "./cloudflare/browser.js";
 import { DatadogDefinition } from "./datadog/index.js";
+import { DataForSeoDefinition } from "./dataforseo/browser.js";
 import { DeepSeekDefinition } from "./deepseek/index.js";
 import { ExpoDefinition } from "./expo/browser.js";
 import { FireworksDefinition } from "./fireworks/index.js";
@@ -61,6 +62,7 @@ export * from "./autumn/browser.js";
 export * from "./aws/browser.js";
 export * from "./bugsnag/browser.js";
 export * from "./cloudflare/browser.js";
+export * from "./dataforseo/browser.js";
 export * from "./datadog/index.js";
 export * from "./deepseek/index.js";
 export * from "./expo/browser.js";
@@ -111,6 +113,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   AwsDefinition,
   BugSnagDefinition,
   CloudflareDefinition,
+  DataForSeoDefinition,
   DatadogDefinition,
   DeepSeekDefinition,
   ExpoDefinition,

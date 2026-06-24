@@ -52,6 +52,10 @@ describe("integrations-definitions server", () => {
       familyId: "cloudflare",
       variantId: "cloudflare-mcp",
     });
+    const dataForSeoDefinition = registry.getDefinition({
+      familyId: "dataforseo",
+      variantId: "dataforseo-mcp",
+    });
     const gcpDefinition = registry.getDefinition({
       familyId: "gcp",
       variantId: "gcp-mcp",
@@ -348,6 +352,10 @@ describe("integrations-definitions server", () => {
     expect(cloudflareDefinition?.oauth2AuthorizationCode).toBeUndefined();
     expect(cloudflareDefinition?.webhookHandler).toBeUndefined();
     expect(cloudflareDefinition?.webhookSource).toBeUndefined();
+    expect(dataForSeoDefinition?.oauth2AuthorizationCode).toBeDefined();
+    expect(dataForSeoDefinition?.webhookHandler).toBeUndefined();
+    expect(dataForSeoDefinition?.webhookSource).toBeUndefined();
+    expect(dataForSeoDefinition?.mcp).toBeDefined();
     expect(gcpDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(gcpDefinition?.webhookHandler).toBeUndefined();
     expect(gcpDefinition?.webhookSource).toBeUndefined();
@@ -565,6 +573,7 @@ describe("integrations-definitions server", () => {
         "agentmail::agentmail-mcp",
         "autumn::autumn-mcp",
         "bugsnag::bugsnag-mcp",
+        "dataforseo::dataforseo-mcp",
         "deepseek::deepseek-default",
         "expo::expo-mcp",
         "fireworks::fireworks-default",

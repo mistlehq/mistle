@@ -45,6 +45,10 @@ describe("integrations-definitions index", () => {
       familyId: "cloudflare",
       variantId: "cloudflare-mcp",
     });
+    const dataForSeoDefinition = registry.getDefinition({
+      familyId: "dataforseo",
+      variantId: "dataforseo-mcp",
+    });
     const gcpDefinition = registry.getDefinition({
       familyId: "gcp",
       variantId: "gcp-mcp",
@@ -281,6 +285,27 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(cloudflareDefinition?.mcp).toBeDefined();
+    expect(dataForSeoDefinition).toMatchObject({
+      familyId: "dataforseo",
+      variantId: "dataforseo-mcp",
+      kind: "connector",
+      displayName: "DataForSEO",
+      logoKey: "dataforseo",
+      connectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "DataForSEO OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect DataForSEO",
+              helperText: "Authorize DataForSEO hosted MCP access.",
+            },
+          },
+        },
+      ],
+    });
+    expect(dataForSeoDefinition?.oauth2AuthorizationCode).toBeUndefined();
     expect(gcpDefinition).toMatchObject({
       familyId: "gcp",
       variantId: "gcp-mcp",
@@ -1378,6 +1403,7 @@ describe("integrations-definitions index", () => {
       "aws::aws-cli-default",
       "bugsnag::bugsnag-mcp",
       "cloudflare::cloudflare-mcp",
+      "dataforseo::dataforseo-mcp",
       "datadog::datadog-default",
       "deepseek::deepseek-default",
       "expo::expo-mcp",
