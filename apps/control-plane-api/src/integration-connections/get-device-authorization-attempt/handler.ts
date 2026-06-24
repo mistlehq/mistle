@@ -14,6 +14,7 @@ const routeHandler = async (
   const dataPlaneClient = ctx.get("dataPlaneClient");
   const db = ctx.get("db");
   const integrationRegistry = ctx.get("integrationRegistry");
+  const openWorkflow = ctx.get("openWorkflow");
   const { attemptId, targetKey } = ctx.req.valid("param");
 
   const attempt = await getDeviceAuthorizationAttempt(
@@ -22,6 +23,7 @@ const routeHandler = async (
       db,
       integrationRegistry,
       integrationsConfig: config.integrations,
+      openWorkflow,
     },
     {
       organizationId: session.activeOrganizationId,

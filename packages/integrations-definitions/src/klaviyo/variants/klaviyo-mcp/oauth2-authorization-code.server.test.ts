@@ -142,7 +142,7 @@ describe("Klaviyo OAuth 2.0 authorization code", () => {
         },
         issuedAt: new Date("2026-06-15T00:00:00.000Z"),
       }),
-    ).toEqual({
+    ).toMatchObject({
       connectionConfig: {
         connection_method: "oauth2-authorization-code",
         client_id: "klaviyo_client_123",
@@ -167,7 +167,7 @@ describe("Klaviyo OAuth 2.0 authorization code", () => {
         },
         issuedAt: new Date("2026-06-15T00:00:00.000Z"),
       }),
-    ).toEqual({
+    ).toMatchObject({
       accessToken: "access_789",
       accessTokenExpiresAt: "2026-06-15T00:30:00.000Z",
       refreshToken: "refresh_789",

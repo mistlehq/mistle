@@ -162,7 +162,7 @@ describe("Google Search Console OAuth authorization code support", () => {
         },
         issuedAt,
       }),
-    ).toEqual({
+    ).toMatchObject({
       connectionConfig: {
         client_id: "google_client_123.apps.googleusercontent.com",
       },
@@ -185,7 +185,7 @@ describe("Google Search Console OAuth authorization code support", () => {
         },
         issuedAt,
       }),
-    ).toEqual({
+    ).toMatchObject({
       accessToken: "access_456",
       accessTokenExpiresAt: "2026-06-23T00:02:00.000Z",
       refreshToken: "refresh_456",
@@ -228,7 +228,7 @@ describe("Google Search Console OAuth authorization code support", () => {
         status: 429,
         body: '{"error":"rate_limit","error_description":"Too many requests"}',
       }),
-    ).toEqual({
+    ).toMatchObject({
       classification:
         IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications.TEMPORARY,
       message: "Too many requests",

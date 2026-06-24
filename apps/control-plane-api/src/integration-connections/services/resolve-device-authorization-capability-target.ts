@@ -4,6 +4,7 @@ import type {
   IntegrationConnectionMethodDefinition,
   IntegrationDeviceAuthorizationCapability,
   IntegrationDeviceAuthorizationConnectionMethodDefinition,
+  IntegrationOAuth2AuthorizationCodeCapability,
   IntegrationRegistry,
 } from "@mistle/integrations-core";
 import { z } from "zod";
@@ -95,6 +96,11 @@ export type ResolvedDeviceAuthorizationCapabilityTarget = {
     Record<string, string>,
     Record<string, unknown>
   >;
+  oauth2AuthorizationCode: IntegrationOAuth2AuthorizationCodeCapability<
+    Record<string, unknown>,
+    Record<string, string>,
+    Record<string, unknown>
+  >;
 };
 
 export async function resolveDeviceAuthorizationCapabilityTargetOrThrow(
@@ -139,6 +145,13 @@ export async function resolveDeviceAuthorizationCapabilityTargetOrThrow(
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.DEVICE_AUTH_CAPABILITY_NOT_CONFIGURED,
       `Integration target '${input.targetKey}' does not define a device authorization capability.`,
+    );
+  }
+  const oauth2AuthorizationCode = definition.oauth2AuthorizationCode;
+  if (oauth2AuthorizationCode === undefined) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.DEVICE_AUTH_CAPABILITY_NOT_CONFIGURED,
+      `Integration target '${input.targetKey}' does not define an OAuth 2.0 refresh capability for device authorization.`,
     );
   }
 
@@ -199,5 +212,6 @@ export async function resolveDeviceAuthorizationCapabilityTargetOrThrow(
     },
     connectionMethod,
     deviceAuthorization,
+    oauth2AuthorizationCode,
   };
 }

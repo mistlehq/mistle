@@ -27,6 +27,7 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
   const dataPlaneClient = ctx.get("dataPlaneClient");
   const integrationRegistry = ctx.get("integrationRegistry");
   const integrationsConfig = ctx.get("config").integrations;
+  const openWorkflow = ctx.get("openWorkflow");
 
   const resolvedCredential = await resolveIntegrationCredential(
     {
@@ -34,9 +35,13 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
       dataPlaneClient,
       integrationRegistry,
       integrationsConfig,
+      openWorkflow,
     },
     {
       connectionId: parsedInput.data.connectionId,
+      ...(parsedInput.data.forceRefresh === undefined
+        ? {}
+        : { forceRefresh: parsedInput.data.forceRefresh }),
       secretType: parsedInput.data.secretType,
       ...(parsedInput.data.bindingId === undefined
         ? {}

@@ -5,6 +5,7 @@ import type {
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult,
 } from "@mistle/integrations-core";
 import {
+  resolveOAuth2NextRefreshAtFromExpiresIn,
   IntegrationConnectionMethodIds,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications,
@@ -61,6 +62,7 @@ type AgentMailProviderState = z.output<typeof AgentMailProviderStateSchema>;
 type AgentMailTokenResultFields = {
   accessToken: string;
   accessTokenExpiresAt?: string;
+  refreshSchedulingResponse: unknown;
   refreshToken?: string;
   credentialMetadata?: Record<string, unknown>;
 };
@@ -204,6 +206,7 @@ function resolveAgentMailTokenResultFields(input: {
 
   return {
     accessToken: input.response.access_token,
+    refreshSchedulingResponse: input.response,
     ...(input.response.expires_in === undefined
       ? {}
       : {
@@ -427,6 +430,26 @@ export const AgentMailMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Aut
     return resolveAgentMailRefreshResult({
       response: AgentMailTokenResponseSchema.parse(JSON.parse(tokenBody)),
       issuedAt: new Date(),
+    });
+  },
+
+  resolveNextRefresh(input) {
+    const parsedResponse = AgentMailTokenResponseSchema.safeParse(input.response);
+    if (!parsedResponse.success) {
+      input.logger?.warn(
+        {
+          issues: parsedResponse.error.issues,
+        },
+        "OAuth 2.0 next refresh resolution skipped because token response is invalid",
+      );
+      return undefined;
+    }
+
+    return resolveOAuth2NextRefreshAtFromExpiresIn({
+      buffer: input.buffer,
+      logger: input.logger,
+      now: input.now,
+      expiresIn: parsedResponse.data.expires_in,
     });
   },
 };

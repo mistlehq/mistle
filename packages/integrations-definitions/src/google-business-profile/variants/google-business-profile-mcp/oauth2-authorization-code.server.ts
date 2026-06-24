@@ -6,6 +6,7 @@ import type {
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult,
 } from "@mistle/integrations-core";
 import {
+  resolveOAuth2NextRefreshAtFromExpiresIn,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications,
 } from "@mistle/integrations-core";
@@ -196,6 +197,7 @@ export function resolveGoogleBusinessProfileCompleteGrantResult(input: {
       client_id: input.providerState.clientId,
     },
     accessToken: input.response.access_token,
+    refreshSchedulingResponse: input.response,
     ...(input.response.expires_in === undefined
       ? {}
       : {
@@ -223,6 +225,7 @@ export function resolveGoogleBusinessProfileRefreshResult(input: {
 
   return {
     accessToken: input.response.access_token,
+    refreshSchedulingResponse: input.response,
     ...(input.response.expires_in === undefined
       ? {}
       : {
@@ -442,6 +445,26 @@ export const GoogleBusinessProfileMcpOAuth2AuthorizationCodeCapability: Integrat
     return resolveGoogleBusinessProfileRefreshResult({
       response: GoogleBusinessProfileTokenResponseSchema.parse(await response.json()),
       issuedAt: new Date(),
+    });
+  },
+
+  resolveNextRefresh(input) {
+    const parsedResponse = GoogleBusinessProfileTokenResponseSchema.safeParse(input.response);
+    if (!parsedResponse.success) {
+      input.logger?.warn(
+        {
+          issues: parsedResponse.error.issues,
+        },
+        "OAuth 2.0 next refresh resolution skipped because token response is invalid",
+      );
+      return undefined;
+    }
+
+    return resolveOAuth2NextRefreshAtFromExpiresIn({
+      buffer: input.buffer,
+      logger: input.logger,
+      now: input.now,
+      expiresIn: parsedResponse.data.expires_in,
     });
   },
 };

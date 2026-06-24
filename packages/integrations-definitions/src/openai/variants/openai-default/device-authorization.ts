@@ -2,12 +2,13 @@ import type {
   IntegrationDeviceAuthorizationCapability,
   IntegrationDeviceAuthorizationPollResult,
   IntegrationOAuth2AuthorizationCodeCapability,
-  IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification,
+  IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult,
 } from "@mistle/integrations-core";
 import {
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications,
+  resolveOAuth2NextRefreshAtFromExpiresIn,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
@@ -46,6 +47,7 @@ const OpenAiTokenExchangeResponseSchema = z
     access_token: z.string().min(1),
     refresh_token: z.string().min(1),
     expires_in: StringOrNumberSchema.optional(),
+    earliest_refresh_at: z.string().min(1).optional(),
   })
   .loose();
 
@@ -55,6 +57,14 @@ const OpenAiRefreshResponseSchema = z
     access_token: z.string().min(1).optional(),
     refresh_token: z.string().min(1).optional(),
     expires_in: StringOrNumberSchema.optional(),
+    earliest_refresh_at: z.string().min(1).optional(),
+  })
+  .loose();
+
+const OpenAiRefreshSchedulingResponseSchema = z
+  .object({
+    expires_in: StringOrNumberSchema.optional(),
+    earliest_refresh_at: z.string().min(1).optional(),
   })
   .loose();
 
@@ -294,6 +304,7 @@ export function parseOpenAiTokenExchangeResponse(input: unknown): {
   accessToken: string;
   refreshToken: string;
   expiresIn?: string | number;
+  refreshSchedulingResponse: z.infer<typeof OpenAiTokenExchangeResponseSchema>;
 } {
   const parsed = OpenAiTokenExchangeResponseSchema.parse(input);
 
@@ -302,6 +313,7 @@ export function parseOpenAiTokenExchangeResponse(input: unknown): {
     accessToken: parsed.access_token,
     refreshToken: parsed.refresh_token,
     ...(parsed.expires_in === undefined ? {} : { expiresIn: parsed.expires_in }),
+    refreshSchedulingResponse: parsed,
   };
 }
 
@@ -371,6 +383,7 @@ function resolveOpenAiRefreshResult(input: {
 
   return {
     accessToken: input.response.access_token,
+    refreshSchedulingResponse: input.response,
     ...(accessTokenExpiresAt === undefined ? {} : { accessTokenExpiresAt }),
     ...(refreshToken === undefined ? {} : { refreshToken }),
     ...(accountMetadata.chatGptAccountId === undefined &&
@@ -394,6 +407,7 @@ export function resolveOpenAiDeviceAuthorizationCompletionFromTokens(input: {
   accessToken: string;
   refreshToken: string;
   accessTokenExpiresAt?: string;
+  refreshSchedulingResponse?: unknown;
 }): Extract<
   IntegrationDeviceAuthorizationPollResult<OpenAiConnectionConfig>,
   { status: "completed" }
@@ -419,6 +433,9 @@ export function resolveOpenAiDeviceAuthorizationCompletionFromTokens(input: {
       ? {}
       : { accessTokenExpiresAt: input.accessTokenExpiresAt }),
     refreshToken: input.refreshToken,
+    ...(input.refreshSchedulingResponse === undefined
+      ? {}
+      : { refreshSchedulingResponse: input.refreshSchedulingResponse }),
   };
 }
 
@@ -478,6 +495,7 @@ async function exchangeAuthorizationCodeForTokens(input: {
   accessToken: string;
   refreshToken: string;
   expiresIn?: string | number;
+  refreshSchedulingResponse: unknown;
 }> {
   const form = new URLSearchParams();
   form.set("grant_type", "authorization_code");
@@ -588,6 +606,7 @@ async function pollOpenAiDeviceAuthorization(
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
     ...(accessTokenExpiresAt === undefined ? {} : { accessTokenExpiresAt }),
+    refreshSchedulingResponse: tokens.refreshSchedulingResponse,
   });
 }
 
@@ -651,6 +670,42 @@ export const OpenAiDeviceAuthorizationOAuth2Capability: IntegrationOAuth2Authori
     return refreshOpenAiAccessToken({
       authBaseUrl: resolveOpenAiAuthBaseUrl(input.target.config),
       refreshToken: input.refreshToken,
+    });
+  },
+
+  resolveNextRefresh(input) {
+    const parsedResponse = OpenAiRefreshSchedulingResponseSchema.safeParse(input.response);
+    if (!parsedResponse.success) {
+      input.logger?.warn(
+        {
+          issues: parsedResponse.error.issues,
+        },
+        "OpenAI next refresh resolution skipped because token response is invalid",
+      );
+      return undefined;
+    }
+
+    const response = parsedResponse.data;
+    if (response.earliest_refresh_at !== undefined) {
+      const nextRefreshAt = new Date(response.earliest_refresh_at);
+      if (Number.isNaN(nextRefreshAt.getTime())) {
+        input.logger?.warn(
+          {
+            earliestRefreshAt: response.earliest_refresh_at,
+          },
+          "OpenAI next refresh resolution skipped because earliest_refresh_at is invalid",
+        );
+        return undefined;
+      }
+
+      return nextRefreshAt;
+    }
+
+    return resolveOAuth2NextRefreshAtFromExpiresIn({
+      buffer: input.buffer,
+      logger: input.logger,
+      now: input.now,
+      expiresIn: response.expires_in,
     });
   },
 };

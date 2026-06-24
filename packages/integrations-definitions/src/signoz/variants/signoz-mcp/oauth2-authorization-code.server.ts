@@ -1,8 +1,11 @@
 import {
+  resolveOAuth2NextRefreshAtFromExpiresIn,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications,
   type IntegrationOAuth2AuthorizationCodeCapability,
+  type IntegrationOAuth2AuthorizationCodeCompleteGrantResult,
   type IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification,
+  type IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
@@ -165,18 +168,14 @@ export function resolveSignozCompleteGrantResult(input: {
   providerState: z.output<typeof SignozProviderStateSchema>;
   response: SignozTokenResponse;
   issuedAt: Date;
-}): {
-  connectionConfig: Omit<SignozConnectionConfig, "connection_method">;
-  accessToken: string;
-  accessTokenExpiresAt: string;
-  refreshToken: string;
-} {
+}): IntegrationOAuth2AuthorizationCodeCompleteGrantResult {
   return {
     connectionConfig: {
       region: input.providerState.region,
       client_id: input.providerState.clientId,
     },
     accessToken: input.response.access_token,
+    refreshSchedulingResponse: input.response,
     accessTokenExpiresAt: resolveExpiresAt({
       issuedAt: input.issuedAt,
       expiresInSeconds: input.response.expires_in,
@@ -188,13 +187,10 @@ export function resolveSignozCompleteGrantResult(input: {
 export function resolveSignozRefreshResult(input: {
   response: SignozTokenResponse;
   issuedAt: Date;
-}): {
-  accessToken: string;
-  accessTokenExpiresAt: string;
-  refreshToken: string;
-} {
+}): IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult {
   return {
     accessToken: input.response.access_token,
+    refreshSchedulingResponse: input.response,
     accessTokenExpiresAt: resolveExpiresAt({
       issuedAt: input.issuedAt,
       expiresInSeconds: input.response.expires_in,
@@ -392,6 +388,26 @@ export const SignozMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Author
     return resolveSignozRefreshResult({
       response: SignozTokenResponseSchema.parse(await response.json()),
       issuedAt: new Date(),
+    });
+  },
+
+  resolveNextRefresh(input) {
+    const parsedResponse = SignozTokenResponseSchema.safeParse(input.response);
+    if (!parsedResponse.success) {
+      input.logger?.warn(
+        {
+          issues: parsedResponse.error.issues,
+        },
+        "OAuth 2.0 next refresh resolution skipped because token response is invalid",
+      );
+      return undefined;
+    }
+
+    return resolveOAuth2NextRefreshAtFromExpiresIn({
+      buffer: input.buffer,
+      logger: input.logger,
+      now: input.now,
+      expiresIn: parsedResponse.data.expires_in,
     });
   },
 };

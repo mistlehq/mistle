@@ -193,7 +193,7 @@ describe("Google Ads OAuth authorization code support", () => {
         },
         issuedAt,
       }),
-    ).toEqual({
+    ).toMatchObject({
       connectionConfig: {
         connection_method: "oauth2-authorization-code",
         client_id: "google_client_123.apps.googleusercontent.com",
@@ -224,7 +224,7 @@ describe("Google Ads OAuth authorization code support", () => {
         },
         issuedAt,
       }),
-    ).toEqual({
+    ).toMatchObject({
       accessToken: "access_456",
       accessTokenExpiresAt: "2026-06-23T00:02:00.000Z",
       refreshToken: "refresh_456",
@@ -267,7 +267,7 @@ describe("Google Ads OAuth authorization code support", () => {
         },
         issuedAt: new Date("2026-06-23T00:00:00.000Z"),
       }),
-    ).toEqual({
+    ).toMatchObject({
       connectionConfig: {
         connection_method: "oauth2-authorization-code",
         client_id: "google_client_123.apps.googleusercontent.com",

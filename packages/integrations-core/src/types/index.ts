@@ -1424,6 +1424,7 @@ export type IntegrationDeviceAuthorizationPollResult<TConnectionConfig = Record<
       accessTokenExpiresAt?: string;
       refreshToken: string;
       refreshTokenExpiresAt?: string;
+      refreshSchedulingResponse?: unknown;
       credentialMetadata?: Record<string, unknown>;
     }
   | {
@@ -1514,6 +1515,7 @@ export type IntegrationOAuth2AuthorizationCodeCompleteGrantResult = {
   accessTokenExpiresAt?: string;
   refreshToken?: string;
   refreshTokenExpiresAt?: string;
+  refreshSchedulingResponse?: unknown;
   clientSecret?: string;
   credentialMetadata?: Record<string, unknown>;
   additionalCredentials?: ReadonlyArray<{
@@ -1545,8 +1547,22 @@ export type IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult = {
   accessTokenExpiresAt?: string;
   refreshToken?: string;
   refreshTokenExpiresAt?: string;
+  refreshSchedulingResponse?: unknown;
   credentialMetadata?: Record<string, unknown>;
 };
+
+export type IntegrationOAuth2ResolveNextRefreshInput<TResponse = unknown> = {
+  buffer: number;
+  logger?: {
+    warn: (context: Record<string, unknown>, message: string) => void;
+  };
+  now: () => Date;
+  response: TResponse;
+};
+
+export type IntegrationOAuth2ResolveNextRefresh<TResponse = unknown> = (
+  input: IntegrationOAuth2ResolveNextRefreshInput<TResponse>,
+) => Date | undefined;
 
 export type IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification =
   | "temporary"
@@ -1594,6 +1610,7 @@ export type IntegrationOAuth2AuthorizationCodeCapability<
       TConnectionConfig
     >,
   ): MaybePromise<IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult>;
+  resolveNextRefresh?: IntegrationOAuth2ResolveNextRefresh;
 };
 
 export type IntegrationOAuth2ClientCredentialsExchangeInput<

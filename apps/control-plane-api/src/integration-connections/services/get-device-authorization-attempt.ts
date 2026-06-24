@@ -8,7 +8,12 @@ import {
 import { NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { and, eq, sql } from "drizzle-orm";
+import type { OpenWorkflow } from "openworkflow";
 
+import {
+  resolveScheduledOAuth2CredentialRefreshAt,
+  scheduleOAuth2CredentialRefresh,
+} from "../../internal/integration-credentials/services/oauth2-refresh-scheduling.js";
 import {
   decryptDeviceAuthorizationProviderStateUtf8,
   encryptDeviceAuthorizationProviderStateUtf8,
@@ -181,6 +186,7 @@ export async function getDeviceAuthorizationAttempt(
       activeMasterEncryptionKeyVersion: number;
       masterEncryptionKeys: Record<string, string>;
     };
+    openWorkflow: Pick<OpenWorkflow, "runWorkflow">;
   },
   input: {
     organizationId: string;
@@ -632,6 +638,21 @@ export async function getDeviceAuthorizationAttempt(
           "Failed to invalidate gateway credential cache",
         );
       });
+  }
+
+  if (
+    completedAttempt.status === IntegrationDeviceAuthorizationAttemptStatuses.COMPLETED &&
+    pollResult.refreshSchedulingResponse !== undefined
+  ) {
+    await scheduleOAuth2CredentialRefresh({
+      openWorkflow: ctx.openWorkflow,
+      organizationId: input.organizationId,
+      connectionId: completedAttempt.connectionId,
+      nextRefreshAt: resolveScheduledOAuth2CredentialRefreshAt({
+        oauth2AuthorizationCode: resolved.oauth2AuthorizationCode,
+        refreshSchedulingResponse: pollResult.refreshSchedulingResponse,
+      }),
+    });
   }
 
   return completedAttempt;
