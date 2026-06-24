@@ -753,7 +753,7 @@ const DesignerBlueprintNodeDescriptionLineHeight = 16;
 const DesignerBlueprintNodeDescriptionCharsPerLine = 34;
 const DesignerBlueprintNodeRoutingSummaryHeight = 28;
 const DesignerBlueprintInitialViewport = { x: 48, y: 32, zoom: 0.95 };
-const DesignerBlueprintElk = new ELK();
+let designerBlueprintElk: InstanceType<typeof ELK> | null = null;
 
 type DesignerBlueprintVisualNodeData = {
   description?: string;
@@ -930,7 +930,7 @@ async function buildDesignerBlueprintGraph(input: {
 }): Promise<DesignerBlueprintGraph> {
   const unresolvedNodes = buildDesignerBlueprintUnresolvedNodes(input);
   const displayEdges = buildDesignerBlueprintDisplayEdges(input.blueprint);
-  const layout = await DesignerBlueprintElk.layout({
+  const layout = await getDesignerBlueprintElk().layout({
     id: "designer-blueprint",
     layoutOptions: {
       "elk.algorithm": "layered",
@@ -968,6 +968,11 @@ async function buildDesignerBlueprintGraph(input: {
     })),
     edges: displayEdges,
   };
+}
+
+function getDesignerBlueprintElk(): InstanceType<typeof ELK> {
+  designerBlueprintElk ??= new ELK();
+  return designerBlueprintElk;
 }
 
 function buildDesignerBlueprintUnresolvedNodes(input: {

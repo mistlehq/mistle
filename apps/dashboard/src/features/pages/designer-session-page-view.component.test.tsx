@@ -246,7 +246,7 @@ describe("DesignerCanvasWorkspace", () => {
     });
 
     expect(await screen.findByText("Issue opened")).toBeDefined();
-    expect(screen.getByLabelText("GitHub · Trigger")).toBeDefined();
+    expect(await screen.findByLabelText("GitHub · Trigger")).toBeDefined();
     await waitFor(() => {
       expect(
         document.querySelector(`img[src="${resolveIntegrationLogoPath({ logoKey: "github" })}"]`),
