@@ -99,8 +99,6 @@ describe.concurrent("designer sessions integration", () => {
     expect(codexAgents?.content).toContain(
       "Ask one focused clarification only when the request is too unclear to draft a high-level workflow.",
     );
-    expect(codexAgents?.content).toContain("Put the recommended selectable option first.");
-    expect(codexAgents?.content).toContain("Keep option labels short and clear.");
     expect(codexAgents?.content).toContain(
       'When asking which sandbox profile should run or receive a workflow, always include "Create a new sandbox profile" alongside recommended existing profiles.',
     );
@@ -115,6 +113,9 @@ describe.concurrent("designer sessions integration", () => {
     );
     expect(codexAgents?.content).toContain(
       "Put provider/source details directly on trigger items with `integrationTargetKey`, `integrationLabel`, and `eventLabel` when known.",
+    );
+    expect(codexAgents?.content).toContain(
+      "Keep blueprint documents semantic: describe workflow items, relationships, and routing targets.",
     );
     expect(codexAgents?.content).toContain(
       "Do not represent sandbox profile selection, integration setup, provider-resource selection, or confirmation as blueprint nodes.",
