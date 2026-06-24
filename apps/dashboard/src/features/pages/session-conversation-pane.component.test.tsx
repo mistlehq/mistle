@@ -549,6 +549,55 @@ describe("SessionConversationBottomPanel", () => {
     expect(screen.getByRole("textbox")).toBeTruthy();
   });
 
+  it("hides the working indicator while a pending server request is shown", () => {
+    render(
+      <SessionConversationBottomPanel
+        chatEntries={[]}
+        composerViewModel={{
+          ...SessionComposerFixtureProps,
+        }}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={function onRespondToServerRequest() {}}
+        serverRequestPanelEntries={[
+          {
+            requestId: "triage-source-choice-request-1",
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [
+              {
+                header: "Intake source",
+                id: "triage-source-choice",
+                options: [
+                  {
+                    label: "GitHub issues/PRs",
+                    isOther: false,
+                  },
+                  {
+                    label: "Slack messages",
+                    isOther: false,
+                  },
+                  {
+                    label: "Support tickets",
+                    isOther: false,
+                  },
+                ],
+                question: "What should the triaging agent watch first?",
+              },
+            ],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        showWorkingIndicator
+        statusMessage={null}
+      />,
+    );
+
+    expect(screen.getByText("What should the triaging agent watch first?")).toBeTruthy();
+    expect(screen.queryByRole("status", { name: "Working" })).toBeNull();
+    expect(screen.getByRole("textbox")).toBeTruthy();
+  });
+
   it("shows upload failures in the rendered pane and keeps pending attachments visible", async () => {
     const { container } = render(
       <RenderedComposerPaneHarness
