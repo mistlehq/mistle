@@ -98,12 +98,14 @@ describe.concurrent("designer sessions integration", () => {
       "Ask one focused clarification only when the request is too unclear to draft even a high-level workflow.",
     );
     expect(codexAgents?.content).toContain(
-      "When a setup decision needs user input, use Codex's native user input request flow. Ask exactly one focused question per request.",
+      "When a setup decision needs user input, call the dashboard-control dynamic tool `dashboard_control.request_user_input`. Ask exactly one focused question per request.",
     );
     expect(codexAgents?.content).toContain(
-      "Include your recommended answer and the trade-off it implies. Provide selectable options when choices are clear; use free-form input only when the answer cannot be reduced to options.",
+      "Include your recommended answer first and explain the trade-off in that option's description. Provide selectable options when choices are clear; use free-form input only when the answer cannot be reduced to options.",
     );
-    expect(codexAgents?.content).toContain("Use one native user input request per decision.");
+    expect(codexAgents?.content).toContain(
+      "Use one `dashboard_control.request_user_input` call per decision.",
+    );
     expect(codexAgents?.content).toContain(
       "Organize the blueprint as the workflow process first: show the triggers that start or advance the workflow, the agent steps that run, and the outputs the workflow produces.",
     );
@@ -121,7 +123,7 @@ describe.concurrent("designer sessions integration", () => {
     );
     expect(codexAgents?.content).toContain('show_designer_canvas_tab` with `tab.kind: "blueprint"');
     expect(codexAgents?.content).toContain(
-      "not a Mistle MCP tool. Do not search Mistle MCP tool discovery",
+      "not Mistle MCP tools. Do not search Mistle MCP tool discovery",
     );
     expect(codexAgents?.content).toContain('show_designer_canvas_tab` with `tab.kind: "route"');
 
