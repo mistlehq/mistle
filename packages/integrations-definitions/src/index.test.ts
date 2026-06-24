@@ -1409,6 +1409,7 @@ describe("integrations-definitions index", () => {
       "expo::expo-mcp",
       "fireworks::fireworks-default",
       "gcp::gcp-mcp",
+      "google::google-default",
       "google-analytics::google-analytics-mcp",
       "googleads::googleads-default",
       "google-business-profile::google-business-profile-mcp",
