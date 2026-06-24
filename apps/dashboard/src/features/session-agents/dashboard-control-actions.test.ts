@@ -32,7 +32,8 @@ describe("dashboard control actions", () => {
                     enum: ["route"],
                   },
                   href: {
-                    description: "Dashboard-internal absolute path.",
+                    description:
+                      "Dashboard-internal absolute path. Do not use /designer/blueprints/current; that href is reserved for blueprint tabs.",
                   },
                 },
               },
@@ -412,6 +413,36 @@ describe("dashboard control actions", () => {
       contentItems: [{ type: "inputText", text: "Designer canvas tab input is invalid." }],
       success: false,
     });
+  });
+
+  it("rejects route tabs that use the reserved Designer blueprint tab identity", () => {
+    for (const tab of [
+      {
+        kind: "route",
+        id: "designer-blueprint-current",
+        title: "Blueprint",
+        href: "/integrations",
+      },
+      {
+        kind: "route",
+        id: "blueprint-route",
+        title: "Blueprint",
+        href: "/designer/blueprints/current",
+      },
+    ]) {
+      const parsed = parseDashboardControlDynamicToolCall({
+        namespace: DashboardControlDynamicToolNamespace,
+        tool: DesignerCanvasTabShowDynamicToolName,
+        arguments: {
+          tab,
+        },
+      });
+
+      expect(parsed).toEqual({
+        contentItems: [{ type: "inputText", text: "Designer canvas tab input is invalid." }],
+        success: false,
+      });
+    }
   });
 
   it("rejects Designer user input calls without an answer surface", () => {

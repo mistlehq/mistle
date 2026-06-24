@@ -227,7 +227,13 @@ const designerBlueprintDocumentSchema = z
 const designerSessionRouteCanvasTabSchema = z
   .object({
     kind: z.literal("route"),
-    id: z.string().min(1).max(128),
+    id: z
+      .string()
+      .min(1)
+      .max(128)
+      .refine((id) => id !== "designer-blueprint-current", {
+        message: "id is reserved for the Designer blueprint tab.",
+      }),
     title: z.string().min(1).max(120),
     href: z
       .string()
@@ -235,6 +241,9 @@ const designerSessionRouteCanvasTabSchema = z
       .max(2_048)
       .refine((href) => isDashboardInternalAbsolutePath(href), {
         message: "href must be a dashboard-internal absolute path.",
+      })
+      .refine((href) => href !== "/designer/blueprints/current", {
+        message: "href is reserved for the Designer blueprint tab.",
       }),
   })
   .strict();

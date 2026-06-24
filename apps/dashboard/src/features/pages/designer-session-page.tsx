@@ -48,28 +48,16 @@ function upsertDesignerCanvasTab(input: {
   currentTabs: readonly DesignerSessionCanvasTab[];
   requestedTab: DesignerCanvasRouteTabShowInput;
 }): readonly DesignerSessionCanvasTab[] {
-  const matchingHrefTab = input.currentTabs.find((tab) => tab.href === input.requestedTab.href);
-  if (matchingHrefTab !== undefined) {
+  const hasMatchingRouteTab = input.currentTabs.some(
+    (tab) => tab.kind === "route" && tab.id === input.requestedTab.id,
+  );
+  if (hasMatchingRouteTab) {
     return input.currentTabs.map((tab) =>
-      tab.href !== input.requestedTab.href
+      tab.kind !== "route" || tab.id !== input.requestedTab.id
         ? tab
         : {
             kind: "route",
-            id: tab.id,
-            title: input.requestedTab.title,
-            href: input.requestedTab.href,
-          },
-    );
-  }
-
-  const matchingIdTab = input.currentTabs.find((tab) => tab.id === input.requestedTab.id);
-  if (matchingIdTab !== undefined) {
-    return input.currentTabs.map((tab) =>
-      tab.id !== input.requestedTab.id
-        ? tab
-        : {
-            kind: "route",
-            id: tab.id,
+            id: input.requestedTab.id,
             title: input.requestedTab.title,
             href: input.requestedTab.href,
           },

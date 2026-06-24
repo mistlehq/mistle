@@ -2,7 +2,11 @@ import type { CodexDynamicToolSpec } from "@mistle/integrations-definitions/agen
 import type { CodexJsonRpcServerRequest } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { z } from "zod";
 
-import { DesignerBlueprintDocumentSchema } from "../designer/designer-blueprint-schema.js";
+import {
+  DesignerBlueprintCurrentTabHref,
+  DesignerBlueprintCurrentTabId,
+  DesignerBlueprintDocumentSchema,
+} from "../designer/designer-blueprint-schema.js";
 import type { ToolRequestUserInputEntry } from "./server-requests/server-request-entries.js";
 
 export const DesignerCanvasTabOpenAction = "designerCanvas.tabOpen";
@@ -16,7 +20,13 @@ export const DesignerUserInputRequestDynamicToolName = "request_user_input";
 const DesignerCanvasRouteTabShowInputSchema = z
   .object({
     kind: z.literal("route"),
-    id: z.string().min(1).max(128),
+    id: z
+      .string()
+      .min(1)
+      .max(128)
+      .refine((id) => id !== DesignerBlueprintCurrentTabId, {
+        message: "id is reserved for the Designer blueprint tab.",
+      }),
     title: z.string().min(1).max(120),
     href: z
       .string()
@@ -24,6 +34,9 @@ const DesignerCanvasRouteTabShowInputSchema = z
       .max(2_048)
       .refine((href) => isDashboardInternalAbsolutePath(href), {
         message: "href must be a dashboard-internal absolute path.",
+      })
+      .refine((href) => href !== DesignerBlueprintCurrentTabHref, {
+        message: "href is reserved for the Designer blueprint tab.",
       }),
   })
   .strict();
@@ -446,7 +459,8 @@ const DesignerCanvasRouteTabJsonSchema = {
       type: "string",
       minLength: 1,
       maxLength: 128,
-      description: "Stable tab id for this dashboard route.",
+      description:
+        "Stable tab id for this dashboard route. Do not use designer-blueprint-current; that id is reserved for blueprint tabs.",
     },
     title: {
       type: "string",
@@ -457,7 +471,8 @@ const DesignerCanvasRouteTabJsonSchema = {
       type: "string",
       minLength: 1,
       maxLength: 2048,
-      description: "Dashboard-internal absolute path.",
+      description:
+        "Dashboard-internal absolute path. Do not use /designer/blueprints/current; that href is reserved for blueprint tabs.",
     },
   },
   required: ["kind", "id", "title", "href"],

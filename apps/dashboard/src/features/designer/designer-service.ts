@@ -22,19 +22,6 @@ const DesignerSessionRouteCanvasTabSchema = z
   })
   .strict();
 
-const DesignerSessionLegacyRouteCanvasTabBaseSchema = z
-  .object({
-    id: z.string().min(1),
-    title: z.string().min(1),
-    href: z.string().min(1),
-  })
-  .strict();
-
-const DesignerSessionLegacyRouteCanvasTabSchema =
-  DesignerSessionLegacyRouteCanvasTabBaseSchema.transform(
-    normalizeLegacyDesignerSessionRouteCanvasTab,
-  );
-
 const DesignerSessionBlueprintCanvasTabSchema = z
   .object({
     kind: z.literal("blueprint"),
@@ -48,7 +35,6 @@ const DesignerSessionBlueprintCanvasTabSchema = z
 const DesignerSessionCanvasTabSchema = z.union([
   DesignerSessionRouteCanvasTabSchema,
   DesignerSessionBlueprintCanvasTabSchema,
-  DesignerSessionLegacyRouteCanvasTabSchema,
 ]);
 
 const DesignerSessionCanvasTabsSchema = z.array(DesignerSessionCanvasTabSchema);
@@ -125,23 +111,6 @@ export type DesignerSessionCanvasTab = z.output<typeof DesignerSessionCanvasTabS
 export const designerSessionsQueryKey = ["designer", "sessions"] as const;
 export function designerSessionQueryKey(sessionId: string) {
   return ["designer", "sessions", sessionId] as const;
-}
-
-export function normalizeDesignerSessionCanvasTabs(
-  input: unknown,
-): readonly DesignerSessionCanvasTab[] {
-  return DesignerSessionCanvasTabsSchema.parse(input);
-}
-
-function normalizeLegacyDesignerSessionRouteCanvasTab(
-  tab: z.output<typeof DesignerSessionLegacyRouteCanvasTabBaseSchema>,
-): z.output<typeof DesignerSessionRouteCanvasTabSchema> {
-  return {
-    kind: "route",
-    id: tab.id,
-    title: tab.title,
-    href: tab.href,
-  };
 }
 
 export async function listDesignerSessions(input?: {
