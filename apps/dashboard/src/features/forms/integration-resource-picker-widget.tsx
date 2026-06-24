@@ -16,7 +16,10 @@ import {
   IntegrationConnectionResourcePickerView,
   toIntegrationConnectionResourcePickerItems,
 } from "./integration-connection-resource-picker-view.js";
-import { buildIntegrationResourcePickerViewModel } from "./integration-resource-picker-view-model.js";
+import {
+  buildIntegrationResourcePickerViewModel,
+  type IntegrationResourceListViewState,
+} from "./integration-resource-picker-view-model.js";
 import type { SchemaFormContext } from "./schema-form.js";
 
 type JsonObject = Record<string, unknown>;
@@ -191,6 +194,18 @@ export function IntegrationResourcePickerWidget(
         fallbackMessage: "Could not load resources for this connection.",
       });
   const availableCount = resourceQuery.data?.items.length ?? options.resourceSummary?.count;
+  const listState: IntegrationResourceListViewState = resourceQuery.isPending
+    ? {
+        mode: "loading",
+      }
+    : resourceQuery.isError
+      ? {
+          mode: "error",
+          message: resourceListErrorMessage ?? "Could not load resources for this connection.",
+        }
+      : {
+          mode: "ready",
+        };
   const widgetViewModel = buildIntegrationResourcePickerViewModel({
     title: options.title,
     availableCount,
@@ -202,18 +217,7 @@ export function IntegrationResourcePickerWidget(
     selectedCount: selectedHandles.length,
     refreshErrorMessage,
     unavailableSelectedHandles,
-    listState: resourceQuery.isPending
-      ? {
-          mode: "loading",
-        }
-      : resourceQuery.isError
-        ? {
-            mode: "error",
-            message: resourceListErrorMessage ?? "Could not load resources for this connection.",
-          }
-        : {
-            mode: "ready",
-          },
+    listState,
     visibleItemsCount: visibleItems.length,
   });
 
@@ -223,21 +227,7 @@ export function IntegrationResourcePickerWidget(
       id={props.id}
       isRefreshing={refreshMutation.isPending}
       label={props.label}
-      listState={
-        resourceQuery.isPending
-          ? {
-              mode: "loading",
-            }
-          : resourceQuery.isError
-            ? {
-                mode: "error",
-                message:
-                  resourceListErrorMessage ?? "Could not load resources for this connection.",
-              }
-            : {
-                mode: "ready",
-              }
-      }
+      listState={listState}
       onBlur={() => {
         props.onBlur(props.id, selectedHandles);
       }}
