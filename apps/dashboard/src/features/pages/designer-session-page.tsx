@@ -386,6 +386,7 @@ function LoadedDesignerSessionPage(input: {
       secondaryPanel={{
         kind: "custom",
         diffControlTitle: "Changes are not shown in Designer.",
+        isVisible: input.canvasTabs.length > 0,
         layoutKey: "designer-canvas",
         minSize: "20rem",
         renderPanel: () => (

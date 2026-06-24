@@ -4,6 +4,7 @@ import type { ChatEntry } from "../chat/chat-types.js";
 import {
   resolveSessionEntryPreparationState,
   shouldAutoStartWorkbenchTurn,
+  shouldShowSessionWorkbenchSecondaryPanel,
 } from "./session-workbench-full-page.js";
 
 type AutoStartInput = Parameters<typeof shouldAutoStartWorkbenchTurn>[0];
@@ -230,5 +231,65 @@ describe("resolveSessionEntryPreparationState", () => {
         }),
       ),
     ).toBeNull();
+  });
+});
+
+describe("shouldShowSessionWorkbenchSecondaryPanel", () => {
+  it("shows custom secondary panels by default", () => {
+    expect(
+      shouldShowSessionWorkbenchSecondaryPanel({
+        sharedSecondaryPanelKind: null,
+        secondaryPanel: {
+          kind: "custom",
+          diffControlTitle: "Custom panel",
+          layoutKey: "custom",
+          minSize: "20rem",
+          renderPanel: () => null,
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("hides custom secondary panels when they explicitly opt out", () => {
+    expect(
+      shouldShowSessionWorkbenchSecondaryPanel({
+        sharedSecondaryPanelKind: null,
+        secondaryPanel: {
+          kind: "custom",
+          diffControlTitle: "Custom panel",
+          isVisible: false,
+          layoutKey: "custom",
+          minSize: "20rem",
+          renderPanel: () => null,
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("shows the secondary panel when the conversation navigator is open", () => {
+    expect(
+      shouldShowSessionWorkbenchSecondaryPanel({
+        sharedSecondaryPanelKind: "conversations",
+        secondaryPanel: {
+          kind: "custom",
+          diffControlTitle: "Custom panel",
+          isVisible: false,
+          layoutKey: "custom",
+          minSize: "20rem",
+          renderPanel: () => null,
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("shows the secondary panel when the diff panel is open", () => {
+    expect(
+      shouldShowSessionWorkbenchSecondaryPanel({
+        sharedSecondaryPanelKind: "diff",
+        secondaryPanel: {
+          kind: "diff",
+        },
+      }),
+    ).toBe(true);
   });
 });

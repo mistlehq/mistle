@@ -60,6 +60,7 @@ type SessionWorkbenchFullPageSecondaryPanel =
   | {
       kind: "custom";
       diffControlTitle: string;
+      isVisible?: boolean;
       layoutKey: string;
       minSize: string;
       renderPanel: () => React.ReactNode;
@@ -188,6 +189,16 @@ export function resolveSessionEntryPreparationState(input: {
   }
 
   return "starting_first_turn";
+}
+
+export function shouldShowSessionWorkbenchSecondaryPanel(input: {
+  sharedSecondaryPanelKind: "conversations" | "diff" | null;
+  secondaryPanel: SessionWorkbenchFullPageSecondaryPanel;
+}): boolean {
+  return (
+    (input.secondaryPanel.kind === "custom" && (input.secondaryPanel.isVisible ?? true)) ||
+    input.sharedSecondaryPanelKind !== null
+  );
 }
 
 export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): React.JSX.Element {
@@ -753,10 +764,10 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
           />
         }
         isBottomPanelVisible={workbench.terminalPanelState.isVisible}
-        isSecondaryPanelVisible={
-          input.secondaryPanel.kind === "custom" ||
-          conversationNavigation.secondaryPanelKind !== null
-        }
+        isSecondaryPanelVisible={shouldShowSessionWorkbenchSecondaryPanel({
+          sharedSecondaryPanelKind: conversationNavigation.secondaryPanelKind,
+          secondaryPanel: input.secondaryPanel,
+        })}
         {...(conversationNavigation.secondaryPanelKind === "conversations"
           ? { secondaryPanelDefaultSize: "20%" }
           : {})}
