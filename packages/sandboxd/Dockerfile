@@ -160,18 +160,18 @@ ENTRYPOINT ["/sbin/init"]
 FROM sandbox-base AS sandbox-designer-base
 
 ARG TARGETARCH
-ARG CODEX_CLI_VERSION=0.142.0-alpha.12
+ARG CODEX_CLI_VERSION=0.142.0
 
 RUN case "${TARGETARCH}" in \
       amd64) \
         codex_asset="codex-x86_64-unknown-linux-musl.tar.gz"; \
         codex_binary="codex-x86_64-unknown-linux-musl"; \
-        codex_sha256="9514f4e738f099c83a58c5231c4566d42af1d5c597928de11913b983664e3c62"; \
+        codex_sha256="2e3acb39a277ff11c314d832cfdd246faebeea26bf01aff8e9e10641e6dea801"; \
         ;; \
       arm64) \
         codex_asset="codex-aarch64-unknown-linux-musl.tar.gz"; \
         codex_binary="codex-aarch64-unknown-linux-musl"; \
-        codex_sha256="73587b5a875d5b29586bce321600038ddf3bcf0c50f055ef209855ef074f8b99"; \
+        codex_sha256="63fc9816f174ab4f713031e638201c49cfa7cc5f41a22b9db71010afa7e09892"; \
         ;; \
       *) \
         echo "Unsupported Designer Codex CLI architecture: ${TARGETARCH}" >&2; \
