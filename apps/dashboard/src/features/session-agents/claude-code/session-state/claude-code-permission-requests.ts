@@ -96,8 +96,6 @@ function mapClaudeCodeAskUserQuestionToServerRequest(
             return [
               {
                 label,
-                description:
-                  typeof option["description"] === "string" ? option["description"] : null,
                 isOther: false,
               },
             ];
@@ -111,7 +109,6 @@ function mapClaudeCodeAskUserQuestionToServerRequest(
           ...options,
           {
             label: "Other",
-            description: null,
             isOther: true,
           },
         ],

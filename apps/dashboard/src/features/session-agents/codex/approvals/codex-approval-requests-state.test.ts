@@ -164,7 +164,6 @@ describe("reduceCodexApprovalRequestsState", () => {
               options: [
                 {
                   label: "A",
-                  description: "First option",
                   isOther: false,
                 },
                 {
@@ -191,12 +190,10 @@ describe("reduceCodexApprovalRequestsState", () => {
             options: [
               {
                 label: "A",
-                description: "First option",
                 isOther: false,
               },
               {
                 label: "B",
-                description: null,
                 isOther: true,
               },
             ],
@@ -223,7 +220,6 @@ describe("reduceCodexApprovalRequestsState", () => {
             options: [
               {
                 label: "ABC",
-                description: "Recommended because it has the newer active version.",
                 isOther: false,
               },
             ],
@@ -247,7 +243,6 @@ describe("reduceCodexApprovalRequestsState", () => {
             options: [
               {
                 label: "ABC",
-                description: "Recommended because it has the newer active version.",
                 isOther: false,
               },
             ],
@@ -353,7 +348,6 @@ describe("reduceCodexApprovalRequestsState", () => {
             options: [
               {
                 label: "Slack messages",
-                description: "Recommended for a general triage inbox.",
                 isOther: false,
               },
             ],

@@ -47,12 +47,10 @@ const MixedServerRequestEntries: readonly ServerRequestEntry[] = [
         options: [
           {
             label: "GPT-5",
-            description: "Higher quality output for review-heavy work.",
             isOther: false,
           },
           {
             label: "GPT-5 Mini",
-            description: "Lower latency for incremental iteration.",
             isOther: false,
           },
         ],
@@ -64,7 +62,6 @@ const MixedServerRequestEntries: readonly ServerRequestEntry[] = [
         options: [
           {
             label: "Add a note",
-            description: "Provide any dashboard-specific caveats.",
             isOther: true,
           },
         ],
@@ -120,19 +117,15 @@ const SuggestedNextActionEntries: readonly ServerRequestEntry[] = [
         options: [
           {
             label: "Stop all sequences - let's start fresh with new messaging",
-            description:
-              "Recommended when the current sequence no longer matches the desired tone.",
             isOther: false,
           },
           {
             label:
               "Don't stop yet - show me who accepted my LinkedIn connection so I can follow up manually",
-            description: "Keeps current outreach active while surfacing manual follow-up targets.",
             isOther: false,
           },
           {
             label: "Keep the sequences running - I want to workshop new copy first, then update",
-            description: "Avoids interrupting active campaigns before replacement copy is ready.",
             isOther: false,
           },
         ],

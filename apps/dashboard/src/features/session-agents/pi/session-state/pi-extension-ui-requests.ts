@@ -69,7 +69,6 @@ function mapPiUserInputRequest(
           question: request.title,
           options: request.options.map((option) => ({
             label: option,
-            description: null,
             isOther: false,
           })),
         },
@@ -92,7 +91,6 @@ function mapPiUserInputRequest(
           options: [
             {
               label: "Response",
-              description: null,
               defaultValue: request.prefill ?? "",
               inputKind: "textarea",
               isOther: true,
@@ -117,7 +115,6 @@ function mapPiUserInputRequest(
         options: [
           {
             label: request.placeholder ?? "Response",
-            description: null,
             isOther: true,
           },
         ],

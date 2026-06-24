@@ -80,25 +80,8 @@ function createUserInputResponse(input: {
 
 function shouldRenderOptionRows(options: readonly ToolUserInputOption[]): boolean {
   return options.some(
-    (option) =>
-      !option.isOther &&
-      (option.description !== null || option.label.length > CompactOptionLabelMaxLength),
+    (option) => !option.isOther && option.label.length > CompactOptionLabelMaxLength,
   );
-}
-
-function createUserInputPanelTitle(
-  entry: Extract<ServerRequestEntry, { kind: "tool-user-input" }>,
-): string {
-  const firstQuestion = entry.questions[0];
-  if (
-    entry.questions.length === 1 &&
-    firstQuestion !== undefined &&
-    firstQuestion.header !== null
-  ) {
-    return firstQuestion.header;
-  }
-
-  return "Input needed";
 }
 
 function UserInputOptions(input: {
@@ -116,7 +99,7 @@ function UserInputOptions(input: {
 
   if (!shouldRenderOptionRows(selectableOptions)) {
     return (
-      <div className="flex flex-wrap gap-2">
+      <div className="mx-4 flex flex-wrap gap-2">
         {selectableOptions.map((option) => (
           <Button
             disabled={input.disabled}
@@ -139,7 +122,7 @@ function UserInputOptions(input: {
   }
 
   return (
-    <div className="divide-y overflow-hidden rounded-md border">
+    <div className="divide-border/60 mx-4 divide-y">
       {selectableOptions.map((option, index) => {
         const isSelected = input.selectedAnswer === option.label;
 
@@ -147,7 +130,7 @@ function UserInputOptions(input: {
           <button
             aria-pressed={isSelected}
             className={cn(
-              "flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+              "flex w-full items-center gap-3 rounded-md px-2 py-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
               isSelected ? "bg-muted" : "bg-background hover:bg-muted/60",
             )}
             disabled={input.disabled}
@@ -163,7 +146,7 @@ function UserInputOptions(input: {
           >
             <span
               className={cn(
-                "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border text-xs",
+                "flex size-6 shrink-0 items-center justify-center rounded-full border text-xs",
                 isSelected
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-muted text-muted-foreground",
@@ -171,15 +154,8 @@ function UserInputOptions(input: {
             >
               {index + 1}
             </span>
-            <span className="min-w-0 space-y-0.5">
-              <span className="block text-sm leading-5 font-medium text-foreground">
-                {option.label}
-              </span>
-              {option.description === null ? null : (
-                <span className="text-muted-foreground block text-xs leading-5">
-                  {option.description}
-                </span>
-              )}
+            <span className="block min-w-0 text-sm leading-5 font-medium text-foreground">
+              {option.label}
             </span>
           </button>
         );
@@ -330,11 +306,11 @@ export function ServerRequestsPanel({
                       return (
                         <div className="space-y-2" key={question.id}>
                           {entry.questions.length === 1 || question.header === null ? null : (
-                            <p className="text-muted-foreground text-xs font-medium">
+                            <p className="text-muted-foreground mx-4 text-xs font-medium">
                               {question.header}
                             </p>
                           )}
-                          <p className="text-muted-foreground text-sm leading-5">
+                          <p className="text-muted-foreground mr-4 ml-6 text-sm leading-5">
                             {question.question}
                           </p>
                           <UserInputOptions
@@ -364,30 +340,34 @@ export function ServerRequestsPanel({
                           />
                           {otherOption === undefined ? null : otherOption.inputKind ===
                             "textarea" ? (
-                            <Textarea
-                              className="min-h-32"
-                              disabled={isRespondingToServerRequest}
-                              onChange={(event) => {
-                                setUserInputAnswers((current) => ({
-                                  ...current,
-                                  [answerKey]: event.target.value,
-                                }));
-                              }}
-                              placeholder={otherOption.label}
-                              value={selectedAnswer}
-                            />
+                            <div className="mx-4">
+                              <Textarea
+                                className="min-h-32"
+                                disabled={isRespondingToServerRequest}
+                                onChange={(event) => {
+                                  setUserInputAnswers((current) => ({
+                                    ...current,
+                                    [answerKey]: event.target.value,
+                                  }));
+                                }}
+                                placeholder={otherOption.label}
+                                value={selectedAnswer}
+                              />
+                            </div>
                           ) : (
-                            <Input
-                              disabled={isRespondingToServerRequest}
-                              onChange={(event) => {
-                                setUserInputAnswers((current) => ({
-                                  ...current,
-                                  [answerKey]: event.target.value,
-                                }));
-                              }}
-                              placeholder={otherOption.label}
-                              value={selectedAnswer}
-                            />
+                            <div className="mx-4">
+                              <Input
+                                disabled={isRespondingToServerRequest}
+                                onChange={(event) => {
+                                  setUserInputAnswers((current) => ({
+                                    ...current,
+                                    [answerKey]: event.target.value,
+                                  }));
+                                }}
+                                placeholder={otherOption.label}
+                                value={selectedAnswer}
+                              />
+                            </div>
                           )}
                         </div>
                       );
@@ -398,7 +378,8 @@ export function ServerRequestsPanel({
                   </div>
                 }
                 key={requestKey}
-                title={createUserInputPanelTitle(entry)}
+                padding="flush-x"
+                title={null}
               />
             );
           }

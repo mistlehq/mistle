@@ -39,7 +39,6 @@ export type ToolRequestUserInputEntry = {
     id: string;
     options: readonly {
       label: string;
-      description: string | null;
       defaultValue?: string | null;
       inputKind?: "textarea";
       isOther: boolean;

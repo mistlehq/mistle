@@ -265,11 +265,9 @@ describe("dashboard control actions", () => {
         options: [
           {
             label: "ABC",
-            description: "Recommended because it has the newer active version.",
           },
           {
             label: "Whapi Ver",
-            description: "Use this if you want to keep the existing WhatsApp profile.",
           },
         ],
       },
@@ -284,11 +282,9 @@ describe("dashboard control actions", () => {
         options: [
           {
             label: "ABC",
-            description: "Recommended because it has the newer active version.",
           },
           {
             label: "Whapi Ver",
-            description: "Use this if you want to keep the existing WhatsApp profile.",
           },
         ],
       },
@@ -305,7 +301,6 @@ describe("dashboard control actions", () => {
         options: [
           {
             label: "ABC",
-            description: "Recommended because it has the newer active version.",
           },
         ],
       },
@@ -323,7 +318,6 @@ describe("dashboard control actions", () => {
           options: [
             {
               label: "ABC",
-              description: "Recommended because it has the newer active version.",
               isOther: false,
             },
           ],

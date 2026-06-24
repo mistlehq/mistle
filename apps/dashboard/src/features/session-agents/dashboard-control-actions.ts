@@ -56,7 +56,6 @@ const DesignerCanvasTabShowDynamicToolCallSchema = z
 const DesignerUserInputOptionSchema = z
   .object({
     label: z.string().min(1).max(240),
-    description: z.string().min(1).max(500).optional(),
   })
   .strict();
 
@@ -495,12 +494,6 @@ const DesignerUserInputOptionJsonSchema = {
       minLength: 1,
       maxLength: 240,
     },
-    description: {
-      type: "string",
-      minLength: 1,
-      maxLength: 500,
-      description: "Short trade-off or recommendation detail for this option.",
-    },
   },
   required: ["label"],
 };
@@ -608,7 +601,6 @@ function createDashboardControlFreeFormUserInputOption(
   if (freeForm.inputKind === "textarea") {
     return {
       label: freeForm.label,
-      description: null,
       defaultValue: freeForm.defaultValue ?? null,
       inputKind: "textarea",
       isOther: true,
@@ -617,7 +609,6 @@ function createDashboardControlFreeFormUserInputOption(
 
   return {
     label: freeForm.label,
-    description: null,
     defaultValue: freeForm.defaultValue ?? null,
     isOther: true,
   };
@@ -714,7 +705,6 @@ export function createDashboardControlUserInputServerRequest(input: {
         options: [
           ...(input.userInput.options ?? []).map((option) => ({
             label: option.label,
-            description: option.description ?? null,
             isOther: false,
           })),
           ...(freeFormOption === null ? [] : [freeFormOption]),

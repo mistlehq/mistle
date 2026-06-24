@@ -73,7 +73,6 @@ describe("Claude Code permission request presentation", () => {
                 options: [
                   {
                     label: "Postgres",
-                    description: "Use PostgreSQL",
                   },
                 ],
               },
@@ -94,12 +93,10 @@ describe("Claude Code permission request presentation", () => {
             options: [
               {
                 label: "Postgres",
-                description: "Use PostgreSQL",
                 isOther: false,
               },
               {
                 label: "Other",
-                description: null,
                 isOther: true,
               },
             ],

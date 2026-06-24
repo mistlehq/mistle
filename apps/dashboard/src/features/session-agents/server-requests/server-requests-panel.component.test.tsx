@@ -64,12 +64,10 @@ describe("ServerRequestsPanel", () => {
                 options: [
                   {
                     label: "A",
-                    description: "First option",
                     isOther: false,
                   },
                   {
                     label: "Other",
-                    description: null,
                     isOther: true,
                   },
                 ],
@@ -85,6 +83,10 @@ describe("ServerRequestsPanel", () => {
         }}
       />,
     );
+
+    expect(screen.queryByText("Choice")).toBeNull();
+    expect(screen.getByText("Which option?").textContent).toBe("Which option?");
+    expect(screen.queryByText("First option")).toBeNull();
 
     fireEvent.change(screen.getByPlaceholderText("Other"), {
       target: {
@@ -123,19 +125,16 @@ describe("ServerRequestsPanel", () => {
                 options: [
                   {
                     label: "Stop all sequences - let's start fresh with new messaging",
-                    description: "Recommended when the current campaign is clearly stale.",
                     isOther: false,
                   },
                   {
                     label:
                       "Don't stop yet - show me who accepted my LinkedIn connection so I can follow up manually",
-                    description: "Keeps outreach active while surfacing manual follow-up targets.",
                     isOther: false,
                   },
                   {
                     label:
                       "Keep the sequences running - I want to workshop new copy first, then update",
-                    description: "Avoids interrupting active campaigns before new copy is ready.",
                     isOther: false,
                   },
                 ],
@@ -152,15 +151,18 @@ describe("ServerRequestsPanel", () => {
       />,
     );
 
-    expect(screen.getByText("Suggested next actions").textContent).toBe("Suggested next actions");
+    expect(screen.queryByText("Suggested next actions")).toBeNull();
+    expect(screen.getByText("What should Designer do next?").textContent).toBe(
+      "What should Designer do next?",
+    );
     expect(screen.queryByText("User input requested")).toBeNull();
+    expect(screen.queryByText("Input needed")).toBeNull();
     expect(screen.queryByText("tool/requestUserInput")).toBeNull();
     expect(screen.queryByRole("button", { name: "Submit responses" })).toBeNull();
     expect(screen.getByText("1").textContent).toBe("1");
     expect(
-      screen.getByText("Keeps outreach active while surfacing manual follow-up targets.")
-        .textContent,
-    ).toBe("Keeps outreach active while surfacing manual follow-up targets.");
+      screen.queryByText("Keeps outreach active while surfacing manual follow-up targets."),
+    ).toBeNull();
 
     fireEvent.click(
       screen.getByRole("button", {
@@ -199,7 +201,6 @@ describe("ServerRequestsPanel", () => {
                 options: [
                   {
                     label: "Response",
-                    description: null,
                     defaultValue: "Keep this text",
                     inputKind: "textarea",
                     isOther: true,

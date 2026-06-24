@@ -59,7 +59,6 @@ const FileChangeApprovalRequestSchema = z.object({
 
 const ToolRequestUserInputOptionSchema = z.object({
   label: z.string().min(1),
-  description: z.string().optional(),
   isOther: z.boolean().optional(),
 });
 
@@ -252,7 +251,6 @@ function toApprovalRequestEntry(
         id: question.id,
         options: (question.options ?? []).map((option) => ({
           label: option.label,
-          description: option.description ?? null,
           isOther: option.isOther ?? false,
         })),
         question: question.question,
