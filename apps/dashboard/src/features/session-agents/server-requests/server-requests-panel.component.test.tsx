@@ -152,6 +152,20 @@ describe("ServerRequestsPanel", () => {
     expect(screen.getByText("What should the triaging agent watch first?").textContent).toBe(
       "What should the triaging agent watch first?",
     );
+    const requestStack = screen.getByRole("region", {
+      name: "Pending server requests",
+    }).firstChild;
+    expect(requestStack instanceof HTMLElement ? requestStack.className : "").toContain(
+      "overflow-y-auto",
+    );
+    expect(requestStack instanceof HTMLElement ? requestStack.className : "").not.toContain("px-1");
+    expect(requestStack instanceof HTMLElement ? requestStack.className : "").not.toContain("pr-2");
+    expect(
+      screen.getByText("What should the triaging agent watch first?").closest("article")?.className,
+    ).toContain("rounded-md");
+    expect(
+      screen.getByText("What should the triaging agent watch first?").closest("article")?.className,
+    ).not.toContain("shadow-sm");
     expect(screen.queryByRole("button", { name: "Submit responses" })).toBeNull();
     expect(screen.getByText("1").textContent).toBe("1");
     expect(screen.getByText("2").textContent).toBe("2");
