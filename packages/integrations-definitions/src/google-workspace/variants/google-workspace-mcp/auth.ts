@@ -28,10 +28,10 @@ export const GoogleWorkspaceServiceAccountCredentialSlotKeys: {
 
 export const GoogleWorkspaceConnectionMethodIds: {
   OAUTH2_AUTHORIZATION_CODE: typeof IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE;
-  SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION: "google-workspace-service-account-domain-wide-delegation";
+  SERVICE_ACCOUNT: "google-workspace-service-account";
 } = {
   OAUTH2_AUTHORIZATION_CODE: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
-  SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION: "google-workspace-service-account-domain-wide-delegation",
+  SERVICE_ACCOUNT: "google-workspace-service-account",
 };
 
 export const GoogleWorkspaceOAuthScopes: ReadonlyArray<string> = [
@@ -68,9 +68,7 @@ export const GoogleWorkspaceConnectionConfigSchema = z
 
 export const GoogleWorkspaceServiceAccountConnectionConfigSchema = z
   .object({
-    connection_method: z.literal(
-      GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION,
-    ),
+    connection_method: z.literal(GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT),
   })
   .strict();
 

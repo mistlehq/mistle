@@ -85,7 +85,7 @@ export const GoogleWorkspaceMcpBaseDefinition: GoogleWorkspaceMcpBaseIntegration
       },
     },
     {
-      id: GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION,
+      id: GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT,
       label: "Service account",
       kind: "form",
       secretFields: [

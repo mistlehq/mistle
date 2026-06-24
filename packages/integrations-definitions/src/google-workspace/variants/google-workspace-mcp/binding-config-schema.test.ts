@@ -14,6 +14,29 @@ describe("GoogleWorkspaceBindingConfigSchema", () => {
     });
   });
 
+  it("treats a blank Workspace user email as omitted", () => {
+    expect(
+      GoogleWorkspaceBindingConfigSchema.parse({
+        mcpServers: [GoogleWorkspaceMcpServerIds.DRIVE],
+        workspaceUserEmail: "  ",
+      }),
+    ).toEqual({
+      mcpServers: [GoogleWorkspaceMcpServerIds.DRIVE],
+    });
+  });
+
+  it("trims a Workspace user email before storing it", () => {
+    expect(
+      GoogleWorkspaceBindingConfigSchema.parse({
+        mcpServers: [GoogleWorkspaceMcpServerIds.DRIVE],
+        workspaceUserEmail: "  workspace-user@example.com  ",
+      }),
+    ).toEqual({
+      mcpServers: [GoogleWorkspaceMcpServerIds.DRIVE],
+      workspaceUserEmail: "workspace-user@example.com",
+    });
+  });
+
   it("rejects unsupported and duplicate Google Workspace MCP server ids", () => {
     expect(() =>
       GoogleWorkspaceBindingConfigSchema.parse({

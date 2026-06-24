@@ -38,10 +38,10 @@ describe("resolveGoogleWorkspaceBindingConfigForm", () => {
     expect(form.schema?.properties).not.toHaveProperty("workspaceUserEmail");
   });
 
-  it("asks for a Workspace user email when the connection uses a service account", () => {
+  it("asks for an optional Workspace user email when the connection uses a service account", () => {
     const form = resolveGoogleWorkspaceBindingConfigForm(
       createFormContext({
-        connectionMethod: GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT_DOMAIN_WIDE_DELEGATION,
+        connectionMethod: GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT,
       }),
     );
 
@@ -51,11 +51,11 @@ describe("resolveGoogleWorkspaceBindingConfigForm", () => {
           type: "string",
           title: "Workspace user email",
           description:
-            "Used as the Google Workspace user subject when minting access tokens with this service account. The Workspace admin must authorize the service account for the required scopes.",
+            "Optional delegated Workspace user subject for domain-wide delegation. Leave blank to mint tokens as the service account itself.",
         },
       },
-      required: ["workspaceUserEmail"],
     });
+    expect(form.schema).not.toHaveProperty("required");
     expect(form.uiSchema).toMatchObject({
       workspaceUserEmail: {
         "ui:placeholder": "user@example.com",

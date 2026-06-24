@@ -6,7 +6,11 @@ import type { IntegrationCredentialResolverInput } from "@mistle/integrations-co
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { GoogleWorkspaceCredentialSecretTypes, GoogleWorkspaceCredentialSlotKeys } from "./auth.js";
+import {
+  GoogleWorkspaceConnectionMethodIds,
+  GoogleWorkspaceCredentialSecretTypes,
+  GoogleWorkspaceCredentialSlotKeys,
+} from "./auth.js";
 import {
   buildGoogleWorkspaceServiceAccountJwtAssertion,
   buildGoogleWorkspaceServiceAccountTokenRequestBody,
@@ -21,7 +25,7 @@ const JwtPayloadSchema = z.object({
   aud: z.string(),
   exp: z.number(),
   iat: z.number(),
-  sub: z.string(),
+  sub: z.string().optional(),
 });
 
 function createRsaPrivateKeyPem(): string {
@@ -81,7 +85,7 @@ function createResolverInput(input: {
       id: "icn_google_workspace",
       status: "active",
       config: {
-        connection_method: "google-workspace-service-account-domain-wide-delegation",
+        connection_method: GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT,
       },
       secrets: {
         serviceAccountKeyJson: JSON.stringify(serviceAccountKey),
@@ -92,7 +96,9 @@ function createResolverInput(input: {
       kind: "connector",
       config: {
         mcpServers: ["gmail"],
-        workspaceUserEmail: input.workspaceUserEmail ?? "workspace-user@example.com",
+        ...(input.workspaceUserEmail === undefined
+          ? {}
+          : { workspaceUserEmail: input.workspaceUserEmail }),
       },
     },
     secretType: GoogleWorkspaceCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
@@ -167,7 +173,27 @@ describe("GoogleWorkspaceServiceAccountCredentialResolver", () => {
     }
   });
 
-  it("builds a service account JWT bearer assertion with a user subject", () => {
+  it("builds a service account JWT bearer assertion without a user subject", () => {
+    const assertion = buildGoogleWorkspaceServiceAccountJwtAssertion({
+      clientEmail: "workspace-mcp@example-project.iam.gserviceaccount.com",
+      privateKey: createRsaPrivateKeyPem(),
+      tokenEndpoint: "https://oauth2.googleapis.com/token",
+      issuedAtEpochSeconds: 1_700_000_000,
+    });
+
+    const payload = decodeJwtPayload(assertion);
+    expect(payload).toMatchObject({
+      iss: "workspace-mcp@example-project.iam.gserviceaccount.com",
+      aud: "https://oauth2.googleapis.com/token",
+      iat: 1_700_000_000,
+      exp: 1_700_003_600,
+    });
+    expect(payload).not.toHaveProperty("sub");
+    expect(payload.scope).toContain("https://www.googleapis.com/auth/gmail.readonly");
+    expect(payload.scope).toContain("https://www.googleapis.com/auth/chat.messages.create");
+  });
+
+  it("builds a domain-wide delegation JWT bearer assertion with a user subject", () => {
     const assertion = buildGoogleWorkspaceServiceAccountJwtAssertion({
       clientEmail: "workspace-mcp@example-project.iam.gserviceaccount.com",
       workspaceUserEmail: "workspace-user@example.com",
@@ -204,6 +230,20 @@ describe("GoogleWorkspaceServiceAccountCredentialResolver", () => {
         createResolverInput({
           privateKey: createRsaPrivateKeyPem(),
           tokenEndpoint: "https://oauth2.googleapis.com/token",
+        }),
+      ),
+    ).toMatchObject({
+      clientEmail: "workspace-mcp@example-project.iam.gserviceaccount.com",
+      tokenEndpoint: "https://oauth2.googleapis.com/token",
+    });
+  });
+
+  it("resolves domain-wide delegation service account context with a Workspace user email", () => {
+    expect(
+      resolveGoogleWorkspaceServiceAccountContext(
+        createResolverInput({
+          privateKey: createRsaPrivateKeyPem(),
+          tokenEndpoint: "https://oauth2.googleapis.com/token",
           workspaceUserEmail: "workspace-user@example.com",
         }),
       ),
@@ -220,6 +260,7 @@ describe("GoogleWorkspaceServiceAccountCredentialResolver", () => {
         createResolverInput({
           privateKey: createRsaPrivateKeyPem(),
           tokenEndpoint: "https://oauth2.example.test/token",
+          workspaceUserEmail: "workspace-user@example.com",
         }),
       ),
     ).toThrow(
