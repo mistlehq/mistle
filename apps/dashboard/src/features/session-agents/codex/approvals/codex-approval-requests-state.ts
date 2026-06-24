@@ -104,6 +104,10 @@ export type CodexApprovalRequestsAction =
       request: CodexJsonRpcServerRequest;
     }
   | {
+      type: "server_request_entry_received";
+      entry: CodexApprovalRequestEntry;
+    }
+  | {
       type: "server_request_response_started";
       requestId: CodexJsonRpcId;
     }
@@ -111,6 +115,10 @@ export type CodexApprovalRequestsAction =
       type: "server_request_response_failed";
       requestId: CodexJsonRpcId;
       errorMessage: string;
+    }
+  | {
+      type: "server_request_response_succeeded";
+      requestId: CodexJsonRpcId;
     }
   | {
       type: "notification_received";
@@ -288,6 +296,13 @@ export function reduceCodexApprovalRequestsState(
     };
   }
 
+  if (action.type === "server_request_entry_received") {
+    return {
+      ...state,
+      entries: upsertEntry(state.entries, action.entry),
+    };
+  }
+
   if (action.type === "server_request_response_started") {
     return {
       ...state,
@@ -299,6 +314,13 @@ export function reduceCodexApprovalRequestsState(
     return {
       ...state,
       entries: markEntryResponseFailed(state.entries, action.requestId, action.errorMessage),
+    };
+  }
+
+  if (action.type === "server_request_response_succeeded") {
+    return {
+      ...state,
+      entries: removeEntry(state.entries, action.requestId),
     };
   }
 

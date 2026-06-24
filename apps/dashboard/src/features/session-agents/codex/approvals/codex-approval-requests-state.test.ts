@@ -208,6 +208,57 @@ describe("reduceCodexApprovalRequestsState", () => {
     ]);
   });
 
+  it("captures already-normalized user input server request entries", () => {
+    const state = reduceCodexApprovalRequestsState(createInitialCodexApprovalRequestsState(), {
+      type: "server_request_entry_received",
+      entry: {
+        requestId: "dashboard-input-1",
+        method: "tool/requestUserInput",
+        kind: "tool-user-input",
+        questions: [
+          {
+            header: "Sandbox profile",
+            id: "profile-choice",
+            question: "Which sandbox profile should run the triaging agent?",
+            options: [
+              {
+                label: "ABC",
+                description: "Recommended because it has the newer active version.",
+                isOther: false,
+              },
+            ],
+          },
+        ],
+        status: "pending",
+        responseErrorMessage: null,
+      },
+    });
+
+    expect(state.entries).toEqual([
+      {
+        requestId: "dashboard-input-1",
+        method: "tool/requestUserInput",
+        kind: "tool-user-input",
+        questions: [
+          {
+            header: "Sandbox profile",
+            id: "profile-choice",
+            question: "Which sandbox profile should run the triaging agent?",
+            options: [
+              {
+                label: "ABC",
+                description: "Recommended because it has the newer active version.",
+                isOther: false,
+              },
+            ],
+          },
+        ],
+        status: "pending",
+        responseErrorMessage: null,
+      },
+    ]);
+  });
+
   it("ignores unsupported approval requests", () => {
     const state = reduceCodexApprovalRequestsState(createInitialCodexApprovalRequestsState(), {
       type: "server_request_received",
@@ -282,6 +333,40 @@ describe("reduceCodexApprovalRequestsState", () => {
           requestId: 11,
         },
       },
+    });
+
+    expect(resolved.entries).toEqual([]);
+  });
+
+  it("removes a synthetic user input request after a successful response", () => {
+    const pending = reduceCodexApprovalRequestsState(createInitialCodexApprovalRequestsState(), {
+      type: "server_request_entry_received",
+      entry: {
+        requestId: "dashboard-input-1",
+        method: "tool/requestUserInput",
+        kind: "tool-user-input",
+        questions: [
+          {
+            header: "Intake source",
+            id: "source-choice",
+            question: "Which intake source should Designer use?",
+            options: [
+              {
+                label: "Slack messages",
+                description: "Recommended for a general triage inbox.",
+                isOther: false,
+              },
+            ],
+          },
+        ],
+        status: "pending",
+        responseErrorMessage: null,
+      },
+    });
+
+    const resolved = reduceCodexApprovalRequestsState(pending, {
+      type: "server_request_response_succeeded",
+      requestId: "dashboard-input-1",
     });
 
     expect(resolved.entries).toEqual([]);

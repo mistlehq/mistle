@@ -3,12 +3,15 @@ import type { CodexJsonRpcServerRequest } from "@mistle/integrations-definitions
 import { z } from "zod";
 
 import { DesignerBlueprintDocumentSchema } from "../designer/designer-blueprint-schema.js";
+import type { ToolRequestUserInputEntry } from "./server-requests/server-request-entries.js";
 
 export const DesignerCanvasTabOpenAction = "designerCanvas.tabOpen";
 export const DesignerBlueprintTabUpsertAction = "designerBlueprint.tabUpsert";
+export const DesignerUserInputRequestAction = "designerUserInput.request";
 export const DashboardControlDynamicToolRequestMethod = "item/tool/call";
 export const DashboardControlDynamicToolNamespace = "dashboard_control";
 export const DesignerCanvasTabShowDynamicToolName = "show_designer_canvas_tab";
+export const DesignerUserInputRequestDynamicToolName = "request_user_input";
 
 const DesignerCanvasRouteTabShowInputSchema = z
   .object({
@@ -50,6 +53,46 @@ const DesignerCanvasTabShowDynamicToolCallSchema = z
   })
   .loose();
 
+const DesignerUserInputOptionSchema = z
+  .object({
+    label: z.string().min(1).max(240),
+    description: z.string().min(1).max(500).optional(),
+  })
+  .strict();
+
+const DesignerUserInputFreeFormSchema = z
+  .object({
+    label: z.string().min(1).max(160),
+    defaultValue: z.string().max(4000).optional(),
+    inputKind: z.enum(["input", "textarea"]).optional(),
+  })
+  .strict();
+
+const DesignerUserInputRequestInputSchema = z
+  .object({
+    header: z.string().min(1).max(80).optional(),
+    id: z.string().min(1).max(120),
+    question: z.string().min(1).max(500),
+    options: z.array(DesignerUserInputOptionSchema).max(6).optional(),
+    freeForm: DesignerUserInputFreeFormSchema.optional(),
+  })
+  .strict()
+  .refine(
+    (input) =>
+      (input.options !== undefined && input.options.length > 0) || input.freeForm !== undefined,
+    {
+      message: "At least one option or freeForm input is required.",
+    },
+  );
+
+const DesignerUserInputRequestDynamicToolCallSchema = z
+  .object({
+    namespace: z.literal(DashboardControlDynamicToolNamespace),
+    tool: z.literal(DesignerUserInputRequestDynamicToolName),
+    arguments: DesignerUserInputRequestInputSchema,
+  })
+  .loose();
+
 const DashboardControlDynamicToolCallIdentitySchema = z
   .object({
     namespace: z.string().nullable().optional(),
@@ -73,6 +116,7 @@ export type DesignerCanvasRouteTabShowInput = z.output<
   typeof DesignerCanvasRouteTabShowInputSchema
 >;
 export type DesignerBlueprintTabShowInput = z.output<typeof DesignerBlueprintTabShowInputSchema>;
+export type DesignerUserInputRequestInput = z.output<typeof DesignerUserInputRequestInputSchema>;
 export type DashboardControlDynamicToolCallResponse = z.output<
   typeof DashboardControlDynamicToolInputSchema
 >;
@@ -85,10 +129,19 @@ export type DashboardControlActionRequest =
   | {
       action: typeof DesignerBlueprintTabUpsertAction;
       input: DesignerBlueprintTabShowInput;
+    }
+  | {
+      action: typeof DesignerUserInputRequestAction;
+      input: DesignerUserInputRequestInput;
     };
 
+export type DashboardControlCanvasActionRequest = Exclude<
+  DashboardControlActionRequest,
+  { action: typeof DesignerUserInputRequestAction }
+>;
+
 export type DashboardControlActionHandler = (
-  request: DashboardControlActionRequest,
+  request: DashboardControlCanvasActionRequest,
 ) => Promise<void>;
 
 export type DashboardControlActionSupport = {
@@ -433,6 +486,48 @@ const DesignerCanvasBlueprintTabJsonSchema = {
   required: ["kind", "title", "blueprint"],
 };
 
+const DesignerUserInputOptionJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    label: {
+      type: "string",
+      minLength: 1,
+      maxLength: 240,
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+      maxLength: 500,
+      description: "Short trade-off or recommendation detail for this option.",
+    },
+  },
+  required: ["label"],
+};
+
+const DesignerUserInputFreeFormJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    label: {
+      type: "string",
+      minLength: 1,
+      maxLength: 160,
+      description: "Placeholder label for the free-form response.",
+    },
+    defaultValue: {
+      type: "string",
+      maxLength: 4000,
+    },
+    inputKind: {
+      type: "string",
+      enum: ["input", "textarea"],
+      description: "Use textarea only when the user needs to edit multi-line text.",
+    },
+  },
+  required: ["label"],
+};
+
 export const DesignerCanvasTabShowDynamicToolSpec = {
   namespace: DashboardControlDynamicToolNamespace,
   name: DesignerCanvasTabShowDynamicToolName,
@@ -450,9 +545,83 @@ export const DesignerCanvasTabShowDynamicToolSpec = {
   },
 } satisfies CodexDynamicToolSpec;
 
+export const DesignerUserInputRequestDynamicToolSpec = {
+  namespace: DashboardControlDynamicToolNamespace,
+  name: DesignerUserInputRequestDynamicToolName,
+  description:
+    "Ask the user exactly one setup question in the dashboard. Use this for Designer decisions that need a selectable choice or a short free-form response.",
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      header: {
+        type: "string",
+        minLength: 1,
+        maxLength: 80,
+        description: "Short label for the decision, such as Suggested next actions.",
+      },
+      id: {
+        type: "string",
+        minLength: 1,
+        maxLength: 120,
+        description: "Stable answer id for this one question.",
+      },
+      question: {
+        type: "string",
+        minLength: 1,
+        maxLength: 500,
+      },
+      options: {
+        type: "array",
+        items: DesignerUserInputOptionJsonSchema,
+        minItems: 1,
+        maxItems: 6,
+        description:
+          "Selectable options. Include the recommended option first when there is a recommendation.",
+      },
+      freeForm: DesignerUserInputFreeFormJsonSchema,
+    },
+    required: ["id", "question"],
+    anyOf: [{ required: ["options"] }, { required: ["freeForm"] }],
+  },
+} satisfies CodexDynamicToolSpec;
+
 export const DashboardControlDynamicToolSpecs = [
   DesignerCanvasTabShowDynamicToolSpec,
+  DesignerUserInputRequestDynamicToolSpec,
 ] satisfies readonly CodexDynamicToolSpec[];
+
+function isKnownDashboardControlDynamicToolName(toolName: string | undefined): boolean {
+  return (
+    toolName === DesignerCanvasTabShowDynamicToolName ||
+    toolName === DesignerUserInputRequestDynamicToolName
+  );
+}
+
+function createDashboardControlFreeFormUserInputOption(
+  freeForm: DesignerUserInputRequestInput["freeForm"],
+): ToolRequestUserInputEntry["questions"][number]["options"][number] | null {
+  if (freeForm === undefined) {
+    return null;
+  }
+
+  if (freeForm.inputKind === "textarea") {
+    return {
+      label: freeForm.label,
+      description: null,
+      defaultValue: freeForm.defaultValue ?? null,
+      inputKind: "textarea",
+      isOther: true,
+    };
+  }
+
+  return {
+    label: freeForm.label,
+    description: null,
+    defaultValue: freeForm.defaultValue ?? null,
+    isOther: true,
+  };
+}
 
 export function isDashboardControlDynamicToolCallRequest(
   request: CodexJsonRpcServerRequest,
@@ -467,7 +636,7 @@ export function isDashboardControlDynamicToolCallRequest(
   return (
     identity.success &&
     identity.data.namespace === DashboardControlDynamicToolNamespace &&
-    identity.data.tool === DesignerCanvasTabShowDynamicToolName
+    isKnownDashboardControlDynamicToolName(identity.data.tool)
   );
 }
 
@@ -476,6 +645,14 @@ export function parseDashboardControlDynamicToolCall(
 ): DashboardControlActionRequest | DashboardControlDynamicToolCallResponse {
   const parsedCanvasTabRequest = DesignerCanvasTabShowDynamicToolCallSchema.safeParse(params);
   if (!parsedCanvasTabRequest.success) {
+    const parsedUserInputRequest = DesignerUserInputRequestDynamicToolCallSchema.safeParse(params);
+    if (parsedUserInputRequest.success) {
+      return {
+        action: DesignerUserInputRequestAction,
+        input: parsedUserInputRequest.data.arguments,
+      };
+    }
+
     const identity = DashboardControlDynamicToolCallIdentitySchema.safeParse(params);
     if (
       identity.success &&
@@ -485,6 +662,17 @@ export function parseDashboardControlDynamicToolCall(
       return createDashboardControlDynamicToolCallResponse({
         success: false,
         text: "Designer canvas tab input is invalid.",
+      });
+    }
+
+    if (
+      identity.success &&
+      identity.data.namespace === DashboardControlDynamicToolNamespace &&
+      identity.data.tool === DesignerUserInputRequestDynamicToolName
+    ) {
+      return createDashboardControlDynamicToolCallResponse({
+        success: false,
+        text: "Designer user input request is invalid.",
       });
     }
 
@@ -506,6 +694,67 @@ export function parseDashboardControlDynamicToolCall(
     action: DesignerBlueprintTabUpsertAction,
     input: requestedTab,
   };
+}
+
+export function createDashboardControlUserInputServerRequest(input: {
+  requestId: string | number;
+  userInput: DesignerUserInputRequestInput;
+}): ToolRequestUserInputEntry {
+  const freeFormOption = createDashboardControlFreeFormUserInputOption(input.userInput.freeForm);
+
+  return {
+    requestId: input.requestId,
+    method: "tool/requestUserInput",
+    kind: "tool-user-input",
+    questions: [
+      {
+        header: input.userInput.header ?? null,
+        id: input.userInput.id,
+        question: input.userInput.question,
+        options: [
+          ...(input.userInput.options ?? []).map((option) => ({
+            label: option.label,
+            description: option.description ?? null,
+            isOther: false,
+          })),
+          ...(freeFormOption === null ? [] : [freeFormOption]),
+        ],
+      },
+    ],
+    status: "pending",
+    responseErrorMessage: null,
+  };
+}
+
+export function createDashboardControlUserInputResponse(input: {
+  result: unknown;
+}): DashboardControlDynamicToolCallResponse {
+  const parsed = z
+    .object({
+      answers: z
+        .array(
+          z.object({
+            id: z.string().min(1),
+            value: z.string(),
+          }),
+        )
+        .min(1),
+    })
+    .safeParse(input.result);
+
+  if (!parsed.success) {
+    return createDashboardControlDynamicToolCallResponse({
+      success: false,
+      text: "Designer user input response was invalid.",
+    });
+  }
+
+  return createDashboardControlDynamicToolCallResponse({
+    success: true,
+    text: JSON.stringify({
+      answers: parsed.data.answers,
+    }),
+  });
 }
 
 export function createDashboardControlDynamicToolCallResponse(input: {
