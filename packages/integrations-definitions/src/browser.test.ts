@@ -12,6 +12,7 @@ import {
   FireworksBrowserDefinition,
   GcpBrowserDefinition,
   GitHubCloudBrowserDefinition,
+  GoogleBrowserDefinition,
   GoogleAdsBrowserDefinition,
   GoogleWorkspaceBrowserDefinition,
   InceptionBrowserDefinition,
@@ -297,6 +298,23 @@ describe("browser definitions", () => {
     });
     expect(GoogleWorkspaceBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
     expect(GoogleWorkspaceBrowserDefinition.credentialResolvers).toBeUndefined();
+  });
+
+  it("keeps Google browser definitions free of server-only OAuth handlers", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: GoogleBrowserDefinition.familyId,
+      variantId: GoogleBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "google",
+      variantId: "google-default",
+      kind: "connector",
+      displayName: "Google",
+      logoKey: "google",
+    });
+    expect(GoogleBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(GoogleBrowserDefinition.authorizationRevocation).toBeUndefined();
   });
 
   it("keeps PostHog browser definitions free of server-only OAuth handlers", () => {

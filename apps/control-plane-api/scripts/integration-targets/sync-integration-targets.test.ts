@@ -108,6 +108,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "google-default",
+        familyId: "google",
+        variantId: "google-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "google-analytics-mcp",
         familyId: "google-analytics",
         variantId: "google-analytics-mcp",
