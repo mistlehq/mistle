@@ -232,6 +232,19 @@ run_as_root ln -sf sandboxd /opt/mistle/bin/mistle-ssh-sign
             timeoutMs: STOP_RUNTIME_READY_TIMEOUT_MS,
           }),
       });
+      const resumedSandboxStatus = await timeSystemRuntimePhase({
+        event: "system_runtime.sandbox_resume_refreshes_sandboxd.phase_timing",
+        phase: "wait_sandbox_connectable_after_resume",
+        attributes: timingAttributes,
+        operation: async () =>
+          await waitForSandboxConnectable({
+            fixture,
+            authenticatedSession,
+            sandboxInstanceId,
+            expectedConnectable: true,
+          }),
+      });
+      expect(resumedSandboxStatus.status).toBe("running");
 
       const refreshedSandboxdVersion = await timeSystemRuntimePhase({
         event: "system_runtime.sandbox_resume_refreshes_sandboxd.phase_timing",
