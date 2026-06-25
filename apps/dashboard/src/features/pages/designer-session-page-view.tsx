@@ -58,6 +58,9 @@ import { IntegrationLogo } from "../integrations/integration-logo.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import { sandboxProfileDetailQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
+import { EmbeddedIntegrationConnectionCreatePage } from "./integration-connection-create-page.js";
+import { resolveIntegrationConnectionReturnPath } from "./integration-connection-return-path.js";
+import { EmbeddedIntegrationConnectionSetupPage } from "./integration-connection-setup-page.js";
 import { OrganizationIntegrationsSettingsPage } from "./organization-integrations-settings-page.js";
 import { EmbeddedSandboxProfileEditorPage } from "./sandbox-profile-editor-page.js";
 import {
@@ -88,6 +91,10 @@ type DesignerBlueprintCommentContextValue = {
 
 type DesignerCanvasDockviewPanelProps = IDockviewPanelProps<DesignerCanvasDockviewParams>;
 
+type DesignerCanvasEmbeddedNavigateOptions = {
+  state?: unknown;
+};
+
 type DesignerCanvasEmbeddedRoute =
   | {
       kind: "blueprint";
@@ -96,6 +103,18 @@ type DesignerCanvasEmbeddedRoute =
       kind: "integrations";
       searchParams: URLSearchParams;
       targetKey: string | null;
+    }
+  | {
+      kind: "integration-create";
+      returnPath?: string;
+      targetKey: string;
+    }
+  | {
+      connectionId: string;
+      kind: "integration-setup";
+      searchParams: URLSearchParams;
+      setupRouteSegment: string;
+      targetKey: string;
     }
   | {
       href: string;
@@ -288,6 +307,10 @@ function useDesignerCanvasResolvedTitle(input: {
     });
   }
 
+  if (input.route.kind === "integration-create" || input.route.kind === "integration-setup") {
+    return input.fallbackTitle;
+  }
+
   return resolveDesignerCanvasStaticTitle({
     currentTitle: input.fallbackTitle,
     href: input.href,
@@ -296,6 +319,7 @@ function useDesignerCanvasResolvedTitle(input: {
 
 function DesignerCanvasEmbeddedSurface(input: {
   children: React.ReactNode;
+  onInternalNavigate?: () => void;
   params: DesignerCanvasDockviewParams;
 }): React.JSX.Element {
   return (
@@ -318,6 +342,7 @@ function DesignerCanvasEmbeddedSurface(input: {
         }
 
         event.preventDefault();
+        input.onInternalNavigate?.();
         navigateDesignerCanvasTab({
           href: nextHref,
           params: input.params,
@@ -346,6 +371,7 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
   const href = readRequiredDesignerCanvasHref(input.params);
   const params = readRequiredDesignerCanvasParams(input.params);
   const route = useMemo(() => resolveDesignerCanvasEmbeddedRoute(href), [href]);
+  const [embeddedLocationState, setEmbeddedLocationState] = useState<unknown>(undefined);
   const title = useDesignerCanvasResolvedTitle({
     fallbackTitle: params.title,
     href,
@@ -360,6 +386,17 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
     });
   }, [href, params, title]);
 
+  const navigateEmbeddedCanvasRoute = (
+    nextHref: string,
+    options?: DesignerCanvasEmbeddedNavigateOptions,
+  ): void => {
+    setEmbeddedLocationState(options?.state);
+    navigateDesignerCanvasTab({
+      href: nextHref,
+      params,
+    });
+  };
+
   if (route.kind === "blueprint") {
     if (params.blueprint === undefined) {
       throw new Error("Designer blueprint canvas tab is missing blueprint data.");
@@ -370,18 +407,20 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
 
   if (route.kind === "integrations") {
     return (
-      <DesignerCanvasEmbeddedSurface params={params}>
+      <DesignerCanvasEmbeddedSurface
+        onInternalNavigate={() => {
+          setEmbeddedLocationState(undefined);
+        }}
+        params={params}
+      >
         <OrganizationIntegrationsSettingsPage
           embeddedRoute={{
             detailTargetKey: route.targetKey,
-            navigate: (nextHref) => {
-              navigateDesignerCanvasTab({
-                href: nextHref,
-                params,
-              });
-            },
+            locationState: embeddedLocationState,
+            navigate: navigateEmbeddedCanvasRoute,
             searchParams: route.searchParams,
             setSearchParams: (nextSearchParams) => {
+              setEmbeddedLocationState(undefined);
               const nextHref = buildDesignerCanvasHref({
                 pathname:
                   route.targetKey === null
@@ -389,6 +428,38 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
                     : `/integrations/${encodeURIComponent(route.targetKey)}`,
                 searchParams: nextSearchParams,
               });
+              navigateEmbeddedCanvasRoute(nextHref);
+            },
+          }}
+        />
+      </DesignerCanvasEmbeddedSurface>
+    );
+  }
+
+  if (route.kind === "integration-create") {
+    return (
+      <DesignerCanvasEmbeddedSurface params={params}>
+        <EmbeddedIntegrationConnectionCreatePage
+          embeddedRoute={{
+            targetKey: route.targetKey,
+            navigate: navigateEmbeddedCanvasRoute,
+            ...(route.returnPath === undefined ? {} : { returnPath: route.returnPath }),
+          }}
+        />
+      </DesignerCanvasEmbeddedSurface>
+    );
+  }
+
+  if (route.kind === "integration-setup") {
+    return (
+      <DesignerCanvasEmbeddedSurface params={params}>
+        <EmbeddedIntegrationConnectionSetupPage
+          embeddedRoute={{
+            connectionId: route.connectionId,
+            searchParams: route.searchParams,
+            setupRouteSegment: route.setupRouteSegment,
+            targetKey: route.targetKey,
+            navigate: (nextHref) => {
               navigateDesignerCanvasTab({
                 href: nextHref,
                 params,
@@ -796,7 +867,7 @@ function resolveDesignerCanvasEmbeddedRoute(href: string): DesignerCanvasEmbedde
     };
   }
 
-  if (pathSegments[0] !== "integrations" || pathSegments.length > 2) {
+  if (pathSegments[0] !== "integrations") {
     return { kind: "unsupported" };
   }
 
@@ -808,6 +879,40 @@ function resolveDesignerCanvasEmbeddedRoute(href: string): DesignerCanvasEmbedde
   }
 
   if (targetKey === "") {
+    return { kind: "unsupported" };
+  }
+
+  if (targetKey !== null && pathSegments[2] === "add" && pathSegments.length === 3) {
+    const returnPath = resolveIntegrationConnectionReturnPath(url.searchParams.get("returnTo"));
+    return {
+      kind: "integration-create",
+      ...(returnPath === null ? {} : { returnPath }),
+      targetKey,
+    };
+  }
+
+  if (targetKey !== null && pathSegments[4] === "setup" && pathSegments.length === 5) {
+    const connectionId = decodeDesignerCanvasPathSegment(pathSegments[2] ?? "");
+    const setupRouteSegment = decodeDesignerCanvasPathSegment(pathSegments[3] ?? "");
+    if (
+      connectionId === null ||
+      connectionId.length === 0 ||
+      setupRouteSegment === null ||
+      setupRouteSegment.length === 0
+    ) {
+      return { kind: "unsupported" };
+    }
+
+    return {
+      connectionId,
+      kind: "integration-setup",
+      searchParams: url.searchParams,
+      setupRouteSegment,
+      targetKey,
+    };
+  }
+
+  if (pathSegments.length > 2) {
     return { kind: "unsupported" };
   }
 

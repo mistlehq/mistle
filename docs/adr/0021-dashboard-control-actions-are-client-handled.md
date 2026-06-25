@@ -2,4 +2,6 @@
 
 Mistle supports **Dashboard control actions** as runtime-requested actions handled by the currently active dashboard surface for browser-owned workspace state, rather than as MCP tools or direct control-plane resource mutations. The first supported action lets the Designer runtime open and focus one dashboard-internal route in a **Designer canvas tab**; the dashboard may persist canvas workspace state separately, but the control action itself only means the active surface accepted the control request. This keeps UI control authority in the browser while leaving Mistle resource access, provider mutations, and approval-gated operations on their existing server-side paths.
 
+Dashboard control actions may open or focus dashboard-owned setup surfaces, but must not become the submission path for integration setup, secret entry, provider consent, or other resource mutations.
+
 For Codex Designer, first-pass support exposes the tab-opening **Dashboard control action** as a Codex dynamic tool on thread start and handles Codex's dynamic tool-call request in the dashboard client. This matches Codex app-server's existing model-visible client-tool path instead of adding a new initialize-time capability negotiation surface that app-server does not consume.
