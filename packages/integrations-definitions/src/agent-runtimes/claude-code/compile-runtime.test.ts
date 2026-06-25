@@ -309,7 +309,7 @@ describe("compileClaudeCodeRuntime", () => {
           "--omit=dev",
           "--no-audit",
           "--no-fund",
-          "@anthropic-ai/claude-agent-sdk@0.3.187",
+          "@anthropic-ai/claude-agent-sdk@0.3.191",
           "ws@8.21.0",
         ],
         timeoutMs: 120000,
