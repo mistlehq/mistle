@@ -109,6 +109,10 @@ describe("Claude Code permission request presentation", () => {
   });
 
   it("resolves supported Claude Code permission decisions", () => {
+    expect(resolveClaudeCodePermissionResponse({ decision: "cancel" })).toEqual({
+      decision: "reject",
+      message: "User cancelled this Claude Code input request.",
+    });
     expect(resolveClaudeCodePermissionResponse({ decision: "once" })).toEqual({
       decision: "once",
     });

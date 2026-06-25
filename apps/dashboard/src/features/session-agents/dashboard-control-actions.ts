@@ -734,6 +734,21 @@ export function createDashboardControlUserInputServerRequest(input: {
 export function createDashboardControlUserInputResponse(input: {
   result: unknown;
 }): DashboardControlDynamicToolCallResponse {
+  const cancel = z
+    .object({
+      decision: z.literal("cancel"),
+    })
+    .safeParse(input.result);
+
+  if (cancel.success) {
+    return createDashboardControlDynamicToolCallResponse({
+      success: true,
+      text: JSON.stringify({
+        decision: "cancel",
+      }),
+    });
+  }
+
   const parsed = z
     .object({
       answers: z

@@ -8,7 +8,10 @@ export type ClaudeCodePermissionServerRequestResponse = {
     value: string;
   }[];
   decision?: "once" | "reject";
+  message?: string;
 };
+
+const CancelledClaudeCodeInputRequestMessage = "User cancelled this Claude Code input request.";
 
 function stringifyClaudeCodeToolInput(toolInput: unknown): string {
   if (toolInput === undefined) {
@@ -153,6 +156,12 @@ export function resolveClaudeCodePermissionResponse(
   }
 
   const decision = result.decision;
+  if (decision === "cancel") {
+    return {
+      decision: "reject",
+      message: CancelledClaudeCodeInputRequestMessage,
+    };
+  }
   if (decision === "once" || decision === "reject") {
     return { decision };
   }

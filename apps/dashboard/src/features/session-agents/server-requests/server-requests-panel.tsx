@@ -76,6 +76,10 @@ function createUserInputResponse(input: {
   };
 }
 
+function createUserInputCancelResponse(): { decision: "cancel" } {
+  return { decision: "cancel" };
+}
+
 function UserInputOptions(input: {
   answerKey: string;
   disabled: boolean;
@@ -224,44 +228,63 @@ export function ServerRequestsPanel({
 
           if (entry.kind === "tool-user-input") {
             const submitOnOptionSelect = canSubmitUserInputOnOptionSelect(entry);
+            const cancelAction = (
+              <Button
+                className="text-muted-foreground"
+                disabled={isRespondingToServerRequest}
+                onClick={() => {
+                  onRespondToServerRequest(entry.requestId, createUserInputCancelResponse());
+                }}
+                type="button"
+                variant="ghost"
+              >
+                Cancel
+              </Button>
+            );
 
             return (
               <ComposerActionPanel
                 actions={
                   submitOnOptionSelect ? null : (
-                    <Button
-                      disabled={
-                        isRespondingToServerRequest ||
-                        entry.questions.some((question) => {
-                          const answerKey = `${requestKey}:${question.id}`;
-                          const otherOption = question.options.find((option) => option.isOther);
-                          return (
-                            readUserInputAnswer({
-                              answerKey,
-                              otherOption,
+                    <div className="flex w-full items-center justify-end gap-2">
+                      {cancelAction}
+                      <Button
+                        disabled={
+                          isRespondingToServerRequest ||
+                          entry.questions.some((question) => {
+                            const answerKey = `${requestKey}:${question.id}`;
+                            const otherOption = question.options.find((option) => option.isOther);
+                            return (
+                              readUserInputAnswer({
+                                answerKey,
+                                otherOption,
+                                userInputAnswers,
+                              }).trim().length === 0
+                            );
+                          })
+                        }
+                        onClick={() => {
+                          onRespondToServerRequest(
+                            entry.requestId,
+                            createUserInputResponse({
+                              entry,
+                              requestKey,
                               userInputAnswers,
-                            }).trim().length === 0
+                            }),
                           );
-                        })
-                      }
-                      onClick={() => {
-                        onRespondToServerRequest(
-                          entry.requestId,
-                          createUserInputResponse({
-                            entry,
-                            requestKey,
-                            userInputAnswers,
-                          }),
-                        );
-                      }}
-                      type="button"
-                    >
-                      Submit responses
-                    </Button>
+                        }}
+                        type="button"
+                      >
+                        Submit
+                      </Button>
+                    </div>
                   )
                 }
                 details={
-                  <div className="space-y-3">
+                  <div className="relative space-y-3">
+                    {submitOnOptionSelect ? (
+                      <div className="absolute top-0 right-4">{cancelAction}</div>
+                    ) : null}
                     {entry.questions.map((question) => {
                       const answerKey = `${requestKey}:${question.id}`;
                       const otherOption = question.options.find((option) => option.isOther);
@@ -278,7 +301,12 @@ export function ServerRequestsPanel({
                               {question.header}
                             </p>
                           )}
-                          <p className="text-muted-foreground mr-4 ml-6 text-sm leading-5">
+                          <p
+                            className={cn(
+                              "text-muted-foreground ml-6 text-sm leading-5",
+                              submitOnOptionSelect ? "mr-24" : "mr-4",
+                            )}
+                          >
                             {question.question}
                           </p>
                           <UserInputOptions

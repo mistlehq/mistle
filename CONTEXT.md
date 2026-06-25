@@ -127,6 +127,10 @@ _Avoid_: Provider write when no explicit operation handler has executed
 A runtime request that asks the user to answer a structured question before the agent continues.
 _Avoid_: Approval request when the user is choosing configuration rather than granting permission
 
+**User input request cancellation**:
+A user's explicit choice not to answer a pending **User input request**, allowing the runtime to continue handling the active turn without treating the choice as a full turn interruption.
+_Avoid_: Runtime approval decline, turn interruption
+
 **Dashboard control action**:
 A runtime-requested action handled by the dashboard client to control browser-owned workspace state.
 _Avoid_: MCP tool when the action is handled by the browser rather than Mistle resource access

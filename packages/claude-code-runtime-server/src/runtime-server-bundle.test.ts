@@ -1,6 +1,59 @@
+import { Script } from "node:vm";
+
 import { describe, expect, it } from "vitest";
 
 import { ClaudeCodeRuntimeServerBundle } from "./runtime-server-bundle.js";
+
+function runBundledClaudeCodePermissionResolver(input: {
+  params: {
+    answers?: readonly {
+      id: string;
+      value: string;
+    }[];
+    decision?: string;
+    message?: string;
+  };
+  request: {
+    toolInput: unknown;
+    toolName: string;
+  };
+}): unknown {
+  const resolverSource = extractBundledFunction("resolveClaudeCodePermissionResponse");
+  const resolverScript = new Script(
+    `${resolverSource}; resolveClaudeCodePermissionResponse(${JSON.stringify(
+      input.request,
+    )}, ${JSON.stringify(input.params)});`,
+  );
+  return resolverScript.runInNewContext();
+}
+
+function extractBundledFunction(functionName: string): string {
+  const declaration = `function ${functionName}`;
+  const startIndex = ClaudeCodeRuntimeServerBundle.indexOf(declaration);
+  if (startIndex < 0) {
+    throw new Error(`Bundled function ${functionName} was not found.`);
+  }
+
+  const bodyStartIndex = ClaudeCodeRuntimeServerBundle.indexOf("{", startIndex);
+  if (bodyStartIndex < 0) {
+    throw new Error(`Bundled function ${functionName} does not have a body.`);
+  }
+
+  let braceDepth = 0;
+  for (let index = bodyStartIndex; index < ClaudeCodeRuntimeServerBundle.length; index += 1) {
+    const character = ClaudeCodeRuntimeServerBundle[index];
+    if (character === "{") {
+      braceDepth += 1;
+    } else if (character === "}") {
+      braceDepth -= 1;
+      if (braceDepth === 0) {
+        return ClaudeCodeRuntimeServerBundle.slice(startIndex, index + 1);
+      }
+    }
+  }
+
+  throw new Error(`Bundled function ${functionName} body was not closed.`);
+}
 
 describe("ClaudeCodeRuntimeServerBundle", () => {
   it("does not request Claude Code bypass permissions because sandboxes run as root", () => {
@@ -136,8 +189,35 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain(
       "Claude Code user input response requires answers.",
     );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "User cancelled this Claude Code input request.",
+    );
     expect(ClaudeCodeRuntimeServerBundle).toContain('behavior: "allow"');
     expect(ClaudeCodeRuntimeServerBundle).toContain('behavior: "deny"');
+  });
+
+  it("maps cancelled Claude Code AskUserQuestion replies to SDK deny behavior", () => {
+    expect(
+      runBundledClaudeCodePermissionResolver({
+        request: {
+          toolName: "AskUserQuestion",
+          toolInput: {
+            questions: [
+              {
+                question: "Which database?",
+              },
+            ],
+          },
+        },
+        params: {
+          decision: "reject",
+          message: "User cancelled this Claude Code input request.",
+        },
+      }),
+    ).toEqual({
+      behavior: "deny",
+      message: "User cancelled this Claude Code input request.",
+    });
   });
 
   it("loads Claude Code model catalog lazily through the SDK", () => {

@@ -57,6 +57,7 @@ import {
   reduceCodexApprovalRequestsState,
   type CodexApprovalRequestEntry,
 } from "../approvals/codex-approval-requests-state.js";
+import { createCodexServerRequestResponse } from "../approvals/codex-server-request-responses.js";
 import {
   editedGoalStatus,
   formatCodexGoalStatus,
@@ -840,7 +841,11 @@ export function useCodexSessionState(input: {
           dashboardControlUserInputRequestIdsRef.current.has(requestId);
         const result = isDashboardControlUserInputRequest
           ? createDashboardControlUserInputResponse({ result: input.result })
-          : input.result;
+          : createCodexServerRequestResponse({
+              entries: serverRequestsState.entries,
+              requestId: input.requestId,
+              result: input.result,
+            });
         await rpcClient.respond(input.requestId, result);
         if (isDashboardControlUserInputRequest) {
           dashboardControlUserInputRequestIdsRef.current.delete(requestId);
