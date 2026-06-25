@@ -565,7 +565,7 @@ function BlueprintCommentStatePreview(input: {
 }
 
 function DesignerCanvasWorkspaceStory(input: {
-  tabs: DesignerSession["canvasTabs"];
+  tabs: readonly DesignerSession["canvasTabs"][number][];
 }): React.JSX.Element {
   const [tabs, setTabs] = useState([...input.tabs]);
   const [activeTabHref, setActiveTabHref] = useState<string | null>(tabs[0]?.href ?? null);

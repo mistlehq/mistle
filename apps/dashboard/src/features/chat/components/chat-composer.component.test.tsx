@@ -116,7 +116,7 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
     gitBranchLabel: null,
     pullRequest: null,
     contextUsage: null,
-    pendingDiffCommentSummary: null,
+    pendingCommentSummary: null,
     pendingAttachments: [],
     modelOptions: [{ value: "gpt-5.4-codex", label: "GPT-5.4" }],
     reasoningEffortOptions: [
@@ -141,7 +141,7 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
     onModelChange: () => {},
     onReasoningEffortChange: () => {},
     onPendingFilesAdded: () => {},
-    onClearPendingDiffComments: () => {},
+    onClearPendingComments: () => {},
     onRemovePendingAttachment: () => {},
   };
 }
@@ -392,7 +392,7 @@ describe("ChatComposer", () => {
     render(
       <ChatComposer
         {...createBaseComposerProps()}
-        pendingDiffCommentSummary={{
+        pendingCommentSummary={{
           count: 3,
           label: "3 comments",
           title: "apps/dashboard/src/features/pages/session-workbench-page.tsx R10",
@@ -611,7 +611,7 @@ describe("ChatComposer", () => {
 
   it("clears the pending diff comment badge when the remove action is pressed", () => {
     function Harness(): React.JSX.Element {
-      const [pendingDiffCommentSummary, setPendingDiffCommentSummary] = useState<{
+      const [pendingCommentSummary, setPendingCommentSummary] = useState<{
         count: number;
         label: string;
         title: string;
@@ -624,10 +624,10 @@ describe("ChatComposer", () => {
       return (
         <ChatComposer
           {...createBaseComposerProps()}
-          onClearPendingDiffComments={() => {
-            setPendingDiffCommentSummary(null);
+          onClearPendingComments={() => {
+            setPendingCommentSummary(null);
           }}
-          pendingDiffCommentSummary={pendingDiffCommentSummary}
+          pendingCommentSummary={pendingCommentSummary}
         />
       );
     }

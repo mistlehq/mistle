@@ -74,7 +74,7 @@ export const SessionComposerFixtureProps: ChatComposerViewModel = {
   contextUsage: null,
   goalStatus: null,
   commandPanel: null,
-  pendingDiffCommentSummary: null,
+  pendingCommentSummary: null,
   pendingAttachments: [],
   modelOptions: CodexFixtureSessionModelOptions,
   reasoningEffortOptions: [
@@ -102,7 +102,7 @@ export const SessionComposerFixtureProps: ChatComposerViewModel = {
   onModelChange: function onModelChange() {},
   onReasoningEffortChange: function onReasoningEffortChange() {},
   onPendingFilesAdded: function onPendingFilesAdded() {},
-  onClearPendingDiffComments: function onClearPendingDiffComments() {},
+  onClearPendingComments: function onClearPendingComments() {},
   onRemovePendingAttachment: function onRemovePendingAttachment() {},
 };
 
@@ -191,7 +191,7 @@ export const SessionComposerFixturePropsWithPendingDiffComments: ChatComposerVie
   composerDraft: createComposerDraft(
     "Please address the diff comments before sending the next patch.",
   ),
-  pendingDiffCommentSummary: {
+  pendingCommentSummary: {
     count: 2,
     label: "2 comments",
     title: [

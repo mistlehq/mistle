@@ -372,7 +372,7 @@ export type ChatComposerViewModel = {
   placeholderText?: string | undefined;
   commandPanel?: ChatComposerCommandPanel | null;
   contextMentionControl?: ChatComposerContextMentionControl | null;
-  pendingDiffCommentSummary: {
+  pendingCommentSummary: {
     count: number;
     label: string;
     title: string;
@@ -415,7 +415,7 @@ export type ChatComposerViewModel = {
   onModelChange: (value: string) => void;
   onReasoningEffortChange: (value: string) => void;
   onPendingFilesAdded: (files: readonly File[]) => void;
-  onClearPendingDiffComments: () => void;
+  onClearPendingComments: () => void;
   onRemovePendingAttachment: (attachmentId: string) => void;
 };
 
@@ -558,7 +558,7 @@ export function ChatComposer({
   placeholderText,
   commandPanel = null,
   contextMentionControl = null,
-  pendingDiffCommentSummary,
+  pendingCommentSummary,
   pendingAttachments,
   modelOptions,
   reasoningEffortOptions,
@@ -584,7 +584,7 @@ export function ChatComposer({
   onModelChange,
   onReasoningEffortChange,
   onPendingFilesAdded,
-  onClearPendingDiffComments,
+  onClearPendingComments,
   onRemovePendingAttachment,
 }: ChatComposerViewModel): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1593,21 +1593,21 @@ export function ChatComposer({
           ref={fileInputRef}
           type="file"
         />
-        {pendingAttachments.length === 0 && pendingDiffCommentSummary === null ? null : (
+        {pendingAttachments.length === 0 && pendingCommentSummary === null ? null : (
           <div className="flex flex-wrap gap-2 px-1.5 pt-1.5">
-            {pendingDiffCommentSummary === null ? null : (
+            {pendingCommentSummary === null ? null : (
               <div
                 className="bg-muted flex items-center gap-2 rounded-full px-3 py-1 text-xs"
-                title={pendingDiffCommentSummary.title}
+                title={pendingCommentSummary.title}
               >
                 <ChatCircleTextIcon aria-hidden="true" className="size-3.5" />
-                <span>{pendingDiffCommentSummary.label}</span>
+                <span>{pendingCommentSummary.label}</span>
                 <button
-                  aria-label={`Remove all ${pendingDiffCommentSummary.label}`}
+                  aria-label={`Remove all ${pendingCommentSummary.label}`}
                   className="text-muted-foreground disabled:cursor-not-allowed"
                   disabled={isUploadingAttachments}
                   onClick={() => {
-                    onClearPendingDiffComments();
+                    onClearPendingComments();
                   }}
                   type="button"
                 >

@@ -346,7 +346,6 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
   const href = readRequiredDesignerCanvasHref(input.params);
   const params = readRequiredDesignerCanvasParams(input.params);
   const route = useMemo(() => resolveDesignerCanvasEmbeddedRoute(href), [href]);
-  const blueprintCommentContext = useDesignerBlueprintCommentContext();
   const title = useDesignerCanvasResolvedTitle({
     fallbackTitle: params.title,
     href,
@@ -366,15 +365,7 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
       throw new Error("Designer blueprint canvas tab is missing blueprint data.");
     }
 
-    return (
-      <DesignerBlueprintCanvasPanel
-        blueprint={params.blueprint}
-        onAddComment={blueprintCommentContext.onAddBlueprintComment}
-        onDeleteComment={blueprintCommentContext.onDeleteBlueprintComment}
-        onUpdateComment={blueprintCommentContext.onUpdateBlueprintComment}
-        pendingComments={blueprintCommentContext.pendingBlueprintComments}
-      />
-    );
+    return <DesignerBlueprintDockviewPanelContent blueprint={params.blueprint} />;
   }
 
   if (route.kind === "integrations") {
@@ -469,6 +460,22 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
   }
 
   return <UnsupportedDesignerCanvasRoute />;
+}
+
+function DesignerBlueprintDockviewPanelContent(input: {
+  blueprint: DesignerBlueprintDocument;
+}): React.JSX.Element {
+  const blueprintCommentContext = useDesignerBlueprintCommentContext();
+
+  return (
+    <DesignerBlueprintCanvasPanel
+      blueprint={input.blueprint}
+      onAddComment={blueprintCommentContext.onAddBlueprintComment}
+      onDeleteComment={blueprintCommentContext.onDeleteBlueprintComment}
+      onUpdateComment={blueprintCommentContext.onUpdateBlueprintComment}
+      pendingComments={blueprintCommentContext.pendingBlueprintComments}
+    />
+  );
 }
 
 function readRequiredDesignerCanvasParams(parameters: unknown): DesignerCanvasDockviewParams {
@@ -842,7 +849,7 @@ const DesignerBlueprintInitialViewport = { x: 48, y: 32, zoom: 0.95 };
 const DesignerBlueprintInitialFocusTopPadding = 56;
 let designerBlueprintElk: InstanceType<typeof ELK> | null = null;
 
-type DesignerBlueprintVisualNodeData = {
+type DesignerBlueprintLayoutNodeData = {
   description?: string;
   integrationLogo?: {
     displayName: string;
@@ -852,6 +859,10 @@ type DesignerBlueprintVisualNodeData = {
   kind: DesignerBlueprintItem["kind"];
   kindLabel: string;
   label: string;
+  routingSummary?: string;
+};
+
+type DesignerBlueprintVisualNodeData = DesignerBlueprintLayoutNodeData & {
   isAddCommentSuppressed: boolean;
   onAddComment: (comment: PendingSessionBlueprintCommentInput) => void;
   onClearAddCommentSuppression: (itemId: string) => void;
@@ -859,39 +870,21 @@ type DesignerBlueprintVisualNodeData = {
   onSuppressAddComment: (itemId: string) => void;
   onUpdateComment: (commentId: string, body: string) => void;
   pendingComment?: PendingSessionBlueprintComment | undefined;
-  routingSummary?: string;
 };
 
+type DesignerBlueprintLayoutNode = Node<DesignerBlueprintLayoutNodeData, "blueprint">;
 type DesignerBlueprintVisualNode = Node<DesignerBlueprintVisualNodeData, "blueprint">;
 type DesignerBlueprintGraphEdge = Edge;
 
 type DesignerBlueprintGraph = {
   edges: DesignerBlueprintGraphEdge[];
   initialFocusNodeId?: string;
-  nodes: DesignerBlueprintVisualNode[];
+  nodes: DesignerBlueprintLayoutNode[];
 };
 
 const DesignerBlueprintNodeTypes = {
   blueprint: DesignerBlueprintVisualNodeComponent,
 } satisfies NodeTypes;
-
-function ignoreDesignerBlueprintNodeCommentAdd(
-  _comment: PendingSessionBlueprintCommentInput,
-): void {
-  return;
-}
-
-function ignoreDesignerBlueprintNodeCommentDelete(_commentId: string): void {
-  return;
-}
-
-function ignoreDesignerBlueprintNodeCommentSuppression(_itemId: string): void {
-  return;
-}
-
-function ignoreDesignerBlueprintNodeCommentUpdate(_commentId: string, _body: string): void {
-  return;
-}
 
 export function DesignerBlueprintCanvasPanel(input: {
   blueprint: DesignerBlueprintDocument;
@@ -937,7 +930,6 @@ export function DesignerBlueprintCanvasPanel(input: {
 
   useEffect(() => {
     let cancelled = false;
-    setGraph(null);
     setLayoutError(null);
 
     buildDesignerBlueprintGraph({
@@ -1047,14 +1039,12 @@ function DesignerBlueprintVisualNodeComponent(
 ): React.JSX.Element {
   const [draftBody, setDraftBody] = useState("");
   const [isDraftingComment, setIsDraftingComment] = useState(false);
-  const [isPendingCommentExpanded, setIsPendingCommentExpanded] = useState(false);
+  const [expandedPendingCommentId, setExpandedPendingCommentId] = useState<string | null>(null);
   const pendingComment = input.data.pendingComment;
+  const isPendingCommentExpanded =
+    pendingComment !== undefined && expandedPendingCommentId === pendingComment.id;
   const canStartDraftingComment =
     pendingComment === undefined && !isDraftingComment && !input.data.isAddCommentSuppressed;
-
-  useEffect(() => {
-    setIsPendingCommentExpanded(false);
-  }, [pendingComment?.id]);
 
   function cancelDraft(): void {
     setDraftBody("");
@@ -1145,7 +1135,7 @@ function DesignerBlueprintVisualNodeComponent(
         <DesignerBlueprintCollapsedCommentButton
           label={`Open blueprint comment for ${input.data.label}`}
           onOpen={() => {
-            setIsPendingCommentExpanded(true);
+            setExpandedPendingCommentId(pendingComment.id);
           }}
           testId={`designer-blueprint-collapsed-comment-${input.data.item.id}`}
         />
@@ -1156,7 +1146,7 @@ function DesignerBlueprintVisualNodeComponent(
             body={pendingComment.body}
             title="Pending comment"
             onCollapse={() => {
-              setIsPendingCommentExpanded(false);
+              setExpandedPendingCommentId(null);
             }}
             onBodyChange={(body) => {
               input.data.onUpdateComment(pendingComment.id, body);
@@ -1164,7 +1154,7 @@ function DesignerBlueprintVisualNodeComponent(
             onDelete={() => {
               input.data.onSuppressAddComment(input.data.item.id);
               input.data.onDeleteComment(pendingComment.id);
-              setIsPendingCommentExpanded(false);
+              setExpandedPendingCommentId(null);
             }}
           />
         </DesignerBlueprintFloatingComment>
@@ -1443,11 +1433,11 @@ function getDesignerBlueprintElk(): InstanceType<typeof ELK> {
 function buildDesignerBlueprintUnresolvedNodes(input: {
   blueprint: DesignerBlueprintDocument;
   integrationMetadataByTargetKey: ReadonlyMap<string, DesignerBlueprintIntegrationMetadata>;
-}): DesignerBlueprintVisualNode[] {
+}): DesignerBlueprintLayoutNode[] {
   return input.blueprint.items.map((item) =>
-    createDesignerBlueprintVisualNode({
+    createDesignerBlueprintLayoutNode({
       id: item.id,
-      data: createDesignerBlueprintVisualNodeData({
+      data: createDesignerBlueprintLayoutNodeData({
         ...(item.description === undefined ? {} : { description: item.description }),
         ...createDesignerBlueprintIntegrationLogoData({
           item,
@@ -1459,23 +1449,17 @@ function buildDesignerBlueprintUnresolvedNodes(input: {
           integrationMetadataByTargetKey: input.integrationMetadataByTargetKey,
         }),
         item,
-        isAddCommentSuppressed: false,
         label: formatDesignerBlueprintNodeLabel(item),
-        onAddComment: ignoreDesignerBlueprintNodeCommentAdd,
-        onClearAddCommentSuppression: ignoreDesignerBlueprintNodeCommentSuppression,
-        onDeleteComment: ignoreDesignerBlueprintNodeCommentDelete,
-        onSuppressAddComment: ignoreDesignerBlueprintNodeCommentSuppression,
-        onUpdateComment: ignoreDesignerBlueprintNodeCommentUpdate,
         ...createDesignerBlueprintRoutingSummaryData(item),
       }),
     }),
   );
 }
 
-function createDesignerBlueprintVisualNode(input: {
-  data: DesignerBlueprintVisualNodeData;
+function createDesignerBlueprintLayoutNode(input: {
+  data: DesignerBlueprintLayoutNodeData;
   id: string;
-}): DesignerBlueprintVisualNode {
+}): DesignerBlueprintLayoutNode {
   return {
     id: input.id,
     type: "blueprint",
@@ -1484,9 +1468,9 @@ function createDesignerBlueprintVisualNode(input: {
   };
 }
 
-function createDesignerBlueprintVisualNodeData(
-  input: DesignerBlueprintVisualNodeData,
-): DesignerBlueprintVisualNodeData {
+function createDesignerBlueprintLayoutNodeData(
+  input: DesignerBlueprintLayoutNodeData,
+): DesignerBlueprintLayoutNodeData {
   return input;
 }
 
@@ -1543,7 +1527,7 @@ function buildDesignerBlueprintDisplayEdges(
   ];
 }
 
-function getDesignerBlueprintNodeHeight(data: DesignerBlueprintVisualNodeData): number {
+function getDesignerBlueprintNodeHeight(data: DesignerBlueprintLayoutNodeData): number {
   return (
     DesignerBlueprintNodeBaseHeight +
     getDesignerBlueprintDescriptionHeight(data.description) +
@@ -1565,11 +1549,16 @@ type DesignerBlueprintIntegrationMetadata = {
   logoKey?: string | undefined;
 };
 
+const EmptyDesignerBlueprintIntegrationMetadataByTargetKey: ReadonlyMap<
+  string,
+  DesignerBlueprintIntegrationMetadata
+> = new Map();
+
 function buildDesignerBlueprintIntegrationMetadataByTargetKey(
   targets: Awaited<ReturnType<typeof listIntegrationDirectory>>["targets"] | undefined,
 ): ReadonlyMap<string, DesignerBlueprintIntegrationMetadata> {
-  if (targets === undefined) {
-    return new Map();
+  if (targets === undefined || targets.length === 0) {
+    return EmptyDesignerBlueprintIntegrationMetadataByTargetKey;
   }
 
   return new Map(
@@ -1586,7 +1575,7 @@ function buildDesignerBlueprintIntegrationMetadataByTargetKey(
 function createDesignerBlueprintIntegrationLogoData(input: {
   item: DesignerBlueprintItem;
   integrationMetadataByTargetKey: ReadonlyMap<string, DesignerBlueprintIntegrationMetadata>;
-}): Pick<DesignerBlueprintVisualNodeData, "integrationLogo"> | Record<string, never> {
+}): Pick<DesignerBlueprintLayoutNodeData, "integrationLogo"> | Record<string, never> {
   if (input.item.kind !== "trigger" || input.item.integrationTargetKey === undefined) {
     return {};
   }
@@ -1670,7 +1659,7 @@ function formatDesignerBlueprintRoutingSummary(item: DesignerBlueprintItem): str
 
 function createDesignerBlueprintRoutingSummaryData(
   item: DesignerBlueprintItem,
-): Pick<DesignerBlueprintVisualNodeData, "routingSummary"> | Record<string, never> {
+): Pick<DesignerBlueprintLayoutNodeData, "routingSummary"> | Record<string, never> {
   const routingSummary = formatDesignerBlueprintRoutingSummary(item);
   return routingSummary === undefined ? {} : { routingSummary };
 }

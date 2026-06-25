@@ -13,7 +13,6 @@ import {
   type PendingSessionBlueprintComment,
 } from "../session-blueprint-comment.js";
 import {
-  buildSessionComposerPrompt,
   buildPendingSessionDiffCommentSummaryLabel,
   buildPendingSessionDiffCommentSummaryTitle,
   type PendingSessionDiffComment,
@@ -32,6 +31,7 @@ import {
   resolveActiveComposerModel,
   supportsImageInspection,
 } from "./session-composer-model-readiness.js";
+import { buildSessionComposerPrompt } from "./session-composer-prompt.js";
 import type {
   SessionComposerBootstrapResult,
   SessionComposerCollaborationModeSettings,
@@ -1143,7 +1143,7 @@ export function useSessionComposerState(input: {
       composerDraft,
       commandPanel: composerStateInput.commandPanel ?? null,
       contextMentionControl: composerStateInput.contextMentionControl ?? null,
-      pendingDiffCommentSummary:
+      pendingCommentSummary:
         countPendingComposerComments({
           pendingBlueprintComments: draftState.pendingBlueprintComments,
           pendingDiffComments: draftState.pendingDiffComments,
@@ -1214,7 +1214,7 @@ export function useSessionComposerState(input: {
       onReasoningEffortChange: handleReasoningEffortChange,
       onPendingFilesAdded: addPendingComposerFiles,
       onRemovePendingAttachment: removePendingComposerAttachment,
-      onClearPendingDiffComments: () => {
+      onClearPendingComments: () => {
         draftState.clearPendingBlueprintComments();
         draftState.clearPendingDiffComments();
       },

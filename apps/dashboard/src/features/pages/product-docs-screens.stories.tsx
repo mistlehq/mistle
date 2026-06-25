@@ -250,7 +250,7 @@ const DocsSessionPendingDiffComments = [
 
 function buildDocsPendingDiffCommentSummary(
   comments: readonly PendingSessionDiffComment[],
-): NonNullable<typeof SessionComposerFixtureProps.pendingDiffCommentSummary> | null {
+): NonNullable<typeof SessionComposerFixtureProps.pendingCommentSummary> | null {
   if (comments.length === 0) {
     return null;
   }
@@ -275,7 +275,7 @@ function DocsSessionConversationBottomPanel(input?: {
         composerDraft: createComposerDraft(
           "Review the current changes and call out anything risky before we commit.",
         ),
-        pendingDiffCommentSummary: buildDocsPendingDiffCommentSummary(pendingDiffComments),
+        pendingCommentSummary: buildDocsPendingDiffCommentSummary(pendingDiffComments),
       }}
       isRespondingToServerRequest={false}
       onRespondToServerRequest={noopRespondToServerRequest}

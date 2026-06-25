@@ -72,7 +72,7 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
             isSubmitPending={input.isCreating}
             isUploadingAttachments={false}
             modelOptions={[]}
-            onClearPendingDiffComments={ignoreDesignerComposerAction}
+            onClearPendingComments={ignoreDesignerComposerAction}
             onComposerDraftChange={(draft) => {
               input.onPromptChange(draft.text);
             }}
@@ -83,7 +83,7 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
             onRuntimeCommandSubmit={ignoreDesignerComposerAction}
             onSubmit={input.onSubmit}
             pendingAttachments={[]}
-            pendingDiffCommentSummary={null}
+            pendingCommentSummary={null}
             placeholderText="Build a triaging agent for incoming GitHub issues and Linear bugs."
             pullRequest={null}
             reasoningEffortOptions={[]}
