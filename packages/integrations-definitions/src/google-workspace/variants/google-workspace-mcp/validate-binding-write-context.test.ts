@@ -6,7 +6,7 @@ function createValidationInput(input: {
   connectionConfig: Record<string, unknown>;
   bindingConfig: {
     mcpServers: string[];
-    workspaceUserEmail?: string;
+    workspaceUserEmail: string;
   };
 }): Parameters<typeof validateGoogleWorkspaceBindingWriteContext>[0] {
   return {
@@ -39,6 +39,7 @@ describe("validateGoogleWorkspaceBindingWriteContext", () => {
           },
           bindingConfig: {
             mcpServers: ["gmail"],
+            workspaceUserEmail: "",
           },
         }),
       ),
@@ -54,6 +55,7 @@ describe("validateGoogleWorkspaceBindingWriteContext", () => {
           },
           bindingConfig: {
             mcpServers: ["gmail"],
+            workspaceUserEmail: "",
           },
         }),
       ),

@@ -34,10 +34,11 @@ export const GoogleWorkspaceBindingConfigSchema = z
           });
         }
       }),
-    workspaceUserEmail: z.preprocess(
-      (value) => (typeof value === "string" && value.trim().length === 0 ? undefined : value),
-      z.string().trim().pipe(z.email()).optional(),
-    ),
+    workspaceUserEmail: z
+      .string()
+      .trim()
+      .pipe(z.union([z.literal(""), z.email()]))
+      .default(""),
   })
   .strict();
 

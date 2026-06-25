@@ -69,6 +69,7 @@ describe("GoogleWorkspaceDefinition", () => {
               GoogleWorkspaceMcpServerIds.SHEETS,
               GoogleWorkspaceMcpServerIds.PEOPLE,
             ],
+            workspaceUserEmail: "",
           },
         },
         refs: {

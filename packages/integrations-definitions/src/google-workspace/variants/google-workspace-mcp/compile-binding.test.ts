@@ -109,6 +109,7 @@ function createCompileInput(input: {
       kind: "connector",
       config: {
         mcpServers: input.mcpServers,
+        workspaceUserEmail: "",
       },
     },
     refs: {
