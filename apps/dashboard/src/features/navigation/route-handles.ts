@@ -142,6 +142,7 @@ export const ROUTE_HANDLES = {
   designerDetail: {
     appShellInsetOwner: "app-shell",
     appShellViewportMode: "workspace",
+    sidebarDefaultOpen: false,
     sidebarTriggerOwner: "workspace",
     hideBreadcrumb: true,
     title: "Designer",

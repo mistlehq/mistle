@@ -722,6 +722,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Mistle Designer session** access is controlled by Designer-specific user organization permissions in the first pass, not API-key scopes.
 - A **Designer canvas** may start empty until **Mistle Designer** opens a route-backed tab.
 - **Mistle Designer** may open ordinary dashboard routes in **Designer canvas tabs**.
+- Updating a **Designer canvas tab** changes that tab's route or navigation state without replacing the **Mistle Designer session** workspace.
 - Future **Mistle Designer** work may update a session's runtime setup as selected **Integration connections** become available.
 - **Mistle Designer sessions** may use preinstalled tools from the **Mistle Designer base image** and session-time integration access without rebuilding their sandbox image.
 - Preinstalled provider CLI tooling in a **Mistle Designer base image** does not imply access to the corresponding **Integration connection**.

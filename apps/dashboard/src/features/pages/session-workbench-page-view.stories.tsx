@@ -114,7 +114,7 @@ function RuntimeConversationNavigationWorkbenchStory(input?: {
         mainContent={createStorySessionMainContent()}
         primaryBottomPanel={input?.primaryBottomPanel ?? createStorySessionBottomPanel()}
         sandboxInstanceId={StorySandboxInstanceId}
-        secondaryPanelDefaultSize="20%"
+        secondaryPanelDefaultSize={20}
         secondaryPanelLayoutKey="right-panel"
         secondaryPanelMinSize="16rem"
         secondaryPanel={<RuntimeConversationNavigationPanel rows={input?.navigatorRows} />}
@@ -220,7 +220,7 @@ function RuntimeConversationNavigationAppShellStory(input?: {
               mainContent={createStorySessionMainContent()}
               primaryBottomPanel={input?.primaryBottomPanel ?? createStorySessionBottomPanel()}
               sandboxInstanceId={StorySandboxInstanceId}
-              secondaryPanelDefaultSize="20%"
+              secondaryPanelDefaultSize={20}
               secondaryPanelLayoutKey="right-panel"
               secondaryPanelMinSize="16rem"
               secondaryPanel={<RuntimeConversationNavigationPanel rows={navigatorRows} />}

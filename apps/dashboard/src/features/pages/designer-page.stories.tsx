@@ -223,6 +223,7 @@ function DesignerPageStory(input: {
       <DesignerPageView
         createErrorMessage={input.createErrorMessage ?? null}
         isCreating={input.isCreating ?? false}
+        onOpenSession={() => {}}
         onPromptChange={setPrompt}
         onSubmit={() => {}}
         prompt={prompt}
@@ -260,6 +261,7 @@ const meta = {
   args: {
     createErrorMessage: null,
     isCreating: false,
+    onOpenSession: () => {},
     onPromptChange: () => {},
     onSubmit: () => {},
     prompt: "Build a triaging agent for Linear and GitHub.",

@@ -231,6 +231,33 @@ describe("SessionWorkbenchHeaderActions", () => {
     expect(screen.getByRole("region", { name: "Mobile conversations" })).toBeDefined();
   });
 
+  it("does not trigger the terminal control when the desktop conversations control is clicked", () => {
+    const calls: string[] = [];
+
+    renderHeaderActions({
+      conversationControl: {
+        ...StoryButtonControl,
+        ariaLabel: "Show conversations",
+        onClick: () => {
+          calls.push("conversations");
+        },
+        title: "Show conversations",
+      },
+      terminalControl: {
+        ...StoryButtonControl,
+        ariaLabel: "Open terminal",
+        onClick: () => {
+          calls.push("terminal");
+        },
+        title: "Open terminal",
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Show conversations" }));
+
+    expect(calls).toEqual(["conversations"]);
+  });
+
   it("exposes secondary workbench tools from the mobile tools menu", () => {
     renderHeaderActions();
 

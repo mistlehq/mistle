@@ -22,6 +22,7 @@ import { resolveSessionUpdatedLabel, SessionTitleCell } from "./sessions-page.js
 export type DesignerPageViewProps = {
   createErrorMessage: string | null;
   isCreating: boolean;
+  onOpenSession: () => void;
   onPromptChange: (prompt: string) => void;
   onSubmit: () => void;
   prompt: string;
@@ -37,6 +38,7 @@ function ignoreDesignerComposerAction(): void {}
 
 function DesignerSessionRowActions(input: {
   href: string;
+  onOpenSession: () => void;
   sessionTitle: string;
 }): React.JSX.Element {
   return (
@@ -44,7 +46,7 @@ function DesignerSessionRowActions(input: {
       triggerLabel={`Designer session actions for ${input.sessionTitle}`}
       triggerSize="icon-xs"
     >
-      <DropdownMenuItem render={<RouterLink to={input.href} />}>
+      <DropdownMenuItem render={<RouterLink to={input.href} onClick={input.onOpenSession} />}>
         <ArrowRightIcon aria-hidden className="size-4" />
         Open session
       </DropdownMenuItem>
@@ -133,6 +135,22 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
                     return (
                       <TableRow
                         className="group/session-row focus-within:bg-muted/50 hover:bg-muted/50"
+                        onClickCapture={(event) => {
+                          if (!(event.target instanceof Element)) {
+                            return;
+                          }
+
+                          const link = event.target.closest("a[href]");
+                          if (
+                            link === null ||
+                            !event.currentTarget.contains(link) ||
+                            link.getAttribute("href") !== sessionHref
+                          ) {
+                            return;
+                          }
+
+                          input.onOpenSession();
+                        }}
                         key={session.id}
                       >
                         <TableCell className="max-w-0 align-top whitespace-normal">
@@ -161,6 +179,7 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
                           <div className="flex justify-end">
                             <DesignerSessionRowActions
                               href={sessionHref}
+                              onOpenSession={input.onOpenSession}
                               sessionTitle={sessionTitle}
                             />
                           </div>

@@ -46,6 +46,7 @@ import { SessionWorkbenchHeaderActions } from "./session-workbench-header-action
 import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
+  type SessionWorkbenchPageViewProps,
 } from "./session-workbench-page-view.js";
 import { SessionRepositoryNoneValue } from "./use-session-primary-repository-state.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
@@ -60,7 +61,10 @@ type SessionWorkbenchFullPageSecondaryPanel =
   | {
       kind: "custom";
       diffControlTitle: string;
+      defaultSize?: number;
+      isVisible?: boolean;
       layoutKey: string;
+      mountMode?: "visible-only" | "persistent-collapsible";
       minSize: string;
       renderPanel: () => React.ReactNode;
     };
@@ -96,6 +100,21 @@ type SessionWorkbenchActiveTurnState = ReturnType<
 type SessionWorkbenchPrimaryPanelTransitionState = ReturnType<
   typeof useSessionWorkbenchController
 >["workbench"]["primaryPanelState"]["transitionState"];
+
+type SessionWorkbenchActiveSecondaryPanelKind = "conversations" | "diff" | "custom" | null;
+
+type SessionWorkbenchSecondaryPanelResolution = {
+  activeContentKind: SessionWorkbenchActiveSecondaryPanelKind;
+  isVisible: boolean;
+  pageViewProps: Pick<
+    SessionWorkbenchPageViewProps,
+    | "primaryPanelDefaultSize"
+    | "secondaryPanelDefaultSize"
+    | "secondaryPanelLayoutKey"
+    | "secondaryPanelMinSize"
+    | "secondaryPanelMountMode"
+  >;
+};
 
 export function shouldAutoStartWorkbenchTurn(input: {
   activeConversationId: string | null;
@@ -188,6 +207,106 @@ export function resolveSessionEntryPreparationState(input: {
   }
 
   return "starting_first_turn";
+}
+
+export function shouldShowSessionWorkbenchSecondaryPanel(input: {
+  sharedSecondaryPanelKind: "conversations" | "diff" | null;
+  secondaryPanel: SessionWorkbenchFullPageSecondaryPanel;
+}): boolean {
+  if (input.sharedSecondaryPanelKind !== null) {
+    return true;
+  }
+
+  if (input.secondaryPanel.kind === "custom") {
+    return input.secondaryPanel.isVisible ?? true;
+  }
+
+  return false;
+}
+
+function resolveSessionWorkbenchSecondaryPanel(input: {
+  runtimeConversationNavigatorProps: React.ComponentProps<
+    typeof RuntimeConversationNavigatorPanel
+  > | null;
+  secondaryPanel: SessionWorkbenchFullPageSecondaryPanel;
+  sharedSecondaryPanelKind: "conversations" | "diff" | null;
+}): SessionWorkbenchSecondaryPanelResolution {
+  const activeContentKind = resolveSessionWorkbenchActiveSecondaryPanelKind(input);
+  const isVisible = shouldShowSessionWorkbenchSecondaryPanel({
+    sharedSecondaryPanelKind: input.sharedSecondaryPanelKind,
+    secondaryPanel: input.secondaryPanel,
+  });
+
+  if (input.secondaryPanel.kind === "custom") {
+    // Shared secondary tools fill the active custom panel geometry on pages that provide one.
+    return {
+      activeContentKind,
+      isVisible,
+      pageViewProps: {
+        ...resolveSecondaryPanelSizing(input.secondaryPanel.defaultSize),
+        secondaryPanelLayoutKey: input.secondaryPanel.layoutKey,
+        secondaryPanelMinSize: input.secondaryPanel.minSize,
+        ...(input.secondaryPanel.mountMode === undefined
+          ? {}
+          : { secondaryPanelMountMode: input.secondaryPanel.mountMode }),
+      },
+    };
+  }
+
+  if (activeContentKind === "conversations") {
+    return {
+      activeContentKind,
+      isVisible,
+      pageViewProps: {
+        ...resolveSecondaryPanelSizing(20),
+        secondaryPanelLayoutKey: "right-panel",
+        secondaryPanelMinSize: "16rem",
+      },
+    };
+  }
+
+  return {
+    activeContentKind,
+    isVisible,
+    pageViewProps: {
+      secondaryPanelLayoutKey: "right-panel",
+      secondaryPanelMinSize: "16rem",
+    },
+  };
+}
+
+function resolveSessionWorkbenchActiveSecondaryPanelKind(input: {
+  runtimeConversationNavigatorProps: React.ComponentProps<
+    typeof RuntimeConversationNavigatorPanel
+  > | null;
+  secondaryPanel: SessionWorkbenchFullPageSecondaryPanel;
+  sharedSecondaryPanelKind: "conversations" | "diff" | null;
+}): SessionWorkbenchActiveSecondaryPanelKind {
+  if (
+    input.sharedSecondaryPanelKind === "conversations" &&
+    input.runtimeConversationNavigatorProps !== null
+  ) {
+    return "conversations";
+  }
+
+  if (input.secondaryPanel.kind === "custom") {
+    return "custom";
+  }
+
+  return input.sharedSecondaryPanelKind;
+}
+
+function resolveSecondaryPanelSizing(
+  secondaryPanelDefaultSize: number | undefined,
+): Pick<SessionWorkbenchPageViewProps, "primaryPanelDefaultSize" | "secondaryPanelDefaultSize"> {
+  if (secondaryPanelDefaultSize === undefined) {
+    return {};
+  }
+
+  return {
+    primaryPanelDefaultSize: 100 - secondaryPanelDefaultSize,
+    secondaryPanelDefaultSize,
+  };
 }
 
 export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): React.JSX.Element {
@@ -306,6 +425,11 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
   const isDiffPanelActive =
     input.secondaryPanel.kind === "diff" && conversationNavigation.isDiffPanelActive;
   const isConversationNavigatorPanelVisible = conversationNavigation.isPanelVisible;
+  const resolvedSecondaryPanel = resolveSessionWorkbenchSecondaryPanel({
+    runtimeConversationNavigatorProps: conversationNavigation.runtimeConversationNavigatorProps,
+    secondaryPanel: input.secondaryPanel,
+    sharedSecondaryPanelKind: conversationNavigation.secondaryPanelKind,
+  });
   const toggleConversationNavigatorPanel = conversationNavigation.togglePanel;
   const headerActions = useMemo(
     () => (
@@ -753,19 +877,8 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
           />
         }
         isBottomPanelVisible={workbench.terminalPanelState.isVisible}
-        isSecondaryPanelVisible={
-          input.secondaryPanel.kind === "custom" ||
-          conversationNavigation.secondaryPanelKind !== null
-        }
-        {...(conversationNavigation.secondaryPanelKind === "conversations"
-          ? { secondaryPanelDefaultSize: "20%" }
-          : {})}
-        secondaryPanelLayoutKey={
-          input.secondaryPanel.kind === "custom" ? input.secondaryPanel.layoutKey : "right-panel"
-        }
-        secondaryPanelMinSize={
-          input.secondaryPanel.kind === "custom" ? input.secondaryPanel.minSize : "16rem"
-        }
+        isSecondaryPanelVisible={resolvedSecondaryPanel.isVisible}
+        {...resolvedSecondaryPanel.pageViewProps}
         mainContentLayout={
           workbench.primaryPanelState.transitionState === "stable_cli" ||
           entryPreparationState !== null
@@ -829,12 +942,13 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
           ) : null
         }
         secondaryPanel={
-          conversationNavigation.secondaryPanelKind === "conversations" &&
+          resolvedSecondaryPanel.activeContentKind === "conversations" &&
           conversationNavigation.runtimeConversationNavigatorProps !== null ? (
             <RuntimeConversationNavigatorPanel
               {...conversationNavigation.runtimeConversationNavigatorProps}
             />
-          ) : input.secondaryPanel.kind === "custom" ? (
+          ) : resolvedSecondaryPanel.activeContentKind === "custom" &&
+            input.secondaryPanel.kind === "custom" ? (
             input.secondaryPanel.renderPanel()
           ) : (
             <SessionDiffPanel

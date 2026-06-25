@@ -33,7 +33,10 @@ beforeAll(() => {
   }
 });
 
-function renderDesignerCanvasWorkspace(input: RenderDesignerCanvasWorkspaceInput): void {
+function renderDesignerCanvasRoute(input: {
+  element: React.ReactNode;
+  configureQueryClient?: (queryClient: QueryClient) => void;
+}): void {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -48,16 +51,7 @@ function renderDesignerCanvasWorkspace(input: RenderDesignerCanvasWorkspaceInput
     [
       {
         path: "/designer/session_story",
-        element: (
-          <DesignerCanvasWorkspace
-            activeTabHref={input.activeTabHref ?? null}
-            {...(input.onApiReady === undefined ? {} : { onApiReady: input.onApiReady })}
-            onActiveTabHrefChange={input.onActiveTabHrefChange ?? (() => {})}
-            onTabClose={input.onTabClose ?? (() => {})}
-            onTabsChange={input.onTabsChange ?? (() => {})}
-            tabs={input.tabs}
-          />
-        ),
+        element: input.element,
       },
     ],
     {
@@ -72,6 +66,27 @@ function renderDesignerCanvasWorkspace(input: RenderDesignerCanvasWorkspaceInput
       </QueryClientProvider>
     </ResolvedAppearanceProvider>,
   );
+}
+
+function renderDesignerCanvasWorkspace(input: RenderDesignerCanvasWorkspaceInput): void {
+  renderDesignerCanvasRoute({
+    element: (
+      <DesignerCanvasWorkspace
+        activeTabHref={input.activeTabHref ?? null}
+        {...(input.mountDockviewWhenEmpty === undefined
+          ? {}
+          : { mountDockviewWhenEmpty: input.mountDockviewWhenEmpty })}
+        {...(input.onApiReady === undefined ? {} : { onApiReady: input.onApiReady })}
+        onActiveTabHrefChange={input.onActiveTabHrefChange ?? (() => {})}
+        onTabClose={input.onTabClose ?? (() => {})}
+        onTabsChange={input.onTabsChange ?? (() => {})}
+        tabs={input.tabs}
+      />
+    ),
+    ...(input.configureQueryClient === undefined
+      ? {}
+      : { configureQueryClient: input.configureQueryClient }),
+  });
 }
 
 function StatefulDesignerCanvasWorkspace(input: {
@@ -94,43 +109,67 @@ function StatefulDesignerCanvasWorkspace(input: {
   );
 }
 
+function UpdatingDesignerCanvasWorkspace(input: {
+  onApiReady: (api: DockviewApi) => void;
+}): React.JSX.Element {
+  const [tabs, setTabs] = useState<DesignerCanvasWorkspaceProps["tabs"]>([
+    {
+      kind: "route",
+      id: "integrations",
+      title: "Integrations",
+      href: "/integrations",
+    },
+  ]);
+
+  return (
+    <>
+      <button
+        onClick={() => {
+          setTabs([
+            {
+              kind: "route",
+              id: "integrations",
+              title: "Slack",
+              href: "/integrations/slack",
+            },
+          ]);
+        }}
+        type="button"
+      >
+        Refresh tab
+      </button>
+      <DesignerCanvasWorkspace
+        activeTabHref="/integrations/slack"
+        onActiveTabHrefChange={() => {}}
+        onApiReady={input.onApiReady}
+        onTabClose={() => {}}
+        onTabsChange={setTabs}
+        tabs={tabs}
+      />
+    </>
+  );
+}
+
 function renderStatefulDesignerCanvasWorkspace(input: {
   activeTabHref: string | null;
   tabs: DesignerCanvasWorkspaceProps["tabs"];
 }): void {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
+  renderDesignerCanvasRoute({
+    element: (
+      <StatefulDesignerCanvasWorkspace
+        initialActiveTabHref={input.activeTabHref}
+        initialTabs={input.tabs}
+      />
+    ),
   });
-  seedAuthenticatedSession(queryClient);
+}
 
-  const router = createMemoryRouter(
-    [
-      {
-        path: "/designer/session_story",
-        element: (
-          <StatefulDesignerCanvasWorkspace
-            initialActiveTabHref={input.activeTabHref}
-            initialTabs={input.tabs}
-          />
-        ),
-      },
-    ],
-    {
-      initialEntries: ["/designer/session_story"],
-    },
-  );
-
-  render(
-    <ResolvedAppearanceProvider resolvedAppearance="light">
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
-    </ResolvedAppearanceProvider>,
-  );
+function renderUpdatingDesignerCanvasWorkspace(input: {
+  onApiReady: (api: DockviewApi) => void;
+}): void {
+  renderDesignerCanvasRoute({
+    element: <UpdatingDesignerCanvasWorkspace onApiReady={input.onApiReady} />,
+  });
 }
 
 describe("DesignerCanvasWorkspace", () => {
@@ -138,6 +177,25 @@ describe("DesignerCanvasWorkspace", () => {
     renderDesignerCanvasWorkspace({ tabs: [] });
 
     expect(screen.getByText("Canvas")).toBeDefined();
+  });
+
+  it("can mount the Designer canvas workspace while it has no tabs", async () => {
+    let resolveApi: ((api: DockviewApi) => void) | null = null;
+    const dockviewApiPromise = new Promise<DockviewApi>((resolve) => {
+      resolveApi = resolve;
+    });
+
+    renderDesignerCanvasWorkspace({
+      mountDockviewWhenEmpty: true,
+      onApiReady: (api) => {
+        resolveApi?.(api);
+      },
+      tabs: [],
+    });
+
+    const dockviewApi = await dockviewApiPromise;
+    expect(dockviewApi.panels).toHaveLength(0);
+    expect(screen.queryByText("Canvas")).toBeNull();
   });
 
   it("renders Designer canvas tab titles from metadata", async () => {
@@ -319,6 +377,32 @@ describe("DesignerCanvasWorkspace", () => {
           href: "/integrations/slack",
         },
       ]);
+    });
+  });
+
+  it("updates refreshed tab parameters without recreating the Dockview panel", async () => {
+    let resolveApi: ((api: DockviewApi) => void) | null = null;
+    const dockviewApiPromise = new Promise<DockviewApi>((resolve) => {
+      resolveApi = resolve;
+    });
+
+    renderUpdatingDesignerCanvasWorkspace({
+      onApiReady: (api) => {
+        resolveApi?.(api);
+      },
+    });
+
+    const dockviewApi = await dockviewApiPromise;
+    const originalPanel = dockviewApi.getPanel("integrations");
+    if (originalPanel === undefined) {
+      throw new Error("Expected integrations panel to exist.");
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh tab" }));
+
+    await waitFor(() => {
+      expect(dockviewApi.getPanel("integrations")).toBe(originalPanel);
+      expect(dockviewApi.panels).toHaveLength(1);
     });
   });
 

@@ -52,6 +52,7 @@ export type AppShellFrame = Pick<
   | "contentInsetOwner"
   | "renderSidebarTrigger"
   | "sidebarContent"
+  | "sidebarDefaultOpen"
   | "sidebarFooterContent"
   | "sidebarHeaderClassName"
   | "sidebarHeaderContent"
@@ -104,6 +105,11 @@ export function resolveAppShellFrame(input: {
   return {
     contentInsetOwner: input.pageMeta.appShellInsetOwner,
     renderSidebarTrigger: input.pageMeta.sidebarTriggerOwner === "page-frame",
+    ...(input.pageMeta.sidebarDefaultOpen === null
+      ? {}
+      : {
+          sidebarDefaultOpen: input.pageMeta.sidebarDefaultOpen,
+        }),
     sidebarContent: showDedicatedSessionsSidebar ? (
       <div className="animate-in fade-in-0 duration-200">
         <SessionsSidebarHeader

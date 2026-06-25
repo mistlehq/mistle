@@ -167,6 +167,7 @@ describe("route breadcrumb metadata", () => {
     ).toEqual({
       appShellInsetOwner: "app-shell",
       appShellViewportMode: "document",
+      sidebarDefaultOpen: null,
       sidebarTriggerOwner: "page-frame",
       title: "Integrations",
       headerIcon: null,
@@ -192,6 +193,7 @@ describe("route breadcrumb metadata", () => {
     ).toEqual({
       appShellInsetOwner: "app-shell",
       appShellViewportMode: "document",
+      sidebarDefaultOpen: null,
       sidebarTriggerOwner: "page-frame",
       title: "Integration connection",
       headerIcon: "Custom icon",
@@ -216,8 +218,33 @@ describe("route breadcrumb metadata", () => {
     ).toEqual({
       appShellInsetOwner: "child",
       appShellViewportMode: "workspace",
+      sidebarDefaultOpen: null,
       sidebarTriggerOwner: "page-frame",
       title: "Create trigger",
+      headerIcon: null,
+      supportingText: "",
+    });
+  });
+
+  it("returns route-level sidebar default metadata", () => {
+    expect(
+      resolveAppPageMetaFromMatches([
+        {
+          handle: {
+            sidebarDefaultOpen: false,
+            title: "Designer",
+            description: "",
+          },
+          params: {},
+          pathname: "/designer/dsn_123",
+        },
+      ]),
+    ).toEqual({
+      appShellInsetOwner: "app-shell",
+      appShellViewportMode: "document",
+      sidebarDefaultOpen: false,
+      sidebarTriggerOwner: "page-frame",
+      title: "Designer",
       headerIcon: null,
       supportingText: "",
     });
