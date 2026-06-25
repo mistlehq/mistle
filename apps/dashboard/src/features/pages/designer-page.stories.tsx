@@ -261,6 +261,7 @@ const meta = {
   args: {
     createErrorMessage: null,
     isCreating: false,
+    onOpenSession: () => {},
     onPromptChange: () => {},
     onSubmit: () => {},
     prompt: "Build a triaging agent for Linear and GitHub.",
