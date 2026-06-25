@@ -1,24 +1,11 @@
 import type { IntegrationFormContext, ResolvedIntegrationForm } from "@mistle/integrations-core";
 
-import { resolveRemoteMcpServerSelectionForm } from "../../../shared/remote-mcp-server-catalog/index.js";
 import { GoogleWorkspaceConnectionMethodIds } from "./auth.js";
 import { GoogleWorkspaceMcpServerCatalog } from "./mcp-catalog.js";
 
 type GoogleWorkspaceBindingFormContext = IntegrationFormContext;
 
-function resolveSchemaProperties(schema: Record<string, unknown>): Record<string, unknown> {
-  const properties = schema["properties"];
-  if (
-    properties === undefined ||
-    properties === null ||
-    typeof properties !== "object" ||
-    Array.isArray(properties)
-  ) {
-    throw new Error("Google Workspace MCP server selection form is missing schema properties.");
-  }
-
-  return Object.fromEntries(Object.entries(properties));
-}
+const GoogleWorkspaceDefaultMcpServers = GoogleWorkspaceMcpServerCatalog.map((entry) => entry.id);
 
 export function resolveGoogleWorkspaceBindingConfigForm(
   input: GoogleWorkspaceBindingFormContext,
@@ -27,28 +14,49 @@ export function resolveGoogleWorkspaceBindingConfigForm(
     throw new Error("Google Workspace binding config form requires connection context.");
   }
 
-  const remoteMcpServerForm = resolveRemoteMcpServerSelectionForm({
-    catalog: GoogleWorkspaceMcpServerCatalog,
-    fieldName: "mcpServers",
-    title: "Google Workspace MCP servers",
-  });
-  if (remoteMcpServerForm.schema === undefined) {
-    throw new Error("Google Workspace MCP server selection form is missing a schema.");
-  }
+  const baseSchemaProperties = {
+    mcpServers: {
+      title: "Google Workspace tools",
+      default: GoogleWorkspaceDefaultMcpServers,
+      items: {
+        type: "string",
+        enum: GoogleWorkspaceMcpServerCatalog.map((entry) => entry.id),
+      },
+      type: "array",
+      uniqueItems: true,
+    },
+  };
+  const baseUiSchema = {
+    mcpServers: {
+      "ui:enumNames": GoogleWorkspaceMcpServerCatalog.map((entry) => entry.displayName),
+      "ui:widget": "checkboxes",
+      "ui:options": {
+        inline: false,
+      },
+    },
+  };
 
   if (
     input.connection.config["connection_method"] !==
     GoogleWorkspaceConnectionMethodIds.SERVICE_ACCOUNT
   ) {
-    return remoteMcpServerForm;
+    return {
+      schema: {
+        properties: baseSchemaProperties,
+      },
+      uiSchema: {
+        ...baseUiSchema,
+        workspaceUserEmail: {
+          "ui:widget": "hidden",
+        },
+      },
+    };
   }
-
-  const remoteMcpServerProperties = resolveSchemaProperties(remoteMcpServerForm.schema);
 
   return {
     schema: {
       properties: {
-        ...remoteMcpServerProperties,
+        ...baseSchemaProperties,
         workspaceUserEmail: {
           type: "string",
           title: "Workspace user email",
@@ -58,8 +66,9 @@ export function resolveGoogleWorkspaceBindingConfigForm(
       },
     },
     uiSchema: {
-      ...remoteMcpServerForm.uiSchema,
+      ...baseUiSchema,
       workspaceUserEmail: {
+        "ui:title": "Workspace user email",
         "ui:placeholder": "user@example.com",
         "ui:widget": "email",
       },

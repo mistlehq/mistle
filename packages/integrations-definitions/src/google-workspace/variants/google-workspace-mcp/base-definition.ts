@@ -1,4 +1,8 @@
-import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
+import {
+  IntegrationKinds,
+  IntegrationMcpTransports,
+  type IntegrationDefinition,
+} from "@mistle/integrations-core";
 
 import { resolveRemoteMcpServers } from "../../../shared/remote-mcp-server-catalog/index.js";
 import {
@@ -14,9 +18,12 @@ import {
 } from "./auth.js";
 import { resolveGoogleWorkspaceBindingConfigForm } from "./binding-config-form.js";
 import { GoogleWorkspaceBindingConfigSchema } from "./binding-config-schema.js";
-import { compileGoogleWorkspaceBinding } from "./compile-binding.js";
+import { compileGoogleWorkspaceBinding, GoogleWorkspaceGwsMcpUrl } from "./compile-binding.js";
 import { GoogleWorkspaceServiceAccountConnectionConfigForm } from "./connection-config-form.js";
-import { GoogleWorkspaceMcpServerCatalog } from "./mcp-catalog.js";
+import {
+  GoogleWorkspaceLocalGwsToolIds,
+  GoogleWorkspaceRemoteMcpServerCatalog,
+} from "./mcp-catalog.js";
 import { GoogleWorkspaceTargetConfigSchema } from "./target-config-schema.js";
 import { GoogleWorkspaceTargetSecretSchema } from "./target-secret-schema.js";
 import { validateGoogleWorkspaceBindingWriteContext } from "./validate-binding-write-context.js";
@@ -34,7 +41,7 @@ export const GoogleWorkspaceMcpBaseDefinition: GoogleWorkspaceMcpBaseIntegration
   kind: IntegrationKinds.CONNECTOR,
   displayName: "Google Workspace",
   description:
-    "Enable Google-hosted Workspace MCP access for Gmail, Drive, Calendar, Chat, and People.",
+    "Enable Google Workspace access for Gmail, Drive, Sheets, Docs, Slides, Calendar, Chat, and People.",
   logoKey: "google",
   targetConfigSchema: GoogleWorkspaceTargetConfigSchema,
   targetSecretSchema: GoogleWorkspaceTargetSecretSchema,
@@ -103,10 +110,32 @@ export const GoogleWorkspaceMcpBaseDefinition: GoogleWorkspaceMcpBaseIntegration
       configForm: GoogleWorkspaceServiceAccountConnectionConfigForm,
     },
   ],
-  mcp: (input) =>
-    resolveRemoteMcpServers({
-      catalog: GoogleWorkspaceMcpServerCatalog,
-      selectedIds: input.binding.config.mcpServers,
-    }),
+  mcp: (input) => {
+    const selectedIdSet = new Set(input.binding.config.mcpServers);
+    const remoteMcpServers = resolveRemoteMcpServers({
+      catalog: GoogleWorkspaceRemoteMcpServerCatalog,
+      selectedIds: GoogleWorkspaceRemoteMcpServerCatalog.filter((entry) =>
+        selectedIdSet.has(entry.id),
+      ).map((entry) => entry.id),
+    });
+    const includesLocalGwsMcp = GoogleWorkspaceLocalGwsToolIds.some((toolId) =>
+      selectedIdSet.has(toolId),
+    );
+
+    return [
+      ...remoteMcpServers,
+      ...(includesLocalGwsMcp
+        ? [
+            {
+              serverId: "google-workspace-gws-mcp",
+              serverName: "google_workspace",
+              transport: IntegrationMcpTransports.STREAMABLE_HTTP,
+              url: GoogleWorkspaceGwsMcpUrl,
+              description: "Google Workspace Drive, Sheets, Docs, and Slides MCP",
+            },
+          ]
+        : []),
+    ];
+  },
   compileBinding: compileGoogleWorkspaceBinding,
 };

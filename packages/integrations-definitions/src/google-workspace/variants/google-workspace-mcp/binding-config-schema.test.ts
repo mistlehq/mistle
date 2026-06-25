@@ -4,13 +4,33 @@ import { GoogleWorkspaceBindingConfigSchema } from "./binding-config-schema.js";
 import { GoogleWorkspaceMcpServerIds } from "./mcp-catalog.js";
 
 describe("GoogleWorkspaceBindingConfigSchema", () => {
+  it("defaults to no selected Google Workspace MCP servers", () => {
+    expect(GoogleWorkspaceBindingConfigSchema.parse({})).toEqual({
+      mcpServers: [],
+    });
+  });
+
   it("accepts selected Google Workspace MCP servers", () => {
     expect(
       GoogleWorkspaceBindingConfigSchema.parse({
-        mcpServers: [GoogleWorkspaceMcpServerIds.GMAIL, GoogleWorkspaceMcpServerIds.CALENDAR],
+        mcpServers: [
+          GoogleWorkspaceMcpServerIds.GMAIL,
+          GoogleWorkspaceMcpServerIds.DRIVE,
+          GoogleWorkspaceMcpServerIds.SHEETS,
+          GoogleWorkspaceMcpServerIds.DOCS,
+          GoogleWorkspaceMcpServerIds.SLIDES,
+          GoogleWorkspaceMcpServerIds.CALENDAR,
+        ],
       }),
     ).toEqual({
-      mcpServers: [GoogleWorkspaceMcpServerIds.GMAIL, GoogleWorkspaceMcpServerIds.CALENDAR],
+      mcpServers: [
+        GoogleWorkspaceMcpServerIds.GMAIL,
+        GoogleWorkspaceMcpServerIds.DRIVE,
+        GoogleWorkspaceMcpServerIds.SHEETS,
+        GoogleWorkspaceMcpServerIds.DOCS,
+        GoogleWorkspaceMcpServerIds.SLIDES,
+        GoogleWorkspaceMcpServerIds.CALENDAR,
+      ],
     });
   });
 
@@ -42,12 +62,12 @@ describe("GoogleWorkspaceBindingConfigSchema", () => {
       GoogleWorkspaceBindingConfigSchema.parse({
         mcpServers: ["unsupported"],
       }),
-    ).toThrow("Unsupported remote MCP server id 'unsupported'.");
+    ).toThrow("Unsupported Google Workspace tool id 'unsupported'.");
 
     expect(() =>
       GoogleWorkspaceBindingConfigSchema.parse({
         mcpServers: [GoogleWorkspaceMcpServerIds.GMAIL, GoogleWorkspaceMcpServerIds.GMAIL],
       }),
-    ).toThrow("Duplicate remote MCP server id 'gmail'.");
+    ).toThrow("Duplicate Google Workspace tool id 'gmail'.");
   });
 });
