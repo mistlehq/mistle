@@ -41,7 +41,7 @@ const WORKSPACE_ROOTS = ["apps", "packages", "tests"] as const;
 const VALIDATION_STEPS: readonly Step[] = ["format", "lint", "typecheck", "test"];
 const DEFAULT_WORKSPACE_POLICY_STEPS: readonly Step[] = ["format", "lint", "typecheck", "test"];
 const TESTS_POLICY_STEPS: readonly Step[] = ["lint", "typecheck"];
-const ROOT_REPO_CHECK_STEPS = new Set<Step>(["format", "typecheck"]);
+const ROOT_REPO_CHECK_STEPS = new Set<Step>(["format"]);
 const AFFECTED_TEST_PACKAGE_NAMES = new Set(["@mistle/dashboard", "@mistle/ui"]);
 const AFFECTED_COMPONENT_TEST_PACKAGE_NAMES = new Set(["@mistle/dashboard"]);
 const AFFECTED_INTEGRATION_TEST_PACKAGE_NAMES = new Set([
@@ -93,6 +93,14 @@ const REPO_WIDE_FILES = new Set([
   "turbo.json",
   "tsconfig.base.json",
   ".lintstagedrc.json",
+]);
+
+const OXFMT_FILE_PATTERN = /\.(?:js|jsx|ts|tsx|mjs|cjs|json|jsonc|md|mdx|yaml|yml|toml|css|html)$/;
+const RUST_FORMAT_PACKAGES = new Map([
+  ["packages/sandboxd", "@mistle/sandboxd"],
+  ["packages/commit-sign", "@mistle/commit-sign"],
+  ["packages/mstl-core", "@mistle/mstl-core"],
+  ["packages/mstl-cli", "@mistle/mstl-cli"],
 ]);
 
 function requireFlagValue(argv: readonly string[], index: number, flagName: string): string {
@@ -492,6 +500,53 @@ function getLintRepoCheckCommands(
   return commands;
 }
 
+function getFormatRepoCheckCommands(
+  changedFiles: readonly string[],
+  steps: readonly Step[],
+): Command[] {
+  if (steps.includes("format") === false) {
+    return [];
+  }
+
+  const commands: Command[] = [];
+  const oxfmtFiles = changedFiles.filter(
+    (filePath) => OXFMT_FILE_PATTERN.test(filePath) && existsSync(resolve(REPO_ROOT, filePath)),
+  );
+  if (oxfmtFiles.length > 0) {
+    commands.push([
+      "pnpm",
+      "exec",
+      "oxfmt",
+      "--check",
+      "--no-error-on-unmatched-pattern",
+      ...oxfmtFiles,
+    ]);
+  }
+
+  const rustPackageNames = Array.from(
+    new Set(
+      changedFiles.flatMap((filePath) => {
+        if (filePath.endsWith(".rs") === false) {
+          return [];
+        }
+
+        for (const [packagePath, packageName] of RUST_FORMAT_PACKAGES.entries()) {
+          if (filePath.startsWith(`${packagePath}/`)) {
+            return [packageName];
+          }
+        }
+
+        return [];
+      }),
+    ),
+  ).sort();
+  for (const packageName of rustPackageNames) {
+    commands.push(["pnpm", "--filter", packageName, "format:check"]);
+  }
+
+  return commands;
+}
+
 function buildReactDoctorCommand(baseRef: string | null, headRef: string | null): Command {
   const command = ["pnpm", "lint:react-doctor"];
   if (baseRef !== null) {
@@ -622,6 +677,7 @@ function createValidationPlan(
   const normalizedChangedFiles = normalizeChangedFiles(changedFiles);
   const packageSelection = selectWorkspacePackages(normalizedChangedFiles, workspacePackages);
 
+  extraCommands.format.push(...getFormatRepoCheckCommands(normalizedChangedFiles, steps));
   extraCommands.lint.push(
     ...getLintRepoCheckCommands(
       normalizedChangedFiles,
@@ -630,8 +686,8 @@ function createValidationPlan(
       reactDoctorHeadRef,
     ),
   );
-  if (steps.includes("typecheck")) {
-    extraCommands.typecheck.push(["pnpm", "--dir", "packages/storybook", "run", "typecheck"]);
+  if (steps.includes("typecheck") && hasScriptsTypecheckRelevantChange(normalizedChangedFiles)) {
+    extraCommands.typecheck.push(["pnpm", "typecheck:scripts"]);
   }
   if (steps.includes("test") && hasComponentTestLaneConfigChange(normalizedChangedFiles)) {
     extraCommands.test.push(["pnpm", "test:component"]);
@@ -646,7 +702,7 @@ function createValidationPlan(
 }
 
 function buildWorkspaceTurboCommand(
-  step: Extract<Step, "lint" | "test">,
+  step: Extract<Step, "lint" | "typecheck" | "test">,
   workspacePackages: readonly WorkspacePackage[],
 ): string[] | null {
   if (
@@ -683,6 +739,12 @@ function hasComponentTestLaneConfigChange(changedFiles: readonly string[]): bool
       filePath === "turbo.json" ||
       filePath === "apps/dashboard/package.json" ||
       filePath === "apps/dashboard/vitest.component.config.ts",
+  );
+}
+
+function hasScriptsTypecheckRelevantChange(changedFiles: readonly string[]): boolean {
+  return changedFiles.some(
+    (filePath) => filePath.startsWith("scripts/") || isRepoWideConfigPath(filePath),
   );
 }
 
@@ -1082,8 +1144,24 @@ function buildExecutionCommands(plan: ValidationPlan, steps: readonly Step[]): s
   const commands: Command[] = [];
 
   for (const step of steps) {
+    if (step === "format") {
+      commands.push(...plan.extraCommands.format);
+      continue;
+    }
+
+    if (step === "typecheck") {
+      continue;
+    }
+
     if (isRootRepoCheckStep(step) && plan.changedFiles.length > 0) {
       commands.push(["pnpm", step]);
+    }
+  }
+
+  if (steps.includes("typecheck")) {
+    const typecheckCommand = buildWorkspaceTurboCommand("typecheck", plan.selectedPackages);
+    if (typecheckCommand !== null) {
+      commands.push(typecheckCommand);
     }
   }
 
@@ -1160,6 +1238,14 @@ function groupWorkspaceChecks(
 }
 
 function getRepoCheckLabels(step: Step, plan: ValidationPlan): string[] {
+  if (step === "format") {
+    return plan.extraCommands.format.map((command) => formatCommand(command));
+  }
+
+  if (step === "typecheck") {
+    return plan.extraCommands.typecheck.map((command) => formatCommand(command));
+  }
+
   if (isRootRepoCheckStep(step) && plan.changedFiles.length > 0) {
     return [step];
   }

@@ -6,6 +6,46 @@ import { describe, expect, it } from "vitest";
 const RepositoryRootPath = fileURLToPath(new URL("../..", import.meta.url));
 
 describe("validate-changed", () => {
+  it("plans format checks only for changed format-supported files", () => {
+    const commands = getDryRunCommandsWithArgs([
+      "--files",
+      "apps/dashboard/src/main.tsx,apps/dashboard/src/deleted.tsx,packages/sandboxd/src/main.rs",
+      "--steps",
+      "format",
+    ]);
+
+    expect(commands).toContain(
+      "pnpm exec oxfmt --check --no-error-on-unmatched-pattern apps/dashboard/src/main.tsx",
+    );
+    expect(commands).toContain("pnpm --filter @mistle/sandboxd format:check");
+    expect(commands).not.toContain("pnpm format");
+  });
+
+  it("plans package-scoped typecheck for changed packages", () => {
+    const commands = getDryRunCommandsWithArgs([
+      "--files",
+      "apps/dashboard/src/main.tsx",
+      "--steps",
+      "typecheck",
+    ]);
+    const typecheckCommand = getRequiredCommand(commands, "turbo run typecheck");
+
+    expect(typecheckCommand).toContain("--filter @mistle/dashboard");
+    expect(commands).not.toContain("pnpm typecheck");
+    expect(commands).not.toContain("pnpm --dir packages/storybook run typecheck");
+  });
+
+  it("plans scripts typecheck for script changes", () => {
+    const commands = getDryRunCommandsWithArgs([
+      "--files",
+      "scripts/dev/validate-changed.ts",
+      "--steps",
+      "typecheck",
+    ]);
+
+    expect(commands).toContain("pnpm typecheck:scripts");
+  });
+
   it("plans advisory React Doctor lint for dashboard React changes", () => {
     const commands = getDryRunCommands(
       "apps/dashboard/src/lib/analytics/authenticated.tsx",
@@ -86,7 +126,7 @@ describe("validate-changed", () => {
         "--base",
         "origin/main",
         "--head",
-        "origin/main",
+        "HEAD~1",
         "--steps",
         "lint",
       ]),
@@ -213,7 +253,7 @@ describe("validate-changed", () => {
 
   it("keeps affected package integration tests when repo-wide changes select the package", () => {
     const commands = getDryRunCommands(
-      ["package.json", "apps/dashboard/integration/auth-session.integration.test.ts"].join(","),
+      ["package.json", "apps/dashboard/integration/sessions-service.integration.test.ts"].join(","),
     );
     const integrationCommand = getRequiredCommand(
       commands,
@@ -222,7 +262,7 @@ describe("validate-changed", () => {
     const turboCommand = getRequiredCommand(commands, "turbo run test");
 
     expect(integrationCommand).toContain(
-      "apps/dashboard/integration/auth-session.integration.test.ts",
+      "apps/dashboard/integration/sessions-service.integration.test.ts",
     );
     expect(turboCommand).toContain("--filter @mistle/dashboard");
   });
@@ -230,7 +270,7 @@ describe("validate-changed", () => {
   it("keeps affected package integration tests when unsupported package files require full tests", () => {
     const commands = getDryRunCommands(
       [
-        "apps/dashboard/integration/auth-session.integration.test.ts",
+        "apps/dashboard/integration/sessions-service.integration.test.ts",
         "apps/dashboard/src/index.css",
       ].join(","),
     );
@@ -241,7 +281,7 @@ describe("validate-changed", () => {
     const turboCommand = getRequiredCommand(commands, "turbo run test");
 
     expect(integrationCommand).toContain(
-      "apps/dashboard/integration/auth-session.integration.test.ts",
+      "apps/dashboard/integration/sessions-service.integration.test.ts",
     );
     expect(turboCommand).toContain("--filter @mistle/dashboard");
   });
@@ -249,7 +289,7 @@ describe("validate-changed", () => {
   it("keeps full package tests when affected package integration tests change with supported source files", () => {
     const commands = getDryRunCommands(
       [
-        "apps/dashboard/integration/auth-session.integration.test.ts",
+        "apps/dashboard/integration/sessions-service.integration.test.ts",
         "apps/dashboard/src/main.tsx",
       ].join(","),
     );
@@ -260,7 +300,7 @@ describe("validate-changed", () => {
     const turboCommand = getRequiredCommand(commands, "turbo run test");
 
     expect(integrationCommand).toContain(
-      "apps/dashboard/integration/auth-session.integration.test.ts",
+      "apps/dashboard/integration/sessions-service.integration.test.ts",
     );
     expect(turboCommand).toContain("--filter @mistle/dashboard");
   });
@@ -282,7 +322,7 @@ describe("validate-changed", () => {
   it("runs existing affected package integration tests when another changed integration test was deleted", () => {
     const commands = getDryRunCommands(
       [
-        "apps/dashboard/integration/auth-session.integration.test.ts",
+        "apps/dashboard/integration/sessions-service.integration.test.ts",
         "apps/dashboard/integration/deleted.integration.test.ts",
       ].join(","),
     );
@@ -293,7 +333,7 @@ describe("validate-changed", () => {
     const turboCommand = getRequiredCommand(commands, "turbo run test");
 
     expect(integrationCommand).toContain(
-      "apps/dashboard/integration/auth-session.integration.test.ts",
+      "apps/dashboard/integration/sessions-service.integration.test.ts",
     );
     expect(turboCommand).toContain("--filter @mistle/dashboard");
   });
