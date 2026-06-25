@@ -175,6 +175,18 @@ _Avoid_: Placeholder connection, fake connection
 The point at which an **Integration connection** has the provider state and credentials needed for its supported behavior.
 _Avoid_: Connection creation when provider setup is still incomplete
 
+**Secret-bearing integration setup**:
+An integration setup step that requires a user-supplied credential or provider secret value.
+_Avoid_: MCP setup mutation, agent-entered secret setup
+
+**User-action integration setup**:
+An integration setup step prepared by an agent but completed directly by the user outside the agent transcript because it involves credential entry, provider consent, or provider installation.
+_Avoid_: Agent mutation, direct MCP setup when secret values or consent prompts are involved
+
+**User-action integration setup descriptor**:
+A structured description of a **User-action integration setup** that a client can render or route to without exposing secret values to an agent.
+_Avoid_: Setup URL when the client needs form fields or action metadata
+
 **Provider placeholder credential**:
 A non-secret credential value supplied only to satisfy provider client libraries before managed egress applies the real integration credential.
 _Avoid_: Dummy credential when it could be mistaken for real provider access
@@ -702,6 +714,15 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Mistle Designer resource access** is distinct from **Mistle resource access** configured on a target **Sandbox profile version**.
 - **Mistle Designer resource access** defines technical access authority; approval behavior for mutating actions is a separate **Mistle Designer** interaction policy.
 - **Mistle Designer resource access** is scoped to a **Mistle Designer session** and organization rather than one target **Sandbox profile version**.
+- A **Secret-bearing integration setup** is completed through a **User-action integration setup**, even when the same setup also includes non-secret fields.
+- Provider consent and provider installation setup steps are completed through **User-action integration setup**.
+- A **User-action integration setup descriptor** describes exactly one **User-action integration setup**.
+- Mistle-mediated setup preparation may create pending setup state when the user-facing credential, consent, installation, or irreversible provider mutation step is still completed through **User-action integration setup**.
+- MCP setup tools should prepare a **User-action integration setup descriptor** instead of accepting secret values for **Secret-bearing integration setup**.
+- MCP setup tools may directly complete non-secret setup that does not require provider consent, provider installation, or irreversible provider mutation.
+- MCP setup tools may expose credential requirement and configured-state metadata, but not secret values or secret-derived previews.
+- A **User-action integration setup descriptor** may include suggested non-secret values, but the final submitted setup payload remains user action.
+- Post-completion **Integration connection resource selection** and **Trigger event** discovery may use Mistle-mediated actions after **Integration connection setup completion**.
 - **Mistle Designer sessions** persist the user's initial prompt, workspace state, and Codex-backed Designer chat runtime state.
 - A **Mistle Designer session** submits its initial prompt as the first Designer chat turn after the Designer sandbox chat runtime is ready.
 - The target **Sandbox profile version**'s **Agent runtime** remains a user choice even when authored through **Mistle Designer**.

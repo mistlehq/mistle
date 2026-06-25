@@ -6,6 +6,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import type { CreateSandboxProfilesServiceInput } from "../sandbox-profiles/services/types.js";
 import type { AppOrganizationActor, ControlPlaneApiPortAccessConfig } from "../types.js";
 import { registerCapabilityTools } from "./tools/capabilities.js";
+import { registerIntegrationTools } from "./tools/integration.js";
 import { registerProfileTools } from "./tools/profile.js";
 import { registerSandboxTools } from "./tools/sandbox.js";
 import { registerTriggerTools } from "./tools/trigger.js";
@@ -36,6 +37,7 @@ export function createMistleMcpServer(context: MistleMcpServerContext): McpServe
   });
 
   registerCapabilityTools(server, context);
+  registerIntegrationTools(server, context);
   registerProfileTools(server, context);
   registerSandboxTools(server, context);
   registerTriggerTools(server, context);
