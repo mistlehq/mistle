@@ -3058,6 +3058,10 @@ function SetupScriptAssistantPanel(input: {
                   }}
                   draftState={{
                     composerDraft,
+                    pendingBlueprintComments: [],
+                    clearPendingBlueprintComments: () => {
+                      return;
+                    },
                     pendingDiffComments,
                     clearPendingDiffComments: handleClearPendingDiffComments,
                     setComposerDraft,

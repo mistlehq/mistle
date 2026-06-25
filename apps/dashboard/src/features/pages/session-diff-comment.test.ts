@@ -3,31 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildPendingSessionDiffCommentPromptBlock,
   buildPendingSessionDiffCommentSummaryLabel,
-  buildSessionComposerPrompt,
   capturePendingSessionDiffCommentAnchor,
   reconcilePendingSessionDiffComments,
   type PendingSessionDiffComment,
 } from "./session-diff-comment.js";
 import { parseSessionDiffPatch } from "./session-diff-panel-model.js";
-
-function createTestComment(
-  input: Pick<PendingSessionDiffComment, "body" | "filePath" | "id">,
-): PendingSessionDiffComment {
-  return {
-    ...input,
-    anchor: {
-      lineText: "test line",
-      nextLineText: null,
-      previousLineText: null,
-    },
-    lineNumber: 10,
-    repositoryPath: "/workspace/mistle",
-    side: "additions",
-    status: {
-      kind: "current",
-    },
-  };
-}
 
 const ReconciliationBasePatch = [
   "diff --git a/example.ts b/example.ts",
@@ -104,69 +84,6 @@ describe("session-diff-comment", () => {
         "",
         "Request change",
       ].join("\n"),
-    );
-  });
-
-  it("serializes pending diff comments ahead of freeform composer text", () => {
-    expect(
-      buildSessionComposerPrompt({
-        composerText: "Please fix this in the next patch.",
-        pendingDiffComments: [
-          createTestComment({
-            body: "Request change",
-            filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
-            id: "comment_1",
-          }),
-        ],
-      }),
-    ).toBe(
-      [
-        buildPendingSessionDiffCommentPromptBlock({
-          body: "Request change",
-          filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
-          lineNumber: 10,
-          side: "additions",
-        }),
-        "Please fix this in the next patch.",
-      ].join("\n\n"),
-    );
-  });
-
-  it("serializes multiple diff comments in order when the composer text is blank", () => {
-    expect(
-      buildSessionComposerPrompt({
-        composerText: "   ",
-        pendingDiffComments: [
-          createTestComment({
-            body: "Request change",
-            filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
-            id: "comment_1",
-          }),
-          {
-            ...createTestComment({
-              body: "Use the shared overflow tooltip here.",
-              filePath: "apps/dashboard/src/features/pages/session-diff-panel.tsx",
-              id: "comment_2",
-            }),
-            lineNumber: 4,
-          },
-        ],
-      }),
-    ).toBe(
-      [
-        buildPendingSessionDiffCommentPromptBlock({
-          body: "Request change",
-          filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
-          lineNumber: 10,
-          side: "additions",
-        }),
-        buildPendingSessionDiffCommentPromptBlock({
-          body: "Use the shared overflow tooltip here.",
-          filePath: "apps/dashboard/src/features/pages/session-diff-panel.tsx",
-          lineNumber: 4,
-          side: "additions",
-        }),
-      ].join("\n\n"),
     );
   });
 

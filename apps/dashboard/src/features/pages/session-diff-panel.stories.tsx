@@ -5,13 +5,13 @@ import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import type { ChatEntry } from "../chat/chat-types.js";
 import { SessionComposerFixturePropsWithPendingDiffComments } from "../session-agents/codex/fixtures/session-fixtures.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
+import { buildSessionComposerPrompt } from "./session-composer/session-composer-prompt.js";
 import type {
   PendingSessionDiffComment,
   PendingSessionDiffCommentInput,
 } from "./session-diff-comment.js";
 import {
   capturePendingSessionDiffCommentAnchor,
-  buildSessionComposerPrompt,
   buildPendingSessionDiffCommentSummaryLabel,
   buildPendingSessionDiffCommentSummaryTitle,
   reconcilePendingSessionDiffComments,
@@ -227,6 +227,7 @@ function buildSubmittedDiffCommentStoryEntries(input: {
       status: "completed",
       text: buildSessionComposerPrompt({
         composerText: input.composerText,
+        pendingBlueprintComments: [],
         pendingDiffComments: input.comments,
       }),
     },
@@ -370,10 +371,10 @@ function StoryDiffWorkbench({
           composerViewModel: {
             ...SessionComposerFixturePropsWithPendingDiffComments,
             composerDraft: createComposerDraft(""),
-            onClearPendingDiffComments: () => {
+            onClearPendingComments: () => {
               setPendingComments([]);
             },
-            pendingDiffCommentSummary: buildStoryPendingDiffCommentSummary(pendingComments),
+            pendingCommentSummary: buildStoryPendingDiffCommentSummary(pendingComments),
           },
         }),
         secondaryPanel: (

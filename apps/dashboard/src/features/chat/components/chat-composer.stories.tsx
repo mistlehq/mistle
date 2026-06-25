@@ -319,9 +319,7 @@ function InteractiveChatComposerStory(
     props.selectedReasoningEffort,
   );
   const [runtimeCommandStatus, setRuntimeCommandStatus] = useState<string | null>(null);
-  const [pendingDiffCommentSummary, setPendingDiffCommentSummary] = useState(
-    props.pendingDiffCommentSummary,
-  );
+  const [pendingCommentSummary, setPendingCommentSummary] = useState(props.pendingCommentSummary);
   const [pendingAttachments, setPendingAttachments] = useState(props.pendingAttachments);
 
   return (
@@ -345,15 +343,15 @@ function InteractiveChatComposerStory(
           setComposerDraft(createComposerDraft(""));
         }}
         onReasoningEffortChange={setSelectedReasoningEffort}
-        onClearPendingDiffComments={() => {
-          setPendingDiffCommentSummary(null);
+        onClearPendingComments={() => {
+          setPendingCommentSummary(null);
         }}
         onRemovePendingAttachment={(attachmentId) => {
           setPendingAttachments((currentAttachments) =>
             currentAttachments.filter((attachment) => attachment.id !== attachmentId),
           );
         }}
-        pendingDiffCommentSummary={pendingDiffCommentSummary}
+        pendingCommentSummary={pendingCommentSummary}
         pendingAttachments={pendingAttachments}
         selectedModel={selectedModel}
         selectedReasoningEffort={selectedReasoningEffort}

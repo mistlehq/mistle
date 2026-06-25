@@ -380,19 +380,3 @@ export function buildPendingSessionDiffCommentPromptBlock(
     comment.body.trim(),
   ].join("\n");
 }
-
-export function buildSessionComposerPrompt(input: {
-  composerText: string;
-  pendingDiffComments: readonly PendingSessionDiffComment[];
-}): string {
-  const promptSections = input.pendingDiffComments.map((comment) =>
-    buildPendingSessionDiffCommentPromptBlock(comment),
-  );
-  const trimmedComposerText = input.composerText.trim();
-
-  if (trimmedComposerText.length > 0) {
-    promptSections.push(trimmedComposerText);
-  }
-
-  return promptSections.join("\n\n");
-}

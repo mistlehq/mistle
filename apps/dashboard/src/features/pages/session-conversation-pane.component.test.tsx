@@ -152,6 +152,10 @@ function RenderedComposerPaneHarness(input: {
       }}
       draftState={{
         composerDraft: createComposerDraft(""),
+        pendingBlueprintComments: [],
+        clearPendingBlueprintComments: () => {
+          return;
+        },
         pendingDiffComments: [],
         clearPendingDiffComments: () => {
           return;
@@ -204,6 +208,10 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
         }}
         draftState={{
           composerDraft,
+          pendingBlueprintComments: [],
+          clearPendingBlueprintComments: () => {
+            return;
+          },
           pendingDiffComments: [],
           clearPendingDiffComments: () => {
             return;
@@ -319,11 +327,13 @@ function DraftOwnedComposerHarness(): React.JSX.Element {
       </button>
       <SessionConversationBottomPanelDraftController
         chatEntries={[]}
+        clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
         clearPendingDiffComments={function clearPendingDiffComments() {}}
         composerStateInput={createReadySessionComposerStateInput()}
         draftResetKey={draftResetKey}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={function onRespondToServerRequest() {}}
+        pendingBlueprintComments={[]}
         pendingDiffComments={[]}
         serverRequestPanelEntries={[]}
       />
