@@ -101,8 +101,8 @@ const ShopifyProviderStateSchema = z
   })
   .strict();
 
-type ShopifyTokenResponse = z.output<typeof ShopifyTokenResponseSchema>;
-type ShopifyProviderState = z.output<typeof ShopifyProviderStateSchema>;
+export type ShopifyTokenResponse = z.output<typeof ShopifyTokenResponseSchema>;
+export type ShopifyProviderState = z.output<typeof ShopifyProviderStateSchema>;
 
 type ShopifyRefreshFailure = {
   classification: IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification;
@@ -189,7 +189,7 @@ export function buildShopifyRefreshRequestBody(input: {
   return params;
 }
 
-function resolveShopifyOAuthTokenEndpoint(shopDomain: string): string {
+export function resolveShopifyOAuthTokenEndpoint(shopDomain: string): string {
   return `https://${normalizeShopifyShopDomain(shopDomain)}/admin/oauth/access_token`;
 }
 
@@ -271,7 +271,7 @@ export function assertShopifyCallbackHmac(input: {
   }
 }
 
-function resolveShopifyCompleteGrantResult(input: {
+export function resolveShopifyCompleteGrantResult(input: {
   providerState: ShopifyProviderState;
   response: ShopifyTokenResponse;
   issuedAt: Date;
@@ -326,7 +326,7 @@ function resolveShopifyCompleteGrantResult(input: {
   };
 }
 
-function resolveShopifyRefreshResult(input: {
+export function resolveShopifyRefreshResult(input: {
   response: ShopifyTokenResponse;
   issuedAt: Date;
 }): IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult {
@@ -444,12 +444,12 @@ function createShopifyRefreshTransportFailure(input: {
   });
 }
 
-async function exchangeShopifyToken(input: {
-  shopDomain: string;
+export async function exchangeShopifyToken(input: {
+  tokenEndpoint: string;
   requestBody: URLSearchParams;
   failureContext: string;
 }): Promise<ShopifyTokenResponse> {
-  const response = await fetch(resolveShopifyOAuthTokenEndpoint(input.shopDomain), {
+  const response = await fetch(input.tokenEndpoint, {
     method: "POST",
     headers: {
       accept: "application/json",
@@ -466,6 +466,44 @@ async function exchangeShopifyToken(input: {
   }
 
   return ShopifyTokenResponseSchema.parse(await response.json());
+}
+
+export async function refreshShopifyAccessToken(input: {
+  tokenEndpoint: string;
+  requestBody: URLSearchParams;
+  issuedAt: Date;
+}): Promise<IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult> {
+  let response: Response;
+  try {
+    response = await fetch(input.tokenEndpoint, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: input.requestBody,
+    });
+  } catch (error) {
+    throw createShopifyRefreshTransportFailure({ error });
+  }
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    const failure = classifyShopifyRefreshFailure({
+      status: response.status,
+      body: responseText,
+    });
+    throw new IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError({
+      message: failure.message,
+      classification: failure.classification,
+      ...(failure.code === undefined ? {} : { code: failure.code }),
+    });
+  }
+
+  return resolveShopifyRefreshResult({
+    response: ShopifyTokenResponseSchema.parse(await response.json()),
+    issuedAt: input.issuedAt,
+  });
 }
 
 export const ShopifyOAuth2AuthorizationCodeCapability: IntegrationOAuth2AuthorizationCodeCapability<
@@ -503,7 +541,7 @@ export const ShopifyOAuth2AuthorizationCodeCapability: IntegrationOAuth2Authoriz
       clientSecret: providerState.clientSecret,
     });
     const response = await exchangeShopifyToken({
-      shopDomain: providerState.shopDomain,
+      tokenEndpoint: resolveShopifyOAuthTokenEndpoint(providerState.shopDomain),
       requestBody: buildShopifyAuthorizationCodeExchangeRequestBody({
         code,
         clientId: providerState.clientId,
@@ -528,39 +566,13 @@ export const ShopifyOAuth2AuthorizationCodeCapability: IntegrationOAuth2Authoriz
       throw new Error("Shopify OAuth refresh requires a client secret.");
     }
 
-    let response: Response;
-    try {
-      response = await fetch(resolveShopifyOAuthTokenEndpoint(parsedConnectionConfig.shop_domain), {
-        method: "POST",
-        headers: {
-          accept: "application/json",
-          "content-type": "application/x-www-form-urlencoded",
-        },
-        body: buildShopifyRefreshRequestBody({
-          refreshToken: input.refreshToken,
-          clientId: parsedConnectionConfig.client_id,
-          clientSecret: input.clientSecret,
-        }),
-      });
-    } catch (error) {
-      throw createShopifyRefreshTransportFailure({ error });
-    }
-
-    if (!response.ok) {
-      const responseText = await response.text();
-      const failure = classifyShopifyRefreshFailure({
-        status: response.status,
-        body: responseText,
-      });
-      throw new IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError({
-        message: failure.message,
-        classification: failure.classification,
-        ...(failure.code === undefined ? {} : { code: failure.code }),
-      });
-    }
-
-    return resolveShopifyRefreshResult({
-      response: ShopifyTokenResponseSchema.parse(await response.json()),
+    return refreshShopifyAccessToken({
+      tokenEndpoint: resolveShopifyOAuthTokenEndpoint(parsedConnectionConfig.shop_domain),
+      requestBody: buildShopifyRefreshRequestBody({
+        refreshToken: input.refreshToken,
+        clientId: parsedConnectionConfig.client_id,
+        clientSecret: input.clientSecret,
+      }),
       issuedAt: new Date(),
     });
   },
