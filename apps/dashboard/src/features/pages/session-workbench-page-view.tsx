@@ -393,6 +393,7 @@ export function SessionWorkbenchPageView({
               <div
                 aria-hidden={!isSecondaryPanelVisible}
                 className="bg-background/98 h-full min-h-0 overflow-hidden backdrop-blur-sm"
+                inert={!isSecondaryPanelVisible ? true : undefined}
               >
                 <div className="h-full w-full">{secondaryPanel}</div>
               </div>

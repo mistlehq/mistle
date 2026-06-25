@@ -225,7 +225,9 @@ describe("SessionWorkbenchPageView", () => {
       "session-workbench-main-group-animated",
     );
     const mountedCanvas = screen.getByText("Designer canvas");
-    expect(mountedCanvas.closest("[aria-hidden]")?.getAttribute("aria-hidden")).toBe("true");
+    const collapsedContent = mountedCanvas.closest("[aria-hidden]");
+    expect(collapsedContent?.getAttribute("aria-hidden")).toBe("true");
+    expect(collapsedContent?.hasAttribute("inert")).toBe(true);
   });
 
   it("uses explicit default sizes for the primary and secondary panels", () => {
