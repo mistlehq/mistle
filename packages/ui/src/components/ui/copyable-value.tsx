@@ -11,7 +11,8 @@ const COPY_SUCCESS_DISPLAY_MS = 1200;
 const singleLineValueClassName =
   "thin-scrollbar-x min-w-0 flex min-h-12 flex-1 items-start overflow-x-auto whitespace-nowrap px-3 pt-3 text-sm leading-6";
 const singleLineContainerClassName =
-  "bg-muted/30 flex items-stretch gap-2 rounded-md border pl-0 pr-2";
+  "bg-muted/30 flex min-w-0 max-w-full items-stretch gap-2 rounded-md border pl-0 pr-2";
+const copyableValueRootClassName = "gap-1.5 flex min-w-0 max-w-full flex-col";
 
 type CopyFeedback =
   | { state: "idle" }
@@ -85,7 +86,7 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
 
   if (isLoading) {
     return (
-      <div className="gap-1.5 flex flex-col">
+      <div className={copyableValueRootClassName}>
         <DetailLabel as="p">{input.label}</DetailLabel>
         <div className={singleLineContainerClassName}>
           <div className="min-h-12 min-w-0 flex flex-1 items-center gap-2 px-3 text-sm">
@@ -168,7 +169,7 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
 
   if (readyInput.variant === "inline") {
     return (
-      <div className="gap-1.5 flex flex-col">
+      <div className={copyableValueRootClassName}>
         <div className={singleLineContainerClassName}>
           <p className={singleLineValueClassName}>{readyInput.value}</p>
           <div className="my-2">{button}</div>
@@ -181,7 +182,7 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
   }
 
   return (
-    <div className="gap-1.5 flex flex-col">
+    <div className={copyableValueRootClassName}>
       <DetailLabel as="p">{readyInput.labelContent ?? readyInput.label}</DetailLabel>
       <div className={singleLineContainerClassName}>
         <p className={singleLineValueClassName}>{readyInput.value}</p>

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useEffect, useState } from "react";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, screen, userEvent, within } from "storybook/test";
 
 import { ChatMarkdownMessage } from "./chat-markdown-message.js";
 
@@ -16,6 +16,10 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+const ExternalLinkSafetyUrl = "https://example.com/mistlehq/e2e-test-repo/pull/125";
+const ExternalLinkSafetyLongUrl =
+  "https://docs.google.com/spreadsheets/d/1m9LAvcAiu89_BW_QyJwPj6JkelE2YqYyKMATL_z7850/edit?gid=1874206882#gid=1874206882&range=A1:Z999&resourcekey=0-very-long-unbroken-google-sheets-review-resource-token";
 
 const StreamingBurstChunks = [
   "I found the places that need attention.",
@@ -197,7 +201,7 @@ export const ExternalLinkSafety: Story = {
     text: [
       "Open this external link from a normal chat markdown message:",
       "",
-      "[untrusted example report](https://example.com/mistlehq/e2e-test-repo/pull/125)",
+      `[untrusted example report](${ExternalLinkSafetyUrl})`,
     ].join("\n"),
   },
   parameters: {
@@ -216,7 +220,7 @@ export const ExternalLinkSafetyOpen: Story = {
     text: [
       "Open this external link from a normal chat markdown message:",
       "",
-      "[untrusted example report](https://example.com/mistlehq/e2e-test-repo/pull/125)",
+      `[untrusted example report](${ExternalLinkSafetyUrl})`,
     ].join("\n"),
   },
   parameters: {
@@ -234,8 +238,38 @@ export const ExternalLinkSafetyOpen: Story = {
         name: "untrusted example report",
       }),
     );
-    await expect(canvas.getByText("Open external link?")).toBeInTheDocument();
-    await expect(canvas.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
-    await expect(canvas.getByRole("button", { name: "Open link" })).toBeInTheDocument();
+    await expect(await screen.findByText("Open external link?")).toBeInTheDocument();
+    await expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
+    await expect(screen.getByRole("button", { name: "Open link" })).toBeInTheDocument();
+  },
+};
+
+export const ExternalLinkSafetyLongUrlOpen: Story = {
+  args: {
+    isStreaming: false,
+    text: [
+      "Open this external link from a normal chat markdown message:",
+      "",
+      `[Google Sheets report](${ExternalLinkSafetyLongUrl})`,
+    ].join("\n"),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Opens the external-link dialog with a long unbroken URL so the copy field can be checked against modal overflow.",
+      },
+    },
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByRole("button", {
+        name: "Google Sheets report",
+      }),
+    );
+    await expect(await screen.findByText("Open external link?")).toBeInTheDocument();
+    await expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
+    await expect(screen.getByRole("button", { name: "Open link" })).toBeInTheDocument();
   },
 };
