@@ -99,6 +99,7 @@ export function SessionWorkbenchPageView({
   const hasAppliedSecondaryPanelVisibilityRef = useRef(false);
   const initialStoredLayoutByGroupRef = useRef(new Map<string, boolean>());
   const previousBottomPanelVisibilityRef = useRef<boolean | null>(null);
+  const previousBottomPanelGroupKeyRef = useRef<string | null>(null);
   const previousSecondaryPanelVisibilityRef = useRef<boolean | null>(null);
   const sandboxInstanceKey = sandboxInstanceId ?? "missing-session";
   const isSecondaryPanelMounted =
@@ -107,6 +108,7 @@ export function SessionWorkbenchPageView({
   const mainPanelIds = isSecondaryPanelMounted
     ? [PrimaryPanelId, SecondaryPanelId]
     : [PrimaryPanelId];
+  const mainPanelGroupRenderKey = `${sandboxInstanceKey}:${secondaryPanelLayoutKey}`;
   const layoutStorage = {
     getItem(key: string): string | null {
       return readBrowserStorageItem({
@@ -159,11 +161,14 @@ export function SessionWorkbenchPageView({
     }
 
     const wasBottomPanelVisible = previousBottomPanelVisibilityRef.current;
+    const previousBottomPanelGroupKey = previousBottomPanelGroupKeyRef.current;
     previousBottomPanelVisibilityRef.current = isBottomPanelVisible;
+    previousBottomPanelGroupKeyRef.current = mainPanelGroupRenderKey;
 
     if (
       hasAppliedBottomPanelVisibilityRef.current &&
-      wasBottomPanelVisible === isBottomPanelVisible
+      wasBottomPanelVisible === isBottomPanelVisible &&
+      previousBottomPanelGroupKey === mainPanelGroupRenderKey
     ) {
       return;
     }
@@ -178,7 +183,7 @@ export function SessionWorkbenchPageView({
     if (wasBottomPanelVisible !== true) {
       bottomPanel.resize(`${String(DefaultTerminalPanelHeightPx)}px`);
     }
-  }, [isBottomPanelVisible]);
+  }, [isBottomPanelVisible, mainPanelGroupRenderKey]);
 
   useLayoutEffect(() => {
     if (secondaryPanelMountMode !== "persistent-collapsible") {
@@ -307,6 +312,7 @@ export function SessionWorkbenchPageView({
       <ResizablePanel
         collapsedSize={0}
         collapsible
+        defaultSize={isBottomPanelVisible ? undefined : 0}
         id={BottomPanelId}
         minSize={`${String(MIN_TERMINAL_PANEL_SIZE)}px`}
         panelRef={bottomPanelRef}
@@ -346,7 +352,7 @@ export function SessionWorkbenchPageView({
         )}
         defaultLayout={mainPanelDefaultLayout}
         id="session-workbench-main-group"
-        key={`${sandboxInstanceKey}:${secondaryPanelLayoutKey}`}
+        key={mainPanelGroupRenderKey}
         onLayoutChanged={mainPanelLayoutPersistence.onLayoutChanged}
         onTransitionEnd={handleMainPanelTransitionEnd}
         orientation="horizontal"

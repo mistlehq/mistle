@@ -299,6 +299,65 @@ describe("SessionWorkbenchPageView", () => {
     });
   });
 
+  it("keeps the terminal panel collapsed when the secondary panel layout key changes", async () => {
+    const originalOffsetHeight = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "offsetHeight",
+    );
+
+    Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
+      configurable: true,
+      get(): number {
+        return 400;
+      },
+    });
+
+    try {
+      const { rerender } = render(
+        <SessionWorkbenchPageView
+          alert={null}
+          bottomPanel={<div>Terminal workspace</div>}
+          isBottomPanelVisible={false}
+          isSecondaryPanelVisible
+          mainContent={<div>Conversation body</div>}
+          primaryBottomPanel={<div>Composer</div>}
+          sandboxInstanceId="sbi_test"
+          secondaryPanel={<div>Designer canvas</div>}
+          secondaryPanelDefaultSize={60}
+          secondaryPanelLayoutKey="designer-canvas-60"
+          secondaryPanelMountMode="persistent-collapsible"
+        />,
+      );
+
+      rerender(
+        <SessionWorkbenchPageView
+          alert={null}
+          bottomPanel={<div>Terminal workspace</div>}
+          isBottomPanelVisible={false}
+          isSecondaryPanelVisible
+          mainContent={<div>Conversation body</div>}
+          primaryBottomPanel={<div>Composer</div>}
+          sandboxInstanceId="sbi_test"
+          secondaryPanel={<div>Conversations</div>}
+          secondaryPanelDefaultSize={20}
+          secondaryPanelLayoutKey="right-panel"
+        />,
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("session-workbench-bottom-panel").getAttribute("style"),
+        ).toContain("flex: 0 1 0px;");
+      });
+    } finally {
+      if (originalOffsetHeight === undefined) {
+        Reflect.deleteProperty(HTMLElement.prototype, "offsetHeight");
+      } else {
+        Object.defineProperty(HTMLElement.prototype, "offsetHeight", originalOffsetHeight);
+      }
+    }
+  });
+
   it("does not remount the bottom panel when the shared right panel opens", () => {
     let nextMountId = 1;
 
