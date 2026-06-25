@@ -36,8 +36,15 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
     contentInsetOwner: input.contentInsetOwner,
     viewportMode: input.viewportMode,
   });
+  const sidebarProviderKey =
+    input.sidebarDefaultOpen === false ? "default-collapsed" : "default-expanded";
+
   return (
-    <SidebarProvider defaultOpen={input.sidebarDefaultOpen ?? true} style={SidebarWidthStyle}>
+    <SidebarProvider
+      defaultOpen={input.sidebarDefaultOpen ?? true}
+      key={sidebarProviderKey}
+      style={SidebarWidthStyle}
+    >
       <Sidebar>
         {input.sidebarHeaderContent === null ? null : (
           <SidebarHeader className={input.sidebarHeaderClassName}>

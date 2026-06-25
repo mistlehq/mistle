@@ -197,6 +197,8 @@ export function SessionWorkbenchPageView({
     }
   }, [isBottomPanelVisible, mainPanelGroupRenderKey]);
 
+  // The persistent resizable panel owns imperative expand/collapse/resize handles;
+  // render state alone cannot resize the already-mounted Dockview panel without remounting it.
   useLayoutEffect(() => {
     if (secondaryPanelMountMode !== "persistent-collapsible") {
       return;
