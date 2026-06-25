@@ -139,6 +139,24 @@ describe("compileSlackBinding", () => {
         },
         requestMiddleware: [SlackRequestMiddlewareIds.APPEND_SESSION_LINK_TO_TEXT],
       },
+      {
+        match: {
+          hosts: ["files.slack.com"],
+        },
+        upstream: {
+          baseUrl: "https://files.slack.com",
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        credentialResolver: {
+          kind: "integration_connection",
+          connectionId: "icn_slack",
+          secretType: SlackCredentialSecretTypes.API_KEY,
+          slotKey: SlackBotTokenSlotKey,
+        },
+      },
     ]);
 
     expect(compiled.artifacts).toHaveLength(1);

@@ -29,6 +29,7 @@ const SlackMcpProcessStopGracePeriodMs = 2_000;
 // resolution and the associated rate-limit / availability failures.
 const SlackCliReleaseTag = "slack/v0.5.0";
 const SlackCliLinuxAmd64Sha256 = "cc58352f84465513951008eccfacaa82a5a6be68bddb25d73e32e3e27addb418";
+const SlackFileBaseUrl = "https://files.slack.com";
 
 function createSlackCliArtifact(
   upstreamBaseUrl: string,
@@ -124,6 +125,13 @@ export function compileSlackBinding(input: SlackCompileBindingInput): CompileBin
   const includesSlackMcp = input.binding.config.tools.includes(SlackToolIds.SLACK_MCP);
   const includesSlackToolArtifact = includesSlackCli || includesSlackMcp;
   const upstreamBaseUrl = input.target.config.apiBaseUrl;
+  const botTokenCredentialResolver: CompileBindingResult["egressRoutes"][number]["credentialResolver"] =
+    {
+      kind: "integration_connection",
+      connectionId: input.connection.id,
+      secretType: SlackCredentialSecretTypes.API_KEY,
+      slotKey: SlackCredentialSlotKeys.BOT_TOKEN,
+    };
 
   return {
     egressRoutes: [
@@ -136,13 +144,21 @@ export function compileSlackBinding(input: SlackCompileBindingInput): CompileBin
           type: "bearer",
           target: "authorization",
         },
-        credentialResolver: {
-          kind: "integration_connection",
-          connectionId: input.connection.id,
-          secretType: SlackCredentialSecretTypes.API_KEY,
-          slotKey: SlackCredentialSlotKeys.BOT_TOKEN,
-        },
+        credentialResolver: botTokenCredentialResolver,
         requestMiddleware: [SlackRequestMiddlewareIds.APPEND_SESSION_LINK_TO_TEXT],
+      },
+      {
+        match: {
+          hosts: ["files.slack.com"],
+        },
+        upstream: {
+          baseUrl: SlackFileBaseUrl,
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        credentialResolver: botTokenCredentialResolver,
       },
     ],
     artifacts: includesSlackToolArtifact ? [createSlackCliArtifact(upstreamBaseUrl)] : [],
