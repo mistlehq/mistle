@@ -1221,7 +1221,14 @@ export function DesignerBlueprintPendingCommentEditor(input: {
   const [draftBody, setDraftBody] = useState(input.body);
 
   function submitDraft(): void {
-    input.onBodyChange(draftBody.trim());
+    const trimmedDraftBody = draftBody.trim();
+    if (trimmedDraftBody.length === 0) {
+      setDraftBody(input.body);
+      return;
+    }
+
+    setDraftBody(trimmedDraftBody);
+    input.onBodyChange(trimmedDraftBody);
   }
 
   return (

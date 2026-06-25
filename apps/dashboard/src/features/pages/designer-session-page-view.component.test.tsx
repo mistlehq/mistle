@@ -461,6 +461,20 @@ describe("DesignerCanvasWorkspace", () => {
     fireEvent.change(screen.getByTestId("designer-blueprint-comment"), {
       target: { value: "Ask for severity first." },
     });
+    fireEvent.keyDown(screen.getByTestId("designer-blueprint-comment"), {
+      key: "Enter",
+    });
+    expect(screen.getByTestId("designer-blueprint-comment")).toHaveProperty(
+      "value",
+      "Ask for severity first.",
+    );
+
+    fireEvent.change(screen.getByTestId("designer-blueprint-comment"), {
+      target: { value: "   " },
+    });
+    fireEvent.keyDown(screen.getByTestId("designer-blueprint-comment"), {
+      key: "Enter",
+    });
     expect(screen.getByTestId("designer-blueprint-comment")).toHaveProperty(
       "value",
       "Ask for severity first.",

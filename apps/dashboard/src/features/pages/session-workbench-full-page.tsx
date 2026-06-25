@@ -377,13 +377,18 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
   }, []);
   const handleUpdatePendingBlueprintComment = useCallback(
     (commentId: string, body: string): void => {
+      const trimmedBody = body.trim();
+      if (trimmedBody.length === 0) {
+        return;
+      }
+
       setPendingBlueprintComments((currentComments) =>
         currentComments.map((comment) =>
           comment.id !== commentId
             ? comment
             : {
                 ...comment,
-                body,
+                body: trimmedBody,
               },
         ),
       );
@@ -746,6 +751,7 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
 
     previousActiveConversationIdRef.current = conversationPane.activeConversationId;
     setComposerDraft(createComposerDraft(""));
+    setPendingBlueprintComments([]);
     setPendingDiffComments([]);
   }, [conversationPane.activeConversationId]);
 
