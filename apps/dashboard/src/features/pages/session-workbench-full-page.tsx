@@ -103,17 +103,17 @@ type SessionWorkbenchPrimaryPanelTransitionState = ReturnType<
 
 type SessionWorkbenchActiveSecondaryPanelKind = "conversations" | "diff" | "custom" | null;
 
-type SessionWorkbenchSecondaryPanelLayout = {
-  defaultSize?: number;
-  layoutKey: string;
-  minSize: string;
-  mountMode?: NonNullable<SessionWorkbenchPageViewProps["secondaryPanelMountMode"]>;
-};
-
-type SessionWorkbenchSecondaryPanelSlot = {
+type SessionWorkbenchSecondaryPanelResolution = {
   activeContentKind: SessionWorkbenchActiveSecondaryPanelKind;
   isVisible: boolean;
-  layout: SessionWorkbenchSecondaryPanelLayout;
+  pageViewProps: Pick<
+    SessionWorkbenchPageViewProps,
+    | "primaryPanelDefaultSize"
+    | "secondaryPanelDefaultSize"
+    | "secondaryPanelLayoutKey"
+    | "secondaryPanelMinSize"
+    | "secondaryPanelMountMode"
+  >;
 };
 
 export function shouldAutoStartWorkbenchTurn(input: {
@@ -224,6 +224,57 @@ export function shouldShowSessionWorkbenchSecondaryPanel(input: {
   return false;
 }
 
+function resolveSessionWorkbenchSecondaryPanel(input: {
+  runtimeConversationNavigatorProps: React.ComponentProps<
+    typeof RuntimeConversationNavigatorPanel
+  > | null;
+  secondaryPanel: SessionWorkbenchFullPageSecondaryPanel;
+  sharedSecondaryPanelKind: "conversations" | "diff" | null;
+}): SessionWorkbenchSecondaryPanelResolution {
+  const activeContentKind = resolveSessionWorkbenchActiveSecondaryPanelKind(input);
+  const isVisible = shouldShowSessionWorkbenchSecondaryPanel({
+    sharedSecondaryPanelKind: input.sharedSecondaryPanelKind,
+    secondaryPanel: input.secondaryPanel,
+  });
+
+  if (input.secondaryPanel.kind === "custom") {
+    // Shared secondary tools fill the active custom panel geometry on pages that provide one.
+    return {
+      activeContentKind,
+      isVisible,
+      pageViewProps: {
+        ...resolveSecondaryPanelSizing(input.secondaryPanel.defaultSize),
+        secondaryPanelLayoutKey: input.secondaryPanel.layoutKey,
+        secondaryPanelMinSize: input.secondaryPanel.minSize,
+        ...(input.secondaryPanel.mountMode === undefined
+          ? {}
+          : { secondaryPanelMountMode: input.secondaryPanel.mountMode }),
+      },
+    };
+  }
+
+  if (activeContentKind === "conversations") {
+    return {
+      activeContentKind,
+      isVisible,
+      pageViewProps: {
+        ...resolveSecondaryPanelSizing(20),
+        secondaryPanelLayoutKey: "right-panel",
+        secondaryPanelMinSize: "16rem",
+      },
+    };
+  }
+
+  return {
+    activeContentKind,
+    isVisible,
+    pageViewProps: {
+      secondaryPanelLayoutKey: "right-panel",
+      secondaryPanelMinSize: "16rem",
+    },
+  };
+}
+
 function resolveSessionWorkbenchActiveSecondaryPanelKind(input: {
   runtimeConversationNavigatorProps: React.ComponentProps<
     typeof RuntimeConversationNavigatorPanel
@@ -245,74 +296,17 @@ function resolveSessionWorkbenchActiveSecondaryPanelKind(input: {
   return input.sharedSecondaryPanelKind;
 }
 
-function resolveSessionWorkbenchSecondaryPanelSlot(input: {
-  activeContentKind: SessionWorkbenchActiveSecondaryPanelKind;
-  secondaryPanel: SessionWorkbenchFullPageSecondaryPanel;
-  sharedSecondaryPanelKind: "conversations" | "diff" | null;
-}): SessionWorkbenchSecondaryPanelSlot {
-  return {
-    activeContentKind: input.activeContentKind,
-    isVisible: shouldShowSessionWorkbenchSecondaryPanel({
-      sharedSecondaryPanelKind: input.sharedSecondaryPanelKind,
-      secondaryPanel: input.secondaryPanel,
-    }),
-    layout: resolveSessionWorkbenchSecondaryPanelLayout(input),
-  };
-}
-
-function resolveSessionWorkbenchSecondaryPanelLayout(input: {
-  activeContentKind: SessionWorkbenchActiveSecondaryPanelKind;
-  secondaryPanel: SessionWorkbenchFullPageSecondaryPanel;
-}): SessionWorkbenchSecondaryPanelLayout {
-  if (input.secondaryPanel.kind === "custom") {
-    // Shared secondary tools fill the active custom panel geometry on pages that provide one.
-    return {
-      ...(input.secondaryPanel.defaultSize === undefined
-        ? {}
-        : { defaultSize: input.secondaryPanel.defaultSize }),
-      layoutKey: input.secondaryPanel.layoutKey,
-      minSize: input.secondaryPanel.minSize,
-      ...(input.secondaryPanel.mountMode === undefined
-        ? {}
-        : { mountMode: input.secondaryPanel.mountMode }),
-    };
-  }
-
-  if (input.activeContentKind === "conversations") {
-    return {
-      defaultSize: 20,
-      layoutKey: "right-panel",
-      minSize: "16rem",
-    };
-  }
-
-  return {
-    layoutKey: "right-panel",
-    minSize: "16rem",
-  };
-}
-
 function resolveSecondaryPanelSizing(
-  layout: SessionWorkbenchSecondaryPanelLayout,
+  secondaryPanelDefaultSize: number | undefined,
 ): Pick<SessionWorkbenchPageViewProps, "primaryPanelDefaultSize" | "secondaryPanelDefaultSize"> {
-  if (layout.defaultSize === undefined) {
+  if (secondaryPanelDefaultSize === undefined) {
     return {};
   }
 
   return {
-    primaryPanelDefaultSize: 100 - layout.defaultSize,
-    secondaryPanelDefaultSize: layout.defaultSize,
+    primaryPanelDefaultSize: 100 - secondaryPanelDefaultSize,
+    secondaryPanelDefaultSize,
   };
-}
-
-function resolveSecondaryPanelMountMode(
-  layout: SessionWorkbenchSecondaryPanelLayout,
-): Pick<SessionWorkbenchPageViewProps, "secondaryPanelMountMode"> {
-  if (layout.mountMode === undefined) {
-    return {};
-  }
-
-  return { secondaryPanelMountMode: layout.mountMode };
 }
 
 export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): React.JSX.Element {
@@ -431,18 +425,11 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
   const isDiffPanelActive =
     input.secondaryPanel.kind === "diff" && conversationNavigation.isDiffPanelActive;
   const isConversationNavigatorPanelVisible = conversationNavigation.isPanelVisible;
-  const activeSecondaryPanelContentKind = resolveSessionWorkbenchActiveSecondaryPanelKind({
+  const resolvedSecondaryPanel = resolveSessionWorkbenchSecondaryPanel({
     runtimeConversationNavigatorProps: conversationNavigation.runtimeConversationNavigatorProps,
     secondaryPanel: input.secondaryPanel,
     sharedSecondaryPanelKind: conversationNavigation.secondaryPanelKind,
   });
-  const secondaryPanelSlot = resolveSessionWorkbenchSecondaryPanelSlot({
-    activeContentKind: activeSecondaryPanelContentKind,
-    secondaryPanel: input.secondaryPanel,
-    sharedSecondaryPanelKind: conversationNavigation.secondaryPanelKind,
-  });
-  const secondaryPanelSizing = resolveSecondaryPanelSizing(secondaryPanelSlot.layout);
-  const secondaryPanelMountMode = resolveSecondaryPanelMountMode(secondaryPanelSlot.layout);
   const toggleConversationNavigatorPanel = conversationNavigation.togglePanel;
   const headerActions = useMemo(
     () => (
@@ -890,11 +877,8 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
           />
         }
         isBottomPanelVisible={workbench.terminalPanelState.isVisible}
-        isSecondaryPanelVisible={secondaryPanelSlot.isVisible}
-        {...secondaryPanelSizing}
-        secondaryPanelLayoutKey={secondaryPanelSlot.layout.layoutKey}
-        {...secondaryPanelMountMode}
-        secondaryPanelMinSize={secondaryPanelSlot.layout.minSize}
+        isSecondaryPanelVisible={resolvedSecondaryPanel.isVisible}
+        {...resolvedSecondaryPanel.pageViewProps}
         mainContentLayout={
           workbench.primaryPanelState.transitionState === "stable_cli" ||
           entryPreparationState !== null
@@ -958,12 +942,12 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
           ) : null
         }
         secondaryPanel={
-          secondaryPanelSlot.activeContentKind === "conversations" &&
+          resolvedSecondaryPanel.activeContentKind === "conversations" &&
           conversationNavigation.runtimeConversationNavigatorProps !== null ? (
             <RuntimeConversationNavigatorPanel
               {...conversationNavigation.runtimeConversationNavigatorProps}
             />
-          ) : secondaryPanelSlot.activeContentKind === "custom" &&
+          ) : resolvedSecondaryPanel.activeContentKind === "custom" &&
             input.secondaryPanel.kind === "custom" ? (
             input.secondaryPanel.renderPanel()
           ) : (

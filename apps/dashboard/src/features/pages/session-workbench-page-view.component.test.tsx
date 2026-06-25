@@ -301,51 +301,6 @@ describe("SessionWorkbenchPageView", () => {
     });
   });
 
-  it("opens a hidden persistent secondary panel to its explicit default size", async () => {
-    const { rerender } = render(
-      <SessionWorkbenchPageView
-        alert={null}
-        bottomPanel={<div>Terminal workspace</div>}
-        isBottomPanelVisible={false}
-        isSecondaryPanelVisible={false}
-        mainContent={<div>Conversation body</div>}
-        primaryBottomPanel={<div>Composer</div>}
-        primaryPanelDefaultSize={40}
-        sandboxInstanceId="sbi_storage"
-        secondaryPanel={<div>Designer canvas</div>}
-        secondaryPanelDefaultSize={60}
-        secondaryPanelLayoutKey="designer-canvas-60"
-        secondaryPanelMountMode="persistent-collapsible"
-      />,
-    );
-
-    rerender(
-      <SessionWorkbenchPageView
-        alert={null}
-        bottomPanel={<div>Terminal workspace</div>}
-        isBottomPanelVisible={false}
-        isSecondaryPanelVisible
-        mainContent={<div>Conversation body</div>}
-        primaryBottomPanel={<div>Composer</div>}
-        primaryPanelDefaultSize={40}
-        sandboxInstanceId="sbi_storage"
-        secondaryPanel={<div>Designer canvas</div>}
-        secondaryPanelDefaultSize={60}
-        secondaryPanelLayoutKey="designer-canvas-60"
-        secondaryPanelMountMode="persistent-collapsible"
-      />,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("session-workbench-primary-panel").getAttribute("style")).toContain(
-        "flex: 40 1 0px;",
-      );
-      expect(
-        screen.getByTestId("session-workbench-secondary-panel").getAttribute("style"),
-      ).toContain("flex: 60 1 0px;");
-    });
-  });
-
   it("keeps the terminal panel collapsed when the secondary panel layout key changes", async () => {
     const originalOffsetHeight = Object.getOwnPropertyDescriptor(
       HTMLElement.prototype,

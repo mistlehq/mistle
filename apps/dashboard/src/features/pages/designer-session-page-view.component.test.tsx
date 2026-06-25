@@ -33,7 +33,10 @@ beforeAll(() => {
   }
 });
 
-function renderDesignerCanvasWorkspace(input: RenderDesignerCanvasWorkspaceInput): void {
+function renderDesignerCanvasRoute(input: {
+  element: React.ReactNode;
+  configureQueryClient?: (queryClient: QueryClient) => void;
+}): void {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -48,19 +51,7 @@ function renderDesignerCanvasWorkspace(input: RenderDesignerCanvasWorkspaceInput
     [
       {
         path: "/designer/session_story",
-        element: (
-          <DesignerCanvasWorkspace
-            activeTabHref={input.activeTabHref ?? null}
-            {...(input.mountDockviewWhenEmpty === undefined
-              ? {}
-              : { mountDockviewWhenEmpty: input.mountDockviewWhenEmpty })}
-            {...(input.onApiReady === undefined ? {} : { onApiReady: input.onApiReady })}
-            onActiveTabHrefChange={input.onActiveTabHrefChange ?? (() => {})}
-            onTabClose={input.onTabClose ?? (() => {})}
-            onTabsChange={input.onTabsChange ?? (() => {})}
-            tabs={input.tabs}
-          />
-        ),
+        element: input.element,
       },
     ],
     {
@@ -75,6 +66,27 @@ function renderDesignerCanvasWorkspace(input: RenderDesignerCanvasWorkspaceInput
       </QueryClientProvider>
     </ResolvedAppearanceProvider>,
   );
+}
+
+function renderDesignerCanvasWorkspace(input: RenderDesignerCanvasWorkspaceInput): void {
+  renderDesignerCanvasRoute({
+    element: (
+      <DesignerCanvasWorkspace
+        activeTabHref={input.activeTabHref ?? null}
+        {...(input.mountDockviewWhenEmpty === undefined
+          ? {}
+          : { mountDockviewWhenEmpty: input.mountDockviewWhenEmpty })}
+        {...(input.onApiReady === undefined ? {} : { onApiReady: input.onApiReady })}
+        onActiveTabHrefChange={input.onActiveTabHrefChange ?? (() => {})}
+        onTabClose={input.onTabClose ?? (() => {})}
+        onTabsChange={input.onTabsChange ?? (() => {})}
+        tabs={input.tabs}
+      />
+    ),
+    ...(input.configureQueryClient === undefined
+      ? {}
+      : { configureQueryClient: input.configureQueryClient }),
+  });
 }
 
 function StatefulDesignerCanvasWorkspace(input: {
@@ -142,72 +154,22 @@ function renderStatefulDesignerCanvasWorkspace(input: {
   activeTabHref: string | null;
   tabs: DesignerCanvasWorkspaceProps["tabs"];
 }): void {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
+  renderDesignerCanvasRoute({
+    element: (
+      <StatefulDesignerCanvasWorkspace
+        initialActiveTabHref={input.activeTabHref}
+        initialTabs={input.tabs}
+      />
+    ),
   });
-  seedAuthenticatedSession(queryClient);
-
-  const router = createMemoryRouter(
-    [
-      {
-        path: "/designer/session_story",
-        element: (
-          <StatefulDesignerCanvasWorkspace
-            initialActiveTabHref={input.activeTabHref}
-            initialTabs={input.tabs}
-          />
-        ),
-      },
-    ],
-    {
-      initialEntries: ["/designer/session_story"],
-    },
-  );
-
-  render(
-    <ResolvedAppearanceProvider resolvedAppearance="light">
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
-    </ResolvedAppearanceProvider>,
-  );
 }
 
 function renderUpdatingDesignerCanvasWorkspace(input: {
   onApiReady: (api: DockviewApi) => void;
 }): void {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
+  renderDesignerCanvasRoute({
+    element: <UpdatingDesignerCanvasWorkspace onApiReady={input.onApiReady} />,
   });
-  seedAuthenticatedSession(queryClient);
-
-  const router = createMemoryRouter(
-    [
-      {
-        path: "/designer/session_story",
-        element: <UpdatingDesignerCanvasWorkspace onApiReady={input.onApiReady} />,
-      },
-    ],
-    {
-      initialEntries: ["/designer/session_story"],
-    },
-  );
-
-  render(
-    <ResolvedAppearanceProvider resolvedAppearance="light">
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
-    </ResolvedAppearanceProvider>,
-  );
 }
 
 describe("DesignerCanvasWorkspace", () => {

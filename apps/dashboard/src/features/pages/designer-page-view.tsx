@@ -141,7 +141,11 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
                           }
 
                           const link = event.target.closest("a[href]");
-                          if (link?.getAttribute("href") !== sessionHref) {
+                          if (
+                            link === null ||
+                            !event.currentTarget.contains(link) ||
+                            link.getAttribute("href") !== sessionHref
+                          ) {
                             return;
                           }
 

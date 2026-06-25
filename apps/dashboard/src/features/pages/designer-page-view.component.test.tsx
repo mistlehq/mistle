@@ -119,6 +119,8 @@ describe("DesignerPageView", () => {
   });
 
   it("notifies before opening a past Designer session", () => {
+    const openSessionCalls: string[] = [];
+
     function DesignerPageViewOpenSessionHarness(): React.JSX.Element {
       const [navigationState, setNavigationState] = useState("open");
 
@@ -127,6 +129,7 @@ describe("DesignerPageView", () => {
           <div>{navigationState}</div>
           <ControlledDesignerPageView
             onOpenSession={() => {
+              openSessionCalls.push("open");
               setNavigationState("closing");
             }}
             sessions={[SampleDesignerSession]}
@@ -140,5 +143,26 @@ describe("DesignerPageView", () => {
     fireEvent.click(screen.getByRole("link", { name: "Design triage agent" }));
 
     expect(screen.getByText("closing")).toBeDefined();
+    expect(openSessionCalls).toEqual(["open"]);
+  });
+
+  it("notifies before opening a past Designer session from the row actions menu", () => {
+    const openSessionCalls: string[] = [];
+
+    render(
+      <ControlledDesignerPageView
+        onOpenSession={() => {
+          openSessionCalls.push("open");
+        }}
+        sessions={[SampleDesignerSession]}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Designer session actions for Design triage agent" }),
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "Open session" }));
+
+    expect(openSessionCalls).toEqual(["open"]);
   });
 });
