@@ -24,6 +24,24 @@ describe("ShopifyConnectionConfigSchema", () => {
     });
   });
 
+  it("accepts custom distribution OAuth config", () => {
+    expect(
+      ShopifyConnectionConfigSchema.parse({
+        connection_method: ShopifyConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+        shop_domain: "example.myshopify.com",
+        admin_api_version: "2026-04",
+        client_id: "client-id",
+        granted_scopes: ["read_products", "write_products"],
+      }),
+    ).toEqual({
+      connection_method: ShopifyConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+      shop_domain: "example.myshopify.com",
+      admin_api_version: "2026-04",
+      client_id: "client-id",
+      granted_scopes: ["read_products", "write_products"],
+    });
+  });
+
   it("rejects non-myshopify shop domains", () => {
     expect(() => normalizeShopifyShopDomain("example.com")).toThrow(
       "Shopify shop domain must use a *.myshopify.com hostname.",

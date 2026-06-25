@@ -1,12 +1,15 @@
 import {
+  IntegrationConnectionMethodIds,
   IntegrationKinds,
   IntegrationMcpTransports,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 
 import {
-  ShopifyConnectionConfigSchema,
   ShopifyConnectionMethodIds,
+  ShopifyCustomAppClientCredentialsConnectionConfigSchema,
+  ShopifyOAuth2AuthorizationCodeConnectionConfigSchema,
+  ShopifyOAuth2AuthorizationCodeConnectionStartConfigSchema,
   type ShopifyConnectionConfig,
   ShopifyCredentialSecretTypes,
   ShopifyCredentialSlotKeys,
@@ -41,6 +44,60 @@ export const ShopifyBaseDefinition: ShopifyBaseIntegrationDefinition = {
   bindingConfigForm: resolveShopifyBindingConfigForm,
   connectionMethods: [
     {
+      id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+      label: "Custom distribution OAuth",
+      kind: "redirect",
+      configSchema: ShopifyOAuth2AuthorizationCodeConnectionConfigSchema,
+      startConfigSchema: ShopifyOAuth2AuthorizationCodeConnectionStartConfigSchema,
+      startConfigForm: () => ({
+        schema: {
+          type: "object",
+          properties: {
+            shop_domain: {
+              type: "string",
+              title: "Shop domain",
+            },
+            admin_api_version: {
+              type: "string",
+              title: "Admin API version",
+              default: "2026-04",
+            },
+            client_id: {
+              type: "string",
+              title: "Client ID",
+            },
+            client_secret: {
+              type: "string",
+              title: "Client secret",
+            },
+          },
+          required: ["shop_domain", "admin_api_version", "client_id", "client_secret"],
+        },
+        uiSchema: {
+          shop_domain: {
+            "ui:placeholder": "example.myshopify.com",
+          },
+          admin_api_version: {
+            "ui:placeholder": "2026-04",
+          },
+          client_secret: {
+            "ui:widget": "password",
+          },
+        },
+      }),
+      ui: {
+        create: {
+          submitLabel: "Connect Shopify",
+          helperText: "Authorize Shopify Admin API access with your custom distribution app.",
+          showCallbackUrl: true,
+        },
+        reauthorize: {
+          actionLabel: "Re-authorize",
+          pendingLabel: "Starting...",
+        },
+      },
+    },
+    {
       id: ShopifyConnectionMethodIds.CUSTOM_APP_CLIENT_CREDENTIALS,
       label: "Custom app client credentials",
       kind: "form",
@@ -54,7 +111,7 @@ export const ShopifyBaseDefinition: ShopifyBaseIntegrationDefinition = {
           slotKey: ShopifyCredentialSlotKeys.CUSTOM_APP_CLIENT_CREDENTIALS_CLIENT_SECRET,
         },
       ],
-      configSchema: ShopifyConnectionConfigSchema,
+      configSchema: ShopifyCustomAppClientCredentialsConnectionConfigSchema,
       configForm: ShopifyCustomAppClientCredentialsConnectionConfigForm,
     },
   ],

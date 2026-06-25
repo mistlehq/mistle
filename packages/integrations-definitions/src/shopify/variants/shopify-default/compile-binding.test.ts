@@ -81,6 +81,7 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
 function compileWithTools(input: {
   tools: Array<(typeof ShopifyToolIds)[keyof typeof ShopifyToolIds]>;
   shopDomain?: string;
+  connectionMethod?: (typeof ShopifyConnectionMethodIds)[keyof typeof ShopifyConnectionMethodIds];
 }) {
   return compileShopifyBinding({
     organizationId: "org_123",
@@ -98,7 +99,8 @@ function compileWithTools(input: {
       id: "icn_shopify",
       status: "active",
       config: {
-        connection_method: ShopifyConnectionMethodIds.CUSTOM_APP_CLIENT_CREDENTIALS,
+        connection_method:
+          input.connectionMethod ?? ShopifyConnectionMethodIds.CUSTOM_APP_CLIENT_CREDENTIALS,
         shop_domain: input.shopDomain ?? "example.myshopify.com",
         admin_api_version: "2026-04",
         client_id: "shopify-client-id",
@@ -231,5 +233,19 @@ describe("compileShopifyBinding", () => {
     expect(compiled.egressRoutes).toHaveLength(1);
     expect(compiled.artifacts).toEqual([]);
     expect(compiled.runtimeClients).toEqual([]);
+  });
+
+  it("uses the OAuth authorization-code access token slot for Shopify OAuth connections", () => {
+    const compiled = compileWithTools({
+      tools: [],
+      connectionMethod: ShopifyConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+    });
+
+    expect(compiled.egressRoutes[0]?.credentialResolver).toEqual({
+      kind: "integration_connection",
+      connectionId: "icn_shopify",
+      secretType: "oauth2_access_token",
+      slotKey: ShopifyCredentialSlotKeys.OAUTH2_AUTHORIZATION_CODE_ACCESS_TOKEN,
+    });
   });
 });
