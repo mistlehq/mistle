@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import type { PendingSessionBlueprintComment } from "../session-blueprint-comment.js";
 import type { PendingSessionDiffComment } from "../session-diff-comment.js";
 import {
   createComposerDraft,
@@ -91,6 +92,7 @@ function SessionComposerStateHarness(input: {
   initialCollaborationMode?: "default" | "plan";
   onSwitchToPlan?: () => void;
   onSwitchToDefault?: () => void;
+  pendingBlueprintComments?: readonly PendingSessionBlueprintComment[];
   pendingDiffComments: readonly PendingSessionDiffComment[];
   placeholderText?: string | undefined;
   selectedModel?: string | null;
@@ -104,6 +106,9 @@ function SessionComposerStateHarness(input: {
     input.initialComposerDraft ?? createComposerDraft(input.composerText),
   );
   const [pendingDiffComments, setPendingDiffComments] = useState(input.pendingDiffComments);
+  const [pendingBlueprintComments, setPendingBlueprintComments] = useState(
+    input.pendingBlueprintComments ?? [],
+  );
   const [submittedPrompt, setSubmittedPrompt] = useState<string | null>(null);
   const [submittedSelectedSkillMentions, setSubmittedSelectedSkillMentions] = useState<
     readonly SelectedSkillMention[]
@@ -251,6 +256,10 @@ function SessionComposerStateHarness(input: {
     },
     draftState: {
       composerDraft,
+      pendingBlueprintComments,
+      clearPendingBlueprintComments: () => {
+        setPendingBlueprintComments([]);
+      },
       pendingDiffComments,
       clearPendingDiffComments: () => {
         setPendingDiffComments([]);
@@ -334,6 +343,7 @@ function SessionComposerStateHarness(input: {
           .join(",")}
       </div>
       <div data-testid="pending-diff-comments">{String(pendingDiffComments.length)}</div>
+      <div data-testid="pending-blueprint-comments">{String(pendingBlueprintComments.length)}</div>
       <div data-testid="queued-prompt-count">{String(composerState.queuedPrompts.length)}</div>
       <div data-testid="queued-prompts">
         {composerState.queuedPrompts.map((queuedPrompt) => queuedPrompt.text).join("|")}
@@ -1051,6 +1061,41 @@ describe("useSessionComposerState", () => {
     );
     expect(screen.getByTestId("composer-text").textContent).toBe("");
     expect(screen.getByTestId("pending-diff-comments").textContent).toBe("0");
+  });
+
+  it("submits blueprint comments even when the composer text is blank and clears them on success", async () => {
+    render(
+      <SessionComposerStateHarness
+        composerText="   "
+        pendingBlueprintComments={[
+          {
+            body: "Ask for severity first.",
+            id: "blueprint-comment-1",
+            itemDescription: "Determine type, priority, owner, and missing information.",
+            itemId: "classify-issue",
+            itemKindLabel: "Agent step",
+            itemLabel: "Classify issue",
+          },
+        ]}
+        pendingDiffComments={[]}
+      />,
+    );
+
+    expect(screen.getByTestId("submit-mode").textContent).toBe("start");
+    expect(screen.getByTestId("submit-disabled").textContent).toBe("false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("submitted-prompt").textContent).toContain(
+        "Designer blueprint comment on `classify-issue` (Agent step: Classify issue):",
+      );
+    });
+    expect(screen.getByTestId("transcript-prompt").textContent).toContain(
+      "Ask for severity first.",
+    );
+    expect(screen.getByTestId("composer-text").textContent).toBe("");
+    expect(screen.getByTestId("pending-blueprint-comments").textContent).toBe("0");
   });
 
   it("keeps the draft visible until submit resolves successfully", async () => {

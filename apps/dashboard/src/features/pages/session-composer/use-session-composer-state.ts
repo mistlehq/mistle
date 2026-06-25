@@ -8,6 +8,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatAttachment } from "../../chat/chat-types.js";
 import type { ChatComposerViewModel } from "../../chat/components/chat-composer.js";
 import {
+  buildPendingSessionBlueprintCommentSummaryLabel,
+  buildPendingSessionBlueprintCommentSummaryTitle,
+  type PendingSessionBlueprintComment,
+} from "../session-blueprint-comment.js";
+import {
   buildSessionComposerPrompt,
   buildPendingSessionDiffCommentSummaryLabel,
   buildPendingSessionDiffCommentSummaryTitle,
@@ -57,6 +62,7 @@ type QueuedComposerPrompt = {
   id: string;
   text: string;
   attachments: readonly PendingComposerAttachment[];
+  pendingBlueprintComments: readonly PendingSessionBlueprintComment[];
   pendingDiffComments: readonly PendingSessionDiffComment[];
   status: "failed" | "queued" | "submitting";
 };
@@ -99,6 +105,43 @@ function mapSelectedSkillMentionsToSubmittedPrompt(input: {
       end: mention.range.end + promptComposerTextOffset,
     },
   }));
+}
+
+function countPendingComposerComments(input: {
+  pendingBlueprintComments: readonly PendingSessionBlueprintComment[];
+  pendingDiffComments: readonly PendingSessionDiffComment[];
+}): number {
+  return input.pendingBlueprintComments.length + input.pendingDiffComments.length;
+}
+
+function buildPendingComposerCommentsSummaryLabel(input: {
+  pendingBlueprintComments: readonly PendingSessionBlueprintComment[];
+  pendingDiffComments: readonly PendingSessionDiffComment[];
+}): string {
+  if (input.pendingBlueprintComments.length > 0 && input.pendingDiffComments.length === 0) {
+    return buildPendingSessionBlueprintCommentSummaryLabel(input.pendingBlueprintComments.length);
+  }
+
+  if (input.pendingBlueprintComments.length === 0) {
+    return buildPendingSessionDiffCommentSummaryLabel(input.pendingDiffComments.length);
+  }
+
+  const commentCount = countPendingComposerComments(input);
+  return `${commentCount} comments`;
+}
+
+function buildPendingComposerCommentsSummaryTitle(input: {
+  pendingBlueprintComments: readonly PendingSessionBlueprintComment[];
+  pendingDiffComments: readonly PendingSessionDiffComment[];
+}): string {
+  return [
+    ...(input.pendingBlueprintComments.length === 0
+      ? []
+      : [buildPendingSessionBlueprintCommentSummaryTitle(input.pendingBlueprintComments)]),
+    ...(input.pendingDiffComments.length === 0
+      ? []
+      : [buildPendingSessionDiffCommentSummaryTitle(input.pendingDiffComments)]),
+  ].join("\n\n");
 }
 
 export type QueuedComposerPromptViewModel = {
@@ -187,7 +230,9 @@ export type SessionComposerStateInput = SessionComposerRuntimeInput & SessionCom
 
 export type SessionComposerDraftState = {
   composerDraft: ComposerDraft;
+  pendingBlueprintComments: readonly PendingSessionBlueprintComment[];
   pendingDiffComments: readonly PendingSessionDiffComment[];
+  clearPendingBlueprintComments: () => void;
   clearPendingDiffComments: () => void;
   setComposerDraft: (nextDraft: ComposerDraft) => void;
 };
@@ -331,6 +376,7 @@ export function useSessionComposerState(input: {
     async (prepareInput: {
       attachments: readonly PendingComposerAttachment[];
       composerDraft: ComposerDraft;
+      pendingBlueprintComments: readonly PendingSessionBlueprintComment[];
       pendingDiffComments: readonly PendingSessionDiffComment[];
     }): Promise<ComposerTurnSubmissionPreparationResult> => {
       if (composerStateInput.bootstrap.phase.status !== "ready") {
@@ -356,6 +402,7 @@ export function useSessionComposerState(input: {
       const trimmedDraft = trimComposerDraft(prepareInput.composerDraft);
       const submittedPrompt = buildSessionComposerPrompt({
         composerText: trimmedDraft.text,
+        pendingBlueprintComments: prepareInput.pendingBlueprintComments,
         pendingDiffComments: prepareInput.pendingDiffComments,
       });
 
@@ -401,12 +448,17 @@ export function useSessionComposerState(input: {
         composerText,
         hasActiveTurn: composerStateInput.turnControl.activeTurnState === "running",
         hasPendingInput:
-          pendingComposerAttachments.length > 0 || draftState.pendingDiffComments.length > 0,
+          pendingComposerAttachments.length > 0 ||
+          countPendingComposerComments({
+            pendingBlueprintComments: draftState.pendingBlueprintComments,
+            pendingDiffComments: draftState.pendingDiffComments,
+          }) > 0,
       }),
     [
       composerText,
       composerStateInput.turnControl.activeTurnState,
       draftState.pendingDiffComments.length,
+      draftState.pendingBlueprintComments,
       pendingComposerAttachments.length,
     ],
   );
@@ -442,7 +494,10 @@ export function useSessionComposerState(input: {
     const hasSubmissionContent =
       trimmedComposerText.length > 0 ||
       pendingComposerAttachments.length > 0 ||
-      draftState.pendingDiffComments.length > 0;
+      countPendingComposerComments({
+        pendingBlueprintComments: draftState.pendingBlueprintComments,
+        pendingDiffComments: draftState.pendingDiffComments,
+      }) > 0;
 
     if (!hasSubmissionContent) {
       return;
@@ -468,6 +523,7 @@ export function useSessionComposerState(input: {
           const preparationResult = await prepareComposerTurnSubmission({
             attachments: pendingComposerAttachments,
             composerDraft: createComposerDraft(trimmedComposerText),
+            pendingBlueprintComments: draftState.pendingBlueprintComments,
             pendingDiffComments: draftState.pendingDiffComments,
           });
 
@@ -495,6 +551,7 @@ export function useSessionComposerState(input: {
           }
 
           draftState.setComposerDraft(createComposerDraft(""));
+          draftState.clearPendingBlueprintComments();
           draftState.clearPendingDiffComments();
           setPendingComposerAttachments([]);
         } finally {
@@ -517,11 +574,13 @@ export function useSessionComposerState(input: {
         id: `queued-prompt-${crypto.randomUUID()}`,
         text: trimmedComposerText,
         attachments: pendingComposerAttachments,
+        pendingBlueprintComments: draftState.pendingBlueprintComments,
         pendingDiffComments: draftState.pendingDiffComments,
         status: "queued",
       },
     ]);
     draftState.setComposerDraft(createComposerDraft(""));
+    draftState.clearPendingBlueprintComments();
     draftState.clearPendingDiffComments();
     setPendingComposerAttachments([]);
   }, [
@@ -562,6 +621,7 @@ export function useSessionComposerState(input: {
       const preparationResult = await prepareComposerTurnSubmission({
         attachments: queuedPrompt.attachments,
         composerDraft: createComposerDraft(queuedPrompt.text),
+        pendingBlueprintComments: queuedPrompt.pendingBlueprintComments,
         pendingDiffComments: queuedPrompt.pendingDiffComments,
       });
 
@@ -667,6 +727,7 @@ export function useSessionComposerState(input: {
       const preparationResult = await prepareComposerTurnSubmission({
         attachments: [],
         composerDraft: planPromptDraft,
+        pendingBlueprintComments: [],
         pendingDiffComments: [],
       });
 
@@ -739,7 +800,13 @@ export function useSessionComposerState(input: {
           return;
         }
 
-        if (pendingComposerAttachments.length > 0 || draftState.pendingDiffComments.length > 0) {
+        if (
+          pendingComposerAttachments.length > 0 ||
+          countPendingComposerComments({
+            pendingBlueprintComments: draftState.pendingBlueprintComments,
+            pendingDiffComments: draftState.pendingDiffComments,
+          }) > 0
+        ) {
           setComposerErrorMessage(`/${typedRuntimeCommand.name} does not support attachments.`);
           return;
         }
@@ -794,6 +861,7 @@ export function useSessionComposerState(input: {
           submitAction.prompt === composerText.trim()
             ? composerDraft
             : createComposerDraft(submitAction.prompt),
+        pendingBlueprintComments: draftState.pendingBlueprintComments,
         pendingDiffComments: draftState.pendingDiffComments,
       });
 
@@ -838,6 +906,7 @@ export function useSessionComposerState(input: {
       }
 
       draftState.setComposerDraft(createComposerDraft(""));
+      draftState.clearPendingBlueprintComments();
       draftState.clearPendingDiffComments();
       setComposerErrorMessage(null);
       setPendingComposerAttachments([]);
@@ -958,7 +1027,10 @@ export function useSessionComposerState(input: {
       composerStateInput.turnControl.isStarting ||
       (composerText.trim().length === 0 &&
         pendingComposerAttachments.length === 0 &&
-        draftState.pendingDiffComments.length === 0) ||
+        countPendingComposerComments({
+          pendingBlueprintComments: draftState.pendingBlueprintComments,
+          pendingDiffComments: draftState.pendingDiffComments,
+        }) === 0) ||
       (requiresModelSelection && activeComposerModel === null)
     );
   }, [
@@ -970,7 +1042,8 @@ export function useSessionComposerState(input: {
     composerStateInput.turnControl.canInterrupt,
     composerStateInput.turnControl.canSteer,
     composerStateInput.turnControl.isStarting,
-    draftState.pendingDiffComments.length,
+    draftState.pendingBlueprintComments,
+    draftState.pendingDiffComments,
     pendingComposerAttachments.length,
     requiresModelSelection,
     submitAction.submitMode,
@@ -990,7 +1063,10 @@ export function useSessionComposerState(input: {
       (requiresModelSelection && activeComposerModel === null) ||
       (composerText.trim().length === 0 &&
         pendingComposerAttachments.length === 0 &&
-        draftState.pendingDiffComments.length === 0),
+        countPendingComposerComments({
+          pendingBlueprintComments: draftState.pendingBlueprintComments,
+          pendingDiffComments: draftState.pendingDiffComments,
+        }) === 0),
     [
       activeComposerModel,
       composerText,
@@ -998,7 +1074,8 @@ export function useSessionComposerState(input: {
       composerStateInput.bootstrap.phase.status,
       composerStateInput.configControl.isUpdating,
       composerStateInput.turnControl.activeTurnState,
-      draftState.pendingDiffComments.length,
+      draftState.pendingBlueprintComments,
+      draftState.pendingDiffComments,
       isSubmittingNativeQueuedPrompt,
       pendingComposerAttachments.length,
       requiresModelSelection,
@@ -1014,7 +1091,10 @@ export function useSessionComposerState(input: {
         text:
           queuedPrompt.text.length > 0
             ? queuedPrompt.text
-            : buildPendingSessionDiffCommentSummaryLabel(queuedPrompt.pendingDiffComments.length),
+            : buildPendingComposerCommentsSummaryLabel({
+                pendingBlueprintComments: queuedPrompt.pendingBlueprintComments,
+                pendingDiffComments: queuedPrompt.pendingDiffComments,
+              }),
         attachments: queuedPrompt.attachments.map((attachment) => ({
           kind: "file" as const,
           name: attachment.name,
@@ -1064,14 +1144,24 @@ export function useSessionComposerState(input: {
       commandPanel: composerStateInput.commandPanel ?? null,
       contextMentionControl: composerStateInput.contextMentionControl ?? null,
       pendingDiffCommentSummary:
-        draftState.pendingDiffComments.length === 0
+        countPendingComposerComments({
+          pendingBlueprintComments: draftState.pendingBlueprintComments,
+          pendingDiffComments: draftState.pendingDiffComments,
+        }) === 0
           ? null
           : {
-              count: draftState.pendingDiffComments.length,
-              label: buildPendingSessionDiffCommentSummaryLabel(
-                draftState.pendingDiffComments.length,
-              ),
-              title: buildPendingSessionDiffCommentSummaryTitle(draftState.pendingDiffComments),
+              count: countPendingComposerComments({
+                pendingBlueprintComments: draftState.pendingBlueprintComments,
+                pendingDiffComments: draftState.pendingDiffComments,
+              }),
+              label: buildPendingComposerCommentsSummaryLabel({
+                pendingBlueprintComments: draftState.pendingBlueprintComments,
+                pendingDiffComments: draftState.pendingDiffComments,
+              }),
+              title: buildPendingComposerCommentsSummaryTitle({
+                pendingBlueprintComments: draftState.pendingBlueprintComments,
+                pendingDiffComments: draftState.pendingDiffComments,
+              }),
             },
       pendingAttachments: pendingComposerAttachments.map((attachment) => ({
         id: attachment.id,
@@ -1097,7 +1187,10 @@ export function useSessionComposerState(input: {
         composerStateInput.turnControl.activeTurnState === "running" &&
         (composerText.trim().length > 0 ||
           pendingComposerAttachments.length > 0 ||
-          draftState.pendingDiffComments.length > 0)
+          countPendingComposerComments({
+            pendingBlueprintComments: draftState.pendingBlueprintComments,
+            pendingDiffComments: draftState.pendingDiffComments,
+          }) > 0)
           ? [
               { action: "Steer", shortcut: "enter" },
               { action: "Queue", shortcut: "mod-enter" },
@@ -1121,7 +1214,10 @@ export function useSessionComposerState(input: {
       onReasoningEffortChange: handleReasoningEffortChange,
       onPendingFilesAdded: addPendingComposerFiles,
       onRemovePendingAttachment: removePendingComposerAttachment,
-      onClearPendingDiffComments: draftState.clearPendingDiffComments,
+      onClearPendingDiffComments: () => {
+        draftState.clearPendingBlueprintComments();
+        draftState.clearPendingDiffComments();
+      },
     },
     queuedPrompts: queuedPromptViewModels,
     removeQueuedPrompt,

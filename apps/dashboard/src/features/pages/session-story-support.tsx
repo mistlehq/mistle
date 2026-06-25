@@ -335,6 +335,8 @@ export function renderSessionWorkbenchStory(input: {
   mainContentScrollContainerRef?: React.Ref<HTMLDivElement>;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
+  secondaryPanelDefaultSize?: number;
+  secondaryPanelMinSize?: string;
   secondaryPanel?: React.ReactNode;
   sandboxInstanceId?: string | null;
 }): React.JSX.Element {
@@ -344,6 +346,14 @@ export function renderSessionWorkbenchStory(input: {
     input.mainContentScrollContainerRef === undefined
       ? {}
       : { mainContentScrollContainerRef: input.mainContentScrollContainerRef };
+  const secondaryPanelDefaultSizeProps =
+    input.secondaryPanelDefaultSize === undefined
+      ? {}
+      : { secondaryPanelDefaultSize: input.secondaryPanelDefaultSize };
+  const secondaryPanelMinSizeProps =
+    input.secondaryPanelMinSize === undefined
+      ? {}
+      : { secondaryPanelMinSize: input.secondaryPanelMinSize };
 
   return (
     <SessionWorkbenchPageView
@@ -354,6 +364,8 @@ export function renderSessionWorkbenchStory(input: {
       mainContent={input.mainContent}
       {...mainContentScrollContainerRefProps}
       primaryBottomPanel={input.primaryBottomPanel}
+      {...secondaryPanelDefaultSizeProps}
+      {...secondaryPanelMinSizeProps}
       secondaryPanel={input.secondaryPanel ?? <></>}
       sandboxInstanceId={input.sandboxInstanceId ?? StorySandboxInstanceId}
       {...mainContentLayoutProps}
@@ -415,6 +427,8 @@ export function renderSessionWorkbenchContentStory(input: {
   mainContentLayout?: React.ComponentProps<typeof SessionWorkbenchPageView>["mainContentLayout"];
   mainContentScrollContainerRef?: React.Ref<HTMLDivElement>;
   primaryBottomPanel: React.ReactNode;
+  secondaryPanelDefaultSize?: number;
+  secondaryPanelMinSize?: string;
   secondaryPanel?: React.ReactNode;
   sandboxInstanceId?: string | null;
 }): React.JSX.Element {

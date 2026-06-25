@@ -111,6 +111,11 @@ _Avoid_: Provider write when the output is only proposed or may require approval
 The progress state metadata for one item in a **Designer blueprint** source document.
 _Avoid_: Live product state when the state is maintained by Mistle Designer
 
+**Designer blueprint comment**:
+A user-authored comment on a **Designer blueprint** item that is sent as context for the next **Mistle Designer** turn.
+_Avoid_: Blueprint source data, persistent annotation
+_Properties_: Anchored to a **Designer blueprint** item id; may include item label, kind, and description as submitted context
+
 **Runtime approval request**:
 A runtime tool call surfaced to the user for approval before the runtime may perform a side-effecting action.
 _Avoid_: Provider configuration change when the change has not been approved or applied
@@ -769,7 +774,12 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A first-pass **Designer blueprint source document** describes version, title, outcome, items, links, and actions.
 - A first-pass **Designer blueprint source document** describes semantic structure rather than visual coordinates.
 - A **Designer blueprint** renderer may derive its visual nodes and edges from the stored **Designer blueprint**.
-- A first-pass **Designer blueprint** renderer is visual-only and read-only, with pan and zoom but without visible action buttons, node dragging, or graph editing.
+- A first-pass **Designer blueprint** renderer is read-only, with pan, zoom, and composer-scoped comment drafting but without node dragging or graph editing.
+- A **Designer blueprint comment** is composer-scoped review context; it does not mutate the **Designer blueprint source document** or create persistent blueprint annotation state.
+- A **Designer blueprint comment** is anchored to a **Designer blueprint** item id rather than visual node coordinates.
+- Drafting a **Designer blueprint comment** may happen on the rendered blueprint item, but submitting it adds pending context to the **Mistle Designer** composer.
+- A **Designer blueprint** item has at most one pending **Designer blueprint comment** before the next **Mistle Designer** turn.
+- A **Designer blueprint comment** should be submitted with **Mistle Designer** context rather than generic code-review language.
 - A **Designer blueprint** is organized process-first: it shows **Designer blueprint triggers**, **Designer blueprint agent steps**, and **Designer blueprint workflow outputs** as the main workflow.
 - Trigger source details such as the integration/provider and event should be shown on the trigger item when known.
 - A **Designer blueprint integration target** uses the same stable target key as an **Integration target** and may be used by the dashboard to resolve product metadata such as the integration logo.

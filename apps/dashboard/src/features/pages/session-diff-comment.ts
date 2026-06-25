@@ -1,5 +1,10 @@
 import type { FileDiffMetadata } from "@pierre/diffs/react";
 
+import {
+  buildPendingSessionBlueprintCommentPromptBlock,
+  type PendingSessionBlueprintComment,
+} from "./session-blueprint-comment.js";
+
 export type PendingSessionDiffCommentAnchor = {
   lineText: string;
   previousLineText: string | null;
@@ -383,11 +388,17 @@ export function buildPendingSessionDiffCommentPromptBlock(
 
 export function buildSessionComposerPrompt(input: {
   composerText: string;
+  pendingBlueprintComments?: readonly PendingSessionBlueprintComment[];
   pendingDiffComments: readonly PendingSessionDiffComment[];
 }): string {
-  const promptSections = input.pendingDiffComments.map((comment) =>
-    buildPendingSessionDiffCommentPromptBlock(comment),
-  );
+  const promptSections = [
+    ...(input.pendingBlueprintComments ?? []).map((comment) =>
+      buildPendingSessionBlueprintCommentPromptBlock(comment),
+    ),
+    ...input.pendingDiffComments.map((comment) =>
+      buildPendingSessionDiffCommentPromptBlock(comment),
+    ),
+  ];
   const trimmedComposerText = input.composerText.trim();
 
   if (trimmedComposerText.length > 0) {

@@ -15,6 +15,10 @@ import {
   DesignerCanvasWorkspace,
   resolveDesignerBlueprintInitialFocusViewport,
 } from "./designer-session-page-view.js";
+import type {
+  PendingSessionBlueprintComment,
+  PendingSessionBlueprintCommentInput,
+} from "./session-blueprint-comment.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 type DesignerCanvasWorkspaceProps = React.ComponentProps<typeof DesignerCanvasWorkspace>;
@@ -76,10 +80,18 @@ function renderDesignerCanvasWorkspace(input: RenderDesignerCanvasWorkspaceInput
         {...(input.mountDockviewWhenEmpty === undefined
           ? {}
           : { mountDockviewWhenEmpty: input.mountDockviewWhenEmpty })}
+        onAddBlueprintComment={input.onAddBlueprintComment ?? function onAddBlueprintComment() {}}
         {...(input.onApiReady === undefined ? {} : { onApiReady: input.onApiReady })}
         onActiveTabHrefChange={input.onActiveTabHrefChange ?? (() => {})}
+        onDeleteBlueprintComment={
+          input.onDeleteBlueprintComment ?? function onDeleteBlueprintComment() {}
+        }
         onTabClose={input.onTabClose ?? (() => {})}
         onTabsChange={input.onTabsChange ?? (() => {})}
+        onUpdateBlueprintComment={
+          input.onUpdateBlueprintComment ?? function onUpdateBlueprintComment() {}
+        }
+        pendingBlueprintComments={input.pendingBlueprintComments ?? []}
         tabs={input.tabs}
       />
     ),
@@ -99,11 +111,15 @@ function StatefulDesignerCanvasWorkspace(input: {
   return (
     <DesignerCanvasWorkspace
       activeTabHref={activeTabHref}
+      onAddBlueprintComment={function onAddBlueprintComment() {}}
       onActiveTabHrefChange={setActiveTabHref}
+      onDeleteBlueprintComment={function onDeleteBlueprintComment() {}}
       onTabClose={(tabId) => {
         setTabs((currentTabs) => currentTabs.filter((tab) => tab.id !== tabId));
       }}
       onTabsChange={setTabs}
+      onUpdateBlueprintComment={function onUpdateBlueprintComment() {}}
+      pendingBlueprintComments={[]}
       tabs={tabs}
     />
   );
@@ -140,13 +156,103 @@ function UpdatingDesignerCanvasWorkspace(input: {
       </button>
       <DesignerCanvasWorkspace
         activeTabHref="/integrations/slack"
+        onAddBlueprintComment={function onAddBlueprintComment() {}}
         onActiveTabHrefChange={() => {}}
+        onDeleteBlueprintComment={function onDeleteBlueprintComment() {}}
         onApiReady={input.onApiReady}
         onTabClose={() => {}}
         onTabsChange={setTabs}
+        onUpdateBlueprintComment={function onUpdateBlueprintComment() {}}
+        pendingBlueprintComments={[]}
         tabs={tabs}
       />
     </>
+  );
+}
+
+function StatefulDesignerBlueprintCommentWorkspace(): React.JSX.Element {
+  const [pendingComments, setPendingComments] = useState<readonly PendingSessionBlueprintComment[]>(
+    [],
+  );
+
+  function addComment(comment: PendingSessionBlueprintCommentInput): void {
+    setPendingComments((currentComments) => {
+      const existingComment = currentComments.find(
+        (currentComment) => currentComment.itemId === comment.itemId,
+      );
+      if (existingComment === undefined) {
+        return [
+          ...currentComments,
+          {
+            ...comment,
+            id: `comment-${comment.itemId}`,
+          },
+        ];
+      }
+
+      return currentComments.map((currentComment) =>
+        currentComment.id === existingComment.id
+          ? {
+              ...currentComment,
+              ...comment,
+            }
+          : currentComment,
+      );
+    });
+  }
+
+  return (
+    <DesignerCanvasWorkspace
+      activeTabHref={DesignerBlueprintCurrentTabHref}
+      onAddBlueprintComment={addComment}
+      onActiveTabHrefChange={() => {}}
+      onDeleteBlueprintComment={(commentId) => {
+        setPendingComments((currentComments) =>
+          currentComments.filter((comment) => comment.id !== commentId),
+        );
+      }}
+      onTabClose={() => {}}
+      onTabsChange={() => {}}
+      onUpdateBlueprintComment={(commentId, body) => {
+        setPendingComments((currentComments) =>
+          currentComments.map((comment) =>
+            comment.id === commentId
+              ? {
+                  ...comment,
+                  body,
+                }
+              : comment,
+          ),
+        );
+      }}
+      pendingBlueprintComments={pendingComments}
+      tabs={[
+        {
+          kind: "blueprint",
+          id: "designer-blueprint-current",
+          title: "Blueprint",
+          href: DesignerBlueprintCurrentTabHref,
+          blueprint: {
+            version: 1,
+            title: "Issue triage blueprint",
+            outcome: {
+              label: "Route incoming issues into the right queue",
+            },
+            items: [
+              {
+                id: "classify-issue",
+                kind: "agent_step",
+                label: "Classify issue",
+                description: "Determine type, priority, owner, and missing information.",
+                state: "needs_setup",
+              },
+            ],
+            links: [],
+            actions: [],
+          },
+        },
+      ]}
+    />
   );
 }
 
@@ -317,6 +423,52 @@ describe("DesignerCanvasWorkspace", () => {
     expect(await screen.findByText("Triage summary")).toBeDefined();
     expect(screen.getByRole("region", { name: "Designer blueprint graph" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "Create trigger" })).toBeNull();
+  });
+
+  it("adds, edits, and deletes pending comments on blueprint nodes", async () => {
+    renderDesignerCanvasRoute({
+      element: <StatefulDesignerBlueprintCommentWorkspace />,
+    });
+
+    expect(await screen.findByText("Classify issue")).toBeDefined();
+    const addCommentNode = await screen.findByTestId("designer-blueprint-node-classify-issue");
+    const addCommentHint = await screen.findByTestId(
+      "designer-blueprint-add-comment-hint-classify-issue",
+    );
+    expect(addCommentHint.textContent).toContain("Click to add comment");
+    fireEvent.click(addCommentNode);
+    fireEvent.change(screen.getByTestId("designer-blueprint-new-comment"), {
+      target: { value: "Ask for missing severity before assigning an owner." },
+    });
+    fireEvent.keyDown(screen.getByTestId("designer-blueprint-new-comment"), {
+      key: "Enter",
+    });
+
+    expect(screen.queryByText("Pending comment")).toBeNull();
+    fireEvent.click(
+      await screen.findByTestId("designer-blueprint-collapsed-comment-classify-issue"),
+    );
+    expect(await screen.findByText("Pending comment")).toBeDefined();
+    expect(screen.getByTestId("designer-blueprint-comment")).toHaveProperty(
+      "value",
+      "Ask for missing severity before assigning an owner.",
+    );
+
+    fireEvent.click(screen.getByTestId("designer-blueprint-collapse-comment"));
+    expect(screen.queryByText("Pending comment")).toBeNull();
+    fireEvent.click(screen.getByTestId("designer-blueprint-collapsed-comment-classify-issue"));
+
+    fireEvent.change(screen.getByTestId("designer-blueprint-comment"), {
+      target: { value: "Ask for severity first." },
+    });
+    expect(screen.getByTestId("designer-blueprint-comment")).toHaveProperty(
+      "value",
+      "Ask for severity first.",
+    );
+
+    fireEvent.click(screen.getByTestId("designer-blueprint-delete-comment"));
+    expect(screen.queryByText("Pending comment")).toBeNull();
+    expect(screen.queryByTestId("designer-blueprint-add-comment-hint-classify-issue")).toBeNull();
   });
 
   it("centers the first blueprint node horizontally near the top of the canvas viewport", () => {

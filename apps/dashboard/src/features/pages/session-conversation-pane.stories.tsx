@@ -162,6 +162,7 @@ function LongTranscriptTypingHarness(): React.JSX.Element {
     primaryBottomPanel: (
       <SessionConversationBottomPanelDraftController
         chatEntries={entries}
+        clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
         clearPendingDiffComments={function clearPendingDiffComments() {}}
         composerStateInput={LongTranscriptComposerStateInput}
         draftResetKey="long-transcript-typing"
@@ -169,6 +170,7 @@ function LongTranscriptTypingHarness(): React.JSX.Element {
         onRespondToServerRequest={
           SessionConversationPanePlaygroundBaseArgs.onRespondToServerRequest
         }
+        pendingBlueprintComments={[]}
         pendingDiffComments={LongTranscriptPendingDiffComments}
         serverRequestPanelEntries={LongTranscriptServerRequestPanelEntries}
       />

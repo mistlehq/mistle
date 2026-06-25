@@ -1,15 +1,40 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
 import { MemoryRouter } from "react-router";
 
 import { withDashboardPageStory, withDashboardWorkspaceStory } from "../../storybook/decorators.js";
+import type { ChatEntry } from "../chat/chat-types.js";
+import { noopRespondToServerRequest } from "../chat/components/chat-story-support.js";
 import {
   DesignerBlueprintCurrentTabHref,
   DesignerBlueprintCurrentTabId,
 } from "../designer/designer-blueprint-schema.js";
 import type { DesignerSession, DesignerSessionListItem } from "../designer/designer-service.js";
+import { createReadySessionComposerStateInput } from "../session-agents/codex/fixtures/session-fixtures.js";
 import { DesignerPageView } from "./designer-page-view.js";
-import { DesignerCanvasWorkspace } from "./designer-session-page-view.js";
+import {
+  DesignerBlueprintCanvasPanel,
+  DesignerBlueprintCollapsedCommentButton,
+  DesignerBlueprintDraftCommentEditor,
+  DesignerBlueprintFloatingComment,
+  DesignerBlueprintPendingCommentEditor,
+  DesignerCanvasWorkspace,
+} from "./designer-session-page-view.js";
+import {
+  type PendingSessionBlueprintComment,
+  type PendingSessionBlueprintCommentInput,
+} from "./session-blueprint-comment.js";
+import {
+  SessionConversationBottomPanelDraftController,
+  SessionConversationMainContent,
+} from "./session-conversation-pane.js";
+import { renderSessionWorkbenchContentStory } from "./session-story-support.js";
+
+type StoryDesignerBlueprintCanvasTab = Extract<
+  DesignerSession["canvasTabs"][number],
+  { kind: "blueprint" }
+>;
 
 const StoryDesignerRuntimeFields: Pick<
   DesignerSession,
@@ -209,6 +234,102 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
   },
 ];
 
+const StoryDesignerSessionConversationEntries = [
+  {
+    id: "designer-session-user-1",
+    turnId: "designer-session-turn-1",
+    kind: "user-message",
+    status: "completed",
+    text: "Build a triage agent for incoming GitHub issues and Linear bugs.",
+  },
+  {
+    id: "designer-session-assistant-1",
+    turnId: "designer-session-turn-1",
+    kind: "assistant-message",
+    phase: null,
+    status: "completed",
+    text: [
+      "I drafted the first blueprint on the canvas.",
+      "",
+      "The trigger nodes collect Linear and GitHub events, the normalize step prepares a single work item shape, and the routing policy decides whether to write the normal triage update or escalate an urgent item.",
+    ].join("\n"),
+  },
+  {
+    id: "designer-session-user-2",
+    turnId: "designer-session-turn-2",
+    kind: "user-message",
+    status: "completed",
+    text: "The routing step probably needs more detail before we build anything.",
+  },
+  {
+    id: "designer-session-assistant-2",
+    turnId: "designer-session-turn-2",
+    kind: "assistant-message",
+    phase: null,
+    status: "completed",
+    text: "Add comments directly on the blueprint nodes you want changed. I will use those comments as Designer-specific context in the next turn.",
+  },
+] satisfies readonly ChatEntry[];
+
+const StoryDesignerSessionPendingBlueprintComments = [
+  {
+    id: "designer-session-routing-comment",
+    body: "Split urgent customer escalations from ordinary severity labels so the routing policy does not over-escalate noisy issues.",
+    itemId: "routing",
+    itemKindLabel: "Routing policy",
+    itemLabel: "Routing policy",
+  },
+] satisfies readonly PendingSessionBlueprintComment[];
+
+const StoryDesignerSessionLongPendingBlueprintComments = [
+  {
+    id: "designer-session-routing-long-comment",
+    body: [
+      "Separate the escalation route from the normal triage update.",
+      "Urgent customer-facing issues should page the support owner, while ordinary high-priority labels should stay in the normal review queue with a suggested owner and summary.",
+    ].join("\n\n"),
+    itemId: "routing",
+    itemKindLabel: "Routing policy",
+    itemLabel: "Routing policy",
+  },
+] satisfies readonly PendingSessionBlueprintComment[];
+
+const StoryDesignerSessionComposerStateInput = createReadySessionComposerStateInput({
+  repositoryStatus: {
+    branchLabel: "designer/triage-agent",
+    pullRequest: null,
+  },
+});
+
+function isStoryDesignerBlueprintCanvasTab(
+  tab: DesignerSession["canvasTabs"][number],
+): tab is StoryDesignerBlueprintCanvasTab {
+  return tab.kind === "blueprint";
+}
+
+function getStoryDesignerBlueprintCanvasTabs(): readonly StoryDesignerBlueprintCanvasTab[] {
+  return (StoryDesignerSessions[0]?.canvasTabs ?? []).filter(isStoryDesignerBlueprintCanvasTab);
+}
+
+function DesignerCanvasStoryRuntime(input: { children: React.ReactNode }): React.JSX.Element {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: false,
+          },
+        },
+      }),
+  );
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>{input.children}</MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
 function DesignerPageStory(input: {
   createErrorMessage?: string | null;
   initialDraft?: string;
@@ -234,6 +355,215 @@ function DesignerPageStory(input: {
   );
 }
 
+function DesignerSessionWithCanvasStory(input?: {
+  initialPendingBlueprintComments?: readonly PendingSessionBlueprintComment[];
+}): React.JSX.Element {
+  const blueprintTab = getStoryDesignerBlueprintCanvasTabs()[0];
+  const blueprintCommentState = useDesignerBlueprintCommentStoryState({
+    initialPendingBlueprintComments:
+      input?.initialPendingBlueprintComments ?? StoryDesignerSessionPendingBlueprintComments,
+  });
+
+  if (blueprintTab === undefined) {
+    throw new Error("Designer blueprint story tab is missing.");
+  }
+
+  return (
+    <DesignerCanvasStoryRuntime>
+      {renderSessionWorkbenchContentStory({
+        isSecondaryPanelVisible: true,
+        mainContent: (
+          <SessionConversationMainContent
+            activeTurnId={null}
+            autoScrollToBottomOnInitialLoad
+            chatEntries={StoryDesignerSessionConversationEntries}
+            initialBottomScrollResetKey="designer-session-with-canvas"
+            isRespondingToServerRequest={false}
+            isTurnInProgress={false}
+            onRespondToServerRequest={noopRespondToServerRequest}
+            pendingTurnId={null}
+            serverRequestPanelEntries={[]}
+          />
+        ),
+        primaryBottomPanel: (
+          <SessionConversationBottomPanelDraftController
+            chatEntries={StoryDesignerSessionConversationEntries}
+            clearPendingBlueprintComments={blueprintCommentState.clearBlueprintComments}
+            clearPendingDiffComments={function clearPendingDiffComments() {}}
+            composerStateInput={StoryDesignerSessionComposerStateInput}
+            draftResetKey="designer-session-with-canvas"
+            isRespondingToServerRequest={false}
+            onRespondToServerRequest={noopRespondToServerRequest}
+            pendingBlueprintComments={blueprintCommentState.pendingBlueprintComments}
+            pendingDiffComments={[]}
+            serverRequestPanelEntries={[]}
+          />
+        ),
+        secondaryPanel: (
+          <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+            <div className="flex h-10 flex-none items-center border-b bg-background px-3 text-sm font-medium">
+              {blueprintTab.title}
+            </div>
+            <DesignerBlueprintCanvasPanel
+              blueprint={blueprintTab.blueprint}
+              onAddComment={blueprintCommentState.addBlueprintComment}
+              onDeleteComment={blueprintCommentState.deleteBlueprintComment}
+              onUpdateComment={blueprintCommentState.updateBlueprintComment}
+              pendingComments={blueprintCommentState.pendingBlueprintComments}
+            />
+          </div>
+        ),
+        secondaryPanelMinSize: "35%",
+        secondaryPanelDefaultSize: 58,
+      })}
+    </DesignerCanvasStoryRuntime>
+  );
+}
+
+function useDesignerBlueprintCommentStoryState(input: {
+  initialPendingBlueprintComments: readonly PendingSessionBlueprintComment[];
+}): {
+  addBlueprintComment: (comment: PendingSessionBlueprintCommentInput) => void;
+  clearBlueprintComments: () => void;
+  deleteBlueprintComment: (commentId: string) => void;
+  pendingBlueprintComments: readonly PendingSessionBlueprintComment[];
+  updateBlueprintComment: (commentId: string, body: string) => void;
+} {
+  const [pendingBlueprintComments, setPendingBlueprintComments] = useState<
+    readonly PendingSessionBlueprintComment[]
+  >(() => input.initialPendingBlueprintComments);
+
+  const addBlueprintComment = useCallback((comment: PendingSessionBlueprintCommentInput) => {
+    setPendingBlueprintComments((currentComments) => [
+      {
+        ...comment,
+        id: `designer-session-${comment.itemId}-comment`,
+      },
+      ...currentComments.filter((currentComment) => currentComment.itemId !== comment.itemId),
+    ]);
+  }, []);
+
+  const deleteBlueprintComment = useCallback((commentId: string) => {
+    setPendingBlueprintComments((currentComments) =>
+      currentComments.filter((comment) => comment.id !== commentId),
+    );
+  }, []);
+
+  const updateBlueprintComment = useCallback((commentId: string, body: string) => {
+    setPendingBlueprintComments((currentComments) =>
+      currentComments.map((comment) =>
+        comment.id === commentId
+          ? {
+              ...comment,
+              body,
+            }
+          : comment,
+      ),
+    );
+  }, []);
+
+  const clearBlueprintComments = useCallback(() => {
+    setPendingBlueprintComments([]);
+  }, []);
+
+  return {
+    addBlueprintComment,
+    clearBlueprintComments,
+    deleteBlueprintComment,
+    pendingBlueprintComments,
+    updateBlueprintComment,
+  };
+}
+
+function BlueprintCommentStateGalleryStory(): React.JSX.Element {
+  const [draftBody, setDraftBody] = useState(
+    "Can we make this branch explicit before implementation?",
+  );
+
+  return (
+    <DesignerCanvasStoryRuntime>
+      <div className="min-h-screen bg-muted/20 p-6 text-foreground">
+        <div className="grid gap-8 lg:grid-cols-2">
+          <BlueprintCommentStatePreview floating={false} title="Collapsed pending comment">
+            <DesignerBlueprintCollapsedCommentButton
+              label="Open blueprint comment for Routing policy"
+              onOpen={function onOpen() {}}
+            />
+          </BlueprintCommentStatePreview>
+          <BlueprintCommentStatePreview title="Pending comment">
+            <DesignerBlueprintPendingCommentEditor
+              body={StoryDesignerSessionPendingBlueprintComments[0]?.body ?? ""}
+              onBodyChange={function onBodyChange() {}}
+              onCollapse={function onCollapse() {}}
+              onDelete={function onDelete() {}}
+              title="Pending comment"
+            />
+          </BlueprintCommentStatePreview>
+          <BlueprintCommentStatePreview title="Long pending comment">
+            <DesignerBlueprintPendingCommentEditor
+              body={StoryDesignerSessionLongPendingBlueprintComments[0]?.body ?? ""}
+              onBodyChange={function onBodyChange() {}}
+              onCollapse={function onCollapse() {}}
+              onDelete={function onDelete() {}}
+              title="Pending comment"
+            />
+          </BlueprintCommentStatePreview>
+          <BlueprintCommentStatePreview title="Draft comment">
+            <DesignerBlueprintDraftCommentEditor
+              body={draftBody}
+              onBodyChange={setDraftBody}
+              onCancel={function onCancel() {}}
+              onSubmit={function onSubmit() {}}
+            />
+          </BlueprintCommentStatePreview>
+          <BlueprintCommentStatePreview title="Empty draft">
+            <DesignerBlueprintDraftCommentEditor
+              body=""
+              onBodyChange={function onBodyChange() {}}
+              onCancel={function onCancel() {}}
+              onSubmit={function onSubmit() {}}
+            />
+          </BlueprintCommentStatePreview>
+        </div>
+      </div>
+    </DesignerCanvasStoryRuntime>
+  );
+}
+
+function BlueprintCommentStatePreview(input: {
+  children: React.ReactNode;
+  floating?: boolean | undefined;
+  title: string;
+}): React.JSX.Element {
+  return (
+    <section className="min-w-0">
+      <h2 className="mb-3 text-sm font-medium text-muted-foreground">{input.title}</h2>
+      <div className="relative h-56 min-w-[620px] rounded-md border border-border bg-background/70 p-4">
+        <div className="relative w-[280px]">
+          <div className="rounded-md border border-border bg-background p-2.5 shadow-sm">
+            <div className="flex items-start gap-2.5">
+              <span className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-sm border border-border bg-muted text-muted-foreground">
+                <span className="size-3 rounded-full bg-muted-foreground/50" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-medium leading-snug">Routing policy</h3>
+                <p className="mt-2 rounded-sm bg-muted px-2 py-1 text-xs leading-relaxed text-muted-foreground">
+                  Escalations: severity includes urgent -&gt; escalate
+                </p>
+              </div>
+            </div>
+          </div>
+          {input.floating === false ? (
+            input.children
+          ) : (
+            <DesignerBlueprintFloatingComment>{input.children}</DesignerBlueprintFloatingComment>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function DesignerCanvasWorkspaceStory(input: {
   tabs: DesignerSession["canvasTabs"];
 }): React.JSX.Element {
@@ -241,17 +571,23 @@ function DesignerCanvasWorkspaceStory(input: {
   const [activeTabHref, setActiveTabHref] = useState<string | null>(tabs[0]?.href ?? null);
 
   return (
-    <DesignerCanvasWorkspace
-      activeTabHref={activeTabHref}
-      onActiveTabHrefChange={setActiveTabHref}
-      onTabClose={(tabId) => {
-        setTabs((currentTabs) => currentTabs.filter((tab) => tab.id !== tabId));
-      }}
-      onTabsChange={(nextTabs) => {
-        setTabs([...nextTabs]);
-      }}
-      tabs={tabs}
-    />
+    <DesignerCanvasStoryRuntime>
+      <DesignerCanvasWorkspace
+        activeTabHref={activeTabHref}
+        onAddBlueprintComment={function onAddBlueprintComment() {}}
+        onActiveTabHrefChange={setActiveTabHref}
+        onDeleteBlueprintComment={function onDeleteBlueprintComment() {}}
+        onTabClose={(tabId) => {
+          setTabs((currentTabs) => currentTabs.filter((tab) => tab.id !== tabId));
+        }}
+        onTabsChange={(nextTabs) => {
+          setTabs([...nextTabs]);
+        }}
+        onUpdateBlueprintComment={function onUpdateBlueprintComment() {}}
+        pendingBlueprintComments={[]}
+        tabs={tabs}
+      />
+    </DesignerCanvasStoryRuntime>
   );
 }
 
@@ -303,7 +639,44 @@ export const CreateError: Story = {
 export const Canvas: Story = {
   decorators: [withDashboardWorkspaceStory],
   render: function RenderCanvasStory(): React.JSX.Element {
-    return <DesignerCanvasWorkspaceStory tabs={StoryDesignerSessions[0]?.canvasTabs ?? []} />;
+    return <DesignerCanvasWorkspaceStory tabs={getStoryDesignerBlueprintCanvasTabs()} />;
+  },
+};
+
+export const SessionWithCanvas: Story = {
+  parameters: {
+    customWorkbenchStory: true,
+  },
+  render: function RenderSessionWithCanvasStory(): React.JSX.Element {
+    return <DesignerSessionWithCanvasStory />;
+  },
+};
+
+export const SessionWithCanvasNoComments: Story = {
+  parameters: {
+    customWorkbenchStory: true,
+  },
+  render: function RenderSessionWithCanvasNoCommentsStory(): React.JSX.Element {
+    return <DesignerSessionWithCanvasStory initialPendingBlueprintComments={[]} />;
+  },
+};
+
+export const SessionWithCanvasLongComment: Story = {
+  parameters: {
+    customWorkbenchStory: true,
+  },
+  render: function RenderSessionWithCanvasLongCommentStory(): React.JSX.Element {
+    return (
+      <DesignerSessionWithCanvasStory
+        initialPendingBlueprintComments={StoryDesignerSessionLongPendingBlueprintComments}
+      />
+    );
+  },
+};
+
+export const BlueprintCommentStates: Story = {
+  render: function RenderBlueprintCommentStatesStory(): React.JSX.Element {
+    return <BlueprintCommentStateGalleryStory />;
   },
 };
 

@@ -132,6 +132,39 @@ describe("session-diff-comment", () => {
     );
   });
 
+  it("serializes pending blueprint comments with Designer-specific context", () => {
+    expect(
+      buildSessionComposerPrompt({
+        composerText: "Please revise the workflow.",
+        pendingBlueprintComments: [
+          {
+            body: "  This step should ask for missing severity first.  ",
+            id: "blueprint-comment-1",
+            itemDescription: "Determine type, priority, owner, and missing information.",
+            itemId: "classify-issue",
+            itemKindLabel: "Agent step",
+            itemLabel: "Classify issue",
+          },
+        ],
+        pendingDiffComments: [],
+      }),
+    ).toBe(
+      [
+        [
+          "Designer blueprint comment on `classify-issue` (Agent step: Classify issue):",
+          "",
+          "Item id: `classify-issue`",
+          "Item kind: Agent step",
+          "Item label: Classify issue",
+          "Item description: Determine type, priority, owner, and missing information.",
+          "",
+          "This step should ask for missing severity first.",
+        ].join("\n"),
+        "Please revise the workflow.",
+      ].join("\n\n"),
+    );
+  });
+
   it("serializes multiple diff comments in order when the composer text is blank", () => {
     expect(
       buildSessionComposerPrompt({

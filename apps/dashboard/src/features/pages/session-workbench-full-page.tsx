@@ -17,6 +17,10 @@ import { UnavailableResourceState } from "../shared/unavailable-resource-state.j
 import { useDocumentTitle } from "../shared/use-document-title.js";
 import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
+import type {
+  PendingSessionBlueprintComment,
+  PendingSessionBlueprintCommentInput,
+} from "./session-blueprint-comment.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import type { SessionComposerBootstrapPhase } from "./session-composer/session-composer-runtime-contracts.js";
@@ -66,7 +70,12 @@ type SessionWorkbenchFullPageSecondaryPanel =
       layoutKey: string;
       mountMode?: "visible-only" | "persistent-collapsible";
       minSize: string;
-      renderPanel: () => React.ReactNode;
+      renderPanel: (input: {
+        onAddBlueprintComment: (comment: PendingSessionBlueprintCommentInput) => void;
+        onDeleteBlueprintComment: (commentId: string) => void;
+        onUpdateBlueprintComment: (commentId: string, body: string) => void;
+        pendingBlueprintComments: readonly PendingSessionBlueprintComment[];
+      }) => React.ReactNode;
     };
 
 export type SessionWorkbenchFullPageProps = {
@@ -332,6 +341,60 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
   const [autoStartedTurnKeys, setAutoStartedTurnKeys] = useState<ReadonlySet<string>>(new Set());
   const autoStartedTurnKeysRef = useRef(new Set<string>());
   const autoStartingTurnKeysRef = useRef(new Set<string>());
+  const [pendingBlueprintComments, setPendingBlueprintComments] = useState<
+    readonly PendingSessionBlueprintComment[]
+  >([]);
+  const handleAddPendingBlueprintComment = useCallback(
+    (comment: PendingSessionBlueprintCommentInput): void => {
+      setPendingBlueprintComments((currentComments) => {
+        const existingComment = currentComments.find(
+          (currentComment) => currentComment.itemId === comment.itemId,
+        );
+        if (existingComment === undefined) {
+          return [
+            ...currentComments,
+            {
+              ...comment,
+              id: crypto.randomUUID(),
+            },
+          ];
+        }
+
+        return currentComments.map((currentComment) =>
+          currentComment.id === existingComment.id
+            ? {
+                ...currentComment,
+                ...comment,
+              }
+            : currentComment,
+        );
+      });
+    },
+    [],
+  );
+  const handleClearPendingBlueprintComments = useCallback((): void => {
+    setPendingBlueprintComments([]);
+  }, []);
+  const handleUpdatePendingBlueprintComment = useCallback(
+    (commentId: string, body: string): void => {
+      setPendingBlueprintComments((currentComments) =>
+        currentComments.map((comment) =>
+          comment.id !== commentId
+            ? comment
+            : {
+                ...comment,
+                body,
+              },
+        ),
+      );
+    },
+    [],
+  );
+  const handleRemovePendingBlueprintComment = useCallback((commentId: string): void => {
+    setPendingBlueprintComments((currentComments) =>
+      currentComments.filter((comment) => comment.id !== commentId),
+    );
+  }, []);
   const [pendingDiffComments, setPendingDiffComments] = useState<
     readonly PendingSessionDiffComment[]
   >([]);
@@ -927,6 +990,8 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
               composerStateInput={conversationPane.composerStateInput}
               draftState={{
                 composerDraft,
+                pendingBlueprintComments,
+                clearPendingBlueprintComments: handleClearPendingBlueprintComments,
                 pendingDiffComments,
                 clearPendingDiffComments: handleClearPendingDiffComments,
                 setComposerDraft,
@@ -949,7 +1014,12 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
             />
           ) : resolvedSecondaryPanel.activeContentKind === "custom" &&
             input.secondaryPanel.kind === "custom" ? (
-            input.secondaryPanel.renderPanel()
+            input.secondaryPanel.renderPanel({
+              onAddBlueprintComment: handleAddPendingBlueprintComment,
+              onDeleteBlueprintComment: handleRemovePendingBlueprintComment,
+              onUpdateBlueprintComment: handleUpdatePendingBlueprintComment,
+              pendingBlueprintComments,
+            })
           ) : (
             <SessionDiffPanel
               errorNotice={diffPanelErrorNotice}

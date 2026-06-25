@@ -70,7 +70,13 @@ type SessionConversationBottomPanelDraftControllerProps = Omit<
   SessionConversationBottomPanelControllerProps,
   "draftState"
 > &
-  Pick<SessionComposerDraftState, "clearPendingDiffComments" | "pendingDiffComments"> & {
+  Pick<
+    SessionComposerDraftState,
+    | "clearPendingBlueprintComments"
+    | "clearPendingDiffComments"
+    | "pendingBlueprintComments"
+    | "pendingDiffComments"
+  > & {
     draftResetKey: string;
   };
 
@@ -211,28 +217,36 @@ export function SessionConversationBottomPanelController({
 }
 
 export function SessionConversationBottomPanelDraftController({
+  clearPendingBlueprintComments,
   clearPendingDiffComments,
   draftResetKey,
+  pendingBlueprintComments,
   pendingDiffComments,
   ...controllerProps
 }: SessionConversationBottomPanelDraftControllerProps): React.JSX.Element {
   return (
     <SessionConversationBottomPanelDraftOwner
       key={draftResetKey}
+      clearPendingBlueprintComments={clearPendingBlueprintComments}
       clearPendingDiffComments={clearPendingDiffComments}
       controllerProps={controllerProps}
+      pendingBlueprintComments={pendingBlueprintComments}
       pendingDiffComments={pendingDiffComments}
     />
   );
 }
 
 function SessionConversationBottomPanelDraftOwner({
+  clearPendingBlueprintComments,
   clearPendingDiffComments,
   controllerProps,
+  pendingBlueprintComments,
   pendingDiffComments,
 }: {
+  clearPendingBlueprintComments: SessionComposerDraftState["clearPendingBlueprintComments"];
   clearPendingDiffComments: SessionComposerDraftState["clearPendingDiffComments"];
   controllerProps: Omit<SessionConversationBottomPanelControllerProps, "draftState">;
+  pendingBlueprintComments: SessionComposerDraftState["pendingBlueprintComments"];
   pendingDiffComments: SessionComposerDraftState["pendingDiffComments"];
 }): React.JSX.Element {
   const [composerDraft, setComposerDraft] = useState(() => createComposerDraft(""));
@@ -247,11 +261,20 @@ function SessionConversationBottomPanelDraftOwner({
   const draftState = useMemo(
     () => ({
       composerDraft,
+      pendingBlueprintComments,
       pendingDiffComments,
+      clearPendingBlueprintComments,
       clearPendingDiffComments,
       setComposerDraft: handleComposerDraftChange,
     }),
-    [clearPendingDiffComments, composerDraft, handleComposerDraftChange, pendingDiffComments],
+    [
+      clearPendingBlueprintComments,
+      clearPendingDiffComments,
+      composerDraft,
+      handleComposerDraftChange,
+      pendingBlueprintComments,
+      pendingDiffComments,
+    ],
   );
 
   return <SessionConversationBottomPanelController {...controllerProps} draftState={draftState} />;
