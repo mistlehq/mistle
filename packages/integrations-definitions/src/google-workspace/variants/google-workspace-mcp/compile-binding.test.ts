@@ -119,7 +119,7 @@ function createCompileInput(input: {
 }
 
 describe("compileGoogleWorkspaceBinding", () => {
-  it("builds the expected Gmail MCP route", () => {
+  it("installs gws and starts a filtered local MCP server for Gmail", () => {
     const compiled = compileGoogleWorkspaceBinding(
       createCompileInput({
         mcpServers: [GoogleWorkspaceMcpServerIds.GMAIL],
@@ -129,11 +129,11 @@ describe("compileGoogleWorkspaceBinding", () => {
     expect(compiled.egressRoutes).toEqual([
       {
         match: {
-          hosts: ["gmailmcp.googleapis.com"],
-          pathPrefixes: ["/mcp/v1"],
+          hosts: ["gmail.googleapis.com"],
+          pathPrefixes: ["/gmail/v1"],
         },
         upstream: {
-          baseUrl: "https://gmailmcp.googleapis.com/mcp/v1",
+          baseUrl: "https://gmail.googleapis.com/gmail/v1",
         },
         authInjection: {
           type: "bearer",
@@ -147,6 +147,8 @@ describe("compileGoogleWorkspaceBinding", () => {
         },
       },
     ]);
+    expect(compiled.artifacts).toHaveLength(1);
+    expect(compiled.runtimeClients[0]?.processes[0]?.command.args).toContain("gmail");
   });
 
   it("installs gws and starts a filtered local MCP server for Drive, Sheets, Docs, and Slides", () => {
@@ -170,15 +172,19 @@ describe("compileGoogleWorkspaceBinding", () => {
     expect(compiled.egressRoutes.map((route) => route.match)).toEqual([
       {
         hosts: ["www.googleapis.com"],
+        pathPrefixes: ["/drive/v3"],
       },
       {
         hosts: ["sheets.googleapis.com"],
+        pathPrefixes: ["/v4"],
       },
       {
         hosts: ["docs.googleapis.com"],
+        pathPrefixes: ["/v1"],
       },
       {
         hosts: ["slides.googleapis.com"],
+        pathPrefixes: ["/v1"],
       },
     ]);
     expect(compiled.artifacts).toHaveLength(1);
@@ -186,8 +192,12 @@ describe("compileGoogleWorkspaceBinding", () => {
     expect(artifact?.artifactKey).toBe("google-workspace-cli");
     expect(artifact?.name).toBe("Google Workspace CLI");
     expect(artifact?.env).toEqual({
+      GWS_CALENDAR_BASE_URL: "https://www.googleapis.com/calendar/v3",
+      GWS_CHAT_BASE_URL: "https://chat.googleapis.com/v1",
       GWS_DOCS_BASE_URL: "https://docs.googleapis.com/v1",
       GWS_DRIVE_BASE_URL: "https://www.googleapis.com/drive/v3",
+      GWS_GMAIL_BASE_URL: "https://gmail.googleapis.com/gmail/v1",
+      GWS_PEOPLE_BASE_URL: "https://people.googleapis.com/v1",
       GWS_SHEETS_BASE_URL: "https://sheets.googleapis.com/v4",
       GWS_SLIDES_BASE_URL: "https://slides.googleapis.com/v1",
     });
@@ -202,13 +212,13 @@ describe("compileGoogleWorkspaceBinding", () => {
           release: {
             kind: "tag",
             match: "exact",
-            tag: "gws/v0.1.0",
+            tag: "gws/v0.2.0",
           },
           asset: {
             kind: "exact",
             fileName: "gws-linux-amd64",
             format: "binary",
-            sha256: "43e7fe1759966e3910a74cfbf69d90fa6b12fa1e44ffb29c69e95191152d13f4",
+            sha256: "7e9f037c7e03f868c101a4412f8dd48ad3fc70acdc1ff4af3a2b1baecdac50fe",
           },
           installPath: "/usr/local/bin/gws",
           timeoutMs: 120_000,
@@ -269,15 +279,17 @@ describe("compileGoogleWorkspaceBinding", () => {
     expect(compiled.egressRoutes.map((route) => route.match)).toEqual([
       {
         hosts: ["www.googleapis.com"],
+        pathPrefixes: ["/drive/v3"],
       },
     ]);
     expect(compiled.runtimeClients[0]?.processes[0]?.command.args).toContain("drive");
   });
 
-  it("keeps hosted MCP routes when hosted Workspace tools are selected", () => {
+  it("uses local gws routes when Gmail, Calendar, Chat, and People tools are selected", () => {
     const compiled = compileGoogleWorkspaceBinding(
       createCompileInput({
         mcpServers: [
+          GoogleWorkspaceMcpServerIds.GMAIL,
           GoogleWorkspaceMcpServerIds.CALENDAR,
           GoogleWorkspaceMcpServerIds.CHAT,
           GoogleWorkspaceMcpServerIds.PEOPLE,
@@ -286,12 +298,33 @@ describe("compileGoogleWorkspaceBinding", () => {
     );
 
     expect(compiled.egressRoutes.map((route) => route.upstream.baseUrl)).toEqual([
-      "https://calendarmcp.googleapis.com/mcp/v1",
-      "https://chatmcp.googleapis.com/mcp/v1",
-      "https://people.googleapis.com/mcp/v1",
+      "https://gmail.googleapis.com/gmail/v1",
+      "https://www.googleapis.com/calendar/v3",
+      "https://chat.googleapis.com/v1",
+      "https://people.googleapis.com/v1",
     ]);
-    expect(compiled.artifacts).toEqual([]);
-    expect(compiled.runtimeClients).toEqual([]);
+    expect(compiled.egressRoutes.map((route) => route.match)).toEqual([
+      {
+        hosts: ["gmail.googleapis.com"],
+        pathPrefixes: ["/gmail/v1"],
+      },
+      {
+        hosts: ["www.googleapis.com"],
+        pathPrefixes: ["/calendar/v3"],
+      },
+      {
+        hosts: ["chat.googleapis.com"],
+        pathPrefixes: ["/v1"],
+      },
+      {
+        hosts: ["people.googleapis.com"],
+        pathPrefixes: ["/v1"],
+      },
+    ]);
+    expect(compiled.artifacts).toHaveLength(1);
+    expect(compiled.runtimeClients[0]?.processes[0]?.command.args).toContain(
+      "gmail,calendar,chat,people",
+    );
   });
 
   it("builds non-overlapping routes for all selected Google Workspace MCP servers", () => {

@@ -55,9 +55,9 @@ describe("resolveGoogleWorkspaceBindingConfigForm", () => {
       properties: {
         mcpServers: {
           title: "Google Workspace tools",
-          default: ["gmail", "calendar", "chat", "people", "drive", "sheets", "docs", "slides"],
+          default: ["gmail", "drive", "sheets", "docs", "slides", "calendar", "chat", "people"],
           items: {
-            enum: ["gmail", "calendar", "chat", "people", "drive", "sheets", "docs", "slides"],
+            enum: ["gmail", "drive", "sheets", "docs", "slides", "calendar", "chat", "people"],
           },
         },
       },
@@ -66,13 +66,13 @@ describe("resolveGoogleWorkspaceBindingConfigForm", () => {
       mcpServers: {
         "ui:enumNames": [
           "Gmail",
-          "Google Calendar",
-          "Google Chat",
-          "People API",
           "Google Drive",
           "Google Sheets",
           "Google Docs",
           "Google Slides",
+          "Google Calendar",
+          "Google Chat",
+          "People API",
         ],
       },
     });
@@ -91,9 +91,9 @@ describe("resolveGoogleWorkspaceBindingConfigForm", () => {
       properties: {
         mcpServers: {
           title: "Google Workspace tools",
-          default: ["gmail", "calendar", "chat", "people", "drive", "sheets", "docs", "slides"],
+          default: ["gmail", "drive", "sheets", "docs", "slides", "calendar", "chat", "people"],
           items: {
-            enum: ["gmail", "calendar", "chat", "people", "drive", "sheets", "docs", "slides"],
+            enum: ["gmail", "drive", "sheets", "docs", "slides", "calendar", "chat", "people"],
           },
         },
       },
@@ -102,13 +102,13 @@ describe("resolveGoogleWorkspaceBindingConfigForm", () => {
       mcpServers: {
         "ui:enumNames": [
           "Gmail",
-          "Google Calendar",
-          "Google Chat",
-          "People API",
           "Google Drive",
           "Google Sheets",
           "Google Docs",
           "Google Slides",
+          "Google Calendar",
+          "Google Chat",
+          "People API",
         ],
       },
     });

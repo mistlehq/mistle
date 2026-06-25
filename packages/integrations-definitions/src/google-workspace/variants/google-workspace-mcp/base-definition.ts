@@ -4,7 +4,6 @@ import {
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 
-import { resolveRemoteMcpServers } from "../../../shared/remote-mcp-server-catalog/index.js";
 import {
   type GoogleWorkspaceConnectionConfig,
   GoogleWorkspaceConnectionMethodIds,
@@ -20,10 +19,7 @@ import { resolveGoogleWorkspaceBindingConfigForm } from "./binding-config-form.j
 import { GoogleWorkspaceBindingConfigSchema } from "./binding-config-schema.js";
 import { compileGoogleWorkspaceBinding, GoogleWorkspaceGwsMcpUrl } from "./compile-binding.js";
 import { GoogleWorkspaceServiceAccountConnectionConfigForm } from "./connection-config-form.js";
-import {
-  GoogleWorkspaceLocalGwsToolIds,
-  GoogleWorkspaceRemoteMcpServerCatalog,
-} from "./mcp-catalog.js";
+import { GoogleWorkspaceLocalGwsToolIds } from "./mcp-catalog.js";
 import { GoogleWorkspaceTargetConfigSchema } from "./target-config-schema.js";
 import { GoogleWorkspaceTargetSecretSchema } from "./target-secret-schema.js";
 import { validateGoogleWorkspaceBindingWriteContext } from "./validate-binding-write-context.js";
@@ -112,29 +108,23 @@ export const GoogleWorkspaceMcpBaseDefinition: GoogleWorkspaceMcpBaseIntegration
   ],
   mcp: (input) => {
     const selectedIdSet = new Set(input.binding.config.mcpServers);
-    const remoteMcpServers = resolveRemoteMcpServers({
-      catalog: GoogleWorkspaceRemoteMcpServerCatalog,
-      selectedIds: GoogleWorkspaceRemoteMcpServerCatalog.filter((entry) =>
-        selectedIdSet.has(entry.id),
-      ).map((entry) => entry.id),
-    });
     const includesLocalGwsMcp = GoogleWorkspaceLocalGwsToolIds.some((toolId) =>
       selectedIdSet.has(toolId),
     );
 
+    if (!includesLocalGwsMcp) {
+      return [];
+    }
+
     return [
-      ...remoteMcpServers,
-      ...(includesLocalGwsMcp
-        ? [
-            {
-              serverId: "google-workspace-gws-mcp",
-              serverName: "google_workspace",
-              transport: IntegrationMcpTransports.STREAMABLE_HTTP,
-              url: GoogleWorkspaceGwsMcpUrl,
-              description: "Google Workspace Drive, Sheets, Docs, and Slides MCP",
-            },
-          ]
-        : []),
+      {
+        serverId: "google-workspace-gws-mcp",
+        serverName: "google_workspace",
+        transport: IntegrationMcpTransports.STREAMABLE_HTTP,
+        url: GoogleWorkspaceGwsMcpUrl,
+        description:
+          "Google Workspace Gmail, Drive, Sheets, Docs, Slides, Calendar, Chat, and People MCP",
+      },
     ];
   },
   compileBinding: compileGoogleWorkspaceBinding,

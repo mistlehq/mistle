@@ -5,14 +5,9 @@ import type {
   RuntimeClient,
 } from "@mistle/integrations-core";
 
-import { compileRemoteMcpServerEgressRoutes } from "../../../shared/remote-mcp-server-catalog/index.js";
 import { GoogleWorkspaceCredentialSecretTypes, GoogleWorkspaceCredentialSlotKeys } from "./auth.js";
 import type { GoogleWorkspaceBindingConfig } from "./binding-config-schema.js";
-import {
-  GoogleWorkspaceLocalGwsToolIds,
-  type GoogleWorkspaceMcpServerId,
-  GoogleWorkspaceRemoteMcpServerCatalog,
-} from "./mcp-catalog.js";
+import { GoogleWorkspaceLocalGwsToolIds, type GoogleWorkspaceMcpServerId } from "./mcp-catalog.js";
 import type { GoogleWorkspaceTargetConfig } from "./target-config-schema.js";
 
 export type GoogleWorkspaceCompileBindingInput = CompileBindingInput<
@@ -27,6 +22,10 @@ export const GoogleWorkspaceDriveBaseUrl = "https://www.googleapis.com/drive/v3"
 export const GoogleWorkspaceSheetsBaseUrl = "https://sheets.googleapis.com/v4";
 export const GoogleWorkspaceDocsBaseUrl = "https://docs.googleapis.com/v1";
 export const GoogleWorkspaceSlidesBaseUrl = "https://slides.googleapis.com/v1";
+export const GoogleWorkspaceGmailBaseUrl = "https://gmail.googleapis.com/gmail/v1";
+export const GoogleWorkspaceCalendarBaseUrl = "https://www.googleapis.com/calendar/v3";
+export const GoogleWorkspaceChatBaseUrl = "https://chat.googleapis.com/v1";
+export const GoogleWorkspacePeopleBaseUrl = "https://people.googleapis.com/v1";
 export const GoogleWorkspaceGwsMcpHost = "127.0.0.1";
 export const GoogleWorkspaceGwsMcpPort = 7353;
 export const GoogleWorkspaceGwsMcpEndpoint = "/mcp";
@@ -40,9 +39,9 @@ const GoogleWorkspaceGwsMcpProcessStopTimeoutMs = 10_000;
 const GoogleWorkspaceGwsMcpProcessStopGracePeriodMs = 2_000;
 // Pin exact release tags for sandbox startup to avoid live upstream version
 // resolution and the associated rate-limit / availability failures.
-const GoogleWorkspaceGwsReleaseTag = "gws/v0.1.0";
+const GoogleWorkspaceGwsReleaseTag = "gws/v0.2.0";
 const GoogleWorkspaceGwsLinuxAmd64Sha256 =
-  "43e7fe1759966e3910a74cfbf69d90fa6b12fa1e44ffb29c69e95191152d13f4";
+  "7e9f037c7e03f868c101a4412f8dd48ad3fc70acdc1ff4af3a2b1baecdac50fe";
 
 function createGoogleWorkspaceCredentialResolver(input: {
   connectionId: string;
@@ -62,6 +61,10 @@ function createGoogleWorkspaceGwsArtifact(): CompileBindingResult["artifacts"][n
     env: {
       GWS_DOCS_BASE_URL: GoogleWorkspaceDocsBaseUrl,
       GWS_DRIVE_BASE_URL: GoogleWorkspaceDriveBaseUrl,
+      GWS_GMAIL_BASE_URL: GoogleWorkspaceGmailBaseUrl,
+      GWS_CALENDAR_BASE_URL: GoogleWorkspaceCalendarBaseUrl,
+      GWS_CHAT_BASE_URL: GoogleWorkspaceChatBaseUrl,
+      GWS_PEOPLE_BASE_URL: GoogleWorkspacePeopleBaseUrl,
       GWS_SHEETS_BASE_URL: GoogleWorkspaceSheetsBaseUrl,
       GWS_SLIDES_BASE_URL: GoogleWorkspaceSlidesBaseUrl,
     },
@@ -138,24 +141,33 @@ function resolveSelectedLocalGwsTools(
   return GoogleWorkspaceLocalGwsToolIds.filter((toolId) => selectedIdSet.has(toolId));
 }
 
-function resolveSelectedRemoteMcpServerIds(
-  selectedIds: ReadonlyArray<string>,
-): ReadonlyArray<string> {
-  const selectedIdSet = new Set(selectedIds);
-  return GoogleWorkspaceRemoteMcpServerCatalog.filter((entry) => selectedIdSet.has(entry.id)).map(
-    (entry) => entry.id,
-  );
-}
-
 function createGoogleWorkspaceGwsEgressRoutes(input: {
   credentialResolver: EgressCredentialResolverRef;
   selectedTools: ReadonlyArray<GoogleWorkspaceMcpServerId>;
 }): CompileBindingResult["egressRoutes"] {
   return input.selectedTools.map((toolId) => {
+    if (toolId === "gmail") {
+      return {
+        match: {
+          hosts: ["gmail.googleapis.com"],
+          pathPrefixes: ["/gmail/v1"],
+        },
+        upstream: {
+          baseUrl: GoogleWorkspaceGmailBaseUrl,
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        credentialResolver: input.credentialResolver,
+      };
+    }
+
     if (toolId === "drive") {
       return {
         match: {
           hosts: ["www.googleapis.com"],
+          pathPrefixes: ["/drive/v3"],
         },
         upstream: {
           baseUrl: GoogleWorkspaceDriveBaseUrl,
@@ -172,6 +184,7 @@ function createGoogleWorkspaceGwsEgressRoutes(input: {
       return {
         match: {
           hosts: ["sheets.googleapis.com"],
+          pathPrefixes: ["/v4"],
         },
         upstream: {
           baseUrl: GoogleWorkspaceSheetsBaseUrl,
@@ -188,6 +201,7 @@ function createGoogleWorkspaceGwsEgressRoutes(input: {
       return {
         match: {
           hosts: ["docs.googleapis.com"],
+          pathPrefixes: ["/v1"],
         },
         upstream: {
           baseUrl: GoogleWorkspaceDocsBaseUrl,
@@ -204,6 +218,7 @@ function createGoogleWorkspaceGwsEgressRoutes(input: {
       return {
         match: {
           hosts: ["slides.googleapis.com"],
+          pathPrefixes: ["/v1"],
         },
         upstream: {
           baseUrl: GoogleWorkspaceSlidesBaseUrl,
@@ -216,7 +231,58 @@ function createGoogleWorkspaceGwsEgressRoutes(input: {
       };
     }
 
-    throw new Error(`Unsupported local Google Workspace tool id '${toolId}'.`);
+    if (toolId === "calendar") {
+      return {
+        match: {
+          hosts: ["www.googleapis.com"],
+          pathPrefixes: ["/calendar/v3"],
+        },
+        upstream: {
+          baseUrl: GoogleWorkspaceCalendarBaseUrl,
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        credentialResolver: input.credentialResolver,
+      };
+    }
+
+    if (toolId === "chat") {
+      return {
+        match: {
+          hosts: ["chat.googleapis.com"],
+          pathPrefixes: ["/v1"],
+        },
+        upstream: {
+          baseUrl: GoogleWorkspaceChatBaseUrl,
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        credentialResolver: input.credentialResolver,
+      };
+    }
+
+    if (toolId === "people") {
+      return {
+        match: {
+          hosts: ["people.googleapis.com"],
+          pathPrefixes: ["/v1"],
+        },
+        upstream: {
+          baseUrl: GoogleWorkspacePeopleBaseUrl,
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        credentialResolver: input.credentialResolver,
+      };
+    }
+
+    throw new Error("Unsupported local Google Workspace tool id.");
   });
 }
 
@@ -231,15 +297,6 @@ export function compileGoogleWorkspaceBinding(
 
   return {
     egressRoutes: [
-      ...compileRemoteMcpServerEgressRoutes({
-        catalog: GoogleWorkspaceRemoteMcpServerCatalog,
-        selectedIds: resolveSelectedRemoteMcpServerIds(input.binding.config.mcpServers),
-        authInjection: {
-          type: "bearer",
-          target: "authorization",
-        },
-        credentialResolver,
-      }),
       ...(includesLocalGwsMcp
         ? createGoogleWorkspaceGwsEgressRoutes({
             credentialResolver,

@@ -34,46 +34,29 @@ type GoogleWorkspaceRemoteMcpServerCatalogEntry = GoogleWorkspaceMcpServerCatalo
 };
 
 export const GoogleWorkspaceLocalGwsToolIds: ReadonlyArray<GoogleWorkspaceMcpServerId> = [
+  GoogleWorkspaceMcpServerIds.GMAIL,
   GoogleWorkspaceMcpServerIds.DRIVE,
   GoogleWorkspaceMcpServerIds.SHEETS,
   GoogleWorkspaceMcpServerIds.DOCS,
   GoogleWorkspaceMcpServerIds.SLIDES,
+  GoogleWorkspaceMcpServerIds.CALENDAR,
+  GoogleWorkspaceMcpServerIds.CHAT,
+  GoogleWorkspaceMcpServerIds.PEOPLE,
 ];
 
 export const GoogleWorkspaceRemoteMcpServerCatalog: ReadonlyArray<GoogleWorkspaceRemoteMcpServerCatalogEntry> =
-  [
-    {
-      id: GoogleWorkspaceMcpServerIds.GMAIL,
-      displayName: "Gmail",
-      url: "https://gmailmcp.googleapis.com/mcp/v1",
-      description: "Google Workspace Gmail MCP",
-    },
-    {
-      id: GoogleWorkspaceMcpServerIds.CALENDAR,
-      displayName: "Google Calendar",
-      url: "https://calendarmcp.googleapis.com/mcp/v1",
-      description: "Google Workspace Calendar MCP",
-    },
-    {
-      id: GoogleWorkspaceMcpServerIds.CHAT,
-      displayName: "Google Chat",
-      url: "https://chatmcp.googleapis.com/mcp/v1",
-      description: "Google Workspace Chat MCP",
-    },
-    {
-      id: GoogleWorkspaceMcpServerIds.PEOPLE,
-      displayName: "People API",
-      url: "https://people.googleapis.com/mcp/v1",
-      description: "Google Workspace People MCP",
-    },
-  ];
+  [];
 
 export const GoogleWorkspaceRemoteMcpServerEntries: ReadonlyArray<RemoteMcpServerCatalogEntry> =
   GoogleWorkspaceRemoteMcpServerCatalog;
 
 export const GoogleWorkspaceMcpServerCatalog: ReadonlyArray<GoogleWorkspaceMcpServerCatalogEntry> =
   [
-    ...GoogleWorkspaceRemoteMcpServerCatalog,
+    {
+      id: GoogleWorkspaceMcpServerIds.GMAIL,
+      displayName: "Gmail",
+      description: "Gmail tools served by the local gws MCP server.",
+    },
     {
       id: GoogleWorkspaceMcpServerIds.DRIVE,
       displayName: "Google Drive",
@@ -93,5 +76,20 @@ export const GoogleWorkspaceMcpServerCatalog: ReadonlyArray<GoogleWorkspaceMcpSe
       id: GoogleWorkspaceMcpServerIds.SLIDES,
       displayName: "Google Slides",
       description: "Google Slides tools served by the local gws MCP server.",
+    },
+    {
+      id: GoogleWorkspaceMcpServerIds.CALENDAR,
+      displayName: "Google Calendar",
+      description: "Google Calendar tools served by the local gws MCP server.",
+    },
+    {
+      id: GoogleWorkspaceMcpServerIds.CHAT,
+      displayName: "Google Chat",
+      description: "Google Chat tools served by the local gws MCP server.",
+    },
+    {
+      id: GoogleWorkspaceMcpServerIds.PEOPLE,
+      displayName: "People API",
+      description: "People API tools served by the local gws MCP server.",
     },
   ];
