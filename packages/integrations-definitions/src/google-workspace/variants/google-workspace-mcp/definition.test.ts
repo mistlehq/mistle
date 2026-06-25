@@ -5,7 +5,7 @@ import { GoogleWorkspaceDefinition } from "./definition.js";
 import { GoogleWorkspaceMcpServerIds } from "./mcp-catalog.js";
 
 describe("GoogleWorkspaceDefinition", () => {
-  it("defines BYO Google OAuth and Google-hosted Workspace MCP servers", () => {
+  it("defines BYO Google OAuth and local Workspace MCP tools", () => {
     expect(GoogleWorkspaceDefinition).toMatchObject({
       familyId: "google-workspace",
       variantId: "google-workspace-mcp",
@@ -33,7 +33,7 @@ describe("GoogleWorkspaceDefinition", () => {
     expect(GoogleWorkspaceMcpBaseDefinition.oauth2AuthorizationCode).toBeUndefined();
   });
 
-  it("resolves selected hosted and local Google Workspace MCP servers from the binding config", () => {
+  it("resolves selected Google Workspace tools to one local MCP server", () => {
     if (typeof GoogleWorkspaceDefinition.mcp !== "function") {
       throw new Error("Expected Google Workspace definition to provide dynamic MCP servers.");
     }
@@ -86,25 +86,12 @@ describe("GoogleWorkspaceDefinition", () => {
       }),
     ).toEqual([
       {
-        serverId: GoogleWorkspaceMcpServerIds.GMAIL,
-        serverName: GoogleWorkspaceMcpServerIds.GMAIL,
-        transport: "streamable-http",
-        url: "https://gmailmcp.googleapis.com/mcp/v1",
-        description: "Google Workspace Gmail MCP",
-      },
-      {
-        serverId: GoogleWorkspaceMcpServerIds.PEOPLE,
-        serverName: GoogleWorkspaceMcpServerIds.PEOPLE,
-        transport: "streamable-http",
-        url: "https://people.googleapis.com/mcp/v1",
-        description: "Google Workspace People MCP",
-      },
-      {
         serverId: "google-workspace-gws-mcp",
         serverName: "google_workspace",
         transport: "streamable-http",
         url: "http://127.0.0.1:7353/mcp",
-        description: "Google Workspace Drive, Sheets, Docs, and Slides MCP",
+        description:
+          "Google Workspace Gmail, Drive, Sheets, Docs, Slides, Calendar, Chat, and People MCP",
       },
     ]);
   });
