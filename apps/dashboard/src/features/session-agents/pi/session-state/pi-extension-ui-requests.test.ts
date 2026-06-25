@@ -188,6 +188,23 @@ describe("Pi extension UI request presentation", () => {
       requestId: "ui_input_1",
       value: "feature/pi-permissions",
     });
+
+    expect(
+      resolvePiExtensionUIResponse({
+        request: {
+          type: "extension_ui_request",
+          id: "ui_editor_1",
+          method: "editor",
+          title: "Edit instructions",
+        },
+        result: {
+          decision: "cancel",
+        },
+      }),
+    ).toEqual({
+      requestId: "ui_editor_1",
+      cancelled: true,
+    });
   });
 
   it("rejects user-input responses for a different Pi request id", () => {

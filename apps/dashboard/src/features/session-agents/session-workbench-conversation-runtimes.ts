@@ -404,6 +404,7 @@ export function buildClaudeCodeConversationRuntime(input: {
       .respondToPermission({
         requestId: String(requestId),
         ...(response.decision === undefined ? {} : { decision: response.decision }),
+        ...(response.message === undefined ? {} : { message: response.message }),
         ...(response.answers === undefined ? {} : { answers: response.answers }),
       })
       .catch((error: unknown) => {

@@ -357,6 +357,24 @@ describe("dashboard control actions", () => {
       ],
       success: true,
     });
+
+    const cancelResponse = createDashboardControlUserInputResponse({
+      result: {
+        decision: "cancel",
+      },
+    });
+
+    expect(cancelResponse).toEqual({
+      contentItems: [
+        {
+          type: "inputText",
+          text: JSON.stringify({
+            decision: "cancel",
+          }),
+        },
+      ],
+      success: true,
+    });
   });
 
   it("rejects blueprints with dangling action references", () => {

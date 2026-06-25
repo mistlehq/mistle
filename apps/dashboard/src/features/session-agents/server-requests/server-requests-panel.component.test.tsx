@@ -93,7 +93,7 @@ describe("ServerRequestsPanel", () => {
         value: "Custom answer",
       },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Submit responses" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
 
     expect(submittedResults).toEqual([
       {
@@ -103,6 +103,49 @@ describe("ServerRequestsPanel", () => {
             value: "Custom answer",
           },
         ],
+      },
+    ]);
+  });
+
+  it("cancels tool/requestUserInput requests without submitting answers", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: 17,
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [
+              {
+                header: "Choice",
+                id: "q1",
+                question: "Which option?",
+                options: [
+                  {
+                    label: "Other",
+                    isOther: true,
+                  },
+                ],
+              },
+            ],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(submittedResults).toEqual([
+      {
+        decision: "cancel",
       },
     ]);
   });
@@ -152,10 +195,11 @@ describe("ServerRequestsPanel", () => {
     expect(screen.getByText("What should the triaging agent watch first?").textContent).toBe(
       "What should the triaging agent watch first?",
     );
-    expect(screen.queryByRole("button", { name: "Submit responses" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
     expect(screen.getByText("1").textContent).toBe("1");
     expect(screen.getByText("2").textContent).toBe("2");
     expect(screen.getByText("3").textContent).toBe("3");
+    expect(screen.getByRole("button", { name: "Cancel" }).textContent).toBe("Cancel");
 
     fireEvent.click(screen.getByRole("button", { name: /Slack messages/u }));
 
@@ -167,6 +211,53 @@ describe("ServerRequestsPanel", () => {
             value: "Slack messages",
           },
         ],
+      },
+    ]);
+  });
+
+  it("cancels selectable tool/requestUserInput requests from the top-right action", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: "triage-source-choice-request-1",
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [
+              {
+                header: "Intake source",
+                id: "triage-source-choice",
+                question: "What should the triaging agent watch first?",
+                options: [
+                  {
+                    label: "GitHub issues/PRs",
+                    isOther: false,
+                  },
+                  {
+                    label: "Slack messages",
+                    isOther: false,
+                  },
+                ],
+              },
+            ],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(submittedResults).toEqual([
+      {
+        decision: "cancel",
       },
     ]);
   });
@@ -222,7 +313,7 @@ describe("ServerRequestsPanel", () => {
     expect(screen.queryByText("User input requested")).toBeNull();
     expect(screen.queryByText("Input needed")).toBeNull();
     expect(screen.queryByText("tool/requestUserInput")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Submit responses" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
     expect(screen.getByText("1").textContent).toBe("1");
     expect(
       screen.queryByText("Keeps outreach active while surfacing manual follow-up targets."),
@@ -285,7 +376,7 @@ describe("ServerRequestsPanel", () => {
 
     expect(screen.getByDisplayValue("Keep this text")).toBeDefined();
 
-    fireEvent.click(screen.getByRole("button", { name: "Submit responses" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
 
     expect(submittedResults).toEqual([
       {

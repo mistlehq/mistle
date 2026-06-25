@@ -130,7 +130,10 @@ export function resolvePiExtensionUIResponse(input: {
   result: unknown;
 }): PiExtensionUIResponseInput {
   if (input.request.method === "confirm") {
-    const decision = readDecision(input.result);
+    const decision = readDecision({
+      missingMessage: "Pi confirmation response is missing a decision.",
+      result: input.result,
+    });
     if (decision === "confirm") {
       return {
         requestId: input.request.id,
@@ -151,6 +154,12 @@ export function resolvePiExtensionUIResponse(input: {
     input.request.method === "input" ||
     input.request.method === "editor"
   ) {
+    if (readDecision({ result: input.result }) === "cancel") {
+      return {
+        requestId: input.request.id,
+        cancelled: true,
+      };
+    }
     const value = readSingleAnswerValue({
       requestId: input.request.id,
       result: input.result,
@@ -164,11 +173,14 @@ export function resolvePiExtensionUIResponse(input: {
   throw new Error("Pi extension UI response method is unsupported.");
 }
 
-function readDecision(result: unknown): string | null {
-  if (typeof result !== "object" || result === null || !("decision" in result)) {
-    throw new Error("Pi confirmation response is missing a decision.");
+function readDecision(input: { missingMessage?: string; result: unknown }): string | null {
+  if (typeof input.result !== "object" || input.result === null || !("decision" in input.result)) {
+    if (input.missingMessage !== undefined) {
+      throw new Error(input.missingMessage);
+    }
+    return null;
   }
-  return typeof result.decision === "string" ? result.decision : null;
+  return typeof input.result.decision === "string" ? input.result.decision : null;
 }
 
 function readSingleAnswerValue(input: { requestId: string; result: unknown }): string {

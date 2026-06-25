@@ -647,6 +647,15 @@ function readClaudeCodePermissionDecision(value) {
 
 function resolveClaudeCodePermissionResponse(request, params) {
   if (request.toolName === "AskUserQuestion") {
+    if (params.decision === "reject") {
+      return {
+        behavior: "deny",
+        message:
+          typeof params.message === "string" && params.message.length > 0
+            ? params.message
+            : "User cancelled this Claude Code input request.",
+      };
+    }
     if (!Array.isArray(params.answers)) {
       throw new Error("Claude Code user input response requires answers.");
     }

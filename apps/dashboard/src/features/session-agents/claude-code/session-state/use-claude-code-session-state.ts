@@ -90,6 +90,7 @@ export type UseClaudeCodeSessionStateResult = {
         value: string;
       }[];
       decision?: "once" | "reject";
+      message?: string;
       requestId: string;
     }) => Promise<void>;
     sendPrompt: (input: { submittedPrompt: string }) => Promise<void>;
@@ -672,6 +673,7 @@ export function useClaudeCodeSessionState(input: {
         value: string;
       }[];
       decision?: "once" | "reject";
+      message?: string;
       requestId: string;
     }): Promise<void> => {
       const client = clientRef.current;
@@ -685,6 +687,7 @@ export function useClaudeCodeSessionState(input: {
           sessionId,
           requestId: permissionInput.requestId,
           ...(permissionInput.decision === undefined ? {} : { decision: permissionInput.decision }),
+          ...(permissionInput.message === undefined ? {} : { message: permissionInput.message }),
           ...(permissionInput.answers === undefined ? {} : { answers: permissionInput.answers }),
         });
         const session = await client.readSession({ sessionId });

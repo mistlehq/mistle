@@ -126,6 +126,29 @@ const SuggestedNextActionEntries: readonly ServerRequestEntry[] = [
   },
 ];
 
+const FreeformUserInputEntries: readonly ServerRequestEntry[] = [
+  {
+    requestId: "freeform-user-input-request-1",
+    method: "tool/requestUserInput",
+    kind: "tool-user-input",
+    questions: [
+      {
+        header: "Goal",
+        id: "goal",
+        options: [
+          {
+            label: "Describe the outcome",
+            isOther: true,
+          },
+        ],
+        question: "What should the agent optimize for?",
+      },
+    ],
+    status: "pending",
+    responseErrorMessage: null,
+  },
+];
+
 function createMixedServerRequestEntriesWithResponseErrors(): readonly ServerRequestEntry[] {
   return MixedServerRequestEntries.map((entry) => {
     return {
@@ -135,6 +158,12 @@ function createMixedServerRequestEntriesWithResponseErrors(): readonly ServerReq
   });
 }
 
+/**
+ * Shows the shared pending server request panel used in session workbenches.
+ * Review both `SuggestedNextActions` and `FreeformUserInput` to verify user input
+ * cancellation placement: suggested actions keep Cancel in the top-right corner,
+ * while freeform input keeps Cancel beside Submit in the footer.
+ */
 const meta = {
   title: "Dashboard/Sessions/SessionWorkbench/ServerRequestsPanel",
   component: ServerRequestsPanel,
@@ -159,6 +188,12 @@ export const MixedRequests: Story = {};
 export const SuggestedNextActions: Story = {
   args: {
     entries: SuggestedNextActionEntries,
+  },
+};
+
+export const FreeformUserInput: Story = {
+  args: {
+    entries: FreeformUserInputEntries,
   },
 };
 
