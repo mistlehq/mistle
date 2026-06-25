@@ -120,6 +120,16 @@ export async function putProfileVersionDraft(
             bindings: input.integrationBindings.bindings,
           },
         );
+  const nextSkillsConfig =
+    input.skillsConfig === undefined
+      ? undefined
+      : mapProfileVersionSkillsConfig(input.skillsConfig);
+  const nextAssociatedResourceEventRoutingConfig =
+    input.associatedResourceEventRoutingConfig === undefined
+      ? undefined
+      : mapProfileVersionAssociatedResourceEventRoutingConfig(
+          input.associatedResourceEventRoutingConfig,
+        );
 
   return db.transaction(async (tx) => {
     const tables = getControlPlaneDatabaseSchema(tx);
@@ -258,11 +268,11 @@ export async function putProfileVersionDraft(
                   sandboxMemoryMb: input.sandboxResources.memoryMb,
                   sandboxDiskMb: input.sandboxResources.diskMb ?? null,
                 }),
-          ...(input.skillsConfig === undefined ? {} : { skillsConfig: input.skillsConfig }),
+          ...(nextSkillsConfig === undefined ? {} : { skillsConfig: nextSkillsConfig }),
           ...(input.associatedResourceEventRoutingConfig === undefined
             ? {}
             : {
-                associatedResourceEventRoutingConfig: input.associatedResourceEventRoutingConfig,
+                associatedResourceEventRoutingConfig: nextAssociatedResourceEventRoutingConfig,
               }),
         })
         .where(
