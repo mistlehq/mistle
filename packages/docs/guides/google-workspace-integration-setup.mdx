@@ -7,16 +7,11 @@ description: Connect Google Workspace tools to Mistle
 
 Connect to Google Workspace by authorizing Mistle with a Google OAuth client or service account that you create in Google Cloud.
 
-Mistle uses the configured connection to obtain Google access tokens, then injects those tokens into the Workspace tools selected in a sandbox profile. Gmail, Calendar, Chat, and People use Google-hosted MCP servers. Drive, Sheets, Docs, and Slides use Mistle's local `gws` tool wrapper around the official Google REST APIs.
+Mistle uses the configured connection to obtain Google access tokens, then injects those tokens into the Workspace tools selected in a sandbox profile. Gmail, Drive, Sheets, Docs, Slides, Calendar, Chat, and People use Mistle's local `gws` tool wrapper around the official Google REST APIs.
 
-<Note>
-  Google-hosted Workspace MCP servers are currently published by Google as a Developer Preview.
-  Verify the Google setup requirements before enabling hosted MCP tools in production.
-</Note>
+## Enable Google Workspace APIs
 
-## Enable Google Workspace MCP
-
-Use a Google Cloud project owned by the Workspace organization that should authorize the MCP servers.
+Use a Google Cloud project owned by the Workspace organization that should authorize the selected Workspace tools.
 
 Enable the Workspace product APIs needed by the selected tools:
 
@@ -33,22 +28,11 @@ gcloud services enable \
   --project=PROJECT_ID
 ```
 
-Enable the Workspace MCP services if you plan to use Gmail, Calendar, Chat, or People:
-
-```bash
-gcloud services enable \
-  gmailmcp.googleapis.com \
-  calendarmcp.googleapis.com \
-  chatmcp.googleapis.com \
-  people.googleapis.com \
-  --project=PROJECT_ID
-```
-
 Replace `PROJECT_ID` with the Google Cloud project ID.
 
 ## Configure Google Chat
 
-If you enable the Google Chat MCP server, configure a Chat app in the same Google Cloud project:
+If you enable the Google Chat tools, configure a Chat app in the same Google Cloud project:
 
 1. Open **Google Chat API > Manage > Configuration**.
 2. Set **App name** to `Chat MCP`.
@@ -75,6 +59,7 @@ Add the OAuth scopes for the Workspace tools you intend to use. Mistle currently
 - `https://www.googleapis.com/auth/calendar.calendarlist.readonly`
 - `https://www.googleapis.com/auth/calendar.events.freebusy`
 - `https://www.googleapis.com/auth/calendar.events.readonly`
+- `https://www.googleapis.com/auth/calendar.events`
 - `https://www.googleapis.com/auth/chat.spaces.readonly`
 - `https://www.googleapis.com/auth/chat.memberships.readonly`
 - `https://www.googleapis.com/auth/chat.messages.readonly`
@@ -133,21 +118,19 @@ Only selected tools are exposed to sessions using that published profile.
 
 ## Supported Tools
 
-| Tool            | Runtime path                                                   |
-| --------------- | -------------------------------------------------------------- |
-| Gmail           | Google-hosted MCP: `https://gmailmcp.googleapis.com/mcp/v1`    |
-| Google Drive    | Local `gws` MCP wrapper for Drive REST API                     |
-| Google Sheets   | Local `gws` MCP wrapper for Sheets REST API                    |
-| Google Docs     | Local `gws` MCP wrapper for Docs REST API                      |
-| Google Slides   | Local `gws` MCP wrapper for Slides REST API                    |
-| Google Calendar | Google-hosted MCP: `https://calendarmcp.googleapis.com/mcp/v1` |
-| Google Chat     | Google-hosted MCP: `https://chatmcp.googleapis.com/mcp/v1`     |
-| People API      | Google-hosted MCP: `https://people.googleapis.com/mcp/v1`      |
+| Tool            | Runtime path                                  |
+| --------------- | --------------------------------------------- |
+| Gmail           | Local `gws` MCP wrapper for Gmail REST API    |
+| Google Drive    | Local `gws` MCP wrapper for Drive REST API    |
+| Google Sheets   | Local `gws` MCP wrapper for Sheets REST API   |
+| Google Docs     | Local `gws` MCP wrapper for Docs REST API     |
+| Google Slides   | Local `gws` MCP wrapper for Slides REST API   |
+| Google Calendar | Local `gws` MCP wrapper for Calendar REST API |
+| Google Chat     | Local `gws` MCP wrapper for Chat REST API     |
+| People API      | Local `gws` MCP wrapper for People REST API   |
 
 ## Official References
 
-- [Configure Google Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers)
-- [Authenticate to Google and Google Cloud MCP servers](https://docs.cloud.google.com/mcp/authenticate-mcp)
 - [OAuth 2.0 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server)
 - [Using OAuth 2.0 for Server to Server Applications](https://developers.google.com/identity/protocols/oauth2/service-account)
 - [Control API access with domain-wide delegation](https://knowledge.workspace.google.com/admin/apps/control-api-access-with-domain-wide-delegation)

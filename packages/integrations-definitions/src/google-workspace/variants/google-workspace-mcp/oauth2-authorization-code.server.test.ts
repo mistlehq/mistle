@@ -42,6 +42,7 @@ describe("Google Workspace OAuth authorization code helpers", () => {
         "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
         "https://www.googleapis.com/auth/calendar.events.freebusy",
         "https://www.googleapis.com/auth/calendar.events.readonly",
+        "https://www.googleapis.com/auth/calendar.events",
         "https://www.googleapis.com/auth/chat.spaces.readonly",
         "https://www.googleapis.com/auth/chat.memberships.readonly",
         "https://www.googleapis.com/auth/chat.messages.readonly",
