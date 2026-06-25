@@ -14,4 +14,4 @@ pre-push:
   parallel: false
   commands:
     validate-changed:
-      run: pnpm validate:changed --base origin/main --head HEAD
+      run: pnpm validate:changed --base origin/main --head HEAD --steps format,lint,typecheck
