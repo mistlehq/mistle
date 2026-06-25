@@ -6,6 +6,7 @@ import type {
 
 import {
   ShopifyConnectionConfigSchema,
+  ShopifyConnectionMethodIds,
   ShopifyCredentialSecretTypes,
   ShopifyCredentialSlotKeys,
   normalizeShopifyShopDomain,
@@ -116,6 +117,10 @@ export function compileShopifyBinding(input: ShopifyCompileBindingInput): Compil
   const includesShopifyCli = input.binding.config.tools.includes(ShopifyToolIds.SHOPIFY_CLI);
   const includesShopifyMcp = input.binding.config.tools.includes(ShopifyToolIds.SHOPIFY_MCP);
   const includesShopifyToolArtifact = includesShopifyCli || includesShopifyMcp;
+  const accessTokenSlotKey =
+    connectionConfig.connection_method === ShopifyConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE
+      ? ShopifyCredentialSlotKeys.OAUTH2_AUTHORIZATION_CODE_ACCESS_TOKEN
+      : ShopifyCredentialSlotKeys.CUSTOM_APP_CLIENT_CREDENTIALS_ACCESS_TOKEN;
 
   return {
     egressRoutes: [
@@ -135,7 +140,7 @@ export function compileShopifyBinding(input: ShopifyCompileBindingInput): Compil
           kind: "integration_connection",
           connectionId: input.connection.id,
           secretType: ShopifyCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
-          slotKey: ShopifyCredentialSlotKeys.CUSTOM_APP_CLIENT_CREDENTIALS_ACCESS_TOKEN,
+          slotKey: accessTokenSlotKey,
         },
       },
     ],
