@@ -163,7 +163,7 @@ export function resolveGoogleWorkspaceServiceAccountContext(
   const key = parseGoogleWorkspaceServiceAccountKey(rawKeyJson);
 
   return {
-    ...(parsedBindingConfig.workspaceUserEmail === undefined
+    ...(parsedBindingConfig.workspaceUserEmail.length === 0
       ? {}
       : { workspaceUserEmail: parsedBindingConfig.workspaceUserEmail }),
     clientEmail: key.client_email,

@@ -238,6 +238,22 @@ describe("GoogleWorkspaceServiceAccountCredentialResolver", () => {
     });
   });
 
+  it("omits a user subject when the parsed binding config defaults the Workspace user email to empty", () => {
+    const context = resolveGoogleWorkspaceServiceAccountContext(
+      createResolverInput({
+        privateKey: createRsaPrivateKeyPem(),
+        tokenEndpoint: "https://oauth2.googleapis.com/token",
+      }),
+    );
+    const assertion = buildGoogleWorkspaceServiceAccountJwtAssertion({
+      ...context,
+      issuedAtEpochSeconds: 1_700_000_000,
+    });
+
+    expect(context).not.toHaveProperty("workspaceUserEmail");
+    expect(decodeJwtPayload(assertion)).not.toHaveProperty("sub");
+  });
+
   it("resolves domain-wide delegation service account context with a Workspace user email", () => {
     expect(
       resolveGoogleWorkspaceServiceAccountContext(

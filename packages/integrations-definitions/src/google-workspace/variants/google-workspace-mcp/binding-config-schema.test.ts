@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { GoogleWorkspaceBindingConfigSchema } from "./binding-config-schema.js";
 import { GoogleWorkspaceMcpServerIds } from "./mcp-catalog.js";
@@ -7,6 +8,27 @@ describe("GoogleWorkspaceBindingConfigSchema", () => {
   it("defaults to no selected Google Workspace MCP servers", () => {
     expect(GoogleWorkspaceBindingConfigSchema.parse({})).toEqual({
       mcpServers: [],
+      workspaceUserEmail: "",
+    });
+  });
+
+  it("defaults the Workspace user email to an empty string in JSON Schema validation", () => {
+    expect(z.toJSONSchema(GoogleWorkspaceBindingConfigSchema)).toMatchObject({
+      properties: {
+        workspaceUserEmail: {
+          default: "",
+          anyOf: [
+            {
+              const: "",
+              type: "string",
+            },
+            {
+              format: "email",
+              type: "string",
+            },
+          ],
+        },
+      },
     });
   });
 
@@ -31,10 +53,11 @@ describe("GoogleWorkspaceBindingConfigSchema", () => {
         GoogleWorkspaceMcpServerIds.SLIDES,
         GoogleWorkspaceMcpServerIds.CALENDAR,
       ],
+      workspaceUserEmail: "",
     });
   });
 
-  it("treats a blank Workspace user email as omitted", () => {
+  it("treats a blank Workspace user email as the empty default", () => {
     expect(
       GoogleWorkspaceBindingConfigSchema.parse({
         mcpServers: [GoogleWorkspaceMcpServerIds.DRIVE],
@@ -42,6 +65,7 @@ describe("GoogleWorkspaceBindingConfigSchema", () => {
       }),
     ).toEqual({
       mcpServers: [GoogleWorkspaceMcpServerIds.DRIVE],
+      workspaceUserEmail: "",
     });
   });
 
