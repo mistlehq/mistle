@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { DockviewApi } from "dockview";
 import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -10,11 +10,17 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { ResolvedAppearanceProvider } from "../appearance/appearance-provider.js";
 import { DesignerBlueprintCurrentTabHref } from "../designer/designer-blueprint-schema.js";
+import type {
+  IntegrationConnection,
+  IntegrationTarget,
+} from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import {
   DesignerCanvasWorkspace,
   resolveDesignerBlueprintInitialFocusViewport,
 } from "./designer-session-page-view.js";
+import { OrganizationIntegrationsSettingsPage } from "./organization-integrations-settings-page.js";
 import type {
   PendingSessionBlueprintComment,
   PendingSessionBlueprintCommentInput,
@@ -37,10 +43,208 @@ beforeAll(() => {
   }
 });
 
+const ApiKeyIntegrationTarget: IntegrationTarget = {
+  targetKey: "openai-default",
+  familyId: "openai",
+  variantId: "openai-default",
+  kind: "connector",
+  enabled: true,
+  config: {},
+  displayName: "OpenAI",
+  description: "Connect OpenAI.",
+  connectionMethods: [
+    {
+      id: "api-key",
+      label: "API key",
+      kind: "form",
+      createBehavior: "single-step",
+      secretFields: [
+        {
+          name: "apiKey",
+          label: "API key",
+          inputType: "password",
+        },
+      ],
+    },
+  ],
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+const ProviderSetupIntegrationTarget: IntegrationTarget = {
+  targetKey: "wasenderapi-mcp",
+  familyId: "wasenderapi",
+  variantId: "wasenderapi-mcp",
+  kind: "connector",
+  enabled: true,
+  config: {},
+  displayName: "WasenderAPI",
+  description: "Connect WasenderAPI.",
+  connectionMethods: [
+    {
+      id: "api-key",
+      label: "Personal access token",
+      kind: "form",
+      createBehavior: "draft-then-setup",
+      setupFlow: {
+        routeSegment: "provider-configuration",
+        setupPane: {
+          kind: "provider-configuration",
+        },
+        completionRequirements: {
+          kind: "config-field",
+          field: "provider_configuration_setup_completed",
+        },
+      },
+      secretFields: [
+        {
+          name: "personalAccessToken",
+          label: "Personal access token",
+          inputType: "password",
+        },
+      ],
+    },
+  ],
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+const CompletedProviderSetupConnection: IntegrationConnection = {
+  id: "icn_wasenderapi_complete",
+  targetKey: "wasenderapi-mcp",
+  displayName: "WasenderAPI production",
+  status: "active",
+  connectionMethodId: "api-key",
+  connectionMethodLabel: "Personal access token",
+  config: {
+    connection_method: "api-key",
+    provider_configuration_setup_completed: "true",
+  },
+  configuredSecretNames: ["personalAccessToken"],
+  createdAt: "2026-06-25T00:00:00.000Z",
+  updatedAt: "2026-06-25T00:00:00.000Z",
+};
+
+const ProviderAppSetupIntegrationTarget: IntegrationTarget = {
+  targetKey: "github-cloud",
+  familyId: "github",
+  variantId: "github-cloud",
+  kind: "git",
+  enabled: true,
+  config: {},
+  displayName: "GitHub",
+  description: "Connect GitHub.",
+  connectionMethods: [
+    {
+      id: "github-app-installation",
+      label: "GitHub App installation",
+      kind: "form",
+      createBehavior: "draft-then-setup",
+      setupFlow: {
+        routeSegment: "github-app",
+        setupPane: {
+          kind: "provider-app",
+        },
+        completionRequirements: {
+          kind: "any-of",
+          anyOf: [
+            {
+              kind: "config-field",
+              field: "installation_id",
+            },
+            {
+              kind: "connection-external-subject",
+            },
+          ],
+        },
+      },
+      secretFields: [
+        {
+          name: "webhookSecret",
+          label: "Webhook secret",
+          inputType: "password",
+        },
+      ],
+    },
+  ],
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+const ProviderAppSetupConnection: IntegrationConnection = {
+  id: "icn_github_provider_app_setup",
+  targetKey: "github-cloud",
+  displayName: "GitHub provider app",
+  status: "active",
+  connectionMethodId: "github-app-installation",
+  connectionMethodLabel: "GitHub App installation",
+  config: {
+    connection_method: "github-app-installation",
+  },
+  createdAt: "2026-06-25T00:00:00.000Z",
+  updatedAt: "2026-06-25T00:00:00.000Z",
+};
+
+const ManagedWebhookIntegrationTarget: IntegrationTarget = {
+  targetKey: "linear-default",
+  familyId: "linear",
+  variantId: "linear-default",
+  kind: "connector",
+  enabled: true,
+  config: {},
+  displayName: "Linear",
+  description: "Connect Linear.",
+  connectionMethods: [
+    {
+      id: "api-key",
+      label: "API key",
+      kind: "form",
+      createBehavior: "single-step",
+      postCreate: {
+        managedWebhookSource: {
+          autoCreate: true,
+          failureNoticeTitle: "Connection created, webhook setup failed",
+          successNoticeTitle: "Linear connection and webhook created successfully",
+        },
+      },
+      secretFields: [
+        {
+          name: "apiKey",
+          label: "API key",
+          inputType: "password",
+        },
+      ],
+    },
+  ],
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+const ManagedWebhookConnection: IntegrationConnection = {
+  id: "icn_linear_managed_webhook",
+  targetKey: "linear-default",
+  displayName: "Linear production",
+  status: "active",
+  connectionMethodId: "api-key",
+  connectionMethodLabel: "API key",
+  config: {
+    connection_method: "api-key",
+  },
+  configuredSecretNames: ["apiKey"],
+  createdAt: "2026-06-25T00:00:00.000Z",
+  updatedAt: "2026-06-25T00:00:00.000Z",
+};
+
 function renderDesignerCanvasRoute(input: {
   element: React.ReactNode;
   configureQueryClient?: (queryClient: QueryClient) => void;
 }): void {
+  cleanup();
+
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -324,6 +528,131 @@ describe("DesignerCanvasWorkspace", () => {
 
     expect(await screen.findByText("First Panel")).toBeDefined();
     expect(await screen.findByText("Second Panel")).toBeDefined();
+  });
+
+  it("renders an integration connection create route inside the Designer canvas", async () => {
+    renderDesignerCanvasWorkspace({
+      activeTabHref: "/integrations/openai-default/add",
+      configureQueryClient: (queryClient) => {
+        queryClient.setQueryDefaults(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+          staleTime: Infinity,
+        });
+        queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+          targets: [ApiKeyIntegrationTarget],
+          connections: [],
+        });
+      },
+      tabs: [
+        {
+          kind: "route",
+          id: "openai-setup",
+          title: "Set up OpenAI",
+          href: "/integrations/openai-default/add",
+        },
+      ],
+    });
+
+    expect(await screen.findByLabelText("Name")).toBeDefined();
+    expect(await screen.findByText("API key")).toBeDefined();
+    expect(screen.getByText("Set up OpenAI")).toBeDefined();
+    expect(screen.queryByText("Integrations")).toBeNull();
+  });
+
+  it("keeps completed integration setup visible in a Designer canvas tab", async () => {
+    renderDesignerCanvasWorkspace({
+      activeTabHref:
+        "/integrations/wasenderapi-mcp/icn_wasenderapi_complete/provider-configuration/setup",
+      configureQueryClient: (queryClient) => {
+        queryClient.setQueryDefaults(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+          staleTime: Infinity,
+        });
+        queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+          targets: [ProviderSetupIntegrationTarget],
+          connections: [CompletedProviderSetupConnection],
+        });
+        queryClient.setQueryData(organizationSummaryQueryKey("org_123"), {
+          name: "Acme",
+        });
+      },
+      tabs: [
+        {
+          kind: "route",
+          id: "wasenderapi-setup",
+          title: "Set up WasenderAPI",
+          href: "/integrations/wasenderapi-mcp/icn_wasenderapi_complete/provider-configuration/setup",
+        },
+      ],
+    });
+
+    expect(await screen.findByText("Integration setup complete")).toBeDefined();
+    expect(await screen.findByRole("button", { name: "View connection" })).toBeDefined();
+    expect(screen.getByText("Set up WasenderAPI")).toBeDefined();
+    expect(screen.queryByText("Integrations")).toBeNull();
+  });
+
+  it("shows a full-dashboard handoff for embedded provider app setup", async () => {
+    const setupHref =
+      "/integrations/github-cloud/icn_github_provider_app_setup/github-app/setup?githubAppManifest=created";
+
+    renderDesignerCanvasWorkspace({
+      activeTabHref: setupHref,
+      configureQueryClient: (queryClient) => {
+        queryClient.setQueryDefaults(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+          staleTime: Infinity,
+        });
+        queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+          targets: [ProviderAppSetupIntegrationTarget],
+          connections: [ProviderAppSetupConnection],
+        });
+      },
+      tabs: [
+        {
+          kind: "route",
+          id: "github-app-setup",
+          title: "Set up GitHub",
+          href: setupHref,
+        },
+      ],
+    });
+
+    expect(await screen.findByText("Open setup in the full dashboard")).toBeDefined();
+    expect(await screen.findByRole("button", { name: "Open setup page" })).toBeDefined();
+  });
+
+  it("renders embedded managed-webhook setup notices from route state", async () => {
+    renderDesignerCanvasRoute({
+      configureQueryClient: (queryClient) => {
+        queryClient.setQueryDefaults(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+          staleTime: Infinity,
+        });
+        queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+          targets: [ManagedWebhookIntegrationTarget],
+          connections: [ManagedWebhookConnection],
+        });
+      },
+      element: (
+        <OrganizationIntegrationsSettingsPage
+          embeddedRoute={{
+            detailTargetKey: "linear-default",
+            locationState: {
+              managedWebhookSetup: {
+                status: "created",
+                webhookSourceId: "iws_linear_managed_webhook",
+              },
+            },
+            navigate: () => {},
+            searchParams: new URLSearchParams({
+              connectionId: ManagedWebhookConnection.id,
+            }),
+            setSearchParams: () => {},
+          }}
+        />
+      ),
+    });
+
+    expect(
+      await screen.findByText("Linear connection and webhook created successfully"),
+    ).toBeDefined();
   });
 
   it("renders blueprint tabs as a visual-only React Flow graph", async () => {

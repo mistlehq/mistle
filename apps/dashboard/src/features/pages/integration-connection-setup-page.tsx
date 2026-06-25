@@ -10,9 +10,18 @@ import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { useOrganizationSummary } from "../shell/use-organization-summary.js";
+import { resolveIntegrationSetupPaneOrThrow } from "./integration-connection-setup-manifest-draft.js";
 import { renderIntegrationConnectionSetupPane } from "./integration-connection-setup-pane-registry.js";
 import { resolveIntegrationConnectionSetupRouteStateOrThrow } from "./integration-connection-setup-state.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
+
+export type EmbeddedIntegrationConnectionSetupRoute = {
+  targetKey: string;
+  connectionId: string;
+  searchParams: URLSearchParams;
+  setupRouteSegment: string;
+  navigate: (nextHref: string) => void | Promise<void>;
+};
 
 export function IntegrationConnectionSetupPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
@@ -36,6 +45,94 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
     throw new Error("Integration setup route segment is required.");
   }
 
+  return (
+    <IntegrationConnectionSetupPageContent
+      breadcrumbs={breadcrumbs}
+      connectionId={connectionId}
+      description={description}
+      headerIcon={pageMeta.headerIcon ?? undefined}
+      navigate={(nextHref) => navigate(nextHref)}
+      providerAppSetupMode="render"
+      redirectWhenComplete
+      setupRouteSegment={setupRouteSegment}
+      targetKey={targetKey}
+      title={title}
+    />
+  );
+}
+
+export function EmbeddedIntegrationConnectionSetupPage(input: {
+  embeddedRoute: EmbeddedIntegrationConnectionSetupRoute;
+}): React.JSX.Element {
+  return (
+    <IntegrationConnectionSetupPageContent
+      breadcrumbs={null}
+      connectionId={input.embeddedRoute.connectionId}
+      navigate={input.embeddedRoute.navigate}
+      providerAppSetupMode="full-dashboard-handoff"
+      redirectWhenComplete={false}
+      searchParams={input.embeddedRoute.searchParams}
+      setupRouteSegment={input.embeddedRoute.setupRouteSegment}
+      targetKey={input.embeddedRoute.targetKey}
+      title="Set up integration"
+    />
+  );
+}
+
+function buildIntegrationConnectionSetupHref(input: {
+  connectionId: string;
+  searchParams?: URLSearchParams | undefined;
+  setupRouteSegment: string;
+  targetKey: string;
+}): string {
+  const pathname = `/integrations/${encodeURIComponent(input.targetKey)}/${encodeURIComponent(
+    input.connectionId,
+  )}/${encodeURIComponent(input.setupRouteSegment)}/setup`;
+  const search = input.searchParams?.toString() ?? "";
+  return search.length === 0 ? pathname : `${pathname}?${search}`;
+}
+
+type IntegrationConnectionSetupPageContentBaseInput = {
+  breadcrumbs: React.ReactNode | null;
+  connectionId: string;
+  description?: string | undefined;
+  headerIcon?: React.ReactNode | undefined;
+  navigate: (nextHref: string) => void | Promise<void>;
+  redirectWhenComplete: boolean;
+  setupRouteSegment: string;
+  targetKey: string;
+  title: string;
+};
+
+type IntegrationConnectionSetupPageContentInput = IntegrationConnectionSetupPageContentBaseInput &
+  (
+    | {
+        providerAppSetupMode: "render";
+        searchParams?: undefined;
+      }
+    | {
+        providerAppSetupMode: "full-dashboard-handoff";
+        searchParams: URLSearchParams;
+      }
+  );
+
+function IntegrationConnectionSetupPageContent(
+  input: IntegrationConnectionSetupPageContentInput,
+): React.JSX.Element {
+  const {
+    breadcrumbs,
+    connectionId,
+    description,
+    headerIcon,
+    navigate,
+    providerAppSetupMode,
+    redirectWhenComplete,
+    searchParams,
+    setupRouteSegment,
+    targetKey,
+    title,
+  } = input;
+
   const directoryQuery = useQuery({
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
     queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
@@ -49,7 +146,7 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
         width="form"
         breadcrumbs={breadcrumbs}
         description={description}
-        headerIcon={pageMeta.headerIcon ?? undefined}
+        headerIcon={headerIcon}
         title={title}
       >
         <FormPageSection>
@@ -83,7 +180,7 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
         width="form"
         breadcrumbs={breadcrumbs}
         description={description}
-        headerIcon={pageMeta.headerIcon ?? undefined}
+        headerIcon={headerIcon}
         title={title}
       >
         {null}
@@ -109,7 +206,7 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
     connectionMethods: card.target.connectionMethods,
     routeSegment: setupRouteSegment,
   });
-  if (setupRouteState.kind === "complete") {
+  if (setupRouteState.kind === "complete" && redirectWhenComplete) {
     return (
       <Navigate
         replace
@@ -120,19 +217,99 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
     );
   }
 
+  if (setupRouteState.kind === "complete") {
+    return (
+      <PageFrame
+        width="form"
+        breadcrumbs={breadcrumbs}
+        description={description}
+        headerIcon={headerIcon}
+        title={title}
+      >
+        <FormPageSection>
+          <div className="flex flex-col gap-4 p-4">
+            <Notice title="Integration setup complete">
+              Designer can now verify this connection through MCP and continue with resource
+              selection, profile binding, or trigger recommendations.
+            </Notice>
+            <div>
+              <Button
+                onClick={() => {
+                  void navigate(
+                    `/integrations/${encodeURIComponent(targetKey)}?connectionId=${encodeURIComponent(
+                      connectionId,
+                    )}`,
+                  );
+                }}
+                type="button"
+                variant="outline"
+              >
+                View connection
+              </Button>
+            </div>
+          </div>
+        </FormPageSection>
+      </PageFrame>
+    );
+  }
+
+  const setupRoute = setupRouteState.setupRoute;
+  const setupPane = resolveIntegrationSetupPaneOrThrow({
+    connection,
+    setupRoute,
+  });
+  if (providerAppSetupMode === "full-dashboard-handoff" && setupPane.kind === "provider-app") {
+    const fullPageSetupHref = buildIntegrationConnectionSetupHref({
+      connectionId,
+      searchParams,
+      setupRouteSegment,
+      targetKey,
+    });
+
+    return (
+      <PageFrame
+        width="form"
+        breadcrumbs={breadcrumbs}
+        description={description}
+        headerIcon={headerIcon}
+        title={title}
+      >
+        <FormPageSection>
+          <div className="flex flex-col gap-4 p-4">
+            <Notice title="Open setup in the full dashboard">
+              This provider setup uses an external authorization flow. Open it in the full dashboard
+              page so the provider can redirect back correctly.
+            </Notice>
+            <div>
+              <Button
+                onClick={() => {
+                  globalThis.location.assign(fullPageSetupHref);
+                }}
+                type="button"
+                variant="outline"
+              >
+                Open setup page
+              </Button>
+            </div>
+          </div>
+        </FormPageSection>
+      </PageFrame>
+    );
+  }
+
   const organizationName = organizationSummary.query.data?.name;
   return (
     <PageFrame
       width="form"
       breadcrumbs={breadcrumbs}
       description={description}
-      headerIcon={pageMeta.headerIcon ?? undefined}
+      headerIcon={headerIcon}
       title={title}
     >
       {renderIntegrationConnectionSetupPane({
         connection,
         organizationName,
-        setupRoute: setupRouteState.setupRoute,
+        setupRoute,
       })}
     </PageFrame>
   );

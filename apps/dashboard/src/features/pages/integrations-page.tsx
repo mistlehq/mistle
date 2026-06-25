@@ -61,6 +61,7 @@ type EmbeddedIntegrationsNavigateOptions = {
 
 export type EmbeddedIntegrationsRoute = {
   detailTargetKey: string | null;
+  locationState?: unknown;
   navigate: (href: string, options?: EmbeddedIntegrationsNavigateOptions) => void;
   searchParams: URLSearchParams;
   setSearchParams: (searchParams: URLSearchParams, options?: { replace?: boolean }) => void;
@@ -281,7 +282,8 @@ export function IntegrationsPage(input?: {
   const navigate = input?.embeddedRoute?.navigate ?? routeNavigate;
   const searchParams = input?.embeddedRoute?.searchParams ?? routeSearchParams;
   const setSearchParams = input?.embeddedRoute?.setSearchParams ?? setRouteSearchParams;
-  const locationState = input?.embeddedRoute === undefined ? location.state : undefined;
+  const locationState =
+    input?.embeddedRoute === undefined ? location.state : input.embeddedRoute.locationState;
   const [urlConnectionNotice, setUrlConnectionNotice] =
     useState<IntegrationConnectionNotice | null>(null);
   const [urlProviderAppSetupErrorNotice, setUrlProviderAppSetupErrorNotice] =

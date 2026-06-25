@@ -1,3 +1,5 @@
+import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
+import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
@@ -11,7 +13,13 @@ import {
   DesignerBlueprintCurrentTabId,
 } from "../designer/designer-blueprint-schema.js";
 import type { DesignerSession, DesignerSessionListItem } from "../designer/designer-service.js";
+import type {
+  IntegrationConnection,
+  IntegrationTarget,
+} from "../integrations/integrations-service.js";
 import { createReadySessionComposerStateInput } from "../session-agents/codex/fixtures/session-fixtures.js";
+import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
+import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { DesignerPageView } from "./designer-page-view.js";
 import {
   DesignerBlueprintCanvasPanel,
@@ -21,6 +29,7 @@ import {
   DesignerBlueprintPendingCommentEditor,
   DesignerCanvasWorkspace,
 } from "./designer-session-page-view.js";
+import { createStoryConnectionMethods } from "./organization-integrations-settings-page-story-support.js";
 import {
   type PendingSessionBlueprintComment,
   type PendingSessionBlueprintCommentInput,
@@ -30,6 +39,9 @@ import {
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 import { renderSessionWorkbenchContentStory } from "./session-story-support.js";
+import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
+
+const IntegrationRegistry = createBrowserIntegrationRegistry();
 
 type StoryDesignerBlueprintCanvasTab = Extract<
   DesignerSession["canvasTabs"][number],
@@ -566,9 +578,12 @@ function BlueprintCommentStatePreview(input: {
 
 function DesignerCanvasWorkspaceStory(input: {
   tabs: readonly DesignerSession["canvasTabs"][number][];
+  activeTabHref?: string;
 }): React.JSX.Element {
   const [tabs, setTabs] = useState([...input.tabs]);
-  const [activeTabHref, setActiveTabHref] = useState<string | null>(tabs[0]?.href ?? null);
+  const [activeTabHref, setActiveTabHref] = useState<string | null>(
+    input.activeTabHref ?? tabs[0]?.href ?? null,
+  );
 
   return (
     <DesignerCanvasStoryRuntime>
@@ -591,6 +606,132 @@ function DesignerCanvasWorkspaceStory(input: {
   );
 }
 
+function getIntegrationDefinitionOrThrow(input: {
+  familyId: string;
+  variantId: string;
+}): AnyIntegrationDefinition {
+  const definition = IntegrationRegistry.getDefinition(input);
+  if (definition === null || definition === undefined) {
+    throw new Error(
+      `Missing integration definition '${input.familyId}/${input.variantId}' for Storybook.`,
+    );
+  }
+
+  return definition;
+}
+
+function createDesignerStoryIntegrationTarget(input: {
+  familyId: string;
+  variantId: string;
+}): IntegrationTarget {
+  const definition = getIntegrationDefinitionOrThrow(input);
+
+  return {
+    targetKey: definition.variantId,
+    familyId: definition.familyId,
+    variantId: definition.variantId,
+    kind: definition.kind,
+    enabled: true,
+    config: {},
+    displayName: definition.displayName,
+    description: definition.description ?? "",
+    ...(definition.logoKey === undefined ? {} : { logoKey: definition.logoKey }),
+    connectionMethods: createStoryConnectionMethods(definition),
+    targetHealth: {
+      configStatus: "valid",
+    },
+  };
+}
+
+const DesignerStoryOpenAiTarget = createDesignerStoryIntegrationTarget({
+  familyId: "openai",
+  variantId: "openai-default",
+});
+
+const DesignerStoryWasenderApiTarget = createDesignerStoryIntegrationTarget({
+  familyId: "wasenderapi",
+  variantId: "wasenderapi-mcp",
+});
+
+const DesignerStoryCompletedWasenderApiConnection: IntegrationConnection = {
+  id: "icn_wasenderapi_story_complete",
+  targetKey: "wasenderapi-mcp",
+  displayName: "WasenderAPI Production",
+  status: "active",
+  connectionMethodId: "api-key",
+  connectionMethodLabel: "Personal access token",
+  config: {
+    connection_method: "api-key",
+    provider_configuration_setup_completed: "true",
+  },
+  configuredSecretNames: ["personalAccessToken", "webhookSecret"],
+  createdAt: "2026-06-21T00:00:00.000Z",
+  updatedAt: "2026-06-21T00:00:00.000Z",
+};
+
+function createDesignerIntegrationSetupStoryQueryClient(): QueryClient {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        gcTime: Infinity,
+        refetchOnMount: false,
+        refetchOnReconnect: false,
+        refetchOnWindowFocus: false,
+        retry: false,
+        staleTime: Infinity,
+      },
+    },
+  });
+
+  queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+    targets: [DesignerStoryOpenAiTarget, DesignerStoryWasenderApiTarget],
+    connections: [DesignerStoryCompletedWasenderApiConnection],
+  });
+  queryClient.setQueryData(SESSION_QUERY_KEY, {
+    session: {
+      activeOrganizationId: "org_story",
+    },
+  });
+  queryClient.setQueryData(organizationSummaryQueryKey("org_story"), {
+    name: "Mistle",
+  });
+
+  return queryClient;
+}
+
+const DesignerIntegrationSetupTabs: DesignerSession["canvasTabs"] = [
+  {
+    kind: "route",
+    id: "openai-create",
+    title: "Add OpenAI",
+    href: "/integrations/openai-default/add",
+  },
+  {
+    kind: "route",
+    id: "wasenderapi-setup-complete",
+    title: "WasenderAPI Setup",
+    href: "/integrations/wasenderapi-mcp/icn_wasenderapi_story_complete/provider-configuration/setup",
+  },
+];
+
+function DesignerIntegrationSetupCanvasStory(input: { activeTabHref: string }): React.JSX.Element {
+  const [queryClient] = useState(createDesignerIntegrationSetupStoryQueryClient);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <DesignerCanvasWorkspaceStory
+        activeTabHref={input.activeTabHref}
+        tabs={DesignerIntegrationSetupTabs}
+      />
+    </QueryClientProvider>
+  );
+}
+
+/**
+ * Review the Designer session list and canvas workspace, including dashboard-owned setup routes
+ * embedded as canvas tabs. The integration setup stories show that setup appears in the canvas,
+ * not above the composer, and that completed setup remains visible until the user closes the tab.
+ */
 const meta = {
   title: "Dashboard/Designer/Page",
   component: DesignerPageView,
@@ -684,5 +825,21 @@ export const EmptyCanvas: Story = {
   decorators: [withDashboardWorkspaceStory],
   render: function RenderEmptyCanvasStory(): React.JSX.Element {
     return <DesignerCanvasWorkspaceStory tabs={[]} />;
+  },
+};
+
+export const CanvasIntegrationCreate: Story = {
+  decorators: [withDashboardWorkspaceStory],
+  render: function RenderCanvasIntegrationCreateStory(): React.JSX.Element {
+    return <DesignerIntegrationSetupCanvasStory activeTabHref="/integrations/openai-default/add" />;
+  },
+};
+
+export const CanvasIntegrationSetupComplete: Story = {
+  decorators: [withDashboardWorkspaceStory],
+  render: function RenderCanvasIntegrationSetupCompleteStory(): React.JSX.Element {
+    return (
+      <DesignerIntegrationSetupCanvasStory activeTabHref="/integrations/wasenderapi-mcp/icn_wasenderapi_story_complete/provider-configuration/setup" />
+    );
   },
 };

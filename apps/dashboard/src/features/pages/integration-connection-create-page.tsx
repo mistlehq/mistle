@@ -1,6 +1,6 @@
 import { Button, Notice } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import { type NavigateOptions, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
@@ -23,6 +23,12 @@ import {
 } from "./use-integration-connection-editor-state.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
+export type EmbeddedIntegrationConnectionCreateRoute = {
+  targetKey: string;
+  returnPath?: string;
+  navigate: (nextHref: string, options?: NavigateOptions) => void | Promise<void>;
+};
+
 export function IntegrationConnectionCreatePage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const breadcrumbs = useAppPageBreadcrumbs();
@@ -37,6 +43,44 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
     throw new Error("Integration target key is required.");
   }
 
+  return (
+    <IntegrationConnectionCreatePageContent
+      breadcrumbs={breadcrumbs}
+      description={description}
+      headerIcon={pageMeta.headerIcon ?? undefined}
+      navigate={(nextHref, options) => navigate(nextHref, options)}
+      returnPath={returnPath ?? undefined}
+      targetKey={targetKey}
+      title={title}
+    />
+  );
+}
+
+export function EmbeddedIntegrationConnectionCreatePage(input: {
+  embeddedRoute: EmbeddedIntegrationConnectionCreateRoute;
+}): React.JSX.Element {
+  return (
+    <IntegrationConnectionCreatePageContent
+      breadcrumbs={null}
+      navigate={input.embeddedRoute.navigate}
+      returnPath={input.embeddedRoute.returnPath}
+      targetKey={input.embeddedRoute.targetKey}
+      title="Add connection"
+    />
+  );
+}
+
+function IntegrationConnectionCreatePageContent(input: {
+  breadcrumbs: React.ReactNode | null;
+  description?: string | undefined;
+  headerIcon?: React.ReactNode | undefined;
+  navigate: (nextHref: string, options?: NavigateOptions) => void | Promise<void>;
+  returnPath?: string | undefined;
+  targetKey: string;
+  title: string;
+}): React.JSX.Element {
+  const { breadcrumbs, description, headerIcon, navigate, returnPath, targetKey, title } = input;
+
   const integrationsQuery = useQuery({
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
     queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
@@ -49,7 +93,7 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
         width="form"
         breadcrumbs={breadcrumbs}
         description={description}
-        headerIcon={pageMeta.headerIcon ?? undefined}
+        headerIcon={headerIcon}
         title={title}
       >
         <FormPageSection>
@@ -83,7 +127,7 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
         width="form"
         breadcrumbs={breadcrumbs}
         description={description}
-        headerIcon={pageMeta.headerIcon ?? undefined}
+        headerIcon={headerIcon}
         title={title}
       >
         {null}
@@ -103,13 +147,14 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
       width="form"
       breadcrumbs={breadcrumbs}
       description={description}
-      headerIcon={pageMeta.headerIcon ?? undefined}
+      headerIcon={headerIcon}
       title={title}
     >
       <LoadedIntegrationConnectionCreatePage
         key={targetKey}
         initialEditorInput={buildOpenCreateIntegrationConnectionInput(card)}
-        {...(returnPath === null ? {} : { returnPath })}
+        navigate={navigate}
+        {...(returnPath === undefined ? {} : { returnPath })}
       />
     </PageFrame>
   );
@@ -117,12 +162,12 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
 
 function LoadedIntegrationConnectionCreatePage(input: {
   initialEditorInput: OpenIntegrationConnectionEditorInput;
+  navigate: (nextHref: string, options?: NavigateOptions) => void | Promise<void>;
   returnPath?: string;
 }): React.JSX.Element {
-  const navigate = useNavigate();
   const connectionState = useIntegrationConnectionEditorState({
     initialEditorInput: input.initialEditorInput,
-    onClose: () => navigate(input.returnPath ?? "/integrations"),
+    onClose: () => input.navigate(input.returnPath ?? "/integrations"),
     onSubmitSuccess: async ({ connectionId, editor, managedWebhookSetup, methodId }) => {
       const draftSetupPath = resolveDraftThenSetupConnectionPath({
         connectionId,
@@ -130,12 +175,12 @@ function LoadedIntegrationConnectionCreatePage(input: {
         methodId,
       });
       if (draftSetupPath !== null) {
-        await navigate(draftSetupPath);
+        await input.navigate(draftSetupPath);
         return;
       }
 
       if (input.returnPath !== undefined && connectionId !== null) {
-        await navigate(
+        await input.navigate(
           appendIntegrationConnectionReturnParams({
             returnPath: input.returnPath,
             params: {
@@ -155,7 +200,7 @@ function LoadedIntegrationConnectionCreatePage(input: {
           connectionId,
         });
 
-        await navigate(`/integrations/${editor.targetKey}?${detailSearchParams.toString()}`, {
+        await input.navigate(`/integrations/${editor.targetKey}?${detailSearchParams.toString()}`, {
           state: {
             managedWebhookSetup,
           },
@@ -163,7 +208,7 @@ function LoadedIntegrationConnectionCreatePage(input: {
         return;
       }
 
-      await navigate(input.returnPath ?? `/integrations/${editor.targetKey}`);
+      await input.navigate(input.returnPath ?? `/integrations/${editor.targetKey}`);
     },
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
   });
