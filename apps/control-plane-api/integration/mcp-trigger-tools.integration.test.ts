@@ -20,9 +20,9 @@ import { describe, expect } from "vitest";
 import { z } from "zod";
 
 import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
-import { GetTriggerResponseSchema } from "../src/triggers/get-trigger/schema.js";
 import { ListTriggersResponseSchema } from "../src/triggers/list-triggers/schema.js";
 import { createApiKeyToken } from "./helpers/api-keys.js";
+import { callMcpTool, listMcpTools } from "./helpers/mcp-json-rpc.js";
 import { sandboxProfileRow, sandboxProfileVersionRow } from "./helpers/sandbox-profiles.js";
 import {
   GitHubIssueCommentCreatedEventType,
@@ -41,19 +41,6 @@ const McpTokenConfig = {
   tokenIssuer: "integration-new-control-plane-api",
   tokenAudience: "integration-new-mistle-mcp",
 };
-
-const JsonRpcToolResponseSchema = z
-  .object({
-    jsonrpc: z.literal("2.0"),
-    id: z.union([z.string(), z.number()]),
-    result: z
-      .object({
-        structuredContent: z.unknown().optional(),
-        isError: z.boolean().optional(),
-      })
-      .loose(),
-  })
-  .strict();
 
 const ListTriggerWebhookEventsResultSchema = z
   .object({
@@ -79,8 +66,118 @@ const ListTriggerWebhookEventsResultSchema = z
   })
   .strict();
 
+const McpTriggerTargetSchema = z
+  .object({
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileVersion: z.number().int().min(1),
+    primaryRepositoryId: z.string().min(1).nullable(),
+  })
+  .strict();
+
+const McpTriggerEventConditionSchema = z
+  .object({
+    eventType: z.string().min(1),
+    payloadFilter: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .strict();
+
+const McpWebhookTriggerConfigSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: z.literal(TriggerKinds.WEBHOOK),
+    name: z.string().min(1),
+    enabled: z.boolean(),
+    integrationWebhookSourceId: z.string().min(1),
+    eventConditions: z.array(McpTriggerEventConditionSchema).min(1),
+    inputTemplate: z.string().min(1),
+    instructions: z.string().min(1).nullable(),
+    conversationKeyTemplate: z.string().min(1),
+    idempotencyKeyTemplate: z.string().min(1).nullable(),
+    target: McpTriggerTargetSchema,
+    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+  })
+  .strict();
+
+const McpScheduleTriggerConfigSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: z.literal(TriggerKinds.SCHEDULE),
+    name: z.string().min(1),
+    enabled: z.boolean(),
+    schedule: z
+      .object({
+        kind: z.enum([ScheduleKinds.RECURRING, ScheduleKinds.ONE_OFF]),
+        name: z.string().min(1),
+        cronExpression: z.string().min(1).nullable(),
+        timezone: z.string().min(1).nullable(),
+        enabled: z.boolean(),
+        nextScheduledAt: z.string().min(1).nullable(),
+        lastScheduledAt: z.string().min(1).nullable(),
+        startAt: z.string().min(1).nullable(),
+      })
+      .strict(),
+    inputTemplate: z.string().min(1),
+    conversationKeyTemplate: z.string().min(1),
+    idempotencyKeyTemplate: z.string().min(1).nullable(),
+    target: McpTriggerTargetSchema,
+    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+  })
+  .strict();
+
+const McpTriggerConfigSchema = z.discriminatedUnion("kind", [
+  McpWebhookTriggerConfigSchema,
+  McpScheduleTriggerConfigSchema,
+]);
+
 describe.concurrent("MCP trigger tools integration", () => {
-  it("lists and gets triggers with the REST trigger summary response shape", async ({ env }) => {
+  it("exposes canonical trigger lifecycle tools without narrow mutation tools", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-trigger-tools-list@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP trigger tool lister",
+      permissions: [
+        OrganizationPermissions.TRIGGER_READ,
+        OrganizationPermissions.TRIGGER_CREATE,
+        OrganizationPermissions.TRIGGER_UPDATE,
+      ],
+    });
+
+    const tools = await listMcpTools({ env, token });
+    const toolNames = tools.map((tool) => tool.name);
+
+    expect(toolNames).toEqual(
+      expect.arrayContaining([
+        "list_triggers",
+        "get_trigger",
+        "create_trigger",
+        "update_trigger",
+        "list_trigger_webhook_events",
+      ]),
+    );
+    expect(toolNames).not.toEqual(
+      expect.arrayContaining([
+        "create_scheduled_trigger",
+        "create_webhook_trigger",
+        "set_trigger_schedule",
+        "set_trigger_webhook_events",
+        "set_trigger_enabled",
+        "rename_trigger",
+        "update_trigger_user_message",
+      ]),
+    );
+    expect(tools.find((tool) => tool.name === "update_trigger")?.annotations).toEqual(
+      expect.objectContaining({
+        idempotentHint: false,
+      }),
+    );
+  });
+
+  it("lists trigger summaries and gets full trigger configuration", async ({ env }) => {
     const firstOrgSession = await env.auth.createSession({
       email: "integration-new-mcp-trigger-list-a@example.com",
     });
@@ -150,10 +247,33 @@ describe.concurrent("MCP trigger tools integration", () => {
     expect(listResult.isError).toBeUndefined();
     expect(getResult.isError).toBeUndefined();
     const triggerList = ListTriggersResponseSchema.parse(listResult.structuredContent);
-    const trigger = GetTriggerResponseSchema.parse(getResult.structuredContent);
+    const trigger = McpTriggerConfigSchema.parse(getResult.structuredContent);
     expect(triggerList.totalResults).toBe(1);
     expect(triggerList.items.map((item) => item.id)).toEqual(["atm_mcp_trigger_list_a"]);
-    expect(trigger).toEqual(triggerList.items[0]);
+    expect(trigger).toMatchObject({
+      id: "atm_mcp_trigger_list_a",
+      kind: TriggerKinds.WEBHOOK,
+      name: "MCP trigger list visible",
+      integrationWebhookSourceId: "iws_mcp_trigger_list_a",
+      eventConditions: [
+        {
+          eventType: GitHubIssueCommentCreatedEventType,
+          payloadFilter: {
+            op: "eq",
+            path: ["action"],
+            value: "created",
+          },
+        },
+      ],
+      target: {
+        sandboxProfileId: "sbp_mcp_trigger_list_a",
+        sandboxProfileVersion: 2,
+        primaryRepositoryId: null,
+      },
+      inputTemplate: "Handle payload",
+    });
+    expect(trigger).not.toHaveProperty("source");
+    expect(trigger.target).not.toHaveProperty("id");
   });
 
   it("accepts legacy webhook trigger read permission for trigger read tools", async ({ env }) => {
@@ -195,7 +315,7 @@ describe.concurrent("MCP trigger tools integration", () => {
     });
 
     expect(result.isError).toBeUndefined();
-    const trigger = GetTriggerResponseSchema.parse(result.structuredContent);
+    const trigger = McpTriggerConfigSchema.parse(result.structuredContent);
     expect(trigger.id).toBe("atm_mcp_trigger_legacy_read");
   });
 
@@ -252,13 +372,17 @@ describe.concurrent("MCP trigger tools integration", () => {
     const result = await callMcpTool({
       env,
       token,
-      name: "create_scheduled_trigger",
+      name: "create_trigger",
       arguments: {
+        kind: TriggerKinds.SCHEDULE,
         name: "MCP created recurring schedule",
         enabled: true,
-        cronExpression: "15 8 * * *",
-        timezone: "UTC",
-        userMessage: "Run the scheduled maintenance check",
+        schedule: {
+          kind: ScheduleKinds.RECURRING,
+          cronExpression: "15 8 * * *",
+          timezone: "UTC",
+        },
+        inputTemplate: "Run the scheduled maintenance check",
         target: {
           sandboxProfileId: "sbp_mcp_trigger_schedule_create",
         },
@@ -266,20 +390,30 @@ describe.concurrent("MCP trigger tools integration", () => {
     });
 
     expect(result.isError).toBeUndefined();
-    const trigger = GetTriggerResponseSchema.parse(result.structuredContent);
+    const trigger = McpTriggerConfigSchema.parse(result.structuredContent);
     expect(trigger).toMatchObject({
-      kind: "schedule",
+      kind: TriggerKinds.SCHEDULE,
       name: "MCP created recurring schedule",
       enabled: true,
       target: {
         sandboxProfileId: "sbp_mcp_trigger_schedule_create",
+        sandboxProfileVersion: 1,
+        primaryRepositoryId: null,
       },
-      source: {
-        kind: "schedule",
+      schedule: {
+        kind: ScheduleKinds.RECURRING,
         cronExpression: "15 8 * * *",
         timezone: "UTC",
       },
+      inputTemplate: "Run the scheduled maintenance check",
+      conversationKeyTemplate: "{{schedule.id}}",
+      idempotencyKeyTemplate: "{{schedule.scheduledActionId}}",
     });
+    expect(trigger.target).not.toHaveProperty("id");
+    if (trigger.kind !== TriggerKinds.SCHEDULE) {
+      throw new Error("Expected scheduled trigger config.");
+    }
+    expect(trigger.schedule).not.toHaveProperty("id");
 
     const persistedScheduleTrigger = await env.controlPlaneDb.query.scheduleTriggers.findFirst({
       columns: {
@@ -316,6 +450,98 @@ describe.concurrent("MCP trigger tools integration", () => {
     expect(persistedSchedule?.nextScheduledAt).not.toBeNull();
   });
 
+  it("creates and updates one-off scheduled triggers with canonical trigger tools", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-trigger-one-off-create-update@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP one-off schedule trigger owner",
+      permissions: [OrganizationPermissions.TRIGGER_CREATE, OrganizationPermissions.TRIGGER_UPDATE],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_mcp_trigger_one_off_create_update",
+        organizationId: session.organizationId,
+        displayName: "MCP one-off schedule profile",
+        activeVersion: 1,
+        createdAt: "2026-06-03T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_mcp_trigger_one_off_create_update",
+        version: 1,
+      }),
+    );
+
+    const createResult = await callMcpTool({
+      env,
+      token,
+      name: "create_trigger",
+      arguments: {
+        kind: TriggerKinds.SCHEDULE,
+        name: "MCP created one-off schedule",
+        enabled: true,
+        schedule: {
+          kind: ScheduleKinds.ONE_OFF,
+          name: "Initial one-off launch",
+          startAt: "2099-07-01T10:00:00.000Z",
+        },
+        inputTemplate: "Run the one-off launch check",
+        target: {
+          sandboxProfileId: "sbp_mcp_trigger_one_off_create_update",
+        },
+      },
+    });
+
+    expect(createResult.isError).toBeUndefined();
+    const created = McpTriggerConfigSchema.parse(createResult.structuredContent);
+    if (created.kind !== TriggerKinds.SCHEDULE) {
+      throw new Error("Expected scheduled trigger config.");
+    }
+    expect(created.schedule).toMatchObject({
+      kind: ScheduleKinds.ONE_OFF,
+      name: "Initial one-off launch",
+      startAt: "2099-07-01T10:00:00.000Z",
+      nextScheduledAt: "2099-07-01T10:00:00.000Z",
+      cronExpression: null,
+      timezone: null,
+    });
+    expect(created.schedule).not.toHaveProperty("id");
+
+    const updateResult = await callMcpTool({
+      env,
+      token,
+      name: "update_trigger",
+      arguments: {
+        kind: TriggerKinds.SCHEDULE,
+        triggerId: created.id,
+        schedule: {
+          kind: ScheduleKinds.ONE_OFF,
+          name: "Updated one-off launch",
+          startAt: "2099-07-02T11:30:00.000Z",
+        },
+      },
+    });
+
+    expect(updateResult.isError).toBeUndefined();
+    const updated = McpTriggerConfigSchema.parse(updateResult.structuredContent);
+    if (updated.kind !== TriggerKinds.SCHEDULE) {
+      throw new Error("Expected scheduled trigger config.");
+    }
+    expect(updated.schedule).toMatchObject({
+      kind: ScheduleKinds.ONE_OFF,
+      name: "Updated one-off launch",
+      startAt: "2099-07-02T11:30:00.000Z",
+      nextScheduledAt: "2099-07-02T11:30:00.000Z",
+    });
+  });
+
   it("rejects legacy webhook create permission for scheduled trigger creation", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-mcp-trigger-schedule-create-legacy-webhook-forbidden@example.com",
@@ -330,12 +556,16 @@ describe.concurrent("MCP trigger tools integration", () => {
     const result = await callMcpTool({
       env,
       token,
-      name: "create_scheduled_trigger",
+      name: "create_trigger",
       arguments: {
+        kind: TriggerKinds.SCHEDULE,
         name: "Forbidden scheduled trigger",
-        cronExpression: "15 8 * * *",
-        timezone: "UTC",
-        userMessage: "This should not be created",
+        schedule: {
+          kind: ScheduleKinds.RECURRING,
+          cronExpression: "15 8 * * *",
+          timezone: "UTC",
+        },
+        inputTemplate: "This should not be created",
         target: {
           sandboxProfileId: "sbp_mcp_trigger_schedule_create_forbidden",
         },
@@ -369,13 +599,18 @@ describe.concurrent("MCP trigger tools integration", () => {
     const result = await callMcpTool({
       env,
       token,
-      name: "create_webhook_trigger",
+      name: "create_trigger",
       arguments: {
+        kind: TriggerKinds.WEBHOOK,
         name: "MCP created webhook trigger",
         enabled: true,
         integrationWebhookSourceId: "iws_mcp_trigger_webhook_create",
-        eventTypes: [GitHubIssueCommentCreatedEventType],
-        userMessage: "Triage {{payload.comment.body}}",
+        eventConditions: [
+          {
+            eventType: GitHubIssueCommentCreatedEventType,
+          },
+        ],
+        inputTemplate: "Triage {{payload.comment.body}}",
         instructions: "Prefer concise triage summaries.",
         conversationKeyTemplate: "{{payload.issue.node_id}}",
         idempotencyKeyTemplate: "{{payload.comment.node_id}}",
@@ -386,23 +621,25 @@ describe.concurrent("MCP trigger tools integration", () => {
     });
 
     expect(result.isError).toBeUndefined();
-    const trigger = GetTriggerResponseSchema.parse(result.structuredContent);
+    const trigger = McpTriggerConfigSchema.parse(result.structuredContent);
     expect(trigger).toMatchObject({
-      kind: "webhook",
+      kind: TriggerKinds.WEBHOOK,
       name: "MCP created webhook trigger",
       enabled: true,
+      integrationWebhookSourceId: "iws_mcp_trigger_webhook_create",
+      eventConditions: [
+        {
+          eventType: GitHubIssueCommentCreatedEventType,
+        },
+      ],
       target: {
         sandboxProfileId: "sbp_mcp_trigger_webhook_create",
-      },
-      source: {
-        kind: "webhook",
-        events: [
-          {
-            label: "Issue comment created",
-          },
-        ],
+        sandboxProfileVersion: 1,
+        primaryRepositoryId: null,
       },
     });
+    expect(trigger).not.toHaveProperty("source");
+    expect(trigger.target).not.toHaveProperty("id");
 
     const persistedWebhook = await env.controlPlaneDb.query.webhookTriggers.findFirst({
       columns: {
@@ -454,49 +691,46 @@ describe.concurrent("MCP trigger tools integration", () => {
       name: "MCP webhook before shared update",
     });
 
-    const renameResult = await callMcpTool({
+    const updateResult = await callMcpTool({
       env,
       token,
-      name: "rename_trigger",
+      name: "update_trigger",
       arguments: {
+        kind: TriggerKinds.WEBHOOK,
         triggerId: "atm_mcp_trigger_webhook_shared_update",
         name: "MCP webhook after rename",
-      },
-    });
-    const disableResult = await callMcpTool({
-      env,
-      token,
-      name: "set_trigger_enabled",
-      arguments: {
-        triggerId: "atm_mcp_trigger_webhook_shared_update",
         enabled: false,
-      },
-    });
-    const messageResult = await callMcpTool({
-      env,
-      token,
-      name: "update_trigger_user_message",
-      arguments: {
-        triggerId: "atm_mcp_trigger_webhook_shared_update",
-        userMessage: "Handle this webhook from MCP",
+        inputTemplate: "Handle this webhook from MCP",
       },
     });
 
-    expect(renameResult.isError).toBeUndefined();
-    expect(disableResult.isError).toBeUndefined();
-    expect(messageResult.isError).toBeUndefined();
-    const renamedTrigger = GetTriggerResponseSchema.parse(renameResult.structuredContent);
-    const disabledTrigger = GetTriggerResponseSchema.parse(disableResult.structuredContent);
-    expect(renamedTrigger.name).toBe("MCP webhook after rename");
-    expect(disabledTrigger.enabled).toBe(false);
+    expect(updateResult.isError).toBeUndefined();
+    const updatedTrigger = McpTriggerConfigSchema.parse(updateResult.structuredContent);
+    expect(updatedTrigger).toMatchObject({
+      kind: TriggerKinds.WEBHOOK,
+      name: "MCP webhook after rename",
+      enabled: false,
+      inputTemplate: "Handle this webhook from MCP",
+    });
 
     const persistedWebhook = await env.controlPlaneDb.query.webhookTriggers.findFirst({
       columns: {
         inputTemplate: true,
+        eventConditions: true,
       },
       where: (table, { eq }) => eq(table.triggerId, "atm_mcp_trigger_webhook_shared_update"),
     });
     expect(persistedWebhook?.inputTemplate).toBe("Handle this webhook from MCP");
+    expect(persistedWebhook?.eventConditions).toEqual([
+      {
+        eventType: GitHubIssueCommentCreatedEventType,
+        payloadFilter: {
+          op: "eq",
+          path: ["action"],
+          value: "created",
+        },
+      },
+    ]);
   });
 
   it("lists webhook trigger events available to a sandbox profile", async ({ env }) => {
@@ -552,7 +786,7 @@ describe.concurrent("MCP trigger tools integration", () => {
     );
   });
 
-  it("sets webhook trigger events by replacing event conditions", async ({ env }) => {
+  it("updates webhook trigger event conditions including payload filters", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-mcp-trigger-webhook-events-set@example.com",
     });
@@ -604,20 +838,35 @@ describe.concurrent("MCP trigger tools integration", () => {
     const result = await callMcpTool({
       env,
       token,
-      name: "set_trigger_webhook_events",
+      name: "update_trigger",
       arguments: {
+        kind: TriggerKinds.WEBHOOK,
         triggerId: "atm_mcp_trigger_webhook_events_set",
-        eventTypes: ["github.pull_request.opened"],
+        eventConditions: [
+          {
+            eventType: "github.pull_request.opened",
+            payloadFilter: {
+              op: "eq",
+              path: ["action"],
+              value: "opened",
+            },
+          },
+        ],
       },
     });
 
     expect(result.isError).toBeUndefined();
-    const trigger = GetTriggerResponseSchema.parse(result.structuredContent);
-    expect(trigger.source).toMatchObject({
-      kind: "webhook",
-      events: [
+    const trigger = McpTriggerConfigSchema.parse(result.structuredContent);
+    expect(trigger).toMatchObject({
+      kind: TriggerKinds.WEBHOOK,
+      eventConditions: [
         {
-          label: "Pull request opened",
+          eventType: "github.pull_request.opened",
+          payloadFilter: {
+            op: "eq",
+            path: ["action"],
+            value: "opened",
+          },
         },
       ],
     });
@@ -631,6 +880,11 @@ describe.concurrent("MCP trigger tools integration", () => {
     expect(persistedWebhook?.eventConditions).toEqual([
       {
         eventType: "github.pull_request.opened",
+        payloadFilter: {
+          op: "eq",
+          path: ["action"],
+          value: "opened",
+        },
       },
     ]);
   });
@@ -670,10 +924,15 @@ describe.concurrent("MCP trigger tools integration", () => {
     const result = await callMcpTool({
       env,
       token,
-      name: "set_trigger_webhook_events",
+      name: "update_trigger",
       arguments: {
+        kind: TriggerKinds.WEBHOOK,
         triggerId: "atm_mcp_trigger_webhook_events_invalid",
-        eventTypes: ["github.not_a_real_event"],
+        eventConditions: [
+          {
+            eventType: "github.not_a_real_event",
+          },
+        ],
       },
     });
 
@@ -719,41 +978,27 @@ describe.concurrent("MCP trigger tools integration", () => {
       createdAt: "2026-06-02T00:00:00.000Z",
     });
 
-    const renameResult = await callMcpTool({
+    const updateResult = await callMcpTool({
       env,
       token,
-      name: "rename_trigger",
+      name: "update_trigger",
       arguments: {
+        kind: TriggerKinds.SCHEDULE,
         triggerId: "atm_mcp_trigger_schedule_shared_update",
         name: "MCP schedule after rename",
-      },
-    });
-    const disableResult = await callMcpTool({
-      env,
-      token,
-      name: "set_trigger_enabled",
-      arguments: {
-        triggerId: "atm_mcp_trigger_schedule_shared_update",
         enabled: false,
-      },
-    });
-    const messageResult = await callMcpTool({
-      env,
-      token,
-      name: "update_trigger_user_message",
-      arguments: {
-        triggerId: "atm_mcp_trigger_schedule_shared_update",
-        userMessage: "Handle this schedule from MCP",
+        inputTemplate: "Handle this schedule from MCP",
       },
     });
 
-    expect(renameResult.isError).toBeUndefined();
-    expect(disableResult.isError).toBeUndefined();
-    expect(messageResult.isError).toBeUndefined();
-    const renamedTrigger = GetTriggerResponseSchema.parse(renameResult.structuredContent);
-    const disabledTrigger = GetTriggerResponseSchema.parse(disableResult.structuredContent);
-    expect(renamedTrigger.name).toBe("MCP schedule after rename");
-    expect(disabledTrigger.enabled).toBe(false);
+    expect(updateResult.isError).toBeUndefined();
+    const updatedTrigger = McpTriggerConfigSchema.parse(updateResult.structuredContent);
+    expect(updatedTrigger).toMatchObject({
+      kind: TriggerKinds.SCHEDULE,
+      name: "MCP schedule after rename",
+      enabled: false,
+      inputTemplate: "Handle this schedule from MCP",
+    });
 
     const persistedSchedule = await env.controlPlaneDb.query.schedules.findFirst({
       columns: {
@@ -797,18 +1042,25 @@ describe.concurrent("MCP trigger tools integration", () => {
     const result = await callMcpTool({
       env,
       token,
-      name: "set_trigger_schedule",
+      name: "update_trigger",
       arguments: {
+        kind: TriggerKinds.SCHEDULE,
         triggerId: "atm_mcp_trigger_schedule_set_timing",
-        cronExpression: "30 10 * * *",
-        timezone: "UTC",
+        schedule: {
+          kind: ScheduleKinds.RECURRING,
+          cronExpression: "30 10 * * *",
+          timezone: "UTC",
+        },
       },
     });
 
     expect(result.isError).toBeUndefined();
-    const trigger = GetTriggerResponseSchema.parse(result.structuredContent);
-    expect(trigger.source).toMatchObject({
-      kind: "schedule",
+    const trigger = McpTriggerConfigSchema.parse(result.structuredContent);
+    if (trigger.kind !== TriggerKinds.SCHEDULE) {
+      throw new Error("Expected scheduled trigger config.");
+    }
+    expect(trigger.schedule).toMatchObject({
+      kind: ScheduleKinds.RECURRING,
       cronExpression: "30 10 * * *",
       timezone: "UTC",
     });
@@ -855,11 +1107,15 @@ describe.concurrent("MCP trigger tools integration", () => {
     const result = await callMcpTool({
       env,
       token,
-      name: "set_trigger_schedule",
+      name: "update_trigger",
       arguments: {
+        kind: TriggerKinds.SCHEDULE,
         triggerId: "atm_mcp_trigger_schedule_legacy_webhook_forbidden",
-        cronExpression: "30 10 * * *",
-        timezone: "UTC",
+        schedule: {
+          kind: ScheduleKinds.RECURRING,
+          cronExpression: "30 10 * * *",
+          timezone: "UTC",
+        },
       },
     });
 
@@ -912,15 +1168,16 @@ describe.concurrent("MCP trigger tools integration", () => {
     const result = await callMcpTool({
       env,
       token,
-      name: "rename_trigger",
+      name: "update_trigger",
       arguments: {
+        kind: TriggerKinds.WEBHOOK,
         triggerId: "atm_mcp_trigger_legacy_update",
         name: "MCP legacy update after rename",
       },
     });
 
     expect(result.isError).toBeUndefined();
-    const trigger = GetTriggerResponseSchema.parse(result.structuredContent);
+    const trigger = McpTriggerConfigSchema.parse(result.structuredContent);
     expect(trigger.name).toBe("MCP legacy update after rename");
   });
 
@@ -938,8 +1195,9 @@ describe.concurrent("MCP trigger tools integration", () => {
     const result = await callMcpTool({
       env,
       token,
-      name: "rename_trigger",
+      name: "update_trigger",
       arguments: {
+        kind: TriggerKinds.WEBHOOK,
         triggerId: "atm_mcp_trigger_update_forbidden",
         name: "Forbidden rename",
       },
@@ -983,13 +1241,18 @@ describe.concurrent("MCP trigger tools integration", () => {
     const createResult = await callMcpTool({
       env,
       token: token.token,
-      name: "create_webhook_trigger",
+      name: "create_trigger",
       arguments: {
+        kind: TriggerKinds.WEBHOOK,
         name: "Designer GitHub issue triage",
         enabled: true,
         integrationWebhookSourceId: "iws_mcp_designer_trigger_mutation",
-        eventTypes: [GitHubIssueCommentCreatedEventType],
-        userMessage: "Triage {{payload.issue.title}}",
+        eventConditions: [
+          {
+            eventType: GitHubIssueCommentCreatedEventType,
+          },
+        ],
+        inputTemplate: "Triage {{payload.issue.title}}",
         instructions: "Classify issue severity and propose owner/component.",
         conversationKeyTemplate: "{{payload.issue.node_id}}",
         idempotencyKeyTemplate: "{{payload.comment.node_id}}",
@@ -999,68 +1262,24 @@ describe.concurrent("MCP trigger tools integration", () => {
       },
     });
     expect(createResult.isError).toBeUndefined();
-    const createdTrigger = GetTriggerResponseSchema.parse(createResult.structuredContent);
+    const createdTrigger = McpTriggerConfigSchema.parse(createResult.structuredContent);
 
     const updateResult = await callMcpTool({
       env,
       token: token.token,
-      name: "rename_trigger",
+      name: "update_trigger",
       arguments: {
+        kind: TriggerKinds.WEBHOOK,
         triggerId: createdTrigger.id,
         name: "Designer GitHub issue triage renamed",
       },
     });
 
     expect(updateResult.isError).toBeUndefined();
-    const updatedTrigger = GetTriggerResponseSchema.parse(updateResult.structuredContent);
+    const updatedTrigger = McpTriggerConfigSchema.parse(updateResult.structuredContent);
     expect(updatedTrigger.name).toBe("Designer GitHub issue triage renamed");
   });
 });
-
-async function callMcpTool(input: {
-  env: IntegrationTestEnvironment;
-  token: string;
-  name: string;
-  arguments: Record<string, unknown>;
-}): Promise<z.infer<typeof JsonRpcToolResponseSchema>["result"]> {
-  const response = await input.env.controlPlaneApi.http.fetch("/mcp", {
-    method: "POST",
-    headers: {
-      accept: "application/json, text/event-stream",
-      authorization: `Bearer ${input.token}`,
-      "content-type": "application/json",
-      forwarded: createForwardedHeaderForBaseUrl(input.env.controlPlaneApi.hostBaseUrl),
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: "mcp-trigger-test",
-      method: "tools/call",
-      params: {
-        name: input.name,
-        arguments: input.arguments,
-      },
-    }),
-  });
-
-  expect(response.status).toBe(200);
-  return JsonRpcToolResponseSchema.parse(parseStreamableHttpJsonRpcMessage(await response.text()))
-    .result;
-}
-
-function createForwardedHeaderForBaseUrl(baseUrl: string): string {
-  const url = new URL(baseUrl);
-  return `proto=${url.protocol.slice(0, -1)};host=${url.host}`;
-}
-
-function parseStreamableHttpJsonRpcMessage(responseBody: string): unknown {
-  const dataLine = responseBody.split("\n").find((line) => line.startsWith("data: "));
-
-  if (dataLine === undefined) {
-    throw new Error("Expected MCP streamable HTTP response to contain a data line.");
-  }
-
-  return JSON.parse(dataLine.slice("data: ".length));
-}
 
 async function seedScheduledTrigger(
   env: IntegrationTestEnvironment,

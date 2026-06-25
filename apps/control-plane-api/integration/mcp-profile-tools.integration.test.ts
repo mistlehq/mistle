@@ -107,8 +107,7 @@ describe.concurrent("MCP profile tools integration", () => {
     const tools = await listMcpTools({ env, token });
 
     expect(tools.map((tool) => tool.name).sort()).toEqual([
-      "create_scheduled_trigger",
-      "create_webhook_trigger",
+      "create_trigger",
       "get_trigger",
       "list_supported_capabilities",
       "list_trigger_webhook_events",
@@ -130,21 +129,17 @@ describe.concurrent("MCP profile tools integration", () => {
       "profile_version_integration_bindings_get",
       "profile_version_publish",
       "profile_version_publishability_get",
-      "rename_trigger",
       "sandbox_instance_get",
       "sandbox_instance_port_access_create",
       "sandbox_operation_events_list",
-      "set_trigger_enabled",
-      "set_trigger_schedule",
-      "set_trigger_webhook_events",
-      "update_trigger_user_message",
+      "update_trigger",
     ]);
-    expect(tools.find((tool) => tool.name === "create_scheduled_trigger")?.annotations).toEqual(
+    expect(tools.find((tool) => tool.name === "create_trigger")?.annotations).toEqual(
       expect.objectContaining({
         idempotentHint: false,
       }),
     );
-    expect(tools.find((tool) => tool.name === "create_webhook_trigger")?.annotations).toEqual(
+    expect(tools.find((tool) => tool.name === "update_trigger")?.annotations).toEqual(
       expect.objectContaining({
         idempotentHint: false,
       }),
