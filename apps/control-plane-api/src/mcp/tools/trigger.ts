@@ -18,26 +18,25 @@ import {
 } from "../../auth/services/organization-policy.js";
 import { resolveTargetMetadataFromPersistedTarget } from "../../integration-targets/services/resolve-target-metadata.js";
 import { createTriggerSchedule } from "../../trigger-schedules/services/create-trigger-schedule.js";
+import { loadScheduleTriggerAggregateOrThrow } from "../../trigger-schedules/services/load-schedule-trigger-aggregate-or-throw.js";
+import type { TriggerScheduleAggregate } from "../../trigger-schedules/services/load-schedule-trigger-aggregate-or-throw.js";
 import { updateTriggerSchedule } from "../../trigger-schedules/services/update-trigger-schedule.js";
 import { createTriggerWebhook } from "../../trigger-webhooks/services/create-trigger-webhook.js";
+import { loadWebhookTriggerAggregateOrThrow } from "../../trigger-webhooks/services/load-webhook-trigger-aggregate-or-throw.js";
+import type { TriggerWebhookAggregate } from "../../trigger-webhooks/services/load-webhook-trigger-aggregate-or-throw.js";
 import { updateTriggerWebhook } from "../../trigger-webhooks/services/update-trigger-webhook.js";
 import {
-  getTrigger,
   listTriggers,
   ListTriggersQuerySchema,
 } from "../../triggers/services/trigger-summaries.js";
 import type { MistleMcpServerContext } from "../server.js";
 import {
-  mcpCreateScheduledTriggerInputSchema,
-  mcpCreateWebhookTriggerInputSchema,
+  mcpCreateTriggerInputSchema,
   mcpListTriggerWebhookEventsInputSchema,
   mcpListTriggersInputSchema,
-  mcpRenameTriggerInputSchema,
-  mcpSetTriggerEnabledInputSchema,
-  mcpSetTriggerScheduleInputSchema,
-  mcpSetTriggerWebhookEventsInputSchema,
   mcpTriggerIdParamsSchema,
-  mcpUpdateTriggerUserMessageInputSchema,
+  mcpUpdateTriggerInputSchema,
+  type McpUpdateTriggerInput,
 } from "../tool-schemas.js";
 import { requireMcpToolPermission, structuredResult } from "./shared.js";
 
@@ -114,7 +113,7 @@ export function registerTriggerTools(server: McpServer, context: MistleMcpServer
     {
       title: "Get a trigger",
       description:
-        "Get one Mistle trigger by ID, including whether it is webhook-based or schedule-based, the target sandbox profile, enabled state, and the user message sent to the agent when it runs.",
+        "Get one Mistle trigger by ID as full trigger configuration. The response is kind-discriminated and includes the durable behavior fields needed for read-modify-write updates.",
       inputSchema: mcpTriggerIdParamsSchema,
       annotations: {
         ...ReadOnlyToolAnnotations,
@@ -123,46 +122,51 @@ export function registerTriggerTools(server: McpServer, context: MistleMcpServer
     },
     async ({ triggerId }) => {
       requireMcpTriggerReadPermission(context);
-
-      const trigger = await getTrigger(
-        {
-          db: context.db,
-        },
-        {
-          organizationId: context.organizationActor.organizationId,
-          triggerId,
-        },
-      );
-
-      return structuredResult(trigger);
+      return structuredResult(await getMcpTriggerConfiguration(context, triggerId));
     },
   );
 
   server.registerTool(
-    "create_scheduled_trigger",
+    "create_trigger",
     {
-      title: "Create scheduled trigger",
+      title: "Create trigger",
       description:
-        "Create a recurring schedule-based Mistle trigger that automatically starts sandbox sessions for a sandbox profile. Provide a cron expression, timezone, target sandbox profile, and user message for the agent to receive each time the trigger runs.",
-      inputSchema: mcpCreateScheduledTriggerInputSchema,
+        "Create a Mistle trigger from full trigger configuration. Use kind='webhook' for webhook triggers and kind='schedule' for recurring or one-off scheduled triggers.",
+      inputSchema: mcpCreateTriggerInputSchema,
       annotations: {
         ...MutatingToolAnnotations,
         idempotentHint: false,
-        title: "Create scheduled trigger",
+        title: "Create trigger",
       },
     },
-    async ({
-      conversationKeyTemplate,
-      cronExpression,
-      enabled,
-      idempotencyKeyTemplate,
-      name,
-      target,
-      timezone,
-      userMessage,
-    }) => {
-      requireMcpToolPermission(context.organizationActor, OrganizationPermissions.TRIGGER_CREATE);
+    async (input) => {
+      if (input.kind === TriggerKinds.WEBHOOK) {
+        requireMcpTriggerCreatePermission(context);
+        const created = await createTriggerWebhook(
+          {
+            db: context.db,
+            integrationRegistry: context.integrationRegistry,
+          },
+          {
+            organizationId: context.organizationActor.organizationId,
+            name: input.name,
+            ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+            integrationWebhookSourceId: input.integrationWebhookSourceId,
+            eventConditions: input.eventConditions,
+            inputTemplate: input.inputTemplate,
+            ...(input.instructions === undefined ? {} : { instructions: input.instructions }),
+            conversationKeyTemplate: input.conversationKeyTemplate,
+            ...(input.idempotencyKeyTemplate === undefined
+              ? {}
+              : { idempotencyKeyTemplate: input.idempotencyKeyTemplate }),
+            target: input.target,
+          },
+        );
 
+        return structuredResult(toMcpWebhookTriggerConfiguration(created));
+      }
+
+      requireMcpToolPermission(context.organizationActor, OrganizationPermissions.TRIGGER_CREATE);
       const created = await createTriggerSchedule(
         {
           db: context.db,
@@ -170,282 +174,99 @@ export function registerTriggerTools(server: McpServer, context: MistleMcpServer
         },
         {
           organizationId: context.organizationActor.organizationId,
-          name,
-          ...(enabled === undefined ? {} : { enabled }),
-          schedule: {
-            kind: "recurring",
-            cronExpression,
-            timezone,
-          },
-          inputTemplate: userMessage,
-          ...(conversationKeyTemplate === undefined ? {} : { conversationKeyTemplate }),
-          ...(idempotencyKeyTemplate === undefined ? {} : { idempotencyKeyTemplate }),
-          target,
+          name: input.name,
+          ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+          schedule: input.schedule,
+          inputTemplate: input.inputTemplate,
+          ...(input.conversationKeyTemplate === undefined
+            ? {}
+            : { conversationKeyTemplate: input.conversationKeyTemplate }),
+          ...(input.idempotencyKeyTemplate === undefined
+            ? {}
+            : { idempotencyKeyTemplate: input.idempotencyKeyTemplate }),
+          target: input.target,
           now: context.clock.nowDate(),
         },
       );
 
-      return structuredResult(
-        await getTrigger(
-          {
-            db: context.db,
-          },
-          {
-            organizationId: context.organizationActor.organizationId,
-            triggerId: created.id,
-          },
-        ),
-      );
+      return structuredResult(toMcpScheduleTriggerConfiguration(created));
     },
   );
 
   server.registerTool(
-    "create_webhook_trigger",
+    "update_trigger",
     {
-      title: "Create webhook trigger",
+      title: "Update trigger",
       description:
-        "Create a webhook-based Mistle trigger that automatically starts sandbox sessions for a sandbox profile when selected webhook events arrive. Use list_trigger_webhook_events first to discover valid eventTypes for the target sandbox profile and integration webhook source.",
-      inputSchema: mcpCreateWebhookTriggerInputSchema,
+        "Partially update one Mistle trigger using full trigger configuration fields. Omitted fields are preserved; explicit null clears nullable fields.",
+      inputSchema: mcpUpdateTriggerInputSchema,
       annotations: {
         ...MutatingToolAnnotations,
         idempotentHint: false,
-        title: "Create webhook trigger",
+        title: "Update trigger",
       },
     },
-    async ({
-      conversationKeyTemplate,
-      enabled,
-      eventTypes,
-      idempotencyKeyTemplate,
-      instructions,
-      integrationWebhookSourceId,
-      name,
-      target,
-      userMessage,
-    }) => {
-      requireMcpTriggerCreatePermission(context);
-
-      const created = await createTriggerWebhook(
-        {
-          db: context.db,
-          integrationRegistry: context.integrationRegistry,
-        },
-        {
-          organizationId: context.organizationActor.organizationId,
-          name,
-          ...(enabled === undefined ? {} : { enabled }),
-          integrationWebhookSourceId,
-          eventConditions: eventTypes.map((eventType) => ({ eventType })),
-          inputTemplate: userMessage,
-          ...(instructions === undefined ? {} : { instructions }),
-          conversationKeyTemplate,
-          ...(idempotencyKeyTemplate === undefined ? {} : { idempotencyKeyTemplate }),
-          target,
-        },
-      );
-
-      return structuredResult(
-        await getTrigger(
+    async (input) => {
+      if (input.kind === TriggerKinds.WEBHOOK) {
+        requireMcpTriggerUpdatePermission(context);
+        assertHasTriggerUpdateField(input);
+        const updated = await updateTriggerWebhook(
           {
             db: context.db,
+            integrationRegistry: context.integrationRegistry,
           },
           {
             organizationId: context.organizationActor.organizationId,
-            triggerId: created.id,
+            triggerId: input.triggerId,
+            ...(input.name === undefined ? {} : { name: input.name }),
+            ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+            ...(input.integrationWebhookSourceId === undefined
+              ? {}
+              : { integrationWebhookSourceId: input.integrationWebhookSourceId }),
+            ...(input.eventConditions === undefined
+              ? {}
+              : { eventConditions: input.eventConditions }),
+            ...(input.inputTemplate === undefined ? {} : { inputTemplate: input.inputTemplate }),
+            ...(input.instructions === undefined ? {} : { instructions: input.instructions }),
+            ...(input.conversationKeyTemplate === undefined
+              ? {}
+              : { conversationKeyTemplate: input.conversationKeyTemplate }),
+            ...(input.idempotencyKeyTemplate === undefined
+              ? {}
+              : { idempotencyKeyTemplate: input.idempotencyKeyTemplate }),
+            ...(input.target === undefined ? {} : { target: input.target }),
           },
-        ),
-      );
-    },
-  );
-
-  server.registerTool(
-    "set_trigger_schedule",
-    {
-      title: "Set trigger schedule",
-      description:
-        "Replace the cron expression and timezone for a recurring scheduled Mistle trigger. Use this only for schedule-based triggers that run repeatedly; it recalculates the next scheduled run time from the current server time.",
-      inputSchema: mcpSetTriggerScheduleInputSchema,
-      annotations: {
-        ...MutatingToolAnnotations,
-        title: "Set trigger schedule",
-      },
-    },
-    async ({ cronExpression, timezone, triggerId }) => {
-      requireMcpToolPermission(context.organizationActor, OrganizationPermissions.TRIGGER_UPDATE);
-      const trigger = await getTrigger(
-        {
-          db: context.db,
-        },
-        {
-          organizationId: context.organizationActor.organizationId,
-          triggerId,
-        },
-      );
-
-      if (trigger.kind !== TriggerKinds.SCHEDULE) {
-        throw new BadRequestError(
-          "INVALID_TRIGGER_KIND",
-          "set_trigger_schedule can only update schedule-based triggers.",
         );
+
+        return structuredResult(toMcpWebhookTriggerConfiguration(updated));
       }
 
-      await updateTriggerSchedule(
+      requireMcpToolPermission(context.organizationActor, OrganizationPermissions.TRIGGER_UPDATE);
+      assertHasTriggerUpdateField(input);
+      const updated = await updateTriggerSchedule(
         {
           db: context.db,
           openWorkflow: context.openWorkflow,
         },
         {
           organizationId: context.organizationActor.organizationId,
-          triggerId,
+          triggerId: input.triggerId,
           now: context.clock.nowDate(),
-          schedule: {
-            kind: "recurring",
-            cronExpression,
-            timezone,
-          },
+          ...(input.name === undefined ? {} : { name: input.name }),
+          ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+          ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+          ...(input.inputTemplate === undefined ? {} : { inputTemplate: input.inputTemplate }),
+          ...(input.conversationKeyTemplate === undefined
+            ? {}
+            : { conversationKeyTemplate: input.conversationKeyTemplate }),
+          ...(input.idempotencyKeyTemplate === undefined
+            ? {}
+            : { idempotencyKeyTemplate: input.idempotencyKeyTemplate }),
+          ...(input.target === undefined ? {} : { target: input.target }),
         },
       );
 
-      return structuredResult(
-        await getTrigger(
-          {
-            db: context.db,
-          },
-          {
-            organizationId: context.organizationActor.organizationId,
-            triggerId,
-          },
-        ),
-      );
-    },
-  );
-
-  server.registerTool(
-    "set_trigger_webhook_events",
-    {
-      title: "Set trigger webhook events",
-      description:
-        "Replace the selected event types for an existing webhook-based Mistle trigger using its current webhook source. Use list_trigger_webhook_events first to discover valid event types for the trigger's sandbox profile. This clears existing webhook payload filters because event-scoped filters may no longer match the new event set.",
-      inputSchema: mcpSetTriggerWebhookEventsInputSchema,
-      annotations: {
-        ...MutatingToolAnnotations,
-        title: "Set trigger webhook events",
-      },
-    },
-    async ({ eventTypes, triggerId }) => {
-      requireMcpTriggerUpdatePermission(context);
-      const trigger = await getTrigger(
-        {
-          db: context.db,
-        },
-        {
-          organizationId: context.organizationActor.organizationId,
-          triggerId,
-        },
-      );
-
-      if (trigger.kind !== TriggerKinds.WEBHOOK) {
-        throw new BadRequestError(
-          "INVALID_TRIGGER_KIND",
-          "set_trigger_webhook_events can only update webhook-based triggers.",
-        );
-      }
-
-      await updateTriggerWebhook(
-        {
-          db: context.db,
-          integrationRegistry: context.integrationRegistry,
-        },
-        {
-          organizationId: context.organizationActor.organizationId,
-          triggerId,
-          eventConditions: eventTypes.map((eventType) => ({ eventType })),
-        },
-      );
-
-      return structuredResult(
-        await getTrigger(
-          {
-            db: context.db,
-          },
-          {
-            organizationId: context.organizationActor.organizationId,
-            triggerId,
-          },
-        ),
-      );
-    },
-  );
-
-  server.registerTool(
-    "set_trigger_enabled",
-    {
-      title: "Set trigger enabled",
-      description:
-        "Enable or disable a Mistle trigger. Enabled triggers can automatically start sandbox sessions when their webhook event or schedule occurs; disabled triggers remain configured but do not run.",
-      inputSchema: mcpSetTriggerEnabledInputSchema,
-      annotations: {
-        ...MutatingToolAnnotations,
-        title: "Set trigger enabled",
-      },
-    },
-    async ({ enabled, triggerId }) => {
-      requireMcpTriggerUpdatePermission(context);
-
-      return structuredResult(
-        await updateTriggerByKind(context, {
-          triggerId,
-          enabled,
-        }),
-      );
-    },
-  );
-
-  server.registerTool(
-    "rename_trigger",
-    {
-      title: "Rename trigger",
-      description:
-        "Rename a Mistle trigger. Use this to change the human-readable label without changing when it runs or which sandbox profile it targets.",
-      inputSchema: mcpRenameTriggerInputSchema,
-      annotations: {
-        ...MutatingToolAnnotations,
-        title: "Rename trigger",
-      },
-    },
-    async ({ name, triggerId }) => {
-      requireMcpTriggerUpdatePermission(context);
-
-      return structuredResult(
-        await updateTriggerByKind(context, {
-          triggerId,
-          name,
-        }),
-      );
-    },
-  );
-
-  server.registerTool(
-    "update_trigger_user_message",
-    {
-      title: "Update trigger user message",
-      description:
-        "Update the user message template sent to the agent each time a trigger starts a sandbox session. Use this to change the task or instructions the agent receives when the trigger fires.",
-      inputSchema: mcpUpdateTriggerUserMessageInputSchema,
-      annotations: {
-        ...MutatingToolAnnotations,
-        title: "Update trigger user message",
-      },
-    },
-    async ({ triggerId, userMessage }) => {
-      requireMcpTriggerUpdatePermission(context);
-
-      return structuredResult(
-        await updateTriggerByKind(context, {
-          triggerId,
-          inputTemplate: userMessage,
-        }),
-      );
+      return structuredResult(toMcpScheduleTriggerConfiguration(updated));
     },
   );
 }
@@ -472,67 +293,6 @@ function requireMcpTriggerUpdatePermission(context: MistleMcpServerContext): voi
   }
 
   throw new ForbiddenError("FORBIDDEN", "Missing required MCP permission: trigger:update.");
-}
-
-async function updateTriggerByKind(
-  context: MistleMcpServerContext,
-  input: {
-    triggerId: string;
-    name?: string;
-    enabled?: boolean;
-    inputTemplate?: string;
-  },
-) {
-  const trigger = await getTrigger(
-    {
-      db: context.db,
-    },
-    {
-      organizationId: context.organizationActor.organizationId,
-      triggerId: input.triggerId,
-    },
-  );
-
-  if (trigger.kind === TriggerKinds.WEBHOOK) {
-    await updateTriggerWebhook(
-      {
-        db: context.db,
-        integrationRegistry: context.integrationRegistry,
-      },
-      {
-        organizationId: context.organizationActor.organizationId,
-        triggerId: input.triggerId,
-        ...(input.name === undefined ? {} : { name: input.name }),
-        ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
-        ...(input.inputTemplate === undefined ? {} : { inputTemplate: input.inputTemplate }),
-      },
-    );
-  } else {
-    await updateTriggerSchedule(
-      {
-        db: context.db,
-        openWorkflow: context.openWorkflow,
-      },
-      {
-        organizationId: context.organizationActor.organizationId,
-        triggerId: input.triggerId,
-        now: context.clock.nowDate(),
-        ...(input.name === undefined ? {} : { name: input.name }),
-        ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
-        ...(input.inputTemplate === undefined ? {} : { inputTemplate: input.inputTemplate }),
-      },
-    );
-  }
-
-  return getTrigger(
-    {
-      db: context.db,
-    },
-    {
-      organizationId: context.organizationActor.organizationId,
-      triggerId: input.triggerId,
-    },
-  );
 }
 
 async function listTriggerWebhookEventsForProfile(
@@ -686,4 +446,151 @@ async function listTriggerWebhookEventsForProfile(
       return left.displayName.localeCompare(right.displayName);
     }),
   };
+}
+
+async function getMcpTriggerConfiguration(context: MistleMcpServerContext, triggerId: string) {
+  const trigger = await context.db.query.triggers.findFirst({
+    columns: {
+      kind: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.id, triggerId),
+        eq(table.organizationId, context.organizationActor.organizationId),
+      ),
+  });
+
+  if (trigger === undefined) {
+    throw new NotFoundError("NOT_FOUND", "Trigger was not found.");
+  }
+
+  if (trigger.kind === TriggerKinds.WEBHOOK) {
+    const aggregate = await loadWebhookTriggerAggregateOrThrow(
+      { db: context.db },
+      {
+        organizationId: context.organizationActor.organizationId,
+        triggerId,
+      },
+    );
+    return toMcpWebhookTriggerConfiguration(aggregate);
+  }
+
+  const aggregate = await loadScheduleTriggerAggregateOrThrow(
+    { db: context.db },
+    {
+      organizationId: context.organizationActor.organizationId,
+      triggerId,
+    },
+  );
+  return toMcpScheduleTriggerConfiguration(aggregate);
+}
+
+function toMcpWebhookTriggerConfiguration(aggregate: TriggerWebhookAggregate) {
+  return {
+    id: aggregate.id,
+    kind: TriggerKinds.WEBHOOK,
+    name: aggregate.name,
+    enabled: aggregate.enabled,
+    integrationWebhookSourceId: aggregate.integrationWebhookSourceId,
+    eventConditions: aggregate.eventConditions,
+    inputTemplate: aggregate.inputTemplate,
+    instructions: aggregate.instructions,
+    conversationKeyTemplate: aggregate.conversationKeyTemplate,
+    idempotencyKeyTemplate: aggregate.idempotencyKeyTemplate,
+    target: {
+      sandboxProfileId: aggregate.target.sandboxProfileId,
+      sandboxProfileVersion: aggregate.target.sandboxProfileVersion,
+      primaryRepositoryId: aggregate.target.primaryRepositoryId,
+    },
+    createdAt: aggregate.createdAt,
+    updatedAt: aggregate.updatedAt,
+  };
+}
+
+function toMcpScheduleTriggerConfiguration(aggregate: TriggerScheduleAggregate) {
+  return {
+    id: aggregate.id,
+    kind: TriggerKinds.SCHEDULE,
+    name: aggregate.name,
+    enabled: aggregate.enabled,
+    schedule: {
+      kind: aggregate.schedule.kind,
+      name: aggregate.schedule.name,
+      cronExpression: aggregate.schedule.cronExpression,
+      timezone: aggregate.schedule.timezone,
+      enabled: aggregate.schedule.enabled,
+      nextScheduledAt: normalizeTimestamp(aggregate.schedule.nextScheduledAt),
+      lastScheduledAt: normalizeTimestamp(aggregate.schedule.lastScheduledAt),
+      startAt: normalizeTimestamp(aggregate.schedule.startAt),
+    },
+    inputTemplate: aggregate.inputTemplate,
+    conversationKeyTemplate: aggregate.conversationKeyTemplate,
+    idempotencyKeyTemplate: aggregate.idempotencyKeyTemplate,
+    target: {
+      sandboxProfileId: aggregate.target.sandboxProfileId,
+      sandboxProfileVersion: aggregate.target.sandboxProfileVersion,
+      primaryRepositoryId: aggregate.target.primaryRepositoryId,
+    },
+    createdAt: aggregate.createdAt,
+    updatedAt: aggregate.updatedAt,
+  };
+}
+
+function normalizeTimestamp(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) {
+    throw new Error(`Invalid persisted schedule timestamp '${value}'.`);
+  }
+
+  return timestamp.toISOString();
+}
+
+function assertHasTriggerUpdateField(input: McpUpdateTriggerInput): void {
+  const hasScheduleField =
+    input.kind === TriggerKinds.SCHEDULE &&
+    input.schedule !== undefined &&
+    hasScheduleUpdateField(input.schedule);
+  const hasTargetField =
+    input.target !== undefined &&
+    (input.target.sandboxProfileId !== undefined ||
+      input.target.sandboxProfileVersion !== undefined ||
+      input.target.primaryRepositoryId !== undefined);
+
+  if (
+    input.name !== undefined ||
+    input.enabled !== undefined ||
+    (input.kind === TriggerKinds.WEBHOOK && input.integrationWebhookSourceId !== undefined) ||
+    (input.kind === TriggerKinds.WEBHOOK && input.eventConditions !== undefined) ||
+    hasScheduleField ||
+    input.inputTemplate !== undefined ||
+    (input.kind === TriggerKinds.WEBHOOK && input.instructions !== undefined) ||
+    input.conversationKeyTemplate !== undefined ||
+    input.idempotencyKeyTemplate !== undefined ||
+    hasTargetField
+  ) {
+    return;
+  }
+
+  throw new BadRequestError(
+    "INVALID_TRIGGER_UPDATE",
+    "update_trigger requires at least one field to update.",
+  );
+}
+
+function hasScheduleUpdateField(
+  schedule: NonNullable<Extract<McpUpdateTriggerInput, { kind: "schedule" }>["schedule"]>,
+): boolean {
+  if (schedule.name !== undefined) {
+    return true;
+  }
+
+  if (schedule.kind === "recurring") {
+    return schedule.cronExpression !== undefined || schedule.timezone !== undefined;
+  }
+
+  return schedule.startAt !== undefined;
 }

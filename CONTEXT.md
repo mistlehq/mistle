@@ -227,6 +227,10 @@ _Avoid_: Composer readiness, runtime-specific loading state
 A configured event or schedule that starts an agent response.
 _Avoid_: Automation
 
+**Trigger configuration**:
+The durable behavior-defining fields of a **Trigger**.
+_Avoid_: Trigger summary when the surface must preserve all behavior-affecting fields
+
 **Duplicated trigger**:
 A disabled **Trigger** created as a configuration copy for a **Sandbox profile duplicate**.
 _Avoid_: Cloned automation, enabled copy

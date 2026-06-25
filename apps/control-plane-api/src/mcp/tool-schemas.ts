@@ -232,7 +232,7 @@ export const mcpListTriggersInputSchema = z
   })
   .strict();
 
-const mcpCreateTriggerTargetInputSchema = z
+const mcpTriggerTargetCreateInputSchema = z
   .object({
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1).optional(),
@@ -240,57 +240,132 @@ const mcpCreateTriggerTargetInputSchema = z
   })
   .strict();
 
-export const mcpCreateScheduledTriggerInputSchema = z
+const mcpTriggerTargetUpdateInputSchema = z
   .object({
-    name: z.string().min(1),
-    enabled: z.boolean().optional(),
-    cronExpression: z.string().min(1),
-    timezone: z.string().min(1),
-    userMessage: z.string().min(1),
-    conversationKeyTemplate: z.string().min(1).optional(),
-    idempotencyKeyTemplate: z.string().min(1).nullable().optional(),
-    target: mcpCreateTriggerTargetInputSchema,
+    sandboxProfileId: z.string().min(1).optional(),
+    sandboxProfileVersion: z.number().int().min(1).optional(),
+    primaryRepositoryId: z.string().min(1).nullable().optional(),
   })
   .strict();
 
-export const mcpCreateWebhookTriggerInputSchema = z
+const mcpTriggerEventConditionInputSchema = z
   .object({
+    eventType: z.string().min(1),
+    payloadFilter: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .strict();
+
+const mcpRecurringScheduleCreateInputSchema = z
+  .object({
+    kind: z.literal("recurring"),
+    name: z.string().min(1).optional(),
+    cronExpression: z.string().min(1),
+    timezone: z.string().min(1),
+  })
+  .strict();
+
+const mcpOneOffScheduleCreateInputSchema = z
+  .object({
+    kind: z.literal("one_off"),
+    name: z.string().min(1).optional(),
+    startAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+
+const mcpRecurringScheduleUpdateInputSchema = z
+  .object({
+    kind: z.literal("recurring"),
+    name: z.string().min(1).optional(),
+    cronExpression: z.string().min(1).optional(),
+    timezone: z.string().min(1).optional(),
+  })
+  .strict();
+
+const mcpOneOffScheduleUpdateInputSchema = z
+  .object({
+    kind: z.literal("one_off"),
+    name: z.string().min(1).optional(),
+    startAt: z.iso.datetime({ offset: true }).optional(),
+  })
+  .strict();
+
+const mcpCreateWebhookTriggerConfigInputSchema = z
+  .object({
+    kind: z.literal(TriggerKinds.WEBHOOK),
     name: z.string().min(1),
     enabled: z.boolean().optional(),
     integrationWebhookSourceId: z.string().min(1),
-    eventTypes: z.array(z.string().min(1)).min(1),
-    userMessage: z.string().min(1),
+    eventConditions: z.array(mcpTriggerEventConditionInputSchema).min(1),
+    inputTemplate: z.string().min(1),
     instructions: z.string().min(1).nullable().optional(),
     conversationKeyTemplate: z.string().min(1),
     idempotencyKeyTemplate: z.string().min(1).nullable().optional(),
-    target: mcpCreateTriggerTargetInputSchema,
+    target: mcpTriggerTargetCreateInputSchema,
   })
   .strict();
 
-export const mcpSetTriggerEnabledInputSchema = mcpTriggerIdParamsSchema
-  .extend({
-    enabled: z.boolean(),
-  })
-  .strict();
-
-export const mcpRenameTriggerInputSchema = mcpTriggerIdParamsSchema
-  .extend({
+const mcpCreateScheduledTriggerConfigInputSchema = z
+  .object({
+    kind: z.literal(TriggerKinds.SCHEDULE),
     name: z.string().min(1),
+    enabled: z.boolean().optional(),
+    schedule: z.discriminatedUnion("kind", [
+      mcpRecurringScheduleCreateInputSchema,
+      mcpOneOffScheduleCreateInputSchema,
+    ]),
+    inputTemplate: z.string().min(1),
+    conversationKeyTemplate: z.string().min(1).optional(),
+    idempotencyKeyTemplate: z.string().min(1).nullable().optional(),
+    target: mcpTriggerTargetCreateInputSchema,
   })
   .strict();
 
-export const mcpUpdateTriggerUserMessageInputSchema = mcpTriggerIdParamsSchema
-  .extend({
-    userMessage: z.string().min(1),
+export const mcpCreateTriggerInputSchema = z.discriminatedUnion("kind", [
+  mcpCreateWebhookTriggerConfigInputSchema,
+  mcpCreateScheduledTriggerConfigInputSchema,
+]);
+
+const mcpUpdateWebhookTriggerConfigInputSchema = z
+  .object({
+    ...mcpTriggerIdParamsSchema.shape,
+    kind: z.literal(TriggerKinds.WEBHOOK),
+    name: z.string().min(1).optional(),
+    enabled: z.boolean().optional(),
+    integrationWebhookSourceId: z.string().min(1).optional(),
+    eventConditions: z.array(mcpTriggerEventConditionInputSchema).min(1).optional(),
+    inputTemplate: z.string().min(1).optional(),
+    instructions: z.string().min(1).nullable().optional(),
+    conversationKeyTemplate: z.string().min(1).optional(),
+    idempotencyKeyTemplate: z.string().min(1).nullable().optional(),
+    target: mcpTriggerTargetUpdateInputSchema.optional(),
   })
   .strict();
 
-export const mcpSetTriggerScheduleInputSchema = mcpTriggerIdParamsSchema
-  .extend({
-    cronExpression: z.string().min(1),
-    timezone: z.string().min(1),
+const mcpUpdateScheduledTriggerConfigInputSchema = z
+  .object({
+    ...mcpTriggerIdParamsSchema.shape,
+    kind: z.literal(TriggerKinds.SCHEDULE),
+    name: z.string().min(1).optional(),
+    enabled: z.boolean().optional(),
+    schedule: z
+      .discriminatedUnion("kind", [
+        mcpRecurringScheduleUpdateInputSchema,
+        mcpOneOffScheduleUpdateInputSchema,
+      ])
+      .optional(),
+    inputTemplate: z.string().min(1).optional(),
+    conversationKeyTemplate: z.string().min(1).optional(),
+    idempotencyKeyTemplate: z.string().min(1).nullable().optional(),
+    target: mcpTriggerTargetUpdateInputSchema.optional(),
   })
   .strict();
+
+export const mcpUpdateTriggerInputSchema = z.discriminatedUnion("kind", [
+  mcpUpdateWebhookTriggerConfigInputSchema,
+  mcpUpdateScheduledTriggerConfigInputSchema,
+]);
+
+export type McpUpdateTriggerInput = z.infer<typeof mcpUpdateTriggerInputSchema>;
 
 export const mcpListTriggerWebhookEventsInputSchema = z
   .object({
@@ -300,11 +375,5 @@ export const mcpListTriggerWebhookEventsInputSchema = z
       .regex(/^sbp_[a-zA-Z0-9_-]+$/, {
         message: "`sandboxProfileId` must be a sandbox profile id.",
       }),
-  })
-  .strict();
-
-export const mcpSetTriggerWebhookEventsInputSchema = mcpTriggerIdParamsSchema
-  .extend({
-    eventTypes: z.array(z.string().min(1)).min(1),
   })
   .strict();
