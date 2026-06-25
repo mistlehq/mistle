@@ -1,4 +1,11 @@
-import { routesOverlap, type EgressCredentialRoute } from "@mistle/integrations-core";
+import {
+  routesOverlap,
+  type EgressCredentialRoute,
+  type RuntimeArtifactGitHubReleaseInstallHelperInput,
+  type RuntimeArtifactInstallStep,
+  type RuntimeArtifactSpec,
+  type RuntimeExecCommand,
+} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { GoogleWorkspaceCredentialSlotKeys } from "./auth.js";
@@ -15,6 +22,63 @@ const SandboxPaths = {
 
 function artifactBinPath(name: string): string {
   return `/usr/local/bin/${name}`;
+}
+
+function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
+  install: ReadonlyArray<RuntimeArtifactInstallStep>;
+} {
+  const install =
+    typeof artifact.lifecycle.install === "function"
+      ? artifact.lifecycle.install({
+          refs: {
+            command: {
+              exec(input: RuntimeExecCommand): RuntimeArtifactInstallStep {
+                return {
+                  op: "exec",
+                  command: input,
+                };
+              },
+            },
+            sandboxPaths: SandboxPaths,
+            artifactBinPath,
+            mise: {
+              install(input: {
+                tools: ReadonlyArray<string>;
+                force?: boolean;
+                timeoutMs?: number;
+              }): RuntimeArtifactInstallStep {
+                return {
+                  op: "mise_install",
+                  tools: input.tools,
+                  ...(input.force === undefined ? {} : { force: input.force }),
+                  ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+                };
+              },
+            },
+            githubReleases: {
+              install(
+                input: RuntimeArtifactGitHubReleaseInstallHelperInput,
+              ): RuntimeArtifactInstallStep {
+                return {
+                  op: "github_release_install",
+                  ...input,
+                };
+              },
+            },
+            compileContext: {
+              organizationId: "org_123",
+              sandboxProfileId: "sbp_123",
+              version: 1,
+              targetKey: "google-workspace-mcp",
+              bindingId: "ibd_123",
+            },
+          },
+        })
+      : artifact.lifecycle.install;
+
+  return {
+    install,
+  };
 }
 
 function createCompileInput(input: {
@@ -85,11 +149,135 @@ describe("compileGoogleWorkspaceBinding", () => {
     ]);
   });
 
-  it("builds the expected Google Workspace MCP routes", () => {
+  it("installs gws and starts a filtered local MCP server for Drive, Sheets, Docs, and Slides", () => {
     const compiled = compileGoogleWorkspaceBinding(
       createCompileInput({
         mcpServers: [
           GoogleWorkspaceMcpServerIds.DRIVE,
+          GoogleWorkspaceMcpServerIds.SHEETS,
+          GoogleWorkspaceMcpServerIds.DOCS,
+          GoogleWorkspaceMcpServerIds.SLIDES,
+        ],
+      }),
+    );
+
+    expect(compiled.egressRoutes.map((route) => route.upstream.baseUrl)).toEqual([
+      "https://www.googleapis.com/drive/v3",
+      "https://sheets.googleapis.com/v4",
+      "https://docs.googleapis.com/v1",
+      "https://slides.googleapis.com/v1",
+    ]);
+    expect(compiled.egressRoutes.map((route) => route.match)).toEqual([
+      {
+        hosts: ["www.googleapis.com"],
+      },
+      {
+        hosts: ["sheets.googleapis.com"],
+      },
+      {
+        hosts: ["docs.googleapis.com"],
+      },
+      {
+        hosts: ["slides.googleapis.com"],
+      },
+    ]);
+    expect(compiled.artifacts).toHaveLength(1);
+    const artifact = compiled.artifacts[0];
+    expect(artifact?.artifactKey).toBe("google-workspace-cli");
+    expect(artifact?.name).toBe("Google Workspace CLI");
+    expect(artifact?.env).toEqual({
+      GWS_DOCS_BASE_URL: "https://docs.googleapis.com/v1",
+      GWS_DRIVE_BASE_URL: "https://www.googleapis.com/drive/v3",
+      GWS_SHEETS_BASE_URL: "https://sheets.googleapis.com/v4",
+      GWS_SLIDES_BASE_URL: "https://slides.googleapis.com/v1",
+    });
+    if (artifact === undefined) {
+      throw new Error("Expected compiled Google Workspace CLI artifact.");
+    }
+    expect(resolveArtifactLifecycleCommands(artifact)).toEqual({
+      install: [
+        {
+          op: "github_release_install",
+          repository: "mistlehq/tools",
+          release: {
+            kind: "tag",
+            match: "exact",
+            tag: "gws/v0.1.0",
+          },
+          asset: {
+            kind: "exact",
+            fileName: "gws-linux-amd64",
+            format: "binary",
+            sha256: "43e7fe1759966e3910a74cfbf69d90fa6b12fa1e44ffb29c69e95191152d13f4",
+          },
+          installPath: "/usr/local/bin/gws",
+          timeoutMs: 120_000,
+        },
+      ],
+    });
+    expect(compiled.runtimeClients).toEqual([
+      {
+        clientId: "google-workspace-gws-mcp",
+        setup: {
+          env: {},
+          files: [],
+        },
+        processes: [
+          {
+            processKey: "google-workspace-gws-mcp-server",
+            command: {
+              args: [
+                "/usr/local/bin/gws",
+                "mcp",
+                "serve",
+                "--addr",
+                "127.0.0.1:7353",
+                "--endpoint",
+                "/mcp",
+                "--tools",
+                "drive,sheets,docs,slides",
+              ],
+            },
+            readiness: {
+              type: "tcp",
+              host: "127.0.0.1",
+              port: 7353,
+              timeoutMs: 60_000,
+            },
+            stop: {
+              signal: "sigterm",
+              timeoutMs: 10_000,
+              gracePeriodMs: 2_000,
+            },
+          },
+        ],
+        endpoints: [],
+      },
+    ]);
+  });
+
+  it("only emits Drive egress when only the Drive local tool is selected", () => {
+    const compiled = compileGoogleWorkspaceBinding(
+      createCompileInput({
+        mcpServers: [GoogleWorkspaceMcpServerIds.DRIVE],
+      }),
+    );
+
+    expect(compiled.egressRoutes.map((route) => route.upstream.baseUrl)).toEqual([
+      "https://www.googleapis.com/drive/v3",
+    ]);
+    expect(compiled.egressRoutes.map((route) => route.match)).toEqual([
+      {
+        hosts: ["www.googleapis.com"],
+      },
+    ]);
+    expect(compiled.runtimeClients[0]?.processes[0]?.command.args).toContain("drive");
+  });
+
+  it("keeps hosted MCP routes when hosted Workspace tools are selected", () => {
+    const compiled = compileGoogleWorkspaceBinding(
+      createCompileInput({
+        mcpServers: [
           GoogleWorkspaceMcpServerIds.CALENDAR,
           GoogleWorkspaceMcpServerIds.CHAT,
           GoogleWorkspaceMcpServerIds.PEOPLE,
@@ -98,28 +286,9 @@ describe("compileGoogleWorkspaceBinding", () => {
     );
 
     expect(compiled.egressRoutes.map((route) => route.upstream.baseUrl)).toEqual([
-      "https://drivemcp.googleapis.com/mcp/v1",
       "https://calendarmcp.googleapis.com/mcp/v1",
       "https://chatmcp.googleapis.com/mcp/v1",
       "https://people.googleapis.com/mcp/v1",
-    ]);
-    expect(compiled.egressRoutes.map((route) => route.match)).toEqual([
-      {
-        hosts: ["drivemcp.googleapis.com"],
-        pathPrefixes: ["/mcp/v1"],
-      },
-      {
-        hosts: ["calendarmcp.googleapis.com"],
-        pathPrefixes: ["/mcp/v1"],
-      },
-      {
-        hosts: ["chatmcp.googleapis.com"],
-        pathPrefixes: ["/mcp/v1"],
-      },
-      {
-        hosts: ["people.googleapis.com"],
-        pathPrefixes: ["/mcp/v1"],
-      },
     ]);
     expect(compiled.artifacts).toEqual([]);
     expect(compiled.runtimeClients).toEqual([]);
@@ -131,6 +300,9 @@ describe("compileGoogleWorkspaceBinding", () => {
         mcpServers: [
           GoogleWorkspaceMcpServerIds.GMAIL,
           GoogleWorkspaceMcpServerIds.DRIVE,
+          GoogleWorkspaceMcpServerIds.SHEETS,
+          GoogleWorkspaceMcpServerIds.DOCS,
+          GoogleWorkspaceMcpServerIds.SLIDES,
           GoogleWorkspaceMcpServerIds.CALENDAR,
           GoogleWorkspaceMcpServerIds.CHAT,
           GoogleWorkspaceMcpServerIds.PEOPLE,
@@ -138,7 +310,7 @@ describe("compileGoogleWorkspaceBinding", () => {
       }),
     );
 
-    expect(compiled.egressRoutes).toHaveLength(5);
+    expect(compiled.egressRoutes).toHaveLength(8);
     const routes = compiled.egressRoutes.map(
       (route, index): EgressCredentialRoute => ({
         egressRuleId: `egress_rule_google_workspace_${String(index)}`,

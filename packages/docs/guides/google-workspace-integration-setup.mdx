@@ -1,41 +1,43 @@
 ---
 title: Google Workspace
-description: Connect Google Workspace MCP servers to Mistle
+description: Connect Google Workspace tools to Mistle
 ---
 
 ## Overview
 
-Connect to Google Workspace by authorizing Mistle with a Google OAuth client that you create in Google Cloud.
+Connect to Google Workspace by authorizing Mistle with a Google OAuth client or service account that you create in Google Cloud.
 
-Mistle uses the OAuth authorization code flow to obtain Google access tokens, then uses those tokens to call Google-hosted Workspace MCP servers selected in a sandbox profile. The connected Google user remains subject to Google Workspace permissions and data governance controls.
+Mistle uses the configured connection to obtain Google access tokens, then injects those tokens into the Workspace tools selected in a sandbox profile. Gmail, Calendar, Chat, and People use Google-hosted MCP servers. Drive, Sheets, Docs, and Slides use Mistle's local `gws` tool wrapper around the official Google REST APIs.
 
 <Note>
-  Google Workspace MCP servers are currently published by Google as a Developer Preview. Verify the
-  Google setup requirements before enabling this integration in production.
+  Google-hosted Workspace MCP servers are currently published by Google as a Developer Preview.
+  Verify the Google setup requirements before enabling hosted MCP tools in production.
 </Note>
 
 ## Enable Google Workspace MCP
 
 Use a Google Cloud project owned by the Workspace organization that should authorize the MCP servers.
 
-Enable the Workspace product APIs:
+Enable the Workspace product APIs needed by the selected tools:
 
 ```bash
 gcloud services enable \
   gmail.googleapis.com \
   drive.googleapis.com \
+  sheets.googleapis.com \
+  docs.googleapis.com \
+  slides.googleapis.com \
   calendar-json.googleapis.com \
   chat.googleapis.com \
   people.googleapis.com \
   --project=PROJECT_ID
 ```
 
-Enable the Workspace MCP services:
+Enable the Workspace MCP services if you plan to use Gmail, Calendar, Chat, or People:
 
 ```bash
 gcloud services enable \
   gmailmcp.googleapis.com \
-  drivemcp.googleapis.com \
   calendarmcp.googleapis.com \
   chatmcp.googleapis.com \
   people.googleapis.com \
@@ -62,12 +64,14 @@ In **Google Auth Platform**, configure branding, audience, and data access for t
 
 For an internal Workspace rollout, select **Internal** audience when available. For an external app in testing mode, add every authorizing Google account as a test user before connecting.
 
-Add the OAuth scopes for the Workspace MCP servers you intend to use. Mistle currently requests a fixed scope set for the supported hosted Workspace MCP servers:
+Add the OAuth scopes for the Workspace tools you intend to use. Mistle currently requests a fixed scope set for the supported Workspace tools:
 
 - `https://www.googleapis.com/auth/gmail.readonly`
 - `https://www.googleapis.com/auth/gmail.compose`
-- `https://www.googleapis.com/auth/drive.readonly`
-- `https://www.googleapis.com/auth/drive.file`
+- `https://www.googleapis.com/auth/drive`
+- `https://www.googleapis.com/auth/spreadsheets`
+- `https://www.googleapis.com/auth/documents`
+- `https://www.googleapis.com/auth/presentations`
 - `https://www.googleapis.com/auth/calendar.calendarlist.readonly`
 - `https://www.googleapis.com/auth/calendar.events.freebusy`
 - `https://www.googleapis.com/auth/calendar.events.readonly`
@@ -98,22 +102,22 @@ Create a Web application OAuth client in Google Auth Platform.
 For headless Workspace automation, you can connect with a Google Cloud service account. This lets Mistle mint short-lived Google access tokens without an interactive OAuth consent flow.
 
 <Note>
-  Service account connections require Google Workspace domain-wide delegation. A Workspace super
-  administrator must authorize the service account client ID for the full fixed Mistle scope set
-  listed above, even when a sandbox profile exposes only selected MCP servers.
+  Domain-wide delegation is optional. Leave the sandbox profile's Workspace user email blank to mint
+  tokens as the service account itself. Enter a Workspace user email only when the service account
+  is configured for domain-wide delegation and should impersonate that user.
 </Note>
 
 To use a service account connection:
 
-1. Create a Google Cloud service account in the same project used for the Workspace MCP services.
-2. In the service account details, enable **Google Workspace domain-wide delegation** and copy the service account **Client ID**.
-3. In Google Workspace Admin Console, open **Security > Access and data control > API controls > Manage Domain Wide Delegation**.
-4. Click **Add new**, paste the service account Client ID, and authorize the full fixed Mistle OAuth scope set listed in **Configure OAuth Consent**.
+1. Create a Google Cloud service account in the same project used for the Workspace APIs.
+2. If you need domain-wide delegation, enable it in the service account details and copy the service account **Client ID**.
+3. If you enabled domain-wide delegation, open **Google Workspace Admin Console > Security > Access and data control > API controls > Manage Domain Wide Delegation**.
+4. If you enabled domain-wide delegation, click **Add new**, paste the service account Client ID, and authorize the full fixed Mistle OAuth scope set listed in **Configure OAuth Consent**.
 5. In Google Cloud, create a JSON key for the service account and store it carefully.
 6. In Mistle, choose **Service account** when adding a Google Workspace connection.
 7. Paste the service account JSON key.
 
-Mistle signs a Google OAuth JWT bearer assertion with the service account key, exchanges it for a short-lived Google access token, and injects that token into calls to the selected Google-hosted MCP servers.
+Mistle signs a Google OAuth JWT bearer assertion with the service account key, exchanges it for a short-lived Google access token, and injects that token into calls to the selected Workspace tools.
 
 ## Connect MCP Servers To A Sandbox Profile
 
@@ -121,21 +125,24 @@ After the Google Workspace connection is active:
 
 1. Open the sandbox profile that should use Google Workspace.
 2. Add the Google Workspace integration connection to the profile.
-3. In **Resources & Tools**, select the Google Workspace MCP servers that agents may use.
-4. For service account connections, enter the **Workspace user email** Mistle should use as the Google Workspace user subject when minting access tokens.
+3. In **Resources & Tools**, select the Google Workspace tools that agents may use.
+4. For service account connections, optionally enter the **Workspace user email** Mistle should use as the Google Workspace user subject when minting access tokens with domain-wide delegation.
 5. Publish the profile version.
 
-Only selected MCP servers are exposed to sessions using that published profile.
+Only selected tools are exposed to sessions using that published profile.
 
-## Supported MCP Servers
+## Supported Tools
 
-| MCP server      | Server URL                                  |
-| --------------- | ------------------------------------------- |
-| Gmail           | `https://gmailmcp.googleapis.com/mcp/v1`    |
-| Google Drive    | `https://drivemcp.googleapis.com/mcp/v1`    |
-| Google Calendar | `https://calendarmcp.googleapis.com/mcp/v1` |
-| Google Chat     | `https://chatmcp.googleapis.com/mcp/v1`     |
-| People API      | `https://people.googleapis.com/mcp/v1`      |
+| Tool            | Runtime path                                                   |
+| --------------- | -------------------------------------------------------------- |
+| Gmail           | Google-hosted MCP: `https://gmailmcp.googleapis.com/mcp/v1`    |
+| Google Drive    | Local `gws` MCP wrapper for Drive REST API                     |
+| Google Sheets   | Local `gws` MCP wrapper for Sheets REST API                    |
+| Google Docs     | Local `gws` MCP wrapper for Docs REST API                      |
+| Google Slides   | Local `gws` MCP wrapper for Slides REST API                    |
+| Google Calendar | Google-hosted MCP: `https://calendarmcp.googleapis.com/mcp/v1` |
+| Google Chat     | Google-hosted MCP: `https://chatmcp.googleapis.com/mcp/v1`     |
+| People API      | Google-hosted MCP: `https://people.googleapis.com/mcp/v1`      |
 
 ## Official References
 

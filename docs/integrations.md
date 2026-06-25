@@ -26,7 +26,7 @@ Refer to [docs/integrations/aws.md](./integrations/aws.md) for AWS, AWS CLI, and
 
 Refer to [packages/docs/guides/posthog-integration-setup.mdx](../packages/docs/guides/posthog-integration-setup.mdx) for PostHog hosted MCP setup guidance.
 
-Refer to [packages/docs/guides/google-workspace-integration-setup.mdx](../packages/docs/guides/google-workspace-integration-setup.mdx) for Google Workspace hosted MCP setup guidance.
+Refer to [packages/docs/guides/google-workspace-integration-setup.mdx](../packages/docs/guides/google-workspace-integration-setup.mdx) for Google Workspace setup guidance.
 
 Refer to [docs/integrations/resend.md](./integrations/resend.md) for Resend MCP setup guidance.
 

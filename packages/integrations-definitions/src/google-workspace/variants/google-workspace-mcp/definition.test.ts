@@ -33,7 +33,7 @@ describe("GoogleWorkspaceDefinition", () => {
     expect(GoogleWorkspaceMcpBaseDefinition.oauth2AuthorizationCode).toBeUndefined();
   });
 
-  it("resolves selected Google Workspace MCP servers from the binding config", () => {
+  it("resolves selected hosted and local Google Workspace MCP servers from the binding config", () => {
     if (typeof GoogleWorkspaceDefinition.mcp !== "function") {
       throw new Error("Expected Google Workspace definition to provide dynamic MCP servers.");
     }
@@ -63,7 +63,12 @@ describe("GoogleWorkspaceDefinition", () => {
           id: "ibd_123",
           kind: "connector",
           config: {
-            mcpServers: [GoogleWorkspaceMcpServerIds.GMAIL, GoogleWorkspaceMcpServerIds.PEOPLE],
+            mcpServers: [
+              GoogleWorkspaceMcpServerIds.GMAIL,
+              GoogleWorkspaceMcpServerIds.DRIVE,
+              GoogleWorkspaceMcpServerIds.SHEETS,
+              GoogleWorkspaceMcpServerIds.PEOPLE,
+            ],
           },
         },
         refs: {
@@ -93,6 +98,13 @@ describe("GoogleWorkspaceDefinition", () => {
         transport: "streamable-http",
         url: "https://people.googleapis.com/mcp/v1",
         description: "Google Workspace People MCP",
+      },
+      {
+        serverId: "google-workspace-gws-mcp",
+        serverName: "google_workspace",
+        transport: "streamable-http",
+        url: "http://127.0.0.1:7353/mcp",
+        description: "Google Workspace Drive, Sheets, Docs, and Slides MCP",
       },
     ]);
   });
