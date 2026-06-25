@@ -1,4 +1,8 @@
-import { IntegrationKinds, resolveIntegrationForm } from "@mistle/integrations-core";
+import {
+  applySchemaDefaultsToFormData,
+  IntegrationKinds,
+  resolveIntegrationForm,
+} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { GoogleWorkspaceConnectionMethodIds } from "./auth.js";
@@ -40,11 +44,26 @@ describe("resolveGoogleWorkspaceBindingConfigForm", () => {
     });
 
     expect(resolvedForm.schema?.properties).toHaveProperty("workspaceUserEmail");
+    const normalizedFormData = applySchemaDefaultsToFormData({
+      schema: resolvedForm.schema ?? {},
+      formData: {
+        mcpServers: ["drive"],
+      },
+    });
+
+    expect(resolvedForm.schema?.required).toContain("workspaceUserEmail");
+    expect(normalizedFormData).toEqual({
+      mcpServers: ["drive"],
+      workspaceUserEmail: "",
+    });
     expect(resolvedForm.uiSchema).toMatchObject({
       workspaceUserEmail: {
         "ui:widget": "hidden",
       },
     });
+    expect(GoogleWorkspaceBindingConfigSchema.parse(normalizedFormData)).toEqual(
+      normalizedFormData,
+    );
     expect(form.schema?.properties).toHaveProperty("mcpServers");
     expect(form.uiSchema).toMatchObject({
       workspaceUserEmail: {

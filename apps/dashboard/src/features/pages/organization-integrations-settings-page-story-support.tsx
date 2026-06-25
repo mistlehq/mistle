@@ -475,7 +475,7 @@ export const AddFlowStorySpecs = {
   },
   GoogleWorkspaceServiceAccount: {
     initialConnectionDisplayNameValue: "Google Workspace Service Account",
-    initialMethodId: "google-workspace-service-account-domain-wide-delegation",
+    initialMethodId: "google-workspace-service-account",
     initialSecrets: {
       serviceAccountKeyJson:
         '{"type":"service_account","client_email":"workspace-mcp@example-project.iam.gserviceaccount.com","private_key":"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"}',

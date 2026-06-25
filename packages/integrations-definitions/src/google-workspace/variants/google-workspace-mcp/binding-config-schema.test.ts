@@ -12,24 +12,18 @@ describe("GoogleWorkspaceBindingConfigSchema", () => {
     });
   });
 
-  it("defaults the Workspace user email to an empty string in JSON Schema validation", () => {
-    expect(z.toJSONSchema(GoogleWorkspaceBindingConfigSchema)).toMatchObject({
+  it("emits the optional Workspace user email as a single string field in JSON Schema validation", () => {
+    const jsonSchema = z.toJSONSchema(GoogleWorkspaceBindingConfigSchema);
+
+    expect(jsonSchema).toMatchObject({
       properties: {
         workspaceUserEmail: {
           default: "",
-          anyOf: [
-            {
-              const: "",
-              type: "string",
-            },
-            {
-              format: "email",
-              type: "string",
-            },
-          ],
+          type: "string",
         },
       },
     });
+    expect(jsonSchema.properties?.workspaceUserEmail).not.toHaveProperty("anyOf");
   });
 
   it("accepts selected Google Workspace MCP servers", () => {
@@ -79,6 +73,15 @@ describe("GoogleWorkspaceBindingConfigSchema", () => {
       mcpServers: [GoogleWorkspaceMcpServerIds.DRIVE],
       workspaceUserEmail: "workspace-user@example.com",
     });
+  });
+
+  it("rejects an invalid Workspace user email", () => {
+    expect(() =>
+      GoogleWorkspaceBindingConfigSchema.parse({
+        mcpServers: [GoogleWorkspaceMcpServerIds.DRIVE],
+        workspaceUserEmail: "not-an-email",
+      }),
+    ).toThrow("Workspace user email must be a valid email address.");
   });
 
   it("rejects unsupported and duplicate Google Workspace MCP server ids", () => {

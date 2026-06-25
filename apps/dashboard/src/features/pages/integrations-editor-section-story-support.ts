@@ -233,7 +233,7 @@ export const StoryGoogleWorkspaceServiceAccountConnection: IntegrationConnection
   targetKey: StoryGoogleWorkspaceTarget.targetKey,
   status: "active",
   config: {
-    connection_method: "google-workspace-service-account-domain-wide-delegation",
+    connection_method: "google-workspace-service-account",
   },
 };
 

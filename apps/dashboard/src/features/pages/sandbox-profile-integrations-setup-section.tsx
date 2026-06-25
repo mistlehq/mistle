@@ -624,6 +624,15 @@ function filterIntegrationChoices(input: {
   });
 }
 
+function targetSupportsSandboxRuntimeTools(target: IntegrationTargetSummary): boolean {
+  const definition = IntegrationRegistry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+
+  return definition?.kind === "sandbox" && definition.bindingConfigForm !== undefined;
+}
+
 function targetAllowsAgentRuntime(input: {
   target: IntegrationTargetSummary;
   agentRuntimeId: SandboxProfileVersion["agentRuntimeId"];
@@ -892,7 +901,14 @@ export function SandboxProfileIntegrationsSetupSection(
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
     includeDisconnectedTargets: true,
-  });
+  }).concat(
+    resolveKindChoices({
+      kind: "sandbox",
+      availableConnections: input.availableConnections,
+      availableTargets: input.availableTargets.filter(targetSupportsSandboxRuntimeTools),
+      includeDisconnectedTargets: true,
+    }),
+  );
 
   function publishAssociatedResourceRoutingDraftState(inputValue: {
     gitDraftState: SandboxProfileAssociatedResourceRoutingDraftState;
@@ -1156,6 +1172,7 @@ export function SandboxProfileIntegrationsSetupSection(
 
     const previousConnectionId = row.connectionId;
     input.onIntegrationBindingRowChange(row.clientId, {
+      kind,
       connectionId: nextConnectionId,
       config: nextConfig,
     });
@@ -1584,7 +1601,7 @@ export function SandboxProfileIntegrationsSetupSection(
                                 if (controlsAreDisabled) {
                                   return;
                                 }
-                                void saveBindingConnection("connector", row, nextConnectionId);
+                                void saveBindingConnection(row.kind, row, nextConnectionId);
                               }}
                               selectedConnectionId={row.connectionId}
                               disabled={controlsAreDisabled}
