@@ -117,6 +117,14 @@ export function SessionWorkbenchPageView({
       });
     },
     setItem(key: string, value: string): void {
+      if (
+        secondaryPanelMountMode === "persistent-collapsible" &&
+        !isSecondaryPanelVisible &&
+        key === getResizablePanelStorageKey({ id: mainPanelGroupId, panelIds: mainPanelIds })
+      ) {
+        return;
+      }
+
       writeBrowserStorageItem({
         key,
         value,
@@ -132,6 +140,8 @@ export function SessionWorkbenchPageView({
   const hasInitialStoredMainPanelLayout = readInitialStoredPanelLayout({
     cache: initialStoredLayoutByGroupRef.current,
     id: mainPanelGroupId,
+    ignoredCollapsedPanelId:
+      secondaryPanelMountMode === "persistent-collapsible" ? SecondaryPanelId : undefined,
     panelIds: mainPanelIds,
     storage: layoutStorage,
   });
@@ -142,6 +152,8 @@ export function SessionWorkbenchPageView({
     secondaryPanelDefaultSize,
     hasStoredLayout: hasStoredResizablePanelLayout({
       id: mainPanelGroupId,
+      ignoredCollapsedPanelId:
+        secondaryPanelMountMode === "persistent-collapsible" ? SecondaryPanelId : undefined,
       panelIds: mainPanelIds,
       storage: layoutStorage,
     }),
@@ -358,7 +370,7 @@ export function SessionWorkbenchPageView({
         orientation="horizontal"
       >
         <ResizablePanel
-          defaultSize={primaryPanelDefaultSize}
+          defaultSize={formatResizablePanelPercentage(primaryPanelDefaultSize)}
           id={PrimaryPanelId}
           minSize={primaryPanelMinSize}
         >
@@ -373,7 +385,7 @@ export function SessionWorkbenchPageView({
             <ResizablePanel
               collapsedSize={0}
               collapsible={secondaryPanelMountMode === "persistent-collapsible"}
-              defaultSize={secondaryPanelDefaultSize}
+              defaultSize={formatResizablePanelPercentage(secondaryPanelDefaultSize)}
               id={SecondaryPanelId}
               minSize={secondaryPanelMinSize}
               panelRef={secondaryPanelRef}
@@ -394,6 +406,7 @@ export function SessionWorkbenchPageView({
 
 function hasStoredResizablePanelLayout(input: {
   id: string;
+  ignoredCollapsedPanelId: string | undefined;
   panelIds: readonly string[];
   storage: Pick<Storage, "getItem">;
 }): boolean {
@@ -402,7 +415,13 @@ function hasStoredResizablePanelLayout(input: {
     panelIds: input.panelIds,
   });
   const currentStoredValue = input.storage.getItem(currentStorageKey);
-  if (currentStoredValue !== null && isStoredPanelLayoutObject(currentStoredValue)) {
+  if (
+    currentStoredValue !== null &&
+    isStoredPanelLayoutObject({
+      ignoredCollapsedPanelId: input.ignoredCollapsedPanelId,
+      value: currentStoredValue,
+    })
+  ) {
     return true;
   }
 
@@ -426,11 +445,24 @@ function hasStoredResizablePanelLayout(input: {
   }
 
   const layout = legacyPanelLayout.layout;
-  return (
-    Array.isArray(layout) &&
-    layout.length === input.panelIds.length &&
-    layout.every((value) => typeof value === "number")
-  );
+  if (
+    !Array.isArray(layout) ||
+    layout.length !== input.panelIds.length ||
+    !layout.every((value) => typeof value === "number")
+  ) {
+    return false;
+  }
+
+  if (input.ignoredCollapsedPanelId === undefined) {
+    return true;
+  }
+
+  const ignoredPanelIndex = input.panelIds.indexOf(input.ignoredCollapsedPanelId);
+  if (ignoredPanelIndex < 0) {
+    return true;
+  }
+
+  return layout[ignoredPanelIndex] !== 0;
 }
 
 function resolveMainPanelDefaultLayout(input: {
@@ -470,6 +502,7 @@ function createExplicitMainPanelDefaultLayout(input: {
 function readInitialStoredPanelLayout(input: {
   cache: Map<string, boolean>;
   id: string;
+  ignoredCollapsedPanelId: string | undefined;
   panelIds: readonly string[];
   storage: Pick<Storage, "getItem">;
 }): boolean {
@@ -492,8 +525,19 @@ function resizePanelToPercentageOnNextFrame(input: {
   percentage: number;
 }): number {
   return window.requestAnimationFrame(() => {
-    input.panel.resize(`${String(input.percentage)}%`);
+    input.panel.resize(formatResizablePanelPercentage(input.percentage));
   });
+}
+
+function formatResizablePanelPercentage(percentage: number): string;
+function formatResizablePanelPercentage(percentage: undefined): undefined;
+function formatResizablePanelPercentage(percentage: number | undefined): string | undefined;
+function formatResizablePanelPercentage(percentage: number | undefined): string | undefined {
+  if (percentage === undefined) {
+    return undefined;
+  }
+
+  return `${String(percentage)}%`;
 }
 
 function isResizablePanelTransitionEnd(event: React.TransitionEvent): boolean {
@@ -508,8 +552,18 @@ function getResizablePanelStorageKey(input: { id: string; panelIds: readonly str
   return `${ResizablePanelStorageKeyPrefix}${[input.id, ...input.panelIds].join(":")}`;
 }
 
-function isStoredPanelLayoutObject(value: string): boolean {
-  const parsedValue = parseJsonRecord(value);
+function isStoredPanelLayoutObject(input: {
+  ignoredCollapsedPanelId: string | undefined;
+  value: string;
+}): boolean {
+  const parsedValue = parseJsonRecord(input.value);
+  if (
+    input.ignoredCollapsedPanelId !== undefined &&
+    parsedValue?.[input.ignoredCollapsedPanelId] === 0
+  ) {
+    return false;
+  }
+
   return (
     parsedValue !== null && Object.values(parsedValue).every((item) => typeof item === "number")
   );
