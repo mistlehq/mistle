@@ -54,6 +54,71 @@ export const mcpListSupportedCapabilitiesInputSchema = z
   })
   .strict();
 
+export const mcpListIntegrationTargetsInputSchema = z
+  .object({
+    limit: z.number().int().min(1).max(100).optional(),
+    after: z.string().min(1).optional(),
+    before: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const mcpListIntegrationConnectionsInputSchema = z
+  .object({
+    limit: z.number().int().min(1).max(100).optional(),
+    after: z.string().min(1).optional(),
+    before: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const mcpIntegrationConnectionIdParamsSchema = z
+  .object({
+    connectionId: z.string().min(1),
+  })
+  .strict();
+
+export const mcpIntegrationConnectionFormSetupPrepareInputSchema = z
+  .object({
+    targetKey: z.string().min(1),
+    methodId: z.string().min(1),
+    connectionId: z.string().min(1).optional(),
+    suggestedDisplayName: z.string().min(1).optional(),
+    suggestedConfig: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+
+export const mcpIntegrationConnectionResourcesListInputSchema =
+  mcpIntegrationConnectionIdParamsSchema
+    .extend({
+      kind: z.string().min(1),
+      search: z.string().min(1).optional(),
+      limit: z.number().int().min(1).max(100).optional(),
+      after: z.string().min(1).optional(),
+      before: z.string().min(1).optional(),
+    })
+    .strict();
+
+export const mcpIntegrationConnectionResourcesRefreshInputSchema =
+  mcpIntegrationConnectionIdParamsSchema
+    .extend({
+      kind: z.string().min(1),
+    })
+    .strict();
+
+export const mcpIntegrationConnectionOAuthStartInputSchema = z
+  .object({
+    targetKey: z.string().min(1),
+    displayName: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const mcpIntegrationConnectionDeviceAuthorizationStartInputSchema = z
+  .object({
+    targetKey: z.string().min(1),
+    methodId: z.string().min(1),
+    displayName: z.string().min(1).optional(),
+  })
+  .strict();
+
 export const mcpUpdateSandboxProfileInputSchema = mcpSandboxProfileIdParamsSchema
   .extend({
     displayName: z.string().min(1),
