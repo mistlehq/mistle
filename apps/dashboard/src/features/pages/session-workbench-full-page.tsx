@@ -265,6 +265,7 @@ function resolveSessionWorkbenchSecondaryPanelLayout(input: {
   secondaryPanel: SessionWorkbenchFullPageSecondaryPanel;
 }): SessionWorkbenchSecondaryPanelLayout {
   if (input.secondaryPanel.kind === "custom") {
+    // Shared secondary tools fill the active custom panel geometry on pages that provide one.
     return {
       ...(input.secondaryPanel.defaultSize === undefined
         ? {}

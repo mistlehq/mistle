@@ -109,6 +109,8 @@ export function SessionWorkbenchPageView({
     ? [PrimaryPanelId, SecondaryPanelId]
     : [PrimaryPanelId];
   const mainPanelGroupRenderKey = `${sandboxInstanceKey}:${secondaryPanelLayoutKey}`;
+  const ignoredCollapsedPanelId =
+    secondaryPanelMountMode === "persistent-collapsible" ? SecondaryPanelId : undefined;
   const layoutStorage = {
     getItem(key: string): string | null {
       return readBrowserStorageItem({
@@ -140,8 +142,7 @@ export function SessionWorkbenchPageView({
   const hasInitialStoredMainPanelLayout = readInitialStoredPanelLayout({
     cache: initialStoredLayoutByGroupRef.current,
     id: mainPanelGroupId,
-    ignoredCollapsedPanelId:
-      secondaryPanelMountMode === "persistent-collapsible" ? SecondaryPanelId : undefined,
+    ignoredCollapsedPanelId,
     panelIds: mainPanelIds,
     storage: layoutStorage,
   });
@@ -152,8 +153,7 @@ export function SessionWorkbenchPageView({
     secondaryPanelDefaultSize,
     hasStoredLayout: hasStoredResizablePanelLayout({
       id: mainPanelGroupId,
-      ignoredCollapsedPanelId:
-        secondaryPanelMountMode === "persistent-collapsible" ? SecondaryPanelId : undefined,
+      ignoredCollapsedPanelId,
       panelIds: mainPanelIds,
       storage: layoutStorage,
     }),
@@ -230,6 +230,12 @@ export function SessionWorkbenchPageView({
     if (
       wasSecondaryPanelVisible === true ||
       hasInitialStoredMainPanelLayout ||
+      hasStoredResizablePanelLayout({
+        id: mainPanelGroupId,
+        ignoredCollapsedPanelId,
+        panelIds: mainPanelIds,
+        storage: layoutStorage,
+      }) ||
       secondaryPanelDefaultSize === undefined
     ) {
       return;
@@ -244,7 +250,9 @@ export function SessionWorkbenchPageView({
     };
   }, [
     hasInitialStoredMainPanelLayout,
+    ignoredCollapsedPanelId,
     isSecondaryPanelVisible,
+    mainPanelGroupId,
     secondaryPanelDefaultSize,
     secondaryPanelMountMode,
   ]);
