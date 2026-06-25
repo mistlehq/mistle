@@ -5,6 +5,7 @@ import { GoogleWorkspaceMcpServerCatalog } from "./mcp-catalog.js";
 const GoogleWorkspaceMcpServerIdSet: ReadonlySet<string> = new Set(
   GoogleWorkspaceMcpServerCatalog.map((entry) => entry.id),
 );
+const GoogleWorkspaceEmailSchema = z.email();
 
 function validateGoogleWorkspaceMcpServerIds(ids: ReadonlyArray<string>): void {
   const seen = new Set<string>();
@@ -37,7 +38,12 @@ export const GoogleWorkspaceBindingConfigSchema = z
     workspaceUserEmail: z
       .string()
       .trim()
-      .pipe(z.union([z.literal(""), z.email()]))
+      .refine(
+        (value) => value.length === 0 || GoogleWorkspaceEmailSchema.safeParse(value).success,
+        {
+          message: "Workspace user email must be a valid email address.",
+        },
+      )
       .default(""),
   })
   .strict();

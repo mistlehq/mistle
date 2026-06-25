@@ -20,6 +20,9 @@ import {
   StoryDatadogTarget,
   StoryGithubConnection,
   StoryGithubTarget,
+  StoryGoogleWorkspaceServiceAccountConnection,
+  StoryGoogleWorkspaceTarget,
+  StoryGoogleWorkspaceTools,
   StoryJiraConnection,
   StoryJiraTarget,
   StoryOpenCodeGoConnection,
@@ -141,22 +144,126 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(runtime.getByText("Jira Production")).toBeDefined();
   });
 
-  it("does not include sandbox providers in the add integration or tool dialog", () => {
+  it("includes sandbox runtime tools with egress support in the add integration or tool dialog", () => {
+    const addedRows: Parameters<
+      SandboxProfileIntegrationsSetupSectionProps["onAddIntegrationBindingRow"]
+    >[0][] = [];
+
     render(
       <TestSandboxProfileIntegrationsSetupSection
         overrides={{
           availableConnections: [StoryTensorlakeConnection, StoryJiraConnection],
-          availableTargets: [StoryTensorlakeTarget, StoryJiraTarget],
+          availableTargets: [StoryTensorlakeTarget, StoryJiraTarget, StoryModalTarget],
           integrationRows: [],
+          onAddIntegrationBindingRow: async (row) => {
+            addedRows.push(row);
+            return true;
+          },
         }}
       />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Add integration or tool" }));
 
-    const dialog = screen.getByRole("dialog");
-    expect(within(dialog).queryByText("Tensorlake")).toBeNull();
+    const dialog = screen.getByRole("dialog", { name: "Add integration or tool" });
+    expect(within(dialog).getByText("Tensorlake")).toBeDefined();
     expect(within(dialog).getByText("Jira")).toBeDefined();
+    expect(within(dialog).queryByText("Modal")).toBeNull();
+
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Search integrations" }), {
+      target: { value: "tensor" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    expect(addedRows).toEqual([
+      {
+        kind: "sandbox",
+        connectionId: StoryTensorlakeConnection.id,
+        config: {
+          tools: [],
+        },
+      },
+    ]);
+  });
+
+  it("renders the Google Workspace service account email field once without anyOf branch controls", () => {
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryGoogleWorkspaceServiceAccountConnection],
+          availableTargets: [StoryGoogleWorkspaceTarget],
+          integrationRows: [
+            {
+              clientId: "google-workspace-service-account-row",
+              connectionId: StoryGoogleWorkspaceServiceAccountConnection.id,
+              kind: "connector",
+              config: {
+                mcpServers: [...StoryGoogleWorkspaceTools],
+                workspaceUserEmail: "workspace-user@example.com",
+              },
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getAllByRole("textbox", { name: "Workspace user email" })).toHaveLength(1);
+    expect(screen.getByDisplayValue("workspace-user@example.com")).toBeDefined();
+    expect(
+      screen.getAllByRole("textbox").some((element) => element.getAttribute("value") === "0"),
+    ).toBe(false);
+  });
+
+  it("preserves sandbox binding kind when changing a sandbox runtime tool connection", async () => {
+    const secondaryTensorlakeConnection: IntegrationConnectionSummary = {
+      ...StoryTensorlakeConnection,
+      id: "connection-tensorlake-secondary",
+      displayName: "Tensorlake Secondary",
+    };
+    const rowChanges: Array<
+      Parameters<SandboxProfileIntegrationsSetupSectionProps["onIntegrationBindingRowChange"]>[1]
+    > = [];
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryTensorlakeConnection, secondaryTensorlakeConnection],
+          availableTargets: [StoryTensorlakeTarget],
+          integrationRows: [
+            {
+              clientId: "tensorlake-row",
+              connectionId: StoryTensorlakeConnection.id,
+              kind: "sandbox",
+              config: {
+                tools: [],
+              },
+            },
+          ],
+          onIntegrationBindingRowChange: (_clientId, changes) => {
+            rowChanges.push(changes);
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Tensorlake connection" }));
+    const secondaryOption = screen.getByRole("option", { name: "Tensorlake Secondary" });
+    fireEvent.mouseMove(secondaryOption);
+    fireEvent.mouseDown(secondaryOption, { button: 0 });
+    fireEvent.mouseUp(secondaryOption, { button: 0 });
+    fireEvent.click(secondaryOption, { button: 0 });
+
+    await waitFor(() => {
+      expect(rowChanges).toEqual([
+        {
+          kind: "sandbox",
+          connectionId: secondaryTensorlakeConnection.id,
+          config: {
+            tools: [],
+          },
+        },
+      ]);
+    });
   });
 
   it("keeps saved pull request activity routing visible after the GitHub git connection is removed", () => {
@@ -1278,6 +1385,18 @@ const StoryTensorlakeConnection: IntegrationConnectionSummary = {
   targetKey: StoryTensorlakeTarget.targetKey,
   status: "active",
   config: {},
+};
+
+const StoryModalTarget: IntegrationTargetSummary = {
+  targetKey: "target-modal",
+  displayName: "Modal",
+  logoKey: "modal",
+  familyId: "modal",
+  variantId: "modal-default",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
 };
 
 function createTestSandboxProfileVersion(input?: {
