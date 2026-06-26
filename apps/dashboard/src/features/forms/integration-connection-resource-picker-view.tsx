@@ -7,6 +7,7 @@ import {
   ComboboxContent,
   ComboboxItem,
   ComboboxList,
+  FieldError,
   Notice,
   useComboboxAnchor,
 } from "@mistle/ui";
@@ -32,9 +33,13 @@ export type IntegrationConnectionResourcePickerResource = {
 };
 
 export type IntegrationConnectionResourcePickerDensity = "default" | "compact";
+export type IntegrationConnectionResourcePickerAlertMessagePresentation = "notice" | "field-error";
 
 export type IntegrationConnectionResourcePickerViewProps = {
   density?: IntegrationConnectionResourcePickerDensity | undefined;
+  alertMessagePresentation?:
+    | IntegrationConnectionResourcePickerAlertMessagePresentation
+    | undefined;
   id: string;
   label: string;
   resourceLabelPlural?: string | undefined;
@@ -70,22 +75,66 @@ export function toIntegrationConnectionResourcePickerItems(
 function IntegrationResourceMessageSection(input: {
   message: string;
   variant: "default" | "alert";
+  alertMessagePresentation: IntegrationConnectionResourcePickerAlertMessagePresentation;
   detail?: string | undefined;
-  children?: React.ReactNode;
+  items?: readonly string[] | undefined;
 }): React.JSX.Element {
+  if (input.variant === "alert" && input.alertMessagePresentation === "field-error") {
+    return (
+      <FieldError className="text-xs whitespace-nowrap">
+        {formatCompactAlertMessage({
+          detail: input.detail,
+          items: input.items,
+          message: input.message,
+        })}
+      </FieldError>
+    );
+  }
+
   return (
     <Notice title={input.message} variant={input.variant}>
       <div className="flex flex-col gap-1">
         {input.detail === undefined ? null : <p>{input.detail}</p>}
-        {input.children}
+        <ResourceMessageItems items={input.items} />
       </div>
     </Notice>
+  );
+}
+
+function formatCompactAlertMessage(input: {
+  message: string;
+  detail: string | undefined;
+  items: readonly string[] | undefined;
+}): string {
+  const messageWithDetail =
+    input.detail === undefined ? input.message : `${input.message} ${input.detail}`;
+  if (input.items === undefined || input.items.length === 0) {
+    return messageWithDetail;
+  }
+
+  return `${messageWithDetail} ${input.items.join(", ")}`;
+}
+
+function ResourceMessageItems(input: {
+  items: readonly string[] | undefined;
+}): React.JSX.Element | null {
+  if (input.items === undefined) {
+    return null;
+  }
+
+  return (
+    <ul className="list-disc pl-5">
+      {input.items.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
   );
 }
 
 function ResourceMessages(input: {
   viewModel: IntegrationResourcePickerViewModel;
   variant?: "default" | "alert";
+  alertMessagePresentation: IntegrationConnectionResourcePickerAlertMessagePresentation;
 }): React.JSX.Element | null {
   const messageSections =
     input.variant === undefined
@@ -100,19 +149,13 @@ function ResourceMessages(input: {
     <div className="flex flex-col gap-2">
       {messageSections.map((section) => (
         <IntegrationResourceMessageSection
+          alertMessagePresentation={input.alertMessagePresentation}
           detail={section.detail}
+          items={section.items}
           key={`${section.variant}:${section.message}`}
           message={section.message}
           variant={section.variant}
-        >
-          {section.items === undefined ? null : (
-            <ul className="list-disc pl-5">
-              {section.items.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          )}
-        </IntegrationResourceMessageSection>
+        />
       ))}
     </div>
   );
@@ -127,6 +170,7 @@ function ComboboxLayout(input: {
   const anchorRef = useComboboxAnchor();
   const [isOpen, setIsOpen] = useState(false);
   const density = input.props.density ?? "default";
+  const alertMessagePresentation = input.props.alertMessagePresentation ?? "field-error";
   const selectAllRef = useCallback(
     (element: HTMLInputElement | null) => {
       if (element) {
@@ -139,6 +183,7 @@ function ComboboxLayout(input: {
   for (const item of input.props.visibleItems) {
     itemLabelsByValue.set(item.value, item.label);
   }
+  const unavailableSelectedValueSet = new Set(input.props.unavailableSelectedValues);
   const chipsClassName = density === "compact" ? "min-h-10 w-full gap-1 px-2 py-1" : "w-full";
   const chipClassName = density === "compact" ? "h-6 max-w-full" : "max-w-full";
   const contentClassName = density === "compact" ? "w-[min(30rem,calc(100vw-2rem))] p-0" : "p-0";
@@ -146,6 +191,9 @@ function ComboboxLayout(input: {
     density === "compact" ? "max-h-64 overflow-y-auto p-2" : "max-h-72 overflow-y-auto p-2";
   const listClassName = density === "compact" ? "max-h-48" : "max-h-56";
   const hasVisibleItems = input.props.visibleItems.length > 0;
+  const hasAlertMessages = input.viewModel.messageSections.some(
+    (section) => section.variant === "alert",
+  );
 
   function toggleAllVisibleItems(): void {
     const visibleValues = input.props.visibleItems.map((item) => item.value);
@@ -212,14 +260,23 @@ function ComboboxLayout(input: {
               setIsOpen(true);
             }}
           >
-            {input.props.selectedValues.map((selectedValue) => (
-              <ComboboxChip className={chipClassName} key={selectedValue}>
-                <span className="truncate">
-                  {itemLabelsByValue.get(selectedValue) ?? selectedValue}
-                </span>
-              </ComboboxChip>
-            ))}
+            {input.props.selectedValues.map((selectedValue) => {
+              const isUnavailableSelected = unavailableSelectedValueSet.has(selectedValue);
+
+              return (
+                <ComboboxChip
+                  className={chipClassName}
+                  invalid={isUnavailableSelected}
+                  key={selectedValue}
+                >
+                  <span className="truncate">
+                    {itemLabelsByValue.get(selectedValue) ?? selectedValue}
+                  </span>
+                </ComboboxChip>
+              );
+            })}
             <ComboboxChipsInput
+              aria-invalid={hasAlertMessages ? true : undefined}
               aria-label={input.props.label}
               className="min-w-28"
               disabled={input.props.disabled === true}
@@ -231,7 +288,11 @@ function ComboboxLayout(input: {
             />
           </ComboboxChips>
         </div>
-        <ResourceMessages variant="alert" viewModel={input.viewModel} />
+        <ResourceMessages
+          alertMessagePresentation={alertMessagePresentation}
+          variant="alert"
+          viewModel={input.viewModel}
+        />
       </div>
 
       {isOpen ? (
@@ -282,7 +343,11 @@ function ComboboxLayout(input: {
           </div>
           <div className={listWrapperClassName}>
             {hasVisibleItems ? (
-              <ResourceMessages variant="default" viewModel={input.viewModel} />
+              <ResourceMessages
+                alertMessagePresentation={alertMessagePresentation}
+                variant="default"
+                viewModel={input.viewModel}
+              />
             ) : null}
             <ComboboxList className={listClassName}>
               {input.props.visibleItems.map((resource) => (

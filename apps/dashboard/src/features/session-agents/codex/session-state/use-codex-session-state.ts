@@ -24,7 +24,7 @@ import {
   type CodexTurnInputLocalImageItem,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   useCallback,
   useEffect,
@@ -41,6 +41,16 @@ import {
   hasComposerCommand,
   listSkillMentions,
 } from "../../../pages/session-composer/session-composer-trigger-detection.js";
+import {
+  sandboxProfileDetailQueryKey,
+  sandboxProfileVersionIntegrationBindingsQueryKey,
+  sandboxProfileVersionsQueryKey,
+} from "../../../sandbox-profiles/sandbox-profiles-query-keys.js";
+import {
+  getSandboxProfileVersionIntegrationBindings,
+  putSandboxProfileVersionDraft,
+} from "../../../sandbox-profiles/sandbox-profiles-service.js";
+import type { SandboxProfileVersionIntegrationBinding } from "../../../sandbox-profiles/sandbox-profiles-types.js";
 import {
   createDashboardControlUserInputResponse,
   createDashboardControlUserInputServerRequest,
@@ -139,6 +149,153 @@ type CodexSessionThreadState = {
   rollbackThread: (threadId: string, numTurns: number) => void;
   ensureCanSwitchPrimaryRepository: () => Promise<void>;
 };
+
+type UserInputAnswerResult = {
+  answers: Array<{
+    id: string;
+    value: string | string[];
+    sideEffect?: {
+      kind: "sandbox-profile-draft-updated";
+      profileId: string;
+      version: number;
+    };
+  }>;
+};
+
+function isUserInputAnswerResult(result: unknown): result is UserInputAnswerResult {
+  if (typeof result !== "object" || result === null || !("answers" in result)) {
+    return false;
+  }
+
+  const answers = (result as { answers: unknown }).answers;
+  return (
+    Array.isArray(answers) &&
+    answers.every((answer) => {
+      if (typeof answer !== "object" || answer === null) {
+        return false;
+      }
+
+      const candidate = answer as { id?: unknown; value?: unknown };
+      return (
+        typeof candidate.id === "string" &&
+        (typeof candidate.value === "string" ||
+          (Array.isArray(candidate.value) &&
+            candidate.value.every((item) => typeof item === "string")))
+      );
+    })
+  );
+}
+
+function serializeIntegrationBindingForDraft(binding: SandboxProfileVersionIntegrationBinding): {
+  id: string;
+  connectionId: string;
+  kind: SandboxProfileVersionIntegrationBinding["kind"];
+  config: Record<string, unknown>;
+} {
+  return {
+    id: binding.id,
+    connectionId: binding.connectionId,
+    kind: binding.kind,
+    config: binding.config,
+  };
+}
+
+async function maybeApplyDashboardUserInputSubmitBehavior(input: {
+  entries: readonly CodexApprovalRequestEntry[];
+  queryClient: QueryClient;
+  requestId: string | number;
+  result: unknown;
+}): Promise<unknown> {
+  if (!isUserInputAnswerResult(input.result)) {
+    return input.result;
+  }
+
+  const entry = input.entries.find(
+    (candidate) => String(candidate.requestId) === String(input.requestId),
+  );
+  if (entry?.kind !== "tool-user-input") {
+    return input.result;
+  }
+
+  const answers = [...input.result.answers];
+  for (const question of entry.questions) {
+    const submitBehavior = question.submitBehavior;
+    if (submitBehavior?.kind !== "saveSandboxProfileDraftBinding") {
+      continue;
+    }
+
+    const answerIndex = answers.findIndex((answer) => answer.id === question.id);
+    const answer = answers[answerIndex];
+    if (answer === undefined || !Array.isArray(answer.value)) {
+      throw new Error(
+        "Sandbox profile draft binding resource selection requires selected handles.",
+      );
+    }
+    const selectedHandles = answer.value;
+
+    const currentBindings = await getSandboxProfileVersionIntegrationBindings({
+      profileId: submitBehavior.profileId,
+      version: submitBehavior.version,
+    });
+    const targetBinding = currentBindings.bindings.find(
+      (binding) => binding.id === submitBehavior.bindingId,
+    );
+    if (targetBinding === undefined) {
+      throw new Error(
+        `Sandbox profile integration binding '${submitBehavior.bindingId}' was not found.`,
+      );
+    }
+
+    await putSandboxProfileVersionDraft({
+      profileId: submitBehavior.profileId,
+      version: submitBehavior.version,
+      integrationBindings: {
+        bindings: currentBindings.bindings.map((binding) => {
+          const serializedBinding = serializeIntegrationBindingForDraft(binding);
+          if (binding.id !== submitBehavior.bindingId) {
+            return serializedBinding;
+          }
+
+          return {
+            ...serializedBinding,
+            config: {
+              ...serializedBinding.config,
+              [submitBehavior.configField]: selectedHandles.slice(),
+            },
+          };
+        }),
+      },
+    });
+
+    await Promise.all([
+      input.queryClient.invalidateQueries({
+        queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
+          profileId: submitBehavior.profileId,
+          version: submitBehavior.version,
+        }),
+      }),
+      input.queryClient.invalidateQueries({
+        queryKey: sandboxProfileVersionsQueryKey(submitBehavior.profileId),
+      }),
+      input.queryClient.invalidateQueries({
+        queryKey: sandboxProfileDetailQueryKey(submitBehavior.profileId),
+      }),
+    ]);
+
+    answers[answerIndex] = {
+      ...answer,
+      sideEffect: {
+        kind: "sandbox-profile-draft-updated",
+        profileId: submitBehavior.profileId,
+        version: submitBehavior.version,
+      },
+    };
+  }
+
+  return {
+    answers,
+  };
+}
 
 type ThreadNavigationMutationContext = {
   requestId: number;
@@ -326,6 +483,7 @@ export function useCodexSessionState(input: {
   dashboardControlActions?: DashboardControlActionSupport;
 }): UseCodexSessionStateResult {
   const rpcClientRef = input.rpcClientRef;
+  const queryClient = useQueryClient();
   const sessionSnapshotRef = useRef<ConnectedCodexSession | null>(null);
   const threadIdRef = useRef<string | null>(null);
   const skillMentionsRef = useRef<readonly SkillMentionDescriptor[]>([]);
@@ -840,7 +998,14 @@ export function useCodexSessionState(input: {
         const isDashboardControlUserInputRequest =
           dashboardControlUserInputRequestIdsRef.current.has(requestId);
         const result = isDashboardControlUserInputRequest
-          ? createDashboardControlUserInputResponse({ result: input.result })
+          ? createDashboardControlUserInputResponse({
+              result: await maybeApplyDashboardUserInputSubmitBehavior({
+                entries: serverRequestsState.entries,
+                queryClient,
+                requestId: input.requestId,
+                result: input.result,
+              }),
+            })
           : createCodexServerRequestResponse({
               entries: serverRequestsState.entries,
               requestId: input.requestId,

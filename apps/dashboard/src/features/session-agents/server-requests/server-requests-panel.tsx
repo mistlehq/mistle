@@ -1,6 +1,19 @@
 import { Button, cn, Input, Textarea } from "@mistle/ui";
+import { useDebouncedValue } from "@tanstack/react-pacer";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type Dispatch, type SetStateAction } from "react";
 
+import { resolveApiErrorMessage } from "../../api/error-message.js";
+import {
+  IntegrationConnectionResourcePickerView,
+  toIntegrationConnectionResourcePickerItems,
+} from "../../forms/integration-connection-resource-picker-view.js";
+import type { IntegrationResourceListViewState } from "../../forms/integration-resource-picker-view-model.js";
+import {
+  listIntegrationConnectionResources,
+  refreshIntegrationConnectionResources,
+} from "../../integrations/integrations-service.js";
+import { sandboxProfileIntegrationDirectoryQueryKey } from "../../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
   ComposerActionPanel,
   ComposerActionPanelStack,
@@ -18,7 +31,10 @@ type ToolUserInputQuestion = Extract<
   ServerRequestEntry,
   { kind: "tool-user-input" }
 >["questions"][number];
-type ToolUserInputOption = ToolUserInputQuestion["options"][number];
+type ToolUserInputOption = NonNullable<ToolUserInputQuestion["options"]>[number];
+type UserInputAnswerValue = string | readonly string[];
+
+const ResourceSearchDebounceMs = 300;
 
 function createRequestKey(requestId: string | number): string {
   return String(requestId);
@@ -31,9 +47,23 @@ function assertUnsupportedServerRequestEntry(_entry: never): never {
 function readUserInputAnswer(input: {
   answerKey: string;
   otherOption: ToolUserInputOption | undefined;
-  userInputAnswers: Readonly<Record<string, string>>;
+  userInputAnswers: Readonly<Record<string, UserInputAnswerValue>>;
 }): string {
-  return input.userInputAnswers[input.answerKey] ?? input.otherOption?.defaultValue ?? "";
+  const answer = input.userInputAnswers[input.answerKey];
+  return typeof answer === "string" ? answer : (input.otherOption?.defaultValue ?? "");
+}
+
+function readResourceSelectionAnswer(input: {
+  answerKey: string;
+  question: ToolUserInputQuestion;
+  userInputAnswers: Readonly<Record<string, UserInputAnswerValue>>;
+}): readonly string[] {
+  const answer = input.userInputAnswers[input.answerKey];
+  if (Array.isArray(answer)) {
+    return answer;
+  }
+
+  return input.question.resourceSelection?.initialSelectedHandles ?? [];
 }
 
 function canSubmitUserInputOnOptionSelect(
@@ -42,6 +72,7 @@ function canSubmitUserInputOnOptionSelect(
   return (
     entry.questions.length === 1 &&
     entry.questions[0] !== undefined &&
+    entry.questions[0].options !== undefined &&
     entry.questions[0].options.some((option) => !option.isOther) &&
     entry.questions[0].options.every((option) => !option.isOther)
   );
@@ -51,8 +82,8 @@ function createUserInputResponse(input: {
   entry: Extract<ServerRequestEntry, { kind: "tool-user-input" }>;
   requestKey: string;
   selectedAnswer?: { questionId: string; value: string };
-  userInputAnswers: Readonly<Record<string, string>>;
-}): { answers: { id: string; value: string }[] } {
+  userInputAnswers: Readonly<Record<string, UserInputAnswerValue>>;
+}): { answers: { id: string; value: string | string[] }[] } {
   return {
     answers: input.entry.questions.map((question) => {
       if (input.selectedAnswer?.questionId === question.id) {
@@ -63,7 +94,20 @@ function createUserInputResponse(input: {
       }
 
       const answerKey = `${input.requestKey}:${question.id}`;
-      const otherOption = question.options.find((option) => option.isOther);
+      if (question.inputKind === "integrationConnectionResourceMultiSelect") {
+        return {
+          id: question.id,
+          value: [
+            ...readResourceSelectionAnswer({
+              answerKey,
+              question,
+              userInputAnswers: input.userInputAnswers,
+            }),
+          ],
+        };
+      }
+
+      const otherOption = question.options?.find((option) => option.isOther);
       return {
         id: question.id,
         value: readUserInputAnswer({
@@ -86,7 +130,7 @@ function UserInputOptions(input: {
   onSelectOption: (option: ToolUserInputOption) => void;
   options: readonly ToolUserInputOption[];
   selectedAnswer: string;
-  setUserInputAnswers: Dispatch<SetStateAction<Record<string, string>>>;
+  setUserInputAnswers: Dispatch<SetStateAction<Record<string, UserInputAnswerValue>>>;
 }): React.JSX.Element | null {
   const selectableOptions = input.options.filter((option) => !option.isOther);
   if (selectableOptions.length === 0) {
@@ -136,12 +180,146 @@ function UserInputOptions(input: {
   );
 }
 
+function IntegrationConnectionResourceMultiSelectQuestion(input: {
+  answerKey: string;
+  disabled: boolean;
+  question: ToolUserInputQuestion;
+  selectedValues: readonly string[];
+  setUserInputAnswers: Dispatch<SetStateAction<Record<string, UserInputAnswerValue>>>;
+}): React.JSX.Element {
+  if (input.question.resourceSelection === undefined) {
+    throw new Error("Resource selection question requires resourceSelection.");
+  }
+
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [debouncedSearch] = useDebouncedValue(search, {
+    wait: ResourceSearchDebounceMs,
+  });
+  const resourceSelection = input.question.resourceSelection;
+  const resourceQueryKey = [
+    "integration-connections",
+    resourceSelection.connectionId,
+    "resources",
+    resourceSelection.resourceKind,
+    debouncedSearch,
+  ] as const;
+  const resourceQuery = useQuery({
+    queryKey: resourceQueryKey,
+    queryFn: async ({ signal }) =>
+      listIntegrationConnectionResources({
+        connectionId: resourceSelection.connectionId,
+        kind: resourceSelection.resourceKind,
+        ...(debouncedSearch.length === 0 ? {} : { search: debouncedSearch }),
+        signal,
+      }),
+    retry: false,
+  });
+  const refreshMutation = useMutation({
+    mutationFn: async () =>
+      refreshIntegrationConnectionResources({
+        connectionId: resourceSelection.connectionId,
+        kind: resourceSelection.resourceKind,
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: [
+            "integration-connections",
+            resourceSelection.connectionId,
+            "resources",
+            resourceSelection.resourceKind,
+          ],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: sandboxProfileIntegrationDirectoryQueryKey(),
+        }),
+      ]);
+    },
+  });
+  const visibleItems = resourceQuery.data?.items ?? [];
+  const availableHandles = new Set(visibleItems.map((item) => item.handle));
+  const unavailableSelectedValues =
+    resourceQuery.data === undefined || debouncedSearch.length > 0
+      ? []
+      : input.selectedValues.filter((handle) => !availableHandles.has(handle));
+  const resourceErrorMessage = !resourceQuery.isError
+    ? null
+    : resolveApiErrorMessage({
+        error: resourceQuery.error,
+        fallbackMessage: `Could not load ${resourceSelection.resourceLabelPlural}.`,
+      });
+  const refreshErrorMessage =
+    refreshMutation.error === null || refreshMutation.error === undefined
+      ? null
+      : resolveApiErrorMessage({
+          error: refreshMutation.error,
+          fallbackMessage: `Could not refresh ${resourceSelection.resourceLabelPlural}.`,
+        });
+  const listState: IntegrationResourceListViewState = resourceQuery.isPending
+    ? {
+        mode: "loading",
+      }
+    : resourceQuery.isError
+      ? {
+          mode: "error",
+          message:
+            resourceErrorMessage ?? `Could not load ${resourceSelection.resourceLabelPlural}.`,
+        }
+      : {
+          mode: "ready",
+        };
+  const refreshLabel = `Refresh ${resourceSelection.resourceLabelPlural}`;
+
+  return (
+    <div className="mx-4">
+      <IntegrationConnectionResourcePickerView
+        density="compact"
+        disabled={input.disabled}
+        emptyMessage={
+          resourceSelection.emptyMessage ??
+          `No ${resourceSelection.resourceLabelPlural} available for this connection.`
+        }
+        id={input.answerKey}
+        isRefreshing={refreshMutation.isPending || resourceQuery.data?.syncState === "syncing"}
+        label={input.question.question}
+        listState={listState}
+        onBlur={() => {}}
+        onFocus={() => {}}
+        onRefresh={() => {
+          refreshMutation.mutate();
+        }}
+        onSearchChange={setSearch}
+        onSelectionChange={(nextValues) => {
+          input.setUserInputAnswers((current) => ({
+            ...current,
+            [input.answerKey]: [...nextValues],
+          }));
+        }}
+        refreshErrorMessage={refreshErrorMessage}
+        refreshLabel={refreshLabel}
+        refreshTooltip={refreshLabel}
+        resourceLabelPlural={resourceSelection.resourceLabelPlural}
+        search={search}
+        searchPlaceholder={
+          resourceSelection.searchPlaceholder ?? `Search ${resourceSelection.resourceLabelPlural}`
+        }
+        selectedValues={input.selectedValues}
+        unavailableSelectedValues={unavailableSelectedValues}
+        visibleItems={toIntegrationConnectionResourcePickerItems(visibleItems)}
+      />
+    </div>
+  );
+}
+
 export function ServerRequestsPanel({
   entries,
   isRespondingToServerRequest,
   onRespondToServerRequest,
 }: ServerRequestsPanelProps): React.JSX.Element | null {
-  const [userInputAnswers, setUserInputAnswers] = useState<Record<string, string>>({});
+  const [userInputAnswers, setUserInputAnswers] = useState<Record<string, UserInputAnswerValue>>(
+    {},
+  );
 
   if (entries.length === 0) {
     return null;
@@ -253,7 +431,17 @@ export function ServerRequestsPanel({
                           isRespondingToServerRequest ||
                           entry.questions.some((question) => {
                             const answerKey = `${requestKey}:${question.id}`;
-                            const otherOption = question.options.find((option) => option.isOther);
+                            if (question.inputKind === "integrationConnectionResourceMultiSelect") {
+                              return (
+                                readResourceSelectionAnswer({
+                                  answerKey,
+                                  question,
+                                  userInputAnswers,
+                                }).length === 0
+                              );
+                            }
+
+                            const otherOption = question.options?.find((option) => option.isOther);
                             return (
                               readUserInputAnswer({
                                 answerKey,
@@ -284,10 +472,15 @@ export function ServerRequestsPanel({
                   <div className="space-y-3">
                     {entry.questions.map((question) => {
                       const answerKey = `${requestKey}:${question.id}`;
-                      const otherOption = question.options.find((option) => option.isOther);
+                      const otherOption = question.options?.find((option) => option.isOther);
                       const selectedAnswer = readUserInputAnswer({
                         answerKey,
                         otherOption,
+                        userInputAnswers,
+                      });
+                      const selectedResourceValues = readResourceSelectionAnswer({
+                        answerKey,
+                        question,
                         userInputAnswers,
                       });
 
@@ -310,31 +503,41 @@ export function ServerRequestsPanel({
                               {question.question}
                             </p>
                           )}
-                          <UserInputOptions
-                            answerKey={answerKey}
-                            disabled={isRespondingToServerRequest}
-                            onSelectOption={(option) => {
-                              if (!submitOnOptionSelect) {
-                                return;
-                              }
+                          {question.inputKind === "integrationConnectionResourceMultiSelect" ? (
+                            <IntegrationConnectionResourceMultiSelectQuestion
+                              answerKey={answerKey}
+                              disabled={isRespondingToServerRequest}
+                              question={question}
+                              selectedValues={selectedResourceValues}
+                              setUserInputAnswers={setUserInputAnswers}
+                            />
+                          ) : (
+                            <UserInputOptions
+                              answerKey={answerKey}
+                              disabled={isRespondingToServerRequest}
+                              onSelectOption={(option) => {
+                                if (!submitOnOptionSelect) {
+                                  return;
+                                }
 
-                              onRespondToServerRequest(
-                                entry.requestId,
-                                createUserInputResponse({
-                                  entry,
-                                  requestKey,
-                                  selectedAnswer: {
-                                    questionId: question.id,
-                                    value: option.label,
-                                  },
-                                  userInputAnswers,
-                                }),
-                              );
-                            }}
-                            options={question.options}
-                            selectedAnswer={selectedAnswer}
-                            setUserInputAnswers={setUserInputAnswers}
-                          />
+                                onRespondToServerRequest(
+                                  entry.requestId,
+                                  createUserInputResponse({
+                                    entry,
+                                    requestKey,
+                                    selectedAnswer: {
+                                      questionId: question.id,
+                                      value: option.label,
+                                    },
+                                    userInputAnswers,
+                                  }),
+                                );
+                              }}
+                              options={question.options ?? []}
+                              selectedAnswer={selectedAnswer}
+                              setUserInputAnswers={setUserInputAnswers}
+                            />
+                          )}
                           {otherOption === undefined ? null : otherOption.inputKind ===
                             "textarea" ? (
                             <div className="mx-4">

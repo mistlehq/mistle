@@ -83,8 +83,146 @@ describe("IntegrationConnectionResourcePickerView", () => {
     );
 
     expect(screen.getByText("Mistle Dashboard")).toBeDefined();
-    expect(screen.getAllByText("mistle/private-internal-tools").length).toBeGreaterThan(0);
-    expect(screen.getByText("The selected resources are no longer available:")).toBeDefined();
+    const unavailableChip = getChipForText("mistle/private-internal-tools");
+    expect(unavailableChip.getAttribute("aria-invalid")).toBe("true");
+    expect(unavailableChip.className).toContain("bg-destructive/10");
+    expect(unavailableChip.className).toContain("text-destructive");
+    expect(unavailableChip.className).toContain(
+      "[&_[data-slot=combobox-chip-remove]]:hover:bg-transparent",
+    );
+    expect(unavailableChip.className).toContain(
+      "[&_[data-slot=combobox-chip-remove]]:text-destructive/70",
+    );
+    expect(unavailableChip.className).toContain(
+      "[&_[data-slot=combobox-chip-remove]]:hover:text-destructive",
+    );
+    expect(
+      screen.getByText("The highlighted resources are no longer available. Please remove them."),
+    ).toBeDefined();
+  });
+
+  it("renders only the highest-priority alert message as a compact field error by default", () => {
+    render(
+      <IntegrationConnectionResourcePickerView
+        emptyMessage="No repositories available for this connection."
+        id="resource-picker"
+        isRefreshing={false}
+        label="Repositories"
+        listState={{
+          mode: "error",
+          message: "Could not load repositories.",
+        }}
+        onBlur={() => {}}
+        onFocus={() => {}}
+        onRefresh={() => {}}
+        onSearchChange={() => {}}
+        onSelectionChange={() => {}}
+        refreshErrorMessage="Could not refresh repositories."
+        refreshLabel="Refresh repositories"
+        refreshTooltip="Refresh repositories"
+        search=""
+        searchPlaceholder="Search repositories"
+        selectedValues={["mistle/private-internal-tools"]}
+        unavailableSelectedValues={["mistle/private-internal-tools"]}
+        visibleItems={RepositoryItems}
+      />,
+    );
+
+    const fieldErrors = screen.getAllByRole("alert");
+    const fieldError = getFieldErrorAt(fieldErrors, 0);
+    const combobox = screen.getByLabelText("Repositories");
+    const chipToolbar = combobox.closest('[data-slot="combobox-chips"]');
+    if (chipToolbar === null) {
+      throw new Error("Expected combobox chips toolbar.");
+    }
+
+    expect(combobox.getAttribute("aria-invalid")).toBe("true");
+    expect(fieldErrors).toHaveLength(1);
+    expect(fieldError.textContent).toBe(
+      "The highlighted resources are no longer available. Please remove them.",
+    );
+    expect(getChipForText("mistle/private-internal-tools").getAttribute("aria-invalid")).toBe(
+      "true",
+    );
+    expect(screen.queryByText("Refresh failed.")).toBeNull();
+    expect(screen.queryByText("Sync failed. Only showing last synced results.")).toBeNull();
+
+    for (const fieldError of fieldErrors) {
+      expect(fieldError.getAttribute("data-slot")).toBe("field-error");
+      expect(fieldError.className).toContain("text-xs");
+    }
+  });
+
+  it("shows refresh failure instead of also stacking the sync failure", () => {
+    render(
+      <IntegrationConnectionResourcePickerView
+        emptyMessage="No repositories available for this connection."
+        id="resource-picker"
+        isRefreshing={false}
+        label="Repositories"
+        listState={{
+          mode: "error",
+          message: "Could not load repositories.",
+        }}
+        onBlur={() => {}}
+        onFocus={() => {}}
+        onRefresh={() => {}}
+        onSearchChange={() => {}}
+        onSelectionChange={() => {}}
+        refreshErrorMessage="Could not refresh repositories."
+        refreshLabel="Refresh repositories"
+        refreshTooltip="Refresh repositories"
+        search=""
+        searchPlaceholder="Search repositories"
+        selectedValues={["mistle/main-dashboard"]}
+        unavailableSelectedValues={[]}
+        visibleItems={RepositoryItems}
+      />,
+    );
+
+    const fieldErrors = screen.getAllByRole("alert");
+    const fieldError = getFieldErrorAt(fieldErrors, 0);
+
+    expect(fieldErrors).toHaveLength(1);
+    expect(fieldError.textContent).toBe("Refresh failed. Please try again.");
+    expect(screen.queryByText("Sync failed. Only showing last synced results.")).toBeNull();
+  });
+
+  it("renders the sync failure message as a non-wrapping compact field error", () => {
+    render(
+      <IntegrationConnectionResourcePickerView
+        emptyMessage="No repositories available for this connection."
+        id="resource-picker"
+        isRefreshing={false}
+        label="Repositories"
+        listState={{
+          mode: "error",
+          message: "Could not load repositories.",
+        }}
+        onBlur={() => {}}
+        onFocus={() => {}}
+        onRefresh={() => {}}
+        onSearchChange={() => {}}
+        onSelectionChange={() => {}}
+        refreshErrorMessage={null}
+        refreshLabel="Refresh repositories"
+        refreshTooltip="Refresh repositories"
+        search=""
+        searchPlaceholder="Search repositories"
+        selectedValues={["mistle/main-dashboard"]}
+        unavailableSelectedValues={[]}
+        visibleItems={RepositoryItems}
+      />,
+    );
+
+    const fieldErrors = screen.getAllByRole("alert");
+    const fieldError = getFieldErrorAt(fieldErrors, 0);
+
+    expect(fieldErrors).toHaveLength(1);
+    expect(fieldError.textContent).toBe(
+      "Sync failed. Only showing last synced results. Try again. If this keeps failing, reconnect the integration.",
+    );
+    expect(fieldError.className).toContain("whitespace-nowrap");
   });
 
   it("selects only visible values and appends them after existing selected values", () => {
@@ -173,3 +311,21 @@ describe("IntegrationConnectionResourcePickerView", () => {
     expect(screen.getAllByText("No repositories available for this connection.")).toHaveLength(1);
   });
 });
+
+function getFieldErrorAt(fieldErrors: readonly HTMLElement[], index: number): HTMLElement {
+  const fieldError = fieldErrors[index];
+  if (fieldError === undefined) {
+    throw new Error(`Expected field error at index ${String(index)}.`);
+  }
+
+  return fieldError;
+}
+
+function getChipForText(text: string): HTMLElement {
+  const chip = screen.getByText(text).closest('[data-slot="combobox-chip"]');
+  if (!(chip instanceof HTMLElement)) {
+    throw new Error(`Expected combobox chip for ${text}.`);
+  }
+
+  return chip;
+}

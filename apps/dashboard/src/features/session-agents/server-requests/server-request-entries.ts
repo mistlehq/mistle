@@ -37,13 +37,33 @@ export type ToolRequestUserInputEntry = {
   questions: readonly {
     header: string | null;
     id: string;
-    options: readonly {
+    inputKind?: "text" | "integrationConnectionResourceMultiSelect";
+    options?: readonly {
       label: string;
       defaultValue?: string | null;
       inputKind?: "textarea";
       isOther: boolean;
     }[];
     question: string;
+    resourceSelection?: {
+      connectionId: string;
+      resourceKind: string;
+      resourceLabelPlural: string;
+      searchPlaceholder?: string;
+      emptyMessage?: string;
+      initialSelectedHandles?: readonly string[];
+    };
+    submitBehavior?:
+      | {
+          kind: "answerOnly";
+        }
+      | {
+          kind: "saveSandboxProfileDraftBinding";
+          profileId: string;
+          version: number;
+          bindingId: string;
+          configField: string;
+        };
   }[];
   status: "pending" | "responding";
   responseErrorMessage: string | null;
