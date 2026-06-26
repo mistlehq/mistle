@@ -1,3 +1,4 @@
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { z } from "zod";
 
 import { TensorlakeToolIds } from "./constants.js";
@@ -6,7 +7,11 @@ export const TensorlakeSandboxRuntimeTargetConfigSchema = z.object({}).strict();
 
 export const TensorlakeSandboxRuntimeTargetSecretSchema = z.object({}).strict();
 
-export const TensorlakeSandboxRuntimeConnectionConfigSchema = z.object({}).strict();
+export const TensorlakeSandboxRuntimeConnectionConfigSchema = z
+  .object({
+    connection_method: z.literal(IntegrationConnectionMethodIds.API_KEY),
+  })
+  .strict();
 
 const TensorlakeToolSchema = z.enum([TensorlakeToolIds.TENSORLAKE_CLI]);
 

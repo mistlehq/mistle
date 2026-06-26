@@ -20,6 +20,7 @@ import {
 } from "../constants.js";
 import { assertIdentityLinkingAuthEditableOrThrow } from "./assert-identity-linking-auth-editable.js";
 import {
+  buildFormConnectionConfigForMethodOrThrow,
   buildFormConnectionMethodContextOrThrow,
   parseFormConnectionConfigOrThrow,
   parseUpdateFormSecretsOrThrow,
@@ -119,14 +120,20 @@ export async function updateFormConnection(
     connectionMethods: definition.connectionMethods,
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
   });
+  const configWithConnectionMethod = buildFormConnectionConfigForMethodOrThrow({
+    targetKey: existingConnection.targetKey,
+    methodId: existingConnectionMethodId,
+    config: input.config,
+    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+  });
   const parsedConfig = parseFormConnectionConfigOrThrow({
     targetKey: existingConnection.targetKey,
     method: formMethod,
-    config: input.config,
+    config: configWithConnectionMethod,
     formContext: buildFormConnectionMethodContextOrThrow({
       targetKey: existingConnection.targetKey,
       target,
-      currentValue: input.config,
+      currentValue: configWithConnectionMethod,
       connection: {
         id: existingConnection.id,
         config: existingConnection.config,

@@ -1,3 +1,4 @@
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { z } from "zod";
 
 import { OpenComputerToolIds } from "./constants.js";
@@ -10,7 +11,11 @@ export const OpenComputerSandboxRuntimeTargetConfigSchema = z
 
 export const OpenComputerSandboxRuntimeTargetSecretSchema = z.object({}).strict();
 
-export const OpenComputerSandboxRuntimeConnectionConfigSchema = z.object({}).strict();
+export const OpenComputerSandboxRuntimeConnectionConfigSchema = z
+  .object({
+    connection_method: z.literal(IntegrationConnectionMethodIds.API_KEY),
+  })
+  .strict();
 
 export const OpenComputerSandboxRuntimeBindingConfigSchema = z
   .object({

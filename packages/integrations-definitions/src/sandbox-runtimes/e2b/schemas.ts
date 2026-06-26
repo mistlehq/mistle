@@ -1,3 +1,4 @@
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { z } from "zod";
 
 import { E2BToolIds } from "./constants.js";
@@ -10,7 +11,11 @@ export const E2BSandboxRuntimeTargetConfigSchema = z
 
 export const E2BSandboxRuntimeTargetSecretSchema = z.object({}).strict();
 
-export const E2BSandboxRuntimeConnectionConfigSchema = z.object({}).strict();
+export const E2BSandboxRuntimeConnectionConfigSchema = z
+  .object({
+    connection_method: z.literal(IntegrationConnectionMethodIds.API_KEY),
+  })
+  .strict();
 
 const E2BToolSchema = z.enum([E2BToolIds.E2B_CLI]);
 

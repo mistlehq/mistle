@@ -34,6 +34,26 @@ export type ParsedFormSecret = {
   persistedSecretRef: PersistedSecretRef;
 };
 
+export function buildFormConnectionConfigForMethodOrThrow(input: {
+  targetKey: string;
+  methodId: IntegrationConnectionMethodId;
+  config: Record<string, unknown>;
+  invalidInputCode: FormConnectionInvalidInputCode;
+}): Record<string, unknown> {
+  const rawConnectionMethod = input.config["connection_method"];
+  if (rawConnectionMethod !== undefined && rawConnectionMethod !== input.methodId) {
+    throw new BadRequestError(
+      input.invalidInputCode,
+      `Connection config for integration target '${input.targetKey}' does not match form connection method '${input.methodId}'.`,
+    );
+  }
+
+  return {
+    ...input.config,
+    connection_method: input.methodId,
+  };
+}
+
 export function buildFormConnectionMethodContextOrThrow(input: {
   targetKey: string;
   target: {

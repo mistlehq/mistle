@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
+  buildFormConnectionConfigForMethodOrThrow,
   buildFormConnectionMethodContextOrThrow,
   parseFormConnectionConfigOrThrow,
   parseCreateFormSecretsOrThrow,
@@ -48,6 +49,44 @@ function expectBadRequestError(
   expect(error.code).toBe(expected.code);
   expect(error.message).toBe(expected.message);
 }
+
+describe("buildFormConnectionConfigForMethodOrThrow", () => {
+  it("builds persisted config from the selected form method", () => {
+    expect(
+      buildFormConnectionConfigForMethodOrThrow({
+        targetKey: "tensorlake-default",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {},
+        invalidInputCode: "INVALID_CREATE_CONNECTION_INPUT",
+      }),
+    ).toEqual({
+      connection_method: IntegrationConnectionMethodIds.API_KEY,
+    });
+  });
+
+  it("throws when request config contains a different connection method", () => {
+    let thrownError: unknown = null;
+
+    try {
+      buildFormConnectionConfigForMethodOrThrow({
+        targetKey: "tensorlake-default",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {
+          connection_method: "oauth2-authorization-code",
+        },
+        invalidInputCode: "INVALID_CREATE_CONNECTION_INPUT",
+      });
+    } catch (error) {
+      thrownError = error;
+    }
+
+    expectBadRequestError(thrownError, {
+      code: "INVALID_CREATE_CONNECTION_INPUT",
+      message:
+        "Connection config for integration target 'tensorlake-default' does not match form connection method 'api-key'.",
+    });
+  });
+});
 
 describe("buildFormConnectionMethodContextOrThrow", () => {
   it("returns parsed target and connection config for update form context", () => {
