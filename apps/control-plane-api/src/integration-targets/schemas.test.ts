@@ -3,6 +3,45 @@ import { describe, expect, it } from "vitest";
 import { IntegrationTargetSchema } from "./schemas.js";
 
 describe("IntegrationTargetSchema", () => {
+  it("parses redirect connection methods that request callback URL display", () => {
+    const parsed = IntegrationTargetSchema.parse({
+      targetKey: "gcp-mcp",
+      familyId: "gcp",
+      variantId: "gcp-mcp",
+      kind: "connector",
+      enabled: true,
+      config: {},
+      displayName: "Google Cloud",
+      description: "Google Cloud integration",
+      connectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "Google OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect Google Cloud",
+              helperText: "Authorize Google Cloud access with your Google OAuth client.",
+              showCallbackUrl: true,
+            },
+          },
+        },
+      ],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    });
+
+    expect(parsed.connectionMethods?.[0]).toMatchObject({
+      kind: "redirect",
+      ui: {
+        create: {
+          showCallbackUrl: true,
+        },
+      },
+    });
+  });
+
   it("parses webhook event parameter group metadata", () => {
     const parsed = IntegrationTargetSchema.parse({
       targetKey: "github-cloud",

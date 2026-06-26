@@ -15685,6 +15685,9 @@
                                             "helperText": {
                                               "type": "string",
                                               "minLength": 1
+                                            },
+                                            "showCallbackUrl": {
+                                              "type": "boolean"
                                             }
                                           },
                                           "required": ["submitLabel", "helperText"],
