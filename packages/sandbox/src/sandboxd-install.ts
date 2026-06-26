@@ -59,25 +59,23 @@ if test "$installed_version" != "$MISTLE_SANDBOXD_ARTIFACT_VERSION"; then
 fi
 `.trim();
 
-// Used when replacing a running daemon and for Tensorlake backwards compatibility:
-// older images and snapshots may still have sandboxd.service enabled, and older
-// daemon instances can leave /run/mistle/sandboxd/control.sock behind. Keep the
-// service stop, direct process kill, and socket removal together so callers
-// consistently clear every legacy daemon entrypoint before starting sandboxd.
+// Used when replacing sandboxd in systemd-backed runtimes. Keep the service
+// stop, direct process kill, and socket removal together so systemd-managed
+// daemon entrypoints and leftover direct processes are cleared before restart.
 export const SandboxdStopDaemonCommand = `
 set -eu
 
 socket_path="/run/mistle/sandboxd/control.sock"
+command -v timeout >/dev/null 2>&1 || {
+  echo "timeout is required to stop sandboxd" >&2
+  exit 1
+}
 command -v pgrep >/dev/null 2>&1 || {
   echo "pgrep is required to stop sandboxd" >&2
   exit 1
 }
 command -v pkill >/dev/null 2>&1 || {
   echo "pkill is required to stop sandboxd" >&2
-  exit 1
-}
-command -v timeout >/dev/null 2>&1 || {
-  echo "timeout is required to stop sandboxd" >&2
   exit 1
 }
 
@@ -95,6 +93,43 @@ if command -v systemctl >/dev/null 2>&1; then
     fi
   fi
 fi
+
+if pgrep -f "^/opt/mistle/bin/sandboxd( |$)" >/dev/null 2>&1; then
+  pkill -TERM -f "^/opt/mistle/bin/sandboxd( |$)" || true
+  attempts=0
+  while pgrep -f "^/opt/mistle/bin/sandboxd( |$)" >/dev/null 2>&1; do
+    attempts=$((attempts + 1))
+    if test "$attempts" -ge 50; then
+      pkill -KILL -f "^/opt/mistle/bin/sandboxd( |$)" || true
+      break
+    fi
+    sleep 0.1
+  done
+fi
+
+if pgrep -f "^/opt/mistle/bin/sandboxd( |$)" >/dev/null 2>&1; then
+  echo "failed to stop sandboxd daemon" >&2
+  exit 1
+fi
+
+rm -f "$socket_path"
+`.trim();
+
+// Used by runtimes that start sandboxd directly instead of through systemd.
+// This avoids systemd stop/kill transactions while still clearing stale direct
+// daemon processes and sockets before restart.
+export const SandboxdStopDirectDaemonCommand = `
+set -eu
+
+socket_path="/run/mistle/sandboxd/control.sock"
+command -v pgrep >/dev/null 2>&1 || {
+  echo "pgrep is required to stop sandboxd" >&2
+  exit 1
+}
+command -v pkill >/dev/null 2>&1 || {
+  echo "pkill is required to stop sandboxd" >&2
+  exit 1
+}
 
 if pgrep -f "^/opt/mistle/bin/sandboxd( |$)" >/dev/null 2>&1; then
   pkill -TERM -f "^/opt/mistle/bin/sandboxd( |$)" || true

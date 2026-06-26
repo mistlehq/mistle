@@ -11,7 +11,7 @@ import {
   SandboxdInstallCommand,
   SandboxdInstallEnvVars,
   SandboxdResetTransparentEgressNftablesCommand,
-  SandboxdStopDaemonCommand,
+  SandboxdStopDirectDaemonCommand,
 } from "../../sandboxd-install.js";
 import type {
   SandboxRuntimeControl,
@@ -128,7 +128,7 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
             sandboxId: input.id,
             operation: TensorlakeClientOperationIds.STOP_SANDBOXD_DAEMON,
             commandDescription: "Stop sandboxd daemon",
-            ...createTensorlakeRootShellCommand({ script: SandboxdStopDaemonCommand }),
+            ...createTensorlakeRootShellCommand({ script: SandboxdStopDirectDaemonCommand }),
             user: TensorlakeRootProcessUser,
             timeoutMs: SandboxdStopDaemonTimeoutMs,
           });
@@ -222,7 +222,7 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
             sandboxId: input.id,
             operation: TensorlakeClientOperationIds.STOP_SANDBOXD_DAEMON,
             commandDescription: "Stop sandboxd daemon",
-            ...createTensorlakeRootShellCommand({ script: SandboxdStopDaemonCommand }),
+            ...createTensorlakeRootShellCommand({ script: SandboxdStopDirectDaemonCommand }),
             user: TensorlakeRootProcessUser,
             timeoutMs: SandboxdStopDaemonTimeoutMs,
           });

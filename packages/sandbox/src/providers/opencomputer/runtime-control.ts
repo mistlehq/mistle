@@ -11,7 +11,7 @@ import {
   SandboxdInstallCommand,
   SandboxdInstallEnvVars,
   SandboxdResetTransparentEgressNftablesCommand,
-  SandboxdStopDaemonCommand,
+  SandboxdStopDirectDaemonCommand,
 } from "../../sandboxd-install.js";
 import type {
   SandboxRuntimeControl,
@@ -123,7 +123,7 @@ export class OpenComputerSandboxRuntimeControl implements SandboxRuntimeControl 
             sandboxId: input.id,
             operation: OpenComputerClientOperationIds.STOP_SANDBOXD_DAEMON,
             commandDescription: "Stop sandboxd daemon",
-            ...createOpenComputerRootShellCommand({ script: SandboxdStopDaemonCommand }),
+            ...createOpenComputerRootShellCommand({ script: SandboxdStopDirectDaemonCommand }),
             timeoutMs: OpenComputerSandboxdStopDaemonTimeoutMs,
           });
           await this.#client.runCommand({
@@ -211,7 +211,7 @@ export class OpenComputerSandboxRuntimeControl implements SandboxRuntimeControl 
             sandboxId: input.id,
             operation: OpenComputerClientOperationIds.STOP_SANDBOXD_DAEMON,
             commandDescription: "Stop sandboxd daemon",
-            ...createOpenComputerRootShellCommand({ script: SandboxdStopDaemonCommand }),
+            ...createOpenComputerRootShellCommand({ script: SandboxdStopDirectDaemonCommand }),
             timeoutMs: OpenComputerSandboxdStopDaemonTimeoutMs,
           });
 

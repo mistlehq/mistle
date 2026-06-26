@@ -11,7 +11,7 @@ import {
   SandboxdInstallCommand,
   SandboxdInstallEnvVars,
   SandboxdResetTransparentEgressNftablesCommand,
-  SandboxdStopDaemonCommand,
+  SandboxdStopDirectDaemonCommand,
 } from "../../sandboxd-install.js";
 import type {
   SandboxRuntimeControl,
@@ -114,7 +114,7 @@ export class FreestyleSandboxRuntimeControl implements SandboxRuntimeControl {
             vmId: input.id,
             operation: FreestyleClientOperationIds.STOP_SANDBOXD_DAEMON,
             commandDescription: "Stop sandboxd daemon",
-            command: SandboxdStopDaemonCommand,
+            command: SandboxdStopDirectDaemonCommand,
             timeoutMs: FreestyleSandboxdStopDaemonTimeoutMs,
           });
           await this.#client.runCommand({
@@ -203,7 +203,7 @@ export class FreestyleSandboxRuntimeControl implements SandboxRuntimeControl {
             vmId: input.id,
             operation: FreestyleClientOperationIds.STOP_SANDBOXD_DAEMON,
             commandDescription: "Stop sandboxd daemon",
-            command: SandboxdStopDaemonCommand,
+            command: SandboxdStopDirectDaemonCommand,
             timeoutMs: FreestyleSandboxdStopDaemonTimeoutMs,
           });
         } catch (error) {
