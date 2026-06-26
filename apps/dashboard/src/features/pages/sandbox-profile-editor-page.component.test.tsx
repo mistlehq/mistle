@@ -30,6 +30,7 @@ import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-ap
 import {
   sandboxProfileDetailQueryKey,
   sandboxProfileIntegrationDirectoryQueryKey,
+  sandboxProfilesListQueryKey,
   sandboxProfileVersionTriggerConfigQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfileVersionPublishabilityQueryKey,
@@ -41,6 +42,7 @@ import type {
   SandboxProfileVersion,
   SandboxProfileVersionDraftTriggerImpactTrigger,
   SandboxProfileVersionPublishability,
+  SandboxProfilesListResult,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
 import type { TriggerSandboxProfileUsage } from "../triggers/triggers-service.js";
@@ -72,6 +74,7 @@ import {
   SandboxProfileEditorView,
   SandboxProfileSetupScriptPanel,
   buildSandboxProfileRuntimeDraftChanges,
+  removeDeletedSandboxProfileFromListQueries,
   resolveDraftSaveErrorOwner,
   resolveSandboxProfileEditorRefetchInterval,
   resolveSelectedSandboxProfileGitCommitSigningIntegrationConnectionId,
@@ -1172,6 +1175,90 @@ function getSetupScriptEditorView(editor: HTMLElement): EditorView {
 }
 
 describe("SandboxProfileEditorPage", () => {
+  it("removes a deleted profile from cached profile list pages before navigation", () => {
+    const queryClient = createTestQueryClient();
+    const firstPageKey = sandboxProfilesListQueryKey({
+      limit: 20,
+      after: null,
+      before: null,
+    });
+    const secondPageKey = sandboxProfilesListQueryKey({
+      limit: 20,
+      after: "sbp_deleted",
+      before: null,
+    });
+
+    queryClient.setQueryData(firstPageKey, {
+      items: [
+        {
+          activeVersion: null,
+          createdAt: "2026-03-05T00:00:00.000Z",
+          displayName: "Deleted profile",
+          id: "sbp_deleted",
+          organizationId: "org_123",
+          status: "active",
+          updatedAt: "2026-03-05T00:00:00.000Z",
+        },
+        {
+          activeVersion: 1,
+          createdAt: "2026-03-06T00:00:00.000Z",
+          displayName: "Kept profile",
+          id: "sbp_kept",
+          organizationId: "org_123",
+          status: "active",
+          updatedAt: "2026-03-06T00:00:00.000Z",
+        },
+      ],
+      nextPage: {
+        after: "sbp_kept",
+        limit: 20,
+      },
+      previousPage: null,
+      totalResults: 2,
+    } satisfies SandboxProfilesListResult);
+    queryClient.setQueryData(secondPageKey, {
+      items: [
+        {
+          activeVersion: null,
+          createdAt: "2026-03-07T00:00:00.000Z",
+          displayName: "Another profile",
+          id: "sbp_another",
+          organizationId: "org_123",
+          status: "active",
+          updatedAt: "2026-03-07T00:00:00.000Z",
+        },
+      ],
+      nextPage: null,
+      previousPage: {
+        before: "sbp_another",
+        limit: 20,
+      },
+      totalResults: 2,
+    } satisfies SandboxProfilesListResult);
+
+    removeDeletedSandboxProfileFromListQueries({
+      queryClient,
+      profileId: "sbp_deleted",
+    });
+
+    expect(queryClient.getQueryData<SandboxProfilesListResult>(firstPageKey)).toMatchObject({
+      items: [
+        {
+          id: "sbp_kept",
+        },
+      ],
+      totalResults: 1,
+    });
+    expect(queryClient.getQueryData<SandboxProfilesListResult>(secondPageKey)).toMatchObject({
+      items: [
+        {
+          id: "sbp_another",
+        },
+      ],
+      totalResults: 2,
+    });
+  });
+
   it("routes Mistle resource access draft save errors to runtime settings", () => {
     const owner = resolveDraftSaveErrorOwner(
       new SandboxProfilesApiError({

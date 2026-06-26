@@ -71,6 +71,7 @@ import { NavigationBlockerDialog } from "../navigation/navigation-blocker-dialog
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
+  SANDBOX_PROFILES_QUERY_KEY_PREFIX,
   sandboxProfileDetailQueryKey,
   sandboxProfileDuplicateTriggerUsagesQueryKey,
   sandboxProfileTriggerUsagesQueryKey,
@@ -104,6 +105,7 @@ import type {
   SandboxProfileVersionDraftTriggerImpact,
   SandboxProfileVersion,
   SandboxProfileVersionIntegrationBinding,
+  SandboxProfilesListResult,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { stopSandboxInstance } from "../sessions/sessions-service.js";
 import {
@@ -910,6 +912,34 @@ export function resolveSandboxProfileEditorRefetchInterval(input: {
   return shouldPollSandboxProfileSnapshotJobs(input.versions) ? 3_000 : false;
 }
 
+export function removeDeletedSandboxProfileFromListQueries(input: {
+  queryClient: QueryClient;
+  profileId: string;
+}): void {
+  input.queryClient.setQueriesData<SandboxProfilesListResult>(
+    {
+      queryKey: [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "list"],
+    },
+    (currentList) => {
+      if (currentList === undefined) {
+        return undefined;
+      }
+
+      const nextItems = currentList.items.filter((profile) => profile.id !== input.profileId);
+      const removedItemCount = currentList.items.length - nextItems.length;
+      if (removedItemCount === 0) {
+        return currentList;
+      }
+
+      return {
+        ...currentList,
+        items: nextItems,
+        totalResults: Math.max(0, currentList.totalResults - removedItemCount),
+      };
+    },
+  );
+}
+
 export function SandboxProfileEditorShell(): React.JSX.Element {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -1601,6 +1631,10 @@ function LoadedSandboxProfileEditorPage(
     onSuccess: async () => {
       setDeleteProfileError(null);
       setIsDeleteProfileDialogOpen(false);
+      removeDeletedSandboxProfileFromListQueries({
+        queryClient,
+        profileId: input.profileId,
+      });
       await Promise.all([
         input.invalidateSandboxProfiles(),
         input.invalidateProfileDetail(input.profileId),
