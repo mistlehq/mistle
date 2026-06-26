@@ -8,8 +8,8 @@ import {
   buildKlaviyoRefreshRequestBody,
   classifyKlaviyoRefreshFailure,
   createKlaviyoRefreshTransportFailure,
-  KlaviyoMcpOAuth2AuthorizationCodeCapability,
   parseKlaviyoDynamicClientRegistrationResponse,
+  parseKlaviyoTokenResponse,
   resolveKlaviyoAuthorizationCodeOrThrow,
   resolveKlaviyoCompleteGrantResult,
   resolveKlaviyoRefreshResult,
@@ -176,54 +176,25 @@ describe("Klaviyo OAuth 2.0 authorization code", () => {
   });
 
   it("accepts an empty token response scope and omits credential metadata", async () => {
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () =>
-      new Response(
-        JSON.stringify({
-          access_token: "access_123",
-          expires_in: 3600,
-          refresh_token: "refresh_456",
-          scope: "",
-          token_type: "Bearer",
-        }),
-        {
-          status: 200,
-          headers: {
-            "content-type": "application/json",
-          },
-        },
-      )) as typeof fetch;
+    const result = resolveKlaviyoCompleteGrantResult({
+      providerState: {
+        clientId: "klaviyo_client_123",
+      },
+      response: parseKlaviyoTokenResponse({
+        access_token: "access_123",
+        expires_in: 3600,
+        refresh_token: "refresh_456",
+        scope: "",
+        token_type: "Bearer",
+      }),
+      issuedAt: new Date("2026-06-15T00:00:00.000Z"),
+    });
 
-    try {
-      const result =
-        await KlaviyoMcpOAuth2AuthorizationCodeCapability.completeAuthorizationCodeGrant({
-          organizationId: "org_123",
-          targetKey: "klaviyo-mcp",
-          target: {
-            familyId: "klaviyo",
-            variantId: "klaviyo-mcp",
-            enabled: true,
-            config: {},
-            secrets: {},
-          },
-          pkceVerifier: "verifier_123",
-          providerState: {
-            clientId: "klaviyo_client_123",
-          },
-          query: new URLSearchParams({
-            code: "code_123",
-          }),
-          redirectUrl: "https://mistle.example.com/callback",
-        });
-
-      expect(result).toMatchObject({
-        accessToken: "access_123",
-        refreshToken: "refresh_456",
-      });
-      expect(result).not.toHaveProperty("credentialMetadata");
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    expect(result).toMatchObject({
+      accessToken: "access_123",
+      refreshToken: "refresh_456",
+    });
+    expect(result).not.toHaveProperty("credentialMetadata");
   });
 
   it("classifies permanent and temporary refresh failures", () => {

@@ -95,6 +95,10 @@ export function parseKlaviyoDynamicClientRegistrationResponse(input: unknown): {
   };
 }
 
+export function parseKlaviyoTokenResponse(input: unknown): KlaviyoTokenResponse {
+  return KlaviyoTokenResponseSchema.parse(input);
+}
+
 export function assertKlaviyoDynamicClientRegistrationSucceeded(input: {
   status: number;
   body: string;
@@ -375,7 +379,7 @@ export const KlaviyoMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Autho
 
     return resolveKlaviyoCompleteGrantResult({
       providerState,
-      response: KlaviyoTokenResponseSchema.parse(JSON.parse(tokenBody)),
+      response: parseKlaviyoTokenResponse(JSON.parse(tokenBody)),
       issuedAt: new Date(),
     });
   },
@@ -409,7 +413,7 @@ export const KlaviyoMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Autho
     }
 
     return resolveKlaviyoRefreshResult({
-      response: KlaviyoTokenResponseSchema.parse(JSON.parse(tokenBody)),
+      response: parseKlaviyoTokenResponse(JSON.parse(tokenBody)),
       issuedAt: new Date(),
     });
   },
