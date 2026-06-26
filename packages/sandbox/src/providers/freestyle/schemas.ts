@@ -63,6 +63,16 @@ export type FreestyleCaptureSandboxSnapshotRequest = z.output<
   typeof FreestyleCaptureSandboxSnapshotRequestSchema
 >;
 
+export const FreestyleCreateBuilderSandboxRequestSchema = z
+  .object({
+    name: z.string().trim().min(1),
+    idleTimeoutSeconds: z.number().int().positive().optional(),
+  })
+  .strict();
+export type FreestyleCreateBuilderSandboxRequest = z.output<
+  typeof FreestyleCreateBuilderSandboxRequestSchema
+>;
+
 export const FreestyleRuntimeControlRequestSchema = z
   .object({
     vmId: z.string().trim().min(1, {
@@ -81,7 +91,6 @@ export const FreestyleCreateSnapshotImageRequestSchema = z
   .object({
     imageId: z.string().trim().min(1),
     baseImageRef: z.string().trim().min(1),
-    cmddirBase64: z.string().trim().min(1),
     requestTimeoutMs: z.number().int().positive().optional(),
     sandboxd: z
       .object({

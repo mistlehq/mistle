@@ -11,7 +11,6 @@ import {
   SandboxProvider,
   type SandboxStartResources,
 } from "../../types.js";
-import { createFreestyleSnapshotSpec } from "./base-image-definition.js";
 import {
   FreestyleClientError,
   FreestyleClientErrorCodes,
@@ -23,7 +22,7 @@ import {
 } from "./client-errors.js";
 import {
   FreestyleCaptureSandboxSnapshotRequestSchema,
-  FreestyleCreateSnapshotImageRequestSchema,
+  FreestyleCreateBuilderSandboxRequestSchema,
   FreestyleRuntimeControlRequestSchema,
   FreestyleSandboxIdRequestSchema,
   FreestyleSnapshotStates,
@@ -32,7 +31,7 @@ import {
   memoryMbToGb,
   validateFreestyleStartResources,
   type FreestyleCaptureSandboxSnapshotRequest,
-  type FreestyleCreateSnapshotImageRequest,
+  type FreestyleCreateBuilderSandboxRequest,
   type FreestyleRuntimeControlRequest,
   type FreestyleSandboxIdRequest,
   type FreestyleSnapshotState,
@@ -99,6 +98,7 @@ const FreestyleVmInfoSchema = z.looseObject({
 });
 
 export type FreestyleStartSandboxResponse = { vmId: string };
+export type FreestyleCreateBuilderSandboxResponse = { vmId: string };
 export type FreestyleCaptureSandboxSnapshotResponse = { snapshotId: string };
 export type FreestyleRunCommandResponse = {
   readonly stdout: string;
@@ -114,9 +114,9 @@ export type FreestyleSnapshotInfo = {
 
 export interface FreestyleClient {
   prepareImage(request: { snapshotId: string }): Promise<{ snapshotId: string }>;
-  createSnapshotImage(
-    request: FreestyleCreateSnapshotImageRequest,
-  ): Promise<{ snapshotId: string }>;
+  createBuilderSandbox(
+    request: FreestyleCreateBuilderSandboxRequest,
+  ): Promise<FreestyleCreateBuilderSandboxResponse>;
   startSandbox(request: FreestyleStartSandboxRequest): Promise<FreestyleStartSandboxResponse>;
   inspectSandbox(request: FreestyleSandboxIdRequest): Promise<FreestyleSandboxInspectResult>;
   resumeSandbox(request: FreestyleSandboxIdRequest): Promise<FreestyleStartSandboxResponse>;
@@ -308,26 +308,20 @@ export class FreestyleApiClient implements FreestyleClient {
     }
   }
 
-  async createSnapshotImage(
-    request: FreestyleCreateSnapshotImageRequest,
-  ): Promise<{ snapshotId: string }> {
-    const parsedRequest = FreestyleCreateSnapshotImageRequestSchema.parse(request);
+  async createBuilderSandbox(
+    request: FreestyleCreateBuilderSandboxRequest,
+  ): Promise<FreestyleCreateBuilderSandboxResponse> {
+    const parsedRequest = FreestyleCreateBuilderSandboxRequestSchema.parse(request);
 
     try {
-      const response = await this.#sdkJsonRequest({
-        method: "POST",
-        path: "/v1/vms/snapshots",
-        body: {
-          name: parsedRequest.imageId,
-          persistence: { type: "persistent" },
-          spec: createFreestyleSnapshotSpec(parsedRequest),
-        },
-        schema: CreateSnapshotResponseSchema,
-        ...(parsedRequest.requestTimeoutMs === undefined
+      const response = await this.#sdk.vms.create({
+        name: parsedRequest.name,
+        ...(parsedRequest.idleTimeoutSeconds === undefined
           ? {}
-          : { timeoutMs: parsedRequest.requestTimeoutMs }),
+          : { idleTimeoutSeconds: parsedRequest.idleTimeoutSeconds }),
       });
-      return { snapshotId: response.snapshotId };
+      const parsedResponse = CreateVmResponseSchema.parse(response);
+      return { vmId: parsedResponse.id };
     } catch (error) {
       throw mapFreestyleClientError(FreestyleClientOperationIds.BUILD_BASE_IMAGE, error);
     }
@@ -603,27 +597,6 @@ export class FreestyleApiClient implements FreestyleClient {
     if (response.status === 204) {
       return input.schema.parse(undefined);
     }
-    return input.schema.parse(await response.json());
-  }
-
-  async #sdkJsonRequest<Output>(input: {
-    method: string;
-    path: string;
-    body?: unknown;
-    schema: z.ZodType<Output>;
-    timeoutMs?: number;
-  }): Promise<Output> {
-    const response = await this.#sdk.fetch(input.path, {
-      method: input.method,
-      headers: { "Content-Type": "application/json" },
-      ...(input.body === undefined ? {} : { body: JSON.stringify(input.body) }),
-      ...(input.timeoutMs === undefined ? {} : { signal: AbortSignal.timeout(input.timeoutMs) }),
-    });
-
-    if (!response.ok) {
-      throw await createHttpError(response);
-    }
-
     return input.schema.parse(await response.json());
   }
 
