@@ -230,10 +230,12 @@ function LoadedWebhookTriggerEditor(input: {
       formError={state.formError}
       validationSummaryError={state.validationSummaryError}
       isDeleting={state.isDeleting}
+      isDuplicating={state.isDuplicating}
       isSaving={state.isSaving}
       triggerTypeField={input.triggerTypeField}
       mode={input.mode}
       onDelete={state.onRequestDelete}
+      onDuplicate={state.onDuplicate}
       onViewActivity={onViewActivity}
       onSubmit={state.onSubmit}
       onValueChange={state.onValueChange}

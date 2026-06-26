@@ -49,9 +49,11 @@ describe("ScheduledTriggerForm", () => {
         formError={null}
         validationSummaryError="Please address the fields highlighted in red."
         isDeleting={false}
+        isDuplicating={false}
         isSaving={false}
         mode="create"
         onDelete={null}
+        onDuplicate={null}
         onSubmit={() => {}}
         onValueChange={() => {}}
         sandboxProfileOptions={SandboxProfileOptions}

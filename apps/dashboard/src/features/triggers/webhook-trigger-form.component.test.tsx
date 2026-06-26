@@ -140,6 +140,7 @@ describe("WebhookTriggerForm", () => {
     fieldErrors?: WebhookTriggerFormFieldErrors;
     primaryRepositoryOptions?: readonly WebhookTriggerFormOption[];
     onDelete?: () => void;
+    onDuplicate?: () => void;
     onSubmit?: () => void;
     onViewActivity?: () => void;
     onValueChange?: (
@@ -157,9 +158,13 @@ describe("WebhookTriggerForm", () => {
           formError={null}
           validationSummaryError={null}
           isDeleting={input.isDeleting ?? false}
+          isDuplicating={false}
           isSaving={input.isSaving ?? false}
           mode={input.mode ?? "create"}
           onDelete={(input.mode ?? "create") === "edit" ? (input.onDelete ?? (() => {})) : null}
+          onDuplicate={
+            (input.mode ?? "create") === "edit" ? (input.onDuplicate ?? (() => {})) : null
+          }
           onSubmit={input.onSubmit ?? (() => {})}
           onViewActivity={input.onViewActivity ?? null}
           onValueChange={input.onValueChange ?? (() => {})}
@@ -316,6 +321,7 @@ describe("WebhookTriggerForm", () => {
 
   it("renders edit-page save access in the header and keeps activity and delete under more actions", () => {
     let deleteCount = 0;
+    let duplicateCount = 0;
     let submitCount = 0;
     let viewActivityCount = 0;
 
@@ -323,6 +329,9 @@ describe("WebhookTriggerForm", () => {
       mode: "edit",
       onDelete: () => {
         deleteCount += 1;
+      },
+      onDuplicate: () => {
+        duplicateCount += 1;
       },
       onSubmit: () => {
         submitCount += 1;
@@ -350,9 +359,12 @@ describe("WebhookTriggerForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "More trigger actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "View Activity" }));
     fireEvent.click(screen.getByRole("button", { name: "More trigger actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate trigger" }));
+    fireEvent.click(screen.getByRole("button", { name: "More trigger actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Delete trigger" }));
 
     expect(viewActivityCount).toBe(1);
+    expect(duplicateCount).toBe(1);
     expect(deleteCount).toBe(1);
   });
 
@@ -448,9 +460,11 @@ describe("WebhookTriggerForm", () => {
           formError={null}
           validationSummaryError={null}
           isDeleting={false}
+          isDuplicating={false}
           isSaving={false}
           mode="create"
           onDelete={null}
+          onDuplicate={null}
           onSubmit={() => {}}
           onValueChange={() => {}}
           sandboxProfileOptions={SandboxProfileOptions}
@@ -572,9 +586,11 @@ describe("WebhookTriggerForm", () => {
           formError={null}
           validationSummaryError="Please address the fields highlighted in red."
           isDeleting={false}
+          isDuplicating={false}
           isSaving={false}
           mode="create"
           onDelete={null}
+          onDuplicate={null}
           onSubmit={() => {}}
           onValueChange={() => {}}
           sandboxProfileOptions={SandboxProfileOptions}
@@ -611,9 +627,11 @@ describe("WebhookTriggerForm", () => {
           formError="The selected events do not support this trigger setup."
           validationSummaryError={null}
           isDeleting={false}
+          isDuplicating={false}
           isSaving={false}
           mode="create"
           onDelete={null}
+          onDuplicate={null}
           onSubmit={() => {}}
           onValueChange={() => {}}
           sandboxProfileOptions={SandboxProfileOptions}

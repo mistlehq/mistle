@@ -89,12 +89,14 @@ type WebhookTriggerFormProps = {
   formError: string | null;
   isSaving: boolean;
   isDeleting: boolean;
+  isDuplicating: boolean;
   triggerTypeField?: ReactNode;
   onValueChange: (
     key: WebhookTriggerFormValueKey,
     value: string | boolean | string[] | WebhookTriggerEventParameterRuleMap,
   ) => void;
   onSubmit: () => void;
+  onDuplicate: (() => void) | null;
   onDelete: (() => void) | null;
   onViewActivity?: (() => void) | null;
 };
@@ -284,10 +286,12 @@ export function WebhookTriggerForm(input: WebhookTriggerFormProps): React.JSX.El
       inputTemplatePlaceholderText={DefaultWebhookTriggerMessageTemplate}
       inputTemplateTokens={formState.agentInstructionTokens}
       isDeleting={input.isDeleting}
+      isDuplicating={input.isDuplicating}
       isSaving={input.isSaving}
       mode={input.mode}
       name={input.values.name}
       onDelete={input.onDelete}
+      onDuplicate={input.onDuplicate}
       onSubmit={input.onSubmit}
       onViewActivity={input.onViewActivity ?? null}
       onValueChange={(key, value) => {

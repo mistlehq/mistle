@@ -43,6 +43,7 @@ import {
 import {
   createWebhookTrigger,
   deleteWebhookTrigger,
+  duplicateWebhookTrigger,
   updateWebhookTrigger,
 } from "./webhook-triggers-service.js";
 import type { WebhookTrigger } from "./webhook-triggers-types.js";
@@ -345,9 +346,11 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
   deleteError: string | null;
   isDeleteDialogOpen: boolean;
   isDeleting: boolean;
+  isDuplicating: boolean;
   isSaving: boolean;
   onDeleteDialogOpenChange: (isOpen: boolean) => void;
   onRequestDelete: (() => void) | null;
+  onDuplicate: (() => void) | null;
   onConfirmDelete: () => void;
   onSubmit: () => void;
   onValueChange: (
@@ -594,6 +597,30 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
     },
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: async () => {
+      if (input.triggerId === undefined) {
+        throw new Error("Trigger id is required.");
+      }
+
+      return duplicateWebhookTrigger({
+        triggerId: input.triggerId,
+      });
+    },
+    onSuccess: async (trigger) => {
+      await invalidateTriggersQuery(queryClient);
+      await input.navigate(`/triggers/${trigger.id}`);
+    },
+    onError: (error: unknown) => {
+      setFormError(
+        resolveTriggerMutationErrorMessage({
+          error,
+          fallbackMessage: "Could not duplicate trigger.",
+        }),
+      );
+    },
+  });
+
   function onValueChange(
     key: keyof WebhookTriggerFormValues,
     value: string | boolean | string[] | WebhookTriggerFormValues["eventParameterRules"],
@@ -706,6 +733,11 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
     deleteMutation.mutate();
   }
 
+  function onDuplicate(): void {
+    setFormError(null);
+    duplicateMutation.mutate();
+  }
+
   return {
     connectionOptions: input.connectionOptions,
     sandboxProfileOptions,
@@ -720,9 +752,11 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
     deleteError,
     isDeleteDialogOpen,
     isDeleting: deleteMutation.isPending,
+    isDuplicating: duplicateMutation.isPending,
     isSaving: createMutation.isPending || updateMutation.isPending,
     onDeleteDialogOpenChange: setIsDeleteDialogOpen,
     onRequestDelete: input.mode === "edit" ? requestDelete : null,
+    onDuplicate: input.mode === "edit" ? onDuplicate : null,
     onConfirmDelete: confirmDelete,
     onSubmit,
     onValueChange,

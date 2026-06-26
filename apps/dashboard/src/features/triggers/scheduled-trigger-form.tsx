@@ -33,9 +33,11 @@ type ScheduledTriggerFormProps = {
   formError: string | null;
   isSaving: boolean;
   isDeleting: boolean;
+  isDuplicating: boolean;
   triggerTypeField?: ReactNode;
   onValueChange: (key: ScheduledTriggerFormValueKey, value: string | boolean) => void;
   onSubmit: () => void;
+  onDuplicate: (() => void) | null;
   onDelete: (() => void) | null;
   onViewActivity?: (() => void) | null;
 };
@@ -185,10 +187,12 @@ export function ScheduledTriggerForm(input: ScheduledTriggerFormProps): React.JS
       inputTemplateLabelId={inputTemplateLabelId}
       inputTemplateTokens={[]}
       isDeleting={input.isDeleting}
+      isDuplicating={input.isDuplicating}
       isSaving={input.isSaving}
       mode={input.mode}
       name={input.values.name}
       onDelete={input.onDelete}
+      onDuplicate={input.onDuplicate}
       onSubmit={input.onSubmit}
       onViewActivity={input.onViewActivity ?? null}
       onValueChange={(key, value) => {

@@ -948,10 +948,12 @@ export function CreateTriggerEditor(input: CreateTriggerEditorProps): React.JSX.
         : {})}
       inputTemplateTokens={state.kind === "trigger" ? formState.agentInstructionTokens : []}
       isDeleting={false}
+      isDuplicating={false}
       isSaving={state.isSaving}
       mode="create"
       name={state.formValues.name}
       onDelete={null}
+      onDuplicate={null}
       onSubmit={state.onSubmit}
       onViewActivity={null}
       onValueChange={(key, value) => {

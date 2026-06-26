@@ -15777,7 +15777,8 @@ export interface paths {
                     | "INVALID_SCHEDULE"
                     | "INVALID_SANDBOX_PROFILE_REFERENCE"
                     | "INVALID_SANDBOX_PROFILE_VERSION_REFERENCE"
-                    | "INVALID_PRIMARY_REPOSITORY";
+                    | "INVALID_PRIMARY_REPOSITORY"
+                    | "UNSUPPORTED_DUPLICATE_SCHEDULE_KIND";
                   message: string;
                 }
               | {
@@ -16154,6 +16155,130 @@ export interface paths {
         };
       };
     };
+    trace?: never;
+  };
+  "/v1/triggers/schedules/{triggerId}/duplicate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          triggerId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Duplicate a recurring scheduled trigger as disabled. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationKeyTemplate: string;
+              createdAt: string;
+              enabled: boolean;
+              id: string;
+              idempotencyKeyTemplate: string | null;
+              inputTemplate: string;
+              /** @enum {string} */
+              kind: "schedule";
+              name: string;
+              schedule: {
+                cronExpression: string | null;
+                enabled: boolean;
+                id: string;
+                /** @enum {string} */
+                kind: "recurring" | "one_off";
+                lastScheduledAt: string | null;
+                name: string;
+                nextScheduledAt: string | null;
+                startAt: string | null;
+                timezone: string | null;
+              };
+              target: {
+                id: string;
+                primaryRepositoryId: string | null;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "UNSUPPORTED_DUPLICATE_SCHEDULE_KIND";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Scheduled trigger was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   "/v1/triggers/webhooks": {
@@ -16610,6 +16735,120 @@ export interface paths {
         };
       };
     };
+    trace?: never;
+  };
+  "/v1/triggers/webhooks/{triggerId}/duplicate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          triggerId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Duplicate a webhook trigger as disabled. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationKeyTemplate: string;
+              createdAt: string;
+              enabled: boolean;
+              eventConditions: {
+                eventType: string;
+                payloadFilter?: {
+                  [key: string]: unknown;
+                } | null;
+              }[];
+              id: string;
+              idempotencyKeyTemplate: string | null;
+              inputTemplate: string;
+              instructions: string | null;
+              integrationWebhookSourceId: string;
+              /** @enum {string} */
+              kind: "webhook";
+              name: string;
+              target: {
+                id: string;
+                primaryRepositoryId: string | null;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Webhook trigger was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
 }

@@ -18,6 +18,7 @@ import type {
 import {
   createScheduledTrigger,
   deleteScheduledTrigger,
+  duplicateScheduledTrigger,
   updateScheduledTrigger,
 } from "./scheduled-triggers-service.js";
 import type { TriggerCreateSuccessPath } from "./trigger-editor-navigation.js";
@@ -140,9 +141,11 @@ export function useLoadedScheduledTriggerEditorState(
   deleteError: string | null;
   isDeleteDialogOpen: boolean;
   isDeleting: boolean;
+  isDuplicating: boolean;
   isSaving: boolean;
   onDeleteDialogOpenChange: (isOpen: boolean) => void;
   onRequestDelete: (() => void) | null;
+  onDuplicate: (() => void) | null;
   onConfirmDelete: () => void;
   onSubmit: () => void;
   onValueChange: (key: ScheduledTriggerFormValueKey, value: string | boolean) => void;
@@ -326,6 +329,33 @@ export function useLoadedScheduledTriggerEditorState(
     },
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: async () => {
+      if (input.triggerId === undefined) {
+        throw new Error("Trigger id is required.");
+      }
+
+      return duplicateScheduledTrigger({
+        triggerId: input.triggerId,
+      });
+    },
+    onSuccess: async (trigger) => {
+      await invalidateTriggersQuery({
+        queryClient,
+        triggerId: input.triggerId,
+      });
+      await input.navigate(`/triggers/${trigger.id}`);
+    },
+    onError: (error: unknown) => {
+      setFormError(
+        resolveTriggerMutationErrorMessage({
+          error,
+          fallbackMessage: "Could not duplicate trigger.",
+        }),
+      );
+    },
+  });
+
   function onValueChange(key: ScheduledTriggerFormValueKey, value: string | boolean): void {
     const nextValues = applyScheduledTriggerValueChange({
       values: formValues,
@@ -392,6 +422,11 @@ export function useLoadedScheduledTriggerEditorState(
     deleteMutation.mutate();
   }
 
+  function onDuplicate(): void {
+    setFormError(null);
+    duplicateMutation.mutate();
+  }
+
   return {
     sandboxProfileOptions,
     primaryRepositoryOptions,
@@ -402,9 +437,11 @@ export function useLoadedScheduledTriggerEditorState(
     deleteError,
     isDeleteDialogOpen,
     isDeleting: deleteMutation.isPending,
+    isDuplicating: duplicateMutation.isPending,
     isSaving: createMutation.isPending || updateMutation.isPending,
     onDeleteDialogOpenChange: setIsDeleteDialogOpen,
     onRequestDelete: input.mode === "edit" ? requestDelete : null,
+    onDuplicate: input.mode === "edit" ? onDuplicate : null,
     onConfirmDelete: confirmDelete,
     onSubmit,
     onValueChange,

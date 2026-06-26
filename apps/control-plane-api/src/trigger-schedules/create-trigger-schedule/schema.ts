@@ -46,6 +46,7 @@ const CreateTriggerScheduleBadRequestCodeSchema = z.enum([
   TriggerSchedulesBadRequestCodes.INVALID_SANDBOX_PROFILE_REFERENCE,
   TriggerSchedulesBadRequestCodes.INVALID_SANDBOX_PROFILE_VERSION_REFERENCE,
   TriggerSchedulesBadRequestCodes.INVALID_PRIMARY_REPOSITORY,
+  TriggerSchedulesBadRequestCodes.UNSUPPORTED_DUPLICATE_SCHEDULE_KIND,
 ]);
 
 export const CreateTriggerScheduleBadRequestResponseSchema = z.union([
