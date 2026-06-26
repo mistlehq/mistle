@@ -18,7 +18,7 @@ import {
   Switch,
   cn,
 } from "@mistle/ui";
-import { ClockCounterClockwiseIcon, TrashIcon } from "@phosphor-icons/react";
+import { ClockCounterClockwiseIcon, CopyIcon, TrashIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
@@ -54,8 +54,10 @@ type TriggerFormShellProps = {
   fieldErrors: Partial<Record<CommonTriggerFormValueKey, string>>;
   validationSummaryError: string | null;
   formError: string | null;
+  formErrorTitle: string;
   isSaving: boolean;
   isDeleting: boolean;
+  isDuplicating: boolean;
   triggerTypeField?: ReactNode;
   typeSpecificSection: ReactNode;
   extraSectionsBeforeMessage?: ReactNode;
@@ -73,6 +75,7 @@ type TriggerFormShellProps = {
   inputIdPrefix: string;
   onValueChange: (key: CommonTriggerFormValueKey, value: string | boolean) => void;
   onSubmit: () => void;
+  onDuplicate: (() => void) | null;
   onDelete: (() => void) | null;
   onViewActivity: (() => void) | null;
 };
@@ -172,7 +175,7 @@ function TriggerFormSelectControl(input: {
 }
 
 export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Element {
-  const disabled = input.isDeleting || input.isSaving;
+  const disabled = input.isDeleting || input.isSaving || input.isDuplicating;
   const submitButtonLabel = input.isSaving ? "Saving..." : input.submitLabel;
   const triggerEnabledId = `${input.inputIdPrefix}-enabled`;
   const triggerNameId = `${input.inputIdPrefix}-name`;
@@ -250,7 +253,9 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
               {submitButtonLabel}
             </Button>
 
-            {input.onDelete === null && input.onViewActivity === null ? null : (
+            {input.onDuplicate === null &&
+            input.onDelete === null &&
+            input.onViewActivity === null ? null : (
               <MoreActionsMenu
                 disabled={disabled}
                 triggerIconVariant="chevron-down"
@@ -262,6 +267,12 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
                   <DropdownMenuItem disabled={disabled} onClick={input.onViewActivity}>
                     <ClockCounterClockwiseIcon aria-hidden className="size-4" />
                     View Activity
+                  </DropdownMenuItem>
+                )}
+                {input.onDuplicate === null ? null : (
+                  <DropdownMenuItem disabled={disabled} onClick={input.onDuplicate}>
+                    <CopyIcon aria-hidden className="size-4" />
+                    Duplicate trigger
                   </DropdownMenuItem>
                 )}
                 {input.onDelete === null ? null : (
@@ -281,7 +292,7 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
       ) : null}
 
       {input.formError === null ? null : (
-        <Notice title="Trigger could not be saved" variant="alert">
+        <Notice title={input.formErrorTitle} variant="alert">
           {input.formError}
         </Notice>
       )}

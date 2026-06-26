@@ -12,7 +12,10 @@ import { getSandboxProfileVersionTriggerConfig } from "../sandbox-profiles/sandb
 import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { TriggerCreateSuccessPath } from "./trigger-editor-navigation.js";
 import type { TriggerFormShellStatusMessage } from "./trigger-form-shell.js";
-import { TRIGGERS_QUERY_KEY_PREFIX } from "./triggers-query-keys.js";
+import {
+  TRIGGERS_LIST_QUERY_KEY_PREFIX,
+  TRIGGERS_QUERY_KEY_PREFIX,
+} from "./triggers-query-keys.js";
 import { useSelectedSandboxProfileVersion } from "./use-selected-sandbox-profile-version.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-trigger-conversation-key-field.js";
 import {
@@ -43,6 +46,7 @@ import {
 import {
   createWebhookTrigger,
   deleteWebhookTrigger,
+  duplicateWebhookTrigger,
   updateWebhookTrigger,
 } from "./webhook-triggers-service.js";
 import type { WebhookTrigger } from "./webhook-triggers-types.js";
@@ -181,6 +185,12 @@ async function invalidateTriggersQuery(queryClient: QueryClient): Promise<void> 
   });
 }
 
+async function invalidateTriggersListQuery(queryClient: QueryClient): Promise<void> {
+  await queryClient.invalidateQueries({
+    queryKey: TRIGGERS_LIST_QUERY_KEY_PREFIX,
+  });
+}
+
 function applyWebhookTriggerValueChange(input: {
   values: WebhookTriggerFormValues;
   key: keyof WebhookTriggerFormValues;
@@ -237,6 +247,7 @@ type LoadedWebhookTriggerEditorStateInput = {
   triggerId: string | undefined;
   navigate: NavigateFunction;
   createSuccessPath?: TriggerCreateSuccessPath;
+  duplicateSuccessPath?: TriggerCreateSuccessPath;
   deleteSuccessPath?: string;
   initialValues: WebhookTriggerFormValues;
   initialSandboxProfileVersion?: number;
@@ -342,12 +353,15 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
   fieldErrors: WebhookTriggerFormFieldErrors;
   validationSummaryError: string | null;
   formError: string | null;
+  formErrorTitle: string;
   deleteError: string | null;
   isDeleteDialogOpen: boolean;
   isDeleting: boolean;
+  isDuplicating: boolean;
   isSaving: boolean;
   onDeleteDialogOpenChange: (isOpen: boolean) => void;
   onRequestDelete: (() => void) | null;
+  onDuplicate: (() => void) | null;
   onConfirmDelete: () => void;
   onSubmit: () => void;
   onValueChange: (
@@ -360,6 +374,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
   const [fieldErrors, setFieldErrors] = useState<WebhookTriggerFormFieldErrors>({});
   const [validationSummaryError, setValidationSummaryError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [formErrorTitle, setFormErrorTitle] = useState("Trigger could not be saved");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const selectedProfileId = formValues.sandboxProfileId.trim();
@@ -519,6 +534,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
       });
       setValidationSummaryError(null);
       setFormError(null);
+      setFormErrorTitle("Trigger could not be saved");
       await invalidateTriggersQuery(queryClient);
       await input.navigate(
         input.createSuccessPath === undefined
@@ -527,6 +543,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
       );
     },
     onError: (error: unknown) => {
+      setFormErrorTitle("Trigger could not be saved");
       setFormError(
         resolveTriggerMutationErrorMessage({
           error,
@@ -558,9 +575,11 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
       setFieldErrors({});
       setValidationSummaryError(null);
       setFormError(null);
+      setFormErrorTitle("Trigger could not be saved");
       await invalidateTriggersQuery(queryClient);
     },
     onError: (error: unknown) => {
+      setFormErrorTitle("Trigger could not be saved");
       setFormError(
         resolveTriggerMutationErrorMessage({
           error,
@@ -589,6 +608,35 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
         resolveTriggerMutationErrorMessage({
           error,
           fallbackMessage: "Could not delete trigger.",
+        }),
+      );
+    },
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: async () => {
+      if (input.triggerId === undefined) {
+        throw new Error("Trigger id is required.");
+      }
+
+      return duplicateWebhookTrigger({
+        triggerId: input.triggerId,
+      });
+    },
+    onSuccess: async (trigger) => {
+      await invalidateTriggersListQuery(queryClient);
+      await input.navigate(
+        input.duplicateSuccessPath === undefined
+          ? `/triggers/${trigger.id}`
+          : input.duplicateSuccessPath(trigger),
+      );
+    },
+    onError: (error: unknown) => {
+      setFormErrorTitle("Trigger could not be duplicated");
+      setFormError(
+        resolveTriggerMutationErrorMessage({
+          error,
+          fallbackMessage: "Could not duplicate trigger.",
         }),
       );
     },
@@ -672,6 +720,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
   }
 
   function onSubmit(): void {
+    setFormErrorTitle("Trigger could not be saved");
     const nextFieldErrors = validateWebhookTriggerFormValues(formValues, webhookEventOptions);
     if (hasActiveProfileVersion === false) {
       nextFieldErrors.sandboxProfileId = resolveNoActiveProfileVersionMessage({
@@ -706,6 +755,11 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
     deleteMutation.mutate();
   }
 
+  function onDuplicate(): void {
+    setFormError(null);
+    duplicateMutation.mutate();
+  }
+
   return {
     connectionOptions: input.connectionOptions,
     sandboxProfileOptions,
@@ -717,12 +771,15 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
     fieldErrors,
     validationSummaryError,
     formError,
+    formErrorTitle,
     deleteError,
     isDeleteDialogOpen,
     isDeleting: deleteMutation.isPending,
+    isDuplicating: duplicateMutation.isPending,
     isSaving: createMutation.isPending || updateMutation.isPending,
     onDeleteDialogOpenChange: setIsDeleteDialogOpen,
     onRequestDelete: input.mode === "edit" ? requestDelete : null,
+    onDuplicate: input.mode === "edit" ? onDuplicate : null,
     onConfirmDelete: confirmDelete,
     onSubmit,
     onValueChange,

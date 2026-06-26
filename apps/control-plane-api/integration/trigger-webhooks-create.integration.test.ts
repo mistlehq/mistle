@@ -10,6 +10,7 @@ import { TriggerWebhookSchema } from "../src/trigger-webhooks/schemas.js";
 import {
   createWebhookTriggerRequestBody,
   GitHubIssueCommentCreatedEventType,
+  seedPersistedWebhookTrigger,
   seedTriggerWebhookTargets,
   seedWebhookTriggerFixture,
 } from "./helpers/trigger-webhooks.js";
@@ -97,6 +98,65 @@ describe.concurrent("trigger webhooks create integration", () => {
     expect(persistedTarget.sandboxProfileId).toBe("sbp_trigger_webhook_create");
     expect(persistedTarget.sandboxProfileVersion).toBe(3);
     expect(persistedTarget.primaryRepositoryId).toBeNull();
+  });
+
+  it("duplicates a webhook trigger as disabled with the same configuration", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-trigger-webhooks-duplicate@example.com",
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_trigger_webhook_duplicate",
+      webhookSourceId: "iws_trigger_webhook_duplicate",
+      profileId: "sbp_trigger_webhook_duplicate",
+      profileVersion: 3,
+      bindingRepositories: ["mistlehq/platform"],
+    });
+    await seedPersistedWebhookTrigger(env, {
+      triggerId: "trg_trigger_webhook_duplicate",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_trigger_webhook_duplicate",
+      profileId: "sbp_trigger_webhook_duplicate",
+      profileVersion: 3,
+      targetId: "tgt_trigger_webhook_duplicate",
+      name: "GitHub Issue Comments",
+      primaryRepositoryId: "mistlehq/platform",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/triggers/webhooks/trg_trigger_webhook_duplicate/duplicate",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const body = TriggerWebhookSchema.parse(await response.json());
+    expect(body.id).not.toBe("trg_trigger_webhook_duplicate");
+    expect(body.name).toBe("GitHub Issue Comments copy");
+    expect(body.enabled).toBe(false);
+    expect(body.integrationWebhookSourceId).toBe("iws_trigger_webhook_duplicate");
+    expect(body.eventConditions).toEqual([
+      {
+        eventType: GitHubIssueCommentCreatedEventType,
+        payloadFilter: {
+          op: "eq",
+          path: ["action"],
+          value: "created",
+        },
+      },
+    ]);
+    expect(body.inputTemplate).toBe("Handle payload");
+    expect(body.instructions).toBe("Prefer deterministic reproduction steps.");
+    expect(body.conversationKeyTemplate).toBe("{{payload.issue.node_id}}");
+    expect(body.idempotencyKeyTemplate).toBe("{{payload.comment.node_id}}");
+    expect(body.target.sandboxProfileId).toBe("sbp_trigger_webhook_duplicate");
+    expect(body.target.sandboxProfileVersion).toBe(3);
+    expect(body.target.primaryRepositoryId).toBe("mistlehq/platform");
   });
 
   it("uses the active sandbox profile version when the request omits a target version", async ({

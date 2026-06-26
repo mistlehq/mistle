@@ -125,6 +125,35 @@ export async function updateWebhookTrigger(input: {
   }
 }
 
+export async function duplicateWebhookTrigger(input: {
+  triggerId: string;
+  signal?: AbortSignal;
+}): Promise<WebhookTrigger> {
+  try {
+    const response = await requestControlPlane({
+      operation: "duplicateWebhookTrigger",
+      method: "POST",
+      pathname: `/v1/triggers/webhooks/${encodeURIComponent(input.triggerId)}/duplicate`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not duplicate webhook trigger.",
+      errorFactory: createWebhookTriggersApiError,
+    });
+
+    return await readJsonWithSchema({
+      response,
+      schema: WebhookTriggerSchema,
+      operation: "duplicateWebhookTrigger",
+      invalidMessage: "Duplicate webhook trigger response payload is invalid.",
+    });
+  } catch (error) {
+    throw toWebhookTriggersApiError({
+      operation: "duplicateWebhookTrigger",
+      error,
+      fallbackMessage: "Could not duplicate webhook trigger.",
+    });
+  }
+}
+
 export async function deleteWebhookTrigger(input: {
   triggerId: string;
   signal?: AbortSignal;

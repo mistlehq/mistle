@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  TRIGGERS_LIST_QUERY_KEY_PREFIX,
   TRIGGERS_QUERY_KEY_PREFIX,
   triggerActivityQueryKey,
   triggerDetailQueryKey,
@@ -12,6 +13,10 @@ import {
 describe("triggers query keys", () => {
   it("builds the shared triggers prefix", () => {
     expect(TRIGGERS_QUERY_KEY_PREFIX).toEqual(["triggers"]);
+  });
+
+  it("builds the triggers list prefix", () => {
+    expect(TRIGGERS_LIST_QUERY_KEY_PREFIX).toEqual(["triggers", "list"]);
   });
 
   it("builds the list query key", () => {

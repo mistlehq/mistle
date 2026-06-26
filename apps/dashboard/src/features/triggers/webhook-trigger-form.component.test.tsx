@@ -133,6 +133,7 @@ describe("WebhookTriggerForm", () => {
     mode?: "create" | "edit";
     values?: WebhookTriggerFormValues;
     isDeleting?: boolean;
+    isDuplicating?: boolean;
     isSaving?: boolean;
     triggerPickerDisabledState?: WebhookTriggerEventPickerDisabledState | null;
     sandboxProfileStatusMessage?: TriggerFormShellStatusMessage | undefined;
@@ -140,6 +141,7 @@ describe("WebhookTriggerForm", () => {
     fieldErrors?: WebhookTriggerFormFieldErrors;
     primaryRepositoryOptions?: readonly WebhookTriggerFormOption[];
     onDelete?: () => void;
+    onDuplicate?: () => void;
     onSubmit?: () => void;
     onViewActivity?: () => void;
     onValueChange?: (
@@ -157,9 +159,13 @@ describe("WebhookTriggerForm", () => {
           formError={null}
           validationSummaryError={null}
           isDeleting={input.isDeleting ?? false}
+          isDuplicating={input.isDuplicating ?? false}
           isSaving={input.isSaving ?? false}
           mode={input.mode ?? "create"}
           onDelete={(input.mode ?? "create") === "edit" ? (input.onDelete ?? (() => {})) : null}
+          onDuplicate={
+            (input.mode ?? "create") === "edit" ? (input.onDuplicate ?? (() => {})) : null
+          }
           onSubmit={input.onSubmit ?? (() => {})}
           onViewActivity={input.onViewActivity ?? null}
           onValueChange={input.onValueChange ?? (() => {})}
@@ -316,6 +322,7 @@ describe("WebhookTriggerForm", () => {
 
   it("renders edit-page save access in the header and keeps activity and delete under more actions", () => {
     let deleteCount = 0;
+    let duplicateCount = 0;
     let submitCount = 0;
     let viewActivityCount = 0;
 
@@ -323,6 +330,9 @@ describe("WebhookTriggerForm", () => {
       mode: "edit",
       onDelete: () => {
         deleteCount += 1;
+      },
+      onDuplicate: () => {
+        duplicateCount += 1;
       },
       onSubmit: () => {
         submitCount += 1;
@@ -350,9 +360,12 @@ describe("WebhookTriggerForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "More trigger actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "View Activity" }));
     fireEvent.click(screen.getByRole("button", { name: "More trigger actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate trigger" }));
+    fireEvent.click(screen.getByRole("button", { name: "More trigger actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Delete trigger" }));
 
     expect(viewActivityCount).toBe(1);
+    expect(duplicateCount).toBe(1);
     expect(deleteCount).toBe(1);
   });
 
@@ -375,6 +388,60 @@ describe("WebhookTriggerForm", () => {
 
     fireEvent.click(deleteMenuItem);
     expect(deleteCount).toBe(0);
+  });
+
+  it("disables the already-open duplicate and delete actions while duplicate is pending", () => {
+    let duplicateCount = 0;
+    let deleteCount = 0;
+    const enabledInput: RenderFormOptions = {
+      mode: "edit",
+      onDelete: () => {
+        deleteCount += 1;
+      },
+      onDuplicate: () => {
+        duplicateCount += 1;
+      },
+      values: buildFormValues(),
+    };
+    const { rerender } = renderFormWithOptions(enabledInput);
+
+    fireEvent.click(screen.getByRole("button", { name: "More trigger actions" }));
+    rerender(createFormElement({ ...enabledInput, isDuplicating: true }));
+
+    const duplicateMenuItem = screen.getByRole("menuitem", { name: "Duplicate trigger" });
+    const deleteMenuItem = screen.getByRole("menuitem", { name: "Delete trigger" });
+    expect(duplicateMenuItem.getAttribute("data-disabled")).not.toBeNull();
+    expect(deleteMenuItem.getAttribute("data-disabled")).not.toBeNull();
+
+    fireEvent.click(duplicateMenuItem);
+    fireEvent.click(deleteMenuItem);
+    expect(duplicateCount).toBe(0);
+    expect(deleteCount).toBe(0);
+  });
+
+  it("disables edit controls while duplicate is pending", () => {
+    renderFormWithOptions({
+      isDuplicating: true,
+      mode: "edit",
+      values: buildFormValues(),
+    });
+
+    expect(
+      screen.getAllByRole("button", { name: "Save" }).every((button) => {
+        return button.getAttribute("disabled") === "";
+      }),
+    ).toBe(true);
+    expect(screen.getByRole("button", { name: "Add condition" }).getAttribute("disabled")).toBe("");
+    expect(
+      screen
+        .getByRole("button", { name: "Remove Issue comment created event" })
+        .getAttribute("disabled"),
+    ).toBe("");
+    const instructionsEditor = screen.getByRole("textbox", {
+      name: "Agent Instructions for Trigger",
+    });
+    const instructionsEditorShell = instructionsEditor.closest('[aria-disabled="true"]');
+    expect(instructionsEditorShell).not.toBeNull();
   });
 
   it("shows the selected-profile trigger binding message when triggers are unavailable", () => {
@@ -448,9 +515,11 @@ describe("WebhookTriggerForm", () => {
           formError={null}
           validationSummaryError={null}
           isDeleting={false}
+          isDuplicating={false}
           isSaving={false}
           mode="create"
           onDelete={null}
+          onDuplicate={null}
           onSubmit={() => {}}
           onValueChange={() => {}}
           sandboxProfileOptions={SandboxProfileOptions}
@@ -572,9 +641,11 @@ describe("WebhookTriggerForm", () => {
           formError={null}
           validationSummaryError="Please address the fields highlighted in red."
           isDeleting={false}
+          isDuplicating={false}
           isSaving={false}
           mode="create"
           onDelete={null}
+          onDuplicate={null}
           onSubmit={() => {}}
           onValueChange={() => {}}
           sandboxProfileOptions={SandboxProfileOptions}
@@ -611,9 +682,11 @@ describe("WebhookTriggerForm", () => {
           formError="The selected events do not support this trigger setup."
           validationSummaryError={null}
           isDeleting={false}
+          isDuplicating={false}
           isSaving={false}
           mode="create"
           onDelete={null}
+          onDuplicate={null}
           onSubmit={() => {}}
           onValueChange={() => {}}
           sandboxProfileOptions={SandboxProfileOptions}
@@ -630,6 +703,35 @@ describe("WebhookTriggerForm", () => {
     expect(
       currentForm.getByText("The selected events do not support this trigger setup."),
     ).toBeDefined();
+  });
+
+  it("shows duplicate failures with the duplicate action title", () => {
+    render(
+      <QueryClientProvider client={TestQueryClient}>
+        <WebhookTriggerForm
+          connectionOptions={ConnectionOptions}
+          fieldErrors={{}}
+          formError="Could not duplicate trigger."
+          formErrorTitle="Trigger could not be duplicated"
+          validationSummaryError={null}
+          isDeleting={false}
+          isDuplicating={false}
+          isSaving={false}
+          mode="edit"
+          onDelete={() => {}}
+          onDuplicate={() => {}}
+          onSubmit={() => {}}
+          onValueChange={() => {}}
+          sandboxProfileOptions={SandboxProfileOptions}
+          triggerPickerDisabledState={null}
+          webhookEventOptions={WebhookEventOptions}
+          values={FormValues}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Trigger could not be duplicated")).toBeDefined();
+    expect(screen.getByText("Could not duplicate trigger.")).toBeDefined();
   });
 
   it("shows the no-trigger helper copy under the message template editor", () => {

@@ -1,6 +1,7 @@
 import type { ListTriggersQuery } from "./triggers-types.js";
 
 export const TRIGGERS_QUERY_KEY_PREFIX: readonly ["triggers"] = ["triggers"];
+export const TRIGGERS_LIST_QUERY_KEY_PREFIX: readonly ["triggers", "list"] = ["triggers", "list"];
 
 type TriggersListQueryKeyInput = Omit<ListTriggersQuery, "after" | "before"> & {
   limit: number;
@@ -12,8 +13,7 @@ export function triggersListQueryKey(
   input: TriggersListQueryKeyInput,
 ): readonly ["triggers", "list", TriggersListQueryKeyInput] {
   return [
-    TRIGGERS_QUERY_KEY_PREFIX[0],
-    "list",
+    ...TRIGGERS_LIST_QUERY_KEY_PREFIX,
     {
       limit: input.limit,
       after: input.after,

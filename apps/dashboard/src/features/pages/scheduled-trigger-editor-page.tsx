@@ -87,6 +87,7 @@ export function EditScheduledTriggerEditor(input: {
   navigate: (to: string) => void | Promise<void>;
   backPath?: string | undefined;
   deleteSuccessPath?: string | undefined;
+  duplicateSuccessPath?: TriggerCreateSuccessPath | undefined;
   activityPath: string;
   renderFrame?: TriggerEditorFrameRenderer;
 }): React.JSX.Element | null {
@@ -159,6 +160,9 @@ export function EditScheduledTriggerEditor(input: {
         {...(input.deleteSuccessPath === undefined
           ? {}
           : { deleteSuccessPath: input.deleteSuccessPath })}
+        {...(input.duplicateSuccessPath === undefined
+          ? {}
+          : { duplicateSuccessPath: input.duplicateSuccessPath })}
         activityPath={input.activityPath}
         initialValues={toScheduledTriggerFormValues(triggerQuery.data)}
         sandboxProfileOptions={prerequisites.sandboxProfileOptions}
@@ -176,6 +180,7 @@ function LoadedScheduledTriggerEditor(input: {
   triggerTypeField?: ReactNode;
   navigate: (to: string) => void | Promise<void>;
   createSuccessPath?: TriggerCreateSuccessPath;
+  duplicateSuccessPath?: TriggerCreateSuccessPath;
   deleteSuccessPath?: string;
   activityPath?: string;
   initialValues: ReturnType<typeof toScheduledTriggerFormValues>;
@@ -196,12 +201,15 @@ function LoadedScheduledTriggerEditor(input: {
     <ScheduledTriggerForm
       fieldErrors={state.fieldErrors}
       formError={state.formError}
+      formErrorTitle={state.formErrorTitle}
       validationSummaryError={state.validationSummaryError}
       isDeleting={state.isDeleting}
+      isDuplicating={state.isDuplicating}
       isSaving={state.isSaving}
       triggerTypeField={input.triggerTypeField}
       mode={input.mode}
       onDelete={state.onRequestDelete}
+      onDuplicate={state.onDuplicate}
       onViewActivity={onViewActivity}
       onSubmit={state.onSubmit}
       onValueChange={state.onValueChange}

@@ -932,6 +932,7 @@ export function CreateTriggerEditor(input: CreateTriggerEditorProps): React.JSX.
       enabled={state.formValues.enabled}
       fieldErrors={state.fieldErrors}
       formError={state.formError}
+      formErrorTitle="Trigger could not be saved"
       inputIdPrefix="trigger"
       inputTemplate={state.formValues.inputTemplate}
       inputTemplateDescription={
@@ -948,10 +949,12 @@ export function CreateTriggerEditor(input: CreateTriggerEditorProps): React.JSX.
         : {})}
       inputTemplateTokens={state.kind === "trigger" ? formState.agentInstructionTokens : []}
       isDeleting={false}
+      isDuplicating={false}
       isSaving={state.isSaving}
       mode="create"
       name={state.formValues.name}
       onDelete={null}
+      onDuplicate={null}
       onSubmit={state.onSubmit}
       onViewActivity={null}
       onValueChange={(key, value) => {
@@ -983,15 +986,15 @@ export function CreateTriggerEditor(input: CreateTriggerEditorProps): React.JSX.
       typeSpecificSection={
         state.kind === null ? null : state.kind === "scheduled" ? (
           <ScheduledTriggerTypeSpecificSection
+            disabled={state.isSaving}
             fieldErrors={state.fieldErrors}
-            isDeleting={false}
-            isSaving={state.isSaving}
             onValueChange={state.onScheduledValueChange}
             values={state.formValues}
           />
         ) : (
           <WebhookTriggerTypeSpecificSection
             connectionOptions={state.connectionOptions}
+            disabled={state.isSaving}
             fieldErrors={state.fieldErrors}
             formState={formState}
             onValueChange={state.onWebhookValueChange}

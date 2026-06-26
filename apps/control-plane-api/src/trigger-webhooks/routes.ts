@@ -5,6 +5,7 @@ import type { AppContextBindings, AppRoutes } from "../types.js";
 import { TRIGGER_WEBHOOKS_ROUTE_BASE_PATH } from "./constants.js";
 import * as createTriggerWebhook from "./create-trigger-webhook/index.js";
 import * as deleteTriggerWebhook from "./delete-trigger-webhook/index.js";
+import * as duplicateTriggerWebhook from "./duplicate-trigger-webhook/index.js";
 import * as getTriggerWebhook from "./get-trigger-webhook/index.js";
 import * as updateTriggerWebhook from "./update-trigger-webhook/index.js";
 
@@ -15,6 +16,7 @@ export function createTriggerWebhooksRoutes(): AppRoutes<typeof TRIGGER_WEBHOOKS
 
   routes.openapi(createTriggerWebhook.route, createTriggerWebhook.handler);
   routes.openapi(getTriggerWebhook.route, getTriggerWebhook.handler);
+  routes.openapi(duplicateTriggerWebhook.route, duplicateTriggerWebhook.handler);
   routes.openapi(updateTriggerWebhook.route, updateTriggerWebhook.handler);
   routes.openapi(deleteTriggerWebhook.route, deleteTriggerWebhook.handler);
 

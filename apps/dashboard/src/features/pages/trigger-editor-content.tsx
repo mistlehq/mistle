@@ -5,6 +5,7 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import { isUnavailableResourceError } from "../api/http-api-error.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { UnavailableResourceState } from "../shared/unavailable-resource-state.js";
+import type { TriggerCreateSuccessPath } from "../triggers/trigger-editor-navigation.js";
 import { triggerDetailQueryKey } from "../triggers/triggers-query-keys.js";
 import { getTrigger } from "../triggers/triggers-service.js";
 import { EditScheduledTriggerEditor } from "./scheduled-trigger-editor-page.js";
@@ -47,6 +48,7 @@ export function TriggerEditorContent(input: {
   navigate: (to: string) => void | Promise<void>;
   backPath: string;
   deleteSuccessPath: string;
+  duplicateSuccessPath?: TriggerCreateSuccessPath | undefined;
   activityPath: string;
   requiredSandboxProfileId?: string | undefined;
   renderFrame?: TriggerEditorFrameRenderer;
@@ -110,6 +112,9 @@ export function TriggerEditorContent(input: {
         activityPath={input.activityPath}
         backPath={input.backPath}
         deleteSuccessPath={input.deleteSuccessPath}
+        {...(input.duplicateSuccessPath === undefined
+          ? {}
+          : { duplicateSuccessPath: input.duplicateSuccessPath })}
         navigate={input.navigate}
         {...(input.renderFrame === undefined ? {} : { renderFrame: input.renderFrame })}
       />
@@ -122,6 +127,9 @@ export function TriggerEditorContent(input: {
       activityPath={input.activityPath}
       backPath={input.backPath}
       deleteSuccessPath={input.deleteSuccessPath}
+      {...(input.duplicateSuccessPath === undefined
+        ? {}
+        : { duplicateSuccessPath: input.duplicateSuccessPath })}
       navigate={input.navigate}
       {...(input.renderFrame === undefined ? {} : { renderFrame: input.renderFrame })}
     />

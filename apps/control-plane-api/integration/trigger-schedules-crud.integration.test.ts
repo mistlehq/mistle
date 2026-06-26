@@ -16,7 +16,10 @@ import { eq, sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
-import { ScheduleActionFailureCodes } from "../src/trigger-schedules/constants.js";
+import {
+  ScheduleActionFailureCodes,
+  TriggerSchedulesBadRequestCodes,
+} from "../src/trigger-schedules/constants.js";
 import { CreateTriggerScheduleBadRequestResponseSchema } from "../src/trigger-schedules/create-trigger-schedule/index.js";
 import { DeleteTriggerScheduleResponseSchema } from "../src/trigger-schedules/delete-trigger-schedule/index.js";
 import { TriggerScheduleSchema } from "../src/trigger-schedules/schemas.js";
@@ -164,6 +167,80 @@ describe("trigger schedules CRUD integration", () => {
     expect(TriggerScheduleSchema.parse(await getResponse.json())).toEqual(body);
   });
 
+  it("duplicates a recurring scheduled trigger as disabled with the same configuration", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "trigger-schedules-duplicate-recurring@example.com",
+    });
+
+    await insertSandboxProfileWithVersion(fixture, {
+      organizationId: authenticatedSession.organizationId,
+      profileId: "sbp_schedule_duplicate_recurring_001",
+      version: 3,
+    });
+
+    const createResponse = await fixture.request("/v1/triggers/schedules", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        name: "Daily issue triage",
+        enabled: true,
+        schedule: {
+          name: "Daily morning schedule",
+          cronExpression: "*/30 * * * *",
+          timezone: "Asia/Singapore",
+        },
+        inputTemplate: "Summarize open issues for {{schedule.localScheduledDate}}",
+        conversationKeyTemplate: "{{schedule.localScheduledDate}}",
+        idempotencyKeyTemplate: "{{schedule.localScheduledDate}}:{{schedule.localScheduledTime}}",
+        target: {
+          sandboxProfileId: "sbp_schedule_duplicate_recurring_001",
+          sandboxProfileVersion: 3,
+        },
+      }),
+    });
+
+    expect(createResponse.status).toBe(201);
+    const created = TriggerScheduleSchema.parse(await createResponse.json());
+
+    const duplicateResponse = await fixture.request(
+      `/v1/triggers/schedules/${created.id}/duplicate`,
+      {
+        method: "POST",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      },
+    );
+
+    expect(duplicateResponse.status).toBe(201);
+    const duplicated = TriggerScheduleSchema.parse(await duplicateResponse.json());
+    expect(duplicated.id).not.toBe(created.id);
+    expect(duplicated.name).toBe("Daily issue triage copy");
+    expect(duplicated.enabled).toBe(false);
+    expect(duplicated.schedule.id).not.toBe(created.schedule.id);
+    expect(duplicated.schedule.name).toBe("Daily morning schedule");
+    expect(duplicated.schedule.kind).toBe(ScheduleKinds.RECURRING);
+    expect(duplicated.schedule.enabled).toBe(false);
+    expect(duplicated.schedule.cronExpression).toBe("*/30 * * * *");
+    expect(duplicated.schedule.timezone).toBe("Asia/Singapore");
+    expect(duplicated.schedule.nextScheduledAt).toBeNull();
+    expect(duplicated.inputTemplate).toBe(
+      "Summarize open issues for {{schedule.localScheduledDate}}",
+    );
+    expect(duplicated.conversationKeyTemplate).toBe("{{schedule.localScheduledDate}}");
+    expect(duplicated.idempotencyKeyTemplate).toBe(
+      "{{schedule.localScheduledDate}}:{{schedule.localScheduledTime}}",
+    );
+    expect(duplicated.target.sandboxProfileId).toBe("sbp_schedule_duplicate_recurring_001");
+    expect(duplicated.target.sandboxProfileVersion).toBe(3);
+    expect(duplicated.target.primaryRepositoryId).toBeNull();
+  });
+
   it("persists the active sandbox profile version when the target version is omitted", async ({
     fixture,
   }) => {
@@ -257,6 +334,57 @@ describe("trigger schedules CRUD integration", () => {
       scheduleId: body.schedule.id,
     });
     expect(normalizePersistedTimestamp(workflowRun.availableAt)).toBe("2099-05-01T01:00:00.000Z");
+  });
+
+  it("rejects duplicate requests for one-off scheduled triggers", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "trigger-schedules-duplicate-one-off@example.com",
+    });
+
+    await insertSandboxProfileWithVersion(fixture, {
+      organizationId: authenticatedSession.organizationId,
+      profileId: "sbp_schedule_duplicate_one_off_001",
+      version: 1,
+    });
+
+    const createResponse = await fixture.request("/v1/triggers/schedules", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        name: "One-off launch",
+        schedule: {
+          kind: "one_off",
+          name: "One-off schedule",
+          startAt: "2099-05-01T01:00:00.000Z",
+        },
+        inputTemplate: "Run once",
+        target: {
+          sandboxProfileId: "sbp_schedule_duplicate_one_off_001",
+        },
+      }),
+    });
+
+    expect(createResponse.status).toBe(201);
+    const created = TriggerScheduleSchema.parse(await createResponse.json());
+
+    const duplicateResponse = await fixture.request(
+      `/v1/triggers/schedules/${created.id}/duplicate`,
+      {
+        method: "POST",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      },
+    );
+
+    expect(duplicateResponse.status).toBe(400);
+    expect(await duplicateResponse.json()).toMatchObject({
+      code: TriggerSchedulesBadRequestCodes.UNSUPPORTED_DUPLICATE_SCHEDULE_KIND,
+      message: "One-off scheduled triggers cannot be duplicated.",
+    });
   });
 
   it("does not enqueue disabled one-off schedules until they are enabled", async ({ fixture }) => {

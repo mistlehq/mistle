@@ -6908,6 +6908,273 @@
         }
       }
     },
+    "/v1/triggers/schedules/{triggerId}/duplicate": {
+      "post": {
+        "tags": ["Triggers"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?:atm|trg)_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "triggerId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Duplicate a recurring scheduled trigger as disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["schedule"]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "schedule": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["recurring"]
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "cronExpression": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "timezone": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "nextScheduledAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "lastScheduledAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "startAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "name",
+                        "cronExpression",
+                        "timezone",
+                        "enabled",
+                        "nextScheduledAt",
+                        "lastScheduledAt",
+                        "startAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "inputTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "conversationKeyTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "idempotencyKeyTemplate": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "target": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "primaryRepositoryId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "sandboxProfileId",
+                        "sandboxProfileVersion",
+                        "primaryRepositoryId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "name",
+                    "enabled",
+                    "schedule",
+                    "inputTemplate",
+                    "conversationKeyTemplate",
+                    "idempotencyKeyTemplate",
+                    "target",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["UNSUPPORTED_DUPLICATE_SCHEDULE_KIND"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scheduled trigger was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/triggers/webhooks": {
       "post": {
         "tags": ["Triggers"],
@@ -7789,6 +8056,231 @@
                     }
                   },
                   "required": ["triggerId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook trigger was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/triggers/webhooks/{triggerId}/duplicate": {
+      "post": {
+        "tags": ["Triggers"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?:atm|trg)_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "triggerId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Duplicate a webhook trigger as disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["webhook"]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "integrationWebhookSourceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "eventConditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "eventType": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "payloadFilter": {
+                            "type": ["object", "null"],
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": ["eventType"],
+                        "additionalProperties": false
+                      },
+                      "minItems": 1
+                    },
+                    "inputTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "instructions": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "conversationKeyTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "idempotencyKeyTemplate": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "target": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "primaryRepositoryId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "sandboxProfileId",
+                        "sandboxProfileVersion",
+                        "primaryRepositoryId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "name",
+                    "enabled",
+                    "integrationWebhookSourceId",
+                    "eventConditions",
+                    "inputTemplate",
+                    "instructions",
+                    "conversationKeyTemplate",
+                    "idempotencyKeyTemplate",
+                    "target",
+                    "createdAt",
+                    "updatedAt"
+                  ],
                   "additionalProperties": false
                 }
               }

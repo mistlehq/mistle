@@ -18,11 +18,15 @@ import type {
 import {
   createScheduledTrigger,
   deleteScheduledTrigger,
+  duplicateScheduledTrigger,
   updateScheduledTrigger,
 } from "./scheduled-triggers-service.js";
 import type { TriggerCreateSuccessPath } from "./trigger-editor-navigation.js";
 import { scheduledTriggerDetailQueryKey } from "./triggers-query-keys.js";
-import { TRIGGERS_QUERY_KEY_PREFIX } from "./triggers-query-keys.js";
+import {
+  TRIGGERS_LIST_QUERY_KEY_PREFIX,
+  TRIGGERS_QUERY_KEY_PREFIX,
+} from "./triggers-query-keys.js";
 import { useSelectedSandboxProfileVersion } from "./use-selected-sandbox-profile-version.js";
 import {
   buildWebhookTriggerPrimaryRepositoryOptions,
@@ -37,6 +41,7 @@ type LoadedScheduledTriggerEditorStateInput = {
   triggerId: string | undefined;
   navigate: NavigateFunction;
   createSuccessPath?: TriggerCreateSuccessPath;
+  duplicateSuccessPath?: TriggerCreateSuccessPath;
   deleteSuccessPath?: string;
   initialValues: ScheduledTriggerFormValues;
   initialSandboxProfileVersion?: number;
@@ -81,6 +86,12 @@ async function invalidateTriggersQuery(input: {
       queryKey: scheduledTriggerDetailQueryKey(input.triggerId),
     });
   }
+}
+
+async function invalidateTriggersListQuery(queryClient: QueryClient): Promise<void> {
+  await queryClient.invalidateQueries({
+    queryKey: TRIGGERS_LIST_QUERY_KEY_PREFIX,
+  });
 }
 
 function resolvePrimaryRepositorySelectionNormalization(input: {
@@ -137,12 +148,15 @@ export function useLoadedScheduledTriggerEditorState(
   fieldErrors: Partial<Record<ScheduledTriggerFormValueKey, string>>;
   validationSummaryError: string | null;
   formError: string | null;
+  formErrorTitle: string;
   deleteError: string | null;
   isDeleteDialogOpen: boolean;
   isDeleting: boolean;
+  isDuplicating: boolean;
   isSaving: boolean;
   onDeleteDialogOpenChange: (isOpen: boolean) => void;
   onRequestDelete: (() => void) | null;
+  onDuplicate: (() => void) | null;
   onConfirmDelete: () => void;
   onSubmit: () => void;
   onValueChange: (key: ScheduledTriggerFormValueKey, value: string | boolean) => void;
@@ -155,6 +169,7 @@ export function useLoadedScheduledTriggerEditorState(
   >({});
   const [validationSummaryError, setValidationSummaryError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [formErrorTitle, setFormErrorTitle] = useState("Trigger could not be saved");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const selectedProfileId = formValues.sandboxProfileId.trim();
@@ -238,6 +253,7 @@ export function useLoadedScheduledTriggerEditorState(
       });
       setValidationSummaryError(null);
       setFormError(null);
+      setFormErrorTitle("Trigger could not be saved");
       await invalidateTriggersQuery({
         queryClient,
         triggerId: trigger.id,
@@ -249,6 +265,7 @@ export function useLoadedScheduledTriggerEditorState(
       );
     },
     onError: (error: unknown) => {
+      setFormErrorTitle("Trigger could not be saved");
       setFormError(
         resolveTriggerMutationErrorMessage({
           error,
@@ -284,12 +301,14 @@ export function useLoadedScheduledTriggerEditorState(
       setFieldErrors({});
       setValidationSummaryError(null);
       setFormError(null);
+      setFormErrorTitle("Trigger could not be saved");
       await invalidateTriggersQuery({
         queryClient,
         triggerId: trigger.id,
       });
     },
     onError: (error: unknown) => {
+      setFormErrorTitle("Trigger could not be saved");
       setFormError(
         resolveTriggerMutationErrorMessage({
           error,
@@ -321,6 +340,35 @@ export function useLoadedScheduledTriggerEditorState(
         resolveTriggerMutationErrorMessage({
           error,
           fallbackMessage: "Could not delete trigger.",
+        }),
+      );
+    },
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: async () => {
+      if (input.triggerId === undefined) {
+        throw new Error("Trigger id is required.");
+      }
+
+      return duplicateScheduledTrigger({
+        triggerId: input.triggerId,
+      });
+    },
+    onSuccess: async (trigger) => {
+      await invalidateTriggersListQuery(queryClient);
+      await input.navigate(
+        input.duplicateSuccessPath === undefined
+          ? `/triggers/${trigger.id}`
+          : input.duplicateSuccessPath(trigger),
+      );
+    },
+    onError: (error: unknown) => {
+      setFormErrorTitle("Trigger could not be duplicated");
+      setFormError(
+        resolveTriggerMutationErrorMessage({
+          error,
+          fallbackMessage: "Could not duplicate trigger.",
         }),
       );
     },
@@ -364,6 +412,7 @@ export function useLoadedScheduledTriggerEditorState(
   }
 
   function onSubmit(): void {
+    setFormErrorTitle("Trigger could not be saved");
     const nextFieldErrors = validateScheduledTriggerFormValues(formValues);
     setFieldErrors(nextFieldErrors);
     setValidationSummaryError(
@@ -392,6 +441,11 @@ export function useLoadedScheduledTriggerEditorState(
     deleteMutation.mutate();
   }
 
+  function onDuplicate(): void {
+    setFormError(null);
+    duplicateMutation.mutate();
+  }
+
   return {
     sandboxProfileOptions,
     primaryRepositoryOptions,
@@ -399,12 +453,15 @@ export function useLoadedScheduledTriggerEditorState(
     fieldErrors,
     validationSummaryError,
     formError,
+    formErrorTitle,
     deleteError,
     isDeleteDialogOpen,
     isDeleting: deleteMutation.isPending,
+    isDuplicating: duplicateMutation.isPending,
     isSaving: createMutation.isPending || updateMutation.isPending,
     onDeleteDialogOpenChange: setIsDeleteDialogOpen,
     onRequestDelete: input.mode === "edit" ? requestDelete : null,
+    onDuplicate: input.mode === "edit" ? onDuplicate : null,
     onConfirmDelete: confirmDelete,
     onSubmit,
     onValueChange,

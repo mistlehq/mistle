@@ -125,6 +125,35 @@ export async function updateScheduledTrigger(input: {
   }
 }
 
+export async function duplicateScheduledTrigger(input: {
+  triggerId: string;
+  signal?: AbortSignal;
+}): Promise<ScheduledTrigger> {
+  try {
+    const response = await requestControlPlane({
+      operation: "duplicateScheduledTrigger",
+      method: "POST",
+      pathname: `/v1/triggers/schedules/${encodeURIComponent(input.triggerId)}/duplicate`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not duplicate scheduled trigger.",
+      errorFactory: createScheduledTriggersApiError,
+    });
+
+    return await readJsonWithSchema({
+      response,
+      schema: ScheduledTriggerSchema,
+      operation: "duplicateScheduledTrigger",
+      invalidMessage: "Duplicate scheduled trigger response payload is invalid.",
+    });
+  } catch (error) {
+    throw toScheduledTriggersApiError({
+      operation: "duplicateScheduledTrigger",
+      error,
+      fallbackMessage: "Could not duplicate scheduled trigger.",
+    });
+  }
+}
+
 export async function deleteScheduledTrigger(input: {
   triggerId: string;
   signal?: AbortSignal;

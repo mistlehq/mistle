@@ -338,10 +338,12 @@ export function WebhookTriggerFormStoryHarness(input: {
           formError={input.formError ?? null}
           validationSummaryError={validationSummaryError}
           isDeleting={input.isDeleting ?? false}
+          isDuplicating={false}
           isSaving={input.isSaving ?? false}
           triggerTypeField={triggerTypeField}
           mode={input.mode}
           onDelete={input.onDelete ?? null}
+          onDuplicate={input.mode === "edit" ? noop : null}
           onViewActivity={input.onViewActivity ?? (input.mode === "edit" ? noop : null)}
           onSubmit={() => {
             if (input.enableSubmitValidation !== true) {

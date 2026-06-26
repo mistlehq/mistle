@@ -262,7 +262,7 @@ The durable behavior-defining fields of a **Trigger**.
 _Avoid_: Trigger summary when the surface must preserve all behavior-affecting fields
 
 **Duplicated trigger**:
-A disabled **Trigger** created as a configuration copy for a **Sandbox profile duplicate**.
+A disabled **Trigger** created as a **Trigger configuration** copy from another **Trigger**.
 _Avoid_: Cloned automation, enabled copy
 
 **Trigger event**:

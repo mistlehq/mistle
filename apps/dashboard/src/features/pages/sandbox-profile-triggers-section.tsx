@@ -352,6 +352,12 @@ function ProfileTriggerDetail(input: { profileId: string }): React.JSX.Element {
     triggerId,
     searchParams,
   });
+  const duplicateSuccessPath = (trigger: { id: string }): string =>
+    createProfileTriggerDetailPath({
+      profileId: input.profileId,
+      triggerId: trigger.id,
+      searchParams,
+    });
   const isActivityRoute =
     activityRouteMatch?.params["profileId"] === input.profileId &&
     activityRouteMatch.params["triggerId"] === triggerId;
@@ -377,6 +383,7 @@ function ProfileTriggerDetail(input: { profileId: string }): React.JSX.Element {
       activityPath={activityPath}
       backPath={backPath}
       deleteSuccessPath={backPath}
+      duplicateSuccessPath={duplicateSuccessPath}
       navigate={navigate}
       requiredSandboxProfileId={input.profileId}
     />

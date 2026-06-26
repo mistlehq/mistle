@@ -31,11 +31,14 @@ type ScheduledTriggerFormProps = {
   fieldErrors: Partial<Record<ScheduledTriggerFormValueKey, string>>;
   validationSummaryError: string | null;
   formError: string | null;
+  formErrorTitle?: string;
   isSaving: boolean;
   isDeleting: boolean;
+  isDuplicating: boolean;
   triggerTypeField?: ReactNode;
   onValueChange: (key: ScheduledTriggerFormValueKey, value: string | boolean) => void;
   onSubmit: () => void;
+  onDuplicate: (() => void) | null;
   onDelete: (() => void) | null;
   onViewActivity?: (() => void) | null;
 };
@@ -46,8 +49,7 @@ type ScheduledTriggerTypeSpecificSectionProps = {
     ScheduledTriggerFormProps["fieldErrors"],
     "conversationMode" | "cronExpression" | "timezone"
   >;
-  isSaving: boolean;
-  isDeleting: boolean;
+  disabled: boolean;
   onValueChange: (key: "conversationMode" | "cronExpression" | "timezone", value: string) => void;
 };
 
@@ -84,7 +86,6 @@ export function ScheduledTriggerTypeSpecificSection(
     timezone: input.values.timezone,
   });
   const cronExpressionBreakdown = resolveCronExpressionBreakdown(input.values.cronExpression);
-  const disabled = input.isDeleting || input.isSaving;
 
   return (
     <FormPageSection
@@ -103,7 +104,7 @@ export function ScheduledTriggerTypeSpecificSection(
             <FieldContent>
               <Input
                 aria-invalid={input.fieldErrors.cronExpression !== undefined ? true : undefined}
-                disabled={disabled}
+                disabled={input.disabled}
                 id="scheduled-trigger-cron-expression"
                 onChange={(event) => {
                   input.onValueChange("cronExpression", event.currentTarget.value);
@@ -121,7 +122,7 @@ export function ScheduledTriggerTypeSpecificSection(
             <FieldContent>
               <SingleSelectStringComboboxField
                 contentClassName="max-h-80"
-                disabled={disabled}
+                disabled={input.disabled}
                 emptyMessage="No matching timezones."
                 inputId="scheduled-trigger-timezone"
                 inputLabel="Timezone"
@@ -147,7 +148,7 @@ export function ScheduledTriggerTypeSpecificSection(
 
         <div className="mt-4">
           <TriggerFormSelectField
-            disabled={disabled}
+            disabled={input.disabled}
             error={input.fieldErrors.conversationMode}
             label="Group runs by"
             onValueChange={(value) => {
@@ -170,6 +171,7 @@ export function ScheduledTriggerForm(input: ScheduledTriggerFormProps): React.JS
     values: input.values,
     primaryRepositoryOptions: input.primaryRepositoryOptions,
   });
+  const disabled = input.isDeleting || input.isSaving || input.isDuplicating;
 
   return (
     <TriggerFormShell
@@ -179,16 +181,19 @@ export function ScheduledTriggerForm(input: ScheduledTriggerFormProps): React.JS
         : { triggerTypeField: input.triggerTypeField })}
       fieldErrors={input.fieldErrors}
       formError={input.formError}
+      formErrorTitle={input.formErrorTitle ?? "Trigger could not be saved"}
       inputIdPrefix="scheduled-trigger"
       inputTemplate={input.values.inputTemplate}
       inputTemplateDescription="Sent to the agent each time this trigger runs."
       inputTemplateLabelId={inputTemplateLabelId}
       inputTemplateTokens={[]}
       isDeleting={input.isDeleting}
+      isDuplicating={input.isDuplicating}
       isSaving={input.isSaving}
       mode={input.mode}
       name={input.values.name}
       onDelete={input.onDelete}
+      onDuplicate={input.onDuplicate}
       onSubmit={input.onSubmit}
       onViewActivity={input.onViewActivity ?? null}
       onValueChange={(key, value) => {
@@ -209,9 +214,8 @@ export function ScheduledTriggerForm(input: ScheduledTriggerFormProps): React.JS
       validationSummaryError={input.validationSummaryError}
       typeSpecificSection={
         <ScheduledTriggerTypeSpecificSection
+          disabled={disabled}
           fieldErrors={input.fieldErrors}
-          isDeleting={input.isDeleting}
-          isSaving={input.isSaving}
           onValueChange={(key, value) => {
             input.onValueChange(key, value);
           }}
