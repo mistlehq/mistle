@@ -6155,6 +6155,7 @@ export interface paths {
                       ui: {
                         create: {
                           helperText: string;
+                          showCallbackUrl?: boolean;
                           submitLabel: string;
                         };
                         reauthorize?: {

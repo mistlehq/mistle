@@ -21,6 +21,7 @@ const IntegrationConnectionMethodCreateUiSchema = z
   .object({
     submitLabel: z.string().min(1),
     helperText: z.string().min(1),
+    showCallbackUrl: z.boolean().optional(),
   })
   .strict();
 
