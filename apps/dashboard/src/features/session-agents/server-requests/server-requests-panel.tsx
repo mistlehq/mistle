@@ -230,7 +230,7 @@ export function ServerRequestsPanel({
             const submitOnOptionSelect = canSubmitUserInputOnOptionSelect(entry);
             const cancelAction = (
               <Button
-                className="text-muted-foreground"
+                className={cn("text-muted-foreground", submitOnOptionSelect ? "-mt-2" : undefined)}
                 disabled={isRespondingToServerRequest}
                 onClick={() => {
                   onRespondToServerRequest(entry.requestId, createUserInputCancelResponse());
@@ -281,10 +281,7 @@ export function ServerRequestsPanel({
                   )
                 }
                 details={
-                  <div className="relative space-y-3">
-                    {submitOnOptionSelect ? (
-                      <div className="absolute top-0 right-4">{cancelAction}</div>
-                    ) : null}
+                  <div className="space-y-3">
                     {entry.questions.map((question) => {
                       const answerKey = `${requestKey}:${question.id}`;
                       const otherOption = question.options.find((option) => option.isOther);
@@ -301,14 +298,18 @@ export function ServerRequestsPanel({
                               {question.header}
                             </p>
                           )}
-                          <p
-                            className={cn(
-                              "text-muted-foreground ml-6 text-sm leading-5",
-                              submitOnOptionSelect ? "mr-24" : "mr-4",
-                            )}
-                          >
-                            {question.question}
-                          </p>
+                          {submitOnOptionSelect ? (
+                            <div className="mx-4 flex items-start justify-between gap-4">
+                              <p className="text-muted-foreground ml-2 min-w-0 flex-1 text-sm leading-5">
+                                {question.question}
+                              </p>
+                              {cancelAction}
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground ml-6 mr-4 text-sm leading-5">
+                              {question.question}
+                            </p>
+                          )}
                           <UserInputOptions
                             answerKey={answerKey}
                             disabled={isRespondingToServerRequest}
