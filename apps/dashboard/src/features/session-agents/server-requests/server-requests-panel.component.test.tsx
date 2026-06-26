@@ -1,11 +1,21 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { systemSleeper } from "@mistle/time";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
+import {
+  cleanupTestQueryClients,
+  createTestQueryClient,
+} from "../../../test-support/query-client.js";
 import { ServerRequestsPanel } from "./server-requests-panel.js";
 
 describe("ServerRequestsPanel", () => {
+  afterEach(async () => {
+    await cleanupTestQueryClients();
+  });
+
   it("renders command approvals in the standalone panel when passed through", () => {
     const submittedResults: unknown[] = [];
 
@@ -388,6 +398,214 @@ describe("ServerRequestsPanel", () => {
         ],
       },
     ]);
+  });
+
+  it("submits empty resource selection answers", async () => {
+    const submittedResults: unknown[] = [];
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    queryClient.setQueryData(
+      ["integration-connections", "icn_test_github", "resources", "repository", ""],
+      {
+        connectionId: "icn_test_github",
+        familyId: "github",
+        kind: "repository",
+        syncState: "ready",
+        items: [],
+      },
+    );
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ServerRequestsPanel
+          entries={[
+            {
+              requestId: "resource-selection-request-1",
+              method: "tool/requestUserInput",
+              kind: "tool-user-input",
+              questions: [
+                {
+                  header: "Repositories",
+                  id: "github-review-repositories",
+                  inputKind: "integrationConnectionResourceMultiSelect",
+                  question: "Which GitHub repositories should this agent review?",
+                  resourceSelection: {
+                    connectionId: "icn_test_github",
+                    resourceKind: "repository",
+                    resourceLabelPlural: "repositories",
+                    initialSelectedHandles: [],
+                  },
+                },
+              ],
+              status: "pending",
+              responseErrorMessage: null,
+            },
+          ]}
+          isRespondingToServerRequest={false}
+          onRespondToServerRequest={(_requestId, result) => {
+            submittedResults.push(result);
+          }}
+        />
+      </QueryClientProvider>,
+    );
+
+    const submitButton = screen.getByRole("button", { name: "Submit" });
+    await waitFor(() => {
+      expect(submitButton.getAttribute("disabled")).toBeNull();
+    });
+    fireEvent.click(submitButton);
+
+    expect(submittedResults).toEqual([
+      {
+        answers: [
+          {
+            id: "github-review-repositories",
+            value: [],
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("keeps resource selection answers disabled while selected resources are unavailable", () => {
+    const submittedResults: unknown[] = [];
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    queryClient.setQueryData(
+      ["integration-connections", "icn_test_github", "resources", "repository", ""],
+      {
+        connectionId: "icn_test_github",
+        familyId: "github",
+        kind: "repository",
+        syncState: "ready",
+        items: [],
+      },
+    );
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ServerRequestsPanel
+          entries={[
+            {
+              requestId: "resource-selection-request-1",
+              method: "tool/requestUserInput",
+              kind: "tool-user-input",
+              questions: [
+                {
+                  header: "Repositories",
+                  id: "github-review-repositories",
+                  inputKind: "integrationConnectionResourceMultiSelect",
+                  question: "Which GitHub repositories should this agent review?",
+                  resourceSelection: {
+                    connectionId: "icn_test_github",
+                    resourceKind: "repository",
+                    resourceLabelPlural: "repositories",
+                    initialSelectedHandles: ["mistle/private-internal-tools"],
+                  },
+                },
+              ],
+              status: "pending",
+              responseErrorMessage: null,
+            },
+          ]}
+          isRespondingToServerRequest={false}
+          onRespondToServerRequest={(_requestId, result) => {
+            submittedResults.push(result);
+          }}
+        />
+      </QueryClientProvider>,
+    );
+
+    const submitButton = screen.getByRole("button", { name: "Submit" });
+    expect(submitButton.getAttribute("disabled")).toBe("");
+    fireEvent.click(submitButton);
+
+    expect(submittedResults).toEqual([]);
+  });
+
+  it("keeps unavailable resource selections disabled while searching", async () => {
+    const submittedResults: unknown[] = [];
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    queryClient.setQueryData(
+      ["integration-connections", "icn_test_github", "resources", "repository", ""],
+      {
+        connectionId: "icn_test_github",
+        familyId: "github",
+        kind: "repository",
+        syncState: "ready",
+        items: [],
+      },
+    );
+    queryClient.setQueryData(
+      ["integration-connections", "icn_test_github", "resources", "repository", "mistle"],
+      {
+        connectionId: "icn_test_github",
+        familyId: "github",
+        kind: "repository",
+        syncState: "ready",
+        items: [],
+      },
+    );
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ServerRequestsPanel
+          entries={[
+            {
+              requestId: "resource-selection-request-1",
+              method: "tool/requestUserInput",
+              kind: "tool-user-input",
+              questions: [
+                {
+                  header: "Repositories",
+                  id: "github-review-repositories",
+                  inputKind: "integrationConnectionResourceMultiSelect",
+                  question: "Which GitHub repositories should this agent review?",
+                  resourceSelection: {
+                    connectionId: "icn_test_github",
+                    resourceKind: "repository",
+                    resourceLabelPlural: "repositories",
+                    searchPlaceholder: "Search repositories",
+                    initialSelectedHandles: ["mistle/private-internal-tools"],
+                  },
+                },
+              ],
+              status: "pending",
+              responseErrorMessage: null,
+            },
+          ]}
+          isRespondingToServerRequest={false}
+          onRespondToServerRequest={(_requestId, result) => {
+            submittedResults.push(result);
+          }}
+        />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.change(
+      screen.getByRole("combobox", {
+        name: "Which GitHub repositories should this agent review?",
+      }),
+      {
+        target: {
+          value: "mistle",
+        },
+      },
+    );
+    await systemSleeper.sleep(350);
+
+    const submitButton = screen.getByRole("button", { name: "Submit" });
+    expect(submitButton.getAttribute("disabled")).toBe("");
+    fireEvent.click(submitButton);
+
+    expect(submittedResults).toEqual([]);
   });
 
   it("renders OpenCode permission requests in the standalone panel", () => {

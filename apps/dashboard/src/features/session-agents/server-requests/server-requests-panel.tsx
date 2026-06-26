@@ -1,7 +1,7 @@
 import { Button, cn, Input, Textarea } from "@mistle/ui";
 import { useDebouncedValue } from "@tanstack/react-pacer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
 import { resolveApiErrorMessage } from "../../api/error-message.js";
 import {
@@ -35,6 +35,7 @@ type ToolUserInputOption = NonNullable<ToolUserInputQuestion["options"]>[number]
 type UserInputAnswerValue = string | readonly string[];
 
 const ResourceSearchDebounceMs = 300;
+const ResourceSyncRefetchIntervalMs = 3_000;
 
 function createRequestKey(requestId: string | number): string {
   return String(requestId);
@@ -185,6 +186,7 @@ function IntegrationConnectionResourceMultiSelectQuestion(input: {
   disabled: boolean;
   question: ToolUserInputQuestion;
   selectedValues: readonly string[];
+  setResourceSelectionAnswerReady: Dispatch<SetStateAction<Record<string, boolean>>>;
   setUserInputAnswers: Dispatch<SetStateAction<Record<string, UserInputAnswerValue>>>;
 }): React.JSX.Element {
   if (input.question.resourceSelection === undefined) {
@@ -197,13 +199,13 @@ function IntegrationConnectionResourceMultiSelectQuestion(input: {
     wait: ResourceSearchDebounceMs,
   });
   const resourceSelection = input.question.resourceSelection;
-  const resourceQueryKey = [
+  const baseResourceQueryKey = [
     "integration-connections",
     resourceSelection.connectionId,
     "resources",
     resourceSelection.resourceKind,
-    debouncedSearch,
   ] as const;
+  const resourceQueryKey = [...baseResourceQueryKey, debouncedSearch] as const;
   const resourceQuery = useQuery({
     queryKey: resourceQueryKey,
     queryFn: async ({ signal }) =>
@@ -213,6 +215,21 @@ function IntegrationConnectionResourceMultiSelectQuestion(input: {
         ...(debouncedSearch.length === 0 ? {} : { search: debouncedSearch }),
         signal,
       }),
+    refetchInterval: (query) =>
+      query.state.data?.syncState === "syncing" ? ResourceSyncRefetchIntervalMs : false,
+    retry: false,
+  });
+  const unfilteredResourceQuery = useQuery({
+    queryKey: [...baseResourceQueryKey, ""] as const,
+    queryFn: async ({ signal }) =>
+      listIntegrationConnectionResources({
+        connectionId: resourceSelection.connectionId,
+        kind: resourceSelection.resourceKind,
+        signal,
+      }),
+    enabled: debouncedSearch.length > 0,
+    refetchInterval: (query) =>
+      query.state.data?.syncState === "syncing" ? ResourceSyncRefetchIntervalMs : false,
     retry: false,
   });
   const refreshMutation = useMutation({
@@ -238,11 +255,34 @@ function IntegrationConnectionResourceMultiSelectQuestion(input: {
     },
   });
   const visibleItems = resourceQuery.data?.items ?? [];
-  const availableHandles = new Set(visibleItems.map((item) => item.handle));
+  const availabilityItems =
+    debouncedSearch.length === 0 ? resourceQuery.data?.items : unfilteredResourceQuery.data?.items;
+  const availabilityHandles =
+    availabilityItems === undefined ? null : new Set(availabilityItems.map((item) => item.handle));
   const unavailableSelectedValues =
-    resourceQuery.data === undefined || debouncedSearch.length > 0
+    availabilityHandles === null
       ? []
-      : input.selectedValues.filter((handle) => !availableHandles.has(handle));
+      : input.selectedValues.filter((handle) => !availabilityHandles.has(handle));
+  const canSubmitResourceSelection =
+    resourceQuery.data !== undefined &&
+    availabilityHandles !== null &&
+    !resourceQuery.isError &&
+    !unfilteredResourceQuery.isError &&
+    unavailableSelectedValues.length === 0;
+
+  useEffect(() => {
+    input.setResourceSelectionAnswerReady((current) => {
+      if (current[input.answerKey] === canSubmitResourceSelection) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [input.answerKey]: canSubmitResourceSelection,
+      };
+    });
+  }, [canSubmitResourceSelection, input.answerKey, input.setResourceSelectionAnswerReady]);
+
   const resourceErrorMessage = !resourceQuery.isError
     ? null
     : resolveApiErrorMessage({
@@ -320,6 +360,9 @@ export function ServerRequestsPanel({
   const [userInputAnswers, setUserInputAnswers] = useState<Record<string, UserInputAnswerValue>>(
     {},
   );
+  const [resourceSelectionAnswerReady, setResourceSelectionAnswerReady] = useState<
+    Record<string, boolean>
+  >({});
 
   if (entries.length === 0) {
     return null;
@@ -432,13 +475,7 @@ export function ServerRequestsPanel({
                           entry.questions.some((question) => {
                             const answerKey = `${requestKey}:${question.id}`;
                             if (question.inputKind === "integrationConnectionResourceMultiSelect") {
-                              return (
-                                readResourceSelectionAnswer({
-                                  answerKey,
-                                  question,
-                                  userInputAnswers,
-                                }).length === 0
-                              );
+                              return resourceSelectionAnswerReady[answerKey] !== true;
                             }
 
                             const otherOption = question.options?.find((option) => option.isOther);
@@ -509,6 +546,7 @@ export function ServerRequestsPanel({
                               disabled={isRespondingToServerRequest}
                               question={question}
                               selectedValues={selectedResourceValues}
+                              setResourceSelectionAnswerReady={setResourceSelectionAnswerReady}
                               setUserInputAnswers={setUserInputAnswers}
                             />
                           ) : (
