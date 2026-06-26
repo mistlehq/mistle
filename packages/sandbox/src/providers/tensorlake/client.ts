@@ -17,7 +17,7 @@ import {
 } from "tensorlake";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
-import { SandboxdStopDaemonCommand } from "../../sandboxd-install.js";
+import { SandboxdStopDirectDaemonCommand } from "../../sandboxd-install.js";
 import {
   SandboxBaseImageSourceKinds,
   SandboxInspectDispositions,
@@ -64,11 +64,9 @@ const StartDaemonCommandArgs: string[] = [];
 export const TensorlakeSandboxTimeoutSecs = 0;
 const DaemonPath = "/opt/mistle/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin";
 // Backwards compatibility for Tensorlake sandboxes and snapshots built before
-// direct daemon startup. Those images may have sandboxd.service enabled, and
-// after Tensorlake suspend/resume systemd can report the unit active while the
-// MainPID is still systemd-executor and no control socket exists. Stop the
-// legacy unit and remove the stale socket before starting sandboxd directly.
-const DirectDaemonCompatibilityCleanupCommand = SandboxdStopDaemonCommand;
+// direct daemon startup. Remove stale direct daemon state before starting
+// sandboxd directly.
+const DirectDaemonCompatibilityCleanupCommand = SandboxdStopDirectDaemonCommand;
 const DirectDaemonCompatibilityCleanupTimeoutMs = 30_000;
 const DaemonReadinessPollIntervalMs = 100;
 export const DaemonReadinessPollAttempts = 600;
@@ -631,19 +629,15 @@ export class TensorlakeApiClient implements TensorlakeClient {
     let startedDaemon = false;
     let recordedFailure = false;
     if (await this.#isDaemonReady(input.sandbox)) {
-      if (await this.#isLegacySystemdDaemonActive(input.sandbox)) {
-        await this.#stopLegacyDaemonState(input.sandbox);
-      } else {
-        recordSandboxDaemonReady({
-          alreadyReady: true,
-          durationMs: systemClock.nowMs() - startedAtMs,
-          outcome: "success",
-          pollAttempts,
-          provider: "tensorlake",
-          startedDaemon,
-        });
-        return;
-      }
+      recordSandboxDaemonReady({
+        alreadyReady: true,
+        durationMs: systemClock.nowMs() - startedAtMs,
+        outcome: "success",
+        pollAttempts,
+        provider: "tensorlake",
+        startedDaemon,
+      });
+      return;
     } else {
       await this.#stopLegacyDaemonState(input.sandbox);
     }
@@ -754,17 +748,6 @@ export class TensorlakeApiClient implements TensorlakeClient {
     return result.exitCode === 0;
   }
 
-  async #isLegacySystemdDaemonActive(sandbox: Sandbox): Promise<boolean> {
-    const result = await sandbox.run("sh", {
-      args: [
-        "-lc",
-        "command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet sandboxd.service",
-      ],
-      user: TensorlakeRootProcessUser,
-    });
-    return result.exitCode === 0;
-  }
-
   async #stopLegacyDaemonState(sandbox: Sandbox): Promise<void> {
     const result = await sandbox.run("sh", {
       args: ["-euc", DirectDaemonCompatibilityCleanupCommand],
@@ -773,7 +756,7 @@ export class TensorlakeApiClient implements TensorlakeClient {
     });
     ensureCommandSucceeded({
       operation: TensorlakeClientOperationIds.ACTIVATE,
-      commandDescription: "Stop legacy Tensorlake sandboxd state",
+      commandDescription: "Stop stale Tensorlake sandboxd state",
       result,
     });
   }

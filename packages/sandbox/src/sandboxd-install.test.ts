@@ -4,6 +4,7 @@ import {
   SandboxdInstallCommand,
   SandboxdInstallEnvVars,
   SandboxdResetTransparentEgressNftablesCommand,
+  SandboxdStopDirectDaemonCommand,
   SandboxdStopDaemonCommand,
 } from "./sandboxd-install.js";
 
@@ -46,21 +47,16 @@ describe("SandboxdInstallCommand", () => {
 });
 
 describe("SandboxdStopDaemonCommand", () => {
-  it("requires process tools and removes the stale control socket after stopping sandboxd", () => {
+  it("requires systemd timeout, process tools, and removes the stale control socket", () => {
+    expect(SandboxdStopDaemonCommand).toContain("command -v timeout");
     expect(SandboxdStopDaemonCommand).toContain("command -v pgrep");
     expect(SandboxdStopDaemonCommand).toContain("command -v pkill");
-    expect(SandboxdStopDaemonCommand).toContain("command -v timeout");
     expect(SandboxdStopDaemonCommand).toContain('rm -f "$socket_path"');
   });
 
-  it("uses bounded systemd stop before forcing the service cgroup and leftover sandboxd processes down", () => {
-    const stopFailureCaptureIndex = SandboxdStopDaemonCommand.indexOf("systemd_stop_failed=0");
+  it("stops the systemd unit before forcing direct sandboxd processes down", () => {
     const systemdStopIndex = SandboxdStopDaemonCommand.indexOf(
-      "if ! timeout 20s systemctl stop sandboxd.service; then",
-    );
-    const stopFailedAssignmentIndex = SandboxdStopDaemonCommand.indexOf("systemd_stop_failed=1");
-    const cgroupKillConditionIndex = SandboxdStopDaemonCommand.indexOf(
-      'if test "$systemd_stop_failed" -ne 0 || systemctl is-active --quiet sandboxd.service; then',
+      "timeout 20s systemctl stop sandboxd.service",
     );
     const systemdKillIndex = SandboxdStopDaemonCommand.indexOf(
       "systemctl kill --kill-who=all --signal=TERM sandboxd.service",
@@ -68,17 +64,41 @@ describe("SandboxdStopDaemonCommand", () => {
     const processKillIndex = SandboxdStopDaemonCommand.indexOf(
       'pkill -TERM -f "^/opt/mistle/bin/sandboxd( |$)"',
     );
-
-    expect(stopFailureCaptureIndex).toBeGreaterThanOrEqual(0);
-    expect(systemdStopIndex).toBeGreaterThan(stopFailureCaptureIndex);
-    expect(stopFailedAssignmentIndex).toBeGreaterThan(systemdStopIndex);
-    expect(cgroupKillConditionIndex).toBeGreaterThan(stopFailedAssignmentIndex);
-    expect(systemdKillIndex).toBeGreaterThan(cgroupKillConditionIndex);
-    expect(processKillIndex).toBeGreaterThan(systemdStopIndex);
-    expect(SandboxdStopDaemonCommand).toContain("systemctl is-active --quiet sandboxd.service");
-    expect(SandboxdStopDaemonCommand).toContain(
-      "systemctl kill --kill-who=all --signal=KILL sandboxd.service",
+    const forceKillIndex = SandboxdStopDaemonCommand.indexOf(
+      'pkill -KILL -f "^/opt/mistle/bin/sandboxd( |$)"',
     );
+    const staleSocketRemovalIndex = SandboxdStopDaemonCommand.indexOf('rm -f "$socket_path"');
+
+    expect(systemdStopIndex).toBeGreaterThanOrEqual(0);
+    expect(systemdKillIndex).toBeGreaterThan(systemdStopIndex);
+    expect(processKillIndex).toBeGreaterThanOrEqual(0);
+    expect(processKillIndex).toBeGreaterThan(systemdKillIndex);
+    expect(forceKillIndex).toBeGreaterThan(processKillIndex);
+    expect(staleSocketRemovalIndex).toBeGreaterThan(forceKillIndex);
+  });
+});
+
+describe("SandboxdStopDirectDaemonCommand", () => {
+  it("requires process tools and removes the stale control socket after stopping sandboxd", () => {
+    expect(SandboxdStopDirectDaemonCommand).toContain("command -v pgrep");
+    expect(SandboxdStopDirectDaemonCommand).toContain("command -v pkill");
+    expect(SandboxdStopDirectDaemonCommand).toContain('rm -f "$socket_path"');
+  });
+
+  it("stops direct sandboxd processes without touching systemd units", () => {
+    const processKillIndex = SandboxdStopDirectDaemonCommand.indexOf(
+      'pkill -TERM -f "^/opt/mistle/bin/sandboxd( |$)"',
+    );
+    const forceKillIndex = SandboxdStopDirectDaemonCommand.indexOf(
+      'pkill -KILL -f "^/opt/mistle/bin/sandboxd( |$)"',
+    );
+    const staleSocketRemovalIndex = SandboxdStopDirectDaemonCommand.indexOf('rm -f "$socket_path"');
+
+    expect(processKillIndex).toBeGreaterThanOrEqual(0);
+    expect(forceKillIndex).toBeGreaterThan(processKillIndex);
+    expect(staleSocketRemovalIndex).toBeGreaterThan(forceKillIndex);
+    expect(SandboxdStopDirectDaemonCommand).not.toContain("systemctl");
+    expect(SandboxdStopDirectDaemonCommand).not.toContain("sandboxd.service");
   });
 });
 
