@@ -184,6 +184,14 @@ _Avoid_: Placeholder connection, fake connection
 The point at which an **Integration connection** has the provider state and credentials needed for its supported behavior.
 _Avoid_: Connection creation when provider setup is still incomplete
 
+**Initial integration resource refresh**:
+The first refresh of an **Integration connection**'s supported provider resources after **Integration connection setup completion**, so resource-backed configuration controls can offer selectable values.
+_Avoid_: Integration connection setup completion, provider app installation, webhook-driven resource refresh
+
+**Integration connection resource readiness**:
+The point at which an **Integration connection** has refreshed the provider resources needed by resource-backed configuration controls.
+_Avoid_: Integration connection setup completion, because setup completion only means provider state and credentials are present
+
 **Secret-bearing integration setup**:
 An integration setup step that requires a user-supplied credential or provider secret value.
 _Avoid_: MCP setup mutation, agent-entered secret setup
