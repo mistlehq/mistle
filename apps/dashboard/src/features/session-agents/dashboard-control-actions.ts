@@ -145,6 +145,14 @@ const DesignerUserInputRequestInputSchema = z
     {
       message: "Resource selection input cannot include options or freeForm.",
     },
+  )
+  .refine(
+    (input) =>
+      input.submitBehavior?.kind !== "saveSandboxProfileDraftBinding" ||
+      input.inputKind === "integrationConnectionResourceMultiSelect",
+    {
+      message: "Save draft submit behavior requires resource selection input.",
+    },
   );
 
 const DesignerUserInputRequestDynamicToolCallSchema = z
@@ -209,6 +217,12 @@ export type DashboardControlActionHandler = (
 export type DashboardControlActionSupport = {
   supportedActions: readonly string[];
   handleAction: DashboardControlActionHandler;
+  userInputSubmitBehavior?: {
+    sandboxProfileDraftBinding?: {
+      profileId: string;
+      version: number;
+    };
+  };
 };
 
 const DesignerBlueprintConditionValueJsonSchema = {
@@ -744,7 +758,39 @@ export const DesignerUserInputRequestDynamicToolSpec = {
     anyOf: [
       { required: ["options"] },
       { required: ["freeForm"] },
-      { required: ["resourceSelection"] },
+      {
+        properties: {
+          inputKind: {
+            const: "integrationConnectionResourceMultiSelect",
+          },
+        },
+        required: ["inputKind", "resourceSelection"],
+      },
+    ],
+    allOf: [
+      {
+        if: {
+          properties: {
+            submitBehavior: {
+              properties: {
+                kind: {
+                  const: "saveSandboxProfileDraftBinding",
+                },
+              },
+              required: ["kind"],
+            },
+          },
+          required: ["submitBehavior"],
+        },
+        then: {
+          properties: {
+            inputKind: {
+              const: "integrationConnectionResourceMultiSelect",
+            },
+          },
+          required: ["inputKind", "resourceSelection"],
+        },
+      },
     ],
   },
 } satisfies CodexDynamicToolSpec;

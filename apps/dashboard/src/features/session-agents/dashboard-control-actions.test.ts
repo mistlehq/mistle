@@ -162,6 +162,16 @@ describe("dashboard control actions", () => {
             },
           },
         },
+        anyOf: expect.arrayContaining([
+          {
+            properties: {
+              inputKind: {
+                const: "integrationConnectionResourceMultiSelect",
+              },
+            },
+            required: ["inputKind", "resourceSelection"],
+          },
+        ]),
       },
     });
   });
@@ -340,6 +350,39 @@ describe("dashboard control actions", () => {
           configField: "repositories",
         },
       },
+    });
+  });
+
+  it("rejects save draft submit behavior on text user input calls", () => {
+    const parsed = parseDashboardControlDynamicToolCall({
+      namespace: DashboardControlDynamicToolNamespace,
+      tool: DesignerUserInputRequestDynamicToolName,
+      arguments: {
+        id: "github-review-repositories",
+        question: "Which GitHub repositories should this agent review?",
+        options: [
+          {
+            label: "mistlehq/mistle",
+          },
+        ],
+        submitBehavior: {
+          kind: "saveSandboxProfileDraftBinding",
+          profileId: "sbp_designer",
+          version: 2,
+          bindingId: "spib_github",
+          configField: "repositories",
+        },
+      },
+    });
+
+    expect(parsed).toEqual({
+      contentItems: [
+        {
+          type: "inputText",
+          text: "Designer user input request is invalid.",
+        },
+      ],
+      success: false,
     });
   });
 

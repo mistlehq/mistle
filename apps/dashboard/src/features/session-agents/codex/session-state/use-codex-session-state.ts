@@ -200,11 +200,20 @@ function serializeIntegrationBindingForDraft(binding: SandboxProfileVersionInteg
   };
 }
 
+function resolveResourceSelectionDraftConfigField(resourceKind: string): string {
+  if (resourceKind === "repository") {
+    return "repositories";
+  }
+
+  throw new Error(`Resource kind '${resourceKind}' cannot be saved to a sandbox profile draft.`);
+}
+
 async function maybeApplyDashboardUserInputSubmitBehavior(input: {
   entries: readonly CodexApprovalRequestEntry[];
   queryClient: QueryClient;
   requestId: string | number;
   result: unknown;
+  submitBehaviorSupport: DashboardControlActionSupport["userInputSubmitBehavior"] | undefined;
 }): Promise<unknown> {
   if (!isUserInputAnswerResult(input.result)) {
     return input.result;
@@ -224,6 +233,32 @@ async function maybeApplyDashboardUserInputSubmitBehavior(input: {
       continue;
     }
 
+    if (
+      question.inputKind !== "integrationConnectionResourceMultiSelect" ||
+      question.resourceSelection === undefined
+    ) {
+      throw new Error("Sandbox profile draft binding updates require resource selection input.");
+    }
+
+    const supportedDraftBinding = input.submitBehaviorSupport?.sandboxProfileDraftBinding;
+    if (supportedDraftBinding === undefined) {
+      throw new Error("Sandbox profile draft binding updates are not supported in this session.");
+    }
+
+    if (
+      submitBehavior.profileId !== supportedDraftBinding.profileId ||
+      submitBehavior.version !== supportedDraftBinding.version
+    ) {
+      throw new Error("Sandbox profile draft binding update target is not allowed.");
+    }
+
+    const expectedConfigField = resolveResourceSelectionDraftConfigField(
+      question.resourceSelection.resourceKind,
+    );
+    if (submitBehavior.configField !== expectedConfigField) {
+      throw new Error("Sandbox profile draft binding config field is not allowed.");
+    }
+
     const answerIndex = answers.findIndex((answer) => answer.id === question.id);
     const answer = answers[answerIndex];
     if (answer === undefined || !Array.isArray(answer.value)) {
@@ -234,8 +269,8 @@ async function maybeApplyDashboardUserInputSubmitBehavior(input: {
     const selectedHandles = answer.value;
 
     const currentBindings = await getSandboxProfileVersionIntegrationBindings({
-      profileId: submitBehavior.profileId,
-      version: submitBehavior.version,
+      profileId: supportedDraftBinding.profileId,
+      version: supportedDraftBinding.version,
     });
     const targetBinding = currentBindings.bindings.find(
       (binding) => binding.id === submitBehavior.bindingId,
@@ -245,10 +280,15 @@ async function maybeApplyDashboardUserInputSubmitBehavior(input: {
         `Sandbox profile integration binding '${submitBehavior.bindingId}' was not found.`,
       );
     }
+    if (targetBinding.connectionId !== question.resourceSelection.connectionId) {
+      throw new Error(
+        "Sandbox profile integration binding does not match the selected connection.",
+      );
+    }
 
     await putSandboxProfileVersionDraft({
-      profileId: submitBehavior.profileId,
-      version: submitBehavior.version,
+      profileId: supportedDraftBinding.profileId,
+      version: supportedDraftBinding.version,
       integrationBindings: {
         bindings: currentBindings.bindings.map((binding) => {
           const serializedBinding = serializeIntegrationBindingForDraft(binding);
@@ -260,7 +300,7 @@ async function maybeApplyDashboardUserInputSubmitBehavior(input: {
             ...serializedBinding,
             config: {
               ...serializedBinding.config,
-              [submitBehavior.configField]: selectedHandles.slice(),
+              [expectedConfigField]: selectedHandles.slice(),
             },
           };
         }),
@@ -270,15 +310,15 @@ async function maybeApplyDashboardUserInputSubmitBehavior(input: {
     await Promise.all([
       input.queryClient.invalidateQueries({
         queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
-          profileId: submitBehavior.profileId,
-          version: submitBehavior.version,
+          profileId: supportedDraftBinding.profileId,
+          version: supportedDraftBinding.version,
         }),
       }),
       input.queryClient.invalidateQueries({
-        queryKey: sandboxProfileVersionsQueryKey(submitBehavior.profileId),
+        queryKey: sandboxProfileVersionsQueryKey(supportedDraftBinding.profileId),
       }),
       input.queryClient.invalidateQueries({
-        queryKey: sandboxProfileDetailQueryKey(submitBehavior.profileId),
+        queryKey: sandboxProfileDetailQueryKey(supportedDraftBinding.profileId),
       }),
     ]);
 
@@ -286,8 +326,8 @@ async function maybeApplyDashboardUserInputSubmitBehavior(input: {
       ...answer,
       sideEffect: {
         kind: "sandbox-profile-draft-updated",
-        profileId: submitBehavior.profileId,
-        version: submitBehavior.version,
+        profileId: supportedDraftBinding.profileId,
+        version: supportedDraftBinding.version,
       },
     };
   }
@@ -982,7 +1022,7 @@ export function useCodexSessionState(input: {
   });
 
   const respondToServerRequestMutation = useMutation({
-    mutationFn: async (input: { requestId: string | number; result: unknown }) => {
+    mutationFn: async (responseInput: { requestId: string | number; result: unknown }) => {
       const rpcClient = rpcClientRef.current;
       if (rpcClient === null) {
         throw new Error("Connect to a sandbox session before responding to server requests.");
@@ -990,11 +1030,11 @@ export function useCodexSessionState(input: {
 
       dispatchServerRequestsAction({
         type: "server_request_response_started",
-        requestId: input.requestId,
+        requestId: responseInput.requestId,
       });
 
       try {
-        const requestId = String(input.requestId);
+        const requestId = String(responseInput.requestId);
         const isDashboardControlUserInputRequest =
           dashboardControlUserInputRequestIdsRef.current.has(requestId);
         const result = isDashboardControlUserInputRequest
@@ -1002,27 +1042,28 @@ export function useCodexSessionState(input: {
               result: await maybeApplyDashboardUserInputSubmitBehavior({
                 entries: serverRequestsState.entries,
                 queryClient,
-                requestId: input.requestId,
-                result: input.result,
+                requestId: responseInput.requestId,
+                result: responseInput.result,
+                submitBehaviorSupport: input.dashboardControlActions?.userInputSubmitBehavior,
               }),
             })
           : createCodexServerRequestResponse({
               entries: serverRequestsState.entries,
-              requestId: input.requestId,
-              result: input.result,
+              requestId: responseInput.requestId,
+              result: responseInput.result,
             });
-        await rpcClient.respond(input.requestId, result);
+        await rpcClient.respond(responseInput.requestId, result);
         if (isDashboardControlUserInputRequest) {
           dashboardControlUserInputRequestIdsRef.current.delete(requestId);
           dispatchServerRequestsAction({
             type: "server_request_response_succeeded",
-            requestId: input.requestId,
+            requestId: responseInput.requestId,
           });
         }
       } catch (error) {
         dispatchServerRequestsAction({
           type: "server_request_response_failed",
-          requestId: input.requestId,
+          requestId: responseInput.requestId,
           errorMessage:
             error instanceof Error ? error.message : "Could not send server request response.",
         });
