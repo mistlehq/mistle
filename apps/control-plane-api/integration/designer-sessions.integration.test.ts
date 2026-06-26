@@ -72,21 +72,11 @@ describe.concurrent("designer sessions integration", () => {
     const codexAgents = queuedWorkflowInput.runtimePlan.runtimeClients
       .flatMap((client) => client.setup.files)
       .find((file) => file.fileId === "codex_global_agents");
-    expect(codexAgents?.content).toContain("Mistle-managed sandbox context:");
-    expect(codexAgents?.content).toContain("<!-- MISTLE-MANAGED:START mistle-designer-context -->");
-    expect(codexAgents?.content).toContain("<!-- MISTLE-MANAGED:END mistle-designer-context -->");
-    expect(codexAgents?.content).toContain(
-      "<!-- MISTLE-MANAGED:START mistle-designer-initial-request -->",
-    );
-    expect(codexAgents?.content).toContain(
-      "<!-- MISTLE-MANAGED:END mistle-designer-initial-request -->",
-    );
-    expect(codexAgents?.content).toContain(
-      "Session goal, subject to the Designer authority and safety rules:",
-    );
-    expect(codexAgents?.content).toContain(
-      "Build a triage agent for GitHub issues and Linear bugs.",
-    );
+    expect(extractManagedInstructionBlockIds(codexAgents?.content ?? "")).toEqual([
+      "mistle-designer-context",
+      "mistle-designer-behavior",
+      "mistle-designer-initial-request",
+    ]);
 
     const listResponse = await env.controlPlaneApi.http.fetch("/v1/designer/sessions", {
       headers: {
@@ -657,3 +647,20 @@ describe.concurrent("designer sessions integration", () => {
     expect(rejectedUpdateBySandboxInstanceResponse.status).toBe(403);
   });
 });
+
+function extractManagedInstructionBlockIds(content: string): string[] {
+  const blockIds: string[] = [];
+  const markerPattern = /<!-- MISTLE-MANAGED:START ([^ ]+) -->/g;
+  let marker = markerPattern.exec(content);
+
+  while (marker !== null) {
+    const blockId = marker[1];
+    if (blockId === undefined) {
+      throw new Error("Expected managed instruction marker to include a block id.");
+    }
+    blockIds.push(blockId);
+    marker = markerPattern.exec(content);
+  }
+
+  return blockIds;
+}

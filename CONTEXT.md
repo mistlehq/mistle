@@ -247,6 +247,7 @@ _Avoid_: Composer readiness, runtime-specific loading state
 **Trigger**:
 A configured event or schedule that starts an agent response.
 _Avoid_: Automation
+_Properties_: New Triggers are enabled by default.
 
 **Trigger configuration**:
 The durable behavior-defining fields of a **Trigger**.
@@ -731,6 +732,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Provider consent and provider installation setup steps are completed through **User-action integration setup**.
 - A **User-action integration setup descriptor** describes exactly one **User-action integration setup**.
 - Mistle-mediated setup preparation may create pending setup state when the user-facing credential, consent, installation, or irreversible provider mutation step is still completed through **User-action integration setup**.
+- Preparing or opening a **User-action integration setup** does not require separate approval because completion remains a user action in the dashboard.
 - MCP setup tools should prepare a **User-action integration setup descriptor** instead of accepting secret values for **Secret-bearing integration setup**.
 - MCP setup tools may directly complete non-secret setup that does not require provider consent, provider installation, or irreversible provider mutation.
 - MCP setup tools may expose credential requirement and configured-state metadata, but not secret values or secret-derived previews.
@@ -799,10 +801,10 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - User alignment on a **Designer blueprint** may authorize **Mistle Designer** to create or update the matching saved draft **Sandbox profile version** without a separate per-field confirmation.
 - **Mistle Designer** applies aligned **Sandbox profile version configuration** as one draft update, preserving unrelated saved draft configuration on existing drafts.
 - When **Mistle Designer** changes **Integration bindings** on a saved draft **Sandbox profile version**, the resulting saved configuration should include the complete intended binding set, including unrelated bindings that remain part of the draft.
-- After **Designer blueprint** alignment, **Mistle Designer** may publish a saved draft **Sandbox profile version** when the aligned outcome requires a launchable agent.
+- After **Designer blueprint** alignment, **Mistle Designer** may publish a saved draft **Sandbox profile version** when the aligned outcome requires a published version.
 - Publishing a **Sandbox profile version** through **Mistle Designer** does not imply starting a **Sandbox session**.
 - **Mistle Designer** may discard a saved draft **Sandbox profile version** when discarding that draft is the aligned outcome.
-- Setup confirmation may apply integration setup or selection, trigger configuration, sandbox profile draft changes, publish, or session launch only through the corresponding supported product action; it is not represented as a **Designer blueprint** item.
+- An **Approved runtime action** may apply integration setup or selection, trigger configuration changes that are not inherent to an aligned concrete step, sandbox profile draft changes that are not inherent to an aligned concrete step, publishing a **Sandbox profile version**, or starting a **Sandbox session** only through the corresponding supported product action; it is not represented as a **Designer blueprint** item.
 - First-pass **Designer blueprint** actions open existing product surfaces with prefilled state where supported, rather than executing product changes directly from the blueprint.
 - A **Designer blueprint** remains useful after confirmation by updating **Designer blueprint item state** metadata such as proposed, needs setup, ready to confirm, applied, or blocked.
 - **Designer blueprint item states** are maintained by **Mistle Designer** rather than inferred as a strict live projection of product state.
