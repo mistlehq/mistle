@@ -243,6 +243,21 @@ describe("ChatComposer", () => {
     expect(composer.getAttribute("aria-placeholder")).toBe("Steer the current turn");
   });
 
+  it("preserves a custom placeholder during an active turn when requested", () => {
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        placeholderText="Type a custom response..."
+        preservePlaceholderDuringActiveTurn
+        submitMode="interrupt"
+      />,
+    );
+
+    const composer = screen.getByRole("textbox");
+
+    expect(composer.getAttribute("aria-placeholder")).toBe("Type a custom response...");
+  });
+
   it("renders a spinner icon while a start-turn request is pending", () => {
     const { container } = render(
       <ChatComposer

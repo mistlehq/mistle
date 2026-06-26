@@ -554,6 +554,30 @@ describe("dashboard control actions", () => {
     });
   });
 
+  it("formats Designer custom user input responses for dynamic tool calls", () => {
+    const response = createDashboardControlUserInputResponse({
+      result: {
+        customResponse: {
+          text: "Use Slack instead",
+        },
+      },
+    });
+
+    expect(response).toEqual({
+      contentItems: [
+        {
+          type: "inputText",
+          text: JSON.stringify({
+            customResponse: {
+              text: "Use Slack instead",
+            },
+          }),
+        },
+      ],
+      success: true,
+    });
+  });
+
   it("formats Designer resource selection responses for dynamic tool calls", () => {
     const response = createDashboardControlUserInputResponse({
       result: {

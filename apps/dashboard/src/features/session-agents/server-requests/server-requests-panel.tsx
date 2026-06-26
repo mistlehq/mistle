@@ -21,11 +21,15 @@ import {
 } from "../../shared/composer-action-panel.js";
 import { ApprovalDecisionButtons } from "./approval-decision-buttons.js";
 import type { ServerRequestEntry } from "./server-request-entries.js";
+import {
+  submitServerRequestResponse,
+  type RespondToServerRequest,
+} from "./server-request-response.js";
 
 type ServerRequestsPanelProps = {
   entries: readonly ServerRequestEntry[];
   isRespondingToServerRequest: boolean;
-  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  onRespondToServerRequest: RespondToServerRequest;
 };
 
 type ToolUserInputQuestion = Extract<
@@ -536,20 +540,28 @@ function useResourceSelectionQuestionStates(input: {
 function ToolUserInputRequestPanelContent(input: {
   entry: Extract<ServerRequestEntry, { kind: "tool-user-input" }>;
   isRespondingToServerRequest: boolean;
-  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  onRespondToServerRequest: RespondToServerRequest;
   requestKey: string;
   resourceSelectionQuestionStates: Readonly<Record<string, ResourceSelectionQuestionViewState>>;
   selectedValuesByAnswerKey: Readonly<Record<string, readonly string[]>>;
   setUserInputAnswers: Dispatch<SetStateAction<Record<string, UserInputAnswerValue>>>;
   userInputAnswers: Readonly<Record<string, UserInputAnswerValue>>;
 }): React.JSX.Element {
+  function submitResponse(response: unknown): void {
+    submitServerRequestResponse({
+      onRespondToServerRequest: input.onRespondToServerRequest,
+      requestId: input.entry.requestId,
+      response,
+    });
+  }
+
   const submitOnOptionSelect = canSubmitUserInputOnOptionSelect(input.entry);
   const cancelAction = (
     <Button
       className={cn("text-muted-foreground", submitOnOptionSelect ? "-mt-2" : undefined)}
       disabled={input.isRespondingToServerRequest}
       onClick={() => {
-        input.onRespondToServerRequest(input.entry.requestId, createUserInputCancelResponse());
+        submitResponse(createUserInputCancelResponse());
       }}
       type="button"
       variant="ghost"
@@ -584,8 +596,7 @@ function ToolUserInputRequestPanelContent(input: {
             <Button
               disabled={isSubmitDisabled}
               onClick={() => {
-                input.onRespondToServerRequest(
-                  input.entry.requestId,
+                submitResponse(
                   createUserInputResponse({
                     entry: input.entry,
                     requestKey: input.requestKey,
@@ -654,8 +665,7 @@ function ToolUserInputRequestPanelContent(input: {
                         return;
                       }
 
-                      input.onRespondToServerRequest(
-                        input.entry.requestId,
+                      submitResponse(
                         createUserInputResponse({
                           entry: input.entry,
                           requestKey: input.requestKey,
@@ -740,7 +750,7 @@ function createSelectedValuesByAnswerKey(input: {
 function PlainToolUserInputRequestPanel(input: {
   entry: Extract<ServerRequestEntry, { kind: "tool-user-input" }>;
   isRespondingToServerRequest: boolean;
-  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  onRespondToServerRequest: RespondToServerRequest;
   requestKey: string;
   userInputAnswers: Readonly<Record<string, UserInputAnswerValue>>;
   setUserInputAnswers: Dispatch<SetStateAction<Record<string, UserInputAnswerValue>>>;
@@ -766,7 +776,7 @@ function PlainToolUserInputRequestPanel(input: {
 function ResourceToolUserInputRequestPanel(input: {
   entry: Extract<ServerRequestEntry, { kind: "tool-user-input" }>;
   isRespondingToServerRequest: boolean;
-  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  onRespondToServerRequest: RespondToServerRequest;
   requestKey: string;
   userInputAnswers: Readonly<Record<string, UserInputAnswerValue>>;
   setUserInputAnswers: Dispatch<SetStateAction<Record<string, UserInputAnswerValue>>>;
@@ -800,7 +810,7 @@ function ResourceToolUserInputRequestPanel(input: {
 function ToolUserInputRequestPanel(input: {
   entry: Extract<ServerRequestEntry, { kind: "tool-user-input" }>;
   isRespondingToServerRequest: boolean;
-  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  onRespondToServerRequest: RespondToServerRequest;
   requestKey: string;
 }): React.JSX.Element {
   const [userInputAnswers, setUserInputAnswers] = useState<Record<string, UserInputAnswerValue>>(

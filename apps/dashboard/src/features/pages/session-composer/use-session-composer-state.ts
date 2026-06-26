@@ -68,6 +68,7 @@ type QueuedComposerPrompt = {
 };
 
 const CodexPlanComposerCommandId = "codex.plan";
+const UserInputRequestCustomResponsePlaceholder = "Type a custom response...";
 
 type PreparedComposerTurnSubmission = {
   preparedAttachments: PreparedComposerAttachments;
@@ -213,6 +214,11 @@ export type SessionComposerRuntimeInput = {
     name: string;
     message: string;
   }[];
+  userInputRequestCustomResponseTarget?: {
+    requestId: string | number;
+    isResponding: boolean;
+    respond: (requestId: string | number, result: unknown) => Promise<void> | void;
+  } | null;
   sessionErrorMessage: string | null;
   turnControl: SessionTurnControl;
 };
@@ -261,6 +267,8 @@ export function useSessionComposerState(input: {
   const [queuedPrompts, setQueuedPrompts] = useState<readonly QueuedComposerPrompt[]>([]);
   const [isSubmittingNativeQueuedPrompt, setIsSubmittingNativeQueuedPrompt] = useState(false);
   const [isSubmittingQueuedPrompt, setIsSubmittingQueuedPrompt] = useState(false);
+  const userInputRequestCustomResponseTarget =
+    composerStateInput.userInputRequestCustomResponseTarget ?? null;
 
   const activeComposerModel = useMemo(
     () =>
@@ -453,6 +461,7 @@ export function useSessionComposerState(input: {
             pendingBlueprintComments: draftState.pendingBlueprintComments,
             pendingDiffComments: draftState.pendingDiffComments,
           }) > 0,
+        userInputRequestCustomResponseTarget,
       }),
     [
       composerText,
@@ -460,6 +469,7 @@ export function useSessionComposerState(input: {
       draftState.pendingDiffComments.length,
       draftState.pendingBlueprintComments,
       pendingComposerAttachments.length,
+      userInputRequestCustomResponseTarget,
     ],
   );
 
@@ -785,7 +795,51 @@ export function useSessionComposerState(input: {
       clearSessionErrorMessage();
       setComposerErrorMessage(null);
 
-      if (submitAction.type !== "interrupt_turn" && composerStateInput.configControl.isUpdating) {
+      if (
+        submitAction.type !== "interrupt_turn" &&
+        submitAction.type !== "respond_to_user_input_request" &&
+        composerStateInput.configControl.isUpdating
+      ) {
+        return;
+      }
+
+      if (submitAction.type === "respond_to_user_input_request") {
+        if (
+          pendingComposerAttachments.length > 0 ||
+          composerDraft.selectedSkillMentions.length > 0 ||
+          countPendingComposerComments({
+            pendingBlueprintComments: draftState.pendingBlueprintComments,
+            pendingDiffComments: draftState.pendingDiffComments,
+          }) > 0
+        ) {
+          setComposerErrorMessage("Custom responses only support text.");
+          return;
+        }
+
+        if (userInputRequestCustomResponseTarget === null) {
+          setComposerErrorMessage("No pending user input request is available.");
+          return;
+        }
+
+        if (userInputRequestCustomResponseTarget.isResponding) {
+          return;
+        }
+
+        try {
+          await userInputRequestCustomResponseTarget.respond(submitAction.requestId, {
+            customResponse: {
+              text: submitAction.prompt,
+            },
+          });
+        } catch (error) {
+          setComposerErrorMessage(
+            error instanceof Error ? error.message : "Could not submit custom response.",
+          );
+          return;
+        }
+
+        draftState.setComposerDraft(createComposerDraft(""));
+        setComposerErrorMessage(null);
         return;
       }
 
@@ -927,6 +981,7 @@ export function useSessionComposerState(input: {
     turnCollaborationModeSettings,
     typedRuntimeCommand,
     unavailableTypedRuntimeCommand,
+    userInputRequestCustomResponseTarget,
   ]);
 
   const submitRuntimeCommand = useCallback(
@@ -976,6 +1031,12 @@ export function useSessionComposerState(input: {
       return composerStateInput.turnControl.isInterrupting ? "Stopping..." : "Stop";
     }
 
+    if (submitAction.submitMode === "custom-response") {
+      return userInputRequestCustomResponseTarget?.isResponding === true
+        ? "Responding..."
+        : "Respond";
+    }
+
     if (submitAction.submitMode === "steer") {
       return composerStateInput.turnControl.isSteering ? "Steering..." : "Steer";
     }
@@ -991,6 +1052,7 @@ export function useSessionComposerState(input: {
     composerStateInput.turnControl.isStarting,
     composerStateInput.turnControl.isSteering,
     submitAction.submitMode,
+    userInputRequestCustomResponseTarget?.isResponding,
   ]);
 
   const submitDisabled = useMemo(() => {
@@ -1008,6 +1070,23 @@ export function useSessionComposerState(input: {
 
     if (composerStateInput.attachmentControl.isUploadingAttachments) {
       return true;
+    }
+
+    if (submitAction.submitMode === "custom-response") {
+      if (userInputRequestCustomResponseTarget === null) {
+        return true;
+      }
+
+      return (
+        composerStateInput.bootstrap.phase.status !== "ready" ||
+        userInputRequestCustomResponseTarget.isResponding ||
+        pendingComposerAttachments.length > 0 ||
+        composerDraft.selectedSkillMentions.length > 0 ||
+        countPendingComposerComments({
+          pendingBlueprintComments: draftState.pendingBlueprintComments,
+          pendingDiffComments: draftState.pendingDiffComments,
+        }) > 0
+      );
     }
 
     if (composerStateInput.configControl.isUpdating) {
@@ -1038,6 +1117,7 @@ export function useSessionComposerState(input: {
     composerText,
     composerStateInput.attachmentControl.isUploadingAttachments,
     composerStateInput.bootstrap.phase.status,
+    composerDraft.selectedSkillMentions.length,
     composerStateInput.configControl.isUpdating,
     composerStateInput.turnControl.canInterrupt,
     composerStateInput.turnControl.canSteer,
@@ -1049,6 +1129,7 @@ export function useSessionComposerState(input: {
     submitAction.submitMode,
     typedRuntimeCommand,
     unavailableTypedRuntimeCommand,
+    userInputRequestCustomResponseTarget,
   ]);
 
   const queuePromptDisabled = useMemo(
@@ -1058,6 +1139,7 @@ export function useSessionComposerState(input: {
       composerStateInput.configControl.isUpdating ||
       isSubmittingNativeQueuedPrompt ||
       composerStateInput.bootstrap.phase.status !== "ready" ||
+      userInputRequestCustomResponseTarget !== null ||
       typedRuntimeCommand !== null ||
       unavailableTypedRuntimeCommand !== null ||
       (requiresModelSelection && activeComposerModel === null) ||
@@ -1081,6 +1163,7 @@ export function useSessionComposerState(input: {
       requiresModelSelection,
       typedRuntimeCommand,
       unavailableTypedRuntimeCommand,
+      userInputRequestCustomResponseTarget,
     ],
   );
 
@@ -1181,7 +1264,11 @@ export function useSessionComposerState(input: {
       pullRequest: composerStateInput.repositoryStatus.pullRequest,
       contextUsage: composerStateInput.contextUsage,
       goalStatus: composerStateInput.goalStatus ?? null,
-      placeholderText: composerStateInput.placeholderText,
+      placeholderText:
+        userInputRequestCustomResponseTarget !== null
+          ? UserInputRequestCustomResponsePlaceholder
+          : composerStateInput.placeholderText,
+      preservePlaceholderDuringActiveTurn: userInputRequestCustomResponseTarget !== null,
       isUploadingAttachments: composerStateInput.attachmentControl.isUploadingAttachments,
       keyboardShortcuts:
         composerStateInput.turnControl.activeTurnState === "running" &&
@@ -1191,10 +1278,12 @@ export function useSessionComposerState(input: {
             pendingBlueprintComments: draftState.pendingBlueprintComments,
             pendingDiffComments: draftState.pendingDiffComments,
           }) > 0)
-          ? [
-              { action: "Steer", shortcut: "enter" },
-              { action: "Queue", shortcut: "mod-enter" },
-            ]
+          ? submitAction.submitMode === "custom-response"
+            ? []
+            : [
+                { action: "Steer", shortcut: "enter" },
+                { action: "Queue", shortcut: "mod-enter" },
+              ]
           : [],
       secondarySubmitDisabled: queuePromptDisabled,
       configControlsDisabled:

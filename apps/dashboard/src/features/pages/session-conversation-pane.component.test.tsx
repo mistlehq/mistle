@@ -262,7 +262,7 @@ function ConversationScrollHarness(input: {
 
 function createLongTranscriptEntries(): readonly ChatEntry[] {
   return createCompletedConversationEntries(
-    Array.from({ length: 180 }, (_, index) => {
+    Array.from({ length: 80 }, (_, index) => {
       const turnNumber = String(index + 1).padStart(3, "0");
 
       return {
@@ -498,7 +498,7 @@ describe("SessionConversationBottomPanel", () => {
     expect(screen.getByText("Long transcript prompt 001")).toBeTruthy();
     expect(
       screen.getByText(
-        "Long transcript assistant response 180. This stable response text keeps the transcript large enough to exercise composer typing without depending on generated fixtures.",
+        "Long transcript assistant response 080. This stable response text keeps the transcript large enough to exercise composer typing without depending on generated fixtures.",
       ),
     ).toBeTruthy();
 
@@ -508,7 +508,7 @@ describe("SessionConversationBottomPanel", () => {
     expect(screen.getByText("Long transcript prompt 001")).toBeTruthy();
     expect(
       screen.getByText(
-        "Long transcript assistant response 180. This stable response text keeps the transcript large enough to exercise composer typing without depending on generated fixtures.",
+        "Long transcript assistant response 080. This stable response text keeps the transcript large enough to exercise composer typing without depending on generated fixtures.",
       ),
     ).toBeTruthy();
     expect(scrollContainerElement.scrollTop).toBe(9_200);

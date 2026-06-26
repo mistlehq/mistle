@@ -968,11 +968,25 @@ export function createDashboardControlUserInputResponse(input: {
     .safeParse(input.result);
 
   if (cancel.success) {
-    return createDashboardControlDynamicToolCallResponse({
-      success: true,
-      text: JSON.stringify({
-        decision: "cancel",
-      }),
+    return createSuccessfulDashboardControlJsonResponse({
+      decision: "cancel",
+    });
+  }
+
+  const customResponse = z
+    .object({
+      customResponse: z
+        .object({
+          text: z.string().min(1),
+        })
+        .strict(),
+    })
+    .strict()
+    .safeParse(input.result);
+
+  if (customResponse.success) {
+    return createSuccessfulDashboardControlJsonResponse({
+      customResponse: customResponse.data.customResponse,
     });
   }
 
@@ -1003,11 +1017,17 @@ export function createDashboardControlUserInputResponse(input: {
     });
   }
 
+  return createSuccessfulDashboardControlJsonResponse({
+    answers: parsed.data.answers,
+  });
+}
+
+function createSuccessfulDashboardControlJsonResponse(
+  payload: unknown,
+): DashboardControlDynamicToolCallResponse {
   return createDashboardControlDynamicToolCallResponse({
     success: true,
-    text: JSON.stringify({
-      answers: parsed.data.answers,
-    }),
+    text: JSON.stringify(payload),
   });
 }
 

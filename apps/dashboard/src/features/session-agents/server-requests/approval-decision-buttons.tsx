@@ -1,10 +1,15 @@
 import { Button } from "@mistle/ui";
 
+import {
+  submitServerRequestResponse,
+  type RespondToServerRequest,
+} from "./server-request-response.js";
+
 type ApprovalDecisionButtonsProps = {
   appearance: "compact" | "panel";
   availableDecisions: readonly string[];
   disabled: boolean;
-  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  onRespondToServerRequest: RespondToServerRequest;
   requestId: string | number;
 };
 
@@ -26,7 +31,11 @@ export function ApprovalDecisionButtons({
               disabled={disabled}
               key={decision}
               onClick={() => {
-                onRespondToServerRequest(requestId, response);
+                submitServerRequestResponse({
+                  onRespondToServerRequest,
+                  requestId,
+                  response,
+                });
               }}
               type="button"
               variant={decision.startsWith("accept") ? "default" : "outline"}
@@ -42,7 +51,11 @@ export function ApprovalDecisionButtons({
             disabled={disabled}
             key={decision}
             onClick={() => {
-              onRespondToServerRequest(requestId, response);
+              submitServerRequestResponse({
+                onRespondToServerRequest,
+                requestId,
+                response,
+              });
             }}
             type="button"
           >

@@ -1,6 +1,9 @@
 import { memo } from "react";
 
-import type { ServerRequestEntry } from "../../session-agents/server-requests/index.js";
+import type {
+  RespondToServerRequest,
+  ServerRequestEntry,
+} from "../../session-agents/server-requests/index.js";
 import { shouldSuppressChatReasoningText } from "../chat-semantic-projection.js";
 import type { ChatEntry, ChatGenericItemEntry, ChatSemanticGroupEntry } from "../chat-types.js";
 import {
@@ -22,7 +25,7 @@ import { ChatUserMessage } from "./chat-user-message.js";
 type ChatThreadProps = {
   entries: readonly ChatEntry[];
   isRespondingToServerRequest: boolean;
-  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  onRespondToServerRequest: RespondToServerRequest;
   onUserMessageAction?: (actionId: string) => void;
   pendingServerRequests: readonly ServerRequestEntry[];
 };

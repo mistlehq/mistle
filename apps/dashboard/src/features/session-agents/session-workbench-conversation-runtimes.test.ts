@@ -866,7 +866,7 @@ describe("buildClaudeCodeConversationRuntime", () => {
       },
     ]);
 
-    runtime.serverRequestsState.respondToServerRequest("permission-1", {
+    void runtime.serverRequestsState.respondToServerRequest("permission-1", {
       decision: "once",
     });
 
@@ -1097,7 +1097,7 @@ describe("buildPiConversationRuntime", () => {
       },
     ]);
 
-    runtime.serverRequestsState.respondToServerRequest("ui_confirm_1", {
+    void runtime.serverRequestsState.respondToServerRequest("ui_confirm_1", {
       decision: "confirm",
     });
 

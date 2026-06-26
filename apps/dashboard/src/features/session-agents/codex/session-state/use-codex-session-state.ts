@@ -62,6 +62,7 @@ import {
   type DashboardControlCanvasActionRequest,
   type DashboardControlActionSupport,
 } from "../../dashboard-control-actions.js";
+import type { RespondToServerRequest } from "../../server-requests/index.js";
 import {
   createInitialCodexApprovalRequestsState,
   reduceCodexApprovalRequestsState,
@@ -472,7 +473,7 @@ type CodexSessionChatState = {
 type CodexSessionServerRequestState = {
   pendingServerRequests: readonly CodexApprovalRequestEntry[];
   isRespondingToServerRequest: boolean;
-  respondToServerRequest: (requestId: string | number, result: unknown) => void;
+  respondToServerRequest: RespondToServerRequest;
   resetServerRequests: () => void;
 };
 
@@ -1253,7 +1254,7 @@ export function useCodexSessionState(input: {
     unsubscribeThreadMutation;
   const { mutate: compactThreadMutate, isPending: isCompactingThread } = compactThreadMutation;
   const { mutate: rollbackThreadMutate, isPending: isRollingBackThread } = rollbackThreadMutation;
-  const { mutate: respondToServerRequestMutate, isPending: isRespondingToServerRequest } =
+  const { mutateAsync: respondToServerRequestMutateAsync, isPending: isRespondingToServerRequest } =
     respondToServerRequestMutation;
 
   const refreshAvailableThreads = useCallback(() => {
@@ -1345,13 +1346,13 @@ export function useCodexSessionState(input: {
   );
 
   const respondToServerRequest = useCallback(
-    (requestId: string | number, result: unknown) => {
-      respondToServerRequestMutate({
+    async (requestId: string | number, result: unknown): Promise<void> => {
+      await respondToServerRequestMutateAsync({
         requestId,
         result,
       });
     },
-    [respondToServerRequestMutate],
+    [respondToServerRequestMutateAsync],
   );
 
   const resetServerRequests = useCallback(() => {

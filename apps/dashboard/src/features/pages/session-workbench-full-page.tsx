@@ -1009,6 +1009,9 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
               key={input.sandboxInstanceId ?? "missing-session"}
               serverRequestPanelEntries={unmatchedServerRequests}
               showWorkingIndicator={isConversationTurnRunning}
+              supportsUserInputRequestCustomResponse={
+                conversationPane.serverRequestsState.supportsUserInputRequestCustomResponse ?? false
+              }
             />
           ) : null
         }
