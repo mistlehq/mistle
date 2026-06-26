@@ -1,5 +1,8 @@
 import { relations } from "drizzle-orm";
 
+import { integrationConnectionResourceAttributes } from "./integration-connection-resource-attributes.js";
+import { integrationConnectionResourceRelationshipStates } from "./integration-connection-resource-relationship-states.js";
+import { integrationConnectionResourceRelationships } from "./integration-connection-resource-relationships.js";
 import { integrationConnectionResourceStates } from "./integration-connection-resource-states.js";
 import { integrationConnectionResources } from "./integration-connection-resources.js";
 import { integrationConnections } from "./integration-connections.js";
@@ -10,6 +13,9 @@ import { userExternalPrincipals } from "./user-external-principals.js";
 import { users } from "./users.js";
 
 export function defineIntegrationConnectionRelations(input: {
+  integrationConnectionResourceAttributes: typeof integrationConnectionResourceAttributes;
+  integrationConnectionResourceRelationshipStates: typeof integrationConnectionResourceRelationshipStates;
+  integrationConnectionResourceRelationships: typeof integrationConnectionResourceRelationships;
   integrationConnectionResourceStates: typeof integrationConnectionResourceStates;
   integrationConnectionResources: typeof integrationConnectionResources;
   integrationConnections: typeof integrationConnections;
@@ -26,6 +32,9 @@ export function defineIntegrationConnectionRelations(input: {
         fields: [input.integrationConnections.targetKey],
         references: [input.integrationTargets.targetKey],
       }),
+      resourceAttributes: many(input.integrationConnectionResourceAttributes),
+      resourceRelationshipStates: many(input.integrationConnectionResourceRelationshipStates),
+      resourceRelationships: many(input.integrationConnectionResourceRelationships),
       resources: many(input.integrationConnectionResources),
       resourceStates: many(input.integrationConnectionResourceStates),
       webhookEvents: many(input.integrationWebhookEvents),
@@ -39,6 +48,56 @@ export function defineIntegrationConnectionRelations(input: {
       connection: one(input.integrationConnections, {
         fields: [input.integrationConnectionResources.connectionId],
         references: [input.integrationConnections.id],
+      }),
+    }),
+  );
+
+  const integrationConnectionResourceAttributesRelations = relations(
+    input.integrationConnectionResourceAttributes,
+    ({ one }) => ({
+      connection: one(input.integrationConnections, {
+        fields: [input.integrationConnectionResourceAttributes.connectionId],
+        references: [input.integrationConnections.id],
+      }),
+    }),
+  );
+
+  const integrationConnectionResourceRelationshipStatesRelations = relations(
+    input.integrationConnectionResourceRelationshipStates,
+    ({ one }) => ({
+      connection: one(input.integrationConnections, {
+        fields: [input.integrationConnectionResourceRelationshipStates.connectionId],
+        references: [input.integrationConnections.id],
+      }),
+      scopeResource: one(input.integrationConnectionResources, {
+        fields: [input.integrationConnectionResourceRelationshipStates.scopeResourceId],
+        references: [input.integrationConnectionResources.id],
+        relationName: "relationshipStateScopeResource",
+      }),
+    }),
+  );
+
+  const integrationConnectionResourceRelationshipsRelations = relations(
+    input.integrationConnectionResourceRelationships,
+    ({ one }) => ({
+      connection: one(input.integrationConnections, {
+        fields: [input.integrationConnectionResourceRelationships.connectionId],
+        references: [input.integrationConnections.id],
+      }),
+      objectResource: one(input.integrationConnectionResources, {
+        fields: [input.integrationConnectionResourceRelationships.objectResourceId],
+        references: [input.integrationConnectionResources.id],
+        relationName: "relationshipObjectResource",
+      }),
+      scopeResource: one(input.integrationConnectionResources, {
+        fields: [input.integrationConnectionResourceRelationships.scopeResourceId],
+        references: [input.integrationConnectionResources.id],
+        relationName: "relationshipScopeResource",
+      }),
+      subjectResource: one(input.integrationConnectionResources, {
+        fields: [input.integrationConnectionResourceRelationships.subjectResourceId],
+        references: [input.integrationConnectionResources.id],
+        relationName: "relationshipSubjectResource",
       }),
     }),
   );
@@ -101,6 +160,9 @@ export function defineIntegrationConnectionRelations(input: {
   );
 
   return {
+    integrationConnectionResourceAttributesRelations,
+    integrationConnectionResourceRelationshipStatesRelations,
+    integrationConnectionResourceRelationshipsRelations,
     integrationConnectionResourcesRelations,
     integrationConnectionResourceStatesRelations,
     integrationConnectionsRelations,
@@ -111,6 +173,9 @@ export function defineIntegrationConnectionRelations(input: {
 }
 
 const defaultRelations = defineIntegrationConnectionRelations({
+  integrationConnectionResourceAttributes,
+  integrationConnectionResourceRelationshipStates,
+  integrationConnectionResourceRelationships,
   integrationConnectionResourceStates,
   integrationConnectionResources,
   integrationConnections,
@@ -122,6 +187,12 @@ const defaultRelations = defineIntegrationConnectionRelations({
 });
 
 export const integrationConnectionsRelations = defaultRelations.integrationConnectionsRelations;
+export const integrationConnectionResourceAttributesRelations =
+  defaultRelations.integrationConnectionResourceAttributesRelations;
+export const integrationConnectionResourceRelationshipStatesRelations =
+  defaultRelations.integrationConnectionResourceRelationshipStatesRelations;
+export const integrationConnectionResourceRelationshipsRelations =
+  defaultRelations.integrationConnectionResourceRelationshipsRelations;
 export const integrationConnectionResourcesRelations =
   defaultRelations.integrationConnectionResourcesRelations;
 export const integrationConnectionResourceStatesRelations =

@@ -330,6 +330,13 @@
       "when": 1781853507881,
       "tag": "0046_add-designer-sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1782545653841,
+      "tag": "0047_add-integration-connection-resource-sync-foundation",
+      "breakpoints": true
     }
   ]
 }

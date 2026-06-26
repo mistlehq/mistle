@@ -53,6 +53,10 @@ export function defineIntegrationConnectionResources(schema: PgSchema) {
         table.kind,
         table.externalId,
       ),
+      uniqueIndex("integration_connection_resources_connection_id_id_unique").on(
+        table.connectionId,
+        table.id,
+      ),
       index("integration_connection_resources_connection_id_kind_status_idx").on(
         table.connectionId,
         table.kind,

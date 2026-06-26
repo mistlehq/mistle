@@ -61,6 +61,9 @@ export {
   type IntegrationConnectionCredentialSlotKey,
 } from "./integration-connection-credentials.js";
 export {
+  integrationConnectionResourceAttributesRelations,
+  integrationConnectionResourceRelationshipStatesRelations,
+  integrationConnectionResourceRelationshipsRelations,
   integrationConnectionResourcesRelations,
   integrationConnectionResourceStatesRelations,
   integrationConnectionsRelations,
@@ -68,6 +71,25 @@ export {
   integrationWebhookEventsRelations,
   integrationWebhookSourcesRelations,
 } from "./integration-connection-relations.js";
+export {
+  integrationConnectionResourceAttributes,
+  IntegrationConnectionResourceAttributeValueTypes,
+  type InsertIntegrationConnectionResourceAttribute,
+  type IntegrationConnectionResourceAttribute,
+  type IntegrationConnectionResourceAttributeValueType,
+} from "./integration-connection-resource-attributes.js";
+export {
+  integrationConnectionResourceRelationshipStates,
+  IntegrationConnectionResourceRelationshipSyncStates,
+  type InsertIntegrationConnectionResourceRelationshipState,
+  type IntegrationConnectionResourceRelationshipState,
+  type IntegrationConnectionResourceRelationshipSyncState,
+} from "./integration-connection-resource-relationship-states.js";
+export {
+  integrationConnectionResourceRelationships,
+  type InsertIntegrationConnectionResourceRelationship,
+  type IntegrationConnectionResourceRelationship,
+} from "./integration-connection-resource-relationships.js";
 export {
   integrationConnectionResources,
   IntegrationConnectionResourceStatuses,
