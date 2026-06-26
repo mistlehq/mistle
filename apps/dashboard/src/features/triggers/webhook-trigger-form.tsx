@@ -57,6 +57,7 @@ type WebhookTriggerTypeSpecificSectionProps = {
   connectionOptions: readonly WebhookTriggerFormOption[];
   webhookEventOptions: readonly WebhookTriggerEventOption[];
   triggerPickerDisabledState: WebhookTriggerEventPickerDisabledState | null;
+  disabled: boolean;
   fieldErrors: Pick<
     WebhookTriggerFormFieldErrors,
     "conversationKeyTemplate" | "eventIds" | "eventParameterRules"
@@ -116,6 +117,7 @@ export function WebhookTriggerTypeSpecificSection(
           </div>
           <WebhookTriggerEventPickerAddButton
             error={input.fieldErrors.eventIds}
+            disabled={input.disabled}
             disabledState={input.triggerPickerDisabledState}
             eventOptions={input.webhookEventOptions}
             hasConnectedIntegrations={input.connectionOptions.length > 0}
@@ -131,6 +133,7 @@ export function WebhookTriggerTypeSpecificSection(
       <div className="p-4">
         <WebhookTriggerEventPicker
           error={input.fieldErrors.eventIds}
+          disabled={input.disabled}
           eventOptions={input.webhookEventOptions}
           {...(input.fieldErrors.eventParameterRules === undefined
             ? {}
@@ -170,7 +173,10 @@ export function WebhookTriggerTypeSpecificSection(
             </FieldHeader>
             <FieldContent>
               <Select
-                disabled={input.formState.conversationKeySelectionState.options.length === 0}
+                disabled={
+                  input.disabled ||
+                  input.formState.conversationKeySelectionState.options.length === 0
+                }
                 onValueChange={(value) => {
                   if (value === null) {
                     return;
@@ -256,6 +262,7 @@ export function WebhookTriggerForm(input: WebhookTriggerFormProps): React.JSX.El
     eventParameterRules: input.values.eventParameterRules,
     eventIdsError: input.fieldErrors.eventIds,
   });
+  const disabled = input.isDeleting || input.isSaving || input.isDuplicating;
 
   return (
     <TriggerFormShell
@@ -316,6 +323,7 @@ export function WebhookTriggerForm(input: WebhookTriggerFormProps): React.JSX.El
       typeSpecificSection={
         <WebhookTriggerTypeSpecificSection
           connectionOptions={input.connectionOptions}
+          disabled={disabled}
           fieldErrors={input.fieldErrors}
           formState={formState}
           onValueChange={(key, value) => {
@@ -328,7 +336,7 @@ export function WebhookTriggerForm(input: WebhookTriggerFormProps): React.JSX.El
       }
       extraSectionsBeforeMessage={
         <WebhookTriggerInstructionsSection
-          disabled={input.isDeleting || input.isSaving}
+          disabled={disabled}
           instructionsLabelId={instructionsLabelId}
           onValueChange={(value) => {
             input.onValueChange("instructions", value);

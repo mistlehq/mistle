@@ -23,7 +23,10 @@ import {
 } from "./scheduled-triggers-service.js";
 import type { TriggerCreateSuccessPath } from "./trigger-editor-navigation.js";
 import { scheduledTriggerDetailQueryKey } from "./triggers-query-keys.js";
-import { TRIGGERS_QUERY_KEY_PREFIX } from "./triggers-query-keys.js";
+import {
+  TRIGGERS_LIST_QUERY_KEY_PREFIX,
+  TRIGGERS_QUERY_KEY_PREFIX,
+} from "./triggers-query-keys.js";
 import { useSelectedSandboxProfileVersion } from "./use-selected-sandbox-profile-version.js";
 import {
   buildWebhookTriggerPrimaryRepositoryOptions,
@@ -82,6 +85,12 @@ async function invalidateTriggersQuery(input: {
       queryKey: scheduledTriggerDetailQueryKey(input.triggerId),
     });
   }
+}
+
+async function invalidateTriggersListQuery(queryClient: QueryClient): Promise<void> {
+  await queryClient.invalidateQueries({
+    queryKey: TRIGGERS_LIST_QUERY_KEY_PREFIX,
+  });
 }
 
 function resolvePrimaryRepositorySelectionNormalization(input: {
@@ -340,10 +349,7 @@ export function useLoadedScheduledTriggerEditorState(
       });
     },
     onSuccess: async (trigger) => {
-      await invalidateTriggersQuery({
-        queryClient,
-        triggerId: input.triggerId,
-      });
+      await invalidateTriggersListQuery(queryClient);
       await input.navigate(`/triggers/${trigger.id}`);
     },
     onError: (error: unknown) => {

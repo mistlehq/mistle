@@ -39,6 +39,12 @@ export const TriggerScheduleSchema = z
   })
   .strict();
 
+export const RecurringTriggerScheduleSchema = TriggerScheduleSchema.extend({
+  schedule: TriggerScheduleScheduleSchema.extend({
+    kind: z.literal("recurring"),
+  }),
+}).strict();
+
 export const TriggerScheduleParamsSchema = z
   .object({
     triggerId: z

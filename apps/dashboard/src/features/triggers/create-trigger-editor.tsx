@@ -985,15 +985,15 @@ export function CreateTriggerEditor(input: CreateTriggerEditorProps): React.JSX.
       typeSpecificSection={
         state.kind === null ? null : state.kind === "scheduled" ? (
           <ScheduledTriggerTypeSpecificSection
+            disabled={state.isSaving}
             fieldErrors={state.fieldErrors}
-            isDeleting={false}
-            isSaving={state.isSaving}
             onValueChange={state.onScheduledValueChange}
             values={state.formValues}
           />
         ) : (
           <WebhookTriggerTypeSpecificSection
             connectionOptions={state.connectionOptions}
+            disabled={state.isSaving}
             fieldErrors={state.fieldErrors}
             formState={formState}
             onValueChange={state.onWebhookValueChange}

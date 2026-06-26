@@ -100,6 +100,7 @@ export function WebhookTriggerEventPicker(input: {
   selectedConnectionId: string;
   selectedEventIds: readonly string[];
   eventOptions: readonly WebhookTriggerEventOption[];
+  disabled?: boolean;
   disabledState?: WebhookTriggerEventPickerDisabledState | null;
   eventParameterRules: WebhookTriggerEventParameterRuleMap;
   error: string | undefined;
@@ -128,8 +129,9 @@ export function WebhookTriggerEventPicker(input: {
     selectedEventIds: input.selectedEventIds,
   });
   const emptyStateMessage = input.error === undefined ? "No events added yet." : input.error;
+  const disabled = input.disabled ?? false;
   const selectedEventControlsDisabled =
-    input.disabledState !== undefined && input.disabledState !== null;
+    disabled || (input.disabledState !== undefined && input.disabledState !== null);
 
   function handleValueChange(value: string[]): void {
     if (selectedEventControlsDisabled) {
@@ -150,6 +152,7 @@ export function WebhookTriggerEventPicker(input: {
       {input.showAddTriggerControl === false ? null : (
         <WebhookTriggerEventPickerAddButton
           error={input.error}
+          disabled={disabled}
           eventOptions={input.eventOptions}
           hasConnectedIntegrations={input.hasConnectedIntegrations}
           onValueChange={handleValueChange}
@@ -188,6 +191,10 @@ export function WebhookTriggerEventPicker(input: {
                   : { eventParameterError: input.eventParameterError })}
                 rules={input.eventParameterRules[option.id] ?? {}}
                 onRuleChange={(parameterId, rule) => {
+                  if (selectedEventControlsDisabled) {
+                    return;
+                  }
+
                   input.onEventParameterRuleChange({
                     triggerId: option.id,
                     parameterId,
@@ -195,6 +202,10 @@ export function WebhookTriggerEventPicker(input: {
                   });
                 }}
                 onRulesChange={(rules) => {
+                  if (selectedEventControlsDisabled) {
+                    return;
+                  }
+
                   input.onEventParameterRulesChange({
                     triggerId: option.id,
                     rules,
@@ -261,6 +272,10 @@ export function WebhookTriggerEventPicker(input: {
                   : { eventParameterError: input.eventParameterError })}
                 rules={input.eventParameterRules[option.id] ?? {}}
                 onRuleChange={(parameterId, rule) => {
+                  if (selectedEventControlsDisabled) {
+                    return;
+                  }
+
                   input.onEventParameterRuleChange({
                     triggerId: option.id,
                     parameterId,
@@ -268,6 +283,10 @@ export function WebhookTriggerEventPicker(input: {
                   });
                 }}
                 onRulesChange={(rules) => {
+                  if (selectedEventControlsDisabled) {
+                    return;
+                  }
+
                   input.onEventParameterRulesChange({
                     triggerId: option.id,
                     rules,
@@ -406,6 +425,7 @@ export function WebhookTriggerEventPickerAddButton(input: {
   hasConnectedIntegrations: boolean;
   selectedEventIds: readonly string[];
   eventOptions: readonly WebhookTriggerEventOption[];
+  disabled?: boolean;
   disabledState?: WebhookTriggerEventPickerDisabledState | null;
   error?: string | undefined;
   onValueChange: (value: string[]) => void;
@@ -417,11 +437,17 @@ export function WebhookTriggerEventPickerAddButton(input: {
     eventOptions: input.eventOptions,
     ...(input.disabledState === undefined ? {} : { disabledState: input.disabledState }),
   });
+  const disabled = input.disabled ?? false;
   const [isOpen, setIsOpen] = useState(false);
   const anchorRef = useComboboxAnchor();
   const triggerPickerId = useId();
+  const pickerIsDisabled = pickerState.disabled || disabled;
 
   function appendCondition(eventOptionId: string): void {
+    if (pickerIsDisabled) {
+      return;
+    }
+
     let index = input.selectedEventIds.length;
     let conditionId = createWebhookTriggerEventConditionId({
       eventOptionId,
@@ -441,10 +467,14 @@ export function WebhookTriggerEventPickerAddButton(input: {
   return (
     <Combobox<string, true>
       autoHighlight
-      disabled={pickerState.disabled}
+      disabled={pickerIsDisabled}
       multiple
       onOpenChange={setIsOpen}
       onValueChange={(value) => {
+        if (pickerIsDisabled) {
+          return;
+        }
+
         const selectedEventOptionId = value.find((item) =>
           input.eventOptions.some((option) => option.id === item),
         );
@@ -461,7 +491,7 @@ export function WebhookTriggerEventPickerAddButton(input: {
           <Button
             aria-expanded={isOpen}
             aria-haspopup="listbox"
-            disabled={pickerState.disabled}
+            disabled={pickerIsDisabled}
             onClick={() => {
               setIsOpen((open) => !open);
             }}
@@ -477,7 +507,7 @@ export function WebhookTriggerEventPickerAddButton(input: {
             <ComboboxInput
               aria-invalid={input.error === undefined ? undefined : true}
               className="w-full [&_[data-slot=input-group-control]]:pl-10"
-              disabled={pickerState.disabled}
+              disabled={pickerIsDisabled}
               id={triggerPickerId}
               placeholder={pickerState.inputPlaceholder}
               showClear={false}
@@ -497,7 +527,7 @@ export function WebhookTriggerEventPickerAddButton(input: {
               <ComboboxInput
                 aria-invalid={input.error === undefined ? undefined : true}
                 className="w-full"
-                disabled={pickerState.disabled}
+                disabled={pickerIsDisabled}
                 id={triggerPickerId}
                 placeholder="Search triggers"
                 showClear={false}

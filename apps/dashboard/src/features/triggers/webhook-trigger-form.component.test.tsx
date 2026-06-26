@@ -133,6 +133,7 @@ describe("WebhookTriggerForm", () => {
     mode?: "create" | "edit";
     values?: WebhookTriggerFormValues;
     isDeleting?: boolean;
+    isDuplicating?: boolean;
     isSaving?: boolean;
     triggerPickerDisabledState?: WebhookTriggerEventPickerDisabledState | null;
     sandboxProfileStatusMessage?: TriggerFormShellStatusMessage | undefined;
@@ -158,7 +159,7 @@ describe("WebhookTriggerForm", () => {
           formError={null}
           validationSummaryError={null}
           isDeleting={input.isDeleting ?? false}
-          isDuplicating={false}
+          isDuplicating={input.isDuplicating ?? false}
           isSaving={input.isSaving ?? false}
           mode={input.mode ?? "create"}
           onDelete={(input.mode ?? "create") === "edit" ? (input.onDelete ?? (() => {})) : null}
@@ -387,6 +388,60 @@ describe("WebhookTriggerForm", () => {
 
     fireEvent.click(deleteMenuItem);
     expect(deleteCount).toBe(0);
+  });
+
+  it("disables the already-open duplicate and delete actions while duplicate is pending", () => {
+    let duplicateCount = 0;
+    let deleteCount = 0;
+    const enabledInput: RenderFormOptions = {
+      mode: "edit",
+      onDelete: () => {
+        deleteCount += 1;
+      },
+      onDuplicate: () => {
+        duplicateCount += 1;
+      },
+      values: buildFormValues(),
+    };
+    const { rerender } = renderFormWithOptions(enabledInput);
+
+    fireEvent.click(screen.getByRole("button", { name: "More trigger actions" }));
+    rerender(createFormElement({ ...enabledInput, isDuplicating: true }));
+
+    const duplicateMenuItem = screen.getByRole("menuitem", { name: "Duplicate trigger" });
+    const deleteMenuItem = screen.getByRole("menuitem", { name: "Delete trigger" });
+    expect(duplicateMenuItem.getAttribute("data-disabled")).not.toBeNull();
+    expect(deleteMenuItem.getAttribute("data-disabled")).not.toBeNull();
+
+    fireEvent.click(duplicateMenuItem);
+    fireEvent.click(deleteMenuItem);
+    expect(duplicateCount).toBe(0);
+    expect(deleteCount).toBe(0);
+  });
+
+  it("disables edit controls while duplicate is pending", () => {
+    renderFormWithOptions({
+      isDuplicating: true,
+      mode: "edit",
+      values: buildFormValues(),
+    });
+
+    expect(
+      screen.getAllByRole("button", { name: "Save" }).every((button) => {
+        return button.getAttribute("disabled") === "";
+      }),
+    ).toBe(true);
+    expect(screen.getByRole("button", { name: "Add condition" }).getAttribute("disabled")).toBe("");
+    expect(
+      screen
+        .getByRole("button", { name: "Remove Issue comment created event" })
+        .getAttribute("disabled"),
+    ).toBe("");
+    const instructionsEditor = screen.getByRole("textbox", {
+      name: "Agent Instructions for Trigger",
+    });
+    const instructionsEditorShell = instructionsEditor.closest('[aria-disabled="true"]');
+    expect(instructionsEditorShell).not.toBeNull();
   });
 
   it("shows the selected-profile trigger binding message when triggers are unavailable", () => {

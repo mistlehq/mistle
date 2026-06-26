@@ -9,7 +9,7 @@ import {
 import { z } from "zod";
 
 import { TriggerSchedulesBadRequestCodes } from "../constants.js";
-import { TriggerScheduleParamsSchema, TriggerScheduleSchema } from "../schemas.js";
+import { RecurringTriggerScheduleSchema, TriggerScheduleParamsSchema } from "../schemas.js";
 
 const DuplicateTriggerScheduleBadRequestCodeSchema = z.enum([
   TriggerSchedulesBadRequestCodes.UNSUPPORTED_DUPLICATE_SCHEDULE_KIND,
@@ -32,7 +32,7 @@ export const route = createRoute({
       description: "Duplicate a recurring scheduled trigger as disabled.",
       content: {
         "application/json": {
-          schema: TriggerScheduleSchema,
+          schema: RecurringTriggerScheduleSchema,
         },
       },
     },

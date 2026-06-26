@@ -6094,8 +6094,7 @@
                             "INVALID_SCHEDULE",
                             "INVALID_SANDBOX_PROFILE_REFERENCE",
                             "INVALID_SANDBOX_PROFILE_VERSION_REFERENCE",
-                            "INVALID_PRIMARY_REPOSITORY",
-                            "UNSUPPORTED_DUPLICATE_SCHEDULE_KIND"
+                            "INVALID_PRIMARY_REPOSITORY"
                           ]
                         },
                         "message": {
@@ -6956,7 +6955,7 @@
                         },
                         "kind": {
                           "type": "string",
-                          "enum": ["recurring", "one_off"]
+                          "enum": ["recurring"]
                         },
                         "name": {
                           "type": "string",

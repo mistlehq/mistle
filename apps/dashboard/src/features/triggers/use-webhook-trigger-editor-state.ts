@@ -12,7 +12,10 @@ import { getSandboxProfileVersionTriggerConfig } from "../sandbox-profiles/sandb
 import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { TriggerCreateSuccessPath } from "./trigger-editor-navigation.js";
 import type { TriggerFormShellStatusMessage } from "./trigger-form-shell.js";
-import { TRIGGERS_QUERY_KEY_PREFIX } from "./triggers-query-keys.js";
+import {
+  TRIGGERS_LIST_QUERY_KEY_PREFIX,
+  TRIGGERS_QUERY_KEY_PREFIX,
+} from "./triggers-query-keys.js";
 import { useSelectedSandboxProfileVersion } from "./use-selected-sandbox-profile-version.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-trigger-conversation-key-field.js";
 import {
@@ -179,6 +182,12 @@ function resolveTriggerMutationErrorMessage(input: {
 async function invalidateTriggersQuery(queryClient: QueryClient): Promise<void> {
   await queryClient.invalidateQueries({
     queryKey: TRIGGERS_QUERY_KEY_PREFIX,
+  });
+}
+
+async function invalidateTriggersListQuery(queryClient: QueryClient): Promise<void> {
+  await queryClient.invalidateQueries({
+    queryKey: TRIGGERS_LIST_QUERY_KEY_PREFIX,
   });
 }
 
@@ -608,7 +617,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
       });
     },
     onSuccess: async (trigger) => {
-      await invalidateTriggersQuery(queryClient);
+      await invalidateTriggersListQuery(queryClient);
       await input.navigate(`/triggers/${trigger.id}`);
     },
     onError: (error: unknown) => {

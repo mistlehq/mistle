@@ -48,8 +48,7 @@ type ScheduledTriggerTypeSpecificSectionProps = {
     ScheduledTriggerFormProps["fieldErrors"],
     "conversationMode" | "cronExpression" | "timezone"
   >;
-  isSaving: boolean;
-  isDeleting: boolean;
+  disabled: boolean;
   onValueChange: (key: "conversationMode" | "cronExpression" | "timezone", value: string) => void;
 };
 
@@ -86,7 +85,6 @@ export function ScheduledTriggerTypeSpecificSection(
     timezone: input.values.timezone,
   });
   const cronExpressionBreakdown = resolveCronExpressionBreakdown(input.values.cronExpression);
-  const disabled = input.isDeleting || input.isSaving;
 
   return (
     <FormPageSection
@@ -105,7 +103,7 @@ export function ScheduledTriggerTypeSpecificSection(
             <FieldContent>
               <Input
                 aria-invalid={input.fieldErrors.cronExpression !== undefined ? true : undefined}
-                disabled={disabled}
+                disabled={input.disabled}
                 id="scheduled-trigger-cron-expression"
                 onChange={(event) => {
                   input.onValueChange("cronExpression", event.currentTarget.value);
@@ -123,7 +121,7 @@ export function ScheduledTriggerTypeSpecificSection(
             <FieldContent>
               <SingleSelectStringComboboxField
                 contentClassName="max-h-80"
-                disabled={disabled}
+                disabled={input.disabled}
                 emptyMessage="No matching timezones."
                 inputId="scheduled-trigger-timezone"
                 inputLabel="Timezone"
@@ -149,7 +147,7 @@ export function ScheduledTriggerTypeSpecificSection(
 
         <div className="mt-4">
           <TriggerFormSelectField
-            disabled={disabled}
+            disabled={input.disabled}
             error={input.fieldErrors.conversationMode}
             label="Group runs by"
             onValueChange={(value) => {
@@ -172,6 +170,7 @@ export function ScheduledTriggerForm(input: ScheduledTriggerFormProps): React.JS
     values: input.values,
     primaryRepositoryOptions: input.primaryRepositoryOptions,
   });
+  const disabled = input.isDeleting || input.isSaving || input.isDuplicating;
 
   return (
     <TriggerFormShell
@@ -213,9 +212,8 @@ export function ScheduledTriggerForm(input: ScheduledTriggerFormProps): React.JS
       validationSummaryError={input.validationSummaryError}
       typeSpecificSection={
         <ScheduledTriggerTypeSpecificSection
+          disabled={disabled}
           fieldErrors={input.fieldErrors}
-          isDeleting={input.isDeleting}
-          isSaving={input.isSaving}
           onValueChange={(key, value) => {
             input.onValueChange(key, value);
           }}

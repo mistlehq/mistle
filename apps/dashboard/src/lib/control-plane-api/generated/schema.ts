@@ -15777,8 +15777,7 @@ export interface paths {
                     | "INVALID_SCHEDULE"
                     | "INVALID_SANDBOX_PROFILE_REFERENCE"
                     | "INVALID_SANDBOX_PROFILE_VERSION_REFERENCE"
-                    | "INVALID_PRIMARY_REPOSITORY"
-                    | "UNSUPPORTED_DUPLICATE_SCHEDULE_KIND";
+                    | "INVALID_PRIMARY_REPOSITORY";
                   message: string;
                 }
               | {
@@ -16198,7 +16197,7 @@ export interface paths {
                 enabled: boolean;
                 id: string;
                 /** @enum {string} */
-                kind: "recurring" | "one_off";
+                kind: "recurring";
                 lastScheduledAt: string | null;
                 name: string;
                 nextScheduledAt: string | null;
