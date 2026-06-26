@@ -20,6 +20,7 @@ const OPENAI_TARGET_KEY = "openai-default";
 const OPENAI_CONNECTION_METHOD_ID = "api-key";
 const OPENAI_API_KEY = "sk-system-sandbox-restart";
 const SANDBOX_READY_TIMEOUT_MS = 3 * 60_000;
+const SANDBOX_CONNECTION_TOKEN_MINT_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 1_000;
 const RUNTIME_READY_POLL_INTERVAL_MS = 100;
 const SANDBOX_SESSION_CONNECT_TIMEOUT_MS = 120_000;
@@ -103,6 +104,11 @@ const SandboxInstancePtySessionResponseSchema = z
     expiresAt: z.string().min(1),
   })
   .strict();
+
+const RetryableSandboxConnectionTokenErrorSchema = z.looseObject({
+  code: z.literal("INSTANCE_NOT_RESUMABLE"),
+  message: z.string().min(1),
+});
 
 const SandboxdHealthResponseSchema = z
   .object({
@@ -273,17 +279,44 @@ export async function mintSandboxConnectionUrl(input: {
   authenticatedSession: CodexSandboxAuthenticatedSession;
   sandboxInstanceId: string;
 }): Promise<string> {
-  const connectionToken = await requestJsonOrThrow({
-    request: input.fixture.request,
-    path: `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/connection-tokens`,
-    expectedStatus: 201,
-    description: "sandbox connection token minting",
-    schema: SandboxInstanceConnectionTokenResponseSchema,
-    init: {
-      method: "POST",
-      headers: {
-        cookie: input.authenticatedSession.cookie,
-      },
+  const path = `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/connection-tokens`;
+  const init = {
+    method: "POST",
+    headers: {
+      cookie: input.authenticatedSession.cookie,
+    },
+  };
+  const connectionToken = await waitForCondition({
+    description: `sandbox '${input.sandboxInstanceId}' connection token minting`,
+    timeoutMs: SANDBOX_CONNECTION_TOKEN_MINT_TIMEOUT_MS,
+    pollIntervalMs: RUNTIME_READY_POLL_INTERVAL_MS,
+    evaluate: async () => {
+      const response = await input.fixture.request(path, init);
+      const bodyText = await response.text().catch(() => "");
+
+      if (response.status === 201) {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(bodyText);
+        } catch (error) {
+          throw new Error(
+            `sandbox connection token minting returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+
+        return SandboxInstanceConnectionTokenResponseSchema.parse(parsed);
+      }
+
+      const retryableError = parseRetryableSandboxConnectionTokenError(bodyText);
+      if (response.status === 409 && retryableError !== null) {
+        throw new RetryableWaitError(
+          `sandbox connection token minting got retryable status 409. Response body: ${bodyText}`,
+        );
+      }
+
+      throw new Error(
+        `sandbox connection token minting expected status 201, got ${String(response.status)}. Response body: ${bodyText}`,
+      );
     },
   });
 
@@ -1053,6 +1086,20 @@ async function requestJsonOrThrow<TSchema extends z.ZodType>(input: {
   }
 
   return input.schema.parse(parsed);
+}
+
+function parseRetryableSandboxConnectionTokenError(
+  bodyText: string,
+): z.infer<typeof RetryableSandboxConnectionTokenErrorSchema> | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(bodyText);
+  } catch {
+    return null;
+  }
+
+  const retryableError = RetryableSandboxConnectionTokenErrorSchema.safeParse(parsed);
+  return retryableError.success ? retryableError.data : null;
 }
 
 function createFixtureSessionRuntime(fixture: CodexSandboxFixture): SandboxSessionRuntime {
