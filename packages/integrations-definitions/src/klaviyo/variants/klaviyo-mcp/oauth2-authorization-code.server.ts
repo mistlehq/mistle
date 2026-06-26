@@ -33,7 +33,7 @@ const KlaviyoTokenResponseSchema = z
     access_token: z.string().min(1),
     refresh_token: z.string().min(1).optional(),
     expires_in: StringOrNumberSchema.optional(),
-    scope: z.string().min(1).optional(),
+    scope: z.string().optional(),
     token_type: z.string().min(1).optional(),
   })
   .loose();
@@ -93,6 +93,10 @@ export function parseKlaviyoDynamicClientRegistrationResponse(input: unknown): {
   return {
     clientId: parsed.client_id,
   };
+}
+
+export function parseKlaviyoTokenResponse(input: unknown): KlaviyoTokenResponse {
+  return KlaviyoTokenResponseSchema.parse(input);
 }
 
 export function assertKlaviyoDynamicClientRegistrationSucceeded(input: {
@@ -207,8 +211,8 @@ function resolveKlaviyoTokenResultFields(input: {
   response: KlaviyoTokenResponse;
   issuedAt: Date;
 }): IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult {
-  const credentialMetadata =
-    input.response.scope === undefined ? undefined : { scope: input.response.scope };
+  const scope = input.response.scope?.trim();
+  const credentialMetadata = scope === undefined || scope.length === 0 ? undefined : { scope };
   return {
     accessToken: input.response.access_token,
     refreshSchedulingResponse: input.response,
@@ -375,7 +379,7 @@ export const KlaviyoMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Autho
 
     return resolveKlaviyoCompleteGrantResult({
       providerState,
-      response: KlaviyoTokenResponseSchema.parse(JSON.parse(tokenBody)),
+      response: parseKlaviyoTokenResponse(JSON.parse(tokenBody)),
       issuedAt: new Date(),
     });
   },
@@ -409,7 +413,7 @@ export const KlaviyoMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Autho
     }
 
     return resolveKlaviyoRefreshResult({
-      response: KlaviyoTokenResponseSchema.parse(JSON.parse(tokenBody)),
+      response: parseKlaviyoTokenResponse(JSON.parse(tokenBody)),
       issuedAt: new Date(),
     });
   },

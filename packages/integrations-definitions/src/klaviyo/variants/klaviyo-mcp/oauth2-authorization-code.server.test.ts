@@ -9,6 +9,7 @@ import {
   classifyKlaviyoRefreshFailure,
   createKlaviyoRefreshTransportFailure,
   parseKlaviyoDynamicClientRegistrationResponse,
+  parseKlaviyoTokenResponse,
   resolveKlaviyoAuthorizationCodeOrThrow,
   resolveKlaviyoCompleteGrantResult,
   resolveKlaviyoRefreshResult,
@@ -172,6 +173,28 @@ describe("Klaviyo OAuth 2.0 authorization code", () => {
       accessTokenExpiresAt: "2026-06-15T00:30:00.000Z",
       refreshToken: "refresh_789",
     });
+  });
+
+  it("accepts an empty token response scope and omits credential metadata", async () => {
+    const result = resolveKlaviyoCompleteGrantResult({
+      providerState: {
+        clientId: "klaviyo_client_123",
+      },
+      response: parseKlaviyoTokenResponse({
+        access_token: "access_123",
+        expires_in: 3600,
+        refresh_token: "refresh_456",
+        scope: "",
+        token_type: "Bearer",
+      }),
+      issuedAt: new Date("2026-06-15T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({
+      accessToken: "access_123",
+      refreshToken: "refresh_456",
+    });
+    expect(result).not.toHaveProperty("credentialMetadata");
   });
 
   it("classifies permanent and temporary refresh failures", () => {
