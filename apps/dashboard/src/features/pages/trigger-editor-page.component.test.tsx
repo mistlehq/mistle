@@ -14,6 +14,7 @@ import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { sandboxProfileVersionTriggerConfigQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { ScheduledTriggerSameConversationKeyTemplate } from "../triggers/scheduled-trigger-form-helpers.js";
 import type { ScheduledTrigger } from "../triggers/scheduled-triggers-types.js";
+import { createProfileTriggerActivityPath } from "../triggers/trigger-editor-navigation.js";
 import {
   triggerActivityQueryKey,
   triggerDetailQueryKey,
@@ -27,6 +28,7 @@ import {
   WEBHOOK_TRIGGER_WEBHOOK_SOURCES_QUERY_KEY_PREFIX,
 } from "../triggers/use-webhook-trigger-prerequisites.js";
 import type { WebhookTrigger } from "../triggers/webhook-triggers-types.js";
+import { TriggerActivityPage } from "./trigger-activity-page.js";
 import { TriggerEditorContent } from "./trigger-editor-content.js";
 import { TriggerEditorPage } from "./trigger-editor-page.js";
 
@@ -380,11 +382,18 @@ function renderTriggerEditorPage(input: {
 }): void {
   const router = createMemoryRouter(
     createRoutesFromElements(
-      <Route
-        element={<TriggerEditorPage />}
-        handle={ROUTE_HANDLES.triggersDetail}
-        path="/triggers/:triggerId"
-      />,
+      <>
+        <Route
+          element={<TriggerEditorPage />}
+          handle={ROUTE_HANDLES.triggersDetail}
+          path="/triggers/:triggerId"
+        />
+        <Route
+          element={<TriggerActivityPage />}
+          handle={ROUTE_HANDLES.triggersDetail}
+          path="/triggers/:triggerId/activity"
+        />
+      </>,
     ),
     {
       initialEntries: [`/triggers/${input.triggerId}`],
@@ -409,11 +418,14 @@ describe("TriggerEditorPage", () => {
     expect(screen.getByText("Trigger source")).toBeDefined();
     expect(screen.getAllByText("Schedule").length).toBeGreaterThan(0);
     expect(screen.getByText("Schedule Profile v1")).toBeDefined();
-    expect(screen.getByRole("tab", { name: "Details" })).toBeDefined();
-    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+    expect(screen.queryByRole("tab", { name: "Details" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Activity" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "More trigger actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "View Activity" }));
     expect(screen.getByRole("heading", { name: "Recent activity" })).toBeDefined();
     expect(screen.getByText("2026-05-18 09:00")).toBeDefined();
     expect(screen.getByText("Dispatched")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Back" })).toBeDefined();
   });
 
   it("shows an explicit unsupported state for one-off scheduled triggers", async () => {
@@ -450,12 +462,15 @@ describe("TriggerEditorPage", () => {
     expect(screen.getByText("Trigger source")).toBeDefined();
     expect(screen.getAllByText("Event").length).toBeGreaterThan(0);
     expect(screen.getByText("Schedule Profile v1")).toBeDefined();
-    expect(screen.getByRole("tab", { name: "Details" })).toBeDefined();
-    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+    expect(screen.queryByRole("tab", { name: "Details" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Activity" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "More trigger actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "View Activity" }));
     expect(screen.getByRole("heading", { name: "Recent activity" })).toBeDefined();
     expect(screen.getByText("github.pull_request.opened")).toBeDefined();
     expect(screen.getByText("delivery-editor-recent")).toBeDefined();
     expect(screen.getByText("Received")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Back" })).toBeDefined();
   });
 
   it("shows standalone trigger 404 as the unavailable page without the edit header", async () => {
@@ -538,6 +553,10 @@ describe("TriggerEditorContent", () => {
       <QueryClientProvider client={queryClient}>
         <TriggerEditorContent
           triggerId={ScheduleTriggerId}
+          activityPath={createProfileTriggerActivityPath({
+            profileId: SandboxProfileId,
+            triggerId: ScheduleTriggerId,
+          })}
           backPath="/sandbox-profiles/sbp_schedule_profile/triggers"
           deleteSuccessPath="/sandbox-profiles/sbp_schedule_profile/triggers"
           navigate={() => {}}

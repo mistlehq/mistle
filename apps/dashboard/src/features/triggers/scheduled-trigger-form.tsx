@@ -37,6 +37,7 @@ type ScheduledTriggerFormProps = {
   onValueChange: (key: ScheduledTriggerFormValueKey, value: string | boolean) => void;
   onSubmit: () => void;
   onDelete: (() => void) | null;
+  onViewActivity?: (() => void) | null;
 };
 
 type ScheduledTriggerTypeSpecificSectionProps = {
@@ -189,6 +190,7 @@ export function ScheduledTriggerForm(input: ScheduledTriggerFormProps): React.JS
       name={input.values.name}
       onDelete={input.onDelete}
       onSubmit={input.onSubmit}
+      onViewActivity={input.onViewActivity ?? null}
       onValueChange={(key, value) => {
         input.onValueChange(key, value);
       }}

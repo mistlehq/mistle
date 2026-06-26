@@ -11,6 +11,14 @@ export function createProfileTriggersPath(profileId: string): string {
   return `/sandbox-profiles/${profileId}/triggers`;
 }
 
+export function createTriggerDetailPath(triggerId: string): string {
+  return `/triggers/${encodeURIComponent(triggerId)}`;
+}
+
+export function createTriggerActivityPath(triggerId: string): string {
+  return `${createTriggerDetailPath(triggerId)}/activity`;
+}
+
 export function createProfileTriggerDetailPath(input: {
   profileId: string;
   triggerId: string;
@@ -19,5 +27,20 @@ export function createProfileTriggerDetailPath(input: {
   const search = input.searchParams?.toString();
   const suffix = search === undefined || search.length === 0 ? "" : `?${search}`;
 
-  return `${createProfileTriggersPath(input.profileId)}/${input.triggerId}${suffix}`;
+  return `${createProfileTriggersPath(input.profileId)}/${encodeURIComponent(
+    input.triggerId,
+  )}${suffix}`;
+}
+
+export function createProfileTriggerActivityPath(input: {
+  profileId: string;
+  triggerId: string;
+  searchParams?: URLSearchParams;
+}): string {
+  const search = input.searchParams?.toString();
+  const suffix = search === undefined || search.length === 0 ? "" : `?${search}`;
+
+  return `${createProfileTriggersPath(input.profileId)}/${encodeURIComponent(
+    input.triggerId,
+  )}/activity${suffix}`;
 }

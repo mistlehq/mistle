@@ -47,6 +47,7 @@ export function TriggerEditorContent(input: {
   navigate: (to: string) => void | Promise<void>;
   backPath: string;
   deleteSuccessPath: string;
+  activityPath: string;
   requiredSandboxProfileId?: string | undefined;
   renderFrame?: TriggerEditorFrameRenderer;
 }): React.JSX.Element | null {
@@ -106,6 +107,7 @@ export function TriggerEditorContent(input: {
     return (
       <EditScheduledTriggerEditor
         triggerId={input.triggerId}
+        activityPath={input.activityPath}
         backPath={input.backPath}
         deleteSuccessPath={input.deleteSuccessPath}
         navigate={input.navigate}
@@ -117,6 +119,7 @@ export function TriggerEditorContent(input: {
   return (
     <EditWebhookTriggerEditor
       triggerId={input.triggerId}
+      activityPath={input.activityPath}
       backPath={input.backPath}
       deleteSuccessPath={input.deleteSuccessPath}
       navigate={input.navigate}

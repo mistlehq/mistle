@@ -52,6 +52,8 @@ function conditionId(eventOptionId: string, index = 0): string {
   return createWebhookTriggerEventConditionId({ eventOptionId, index });
 }
 
+function noop(): void {}
+
 function isAnyOfRule(values: readonly string[]) {
   return {
     operator: WebhookTriggerEventParameterRuleOperators.IS,
@@ -300,6 +302,7 @@ export function WebhookTriggerFormStoryHarness(input: {
   isSaving?: boolean;
   isDeleting?: boolean;
   onDelete?: (() => void) | null;
+  onViewActivity?: (() => void) | null;
   triggerPickerDisabledState?: WebhookTriggerEventPickerDisabledState | null;
   connectionOptions?: readonly WebhookTriggerFormOption[];
   sandboxProfileOptions?: readonly WebhookTriggerFormOption[];
@@ -339,6 +342,7 @@ export function WebhookTriggerFormStoryHarness(input: {
           triggerTypeField={triggerTypeField}
           mode={input.mode}
           onDelete={input.onDelete ?? null}
+          onViewActivity={input.onViewActivity ?? (input.mode === "edit" ? noop : null)}
           onSubmit={() => {
             if (input.enableSubmitValidation !== true) {
               return;

@@ -44,9 +44,21 @@ import type {
   SandboxProfileVersionPublishability,
   SandboxProfilesListResult,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
+import {
+  createProfileTriggerActivityPath,
+  createProfileTriggerDetailPath,
+} from "../triggers/trigger-editor-navigation.js";
+import {
+  triggerActivityQueryKey,
+  triggerDetailQueryKey,
+  triggersListQueryKey,
+} from "../triggers/triggers-query-keys.js";
 import type { TriggerSandboxProfileUsage } from "../triggers/triggers-service.js";
-import type { TriggersListResult } from "../triggers/triggers-types.js";
+import type {
+  TriggerActivityResult,
+  TriggerListItem,
+  TriggersListResult,
+} from "../triggers/triggers-types.js";
 import {
   WEBHOOK_TRIGGER_INTEGRATION_DIRECTORY_QUERY_KEY,
   WEBHOOK_TRIGGER_WEBHOOK_SOURCES_QUERY_KEY_PREFIX,
@@ -590,6 +602,8 @@ function renderSandboxProfileEditor(input?: {
   sandboxProvidersLoading?: boolean;
   maintenanceScript?: string | null;
   profileTriggersListResult?: TriggersListResult;
+  profileTriggerActivity?: TriggerActivityResult;
+  profileTriggerDetail?: TriggerListItem;
   profileDetailErrorStatus?: number;
   profileVersionsErrorStatus?: number;
   profileVersionsLoading?: boolean;
@@ -597,6 +611,8 @@ function renderSandboxProfileEditor(input?: {
   routeSearch?: string;
   routeState?: unknown;
   routeSection?: SandboxProfileEditorTestRouteSection;
+  routeTriggerActivity?: boolean;
+  routeTriggerId?: string;
   view?: SandboxProfileEditorTestRouteView;
   versionState?: SandboxProfileEditorTestVersionState;
   refreshSchedule?: SandboxProfileVersion["refreshSchedule"];
@@ -729,6 +745,18 @@ function renderSandboxProfileEditor(input?: {
       totalResults: 0,
     },
   );
+  if (input?.profileTriggerDetail !== undefined) {
+    queryClient.setQueryData(
+      triggerDetailQueryKey(input.profileTriggerDetail.id),
+      input.profileTriggerDetail,
+    );
+  }
+  if (input?.profileTriggerActivity !== undefined && input.routeTriggerId !== undefined) {
+    queryClient.setQueryData(
+      triggerActivityQueryKey(input.routeTriggerId),
+      input.profileTriggerActivity,
+    );
+  }
   if (input?.profileVersionsErrorStatus !== undefined) {
     const error = new HttpApiError({
       operation: "listSandboxProfileVersions",
@@ -867,13 +895,25 @@ function renderSandboxProfileEditor(input?: {
   }
   const resolvedRouteSection =
     input?.routeSection === undefined ? "sandbox-profile" : input.routeSection;
+  const profileTriggerRoutePath =
+    input?.routeTriggerId === undefined
+      ? "/triggers"
+      : input.routeTriggerActivity === true
+        ? createProfileTriggerActivityPath({
+            profileId,
+            triggerId: input.routeTriggerId,
+          }).replace(`/sandbox-profiles/${profileId}`, "")
+        : createProfileTriggerDetailPath({
+            profileId,
+            triggerId: input.routeTriggerId,
+          }).replace(`/sandbox-profiles/${profileId}`, "");
   const sectionPath =
     resolvedRouteSection === null
       ? ""
       : resolvedRouteSection === "snapshot"
         ? "/snapshots"
         : resolvedRouteSection === "triggers"
-          ? "/triggers"
+          ? profileTriggerRoutePath
           : resolvedRouteView === "default"
             ? "/sandbox-profile"
             : `/sandbox-profile/${resolvedRouteView}`;
@@ -896,6 +936,7 @@ function renderSandboxProfileEditor(input?: {
             <Route element={<Outlet />} path="triggers">
               <Route element={<Outlet />} index />
               <Route element={<Outlet />} path=":triggerId" />
+              <Route element={<Outlet />} path=":triggerId/activity" />
             </Route>
             <Route element={<Outlet />} path="snapshots" />
           </Route>
@@ -2370,6 +2411,72 @@ describe("SandboxProfileEditorPage", () => {
     ).toBeDefined();
     expect(screen.queryByText("GitHub connection required.")).toBeNull();
     expect(screen.getAllByRole("button", { name: "Select" }).length).toBeGreaterThan(0);
+  });
+
+  it("opens a profile trigger activity route from the route segment", async () => {
+    const triggerId = "atm_profile_activity";
+    const profileTrigger = {
+      id: triggerId,
+      kind: "webhook",
+      name: "Profile webhook activity",
+      enabled: true,
+      target: {
+        sandboxProfileId: "sbp_test",
+        sandboxProfileName: "Prototype Profile",
+        sandboxProfileVersion: 3,
+        primaryRepositoryId: null,
+        primaryRepositoryName: null,
+      },
+      source: {
+        kind: "webhook",
+        events: [
+          {
+            label: "Pull request opened",
+          },
+        ],
+      },
+      updatedAt: "2026-04-23T00:00:00.000Z",
+    } satisfies TriggerListItem;
+    const { profileId, router } = renderSandboxProfileEditor({
+      routeSection: "triggers",
+      routeSearch: "?after=cursor_after",
+      routeTriggerActivity: true,
+      routeTriggerId: triggerId,
+      versionState: "published",
+      profileTriggerDetail: profileTrigger,
+      profileTriggerActivity: {
+        kind: "webhook",
+        items: [
+          {
+            id: "iwe_profile_activity",
+            sourceOccurredAt: "2026-06-24T06:42:00.000Z",
+            finalizedAt: "2026-06-24T06:42:03.000Z",
+            eventType: "github.pull_request.opened",
+            providerEventType: "pull_request",
+            externalDeliveryId: "github-delivery-profile",
+            status: "processed",
+          },
+        ],
+      },
+      profileTriggersListResult: {
+        items: [profileTrigger],
+        nextPage: null,
+        previousPage: null,
+        totalResults: 1,
+      },
+    });
+
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/triggers/${triggerId}/activity`,
+    );
+    expect(router.state.location.search).toBe("?after=cursor_after");
+    expect(await screen.findByRole("heading", { name: "Recent activity" })).toBeDefined();
+    expect(screen.getByText("github.pull_request.opened")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/triggers/${triggerId}`,
+    );
+    expect(router.state.location.search).toBe("?after=cursor_after");
   });
 
   it("does not make the GitHub PR review template selectable when required events are split across webhook sources", () => {

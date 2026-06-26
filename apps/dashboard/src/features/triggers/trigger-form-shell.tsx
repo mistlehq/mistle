@@ -18,7 +18,7 @@ import {
   Switch,
   cn,
 } from "@mistle/ui";
-import { TrashIcon } from "@phosphor-icons/react";
+import { ClockCounterClockwiseIcon, TrashIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
@@ -74,6 +74,7 @@ type TriggerFormShellProps = {
   onValueChange: (key: CommonTriggerFormValueKey, value: string | boolean) => void;
   onSubmit: () => void;
   onDelete: (() => void) | null;
+  onViewActivity: (() => void) | null;
 };
 
 export type TriggerFormShellStatusMessage = {
@@ -249,7 +250,7 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
               {submitButtonLabel}
             </Button>
 
-            {input.onDelete === null ? null : (
+            {input.onDelete === null && input.onViewActivity === null ? null : (
               <MoreActionsMenu
                 disabled={disabled}
                 triggerIconVariant="chevron-down"
@@ -257,14 +258,22 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
                 triggerSize="icon"
                 triggerVariant="default"
               >
-                <DropdownMenuItem
-                  disabled={disabled}
-                  onClick={input.onDelete}
-                  variant="destructive"
-                >
-                  <TrashIcon aria-hidden className="size-4" />
-                  Delete trigger
-                </DropdownMenuItem>
+                {input.onViewActivity === null ? null : (
+                  <DropdownMenuItem disabled={disabled} onClick={input.onViewActivity}>
+                    <ClockCounterClockwiseIcon aria-hidden className="size-4" />
+                    View Activity
+                  </DropdownMenuItem>
+                )}
+                {input.onDelete === null ? null : (
+                  <DropdownMenuItem
+                    disabled={disabled}
+                    onClick={input.onDelete}
+                    variant="destructive"
+                  >
+                    <TrashIcon aria-hidden className="size-4" />
+                    Delete trigger
+                  </DropdownMenuItem>
+                )}
               </MoreActionsMenu>
             )}
           </ButtonGroup>

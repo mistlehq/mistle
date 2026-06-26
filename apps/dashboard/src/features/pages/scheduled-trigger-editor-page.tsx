@@ -10,9 +10,7 @@ import { DeleteTriggerDialog } from "../triggers/delete-trigger-dialog.js";
 import { toScheduledTriggerFormValues } from "../triggers/scheduled-trigger-form-helpers.js";
 import { ScheduledTriggerForm } from "../triggers/scheduled-trigger-form.js";
 import { getScheduledTrigger } from "../triggers/scheduled-triggers-service.js";
-import { TriggerActivitySection } from "../triggers/trigger-activity-section.js";
 import type { TriggerCreateSuccessPath } from "../triggers/trigger-editor-navigation.js";
-import { TriggerEditorTabs } from "../triggers/trigger-editor-tabs.js";
 import { TriggerTypeDisplayField } from "../triggers/trigger-type-field.js";
 import { scheduledTriggerDetailQueryKey } from "../triggers/triggers-query-keys.js";
 import { useLoadedScheduledTriggerEditorState } from "../triggers/use-scheduled-trigger-editor-state.js";
@@ -89,6 +87,7 @@ export function EditScheduledTriggerEditor(input: {
   navigate: (to: string) => void | Promise<void>;
   backPath?: string | undefined;
   deleteSuccessPath?: string | undefined;
+  activityPath: string;
   renderFrame?: TriggerEditorFrameRenderer;
 }): React.JSX.Element | null {
   const triggerQuery = useQuery({
@@ -160,6 +159,7 @@ export function EditScheduledTriggerEditor(input: {
         {...(input.deleteSuccessPath === undefined
           ? {}
           : { deleteSuccessPath: input.deleteSuccessPath })}
+        activityPath={input.activityPath}
         initialValues={toScheduledTriggerFormValues(triggerQuery.data)}
         sandboxProfileOptions={prerequisites.sandboxProfileOptions}
         initialSandboxProfileVersion={triggerQuery.data.target.sandboxProfileVersion}
@@ -177,6 +177,7 @@ function LoadedScheduledTriggerEditor(input: {
   navigate: (to: string) => void | Promise<void>;
   createSuccessPath?: TriggerCreateSuccessPath;
   deleteSuccessPath?: string;
+  activityPath?: string;
   initialValues: ReturnType<typeof toScheduledTriggerFormValues>;
   sandboxProfileOptions: ReturnType<
     typeof useTriggerSandboxProfileOptions
@@ -184,6 +185,13 @@ function LoadedScheduledTriggerEditor(input: {
   initialSandboxProfileVersion?: number;
 }): React.JSX.Element {
   const state = useLoadedScheduledTriggerEditorState(input);
+  const activityPath = input.activityPath;
+  const onViewActivity =
+    activityPath === undefined
+      ? null
+      : () => {
+          void input.navigate(activityPath);
+        };
   const form = (
     <ScheduledTriggerForm
       fieldErrors={state.fieldErrors}
@@ -194,6 +202,7 @@ function LoadedScheduledTriggerEditor(input: {
       triggerTypeField={input.triggerTypeField}
       mode={input.mode}
       onDelete={state.onRequestDelete}
+      onViewActivity={onViewActivity}
       onSubmit={state.onSubmit}
       onValueChange={state.onValueChange}
       primaryRepositoryOptions={state.primaryRepositoryOptions}
@@ -204,14 +213,7 @@ function LoadedScheduledTriggerEditor(input: {
 
   return (
     <>
-      {input.mode === "edit" && input.triggerId !== undefined ? (
-        <TriggerEditorTabs
-          activity={<TriggerActivitySection triggerId={input.triggerId} />}
-          details={form}
-        />
-      ) : (
-        form
-      )}
+      {form}
 
       {input.mode === "edit" ? (
         <>

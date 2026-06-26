@@ -96,6 +96,7 @@ type WebhookTriggerFormProps = {
   ) => void;
   onSubmit: () => void;
   onDelete: (() => void) | null;
+  onViewActivity?: (() => void) | null;
 };
 
 export function WebhookTriggerTypeSpecificSection(
@@ -288,6 +289,7 @@ export function WebhookTriggerForm(input: WebhookTriggerFormProps): React.JSX.El
       name={input.values.name}
       onDelete={input.onDelete}
       onSubmit={input.onSubmit}
+      onViewActivity={input.onViewActivity ?? null}
       onValueChange={(key, value) => {
         input.onValueChange(key, value);
       }}
