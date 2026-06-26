@@ -494,6 +494,7 @@ export class FreestyleApiClient implements FreestyleClient {
     let session: PtySession | undefined;
     let exitCode: number | undefined;
     let lastTransportError: string | undefined;
+    let activationOutput = "";
 
     try {
       exitCode = await new Promise<number>((resolve, reject) => {
@@ -539,14 +540,20 @@ export class FreestyleApiClient implements FreestyleClient {
             rows: PtyRows,
             reconnect: true,
             onData: (data) => {
+              const text = new TextDecoder().decode(data);
               if (ready) {
+                activationOutput += text;
                 return;
               }
-              outputBeforeReady += new TextDecoder().decode(data);
+              outputBeforeReady += text;
               if (!outputBeforeReady.includes(ActivationReadyMarker)) {
                 return;
               }
               ready = true;
+              const markerIndex = outputBeforeReady.indexOf(ActivationReadyMarker);
+              activationOutput += outputBeforeReady.slice(
+                markerIndex + ActivationReadyMarker.length,
+              );
               session?.write(Buffer.from(request.payload));
             },
             onExit: (code) => {
@@ -595,7 +602,7 @@ export class FreestyleApiClient implements FreestyleClient {
         operation: FreestyleClientOperationIds.ACTIVATE,
         commandDescription: "Activate sandboxd through Freestyle PTY",
         exitCode,
-        stdout: "",
+        stdout: activationOutput,
         stderr: "",
       });
     }
