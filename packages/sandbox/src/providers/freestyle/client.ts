@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 
 import { systemScheduler } from "@mistle/time";
-import { Freestyle } from "freestyle";
+import { Freestyle, type PtySession } from "freestyle";
 import { z } from "zod";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
@@ -42,8 +42,9 @@ import type { FreestyleSandboxInspectResult, FreestyleVmInfo } from "./types.js"
 
 const FreestyleDefaultBaseUrl = "https://api.freestyle.sh";
 const SandboxdCommand = "/opt/mistle/bin/sandboxd";
-const PityCols = 80;
+const PtyCols = 80;
 const PtyRows = 24;
+const ActivationReadyMarker = "__MISTLE_FREESTYLE_ACTIVATE_READY__";
 
 const CreateVmResponseSchema = z.looseObject({
   id: z.string().trim().min(1),
@@ -232,6 +233,7 @@ export function createFreestyleActivatePrelude(input: {
   return createFreestyleExecCommand({
     command: [
       "stty raw -echo",
+      `printf '${ActivationReadyMarker}'`,
       `${SandboxdCommand} activate --stdin-bytes ${String(input.payload.byteLength)}`,
       "rc=$?",
       "stty sane",
@@ -488,71 +490,105 @@ export class FreestyleApiClient implements FreestyleClient {
   async close(): Promise<void> {}
 
   async #runPtyActivation(request: FreestyleRuntimeControlRequest): Promise<void> {
-    const exitCode = await new Promise<number>((resolve, reject) => {
-      const socket = this.#openPtySocket(request.vmId);
-      let timeout: ReturnType<typeof systemScheduler.schedule> | undefined;
-      let settled = false;
+    const vm = this.#sdk.vms.ref({ vmId: request.vmId });
+    let session: PtySession | undefined;
+    let exitCode: number | undefined;
+    let lastTransportError: string | undefined;
 
-      const cleanup = (): void => {
-        if (timeout !== undefined) {
-          systemScheduler.cancel(timeout);
-        }
-        if (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN) {
-          socket.close();
-        }
-      };
-      const settleReject = (error: unknown): void => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        cleanup();
-        reject(error);
-      };
-      const settleResolve = (code: number): void => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        cleanup();
-        resolve(code);
-      };
-      timeout = systemScheduler.schedule(() => {
-        settleReject(
-          new Error(`Freestyle PTY activation timed out after ${String(request.timeoutMs)}ms.`),
-        );
-      }, request.timeoutMs);
+    try {
+      exitCode = await new Promise<number>((resolve, reject) => {
+        let timeout: ReturnType<typeof systemScheduler.schedule> | undefined;
+        let settled = false;
+        let ready = false;
+        let outputBeforeReady = "";
 
-      socket.binaryType = "arraybuffer";
-      socket.addEventListener("open", () => {
-        socket.send(
-          `${createFreestyleActivatePrelude({
-            payload: request.payload,
-            ...(request.env === undefined ? {} : { env: request.env }),
-          })}\n`,
-        );
-        socket.send(Buffer.from(request.payload));
-      });
-      socket.addEventListener("message", (event) => {
-        if (typeof event.data !== "string") {
-          return;
-        }
-        const parsed = parsePtyJsonMessage(event.data);
-        if (parsed?.type === "exited") {
-          settleResolve(parsed.exitCode);
-        }
-      });
-      socket.addEventListener("error", (error) => {
-        settleReject(error);
-      });
-      socket.addEventListener("close", (event) => {
-        if (!settled) {
+        const cleanup = (): void => {
+          if (timeout !== undefined) {
+            systemScheduler.cancel(timeout);
+          }
+          session?.detach();
+        };
+        const settleReject = (error: unknown): void => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          try {
+            session?.signal("SIGKILL");
+          } catch {}
+          cleanup();
+          reject(error);
+        };
+        const settleResolve = (code: number): void => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          cleanup();
+          resolve(code);
+        };
+        timeout = systemScheduler.schedule(() => {
           settleReject(
-            new Error(`Freestyle PTY closed before activation exit code: ${String(event.code)}`),
+            new Error(`Freestyle PTY activation timed out after ${String(request.timeoutMs)}ms.`),
           );
-        }
+        }, request.timeoutMs);
+
+        void vm.pty
+          .open({
+            cols: PtyCols,
+            rows: PtyRows,
+            reconnect: true,
+            onData: (data) => {
+              if (ready) {
+                return;
+              }
+              outputBeforeReady += new TextDecoder().decode(data);
+              if (!outputBeforeReady.includes(ActivationReadyMarker)) {
+                return;
+              }
+              ready = true;
+              session?.write(Buffer.from(request.payload));
+            },
+            onExit: (code) => {
+              settleResolve(code);
+            },
+            onClose: (info) => {
+              if (!settled) {
+                settleReject(
+                  new Error(
+                    `Freestyle PTY closed before activation exit code: code=${String(
+                      info.code,
+                    )}, clean=${String(info.wasClean)}, reason=${info.reason}`,
+                  ),
+                );
+              }
+            },
+            onError: (error) => {
+              lastTransportError = formatFreestylePtyError(error);
+            },
+          })
+          .then((openedSession) => {
+            session = openedSession;
+            session.write(
+              `${createFreestyleActivatePrelude({
+                payload: request.payload,
+                ...(request.env === undefined ? {} : { env: request.env }),
+              })}\n`,
+            );
+          })
+          .catch((error: unknown) => {
+            settleReject(error);
+          });
       });
-    });
+    } catch (error) {
+      if (lastTransportError === undefined) {
+        throw error;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`${message}. Last PTY transport error: ${lastTransportError}`, {
+        cause: error,
+      });
+    }
 
     if (exitCode !== 0) {
       throw new FreestyleCommandExitError({
@@ -563,21 +599,6 @@ export class FreestyleApiClient implements FreestyleClient {
         stderr: "",
       });
     }
-  }
-
-  #openPtySocket(vmId: string): WebSocket {
-    const url = new URL(`/v1/vms/${encodeURIComponent(vmId)}/pty`, this.#baseUrl);
-    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-    url.searchParams.set("cols", String(PityCols));
-    url.searchParams.set("rows", String(PtyRows));
-    // Node 22+ accepts a WebSocket headers option; the DOM lib declaration only
-    // models browser constructors, which cannot send authentication headers.
-    return new WebSocket(url, {
-      // @ts-expect-error Node WebSocket header option is required for Freestyle PTY auth.
-      headers: {
-        Authorization: `Bearer ${this.#apiKey}`,
-      },
-    });
   }
 
   async #jsonRequest<Output>(input: {
@@ -717,20 +738,6 @@ function parseProviderErrorCode(body: string): string | null {
   }
 }
 
-function parsePtyJsonMessage(data: string): { type: "exited"; exitCode: number } | null {
-  try {
-    const parsed = z
-      .object({
-        type: z.literal("exited"),
-        exitCode: z.number().int(),
-      })
-      .safeParse(JSON.parse(data));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
-}
-
 function formatSnapshotFailureReason(reason: string | null | undefined): string {
   if (reason === undefined || reason === null || reason.trim().length === 0) {
     return "";
@@ -758,4 +765,35 @@ function shellIdentifier(key: string): string {
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\"'\"'")}'`;
+}
+
+function formatFreestylePtyError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (!isRecord(error)) {
+    return String(error);
+  }
+
+  const parts: string[] = [];
+  const type = error.type;
+  if (typeof type === "string" && type.length > 0) {
+    parts.push(`type=${type}`);
+  }
+  const message = error.message;
+  if (typeof message === "string" && message.length > 0) {
+    parts.push(`message=${message}`);
+  }
+  const nestedError = error.error;
+  if (nestedError instanceof Error) {
+    parts.push(`error=${nestedError.message}`);
+  } else if (typeof nestedError === "string" && nestedError.length > 0) {
+    parts.push(`error=${nestedError}`);
+  }
+
+  return parts.length === 0 ? "unrecognized PTY error object" : parts.join(", ");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
