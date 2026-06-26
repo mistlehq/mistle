@@ -663,7 +663,9 @@ describe("WebhookTriggerEventPicker", () => {
     });
 
     expect(screen.getAllByText("retired-user").length).toBeGreaterThan(0);
-    expect(screen.getByText("The selected resources are no longer available:")).toBeDefined();
+    expect(
+      screen.getByText("The highlighted resources are no longer available. Please remove them."),
+    ).toBeDefined();
   });
 
   it("renders GitHub actor bot parameters from synced bot resources", async () => {

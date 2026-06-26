@@ -75,7 +75,8 @@ describe.concurrent("sandbox profiles create integration", () => {
     expect(initialVersion.state).toBe(SandboxProfileVersionStates.DRAFT);
     expect(initialVersion.agentRuntimeId).toBe(SandboxProfileVersionAgentRuntimeIds.CODEX);
     expect(initialVersion.publishedAt).toBeNull();
-    expect(initialVersion.sandboxProvider).toBeNull();
+    expect(initialVersion.sandboxProvider).toBe(SandboxProvider.DOCKER);
+    expect(initialVersion.sandboxConnectionId).toBeNull();
     expect(initialVersion.sandboxVcpuCount).toBeNull();
     expect(initialVersion.sandboxMemoryMb).toBeNull();
     expect(initialVersion.sandboxDiskMb).toBeNull();

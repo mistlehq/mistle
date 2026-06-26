@@ -609,7 +609,9 @@ export const SlackUserGroupMentionUnavailableSavedValue: Story = {
   play: async ({ canvasElement }): Promise<void> => {
     const body = await openSlackUserGroupMentionPicker(canvasElement);
 
-    await expect(body.getByText("The selected resources are no longer available:")).toBeVisible();
+    await expect(
+      body.getByText("The highlighted resources are no longer available. Please remove them."),
+    ).toBeVisible();
     await expect(body.getByText("S_LEGACY")).toBeVisible();
   },
 };
