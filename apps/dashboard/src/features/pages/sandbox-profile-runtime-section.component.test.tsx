@@ -1170,7 +1170,7 @@ describe("SandboxProfileRuntimeSection", () => {
     });
   });
 
-  it("renders Freestyle as a selectable provider with explicit resource choices", async () => {
+  it("renders Freestyle as a selectable provider with slider resource choices", async () => {
     let runtimeDraftState: SandboxProfileRuntimeDraftState | undefined;
     render(
       <MemoryRouter>
@@ -1202,8 +1202,15 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByRole("option", { name: "Freestyle" })).toBeTruthy();
     fireEvent.keyDown(providerCombobox, { key: "Escape" });
 
-    selectOptionFromCombobox({ comboboxName: "CPU", optionName: "4 vCPU" });
-    selectOptionFromCombobox({ comboboxName: "Memory (MB)", optionName: "8192 MB" });
+    expect(screen.queryByRole("combobox", { name: "CPU" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Memory (MB)" })).toBeNull();
+
+    const cpuSlider = screen.getByRole("group", { name: "CPU" });
+    const memorySlider = screen.getByRole("group", { name: "Memory (MB)" });
+    expect(cpuSlider).toBeTruthy();
+    expect(memorySlider).toBeTruthy();
+    expect(screen.getByText("2 vCPU")).toBeTruthy();
+    expect(screen.getByText("4096 MB")).toBeTruthy();
 
     await waitFor(() => {
       if (runtimeDraftState?.buildDraftChanges === undefined) {
@@ -1214,8 +1221,8 @@ describe("SandboxProfileRuntimeSection", () => {
         expect.objectContaining({
           sandboxProvider: "freestyle",
           sandboxResources: {
-            vcpuCount: 4,
-            memoryMb: 8192,
+            vcpuCount: 2,
+            memoryMb: 4096,
             diskMb: 16384,
           },
         }),

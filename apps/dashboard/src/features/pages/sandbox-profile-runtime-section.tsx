@@ -972,17 +972,7 @@ function ResourceSliderField(input: {
   value: number;
 }): React.JSX.Element {
   if (hasAllowedResourceValues(input.capability)) {
-    return (
-      <ResourceSelectField
-        capability={input.capability}
-        disabled={input.disabled}
-        formatValue={input.formatValue}
-        id={input.id}
-        label={input.label}
-        onChange={input.onChange}
-        value={input.value}
-      />
-    );
+    return <AllowedResourceSliderField {...input} capability={input.capability} />;
   }
 
   return (
@@ -1012,6 +1002,63 @@ function ResourceSliderField(input: {
           />
           <span className="min-w-20 shrink-0 text-right text-sm font-medium">
             {input.formatValue(input.value)}
+          </span>
+        </div>
+      </FieldContent>
+    </Field>
+  );
+}
+
+function AllowedResourceSliderField(input: {
+  capability: ResourceCapability & { allowedValues: number[] };
+  disabled: boolean;
+  formatValue: (value: number) => string;
+  id: string;
+  label: string;
+  onChange: (value: number) => void;
+  value: number;
+}): React.JSX.Element {
+  const allowedValues = input.capability.allowedValues;
+  if (allowedValues.length === 0) {
+    throw new Error("Resource capability allowed values must not be empty.");
+  }
+
+  const selectedValue = clampResourceValue(input.value, input.capability);
+  const selectedIndex = allowedValues.indexOf(selectedValue);
+  const sliderIndex = selectedIndex === -1 ? 0 : selectedIndex;
+
+  return (
+    <Field contentWidth="fill" orientation="horizontal">
+      <FieldHeader>
+        <FieldLabel htmlFor={input.id}>{input.label}</FieldLabel>
+      </FieldHeader>
+      <FieldContent>
+        <div className="flex items-center gap-4">
+          <Slider
+            aria-label={input.label}
+            className="[&_[data-slot=slider-range]]:bg-primary/80 [&_[data-slot=slider-thumb]]:size-5 [&_[data-slot=slider-track]]:h-2 [&_[data-slot=slider-track]]:bg-border min-w-0 flex-1"
+            disabled={input.disabled}
+            id={input.id}
+            max={allowedValues.length - 1}
+            min={0}
+            onValueChange={(values) => {
+              const nextIndex = Array.isArray(values) ? values[0] : values;
+              if (nextIndex === undefined) {
+                return;
+              }
+
+              const nextValue = allowedValues[nextIndex];
+              if (nextValue === undefined) {
+                return;
+              }
+
+              input.onChange(nextValue);
+            }}
+            step={1}
+            value={[sliderIndex]}
+          />
+          <span className="min-w-20 shrink-0 text-right text-sm font-medium">
+            {input.formatValue(selectedValue)}
           </span>
         </div>
       </FieldContent>
