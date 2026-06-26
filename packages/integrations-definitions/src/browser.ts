@@ -55,6 +55,7 @@ import { StripeMcpBaseDefinition } from "./stripe/variants/stripe-mcp/base-defin
 import { SupabaseMcpBaseDefinition } from "./supabase/variants/supabase-mcp/base-definition.js";
 import { WasenderApiBaseDefinition } from "./wasenderapi/variants/wasenderapi-mcp/base-definition.js";
 import { WhapiMcpBaseDefinition } from "./whapi/variants/whapi-mcp/base-definition.js";
+import { XeroMcpBaseDefinition } from "./xero/variants/xero-mcp/base-definition.js";
 import { ZaiDefinition } from "./zai/index.js";
 export const AgentMailBrowserDefinition = AgentMailMcpBaseDefinition;
 export const AnthropicBrowserDefinition = AnthropicDefinition;
@@ -102,6 +103,7 @@ export const StripeBrowserDefinition = StripeMcpBaseDefinition;
 export const SupabaseBrowserDefinition = SupabaseMcpBaseDefinition;
 export const WasenderApiBrowserDefinition = WasenderApiBaseDefinition;
 export const WhapiBrowserDefinition = WhapiMcpBaseDefinition;
+export const XeroBrowserDefinition = XeroMcpBaseDefinition;
 export const ZaiBrowserDefinition = ZaiDefinition;
 
 const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
@@ -152,6 +154,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   SupabaseBrowserDefinition,
   WasenderApiBrowserDefinition,
   WhapiBrowserDefinition,
+  XeroBrowserDefinition,
   ZaiBrowserDefinition,
 ];
 
@@ -213,4 +216,5 @@ export * from "./stripe/browser.js";
 export * from "./supabase/browser.js";
 export * from "./wasenderapi/browser.js";
 export * from "./whapi/browser.js";
+export * from "./xero/browser.js";
 export * from "./zai/index.js";

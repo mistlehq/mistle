@@ -34,6 +34,7 @@ import {
   TensorlakeSandboxRuntimeBrowserDefinition,
   WasenderApiBrowserDefinition,
   WhapiBrowserDefinition,
+  XeroBrowserDefinition,
   ZaiBrowserDefinition,
 } from "./browser.js";
 
@@ -414,6 +415,25 @@ describe("browser definitions", () => {
     expect(WhapiBrowserDefinition.mcp).toBeDefined();
     expect(WhapiBrowserDefinition.webhookHandler).toBeUndefined();
     expect(WhapiBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("registers Xero in the browser-safe definitions bundle without server-only hooks", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: XeroBrowserDefinition.familyId,
+      variantId: XeroBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "xero",
+      variantId: "xero-mcp",
+      kind: "connector",
+      displayName: "Xero",
+      logoKey: "xero",
+    });
+    expect(definition?.mcp).toBeDefined();
+    expect(XeroBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(XeroBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(XeroBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("registers Tensorlake sandbox runtime in the browser-safe definitions bundle", () => {
