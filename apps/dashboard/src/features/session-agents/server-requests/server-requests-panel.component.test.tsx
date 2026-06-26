@@ -9,8 +9,9 @@ import {
   cleanupTestQueryClients,
   createTestQueryClient,
 } from "../../../test-support/query-client.js";
+import { HttpApiError } from "../../api/http-api-error.js";
 import type { ServerRequestEntry } from "./server-request-entries.js";
-import { ServerRequestsPanel } from "./server-requests-panel.js";
+import { ServerRequestsPanel, shouldPollResourceSelectionQuery } from "./server-requests-panel.js";
 
 type ResourceSelectionQuestion = Extract<
   ServerRequestEntry,
@@ -572,6 +573,64 @@ describe("ServerRequestsPanel", () => {
     fireEvent.click(submitButton);
 
     expect(submittedResults).toEqual([]);
+  });
+
+  it("keeps first-time resource sync polling from refresh through in-progress conflicts until resources are ready", () => {
+    const syncRequiredError = new HttpApiError({
+      operation: "listIntegrationConnectionResources",
+      status: 409,
+      body: {
+        code: "RESOURCE_SYNC_REQUIRED",
+        message: "Resource sync is required before resources can be listed.",
+      },
+      code: "RESOURCE_SYNC_REQUIRED",
+      message: "Resource sync is required before resources can be listed.",
+    });
+    const syncInProgressError = new HttpApiError({
+      operation: "listIntegrationConnectionResources",
+      status: 409,
+      body: {
+        code: "RESOURCE_SYNC_IN_PROGRESS",
+        message: "Resource sync is still in progress.",
+      },
+      code: "RESOURCE_SYNC_IN_PROGRESS",
+      message: "Resource sync is still in progress.",
+    });
+
+    expect(
+      shouldPollResourceSelectionQuery({
+        data: undefined,
+        error: syncRequiredError,
+        refreshHasStartedSync: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldPollResourceSelectionQuery({
+        data: undefined,
+        error: syncRequiredError,
+        refreshHasStartedSync: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldPollResourceSelectionQuery({
+        data: undefined,
+        error: syncInProgressError,
+        refreshHasStartedSync: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldPollResourceSelectionQuery({
+        data: {
+          connectionId: "icn_test_github",
+          familyId: "github",
+          kind: "repository",
+          syncState: "ready",
+          items: [],
+        },
+        error: null,
+        refreshHasStartedSync: true,
+      }),
+    ).toBe(false);
   });
 
   it("renders OpenCode permission requests in the standalone panel", () => {

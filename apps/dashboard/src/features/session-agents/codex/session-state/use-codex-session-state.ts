@@ -162,28 +162,44 @@ type UserInputAnswerResult = {
   }>;
 };
 
-function isUserInputAnswerResult(result: unknown): result is UserInputAnswerResult {
-  if (typeof result !== "object" || result === null || !("answers" in result)) {
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isUserInputAnswerValue(value: unknown): value is string | string[] {
+  return typeof value === "string" || isStringArray(value);
+}
+
+function isUserInputAnswerSideEffect(
+  value: unknown,
+): value is NonNullable<UserInputAnswerResult["answers"][number]["sideEffect"]> {
+  return (
+    isRecord(value) &&
+    value["kind"] === "sandbox-profile-draft-updated" &&
+    typeof value["profileId"] === "string" &&
+    typeof value["version"] === "number" &&
+    Number.isInteger(value["version"])
+  );
+}
+
+function isUserInputAnswer(value: unknown): value is UserInputAnswerResult["answers"][number] {
+  if (!isRecord(value) || typeof value["id"] !== "string") {
     return false;
   }
 
-  const answers = (result as { answers: unknown }).answers;
-  return (
-    Array.isArray(answers) &&
-    answers.every((answer) => {
-      if (typeof answer !== "object" || answer === null) {
-        return false;
-      }
+  if (!isUserInputAnswerValue(value["value"])) {
+    return false;
+  }
 
-      const candidate = answer as { id?: unknown; value?: unknown };
-      return (
-        typeof candidate.id === "string" &&
-        (typeof candidate.value === "string" ||
-          (Array.isArray(candidate.value) &&
-            candidate.value.every((item) => typeof item === "string")))
-      );
-    })
-  );
+  return value["sideEffect"] === undefined || isUserInputAnswerSideEffect(value["sideEffect"]);
+}
+
+function isUserInputAnswerResult(result: unknown): result is UserInputAnswerResult {
+  if (!isRecord(result)) {
+    return false;
+  }
+
+  return Array.isArray(result["answers"]) && result["answers"].every(isUserInputAnswer);
 }
 
 function serializeIntegrationBindingForDraft(binding: SandboxProfileVersionIntegrationBinding): {
