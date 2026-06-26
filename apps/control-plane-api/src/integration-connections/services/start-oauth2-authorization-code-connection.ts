@@ -119,7 +119,7 @@ function removeFrameworkConnectionConfigFields(
 
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(config)) {
-    if (key !== "connection_method" && key !== "client_id") {
+    if (key !== "connection_method" && key !== "client_id" && key !== "granted_scopes") {
       result[key] = value;
     }
   }

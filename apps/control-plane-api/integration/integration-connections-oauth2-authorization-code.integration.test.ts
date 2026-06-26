@@ -330,6 +330,10 @@ describe.concurrent("integration connections OAuth 2.0 authorization-code integr
         .update(env.controlPlaneTables.integrationConnections)
         .set({
           status: IntegrationConnectionStatuses.ERROR,
+          config: {
+            ...connection.config,
+            granted_scopes: ["read_observability"],
+          },
         })
         .where(eq(env.controlPlaneTables.integrationConnections.id, connection.id));
 
