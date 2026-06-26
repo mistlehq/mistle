@@ -115,6 +115,76 @@ describe("buildManagedEgressRequest", () => {
     expect(result.request.headers.get("authorization")).toBe("Bearer workspace-b-token");
   });
 
+  it("applies header credential prefixes when injecting resolved credentials", async () => {
+    const controlPlaneBaseUrl = await startRecordingControlPlane((_request, response) => {
+      response.writeHead(200, {
+        "content-type": "application/json",
+      });
+      response.end(
+        JSON.stringify({
+          kind: "value",
+          value: "discord-bot-token",
+        }),
+      );
+    });
+    const route: CompiledRuntimePlan["egressRoutes"][number] = {
+      egressRuleId: "egress_rule_discord",
+      bindingId: "bind_discord",
+      familyId: "discord",
+      variantId: "discord-default",
+      match: {
+        hosts: ["discord.com"],
+        methods: ["GET"],
+      },
+      upstream: {
+        baseUrl: "https://discord.com/api/v10",
+      },
+      authInjection: {
+        type: "header",
+        target: "authorization",
+        credentialPrefix: "Bot ",
+      },
+      credentialResolver: {
+        kind: "integration_connection",
+        connectionId: "icn_discord",
+        secretType: "api_key",
+        slotKey: "discord.discord-default.discord-bot.bot-token",
+      },
+    };
+
+    const result = await buildManagedEgressRequest({
+      body: undefined,
+      controlPlanePublicBaseUrl: "https://control-plane.test",
+      controlPlaneInternalClient: new ControlPlaneInternalClient({
+        baseUrl: controlPlaneBaseUrl,
+        internalAuthServiceToken: "service-token",
+      }),
+      credentialCache: new CredentialCache({
+        cache: new Cache({ adapter: new InMemoryCacheAdapter() }),
+        defaultTtlSeconds: 300,
+        refreshSkewSeconds: 0,
+        now: () => Date.parse("2026-01-01T00:00:00.000Z"),
+      }),
+      mcpTokenConfig: {
+        tokenSecret: "mcp-token-secret",
+        tokenIssuer: "data-plane-gateway",
+        tokenAudience: "mistle-mcp",
+      },
+      organizationId: "org_123",
+      request: {
+        authority: "discord.com",
+        headers: {},
+        method: "GET",
+        path: "/api/v10/users/@me",
+        scheme: "https",
+      },
+      route,
+      sandboxInstanceId: "sbi_123",
+    });
+
+    expect(result.request.headers.get("authorization")).toBe("Bot discord-bot-token");
+  });
+
   it("replaces incoming AWS SigV4 headers with resolved AWS session credentials", async () => {
     let observedBody: unknown;
     const controlPlaneBaseUrl = await startRecordingControlPlane((request, response) => {

@@ -1,10 +1,11 @@
-import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { type ControlPlaneDatabase, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import type {
   AnyIntegrationDefinition,
   IntegrationProviderConfigurationSetupFlowCapability,
   IntegrationRegistry,
 } from "@mistle/integrations-core";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -230,8 +231,9 @@ export async function completeProviderConfigurationSetup(
         })
       : undefined;
 
+  let setupResult: Awaited<ReturnType<typeof flow.complete>>;
   try {
-    await flow.complete({
+    setupResult = await flow.complete({
       connection: {
         id: input.connection.id,
         status: input.connection.status,
@@ -260,5 +262,34 @@ export async function completeProviderConfigurationSetup(
       IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
       error instanceof Error ? error.message : "Provider configuration setup failed.",
     );
+  }
+
+  const providerMetadata = setupResult?.webhookSource?.providerMetadata;
+  if (providerMetadata === undefined) {
+    return;
+  }
+
+  const webhookSource = await ensureImplicitConnectionWebhookSource({
+    db: ctx.db,
+    organizationId: input.connection.organizationId,
+    connectionId: input.connection.id,
+    targetKey: input.connection.targetKey,
+  });
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+  const updatedSources = await ctx.db
+    .update(tables.integrationWebhookSources)
+    .set({
+      providerMetadata: {
+        ...webhookSource.providerMetadata,
+        ...providerMetadata,
+      },
+    })
+    .where(eq(tables.integrationWebhookSources.id, webhookSource.id))
+    .returning({
+      id: tables.integrationWebhookSources.id,
+    });
+
+  if (updatedSources.length !== 1) {
+    throw new Error(`Failed to update webhook source '${webhookSource.id}'.`);
   }
 }

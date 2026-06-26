@@ -73,6 +73,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "discord-default",
+        familyId: "discord",
+        variantId: "discord-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "e2b-default",
         familyId: "e2b",
         variantId: "e2b-default",

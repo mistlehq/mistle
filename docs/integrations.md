@@ -24,6 +24,8 @@ Refer to [packages/docs/guides/agentmail-integration-setup.mdx](../packages/docs
 
 Refer to [docs/integrations/aws.md](./integrations/aws.md) for AWS, AWS CLI, and CloudWatch MCP setup guidance.
 
+Refer to [docs/integrations/discord.md](./integrations/discord.md) for Discord bot, MCP, callback, and Gateway relay setup guidance.
+
 Refer to [packages/docs/guides/posthog-integration-setup.mdx](../packages/docs/guides/posthog-integration-setup.mdx) for PostHog hosted MCP setup guidance.
 
 Refer to [packages/docs/guides/google-workspace-integration-setup.mdx](../packages/docs/guides/google-workspace-integration-setup.mdx) for Google Workspace setup guidance.

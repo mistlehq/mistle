@@ -13,6 +13,7 @@ describe("webhook trigger requirements", () => {
     );
 
     expect(triggerCapableDefinitions.map(toDefinitionKey)).toEqual([
+      "discord::discord-default",
       "jira::jira-default",
       "github::github-cloud",
       "github::github-enterprise-server",

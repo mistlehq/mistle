@@ -8,6 +8,7 @@ import {
   DataForSeoBrowserDefinition,
   DatadogBrowserDefinition,
   DeepSeekBrowserDefinition,
+  DiscordBrowserDefinition,
   E2BSandboxRuntimeBrowserDefinition,
   ExpoBrowserDefinition,
   FireworksBrowserDefinition,
@@ -134,6 +135,24 @@ describe("browser definitions", () => {
     expect(DeepSeekBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
     expect(DeepSeekBrowserDefinition.webhookHandler).toBeUndefined();
     expect(DeepSeekBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("registers Discord in the browser-safe definitions bundle without server-only hooks", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: DiscordBrowserDefinition.familyId,
+      variantId: DiscordBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "discord",
+      variantId: "discord-default",
+      kind: "connector",
+      displayName: "Discord",
+      logoKey: "discord",
+    });
+    expect(DiscordBrowserDefinition.providerConfigurationSetup).toBeUndefined();
+    expect(DiscordBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(DiscordBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("registers Kimi in the browser-safe definitions bundle", () => {

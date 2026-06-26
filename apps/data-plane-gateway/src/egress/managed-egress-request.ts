@@ -1160,7 +1160,10 @@ function applyAuthInjection(input: {
       );
       return;
     case "header":
-      input.outgoingHeaders.set(input.authInjection.target, input.secretValue);
+      input.outgoingHeaders.set(
+        input.authInjection.target,
+        `${input.authInjection.credentialPrefix ?? ""}${input.secretValue}`,
+      );
       return;
     case "query":
       input.upstreamUrl.searchParams.set(input.authInjection.target, input.secretValue);

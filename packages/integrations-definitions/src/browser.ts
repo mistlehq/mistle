@@ -14,6 +14,7 @@ import { CloudflareDefinition } from "./cloudflare/variants/cloudflare-mcp/defin
 import { DatadogDefinition } from "./datadog/index.js";
 import { DataForSeoMcpBaseDefinition } from "./dataforseo/variants/dataforseo-mcp/base-definition.js";
 import { DeepSeekDefinition } from "./deepseek/index.js";
+import { DiscordBaseDefinition } from "./discord/variants/discord-default/base-definition.js";
 import { ExpoMcpBaseDefinition } from "./expo/variants/expo-mcp/base-definition.js";
 import { FireworksDefinition } from "./fireworks/index.js";
 import { GcpMcpBaseDefinition } from "./gcp/variants/gcp-mcp/base-definition.js";
@@ -66,6 +67,7 @@ export const CloudflareBrowserDefinition = CloudflareDefinition;
 export const DataForSeoBrowserDefinition = DataForSeoMcpBaseDefinition;
 export const DatadogBrowserDefinition = DatadogDefinition;
 export const DeepSeekBrowserDefinition = DeepSeekDefinition;
+export const DiscordBrowserDefinition = DiscordBaseDefinition;
 export const ExpoBrowserDefinition = ExpoMcpBaseDefinition;
 export const FireworksBrowserDefinition = FireworksDefinition;
 export const GcpBrowserDefinition = GcpMcpBaseDefinition;
@@ -116,6 +118,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   DataForSeoBrowserDefinition,
   DatadogBrowserDefinition,
   DeepSeekBrowserDefinition,
+  DiscordBrowserDefinition,
   ExpoBrowserDefinition,
   FireworksBrowserDefinition,
   GcpBrowserDefinition,
@@ -184,6 +187,7 @@ export * from "./cloudflare/browser.js";
 export * from "./dataforseo/browser.js";
 export * from "./datadog/index.js";
 export * from "./deepseek/index.js";
+export * from "./discord/browser.js";
 export * from "./expo/browser.js";
 export * from "./fireworks/index.js";
 export * from "./gcp/browser.js";

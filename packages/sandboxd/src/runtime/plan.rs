@@ -108,6 +108,7 @@ pub struct CompiledEgressRouteAuthInjection {
     pub r#type: CompiledEgressRouteAuthInjectionType,
     pub target: Option<String>,
     pub username: Option<String>,
+    pub credential_prefix: Option<String>,
     pub service: Option<String>,
     pub region: Option<String>,
 }
@@ -1206,6 +1207,43 @@ mod tests {
             route.auth_injection.r#type,
             CompiledEgressRouteAuthInjectionType::Bearer
         ));
+    }
+
+    #[test]
+    fn decodes_header_auth_injection_credential_prefix() {
+        let route = serde_json::from_value::<CompiledEgressRoute>(serde_json::json!({
+          "egressRuleId": "egress_rule_bind_discord",
+          "bindingId": "bind_discord",
+          "familyId": "discord",
+          "variantId": "discord-default",
+          "match": {
+            "hosts": ["discord.com"]
+          },
+          "upstream": {
+            "baseUrl": "https://discord.com/api/v10"
+          },
+          "authInjection": {
+            "type": "header",
+            "target": "authorization",
+            "credentialPrefix": "Bot "
+          },
+          "credentialResolver": {
+            "kind": "integration_connection",
+            "connectionId": "icn_discord",
+            "secretType": "api_key",
+            "slotKey": "discord.discord-default.discord-bot.bot-token"
+          }
+        }))
+        .expect("egress route should decode");
+
+        assert!(matches!(
+            route.auth_injection.r#type,
+            CompiledEgressRouteAuthInjectionType::Header
+        ));
+        assert_eq!(
+            route.auth_injection.credential_prefix.as_deref(),
+            Some("Bot ")
+        );
     }
 
     #[test]
