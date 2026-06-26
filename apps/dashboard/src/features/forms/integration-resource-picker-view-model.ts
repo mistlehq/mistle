@@ -22,7 +22,6 @@ export type IntegrationResourceWidgetMessageSection = {
   variant: "default" | "alert";
   message: string;
   detail?: string | undefined;
-  items?: readonly string[] | undefined;
 };
 
 function formatIntegrationResourceSearchPlaceholder(input: {

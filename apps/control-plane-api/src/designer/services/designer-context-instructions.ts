@@ -1,6 +1,6 @@
-import type { DesignerManagedInstructionBlock } from "./designer-managed-instructions.js";
+import type { MistleManagedInstructionBlock } from "@mistle/integrations-definitions/agent-runtimes/codex";
 
-export const DesignerContextInstructionBlock: DesignerManagedInstructionBlock = {
+export const DesignerContextInstructionBlock: MistleManagedInstructionBlock = {
   blockId: "mistle-designer-context",
   content: [
     "Use this context as the Designer session agent's vocabulary for explaining, planning, and mapping work back to Mistle product state and UI.",

@@ -9,7 +9,91 @@ import {
   cleanupTestQueryClients,
   createTestQueryClient,
 } from "../../../test-support/query-client.js";
+import type { ServerRequestEntry } from "./server-request-entries.js";
 import { ServerRequestsPanel } from "./server-requests-panel.js";
+
+type ResourceSelectionQuestion = Extract<
+  ServerRequestEntry,
+  { kind: "tool-user-input" }
+>["questions"][number];
+
+function seedResourceQuery(input: {
+  queryClient: ReturnType<typeof createTestQueryClient>;
+  connectionId: string;
+  search: string;
+  handles: readonly string[];
+}): void {
+  input.queryClient.setQueryData(
+    ["integration-connections", input.connectionId, "resources", "repository", input.search],
+    {
+      connectionId: input.connectionId,
+      familyId: "github",
+      kind: "repository",
+      syncState: "ready",
+      items: input.handles.map((handle) => ({
+        id: `repo_${handle.replace(/[^a-zA-Z0-9]+/gu, "_")}`,
+        familyId: "github",
+        kind: "repository",
+        handle,
+        displayName: handle,
+        status: "accessible",
+        metadata: {},
+      })),
+    },
+  );
+}
+
+function renderResourceSelectionRequest(input: {
+  initialSelectedHandles: readonly string[];
+  searchPlaceholder?: string | undefined;
+  seed?: (queryClient: ReturnType<typeof createTestQueryClient>) => void;
+}): { submittedResults: unknown[] } {
+  const submittedResults: unknown[] = [];
+  const queryClient = createTestQueryClient({
+    refetchOnMount: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  input.seed?.(queryClient);
+
+  const question: ResourceSelectionQuestion = {
+    header: "Repositories",
+    id: "github-review-repositories",
+    inputKind: "integrationConnectionResourceMultiSelect",
+    question: "Which GitHub repositories should this agent review?",
+    resourceSelection: {
+      connectionId: "icn_test_github",
+      resourceKind: "repository",
+      resourceLabelPlural: "repositories",
+      ...(input.searchPlaceholder === undefined
+        ? {}
+        : { searchPlaceholder: input.searchPlaceholder }),
+      initialSelectedHandles: input.initialSelectedHandles,
+    },
+  };
+
+  render(
+    <QueryClientProvider client={queryClient}>
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: "resource-selection-request-1",
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [question],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+      />
+    </QueryClientProvider>,
+  );
+
+  return { submittedResults };
+}
 
 describe("ServerRequestsPanel", () => {
   afterEach(async () => {
@@ -401,55 +485,17 @@ describe("ServerRequestsPanel", () => {
   });
 
   it("submits empty resource selection answers", async () => {
-    const submittedResults: unknown[] = [];
-    const queryClient = createTestQueryClient({
-      refetchOnMount: false,
-      staleTime: Number.POSITIVE_INFINITY,
-    });
-    queryClient.setQueryData(
-      ["integration-connections", "icn_test_github", "resources", "repository", ""],
-      {
-        connectionId: "icn_test_github",
-        familyId: "github",
-        kind: "repository",
-        syncState: "ready",
-        items: [],
+    const { submittedResults } = renderResourceSelectionRequest({
+      initialSelectedHandles: [],
+      seed: (queryClient) => {
+        seedResourceQuery({
+          queryClient,
+          connectionId: "icn_test_github",
+          search: "",
+          handles: [],
+        });
       },
-    );
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <ServerRequestsPanel
-          entries={[
-            {
-              requestId: "resource-selection-request-1",
-              method: "tool/requestUserInput",
-              kind: "tool-user-input",
-              questions: [
-                {
-                  header: "Repositories",
-                  id: "github-review-repositories",
-                  inputKind: "integrationConnectionResourceMultiSelect",
-                  question: "Which GitHub repositories should this agent review?",
-                  resourceSelection: {
-                    connectionId: "icn_test_github",
-                    resourceKind: "repository",
-                    resourceLabelPlural: "repositories",
-                    initialSelectedHandles: [],
-                  },
-                },
-              ],
-              status: "pending",
-              responseErrorMessage: null,
-            },
-          ]}
-          isRespondingToServerRequest={false}
-          onRespondToServerRequest={(_requestId, result) => {
-            submittedResults.push(result);
-          }}
-        />
-      </QueryClientProvider>,
-    );
+    });
 
     const submitButton = screen.getByRole("button", { name: "Submit" });
     await waitFor(() => {
@@ -470,55 +516,17 @@ describe("ServerRequestsPanel", () => {
   });
 
   it("keeps resource selection answers disabled while selected resources are unavailable", () => {
-    const submittedResults: unknown[] = [];
-    const queryClient = createTestQueryClient({
-      refetchOnMount: false,
-      staleTime: Number.POSITIVE_INFINITY,
-    });
-    queryClient.setQueryData(
-      ["integration-connections", "icn_test_github", "resources", "repository", ""],
-      {
-        connectionId: "icn_test_github",
-        familyId: "github",
-        kind: "repository",
-        syncState: "ready",
-        items: [],
+    const { submittedResults } = renderResourceSelectionRequest({
+      initialSelectedHandles: ["mistle/private-internal-tools"],
+      seed: (queryClient) => {
+        seedResourceQuery({
+          queryClient,
+          connectionId: "icn_test_github",
+          search: "",
+          handles: [],
+        });
       },
-    );
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <ServerRequestsPanel
-          entries={[
-            {
-              requestId: "resource-selection-request-1",
-              method: "tool/requestUserInput",
-              kind: "tool-user-input",
-              questions: [
-                {
-                  header: "Repositories",
-                  id: "github-review-repositories",
-                  inputKind: "integrationConnectionResourceMultiSelect",
-                  question: "Which GitHub repositories should this agent review?",
-                  resourceSelection: {
-                    connectionId: "icn_test_github",
-                    resourceKind: "repository",
-                    resourceLabelPlural: "repositories",
-                    initialSelectedHandles: ["mistle/private-internal-tools"],
-                  },
-                },
-              ],
-              status: "pending",
-              responseErrorMessage: null,
-            },
-          ]}
-          isRespondingToServerRequest={false}
-          onRespondToServerRequest={(_requestId, result) => {
-            submittedResults.push(result);
-          }}
-        />
-      </QueryClientProvider>,
-    );
+    });
 
     const submitButton = screen.getByRole("button", { name: "Submit" });
     expect(submitButton.getAttribute("disabled")).toBe("");
@@ -528,66 +536,24 @@ describe("ServerRequestsPanel", () => {
   });
 
   it("keeps unavailable resource selections disabled while searching", async () => {
-    const submittedResults: unknown[] = [];
-    const queryClient = createTestQueryClient({
-      refetchOnMount: false,
-      staleTime: Number.POSITIVE_INFINITY,
+    const { submittedResults } = renderResourceSelectionRequest({
+      initialSelectedHandles: ["mistle/private-internal-tools"],
+      searchPlaceholder: "Search repositories",
+      seed: (queryClient) => {
+        seedResourceQuery({
+          queryClient,
+          connectionId: "icn_test_github",
+          search: "",
+          handles: [],
+        });
+        seedResourceQuery({
+          queryClient,
+          connectionId: "icn_test_github",
+          search: "mistle",
+          handles: [],
+        });
+      },
     });
-    queryClient.setQueryData(
-      ["integration-connections", "icn_test_github", "resources", "repository", ""],
-      {
-        connectionId: "icn_test_github",
-        familyId: "github",
-        kind: "repository",
-        syncState: "ready",
-        items: [],
-      },
-    );
-    queryClient.setQueryData(
-      ["integration-connections", "icn_test_github", "resources", "repository", "mistle"],
-      {
-        connectionId: "icn_test_github",
-        familyId: "github",
-        kind: "repository",
-        syncState: "ready",
-        items: [],
-      },
-    );
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <ServerRequestsPanel
-          entries={[
-            {
-              requestId: "resource-selection-request-1",
-              method: "tool/requestUserInput",
-              kind: "tool-user-input",
-              questions: [
-                {
-                  header: "Repositories",
-                  id: "github-review-repositories",
-                  inputKind: "integrationConnectionResourceMultiSelect",
-                  question: "Which GitHub repositories should this agent review?",
-                  resourceSelection: {
-                    connectionId: "icn_test_github",
-                    resourceKind: "repository",
-                    resourceLabelPlural: "repositories",
-                    searchPlaceholder: "Search repositories",
-                    initialSelectedHandles: ["mistle/private-internal-tools"],
-                  },
-                },
-              ],
-              status: "pending",
-              responseErrorMessage: null,
-            },
-          ]}
-          isRespondingToServerRequest={false}
-          onRespondToServerRequest={(_requestId, result) => {
-            submittedResults.push(result);
-          }}
-        />
-      </QueryClientProvider>,
-    );
 
     fireEvent.change(
       screen.getByRole("combobox", {

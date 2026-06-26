@@ -71,14 +71,12 @@ function IntegrationResourceMessageSection(input: {
   message: string;
   variant: "default" | "alert";
   detail?: string | undefined;
-  items?: readonly string[] | undefined;
 }): React.JSX.Element {
   if (input.variant === "alert") {
     return (
       <FieldError className="text-xs whitespace-nowrap">
         {formatCompactAlertMessage({
           detail: input.detail,
-          items: input.items,
           message: input.message,
         })}
       </FieldError>
@@ -88,18 +86,8 @@ function IntegrationResourceMessageSection(input: {
   return <p className="text-muted-foreground text-sm">{input.message}</p>;
 }
 
-function formatCompactAlertMessage(input: {
-  message: string;
-  detail: string | undefined;
-  items: readonly string[] | undefined;
-}): string {
-  const messageWithDetail =
-    input.detail === undefined ? input.message : `${input.message} ${input.detail}`;
-  if (input.items === undefined || input.items.length === 0) {
-    return messageWithDetail;
-  }
-
-  return `${messageWithDetail} ${input.items.join(", ")}`;
+function formatCompactAlertMessage(input: { message: string; detail: string | undefined }): string {
+  return input.detail === undefined ? input.message : `${input.message} ${input.detail}`;
 }
 
 function ResourceMessages(input: {
@@ -120,7 +108,6 @@ function ResourceMessages(input: {
       {messageSections.map((section) => (
         <IntegrationResourceMessageSection
           detail={section.detail}
-          items={section.items}
           key={`${section.variant}:${section.message}`}
           message={section.message}
           variant={section.variant}

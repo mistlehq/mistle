@@ -85,17 +85,6 @@ describe("IntegrationConnectionResourcePickerView", () => {
     expect(screen.getByText("Mistle Dashboard")).toBeDefined();
     const unavailableChip = getChipForText("mistle/private-internal-tools");
     expect(unavailableChip.getAttribute("aria-invalid")).toBe("true");
-    expect(unavailableChip.className).toContain("bg-destructive/10");
-    expect(unavailableChip.className).toContain("text-destructive");
-    expect(unavailableChip.className).toContain(
-      "[&_[data-slot=combobox-chip-remove]]:hover:bg-transparent",
-    );
-    expect(unavailableChip.className).toContain(
-      "[&_[data-slot=combobox-chip-remove]]:text-destructive/70",
-    );
-    expect(unavailableChip.className).toContain(
-      "[&_[data-slot=combobox-chip-remove]]:hover:text-destructive",
-    );
     expect(
       screen.getByText("The highlighted resources are no longer available. Please remove them."),
     ).toBeDefined();

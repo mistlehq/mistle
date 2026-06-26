@@ -172,6 +172,21 @@ describe("dashboard control actions", () => {
             required: ["inputKind", "resourceSelection"],
           },
         ]),
+        allOf: expect.arrayContaining([
+          {
+            if: {
+              required: ["resourceSelection"],
+            },
+            then: {
+              properties: {
+                inputKind: {
+                  const: "integrationConnectionResourceMultiSelect",
+                },
+              },
+              required: ["inputKind"],
+            },
+          },
+        ]),
       },
     });
   });
@@ -371,6 +386,37 @@ describe("dashboard control actions", () => {
           version: 2,
           bindingId: "spib_github",
           configField: "repositories",
+        },
+      },
+    });
+
+    expect(parsed).toEqual({
+      contentItems: [
+        {
+          type: "inputText",
+          text: "Designer user input request is invalid.",
+        },
+      ],
+      success: false,
+    });
+  });
+
+  it("rejects resource selection on text user input calls", () => {
+    const parsed = parseDashboardControlDynamicToolCall({
+      namespace: DashboardControlDynamicToolNamespace,
+      tool: DesignerUserInputRequestDynamicToolName,
+      arguments: {
+        id: "github-review-repositories",
+        question: "Which GitHub repositories should this agent review?",
+        options: [
+          {
+            label: "mistlehq/mistle",
+          },
+        ],
+        resourceSelection: {
+          connectionId: "icn_github",
+          resourceKind: "repository",
+          resourceLabelPlural: "repositories",
         },
       },
     });

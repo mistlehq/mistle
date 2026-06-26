@@ -80,12 +80,6 @@ const DesignerUserInputFreeFormSchema = z
   })
   .strict();
 
-const DesignerUserInputAnswerOnlySubmitBehaviorSchema = z
-  .object({
-    kind: z.literal("answerOnly"),
-  })
-  .strict();
-
 const DesignerUserInputSaveSandboxProfileDraftBindingSubmitBehaviorSchema = z
   .object({
     kind: z.literal("saveSandboxProfileDraftBinding"),
@@ -95,11 +89,6 @@ const DesignerUserInputSaveSandboxProfileDraftBindingSubmitBehaviorSchema = z
     configField: z.string().min(1).max(120),
   })
   .strict();
-
-const DesignerUserInputSubmitBehaviorSchema = z.discriminatedUnion("kind", [
-  DesignerUserInputAnswerOnlySubmitBehaviorSchema,
-  DesignerUserInputSaveSandboxProfileDraftBindingSubmitBehaviorSchema,
-]);
 
 const DesignerUserInputIntegrationConnectionResourceSelectionSchema = z
   .object({
@@ -121,7 +110,7 @@ const DesignerUserInputRequestInputSchema = z
     options: z.array(DesignerUserInputOptionSchema).max(6).optional(),
     freeForm: DesignerUserInputFreeFormSchema.optional(),
     resourceSelection: DesignerUserInputIntegrationConnectionResourceSelectionSchema.optional(),
-    submitBehavior: DesignerUserInputSubmitBehaviorSchema.optional(),
+    submitBehavior: DesignerUserInputSaveSandboxProfileDraftBindingSubmitBehaviorSchema.optional(),
   })
   .strict()
   .refine(
@@ -144,6 +133,14 @@ const DesignerUserInputRequestInputSchema = z
       (input.options === undefined && input.freeForm === undefined),
     {
       message: "Resource selection input cannot include options or freeForm.",
+    },
+  )
+  .refine(
+    (input) =>
+      input.resourceSelection === undefined ||
+      input.inputKind === "integrationConnectionResourceMultiSelect",
+    {
+      message: "Resource selection requires resource selection input kind.",
     },
   )
   .refine(
@@ -646,51 +643,35 @@ const DesignerUserInputIntegrationConnectionResourceSelectionJsonSchema = {
 };
 
 const DesignerUserInputSubmitBehaviorJsonSchema = {
-  oneOf: [
-    {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        kind: {
-          type: "string",
-          enum: ["answerOnly"],
-        },
-      },
-      required: ["kind"],
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    kind: {
+      type: "string",
+      enum: ["saveSandboxProfileDraftBinding"],
     },
-    {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        kind: {
-          type: "string",
-          enum: ["saveSandboxProfileDraftBinding"],
-        },
-        profileId: {
-          type: "string",
-          minLength: 1,
-          maxLength: 160,
-        },
-        version: {
-          type: "integer",
-          minimum: 1,
-        },
-        bindingId: {
-          type: "string",
-          minLength: 1,
-          maxLength: 160,
-        },
-        configField: {
-          type: "string",
-          minLength: 1,
-          maxLength: 120,
-          description:
-            "Top-level binding config field to replace with the selected resource handles.",
-        },
-      },
-      required: ["kind", "profileId", "version", "bindingId", "configField"],
+    profileId: {
+      type: "string",
+      minLength: 1,
+      maxLength: 160,
     },
-  ],
+    version: {
+      type: "integer",
+      minimum: 1,
+    },
+    bindingId: {
+      type: "string",
+      minLength: 1,
+      maxLength: 160,
+    },
+    configField: {
+      type: "string",
+      minLength: 1,
+      maxLength: 120,
+      description: "Top-level binding config field to replace with the selected resource handles.",
+    },
+  },
+  required: ["kind", "profileId", "version", "bindingId", "configField"],
 };
 
 export const DesignerCanvasTabShowDynamicToolSpec = {
@@ -768,6 +749,19 @@ export const DesignerUserInputRequestDynamicToolSpec = {
       },
     ],
     allOf: [
+      {
+        if: {
+          required: ["resourceSelection"],
+        },
+        then: {
+          properties: {
+            inputKind: {
+              const: "integrationConnectionResourceMultiSelect",
+            },
+          },
+          required: ["inputKind"],
+        },
+      },
       {
         if: {
           properties: {

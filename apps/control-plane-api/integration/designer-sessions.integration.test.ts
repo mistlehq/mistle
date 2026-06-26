@@ -650,16 +650,41 @@ describe.concurrent("designer sessions integration", () => {
 
 function extractManagedInstructionBlockIds(content: string): string[] {
   const blockIds: string[] = [];
-  const markerPattern = /<!-- MISTLE-MANAGED:START ([^ ]+) -->/g;
+  let openBlockId: string | null = null;
+  const markerPattern = /<!-- MISTLE-MANAGED:(START|END) ([^ ]+) -->/g;
   let marker = markerPattern.exec(content);
 
   while (marker !== null) {
-    const blockId = marker[1];
+    const markerKind = marker[1];
+    const blockId = marker[2];
+    if (markerKind === undefined) {
+      throw new Error("Expected managed instruction marker to include a marker kind.");
+    }
     if (blockId === undefined) {
       throw new Error("Expected managed instruction marker to include a block id.");
     }
-    blockIds.push(blockId);
+
+    if (markerKind === "START") {
+      if (openBlockId !== null) {
+        throw new Error(`Managed instruction block '${openBlockId}' was not closed.`);
+      }
+      openBlockId = blockId;
+    } else {
+      if (openBlockId === null) {
+        throw new Error(`Managed instruction block '${blockId}' ended before it started.`);
+      }
+      if (openBlockId !== blockId) {
+        throw new Error(`Managed instruction block '${openBlockId}' ended with '${blockId}'.`);
+      }
+      blockIds.push(blockId);
+      openBlockId = null;
+    }
+
     marker = markerPattern.exec(content);
+  }
+
+  if (openBlockId !== null) {
+    throw new Error(`Managed instruction block '${openBlockId}' was not closed.`);
   }
 
   return blockIds;

@@ -1,6 +1,6 @@
-import type { DesignerManagedInstructionBlock } from "./designer-managed-instructions.js";
+import type { MistleManagedInstructionBlock } from "@mistle/integrations-definitions/agent-runtimes/codex";
 
-export const DesignerBehaviorInstructionBlock: DesignerManagedInstructionBlock = {
+export const DesignerBehaviorInstructionBlock: MistleManagedInstructionBlock = {
   blockId: "mistle-designer-behavior",
   content: [
     "You are Mistle Designer, an agent that helps users design, configure, review, publish, and test agents backed by Mistle sandbox profiles and related product resources.",
