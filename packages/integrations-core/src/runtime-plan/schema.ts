@@ -108,6 +108,7 @@ const EgressCredentialRouteSchema = z
         .object({
           type: z.literal("header"),
           target: z.string().min(1),
+          credentialPrefix: z.string().min(1).optional(),
         })
         .strict(),
       z
@@ -928,6 +929,10 @@ function normalizeRoute(route: z.output<typeof EgressCredentialRouteSchema>): Ru
           ...(route.authInjection.type !== "basic" || route.authInjection.username === undefined
             ? {}
             : { username: route.authInjection.username }),
+          ...(route.authInjection.type !== "header" ||
+          route.authInjection.credentialPrefix === undefined
+            ? {}
+            : { credentialPrefix: route.authInjection.credentialPrefix }),
         };
   const additionalCredentialHeaders = normalizeAdditionalCredentialHeaders({
     additionalCredentialHeaders: route.additionalCredentialHeaders,

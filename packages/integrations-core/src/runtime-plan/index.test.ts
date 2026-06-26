@@ -1016,6 +1016,53 @@ describe("assembleCompiledRuntimePlan", () => {
     expect(plan.egressRoutes[0]?.requestMiddleware).toEqual(["append-session-link-to-openai-text"]);
   });
 
+  it("preserves header credential prefixes in egress routes", () => {
+    const plan = CompiledRuntimePlanSchema.parse({
+      sandboxProfileId: "sbp_123",
+      version: 7,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
+      egressRoutes: [
+        {
+          egressRuleId: "egress_rule_discord",
+          bindingId: "bind_discord",
+          familyId: "discord",
+          variantId: "discord-default",
+          match: {
+            hosts: ["discord.com"],
+          },
+          upstream: {
+            baseUrl: "https://discord.com/api/v10",
+          },
+          authInjection: {
+            type: "header",
+            target: "authorization",
+            credentialPrefix: "Bot ",
+          },
+          credentialResolver: {
+            kind: "integration_connection",
+            connectionId: "conn_discord",
+            secretType: "api_key",
+            slotKey: "discord.discord-default.discord-bot.bot-token",
+          },
+        },
+      ],
+      artifacts: [],
+      workspaceSources: [],
+      runtimeClients: [],
+      agentRuntimes: [],
+    });
+
+    expect(plan.egressRoutes[0]?.authInjection).toEqual({
+      type: "header",
+      target: "authorization",
+      credentialPrefix: "Bot ",
+    });
+  });
+
   it("rejects additional egress headers that collapse to the same normalized name", () => {
     expect(() =>
       CompiledRuntimePlanSchema.parse({

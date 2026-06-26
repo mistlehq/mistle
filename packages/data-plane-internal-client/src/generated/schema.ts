@@ -485,6 +485,7 @@ export interface paths {
                       username?: string;
                     }
                   | {
+                      credentialPrefix?: string;
                       target: string;
                       /** @enum {string} */
                       type: "header";
@@ -1009,6 +1010,7 @@ export interface paths {
                         username?: string;
                       }
                     | {
+                        credentialPrefix?: string;
                         target: string;
                         /** @enum {string} */
                         type: "header";

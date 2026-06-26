@@ -14,6 +14,7 @@ import { CloudflareDefinition } from "./cloudflare/browser.js";
 import { DatadogDefinition } from "./datadog/index.js";
 import { DataForSeoDefinition } from "./dataforseo/browser.js";
 import { DeepSeekDefinition } from "./deepseek/index.js";
+import { DiscordDefinition } from "./discord/browser.js";
 import { ExpoDefinition } from "./expo/browser.js";
 import { FireworksDefinition } from "./fireworks/index.js";
 import { GcpDefinition } from "./gcp/browser.js";
@@ -66,6 +67,7 @@ export * from "./cloudflare/browser.js";
 export * from "./dataforseo/browser.js";
 export * from "./datadog/index.js";
 export * from "./deepseek/index.js";
+export * from "./discord/browser.js";
 export * from "./expo/browser.js";
 export * from "./fireworks/index.js";
 export * from "./gcp/browser.js";
@@ -118,6 +120,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   DataForSeoDefinition,
   DatadogDefinition,
   DeepSeekDefinition,
+  DiscordDefinition,
   ExpoDefinition,
   FireworksDefinition,
   GcpDefinition,

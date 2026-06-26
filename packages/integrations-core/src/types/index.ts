@@ -1005,6 +1005,12 @@ export type IntegrationProviderConfigurationSetupCompleteInput<
   webhookCallbackUrl?: string | undefined;
 };
 
+export type IntegrationProviderConfigurationSetupCompleteResult = {
+  webhookSource?: {
+    providerMetadata?: Record<string, unknown>;
+  };
+};
+
 export type IntegrationProviderConfigurationSetupFlowCapability<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -1016,7 +1022,7 @@ export type IntegrationProviderConfigurationSetupFlowCapability<
       TTargetSecrets,
       TConnectionConfig
     >,
-  ): MaybePromise<void>;
+  ): MaybePromise<void | IntegrationProviderConfigurationSetupCompleteResult>;
   methodId: IntegrationConnectionMethodId;
   requiresWebhookCallbackUrl?: boolean | undefined;
   routeSegment: string;
@@ -2009,6 +2015,7 @@ export type EgressCredentialRoute = {
     | {
         type: "header";
         target: string;
+        credentialPrefix?: string;
       }
     | {
         type: "query";

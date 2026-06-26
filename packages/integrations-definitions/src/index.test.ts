@@ -1425,6 +1425,7 @@ describe("integrations-definitions index", () => {
       "dataforseo::dataforseo-mcp",
       "datadog::datadog-default",
       "deepseek::deepseek-default",
+      "discord::discord-default",
       "expo::expo-mcp",
       "fireworks::fireworks-default",
       "gcp::gcp-mcp",

@@ -45,6 +45,7 @@ const RuntimePlanSchema = z.object({
         z.object({
           type: z.literal("header"),
           target: z.string().min(1),
+          credentialPrefix: z.string().min(1).optional(),
         }),
         z.object({
           type: z.literal("query"),

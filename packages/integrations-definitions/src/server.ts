@@ -16,6 +16,7 @@ import { CloudflareDefinition } from "./cloudflare/server.js";
 import { DatadogDefinition } from "./datadog/index.js";
 import { DataForSeoDefinition } from "./dataforseo/server.js";
 import { DeepSeekDefinition } from "./deepseek/index.js";
+import { DiscordDefinition } from "./discord/server.js";
 import { resolveDefinitionEgressCredentialResolver } from "./egress-credential-resolver.server.js";
 import { resolveDefinitionEgressRequestMiddleware } from "./egress-request-middleware.server.js";
 import { ExpoDefinition } from "./expo/server.js";
@@ -70,6 +71,7 @@ export * from "./cloudflare/server.js";
 export * from "./dataforseo/server.js";
 export * from "./datadog/index.js";
 export * from "./deepseek/index.js";
+export * from "./discord/server.js";
 export * from "./egress-credential-resolver.server.js";
 export * from "./egress-request-middleware.server.js";
 export * from "./egress-telemetry.server.js";
@@ -128,6 +130,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   DataForSeoDefinition,
   DatadogDefinition,
   DeepSeekDefinition,
+  DiscordDefinition,
   ExpoDefinition,
   FireworksDefinition,
   GcpDefinition,

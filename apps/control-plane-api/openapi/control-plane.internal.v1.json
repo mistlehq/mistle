@@ -1820,6 +1820,10 @@
                                       "target": {
                                         "type": "string",
                                         "minLength": 1
+                                      },
+                                      "credentialPrefix": {
+                                        "type": "string",
+                                        "minLength": 1
                                       }
                                     },
                                     "required": ["type", "target"],

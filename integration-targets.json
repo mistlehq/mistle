@@ -49,6 +49,13 @@
       "config": {}
     },
     {
+      "targetKey": "discord-default",
+      "enabled": true,
+      "config": {
+        "api_base_url": "https://discord.com/api/v10"
+      }
+    },
+    {
       "targetKey": "expo-mcp",
       "enabled": true,
       "config": {}

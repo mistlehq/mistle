@@ -1,0 +1,12 @@
+export * from "./variants/discord-default/auth.js";
+export * from "./variants/discord-default/base-definition.js";
+export * from "./variants/discord-default/binding-config-form.js";
+export * from "./variants/discord-default/binding-config-schema.js";
+export * from "./variants/discord-default/compile-binding.js";
+export * from "./variants/discord-default/connection-config-form.js";
+export * from "./variants/discord-default/supported-webhook-events.js";
+export * from "./variants/discord-default/target-config-schema.js";
+export * from "./variants/discord-default/target-secret-schema.js";
+export * from "./variants/discord-default/tool-ids.js";
+export * from "./shared/resource-definitions.js";
+export { DiscordBaseDefinition as DiscordDefinition } from "./variants/discord-default/base-definition.js";

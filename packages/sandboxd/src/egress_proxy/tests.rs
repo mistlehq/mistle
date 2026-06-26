@@ -1397,6 +1397,7 @@ fn sample_runtime_plan() -> CompiledRuntimePlan {
                 r#type: CompiledEgressRouteAuthInjectionType::Bearer,
                 target: None,
                 username: None,
+                credential_prefix: None,
                 service: None,
                 region: None,
             },
