@@ -10,7 +10,7 @@ import {
 const integrationRegistry = createIntegrationRegistry();
 
 describe("profile version runtime config", () => {
-  it("creates an empty default runtime config for new profile versions", () => {
+  it("defaults new profile versions to the configured Mistle managed provider", () => {
     expect(
       createDefaultProfileVersionRuntimeConfig({
         integrationRegistry,
@@ -25,6 +25,29 @@ describe("profile version runtime config", () => {
           tensorlake: {
             enabled: true,
             apiKey: "tensorlake-api-key",
+          },
+        },
+      }),
+    ).toEqual({
+      sandboxProvider: SandboxProvider.TENSORLAKE,
+      sandboxConnectionId: null,
+      sandboxVcpuCount: 2,
+      sandboxMemoryMb: 8192,
+      sandboxDiskMb: 10240,
+    });
+  });
+
+  it("keeps new profile versions unconfigured when no managed provider is available", () => {
+    expect(
+      createDefaultProfileVersionRuntimeConfig({
+        integrationRegistry,
+        sandboxConfig: {
+          defaultBaseImage: "tensorlake:image:mistle-base",
+          gatewayWsUrl: "wss://gateway.example.com/tunnel/sandbox",
+          bootstrap: {
+            tokenSecret: "bootstrap-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "data-plane-gateway",
           },
         },
       }),

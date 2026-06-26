@@ -43,6 +43,18 @@ export type SandboxRuntimeConfigValidationIssue = {
   targetKey?: string;
 };
 
+const ManagedSandboxProviderPreference = [
+  SandboxProvider.TENSORLAKE,
+  SandboxProvider.E2B,
+  SandboxProvider.DOCKER,
+] as const;
+
+const MistleSandboxResourceBaseline = {
+  vcpuCount: 2,
+  memoryMb: 8192,
+  diskMb: 10240,
+} satisfies SandboxProfileVersionResources;
+
 export function createWorkflowSandboxRuntime(
   runtimeConfig: SandboxProfileVersionRuntimeConfig,
 ): SandboxRuntimeProviderInput {
@@ -89,13 +101,115 @@ export function createDefaultProfileVersionRuntimeConfig(input: {
   integrationRegistry: IntegrationRegistry;
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
 }): SandboxProfileVersionRuntimeConfigColumns {
-  void input;
+  const managedProvider = resolveManagedSandboxProvider(input);
+  if (managedProvider !== null) {
+    return {
+      sandboxProvider: managedProvider,
+      sandboxConnectionId: null,
+      ...mapProfileVersionResourcesToColumns(
+        createDefaultMistleSandboxResources({
+          integrationRegistry: input.integrationRegistry,
+          providerId: managedProvider,
+        }),
+      ),
+    };
+  }
+
   return {
     sandboxProvider: null,
     sandboxConnectionId: null,
     sandboxVcpuCount: null,
     sandboxMemoryMb: null,
     sandboxDiskMb: null,
+  };
+}
+
+function resolveManagedSandboxProvider(input: {
+  integrationRegistry: IntegrationRegistry;
+  sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
+}): SandboxProvider | null {
+  const managedProviders = listManagedSandboxProviders(input);
+  for (const provider of ManagedSandboxProviderPreference) {
+    if (managedProviders.includes(provider)) {
+      return provider;
+    }
+  }
+
+  return managedProviders[0] ?? null;
+}
+
+function listManagedSandboxProviders(input: {
+  integrationRegistry: IntegrationRegistry;
+  sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
+}): SandboxProvider[] {
+  const providers: SandboxProvider[] = [];
+
+  if (input.sandboxConfig.docker?.enabled === true) {
+    providers.push(SandboxProvider.DOCKER);
+  }
+
+  for (const provider of [
+    SandboxProvider.E2B,
+    SandboxProvider.MODAL,
+    SandboxProvider.OPENCOMPUTER,
+    SandboxProvider.TENSORLAKE,
+  ]) {
+    const definition = findSandboxRuntimeDefinition({
+      integrationRegistry: input.integrationRegistry,
+      providerId: provider,
+    });
+    if (
+      definition !== undefined &&
+      validateManagedSandboxProviderAvailability({
+        providerId: provider,
+        sandboxConfig: input.sandboxConfig,
+      }).length === 0
+    ) {
+      providers.push(provider);
+    }
+  }
+
+  return providers;
+}
+
+function createDefaultMistleSandboxResources(input: {
+  integrationRegistry: IntegrationRegistry;
+  providerId: SandboxProvider;
+}): SandboxProfileVersionResources | null {
+  if (input.providerId === SandboxProvider.DOCKER) {
+    return null;
+  }
+
+  const capabilities = findSandboxRuntimeResourceCapabilities({
+    integrationRegistry: input.integrationRegistry,
+    providerId: input.providerId,
+  });
+
+  return {
+    vcpuCount: MistleSandboxResourceBaseline.vcpuCount,
+    memoryMb: MistleSandboxResourceBaseline.memoryMb,
+    ...(capabilities.diskMb === undefined ? {} : { diskMb: MistleSandboxResourceBaseline.diskMb }),
+  };
+}
+
+function mapProfileVersionResourcesToColumns(
+  resources: SandboxProfileVersionResources | null,
+): Pick<
+  SandboxProfileVersionRuntimeConfigColumns,
+  "sandboxVcpuCount" | "sandboxMemoryMb" | "sandboxDiskMb"
+> {
+  if (resources === null) {
+    return {
+      sandboxVcpuCount: null,
+      sandboxMemoryMb: null,
+      sandboxDiskMb: null,
+    };
+  }
+
+  return {
+    sandboxVcpuCount: resources.vcpuCount,
+    sandboxMemoryMb: resources.memoryMb,
+    sandboxDiskMb: resources.diskMb ?? null,
   };
 }
 
