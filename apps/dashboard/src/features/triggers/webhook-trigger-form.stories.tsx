@@ -418,7 +418,6 @@ export const EditPageLayout: Story = {
   args: {
     mode: "edit",
     onDelete: function onDelete() {},
-    onViewActivity: function onViewActivity() {},
     values: ExistingTriggerValues,
   },
 };
@@ -427,7 +426,6 @@ export const EditPageWithTopActions: Story = {
   args: {
     mode: "edit",
     onDelete: function onDelete() {},
-    onViewActivity: function onViewActivity() {},
     primaryRepositoryOptions: [
       {
         value: "mistlehq/company-os",
@@ -450,7 +448,6 @@ export const EditPageWithSlackMessageAndReactionFilters: Story = {
   args: {
     mode: "edit",
     onDelete: function onDelete() {},
-    onViewActivity: function onViewActivity() {},
     values: ExistingSlackMessageAndReactionTriggerValues,
     webhookEventOptions: SlackWebhookEventOptions,
   },
@@ -460,7 +457,6 @@ export const EditPageWithInvalidSlackInvocationToken: Story = {
   args: {
     mode: "edit",
     onDelete: function onDelete() {},
-    onViewActivity: function onViewActivity() {},
     fieldErrors: {
       eventParameterRules: {
         triggerId: StorySlackMessageConditionId,

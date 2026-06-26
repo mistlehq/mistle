@@ -14,6 +14,7 @@ import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { sandboxProfileVersionTriggerConfigQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { ScheduledTriggerSameConversationKeyTemplate } from "../triggers/scheduled-trigger-form-helpers.js";
 import type { ScheduledTrigger } from "../triggers/scheduled-triggers-types.js";
+import { createProfileTriggerActivityPath } from "../triggers/trigger-editor-navigation.js";
 import {
   triggerActivityQueryKey,
   triggerDetailQueryKey,
@@ -552,6 +553,10 @@ describe("TriggerEditorContent", () => {
       <QueryClientProvider client={queryClient}>
         <TriggerEditorContent
           triggerId={ScheduleTriggerId}
+          activityPath={createProfileTriggerActivityPath({
+            profileId: SandboxProfileId,
+            triggerId: ScheduleTriggerId,
+          })}
           backPath="/sandbox-profiles/sbp_schedule_profile/triggers"
           deleteSuccessPath="/sandbox-profiles/sbp_schedule_profile/triggers"
           navigate={() => {}}

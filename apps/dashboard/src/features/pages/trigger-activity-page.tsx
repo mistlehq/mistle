@@ -11,6 +11,7 @@ import { FormPageSection } from "../shared/form-page.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { UnavailableResourceState } from "../shared/unavailable-resource-state.js";
 import { TriggerActivitySection } from "../triggers/trigger-activity-section.js";
+import { createTriggerDetailPath } from "../triggers/trigger-editor-navigation.js";
 import { triggerDetailQueryKey } from "../triggers/triggers-query-keys.js";
 import { getTrigger } from "../triggers/triggers-service.js";
 import {
@@ -157,7 +158,7 @@ export function TriggerActivityPage(): React.JSX.Element {
   return (
     <TriggerActivityContent
       triggerId={triggerId}
-      backPath={`/triggers/${encodeURIComponent(triggerId)}`}
+      backPath={createTriggerDetailPath(triggerId)}
       navigate={navigate}
       renderFrame={renderFrame}
     />

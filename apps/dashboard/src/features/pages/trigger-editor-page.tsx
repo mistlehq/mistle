@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router";
 import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { createTriggerActivityPath } from "../triggers/trigger-editor-navigation.js";
 import { TriggerEditorContent } from "./trigger-editor-content.js";
 import type { TriggerEditorFrameRenderer } from "./trigger-editor-frame.js";
 
@@ -40,6 +41,7 @@ export function TriggerEditorPage(): React.JSX.Element {
   return (
     <TriggerEditorContent
       triggerId={triggerId}
+      activityPath={createTriggerActivityPath(triggerId)}
       backPath="/triggers"
       deleteSuccessPath="/triggers"
       navigate={navigate}

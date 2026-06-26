@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { createTriggerDetailPath } from "../triggers/trigger-editor-navigation.js";
 import { triggerActivityQueryKey, triggerDetailQueryKey } from "../triggers/triggers-query-keys.js";
 import type { TriggerActivityResult, TriggerListItem } from "../triggers/triggers-types.js";
 import { TriggerActivityContent } from "./trigger-activity-page.js";
@@ -170,7 +171,7 @@ function TriggerActivityPageStoryHarness(input: {
     <QueryClientProvider client={queryClient}>
       <TriggerActivityContent
         triggerId={input.trigger.id}
-        backPath={`/triggers/${input.trigger.id}`}
+        backPath={createTriggerDetailPath(input.trigger.id)}
         navigate={() => {}}
       />
     </QueryClientProvider>

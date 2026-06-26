@@ -10,7 +10,7 @@ import {
 import { CalendarDotsIcon, PlusIcon, WebhooksLogoIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
+import { useMatch, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { IntegrationLogo } from "../integrations/integration-logo.js";
@@ -35,6 +35,7 @@ import { ActionTile } from "../shared/action-tile.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import {
+  createProfileTriggerActivityPath,
   createProfileTriggerDetailPath,
   createProfileTriggersPath,
 } from "../triggers/trigger-editor-navigation.js";
@@ -328,9 +329,13 @@ function ProfileTriggerListRow(input: {
 }
 
 function ProfileTriggerDetail(input: { profileId: string }): React.JSX.Element {
-  const location = useLocation();
   const navigate = useNavigate();
   const params = useParams();
+  const [searchParams] = useSearchParams();
+  const activityRouteMatch = useMatch({
+    path: "/sandbox-profiles/:profileId/triggers/:triggerId/activity",
+    end: true,
+  });
   const triggerId = params["triggerId"];
   const backPath = createProfileTriggersPath(input.profileId);
 
@@ -342,11 +347,24 @@ function ProfileTriggerDetail(input: { profileId: string }): React.JSX.Element {
     );
   }
 
-  if (location.pathname.endsWith("/activity")) {
+  const activityPath = createProfileTriggerActivityPath({
+    profileId: input.profileId,
+    triggerId,
+    searchParams,
+  });
+  const isActivityRoute =
+    activityRouteMatch?.params["profileId"] === input.profileId &&
+    activityRouteMatch.params["triggerId"] === triggerId;
+
+  if (isActivityRoute) {
     return (
       <TriggerActivityContent
         triggerId={triggerId}
-        backPath={`${backPath}/${encodeURIComponent(triggerId)}`}
+        backPath={createProfileTriggerDetailPath({
+          profileId: input.profileId,
+          triggerId,
+          searchParams,
+        })}
         navigate={navigate}
         requiredSandboxProfileId={input.profileId}
       />
@@ -356,6 +374,7 @@ function ProfileTriggerDetail(input: { profileId: string }): React.JSX.Element {
   return (
     <TriggerEditorContent
       triggerId={triggerId}
+      activityPath={activityPath}
       backPath={backPath}
       deleteSuccessPath={backPath}
       navigate={navigate}
