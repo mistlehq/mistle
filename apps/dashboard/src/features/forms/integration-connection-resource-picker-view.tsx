@@ -8,7 +8,6 @@ import {
   ComboboxItem,
   ComboboxList,
   FieldError,
-  Notice,
   useComboboxAnchor,
 } from "@mistle/ui";
 import { ArrowClockwiseIcon } from "@phosphor-icons/react";
@@ -33,13 +32,9 @@ export type IntegrationConnectionResourcePickerResource = {
 };
 
 export type IntegrationConnectionResourcePickerDensity = "default" | "compact";
-export type IntegrationConnectionResourcePickerAlertMessagePresentation = "notice" | "field-error";
 
 export type IntegrationConnectionResourcePickerViewProps = {
   density?: IntegrationConnectionResourcePickerDensity | undefined;
-  alertMessagePresentation?:
-    | IntegrationConnectionResourcePickerAlertMessagePresentation
-    | undefined;
   id: string;
   label: string;
   resourceLabelPlural?: string | undefined;
@@ -75,11 +70,10 @@ export function toIntegrationConnectionResourcePickerItems(
 function IntegrationResourceMessageSection(input: {
   message: string;
   variant: "default" | "alert";
-  alertMessagePresentation: IntegrationConnectionResourcePickerAlertMessagePresentation;
   detail?: string | undefined;
   items?: readonly string[] | undefined;
 }): React.JSX.Element {
-  if (input.variant === "alert" && input.alertMessagePresentation === "field-error") {
+  if (input.variant === "alert") {
     return (
       <FieldError className="text-xs whitespace-nowrap">
         {formatCompactAlertMessage({
@@ -91,14 +85,7 @@ function IntegrationResourceMessageSection(input: {
     );
   }
 
-  return (
-    <Notice title={input.message} variant={input.variant}>
-      <div className="flex flex-col gap-1">
-        {input.detail === undefined ? null : <p>{input.detail}</p>}
-        <ResourceMessageItems items={input.items} />
-      </div>
-    </Notice>
-  );
+  return <p className="text-muted-foreground text-sm">{input.message}</p>;
 }
 
 function formatCompactAlertMessage(input: {
@@ -115,26 +102,9 @@ function formatCompactAlertMessage(input: {
   return `${messageWithDetail} ${input.items.join(", ")}`;
 }
 
-function ResourceMessageItems(input: {
-  items: readonly string[] | undefined;
-}): React.JSX.Element | null {
-  if (input.items === undefined) {
-    return null;
-  }
-
-  return (
-    <ul className="list-disc pl-5">
-      {input.items.map((item) => (
-        <li key={item}>{item}</li>
-      ))}
-    </ul>
-  );
-}
-
 function ResourceMessages(input: {
   viewModel: IntegrationResourcePickerViewModel;
   variant?: "default" | "alert";
-  alertMessagePresentation: IntegrationConnectionResourcePickerAlertMessagePresentation;
 }): React.JSX.Element | null {
   const messageSections =
     input.variant === undefined
@@ -149,7 +119,6 @@ function ResourceMessages(input: {
     <div className="flex flex-col gap-2">
       {messageSections.map((section) => (
         <IntegrationResourceMessageSection
-          alertMessagePresentation={input.alertMessagePresentation}
           detail={section.detail}
           items={section.items}
           key={`${section.variant}:${section.message}`}
@@ -170,7 +139,6 @@ function ComboboxLayout(input: {
   const anchorRef = useComboboxAnchor();
   const [isOpen, setIsOpen] = useState(false);
   const density = input.props.density ?? "default";
-  const alertMessagePresentation = input.props.alertMessagePresentation ?? "field-error";
   const selectAllRef = useCallback(
     (element: HTMLInputElement | null) => {
       if (element) {
@@ -288,11 +256,7 @@ function ComboboxLayout(input: {
             />
           </ComboboxChips>
         </div>
-        <ResourceMessages
-          alertMessagePresentation={alertMessagePresentation}
-          variant="alert"
-          viewModel={input.viewModel}
-        />
+        <ResourceMessages variant="alert" viewModel={input.viewModel} />
       </div>
 
       {isOpen ? (
@@ -343,11 +307,7 @@ function ComboboxLayout(input: {
           </div>
           <div className={listWrapperClassName}>
             {hasVisibleItems ? (
-              <ResourceMessages
-                alertMessagePresentation={alertMessagePresentation}
-                variant="default"
-                viewModel={input.viewModel}
-              />
+              <ResourceMessages variant="default" viewModel={input.viewModel} />
             ) : null}
             <ComboboxList className={listClassName}>
               {input.props.visibleItems.map((resource) => (
