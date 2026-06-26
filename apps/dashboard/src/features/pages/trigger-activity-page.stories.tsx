@@ -76,6 +76,24 @@ const WebhookActivity = {
       externalDeliveryId: "github-delivery-9928",
       status: "processing",
     },
+    {
+      id: "iwe_story_activity_page_duplicate",
+      sourceOccurredAt: "2026-06-24T06:34:00.000Z",
+      finalizedAt: "2026-06-24T06:34:02.000Z",
+      eventType: "github.pull_request.opened",
+      providerEventType: "pull_request",
+      externalDeliveryId: "github-delivery-9924",
+      status: "duplicate",
+    },
+    {
+      id: "iwe_story_activity_page_missing_source_time",
+      sourceOccurredAt: null,
+      finalizedAt: "2026-06-24T06:20:00.000Z",
+      eventType: "github.push.deleted",
+      providerEventType: "push",
+      externalDeliveryId: null,
+      status: "ignored",
+    },
   ],
 } satisfies TriggerActivityResult;
 
@@ -96,7 +114,26 @@ const ScheduledActivity = {
       localScheduledTime: "09:00",
       status: "dispatched",
     },
+    {
+      id: "sca_story_activity_page_failed",
+      scheduledAt: "2026-06-23T01:00:00.000Z",
+      localScheduledDate: "2026-06-23",
+      localScheduledTime: "09:00",
+      status: "failed",
+    },
+    {
+      id: "sca_story_activity_page_skipped_late",
+      scheduledAt: "2026-06-22T01:00:00.000Z",
+      localScheduledDate: "2026-06-22",
+      localScheduledTime: "09:00",
+      status: "skipped_late",
+    },
   ],
+} satisfies TriggerActivityResult;
+
+const EmptyWebhookActivity = {
+  kind: "webhook",
+  items: [],
 } satisfies TriggerActivityResult;
 
 function createTriggerActivityPageQueryClient(input: {
@@ -164,5 +201,12 @@ export const ScheduledRuns: Story = {
   args: {
     trigger: ScheduledTrigger,
     activity: ScheduledActivity,
+  },
+};
+
+export const EmptyWebhook: Story = {
+  args: {
+    trigger: WebhookTrigger,
+    activity: EmptyWebhookActivity,
   },
 };
