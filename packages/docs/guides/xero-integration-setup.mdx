@@ -1,0 +1,72 @@
+---
+title: Xero
+description: Connect Xero to Mistle
+icon: /icons/integrations/xero.svg
+---
+
+## Overview
+
+Xero connects to Mistle with OAuth 2.0 authorization code flow.
+
+After authorization, Mistle exposes Xero through the Xero MCP tools in sandbox profiles. The tools can list connected tenants and make authenticated requests to the Xero Accounting, Files, Assets, and Projects API families.
+
+## Prerequisites
+
+- A Xero account with access to the organization you want to connect
+- A Xero OAuth 2.0 app in the [Xero Developer portal](https://developer.xero.com/)
+- The Mistle OAuth callback URL shown during connection setup
+- A Xero client ID and client secret
+
+## Configure Xero
+
+Create or open your OAuth 2.0 app in the Xero Developer portal, then add the Mistle callback URL as an allowed redirect URI.
+
+Xero does not support wildcard redirect URIs. Use the exact callback URL shown in Mistle.
+
+## Connect in Mistle
+
+In Mistle, choose **Xero**, then connect with:
+
+| Field         | Value                      |
+| ------------- | -------------------------- |
+| Client ID     | Xero OAuth client ID       |
+| Client secret | Xero OAuth client secret   |
+| Scopes        | Xero OAuth scopes to grant |
+
+Mistle defaults to the minimum scope needed to keep the connection refreshable:
+
+- `offline_access`
+
+Xero requires `offline_access` when the connection should receive a refresh token and stay connected after the short-lived access token expires.
+
+Add the specific Xero API scopes needed for the endpoints your agents will use. Xero apps created on or after March 2, 2026 use granular scopes, so use the current granular scopes from Xero's developer documentation instead of broad legacy scopes such as `accounting.transactions`.
+
+## Use Xero MCP
+
+After the connection is authorized, bind Xero to a sandbox profile. Sessions using that profile can call:
+
+- `xero_tenants_list`
+- `xero_api_get`
+- `xero_api_post`
+- `xero_api_put`
+- `xero_api_delete`
+
+Call `xero_tenants_list` first to find the `tenantId` for the Xero organization. API calls then require:
+
+| Field      | Value                                                                       |
+| ---------- | --------------------------------------------------------------------------- |
+| `family`   | `accounting`, `files`, `assets`, or `projects`                              |
+| `tenantId` | Xero tenant ID returned by `xero_tenants_list`                              |
+| `endpoint` | Xero endpoint path, such as `/Invoices`, `/Contacts`, or `/Files`           |
+| `body`     | JSON request body for `POST` and `PUT` requests, when the endpoint needs it |
+
+## Current Limitations
+
+Xero webhooks are not configured by the Mistle Xero integration yet.
+
+## Official References
+
+- [Xero OAuth 2.0 authorization code flow](https://developer.xero.com/documentation/guides/oauth2/auth-flow/)
+- [Xero OAuth 2.0 scopes](https://developer.xero.com/documentation/guides/oauth2/scopes/)
+- [Xero granular scopes FAQ](https://developer.xero.com/faq/granular-scopes)
+- [Xero tenants](https://developer.xero.com/documentation/guides/oauth2/tenants)

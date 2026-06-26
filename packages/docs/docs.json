@@ -79,6 +79,7 @@
               "guides/supabase-integration-setup",
               "guides/tensorlake-integration-setup",
               "guides/whapi-integration-setup",
+              "guides/xero-integration-setup",
               "guides/zai-integration-setup"
             ]
           }

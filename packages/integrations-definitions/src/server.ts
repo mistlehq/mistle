@@ -58,6 +58,7 @@ import { StripeDefinition } from "./stripe/server.js";
 import { SupabaseDefinition } from "./supabase/server.js";
 import { WasenderApiDefinition } from "./wasenderapi/server.js";
 import { WhapiDefinition } from "./whapi/server.js";
+import { XeroDefinition } from "./xero/server.js";
 import { ZaiDefinition } from "./zai/index.js";
 
 export * from "./agentmail/server.js";
@@ -107,6 +108,7 @@ export * from "./stripe/server.js";
 export * from "./supabase/server.js";
 export * from "./wasenderapi/server.js";
 export * from "./whapi/server.js";
+export * from "./xero/server.js";
 export * from "./zai/index.js";
 export * from "./forms/index.js";
 export * from "./agent-runtimes/provider-selection.js";
@@ -164,6 +166,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   SupabaseDefinition,
   WasenderApiDefinition,
   WhapiDefinition,
+  XeroDefinition,
   ZaiDefinition,
 ];
 

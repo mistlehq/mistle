@@ -339,6 +339,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "xero-mcp",
+        familyId: "xero",
+        variantId: "xero-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "zai-coding-plan",
         familyId: "zai",
         variantId: "zai-coding-plan",

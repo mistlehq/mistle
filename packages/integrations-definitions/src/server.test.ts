@@ -148,6 +148,10 @@ describe("integrations-definitions server", () => {
       familyId: "whapi",
       variantId: "whapi-mcp",
     });
+    const xeroDefinition = registry.getDefinition({
+      familyId: "xero",
+      variantId: "xero-mcp",
+    });
     const sentryDefinition = registry.getDefinition({
       familyId: "sentry",
       variantId: "sentry-mcp",
@@ -487,6 +491,24 @@ describe("integrations-definitions server", () => {
     });
     expect(whapiDefinition?.webhookHandler).toBeDefined();
     expect(whapiDefinition?.webhookSource).toBeDefined();
+    expect(xeroDefinition).toMatchObject({
+      familyId: "xero",
+      variantId: "xero-mcp",
+      kind: "connector",
+      displayName: "Xero",
+      logoKey: "xero",
+      connectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "Xero OAuth",
+          kind: "redirect",
+        },
+      ],
+    });
+    expect(xeroDefinition?.mcp).toBeDefined();
+    expect(xeroDefinition?.oauth2AuthorizationCode).toBeDefined();
+    expect(xeroDefinition?.webhookHandler).toBeUndefined();
+    expect(xeroDefinition?.webhookSource).toBeUndefined();
     expect(notionDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(notionDefinition?.webhookHandler).toBeUndefined();
     expect(notionDefinition?.webhookSource).toBeUndefined();
@@ -598,6 +620,7 @@ describe("integrations-definitions server", () => {
         "supabase::supabase-mcp",
         "wasenderapi::wasenderapi-mcp",
         "whapi::whapi-mcp",
+        "xero::xero-mcp",
         "zai::zai-coding-plan",
       ]),
     );
