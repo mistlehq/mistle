@@ -24,6 +24,7 @@ import {
 import type { CreatedFormIntegrationConnection, ManagedWebhookSetupResult } from "../schemas.js";
 import { buildIntegrationConnectionResponse } from "./build-integration-connection-response.js";
 import {
+  buildFormConnectionConfigForMethodOrThrow,
   buildFormConnectionMethodContextOrThrow,
   parseFormConnectionConfigOrThrow,
   parseCreateFormSecretsOrThrow,
@@ -133,14 +134,20 @@ export async function createFormConnection(
     connectionMethods: definition.connectionMethods,
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
   });
+  const configWithConnectionMethod = buildFormConnectionConfigForMethodOrThrow({
+    targetKey: input.targetKey,
+    methodId: input.methodId,
+    config: input.config,
+    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
+  });
   const parsedConfig = parseFormConnectionConfigOrThrow({
     targetKey: input.targetKey,
     method: formMethod,
-    config: input.config,
+    config: configWithConnectionMethod,
     formContext: buildFormConnectionMethodContextOrThrow({
       targetKey: input.targetKey,
       target,
-      currentValue: input.config,
+      currentValue: configWithConnectionMethod,
       definition,
       invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
     }),
@@ -180,10 +187,7 @@ export async function createFormConnection(
           targetKey: input.targetKey,
           displayName: input.displayName,
           status: IntegrationConnectionStatuses.ACTIVE,
-          config: {
-            ...parsedConfig,
-            connection_method: input.methodId,
-          },
+          config: parsedConfig,
           targetSnapshotConfig: target.config,
         })
         .returning();
@@ -230,10 +234,7 @@ export async function createFormConnection(
           connection: {
             id: createdConnection.id,
             status: createdConnection.status,
-            config: {
-              ...parsedConfig,
-              connection_method: input.methodId,
-            },
+            config: parsedConfig,
           },
         })) ??
           true)
