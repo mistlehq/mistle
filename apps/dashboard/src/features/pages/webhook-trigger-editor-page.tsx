@@ -94,6 +94,7 @@ export function EditWebhookTriggerEditor(input: {
   navigate: (to: string) => void | Promise<void>;
   backPath?: string | undefined;
   deleteSuccessPath?: string | undefined;
+  duplicateSuccessPath?: TriggerCreateSuccessPath | undefined;
   activityPath: string;
   renderFrame?: TriggerEditorFrameRenderer;
 }): React.JSX.Element | null {
@@ -186,6 +187,9 @@ export function EditWebhookTriggerEditor(input: {
         {...(input.deleteSuccessPath === undefined
           ? {}
           : { deleteSuccessPath: input.deleteSuccessPath })}
+        {...(input.duplicateSuccessPath === undefined
+          ? {}
+          : { duplicateSuccessPath: input.duplicateSuccessPath })}
         activityPath={input.activityPath}
         initialValues={initialValues}
         preservedWebhookSourceId={triggerQuery.data.integrationWebhookSourceId}
@@ -206,6 +210,7 @@ function LoadedWebhookTriggerEditor(input: {
   triggerTypeField?: ReactNode;
   navigate: (to: string) => void | Promise<void>;
   createSuccessPath?: TriggerCreateSuccessPath;
+  duplicateSuccessPath?: TriggerCreateSuccessPath;
   deleteSuccessPath?: string;
   activityPath?: string;
   initialValues: ReturnType<typeof toWebhookTriggerFormValues>;
@@ -228,6 +233,7 @@ function LoadedWebhookTriggerEditor(input: {
       connectionOptions={state.connectionOptions}
       fieldErrors={state.fieldErrors}
       formError={state.formError}
+      formErrorTitle={state.formErrorTitle}
       validationSummaryError={state.validationSummaryError}
       isDeleting={state.isDeleting}
       isDuplicating={state.isDuplicating}

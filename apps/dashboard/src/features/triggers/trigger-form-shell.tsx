@@ -54,6 +54,7 @@ type TriggerFormShellProps = {
   fieldErrors: Partial<Record<CommonTriggerFormValueKey, string>>;
   validationSummaryError: string | null;
   formError: string | null;
+  formErrorTitle: string;
   isSaving: boolean;
   isDeleting: boolean;
   isDuplicating: boolean;
@@ -291,7 +292,7 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
       ) : null}
 
       {input.formError === null ? null : (
-        <Notice title="Trigger could not be saved" variant="alert">
+        <Notice title={input.formErrorTitle} variant="alert">
           {input.formError}
         </Notice>
       )}

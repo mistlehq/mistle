@@ -705,6 +705,35 @@ describe("WebhookTriggerForm", () => {
     ).toBeDefined();
   });
 
+  it("shows duplicate failures with the duplicate action title", () => {
+    render(
+      <QueryClientProvider client={TestQueryClient}>
+        <WebhookTriggerForm
+          connectionOptions={ConnectionOptions}
+          fieldErrors={{}}
+          formError="Could not duplicate trigger."
+          formErrorTitle="Trigger could not be duplicated"
+          validationSummaryError={null}
+          isDeleting={false}
+          isDuplicating={false}
+          isSaving={false}
+          mode="edit"
+          onDelete={() => {}}
+          onDuplicate={() => {}}
+          onSubmit={() => {}}
+          onValueChange={() => {}}
+          sandboxProfileOptions={SandboxProfileOptions}
+          triggerPickerDisabledState={null}
+          webhookEventOptions={WebhookEventOptions}
+          values={FormValues}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Trigger could not be duplicated")).toBeDefined();
+    expect(screen.getByText("Could not duplicate trigger.")).toBeDefined();
+  });
+
   it("shows the no-trigger helper copy under the message template editor", () => {
     renderFormWithOptions({
       mode: "create",

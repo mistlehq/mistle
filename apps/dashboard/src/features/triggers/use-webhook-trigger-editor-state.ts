@@ -247,6 +247,7 @@ type LoadedWebhookTriggerEditorStateInput = {
   triggerId: string | undefined;
   navigate: NavigateFunction;
   createSuccessPath?: TriggerCreateSuccessPath;
+  duplicateSuccessPath?: TriggerCreateSuccessPath;
   deleteSuccessPath?: string;
   initialValues: WebhookTriggerFormValues;
   initialSandboxProfileVersion?: number;
@@ -352,6 +353,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
   fieldErrors: WebhookTriggerFormFieldErrors;
   validationSummaryError: string | null;
   formError: string | null;
+  formErrorTitle: string;
   deleteError: string | null;
   isDeleteDialogOpen: boolean;
   isDeleting: boolean;
@@ -372,6 +374,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
   const [fieldErrors, setFieldErrors] = useState<WebhookTriggerFormFieldErrors>({});
   const [validationSummaryError, setValidationSummaryError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [formErrorTitle, setFormErrorTitle] = useState("Trigger could not be saved");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const selectedProfileId = formValues.sandboxProfileId.trim();
@@ -531,6 +534,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
       });
       setValidationSummaryError(null);
       setFormError(null);
+      setFormErrorTitle("Trigger could not be saved");
       await invalidateTriggersQuery(queryClient);
       await input.navigate(
         input.createSuccessPath === undefined
@@ -539,6 +543,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
       );
     },
     onError: (error: unknown) => {
+      setFormErrorTitle("Trigger could not be saved");
       setFormError(
         resolveTriggerMutationErrorMessage({
           error,
@@ -570,9 +575,11 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
       setFieldErrors({});
       setValidationSummaryError(null);
       setFormError(null);
+      setFormErrorTitle("Trigger could not be saved");
       await invalidateTriggersQuery(queryClient);
     },
     onError: (error: unknown) => {
+      setFormErrorTitle("Trigger could not be saved");
       setFormError(
         resolveTriggerMutationErrorMessage({
           error,
@@ -618,9 +625,14 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
     },
     onSuccess: async (trigger) => {
       await invalidateTriggersListQuery(queryClient);
-      await input.navigate(`/triggers/${trigger.id}`);
+      await input.navigate(
+        input.duplicateSuccessPath === undefined
+          ? `/triggers/${trigger.id}`
+          : input.duplicateSuccessPath(trigger),
+      );
     },
     onError: (error: unknown) => {
+      setFormErrorTitle("Trigger could not be duplicated");
       setFormError(
         resolveTriggerMutationErrorMessage({
           error,
@@ -708,6 +720,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
   }
 
   function onSubmit(): void {
+    setFormErrorTitle("Trigger could not be saved");
     const nextFieldErrors = validateWebhookTriggerFormValues(formValues, webhookEventOptions);
     if (hasActiveProfileVersion === false) {
       nextFieldErrors.sandboxProfileId = resolveNoActiveProfileVersionMessage({
@@ -758,6 +771,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
     fieldErrors,
     validationSummaryError,
     formError,
+    formErrorTitle,
     deleteError,
     isDeleteDialogOpen,
     isDeleting: deleteMutation.isPending,

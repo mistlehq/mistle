@@ -31,6 +31,7 @@ type ScheduledTriggerFormProps = {
   fieldErrors: Partial<Record<ScheduledTriggerFormValueKey, string>>;
   validationSummaryError: string | null;
   formError: string | null;
+  formErrorTitle?: string;
   isSaving: boolean;
   isDeleting: boolean;
   isDuplicating: boolean;
@@ -180,6 +181,7 @@ export function ScheduledTriggerForm(input: ScheduledTriggerFormProps): React.JS
         : { triggerTypeField: input.triggerTypeField })}
       fieldErrors={input.fieldErrors}
       formError={input.formError}
+      formErrorTitle={input.formErrorTitle ?? "Trigger could not be saved"}
       inputIdPrefix="scheduled-trigger"
       inputTemplate={input.values.inputTemplate}
       inputTemplateDescription="Sent to the agent each time this trigger runs."

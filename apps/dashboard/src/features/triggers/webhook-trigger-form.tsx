@@ -88,6 +88,7 @@ type WebhookTriggerFormProps = {
   fieldErrors: WebhookTriggerFormFieldErrors;
   validationSummaryError: string | null;
   formError: string | null;
+  formErrorTitle?: string;
   isSaving: boolean;
   isDeleting: boolean;
   isDuplicating: boolean;
@@ -272,6 +273,7 @@ export function WebhookTriggerForm(input: WebhookTriggerFormProps): React.JSX.El
         : { triggerTypeField: input.triggerTypeField })}
       fieldErrors={input.fieldErrors}
       formError={input.formError}
+      formErrorTitle={input.formErrorTitle ?? "Trigger could not be saved"}
       inputIdPrefix="trigger"
       inputTemplate={input.values.inputTemplate}
       inputTemplateDescription={

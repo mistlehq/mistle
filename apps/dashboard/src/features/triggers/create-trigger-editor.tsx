@@ -932,6 +932,7 @@ export function CreateTriggerEditor(input: CreateTriggerEditorProps): React.JSX.
       enabled={state.formValues.enabled}
       fieldErrors={state.fieldErrors}
       formError={state.formError}
+      formErrorTitle="Trigger could not be saved"
       inputIdPrefix="trigger"
       inputTemplate={state.formValues.inputTemplate}
       inputTemplateDescription={
