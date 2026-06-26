@@ -896,6 +896,7 @@ function renderSandboxProfileEditor(input?: {
             <Route element={<Outlet />} path="triggers">
               <Route element={<Outlet />} index />
               <Route element={<Outlet />} path=":triggerId" />
+              <Route element={<Outlet />} path=":triggerId/activity" />
             </Route>
             <Route element={<Outlet />} path="snapshots" />
           </Route>

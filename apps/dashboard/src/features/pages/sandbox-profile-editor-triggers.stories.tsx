@@ -411,6 +411,10 @@ export function SandboxProfileTriggersStory(input: {
             element={<SandboxProfileTriggersSection profileId={ProfileId} />}
             path=":triggerId"
           />
+          <Route
+            element={<SandboxProfileTriggersSection profileId={ProfileId} />}
+            path=":triggerId/activity"
+          />
         </Route>,
       ),
       {

@@ -64,6 +64,8 @@ export const ExistingScheduledTriggerValues: ScheduledTriggerFormValues = {
   inputTemplate: "Review open pull requests and summarize anything blocked.",
 };
 
+function noop(): void {}
+
 export function ScheduledTriggerFormStoryHarness(input: {
   mode: "create" | "edit";
   values: ScheduledTriggerFormValues;
@@ -73,6 +75,7 @@ export function ScheduledTriggerFormStoryHarness(input: {
   isSaving?: boolean;
   isDeleting?: boolean;
   onDelete?: (() => void) | null;
+  onViewActivity?: (() => void) | null;
   primaryRepositoryOptions?: readonly ScheduledTriggerFormOption[];
   sandboxProfileOptions?: readonly ScheduledTriggerFormOption[];
   enableSubmitValidation?: boolean;
@@ -105,6 +108,7 @@ export function ScheduledTriggerFormStoryHarness(input: {
         }
         mode={input.mode}
         onDelete={input.onDelete ?? null}
+        onViewActivity={input.onViewActivity ?? (input.mode === "edit" ? noop : null)}
         onSubmit={() => {
           if (input.enableSubmitValidation !== true) {
             return;

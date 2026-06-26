@@ -52,6 +52,8 @@ function conditionId(eventOptionId: string, index = 0): string {
   return createWebhookTriggerEventConditionId({ eventOptionId, index });
 }
 
+function noop(): void {}
+
 function isAnyOfRule(values: readonly string[]) {
   return {
     operator: WebhookTriggerEventParameterRuleOperators.IS,
@@ -300,6 +302,7 @@ export function WebhookTriggerFormStoryHarness(input: {
   isSaving?: boolean;
   isDeleting?: boolean;
   onDelete?: (() => void) | null;
+  onViewActivity?: (() => void) | null;
   triggerPickerDisabledState?: WebhookTriggerEventPickerDisabledState | null;
   connectionOptions?: readonly WebhookTriggerFormOption[];
   sandboxProfileOptions?: readonly WebhookTriggerFormOption[];
@@ -339,6 +342,7 @@ export function WebhookTriggerFormStoryHarness(input: {
           triggerTypeField={triggerTypeField}
           mode={input.mode}
           onDelete={input.onDelete ?? null}
+          onViewActivity={input.onViewActivity ?? (input.mode === "edit" ? noop : null)}
           onSubmit={() => {
             if (input.enableSubmitValidation !== true) {
               return;
@@ -414,6 +418,7 @@ export const EditPageLayout: Story = {
   args: {
     mode: "edit",
     onDelete: function onDelete() {},
+    onViewActivity: function onViewActivity() {},
     values: ExistingTriggerValues,
   },
 };
@@ -422,6 +427,7 @@ export const EditPageWithTopActions: Story = {
   args: {
     mode: "edit",
     onDelete: function onDelete() {},
+    onViewActivity: function onViewActivity() {},
     primaryRepositoryOptions: [
       {
         value: "mistlehq/company-os",
@@ -444,6 +450,7 @@ export const EditPageWithSlackMessageAndReactionFilters: Story = {
   args: {
     mode: "edit",
     onDelete: function onDelete() {},
+    onViewActivity: function onViewActivity() {},
     values: ExistingSlackMessageAndReactionTriggerValues,
     webhookEventOptions: SlackWebhookEventOptions,
   },
@@ -453,6 +460,7 @@ export const EditPageWithInvalidSlackInvocationToken: Story = {
   args: {
     mode: "edit",
     onDelete: function onDelete() {},
+    onViewActivity: function onViewActivity() {},
     fieldErrors: {
       eventParameterRules: {
         triggerId: StorySlackMessageConditionId,

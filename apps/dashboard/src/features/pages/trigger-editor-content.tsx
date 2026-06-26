@@ -102,10 +102,13 @@ export function TriggerEditorContent(input: {
     return renderUnavailableResource();
   }
 
+  const activityPath = `${input.backPath}/${encodeURIComponent(input.triggerId)}/activity`;
+
   if (triggerQuery.data.kind === "schedule") {
     return (
       <EditScheduledTriggerEditor
         triggerId={input.triggerId}
+        activityPath={activityPath}
         backPath={input.backPath}
         deleteSuccessPath={input.deleteSuccessPath}
         navigate={input.navigate}
@@ -117,6 +120,7 @@ export function TriggerEditorContent(input: {
   return (
     <EditWebhookTriggerEditor
       triggerId={input.triggerId}
+      activityPath={activityPath}
       backPath={input.backPath}
       deleteSuccessPath={input.deleteSuccessPath}
       navigate={input.navigate}

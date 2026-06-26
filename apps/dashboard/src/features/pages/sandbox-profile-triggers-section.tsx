@@ -10,7 +10,7 @@ import {
 import { CalendarDotsIcon, PlusIcon, WebhooksLogoIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { IntegrationLogo } from "../integrations/integration-logo.js";
@@ -54,6 +54,7 @@ import {
   buildWebhookTriggerEventOptions,
   resolveEligibleProfileTriggerConnectionIds,
 } from "../triggers/webhook-trigger-option-builders.js";
+import { TriggerActivityContent } from "./trigger-activity-page.js";
 import { TriggerEditorContent } from "./trigger-editor-content.js";
 
 const ProfileTriggersListLimit = 25;
@@ -327,6 +328,7 @@ function ProfileTriggerListRow(input: {
 }
 
 function ProfileTriggerDetail(input: { profileId: string }): React.JSX.Element {
+  const location = useLocation();
   const navigate = useNavigate();
   const params = useParams();
   const triggerId = params["triggerId"];
@@ -337,6 +339,17 @@ function ProfileTriggerDetail(input: { profileId: string }): React.JSX.Element {
       <div className="flex min-h-64 items-center justify-center p-6 text-center text-sm text-muted-foreground">
         Select a trigger to view and edit it.
       </div>
+    );
+  }
+
+  if (location.pathname.endsWith("/activity")) {
+    return (
+      <TriggerActivityContent
+        triggerId={triggerId}
+        backPath={`${backPath}/${encodeURIComponent(triggerId)}`}
+        navigate={navigate}
+        requiredSandboxProfileId={input.profileId}
+      />
     );
   }
 

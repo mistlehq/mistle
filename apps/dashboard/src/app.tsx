@@ -41,6 +41,7 @@ import {
 import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
 import { SessionWorkbenchPage } from "./features/pages/session-workbench-page.js";
 import { SessionsPage } from "./features/pages/sessions-page.js";
+import { TriggerActivityPage } from "./features/pages/trigger-activity-page.js";
 import { TriggerCreatePage } from "./features/pages/trigger-create-page.js";
 import { TriggerEditorPage } from "./features/pages/trigger-editor-page.js";
 import { TriggersPage } from "./features/pages/triggers-page.js";
@@ -112,6 +113,7 @@ export const APP_ROUTES = createRoutesFromElements(
               >
                 <Route element={<RouteOutlet />} index />
                 <Route element={<RouteOutlet />} path=":triggerId" />
+                <Route element={<RouteOutlet />} path=":triggerId/activity" />
               </Route>
               <Route
                 element={<RouteOutlet />}
@@ -124,6 +126,11 @@ export const APP_ROUTES = createRoutesFromElements(
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.triggers} path="triggers">
           <Route element={<TriggersPage />} index />
           <Route element={<TriggerCreatePage />} handle={ROUTE_HANDLES.triggersNew} path="new" />
+          <Route
+            element={<TriggerActivityPage />}
+            handle={ROUTE_HANDLES.triggersDetail}
+            path=":triggerId/activity"
+          />
           <Route
             element={<TriggerEditorPage />}
             handle={ROUTE_HANDLES.triggersDetail}

@@ -1,5 +1,15 @@
-import { Notice, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mistle/ui";
+import {
+  Notice,
+  OverflowTooltipText,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { formatDateTime } from "../shared/date-formatters.js";
@@ -53,14 +63,19 @@ function WebhookActivityRows(input: {
             </TableCell>
             <TableCell className="text-sm whitespace-normal">
               <div className="flex min-w-0 flex-col gap-1">
-                <span className="truncate">{item.eventType}</span>
-                <span className="text-muted-foreground truncate text-xs">
-                  {item.providerEventType}
-                </span>
+                <OverflowTooltipText
+                  className="text-sm"
+                  containerClassName="block"
+                  text={item.eventType}
+                />
               </div>
             </TableCell>
-            <TableCell className="text-muted-foreground truncate text-sm">
-              {item.externalDeliveryId ?? "-"}
+            <TableCell className="text-muted-foreground text-sm">
+              <OverflowTooltipText
+                className="text-sm text-muted-foreground"
+                containerClassName="block"
+                text={item.externalDeliveryId ?? "-"}
+              />
             </TableCell>
             <TableCell className="text-sm whitespace-nowrap">{formatStatus(item.status)}</TableCell>
           </TableRow>
@@ -111,7 +126,10 @@ function ScheduleActivityRows(input: {
   );
 }
 
-export function TriggerActivitySection(input: { triggerId: string }): React.JSX.Element {
+export function TriggerActivitySection(input: {
+  triggerId: string;
+  actions?: ReactNode;
+}): React.JSX.Element {
   const activityQuery = useQuery({
     queryKey: triggerActivityQueryKey(input.triggerId),
     queryFn: async ({ signal }) =>
@@ -130,9 +148,7 @@ export function TriggerActivitySection(input: { triggerId: string }): React.JSX.
     : null;
 
   return (
-    <FormPageSection
-      header={<FormPageHeader description="Most recent source events." title="Recent activity" />}
-    >
+    <FormPageSection header={<FormPageHeader actions={input.actions} title="Recent activity" />}>
       {errorMessage !== null ? (
         <div className="p-4">
           <Notice title="Could not load activity" variant="alert">

@@ -141,6 +141,7 @@ describe("WebhookTriggerForm", () => {
     primaryRepositoryOptions?: readonly WebhookTriggerFormOption[];
     onDelete?: () => void;
     onSubmit?: () => void;
+    onViewActivity?: () => void;
     onValueChange?: (
       key: keyof WebhookTriggerFormValues,
       value: string | boolean | string[] | WebhookTriggerEventParameterRuleMap,
@@ -160,6 +161,7 @@ describe("WebhookTriggerForm", () => {
           mode={input.mode ?? "create"}
           onDelete={(input.mode ?? "create") === "edit" ? (input.onDelete ?? (() => {})) : null}
           onSubmit={input.onSubmit ?? (() => {})}
+          onViewActivity={input.onViewActivity ?? null}
           onValueChange={input.onValueChange ?? (() => {})}
           {...(input.primaryRepositoryOptions === undefined
             ? {}
@@ -312,9 +314,10 @@ describe("WebhookTriggerForm", () => {
     expect(form.queryByRole("button", { name: "Edit trigger name" })).toBeNull();
   });
 
-  it("renders edit-page save access in the header and keeps delete under more actions", () => {
+  it("renders edit-page save access in the header and keeps activity and delete under more actions", () => {
     let deleteCount = 0;
     let submitCount = 0;
+    let viewActivityCount = 0;
 
     renderFormWithOptions({
       mode: "edit",
@@ -323,6 +326,9 @@ describe("WebhookTriggerForm", () => {
       },
       onSubmit: () => {
         submitCount += 1;
+      },
+      onViewActivity: () => {
+        viewActivityCount += 1;
       },
       values: buildFormValues(),
     });
@@ -342,8 +348,11 @@ describe("WebhookTriggerForm", () => {
     expect(submitCount).toBe(2);
 
     fireEvent.click(screen.getByRole("button", { name: "More trigger actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "View Activity" }));
+    fireEvent.click(screen.getByRole("button", { name: "More trigger actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Delete trigger" }));
 
+    expect(viewActivityCount).toBe(1);
     expect(deleteCount).toBe(1);
   });
 

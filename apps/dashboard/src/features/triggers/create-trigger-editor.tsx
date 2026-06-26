@@ -953,6 +953,7 @@ export function CreateTriggerEditor(input: CreateTriggerEditorProps): React.JSX.
       name={state.formValues.name}
       onDelete={null}
       onSubmit={state.onSubmit}
+      onViewActivity={null}
       onValueChange={(key, value) => {
         state.onCommonValueChange(key, value);
       }}

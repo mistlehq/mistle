@@ -7,9 +7,7 @@ import { isUnavailableResourceError } from "../api/http-api-error.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { UnavailableResourceState } from "../shared/unavailable-resource-state.js";
 import { DeleteTriggerDialog } from "../triggers/delete-trigger-dialog.js";
-import { TriggerActivitySection } from "../triggers/trigger-activity-section.js";
 import type { TriggerCreateSuccessPath } from "../triggers/trigger-editor-navigation.js";
-import { TriggerEditorTabs } from "../triggers/trigger-editor-tabs.js";
 import { TriggerTypeDisplayField } from "../triggers/trigger-type-field.js";
 import { webhookTriggerDetailQueryKey } from "../triggers/triggers-query-keys.js";
 import {
@@ -96,6 +94,7 @@ export function EditWebhookTriggerEditor(input: {
   navigate: (to: string) => void | Promise<void>;
   backPath?: string | undefined;
   deleteSuccessPath?: string | undefined;
+  activityPath: string;
   renderFrame?: TriggerEditorFrameRenderer;
 }): React.JSX.Element | null {
   const triggerQuery = useQuery({
@@ -187,6 +186,7 @@ export function EditWebhookTriggerEditor(input: {
         {...(input.deleteSuccessPath === undefined
           ? {}
           : { deleteSuccessPath: input.deleteSuccessPath })}
+        activityPath={input.activityPath}
         initialValues={initialValues}
         preservedWebhookSourceId={triggerQuery.data.integrationWebhookSourceId}
         connectionOptions={prerequisites.connectionOptions}
@@ -207,6 +207,7 @@ function LoadedWebhookTriggerEditor(input: {
   navigate: (to: string) => void | Promise<void>;
   createSuccessPath?: TriggerCreateSuccessPath;
   deleteSuccessPath?: string;
+  activityPath?: string;
   initialValues: ReturnType<typeof toWebhookTriggerFormValues>;
   connectionOptions: ReturnType<typeof useWebhookTriggerPrerequisites>["connectionOptions"];
   sandboxProfileOptions: ReturnType<typeof useWebhookTriggerPrerequisites>["sandboxProfileOptions"];
@@ -215,6 +216,13 @@ function LoadedWebhookTriggerEditor(input: {
   initialSandboxProfileVersion?: number;
 }): React.JSX.Element {
   const state = useLoadedWebhookTriggerEditorState(input);
+  const activityPath = input.activityPath;
+  const onViewActivity =
+    activityPath === undefined
+      ? null
+      : () => {
+          void input.navigate(activityPath);
+        };
   const form = (
     <WebhookTriggerForm
       connectionOptions={state.connectionOptions}
@@ -226,6 +234,7 @@ function LoadedWebhookTriggerEditor(input: {
       triggerTypeField={input.triggerTypeField}
       mode={input.mode}
       onDelete={state.onRequestDelete}
+      onViewActivity={onViewActivity}
       onSubmit={state.onSubmit}
       onValueChange={state.onValueChange}
       primaryRepositoryOptions={state.primaryRepositoryOptions}
@@ -239,14 +248,7 @@ function LoadedWebhookTriggerEditor(input: {
 
   return (
     <>
-      {input.mode === "edit" && input.triggerId !== undefined ? (
-        <TriggerEditorTabs
-          activity={<TriggerActivitySection triggerId={input.triggerId} />}
-          details={form}
-        />
-      ) : (
-        form
-      )}
+      {form}
 
       {input.mode === "edit" ? (
         <>
