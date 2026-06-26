@@ -43,6 +43,13 @@ export const DirectEgressHttpRoutePath = "/_mistle/egress/http";
 export const DirectEgressWebSocketRoutePath = "/_mistle/egress/ws";
 export const DirectEgressTokenHeaderName = "x-mistle-egress-token";
 const ProviderResourceAssociationObservationBodyLimitBytes = 1024 * 1024;
+const ObservableResponseHeaderNames = [
+  "cache-control",
+  "connection",
+  "content-length",
+  "content-type",
+  "transfer-encoding",
+] as const;
 
 type ActiveRuntimePlan = NonNullable<Awaited<ReturnType<typeof loadActiveSandboxRuntimePlan>>>;
 type MaybePromise<T> = T | Promise<T>;
@@ -636,6 +643,32 @@ function toResponseHeaders(headers: IncomingHttpHeaders): Headers {
   return responseHeaders;
 }
 
+export function toObservableResponseHeaders(
+  headers: IncomingHttpHeaders,
+): Record<(typeof ObservableResponseHeaderNames)[number], string | string[] | undefined> {
+  const observableHeaders: Record<
+    (typeof ObservableResponseHeaderNames)[number],
+    string | string[] | undefined
+  > = {
+    "cache-control": undefined,
+    connection: undefined,
+    "content-length": undefined,
+    "content-type": undefined,
+    "transfer-encoding": undefined,
+  };
+
+  for (const name of ObservableResponseHeaderNames) {
+    const value = headers[name];
+    if (value === undefined) {
+      continue;
+    }
+
+    observableHeaders[name] = value;
+  }
+
+  return observableHeaders;
+}
+
 function sendDirectHttpRequest(input: {
   body: Uint8Array | undefined;
   headers: Headers | Record<string, string>;
@@ -682,6 +715,7 @@ function sendDirectHttpRequest(input: {
         event: "gateway_direct_egress_http_response_started",
         durationMs: Date.now() - input.startedAtMs,
         requestBodyBytes: input.requestBodyBytes,
+        responseHeaders: toObservableResponseHeaders(response.headers),
         status,
       };
       logger.info(responseLogFields, "Direct gateway HTTP egress response started");
