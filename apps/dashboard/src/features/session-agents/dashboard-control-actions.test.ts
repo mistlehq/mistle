@@ -146,7 +146,7 @@ describe("dashboard control actions", () => {
       namespace: DashboardControlDynamicToolNamespace,
       name: DesignerUserInputRequestDynamicToolName,
       description:
-        "Ask the user exactly one setup question in the dashboard. Use this for Designer decisions that need a selectable choice or a short free-form response. Prefer selectable options when the answer can be reduced to choices; use free-form input only when options cannot capture the answer.",
+        "Ask the user exactly one setup question in the dashboard. Use this for Designer decisions that need a selectable choice, short free-form response, or integration connection resource selection.",
       inputSchema: {
         properties: {
           options: {
@@ -162,6 +162,31 @@ describe("dashboard control actions", () => {
             },
           },
         },
+        anyOf: expect.arrayContaining([
+          {
+            properties: {
+              inputKind: {
+                const: "integrationConnectionResourceMultiSelect",
+              },
+            },
+            required: ["inputKind", "resourceSelection"],
+          },
+        ]),
+        allOf: expect.arrayContaining([
+          {
+            if: {
+              required: ["resourceSelection"],
+            },
+            then: {
+              properties: {
+                inputKind: {
+                  const: "integrationConnectionResourceMultiSelect",
+                },
+              },
+              required: ["inputKind"],
+            },
+          },
+        ]),
       },
     });
   });
@@ -292,6 +317,121 @@ describe("dashboard control actions", () => {
     });
   });
 
+  it("parses Designer integration connection resource selection user input calls", () => {
+    const parsed = parseDashboardControlDynamicToolCall({
+      namespace: DashboardControlDynamicToolNamespace,
+      tool: DesignerUserInputRequestDynamicToolName,
+      arguments: {
+        id: "github-review-repositories",
+        question: "Which GitHub repositories should this agent review?",
+        inputKind: "integrationConnectionResourceMultiSelect",
+        resourceSelection: {
+          connectionId: "icn_github",
+          resourceKind: "repository",
+          resourceLabelPlural: "repositories",
+          searchPlaceholder: "Search repositories",
+          emptyMessage: "No repositories available for this connection.",
+          initialSelectedHandles: ["mistlehq/mistle"],
+        },
+        submitBehavior: {
+          kind: "saveSandboxProfileDraftBinding",
+          profileId: "sbp_designer",
+          version: 2,
+          bindingId: "spib_github",
+          configField: "repositories",
+        },
+      },
+    });
+
+    expect(parsed).toEqual({
+      action: DesignerUserInputRequestAction,
+      input: {
+        id: "github-review-repositories",
+        question: "Which GitHub repositories should this agent review?",
+        inputKind: "integrationConnectionResourceMultiSelect",
+        resourceSelection: {
+          connectionId: "icn_github",
+          resourceKind: "repository",
+          resourceLabelPlural: "repositories",
+          searchPlaceholder: "Search repositories",
+          emptyMessage: "No repositories available for this connection.",
+          initialSelectedHandles: ["mistlehq/mistle"],
+        },
+        submitBehavior: {
+          kind: "saveSandboxProfileDraftBinding",
+          profileId: "sbp_designer",
+          version: 2,
+          bindingId: "spib_github",
+          configField: "repositories",
+        },
+      },
+    });
+  });
+
+  it("rejects save draft submit behavior on text user input calls", () => {
+    const parsed = parseDashboardControlDynamicToolCall({
+      namespace: DashboardControlDynamicToolNamespace,
+      tool: DesignerUserInputRequestDynamicToolName,
+      arguments: {
+        id: "github-review-repositories",
+        question: "Which GitHub repositories should this agent review?",
+        options: [
+          {
+            label: "mistlehq/mistle",
+          },
+        ],
+        submitBehavior: {
+          kind: "saveSandboxProfileDraftBinding",
+          profileId: "sbp_designer",
+          version: 2,
+          bindingId: "spib_github",
+          configField: "repositories",
+        },
+      },
+    });
+
+    expect(parsed).toEqual({
+      contentItems: [
+        {
+          type: "inputText",
+          text: "Designer user input request is invalid.",
+        },
+      ],
+      success: false,
+    });
+  });
+
+  it("rejects resource selection on text user input calls", () => {
+    const parsed = parseDashboardControlDynamicToolCall({
+      namespace: DashboardControlDynamicToolNamespace,
+      tool: DesignerUserInputRequestDynamicToolName,
+      arguments: {
+        id: "github-review-repositories",
+        question: "Which GitHub repositories should this agent review?",
+        options: [
+          {
+            label: "mistlehq/mistle",
+          },
+        ],
+        resourceSelection: {
+          connectionId: "icn_github",
+          resourceKind: "repository",
+          resourceLabelPlural: "repositories",
+        },
+      },
+    });
+
+    expect(parsed).toEqual({
+      contentItems: [
+        {
+          type: "inputText",
+          text: "Designer user input request is invalid.",
+        },
+      ],
+      success: false,
+    });
+  });
+
   it("maps Designer user input requests to server requests", () => {
     const serverRequest = createDashboardControlUserInputServerRequest({
       requestId: "request-1",
@@ -322,6 +462,43 @@ describe("dashboard control actions", () => {
               isOther: false,
             },
           ],
+        },
+      ],
+      status: "pending",
+      responseErrorMessage: null,
+    });
+  });
+
+  it("maps Designer resource selection user input requests to server requests", () => {
+    const serverRequest = createDashboardControlUserInputServerRequest({
+      requestId: "request-1",
+      userInput: {
+        id: "github-review-repositories",
+        question: "Which GitHub repositories should this agent review?",
+        inputKind: "integrationConnectionResourceMultiSelect",
+        resourceSelection: {
+          connectionId: "icn_github",
+          resourceKind: "repository",
+          resourceLabelPlural: "repositories",
+        },
+      },
+    });
+
+    expect(serverRequest).toEqual({
+      requestId: "request-1",
+      method: "tool/requestUserInput",
+      kind: "tool-user-input",
+      questions: [
+        {
+          header: null,
+          id: "github-review-repositories",
+          inputKind: "integrationConnectionResourceMultiSelect",
+          question: "Which GitHub repositories should this agent review?",
+          resourceSelection: {
+            connectionId: "icn_github",
+            resourceKind: "repository",
+            resourceLabelPlural: "repositories",
+          },
         },
       ],
       status: "pending",
@@ -370,6 +547,46 @@ describe("dashboard control actions", () => {
           type: "inputText",
           text: JSON.stringify({
             decision: "cancel",
+          }),
+        },
+      ],
+      success: true,
+    });
+  });
+
+  it("formats Designer resource selection responses for dynamic tool calls", () => {
+    const response = createDashboardControlUserInputResponse({
+      result: {
+        answers: [
+          {
+            id: "github-review-repositories",
+            value: ["mistlehq/mistle-desktop", "mistlehq/mistle"],
+            sideEffect: {
+              kind: "sandbox-profile-draft-updated",
+              profileId: "sbp_designer",
+              version: 2,
+            },
+          },
+        ],
+      },
+    });
+
+    expect(response).toEqual({
+      contentItems: [
+        {
+          type: "inputText",
+          text: JSON.stringify({
+            answers: [
+              {
+                id: "github-review-repositories",
+                value: ["mistlehq/mistle-desktop", "mistlehq/mistle"],
+                sideEffect: {
+                  kind: "sandbox-profile-draft-updated",
+                  profileId: "sbp_designer",
+                  version: 2,
+                },
+              },
+            ],
           }),
         },
       ],

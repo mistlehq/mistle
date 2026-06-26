@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { withDashboardWorkspaceStory } from "../../../storybook/decorators.js";
 import { noopRespondToServerRequest } from "../../chat/components/chat-story-support.js";
@@ -149,6 +150,90 @@ const FreeformUserInputEntries: readonly ServerRequestEntry[] = [
   },
 ];
 
+const ResourceSelectionUserInputEntries: readonly ServerRequestEntry[] = [
+  {
+    requestId: "resource-selection-user-input-request-1",
+    method: "tool/requestUserInput",
+    kind: "tool-user-input",
+    questions: [
+      {
+        header: "Repositories",
+        id: "github-review-repositories",
+        inputKind: "integrationConnectionResourceMultiSelect",
+        question: "Which GitHub repositories should this agent review?",
+        resourceSelection: {
+          connectionId: "icn_story_github",
+          resourceKind: "repository",
+          resourceLabelPlural: "repositories",
+          searchPlaceholder: "Search repositories",
+          emptyMessage: "No repositories available for this connection.",
+          initialSelectedHandles: ["mistlehq/mistle-desktop"],
+        },
+        submitBehavior: {
+          kind: "saveSandboxProfileDraftBinding",
+          profileId: "sbp_story_designer",
+          version: 2,
+          bindingId: "spib_story_github",
+          configField: "repositories",
+        },
+      },
+    ],
+    status: "pending",
+    responseErrorMessage: null,
+  },
+];
+
+function createResourceSelectionStoryQueryClient(): QueryClient {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  queryClient.setQueryData(
+    ["integration-connections", "icn_story_github", "resources", "repository", ""],
+    {
+      connectionId: "icn_story_github",
+      familyId: "github",
+      kind: "repository",
+      syncState: "ready",
+      items: [
+        {
+          id: "repo_story_desktop",
+          familyId: "github",
+          kind: "repository",
+          handle: "mistlehq/mistle-desktop",
+          displayName: "mistlehq/mistle-desktop",
+          status: "accessible",
+          metadata: {},
+        },
+        {
+          id: "repo_story_mistle",
+          familyId: "github",
+          kind: "repository",
+          handle: "mistlehq/mistle",
+          displayName: "mistlehq/mistle",
+          status: "accessible",
+          metadata: {},
+        },
+        {
+          id: "repo_story_docs",
+          familyId: "github",
+          kind: "repository",
+          handle: "mistlehq/docs",
+          displayName: "mistlehq/docs",
+          status: "accessible",
+          metadata: {},
+        },
+      ],
+    },
+  );
+
+  return queryClient;
+}
+
 function createMixedServerRequestEntriesWithResponseErrors(): readonly ServerRequestEntry[] {
   return MixedServerRequestEntries.map((entry) => {
     return {
@@ -195,6 +280,23 @@ export const FreeformUserInput: Story = {
   args: {
     entries: FreeformUserInputEntries,
   },
+};
+
+export const ResourceSelectionUserInput: Story = {
+  args: {
+    entries: ResourceSelectionUserInputEntries,
+  },
+  decorators: [
+    (Story): React.JSX.Element => {
+      const queryClient = createResourceSelectionStoryQueryClient();
+
+      return (
+        <QueryClientProvider client={queryClient}>
+          <Story />
+        </QueryClientProvider>
+      );
+    },
+  ],
 };
 
 export const ResponseErrors: Story = {

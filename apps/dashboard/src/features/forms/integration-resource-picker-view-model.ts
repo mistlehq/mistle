@@ -22,7 +22,6 @@ export type IntegrationResourceWidgetMessageSection = {
   variant: "default" | "alert";
   message: string;
   detail?: string | undefined;
-  items?: readonly string[] | undefined;
 };
 
 function formatIntegrationResourceSearchPlaceholder(input: {
@@ -114,6 +113,43 @@ function resolveSyncFailureState(input: {
   };
 }
 
+function resolveIntegrationResourceAlertMessageSection(input: {
+  refreshErrorMessage: string | null;
+  unavailableSelectedHandles?: readonly string[] | undefined;
+  syncFailureState: {
+    message: string | null;
+    detail: string | null;
+  };
+}): IntegrationResourceWidgetMessageSection | null {
+  if (
+    input.unavailableSelectedHandles !== undefined &&
+    input.unavailableSelectedHandles.length > 0
+  ) {
+    return {
+      variant: "alert",
+      message: "The highlighted resources are no longer available. Please remove them.",
+    };
+  }
+
+  if (input.refreshErrorMessage !== null) {
+    return {
+      variant: "alert",
+      message: "Refresh failed.",
+      detail: "Please try again.",
+    };
+  }
+
+  if (input.syncFailureState.message !== null) {
+    return {
+      variant: "alert",
+      message: input.syncFailureState.message,
+      ...(input.syncFailureState.detail === null ? {} : { detail: input.syncFailureState.detail }),
+    };
+  }
+
+  return null;
+}
+
 export function buildIntegrationResourcePickerViewModel(input: {
   title: string | undefined;
   availableCount: number | undefined;
@@ -141,32 +177,14 @@ export function buildIntegrationResourcePickerViewModel(input: {
     resourceLabelPlural: input.resourceLabelPlural ?? "resources",
   });
   const messageSections: IntegrationResourceWidgetMessageSection[] = [];
+  const alertMessageSection = resolveIntegrationResourceAlertMessageSection({
+    refreshErrorMessage: input.refreshErrorMessage,
+    unavailableSelectedHandles: input.unavailableSelectedHandles,
+    syncFailureState,
+  });
 
-  if (input.refreshErrorMessage !== null) {
-    messageSections.push({
-      variant: "alert",
-      message: "Refresh failed.",
-      detail: "Please try again.",
-    });
-  }
-
-  if (
-    input.unavailableSelectedHandles !== undefined &&
-    input.unavailableSelectedHandles.length > 0
-  ) {
-    messageSections.push({
-      variant: "alert",
-      message: "The selected resources are no longer available:",
-      items: input.unavailableSelectedHandles,
-    });
-  }
-
-  if (syncFailureState.message !== null) {
-    messageSections.push({
-      variant: "alert",
-      message: syncFailureState.message,
-      ...(syncFailureState.detail === null ? {} : { detail: syncFailureState.detail }),
-    });
+  if (alertMessageSection !== null) {
+    messageSections.push(alertMessageSection);
   } else if (!hasVisibleItems && input.listState.mode !== "loading") {
     messageSections.push({
       variant: "default",

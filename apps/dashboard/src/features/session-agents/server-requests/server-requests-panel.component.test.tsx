@@ -1,11 +1,106 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { systemSleeper } from "@mistle/time";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { ServerRequestsPanel } from "./server-requests-panel.js";
+import {
+  cleanupTestQueryClients,
+  createTestQueryClient,
+} from "../../../test-support/query-client.js";
+import { HttpApiError } from "../../api/http-api-error.js";
+import type { ServerRequestEntry } from "./server-request-entries.js";
+import { ServerRequestsPanel, shouldPollResourceSelectionQuery } from "./server-requests-panel.js";
+
+type ResourceSelectionQuestion = Extract<
+  ServerRequestEntry,
+  { kind: "tool-user-input" }
+>["questions"][number];
+
+function seedResourceQuery(input: {
+  queryClient: ReturnType<typeof createTestQueryClient>;
+  connectionId: string;
+  search: string;
+  handles: readonly string[];
+}): void {
+  input.queryClient.setQueryData(
+    ["integration-connections", input.connectionId, "resources", "repository", input.search],
+    {
+      connectionId: input.connectionId,
+      familyId: "github",
+      kind: "repository",
+      syncState: "ready",
+      items: input.handles.map((handle) => ({
+        id: `repo_${handle.replace(/[^a-zA-Z0-9]+/gu, "_")}`,
+        familyId: "github",
+        kind: "repository",
+        handle,
+        displayName: handle,
+        status: "accessible",
+        metadata: {},
+      })),
+    },
+  );
+}
+
+function renderResourceSelectionRequest(input: {
+  initialSelectedHandles: readonly string[];
+  searchPlaceholder?: string | undefined;
+  seed?: (queryClient: ReturnType<typeof createTestQueryClient>) => void;
+}): { submittedResults: unknown[] } {
+  const submittedResults: unknown[] = [];
+  const queryClient = createTestQueryClient({
+    refetchOnMount: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  input.seed?.(queryClient);
+
+  const question: ResourceSelectionQuestion = {
+    header: "Repositories",
+    id: "github-review-repositories",
+    inputKind: "integrationConnectionResourceMultiSelect",
+    question: "Which GitHub repositories should this agent review?",
+    resourceSelection: {
+      connectionId: "icn_test_github",
+      resourceKind: "repository",
+      resourceLabelPlural: "repositories",
+      ...(input.searchPlaceholder === undefined
+        ? {}
+        : { searchPlaceholder: input.searchPlaceholder }),
+      initialSelectedHandles: input.initialSelectedHandles,
+    },
+  };
+
+  render(
+    <QueryClientProvider client={queryClient}>
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: "resource-selection-request-1",
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [question],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+      />
+    </QueryClientProvider>,
+  );
+
+  return { submittedResults };
+}
 
 describe("ServerRequestsPanel", () => {
+  afterEach(async () => {
+    await cleanupTestQueryClients();
+  });
+
   it("renders command approvals in the standalone panel when passed through", () => {
     const submittedResults: unknown[] = [];
 
@@ -388,6 +483,154 @@ describe("ServerRequestsPanel", () => {
         ],
       },
     ]);
+  });
+
+  it("submits empty resource selection answers", async () => {
+    const { submittedResults } = renderResourceSelectionRequest({
+      initialSelectedHandles: [],
+      seed: (queryClient) => {
+        seedResourceQuery({
+          queryClient,
+          connectionId: "icn_test_github",
+          search: "",
+          handles: [],
+        });
+      },
+    });
+
+    const submitButton = screen.getByRole("button", { name: "Submit" });
+    await waitFor(() => {
+      expect(submitButton.getAttribute("disabled")).toBeNull();
+    });
+    fireEvent.click(submitButton);
+
+    expect(submittedResults).toEqual([
+      {
+        answers: [
+          {
+            id: "github-review-repositories",
+            value: [],
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("keeps resource selection answers disabled while selected resources are unavailable", () => {
+    const { submittedResults } = renderResourceSelectionRequest({
+      initialSelectedHandles: ["mistle/private-internal-tools"],
+      seed: (queryClient) => {
+        seedResourceQuery({
+          queryClient,
+          connectionId: "icn_test_github",
+          search: "",
+          handles: [],
+        });
+      },
+    });
+
+    const submitButton = screen.getByRole("button", { name: "Submit" });
+    expect(submitButton.getAttribute("disabled")).toBe("");
+    fireEvent.click(submitButton);
+
+    expect(submittedResults).toEqual([]);
+  });
+
+  it("keeps unavailable resource selections disabled while searching", async () => {
+    const { submittedResults } = renderResourceSelectionRequest({
+      initialSelectedHandles: ["mistle/private-internal-tools"],
+      searchPlaceholder: "Search repositories",
+      seed: (queryClient) => {
+        seedResourceQuery({
+          queryClient,
+          connectionId: "icn_test_github",
+          search: "",
+          handles: [],
+        });
+        seedResourceQuery({
+          queryClient,
+          connectionId: "icn_test_github",
+          search: "mistle",
+          handles: [],
+        });
+      },
+    });
+
+    fireEvent.change(
+      screen.getByRole("combobox", {
+        name: "Which GitHub repositories should this agent review?",
+      }),
+      {
+        target: {
+          value: "mistle",
+        },
+      },
+    );
+    await systemSleeper.sleep(350);
+
+    const submitButton = screen.getByRole("button", { name: "Submit" });
+    expect(submitButton.getAttribute("disabled")).toBe("");
+    fireEvent.click(submitButton);
+
+    expect(submittedResults).toEqual([]);
+  });
+
+  it("keeps first-time resource sync polling from refresh through in-progress conflicts until resources are ready", () => {
+    const syncRequiredError = new HttpApiError({
+      operation: "listIntegrationConnectionResources",
+      status: 409,
+      body: {
+        code: "RESOURCE_SYNC_REQUIRED",
+        message: "Resource sync is required before resources can be listed.",
+      },
+      code: "RESOURCE_SYNC_REQUIRED",
+      message: "Resource sync is required before resources can be listed.",
+    });
+    const syncInProgressError = new HttpApiError({
+      operation: "listIntegrationConnectionResources",
+      status: 409,
+      body: {
+        code: "RESOURCE_SYNC_IN_PROGRESS",
+        message: "Resource sync is still in progress.",
+      },
+      code: "RESOURCE_SYNC_IN_PROGRESS",
+      message: "Resource sync is still in progress.",
+    });
+
+    expect(
+      shouldPollResourceSelectionQuery({
+        data: undefined,
+        error: syncRequiredError,
+        refreshHasStartedSync: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldPollResourceSelectionQuery({
+        data: undefined,
+        error: syncRequiredError,
+        refreshHasStartedSync: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldPollResourceSelectionQuery({
+        data: undefined,
+        error: syncInProgressError,
+        refreshHasStartedSync: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldPollResourceSelectionQuery({
+        data: {
+          connectionId: "icn_test_github",
+          familyId: "github",
+          kind: "repository",
+          syncState: "ready",
+          items: [],
+        },
+        error: null,
+        refreshHasStartedSync: true,
+      }),
+    ).toBe(false);
   });
 
   it("renders OpenCode permission requests in the standalone panel", () => {

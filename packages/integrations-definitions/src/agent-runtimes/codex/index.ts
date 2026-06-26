@@ -1,6 +1,7 @@
 export { CodexRuntimeDefinition } from "./definition.js";
 export { CodexRuntimeConfigSchema, type CodexRuntimeConfig } from "./runtime-config-schema.js";
 export { compileCodexRuntime, compileInstalledCodexRuntime } from "./compile-runtime.js";
+export type { MistleManagedInstructionBlock } from "../shared/managed-instructions.js";
 export {
   CodexAppServerEndpointKey,
   CodexAppServerListenUrl,

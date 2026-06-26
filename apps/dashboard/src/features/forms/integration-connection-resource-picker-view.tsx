@@ -7,7 +7,7 @@ import {
   ComboboxContent,
   ComboboxItem,
   ComboboxList,
-  Notice,
+  FieldError,
   useComboboxAnchor,
 } from "@mistle/ui";
 import { ArrowClockwiseIcon } from "@phosphor-icons/react";
@@ -71,16 +71,23 @@ function IntegrationResourceMessageSection(input: {
   message: string;
   variant: "default" | "alert";
   detail?: string | undefined;
-  children?: React.ReactNode;
 }): React.JSX.Element {
-  return (
-    <Notice title={input.message} variant={input.variant}>
-      <div className="flex flex-col gap-1">
-        {input.detail === undefined ? null : <p>{input.detail}</p>}
-        {input.children}
-      </div>
-    </Notice>
-  );
+  if (input.variant === "alert") {
+    return (
+      <FieldError className="text-xs whitespace-nowrap">
+        {formatCompactAlertMessage({
+          detail: input.detail,
+          message: input.message,
+        })}
+      </FieldError>
+    );
+  }
+
+  return <p className="text-muted-foreground text-sm">{input.message}</p>;
+}
+
+function formatCompactAlertMessage(input: { message: string; detail: string | undefined }): string {
+  return input.detail === undefined ? input.message : `${input.message} ${input.detail}`;
 }
 
 function ResourceMessages(input: {
@@ -104,15 +111,7 @@ function ResourceMessages(input: {
           key={`${section.variant}:${section.message}`}
           message={section.message}
           variant={section.variant}
-        >
-          {section.items === undefined ? null : (
-            <ul className="list-disc pl-5">
-              {section.items.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          )}
-        </IntegrationResourceMessageSection>
+        />
       ))}
     </div>
   );
@@ -139,6 +138,7 @@ function ComboboxLayout(input: {
   for (const item of input.props.visibleItems) {
     itemLabelsByValue.set(item.value, item.label);
   }
+  const unavailableSelectedValueSet = new Set(input.props.unavailableSelectedValues);
   const chipsClassName = density === "compact" ? "min-h-10 w-full gap-1 px-2 py-1" : "w-full";
   const chipClassName = density === "compact" ? "h-6 max-w-full" : "max-w-full";
   const contentClassName = density === "compact" ? "w-[min(30rem,calc(100vw-2rem))] p-0" : "p-0";
@@ -146,6 +146,9 @@ function ComboboxLayout(input: {
     density === "compact" ? "max-h-64 overflow-y-auto p-2" : "max-h-72 overflow-y-auto p-2";
   const listClassName = density === "compact" ? "max-h-48" : "max-h-56";
   const hasVisibleItems = input.props.visibleItems.length > 0;
+  const hasAlertMessages = input.viewModel.messageSections.some(
+    (section) => section.variant === "alert",
+  );
 
   function toggleAllVisibleItems(): void {
     const visibleValues = input.props.visibleItems.map((item) => item.value);
@@ -212,14 +215,23 @@ function ComboboxLayout(input: {
               setIsOpen(true);
             }}
           >
-            {input.props.selectedValues.map((selectedValue) => (
-              <ComboboxChip className={chipClassName} key={selectedValue}>
-                <span className="truncate">
-                  {itemLabelsByValue.get(selectedValue) ?? selectedValue}
-                </span>
-              </ComboboxChip>
-            ))}
+            {input.props.selectedValues.map((selectedValue) => {
+              const isUnavailableSelected = unavailableSelectedValueSet.has(selectedValue);
+
+              return (
+                <ComboboxChip
+                  className={chipClassName}
+                  invalid={isUnavailableSelected}
+                  key={selectedValue}
+                >
+                  <span className="truncate">
+                    {itemLabelsByValue.get(selectedValue) ?? selectedValue}
+                  </span>
+                </ComboboxChip>
+              );
+            })}
             <ComboboxChipsInput
+              aria-invalid={hasAlertMessages ? true : undefined}
               aria-label={input.props.label}
               className="min-w-28"
               disabled={input.props.disabled === true}

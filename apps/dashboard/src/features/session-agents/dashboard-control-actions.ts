@@ -80,20 +80,75 @@ const DesignerUserInputFreeFormSchema = z
   })
   .strict();
 
+const DesignerUserInputSaveSandboxProfileDraftBindingSubmitBehaviorSchema = z
+  .object({
+    kind: z.literal("saveSandboxProfileDraftBinding"),
+    profileId: z.string().min(1).max(160),
+    version: z.number().int().min(1),
+    bindingId: z.string().min(1).max(160),
+    configField: z.string().min(1).max(120),
+  })
+  .strict();
+
+const DesignerUserInputIntegrationConnectionResourceSelectionSchema = z
+  .object({
+    connectionId: z.string().min(1).max(160),
+    resourceKind: z.string().min(1).max(120),
+    resourceLabelPlural: z.string().min(1).max(80),
+    searchPlaceholder: z.string().min(1).max(160).optional(),
+    emptyMessage: z.string().min(1).max(240).optional(),
+    initialSelectedHandles: z.array(z.string().min(1).max(500)).max(500).optional(),
+  })
+  .strict();
+
 const DesignerUserInputRequestInputSchema = z
   .object({
     header: z.string().min(1).max(80).optional(),
     id: z.string().min(1).max(120),
     question: z.string().min(1).max(500),
+    inputKind: z.enum(["text", "integrationConnectionResourceMultiSelect"]).optional(),
     options: z.array(DesignerUserInputOptionSchema).max(6).optional(),
     freeForm: DesignerUserInputFreeFormSchema.optional(),
+    resourceSelection: DesignerUserInputIntegrationConnectionResourceSelectionSchema.optional(),
+    submitBehavior: DesignerUserInputSaveSandboxProfileDraftBindingSubmitBehaviorSchema.optional(),
   })
   .strict()
   .refine(
-    (input) =>
-      (input.options !== undefined && input.options.length > 0) || input.freeForm !== undefined,
+    (input) => {
+      if (input.inputKind === "integrationConnectionResourceMultiSelect") {
+        return input.resourceSelection !== undefined;
+      }
+
+      return (
+        (input.options !== undefined && input.options.length > 0) || input.freeForm !== undefined
+      );
+    },
     {
-      message: "At least one option or freeForm input is required.",
+      message: "Input kind requires a matching answer surface.",
+    },
+  )
+  .refine(
+    (input) =>
+      input.inputKind !== "integrationConnectionResourceMultiSelect" ||
+      (input.options === undefined && input.freeForm === undefined),
+    {
+      message: "Resource selection input cannot include options or freeForm.",
+    },
+  )
+  .refine(
+    (input) =>
+      input.resourceSelection === undefined ||
+      input.inputKind === "integrationConnectionResourceMultiSelect",
+    {
+      message: "Resource selection requires resource selection input kind.",
+    },
+  )
+  .refine(
+    (input) =>
+      input.submitBehavior?.kind !== "saveSandboxProfileDraftBinding" ||
+      input.inputKind === "integrationConnectionResourceMultiSelect",
+    {
+      message: "Save draft submit behavior requires resource selection input.",
     },
   );
 
@@ -159,6 +214,12 @@ export type DashboardControlActionHandler = (
 export type DashboardControlActionSupport = {
   supportedActions: readonly string[];
   handleAction: DashboardControlActionHandler;
+  userInputSubmitBehavior?: {
+    sandboxProfileDraftBinding?: {
+      profileId: string;
+      version: number;
+    };
+  };
 };
 
 const DesignerBlueprintConditionValueJsonSchema = {
@@ -536,6 +597,83 @@ const DesignerUserInputFreeFormJsonSchema = {
   required: ["label"],
 };
 
+const DesignerUserInputIntegrationConnectionResourceSelectionJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    connectionId: {
+      type: "string",
+      minLength: 1,
+      maxLength: 160,
+      description: "Integration connection id whose synced provider resources should be listed.",
+    },
+    resourceKind: {
+      type: "string",
+      minLength: 1,
+      maxLength: 120,
+      description: "Provider resource kind to select, such as repository.",
+    },
+    resourceLabelPlural: {
+      type: "string",
+      minLength: 1,
+      maxLength: 80,
+      description: "Plural user-facing label for this resource kind, such as repositories.",
+    },
+    searchPlaceholder: {
+      type: "string",
+      minLength: 1,
+      maxLength: 160,
+    },
+    emptyMessage: {
+      type: "string",
+      minLength: 1,
+      maxLength: 240,
+    },
+    initialSelectedHandles: {
+      type: "array",
+      items: {
+        type: "string",
+        minLength: 1,
+        maxLength: 500,
+      },
+      maxItems: 500,
+    },
+  },
+  required: ["connectionId", "resourceKind", "resourceLabelPlural"],
+};
+
+const DesignerUserInputSubmitBehaviorJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    kind: {
+      type: "string",
+      enum: ["saveSandboxProfileDraftBinding"],
+    },
+    profileId: {
+      type: "string",
+      minLength: 1,
+      maxLength: 160,
+    },
+    version: {
+      type: "integer",
+      minimum: 1,
+    },
+    bindingId: {
+      type: "string",
+      minLength: 1,
+      maxLength: 160,
+    },
+    configField: {
+      type: "string",
+      minLength: 1,
+      maxLength: 120,
+      description: "Top-level binding config field to replace with the selected resource handles.",
+    },
+  },
+  required: ["kind", "profileId", "version", "bindingId", "configField"],
+};
+
 export const DesignerCanvasTabShowDynamicToolSpec = {
   namespace: DashboardControlDynamicToolNamespace,
   name: DesignerCanvasTabShowDynamicToolName,
@@ -557,7 +695,7 @@ export const DesignerUserInputRequestDynamicToolSpec = {
   namespace: DashboardControlDynamicToolNamespace,
   name: DesignerUserInputRequestDynamicToolName,
   description:
-    "Ask the user exactly one setup question in the dashboard. Use this for Designer decisions that need a selectable choice or a short free-form response. Prefer selectable options when the answer can be reduced to choices; use free-form input only when options cannot capture the answer.",
+    "Ask the user exactly one setup question in the dashboard. Use this for Designer decisions that need a selectable choice, short free-form response, or integration connection resource selection.",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -579,6 +717,12 @@ export const DesignerUserInputRequestDynamicToolSpec = {
         minLength: 1,
         maxLength: 500,
       },
+      inputKind: {
+        type: "string",
+        enum: ["text", "integrationConnectionResourceMultiSelect"],
+        description:
+          "Omit or use text for options/freeForm questions. Use integrationConnectionResourceMultiSelect to let the dashboard list and select provider resources from an integration connection.",
+      },
       options: {
         type: "array",
         items: DesignerUserInputOptionJsonSchema,
@@ -588,9 +732,60 @@ export const DesignerUserInputRequestDynamicToolSpec = {
           "Selectable options. Include the recommended option first when there is a recommendation. Keep option labels short and clear.",
       },
       freeForm: DesignerUserInputFreeFormJsonSchema,
+      resourceSelection: DesignerUserInputIntegrationConnectionResourceSelectionJsonSchema,
+      submitBehavior: DesignerUserInputSubmitBehaviorJsonSchema,
     },
     required: ["id", "question"],
-    anyOf: [{ required: ["options"] }, { required: ["freeForm"] }],
+    anyOf: [
+      { required: ["options"] },
+      { required: ["freeForm"] },
+      {
+        properties: {
+          inputKind: {
+            const: "integrationConnectionResourceMultiSelect",
+          },
+        },
+        required: ["inputKind", "resourceSelection"],
+      },
+    ],
+    allOf: [
+      {
+        if: {
+          required: ["resourceSelection"],
+        },
+        then: {
+          properties: {
+            inputKind: {
+              const: "integrationConnectionResourceMultiSelect",
+            },
+          },
+          required: ["inputKind"],
+        },
+      },
+      {
+        if: {
+          properties: {
+            submitBehavior: {
+              properties: {
+                kind: {
+                  const: "saveSandboxProfileDraftBinding",
+                },
+              },
+              required: ["kind"],
+            },
+          },
+          required: ["submitBehavior"],
+        },
+        then: {
+          properties: {
+            inputKind: {
+              const: "integrationConnectionResourceMultiSelect",
+            },
+          },
+          required: ["inputKind", "resourceSelection"],
+        },
+      },
+    ],
   },
 } satisfies CodexDynamicToolSpec;
 
@@ -608,7 +803,7 @@ function isKnownDashboardControlDynamicToolName(toolName: string | undefined): b
 
 function createDashboardControlFreeFormUserInputOption(
   freeForm: DesignerUserInputRequestInput["freeForm"],
-): ToolRequestUserInputEntry["questions"][number]["options"][number] | null {
+): NonNullable<ToolRequestUserInputEntry["questions"][number]["options"]>[number] | null {
   if (freeForm === undefined) {
     return null;
   }
@@ -716,14 +911,46 @@ export function createDashboardControlUserInputServerRequest(input: {
       {
         header: input.userInput.header ?? null,
         id: input.userInput.id,
+        ...(input.userInput.inputKind === undefined
+          ? {}
+          : { inputKind: input.userInput.inputKind }),
         question: input.userInput.question,
-        options: [
-          ...(input.userInput.options ?? []).map((option) => ({
-            label: option.label,
-            isOther: false,
-          })),
-          ...(freeFormOption === null ? [] : [freeFormOption]),
-        ],
+        ...(input.userInput.resourceSelection === undefined
+          ? {}
+          : {
+              resourceSelection: {
+                connectionId: input.userInput.resourceSelection.connectionId,
+                resourceKind: input.userInput.resourceSelection.resourceKind,
+                resourceLabelPlural: input.userInput.resourceSelection.resourceLabelPlural,
+                ...(input.userInput.resourceSelection.searchPlaceholder === undefined
+                  ? {}
+                  : { searchPlaceholder: input.userInput.resourceSelection.searchPlaceholder }),
+                ...(input.userInput.resourceSelection.emptyMessage === undefined
+                  ? {}
+                  : { emptyMessage: input.userInput.resourceSelection.emptyMessage }),
+                ...(input.userInput.resourceSelection.initialSelectedHandles === undefined
+                  ? {}
+                  : {
+                      initialSelectedHandles: [
+                        ...input.userInput.resourceSelection.initialSelectedHandles,
+                      ],
+                    }),
+              },
+            }),
+        ...(input.userInput.submitBehavior === undefined
+          ? {}
+          : { submitBehavior: input.userInput.submitBehavior }),
+        ...(input.userInput.inputKind === "integrationConnectionResourceMultiSelect"
+          ? {}
+          : {
+              options: [
+                ...(input.userInput.options ?? []).map((option) => ({
+                  label: option.label,
+                  isOther: false,
+                })),
+                ...(freeFormOption === null ? [] : [freeFormOption]),
+              ],
+            }),
       },
     ],
     status: "pending",
@@ -755,7 +982,14 @@ export function createDashboardControlUserInputResponse(input: {
         .array(
           z.object({
             id: z.string().min(1),
-            value: z.string(),
+            value: z.union([z.string(), z.array(z.string())]),
+            sideEffect: z
+              .object({
+                kind: z.literal("sandbox-profile-draft-updated"),
+                profileId: z.string().min(1),
+                version: z.number().int().min(1),
+              })
+              .optional(),
           }),
         )
         .min(1),

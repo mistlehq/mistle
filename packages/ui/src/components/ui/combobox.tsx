@@ -207,16 +207,22 @@ function ComboboxChips({
 function ComboboxChip({
   className,
   children,
+  invalid = false,
   showRemove = true,
   ...props
 }: ComboboxPrimitive.Chip.Props & {
+  invalid?: boolean;
   showRemove?: boolean;
 }) {
   return (
     <ComboboxPrimitive.Chip
+      aria-invalid={invalid ? true : undefined}
       data-slot="combobox-chip"
       className={cn(
         "bg-muted text-foreground flex h-[calc(--spacing(5.5))] w-fit items-center justify-center gap-1 rounded-sm px-1.5 text-xs font-medium whitespace-nowrap has-data-[slot=combobox-chip-remove]:pr-0 has-disabled:pointer-events-none has-disabled:cursor-not-allowed has-disabled:opacity-50",
+        invalid
+          ? "border border-destructive/30 bg-destructive/10 text-destructive [&_[data-slot=combobox-chip-remove]]:text-destructive/70 [&_[data-slot=combobox-chip-remove]]:hover:bg-transparent [&_[data-slot=combobox-chip-remove]]:hover:text-destructive [&_[data-slot=combobox-chip-remove]]:focus-visible:bg-transparent [&_[data-slot=combobox-chip-remove]]:focus-visible:text-destructive"
+          : undefined,
         className,
       )}
       {...props}
