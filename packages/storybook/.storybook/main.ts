@@ -16,20 +16,21 @@ const SandboxSessionClientIndexPath = fileURLToPath(
 const SandboxSessionClientBrowserPath = fileURLToPath(
   new URL("../../sandbox-session-client/src/browser.ts", import.meta.url),
 );
+const StorybookReactViteFrameworkPath = fileURLToPath(
+  new URL("../node_modules/@storybook/react-vite", import.meta.url),
+);
 const StorybookControlPlaneApiOrigin = "https://control-plane.example.com";
 
 const config: StorybookConfig = {
   framework: {
-    name: "@storybook/react-vite",
+    name: StorybookReactViteFrameworkPath,
     options: {},
   },
+  features: {
+    changeDetection: false,
+  },
   staticDirs: ["../../../apps/dashboard/public"],
-  addons: [
-    "@storybook/addon-docs",
-    "@storybook/addon-links",
-    "@storybook/addon-a11y",
-    "@storybook/addon-vitest",
-  ],
+  addons: ["@storybook/addon-docs", "@storybook/addon-links", "@storybook/addon-a11y"],
   stories: [
     "../../ui/src/**/*.stories.@(ts|tsx)",
     "../../../apps/dashboard/src/**/*.stories.@(ts|tsx)",
