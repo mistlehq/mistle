@@ -1,5 +1,6 @@
 import { listSlackConnectionResources } from "../../shared/list-connection-resources.server.js";
 import {
+  createSlackResourceRelationshipDefinitions,
   createSlackResourceDefinitions,
   SlackResourceSyncTriggers,
 } from "../../shared/resource-definitions.js";
@@ -23,6 +24,7 @@ export const SlackDefinition: SlackBaseIntegrationDefinition = {
   webhookSource: SlackWebhookSourceCapability,
   associatedResourceEvents: SlackAssociatedResourceEventsCapability,
   resourceDefinitions: createSlackResourceDefinitions(),
+  resourceRelationshipDefinitions: createSlackResourceRelationshipDefinitions(),
   resourceSyncTriggers: SlackResourceSyncTriggers,
   listConnectionResources: listSlackConnectionResources,
 };

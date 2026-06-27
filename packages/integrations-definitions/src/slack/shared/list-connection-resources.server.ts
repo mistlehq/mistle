@@ -2,6 +2,7 @@ import { buildUrlWithPath } from "@mistle/http";
 import type {
   DiscoveredIntegrationResourceAttribute,
   DiscoveredIntegrationResource,
+  DiscoveredIntegrationResourceRelationship,
   ListConnectionResourcesInput,
   ListConnectionResourcesResult,
 } from "@mistle/integrations-core";
@@ -277,6 +278,28 @@ function toDiscoveredUserAttributes(
   ];
 }
 
+function toDiscoveredWorkspaceMembership(input: {
+  user: SlackUser & { team_id: string };
+  workspaceExternalId: string;
+  workspaceHandle: string;
+}): DiscoveredIntegrationResourceRelationship {
+  return {
+    relationshipKind: "belongs_to",
+    subjectResourceKind: SlackUserKind,
+    subjectExternalId: input.user.id,
+    subjectHandle: input.user.id,
+    objectResourceKind: SlackWorkspaceKind,
+    objectExternalId: input.workspaceExternalId,
+    objectHandle: input.workspaceHandle,
+    scopeKind: SlackWorkspaceKind,
+    scopeExternalId: input.workspaceExternalId,
+    scopeHandle: input.workspaceHandle,
+    metadata: {
+      teamId: input.user.team_id,
+    },
+  };
+}
+
 function toDiscoveredUserGroupResource(userGroup: SlackUserGroup): DiscoveredIntegrationResource {
   const handle = userGroup.handle?.trim() ?? "";
   const name = userGroup.name?.trim() ?? "";
@@ -393,9 +416,8 @@ async function listSlackWorkspace(input: {
 async function listSlackUsers(input: {
   apiBaseUrl: string;
   botToken: string;
-}): Promise<ListConnectionResourcesResult> {
-  const users: DiscoveredIntegrationResource[] = [];
-  const attributes: DiscoveredIntegrationResourceAttribute[] = [];
+}): Promise<ReadonlyArray<SlackUser>> {
+  const users: SlackUser[] = [];
   let nextCursor: string | undefined;
 
   for (;;) {
@@ -429,8 +451,7 @@ async function listSlackUsers(input: {
         continue;
       }
 
-      users.push(toDiscoveredUserResource(user));
-      attributes.push(...toDiscoveredUserAttributes(user));
+      users.push(user);
     }
 
     const candidateCursor = parsedPayload.response_metadata?.next_cursor?.trim() ?? "";
@@ -441,13 +462,50 @@ async function listSlackUsers(input: {
     nextCursor = candidateCursor;
   }
 
+  return users;
+}
+
+async function listSlackUserResources(input: {
+  apiBaseUrl: string;
+  botToken: string;
+}): Promise<ListConnectionResourcesResult> {
+  const users = await listSlackUsers(input);
+  const attributes = users.flatMap((user) => toDiscoveredUserAttributes(user));
+
   return {
-    resources: users.sort((left, right) => left.displayName.localeCompare(right.displayName)),
+    resources: users
+      .map((user) => toDiscoveredUserResource(user))
+      .sort((left, right) => left.displayName.localeCompare(right.displayName)),
     attributes: attributes.sort((left, right) => {
       const resourceComparison = left.resourceHandle.localeCompare(right.resourceHandle);
       return resourceComparison === 0 ? left.key.localeCompare(right.key) : resourceComparison;
     }),
   };
+}
+
+async function listSlackWorkspaceMembershipRelationships(input: {
+  apiBaseUrl: string;
+  botToken: string;
+  scopeExternalId: string;
+  scopeHandle: string;
+}): Promise<ReadonlyArray<DiscoveredIntegrationResourceRelationship>> {
+  const users = await listSlackUsers({
+    apiBaseUrl: input.apiBaseUrl,
+    botToken: input.botToken,
+  });
+
+  return users
+    .filter(
+      (user): user is SlackUser & { team_id: string } => user.team_id === input.scopeExternalId,
+    )
+    .map((user) =>
+      toDiscoveredWorkspaceMembership({
+        user,
+        workspaceExternalId: input.scopeExternalId,
+        workspaceHandle: input.scopeHandle,
+      }),
+    )
+    .sort((left, right) => left.subjectHandle.localeCompare(right.subjectHandle));
 }
 
 async function listSlackUserGroups(input: {
@@ -499,10 +557,22 @@ export async function listSlackConnectionResources(
   SlackConnectionConfigSchema.parse(input.connection.config);
 
   if (input.kind === SlackWorkspaceKind) {
+    const resources = await listSlackWorkspace({
+      apiBaseUrl: input.target.config.apiBaseUrl,
+      botToken: input.credential.value,
+    });
+    const workspace = resources[0];
+    if (workspace === undefined || workspace.externalId === undefined) {
+      throw new Error("Slack workspace resource listing did not return a scoped workspace.");
+    }
+
     return {
-      resources: await listSlackWorkspace({
+      resources,
+      relationships: await listSlackWorkspaceMembershipRelationships({
         apiBaseUrl: input.target.config.apiBaseUrl,
         botToken: input.credential.value,
+        scopeExternalId: workspace.externalId,
+        scopeHandle: workspace.handle,
       }),
     };
   }
@@ -517,7 +587,7 @@ export async function listSlackConnectionResources(
   }
 
   if (input.kind === SlackUserKind) {
-    return await listSlackUsers({
+    return await listSlackUserResources({
       apiBaseUrl: input.target.config.apiBaseUrl,
       botToken: input.credential.value,
     });

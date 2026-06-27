@@ -3,6 +3,7 @@ import {
   type IntegrationResourceSyncTrigger,
   type IntegrationResourceCredentialRef,
   type IntegrationResourceDefinition,
+  type IntegrationResourceRelationshipDefinition,
 } from "@mistle/integrations-core";
 
 import {
@@ -79,6 +80,25 @@ export function createSlackResourceDefinitions(): ReadonlyArray<IntegrationResou
   ];
 }
 
+export function createSlackResourceRelationshipDefinitions(): ReadonlyArray<IntegrationResourceRelationshipDefinition> {
+  return [
+    {
+      relationshipKind: "belongs_to",
+      subjectResourceKind: "user",
+      objectResourceKind: "workspace",
+      displayName: "Workspace members",
+      description: "Slack users that belong to the connected workspace.",
+      scopeDefinitions: [
+        {
+          scopeKind: "workspace",
+          displayName: "Workspace",
+          description: "The Slack workspace whose user membership snapshot is synced.",
+        },
+      ],
+    },
+  ];
+}
+
 export const SlackResourceSyncTriggers: ReadonlyArray<IntegrationResourceSyncTrigger> = [
   {
     eventType: "slack:channel_created",
@@ -110,11 +130,11 @@ export const SlackResourceSyncTriggers: ReadonlyArray<IntegrationResourceSyncTri
   },
   {
     eventType: "slack:team_join",
-    resourceKinds: ["user"],
+    resourceKinds: ["user", "workspace"],
   },
   {
     eventType: "slack:user_change",
-    resourceKinds: ["user"],
+    resourceKinds: ["user", "workspace"],
   },
   {
     eventType: "slack:subteam_created",

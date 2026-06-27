@@ -562,6 +562,18 @@ describe("integrations-definitions server", () => {
         bindingField: "userGroups",
       }),
     ]);
+    expect(slackDefinition?.resourceRelationshipDefinitions).toEqual([
+      expect.objectContaining({
+        relationshipKind: "belongs_to",
+        subjectResourceKind: "user",
+        objectResourceKind: "workspace",
+        scopeDefinitions: [
+          expect.objectContaining({
+            scopeKind: "workspace",
+          }),
+        ],
+      }),
+    ]);
     expect(slackDefinition?.resourceSyncTriggers).toEqual([
       {
         eventType: "slack:channel_created",
@@ -593,11 +605,11 @@ describe("integrations-definitions server", () => {
       },
       {
         eventType: "slack:team_join",
-        resourceKinds: ["user"],
+        resourceKinds: ["user", "workspace"],
       },
       {
         eventType: "slack:user_change",
-        resourceKinds: ["user"],
+        resourceKinds: ["user", "workspace"],
       },
       {
         eventType: "slack:subteam_created",

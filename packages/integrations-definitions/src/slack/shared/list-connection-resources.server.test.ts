@@ -74,19 +74,53 @@ describe("listSlackConnectionResources", () => {
         );
         response.setHeader("content-type", "application/json");
 
-        // Grounded in Slack's documented auth.test response shape:
-        // https://docs.slack.dev/reference/methods/auth.test/
-        response.end(
-          JSON.stringify({
-            ok: true,
-            url: "https://mistle.slack.com/",
-            team: "Mistle",
-            user: "mistlebot",
-            team_id: "T123",
-            user_id: "U_BOT",
-            bot_id: "B123",
-          }),
-        );
+        if (requestUrl.pathname === "/api/auth.test") {
+          // Grounded in Slack's documented auth.test response shape:
+          // https://docs.slack.dev/reference/methods/auth.test/
+          response.end(
+            JSON.stringify({
+              ok: true,
+              url: "https://mistle.slack.com/",
+              team: "Mistle",
+              user: "mistlebot",
+              team_id: "T123",
+              user_id: "U_BOT",
+              bot_id: "B123",
+            }),
+          );
+          return;
+        }
+
+        if (requestUrl.pathname === "/api/users.list") {
+          // Grounded in Slack's documented users.list response shape:
+          // https://docs.slack.dev/reference/methods/users.list/
+          response.end(
+            JSON.stringify({
+              ok: true,
+              members: [
+                {
+                  id: "U_HUMAN",
+                  team_id: "T123",
+                  name: "casey",
+                  deleted: false,
+                },
+                {
+                  id: "U_OTHER_WORKSPACE",
+                  team_id: "T999",
+                  name: "other-workspace-user",
+                  deleted: false,
+                },
+              ],
+              response_metadata: {
+                next_cursor: "",
+              },
+            }),
+          );
+          return;
+        }
+
+        response.writeHead(404);
+        response.end("Unexpected Slack API method.");
       },
     });
 
@@ -119,6 +153,7 @@ describe("listSlackConnectionResources", () => {
 
       expect(seenRequests).toEqual([
         "POST http://127.0.0.1/api/auth.test application/x-www-form-urlencoded",
+        "GET http://127.0.0.1/api/users.list?limit=200 ",
       ]);
       expect(result).toEqual({
         resources: [
@@ -132,6 +167,23 @@ describe("listSlackConnectionResources", () => {
               authenticatedUserName: "mistlebot",
               authenticatedUserId: "U_BOT",
               authenticatedBotId: "B123",
+            },
+          },
+        ],
+        relationships: [
+          {
+            relationshipKind: "belongs_to",
+            subjectResourceKind: "user",
+            subjectExternalId: "U_HUMAN",
+            subjectHandle: "U_HUMAN",
+            objectResourceKind: "workspace",
+            objectExternalId: "T123",
+            objectHandle: "T123",
+            scopeKind: "workspace",
+            scopeExternalId: "T123",
+            scopeHandle: "T123",
+            metadata: {
+              teamId: "T123",
             },
           },
         ],
