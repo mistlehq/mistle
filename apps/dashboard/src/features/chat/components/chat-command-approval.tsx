@@ -1,13 +1,14 @@
 import {
   ApprovalDecisionButtons,
   type CommandApprovalRequestEntry,
+  type RespondToServerRequest,
 } from "../../session-agents/server-requests/index.js";
 
 type ChatCommandApprovalProps = {
   approvalRequest: CommandApprovalRequestEntry;
   command: string | null;
   isRespondingToServerRequest: boolean;
-  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  onRespondToServerRequest: RespondToServerRequest;
 };
 
 export function ChatCommandApproval({

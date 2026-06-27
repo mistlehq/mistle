@@ -6,6 +6,12 @@ export type ComposerSubmitAction =
       submitMode: "interrupt";
     }
   | {
+      type: "respond_to_user_input_request";
+      prompt: string;
+      requestId: string | number;
+      submitMode: "custom-response";
+    }
+  | {
       type: "start_turn" | "steer_turn";
       prompt: string;
       submitMode: "start" | "steer";
@@ -38,9 +44,19 @@ export function resolveComposerSubmitAction(input: {
   composerText: string;
   hasActiveTurn: boolean;
   hasPendingInput: boolean;
+  userInputRequestCustomResponseTarget: { requestId: string | number } | null;
 }): ComposerSubmitAction {
   const trimmedComposerText = input.composerText.trim();
   const hasSubmissionContent = trimmedComposerText.length > 0 || input.hasPendingInput;
+
+  if (input.userInputRequestCustomResponseTarget !== null && trimmedComposerText.length > 0) {
+    return {
+      type: "respond_to_user_input_request",
+      requestId: input.userInputRequestCustomResponseTarget.requestId,
+      submitMode: "custom-response",
+      prompt: trimmedComposerText,
+    };
+  }
 
   if (!input.hasActiveTurn) {
     return {

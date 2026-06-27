@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
-import { useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import type { ChatEntry } from "../chat/chat-types.js";
 import {
@@ -20,6 +20,9 @@ import {
   SessionComposerFixturePropsWithPendingAttachments,
   CodexFixtureSessionEntriesWithExploringGroup,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
+import type { ServerRequestEntry } from "../session-agents/server-requests/index.js";
+import type { SessionComposerDraftState } from "./session-composer/index.js";
+import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import {
   SessionConversationPanePlaygroundBaseArgs,
   type SessionConversationPaneStoryArgs,
@@ -31,6 +34,7 @@ import {
   SessionConversationPaneLayoutPlayground,
 } from "./session-conversation-pane-playground.js";
 import {
+  SessionConversationBottomPanelController,
   SessionConversationBottomPanelDraftController,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
@@ -83,6 +87,52 @@ const LongTranscriptComposerStateInput: React.ComponentProps<
   },
 });
 
+const UserInputCustomResponseRequestEntries: readonly ServerRequestEntry[] = [
+  {
+    requestId: "designer-user-input-custom-response-1",
+    method: "tool/requestUserInput",
+    kind: "tool-user-input",
+    questions: [
+      {
+        header: "Provider",
+        id: "provider-selection",
+        options: [
+          {
+            label: "Use Gmail for the first workflow",
+            isOther: false,
+          },
+          {
+            label: "Use Outlook for the first workflow",
+            isOther: false,
+          },
+        ],
+        question: "Which email provider should Designer configure first?",
+      },
+    ],
+    status: "pending",
+    responseErrorMessage: null,
+  },
+];
+
+const UserInputCustomResponseBaseComposerStateInput = createReadySessionComposerStateInput({
+  repositoryStatus: {
+    branchLabel: "designer/custom-response-story",
+    pullRequest: null,
+  },
+});
+
+const UserInputCustomResponseComposerStateInput: React.ComponentProps<
+  typeof SessionConversationBottomPanelController
+>["composerStateInput"] = {
+  ...UserInputCustomResponseBaseComposerStateInput,
+  turnControl: {
+    ...UserInputCustomResponseBaseComposerStateInput.turnControl,
+    activeTurnState: "running",
+    canInterrupt: true,
+    canSteer: true,
+  },
+};
+
 function createLongTranscriptAssistantText(input: {
   paragraphCount: number;
   turnNumber: number;
@@ -127,6 +177,91 @@ function createLongTranscriptEntries(input: {
       },
     ];
   }).flat();
+}
+
+function UserInputCustomResponseHarness(): React.JSX.Element {
+  const [composerDraft, setComposerDraft] = useState(() =>
+    createComposerDraft("Actually use Postmark for this setup."),
+  );
+  const [lastResponseText, setLastResponseText] = useState<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const handleComposerDraftChange = useCallback(
+    (nextComposerDraft: React.SetStateAction<typeof composerDraft>): void => {
+      setComposerDraft(nextComposerDraft);
+    },
+    [],
+  );
+  const draftState = useMemo(
+    (): SessionComposerDraftState => ({
+      composerDraft,
+      pendingBlueprintComments: [],
+      pendingDiffComments: [],
+      clearPendingBlueprintComments: function clearPendingBlueprintComments() {},
+      clearPendingDiffComments: function clearPendingDiffComments() {},
+      setComposerDraft: handleComposerDraftChange,
+    }),
+    [composerDraft, handleComposerDraftChange],
+  );
+  const chatEntries = useMemo(
+    (): readonly ChatEntry[] => [
+      {
+        id: "user-input-custom-response-user-1",
+        turnId: "user-input-custom-response-turn",
+        kind: "user-message",
+        status: "completed",
+        text: "Set up the first outbound email workflow.",
+      },
+      {
+        id: "user-input-custom-response-assistant-1",
+        turnId: "user-input-custom-response-turn",
+        kind: "assistant-message",
+        phase: null,
+        status: "completed",
+        text: "I need one provider decision before I can continue configuring the workflow.",
+      },
+    ],
+    [],
+  );
+  const handleRespondToServerRequest = useCallback(
+    (requestId: string | number, result: unknown) => {
+      setLastResponseText(JSON.stringify({ requestId, result }, null, 2));
+    },
+    [],
+  );
+
+  return renderSessionWorkbenchContentStory({
+    mainContent: (
+      <SessionConversationMainContent
+        activeTurnId="user-input-custom-response-turn"
+        chatEntries={chatEntries}
+        isRespondingToServerRequest={false}
+        isTurnInProgress
+        onRespondToServerRequest={handleRespondToServerRequest}
+        pendingTurnId={null}
+        scrollContainerRef={scrollContainerRef}
+        serverRequestPanelEntries={UserInputCustomResponseRequestEntries}
+      />
+    ),
+    mainContentScrollContainerRef: scrollContainerRef,
+    primaryBottomPanel: (
+      <div className="space-y-3">
+        <SessionConversationBottomPanelController
+          chatEntries={chatEntries}
+          composerStateInput={UserInputCustomResponseComposerStateInput}
+          draftState={draftState}
+          isRespondingToServerRequest={false}
+          onRespondToServerRequest={handleRespondToServerRequest}
+          serverRequestPanelEntries={UserInputCustomResponseRequestEntries}
+          supportsUserInputRequestCustomResponse
+        />
+        {lastResponseText === null ? null : (
+          <pre className="max-h-32 overflow-auto rounded border bg-muted/40 p-3 text-xs text-muted-foreground">
+            {lastResponseText}
+          </pre>
+        )}
+      </div>
+    ),
+  });
 }
 
 function LongTranscriptTypingHarness(): React.JSX.Element {
@@ -350,6 +485,13 @@ export const LongTranscriptTyping: Story = {
     customWorkbenchStory: true,
   },
   render: LongTranscriptTypingHarness,
+};
+
+export const PendingUserInputCustomResponse: Story = {
+  parameters: {
+    customWorkbenchStory: true,
+  },
+  render: UserInputCustomResponseHarness,
 };
 
 export const PendingStartWithoutWorkingFooter: Story = {

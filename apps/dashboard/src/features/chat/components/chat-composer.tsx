@@ -370,6 +370,7 @@ export type ChatComposerViewModel = {
     onSwitchToDefault?: () => void;
   } | null;
   placeholderText?: string | undefined;
+  preservePlaceholderDuringActiveTurn?: boolean;
   commandPanel?: ChatComposerCommandPanel | null;
   contextMentionControl?: ChatComposerContextMentionControl | null;
   pendingCommentSummary: {
@@ -392,7 +393,7 @@ export type ChatComposerViewModel = {
   selectedModel: string | null;
   selectedReasoningEffort: string | null;
   isSubmitPending: boolean;
-  submitMode: "start" | "steer" | "interrupt";
+  submitMode: "start" | "steer" | "interrupt" | "custom-response";
   submitLabel: string;
   submitDisabled: boolean;
   submitDisabledReason: string | null;
@@ -556,6 +557,7 @@ export function ChatComposer({
   goalStatus = null,
   collaborationModeStatus = null,
   placeholderText,
+  preservePlaceholderDuringActiveTurn = false,
   commandPanel = null,
   contextMentionControl = null,
   pendingCommentSummary,
@@ -755,9 +757,12 @@ export function ChatComposer({
       ? null
       : (filteredCommandPanelOptions[activeCommandPanelOptionIndexWithinBounds] ?? null);
   const composerPlaceholder =
-    submitMode === "steer" || submitMode === "interrupt"
-      ? "Steer the current turn"
-      : (placeholderText ?? "Ask anything");
+    placeholderText !== undefined &&
+    (preservePlaceholderDuringActiveTurn || (submitMode !== "steer" && submitMode !== "interrupt"))
+      ? placeholderText
+      : submitMode === "steer" || submitMode === "interrupt"
+        ? "Steer the current turn"
+        : "Ask anything";
   const composerActionIcon =
     submitMode === "interrupt" ? (
       <StopCircleIcon aria-hidden="true" className="size-5" weight="fill" />
@@ -1088,7 +1093,7 @@ export function ChatComposer({
 
   function commandIsDisabledDuringActiveTurn(command: ComposerCommandDescriptor): boolean {
     return (
-      (submitMode === "steer" || submitMode === "interrupt") &&
+      (submitMode === "steer" || submitMode === "interrupt" || submitMode === "custom-response") &&
       command.availability?.duringActiveTurn === "disabled"
     );
   }

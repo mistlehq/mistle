@@ -9,6 +9,7 @@ describe("resolveComposerSubmitAction", () => {
         composerText: "  hello world  ",
         hasActiveTurn: false,
         hasPendingInput: false,
+        userInputRequestCustomResponseTarget: null,
       }),
     ).toEqual({
       type: "start_turn",
@@ -23,6 +24,7 @@ describe("resolveComposerSubmitAction", () => {
         composerText: "   ",
         hasActiveTurn: true,
         hasPendingInput: false,
+        userInputRequestCustomResponseTarget: null,
       }),
     ).toEqual({
       type: "interrupt_turn",
@@ -36,11 +38,30 @@ describe("resolveComposerSubmitAction", () => {
         composerText: "  refine this  ",
         hasActiveTurn: true,
         hasPendingInput: false,
+        userInputRequestCustomResponseTarget: null,
       }),
     ).toEqual({
       type: "steer_turn",
       submitMode: "steer",
       prompt: "refine this",
+    });
+  });
+
+  it("responds to a pending user input request with trimmed custom text", () => {
+    expect(
+      resolveComposerSubmitAction({
+        composerText: "  use Slack instead  ",
+        hasActiveTurn: true,
+        hasPendingInput: false,
+        userInputRequestCustomResponseTarget: {
+          requestId: "request-1",
+        },
+      }),
+    ).toEqual({
+      type: "respond_to_user_input_request",
+      requestId: "request-1",
+      submitMode: "custom-response",
+      prompt: "use Slack instead",
     });
   });
 
@@ -50,6 +71,7 @@ describe("resolveComposerSubmitAction", () => {
         composerText: "   ",
         hasActiveTurn: false,
         hasPendingInput: true,
+        userInputRequestCustomResponseTarget: null,
       }),
     ).toEqual({
       type: "start_turn",
@@ -64,6 +86,7 @@ describe("resolveComposerSubmitAction", () => {
         composerText: "   ",
         hasActiveTurn: true,
         hasPendingInput: true,
+        userInputRequestCustomResponseTarget: null,
       }),
     ).toEqual({
       type: "steer_turn",

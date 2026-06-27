@@ -11,7 +11,9 @@ import { ChatThread } from "../chat/components/chat-thread.js";
 import { ChatUserMessage } from "../chat/components/chat-user-message.js";
 import {
   ServerRequestsPanel,
+  type RespondToServerRequest,
   type ServerRequestEntry,
+  type ToolRequestUserInputEntry,
 } from "../session-agents/server-requests/index.js";
 import {
   ComposerStatusBanner,
@@ -41,7 +43,7 @@ type SessionConversationMainContentProps = {
   onUserMessageAction?: ((actionId: string) => void) | undefined;
   serverRequestPanelEntries: readonly ServerRequestEntry[];
   isRespondingToServerRequest: boolean;
-  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  onRespondToServerRequest: RespondToServerRequest;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 };
 
@@ -49,7 +51,7 @@ type SessionConversationSharedPanelProps = {
   chatEntries: readonly ChatEntry[];
   serverRequestPanelEntries: readonly ServerRequestEntry[];
   isRespondingToServerRequest: boolean;
-  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  onRespondToServerRequest: RespondToServerRequest;
 };
 
 type SessionConversationBottomPanelProps = SessionConversationSharedPanelProps & {
@@ -64,6 +66,7 @@ type SessionConversationBottomPanelControllerProps = SessionConversationSharedPa
   draftState: SessionComposerDraftState;
   composerStateInput: SessionComposerStateInput;
   showWorkingIndicator?: boolean;
+  supportsUserInputRequestCustomResponse?: boolean;
 };
 
 type SessionConversationBottomPanelDraftControllerProps = Omit<
@@ -79,6 +82,19 @@ type SessionConversationBottomPanelDraftControllerProps = Omit<
   > & {
     draftResetKey: string;
   };
+
+function resolveSinglePendingUserInputRequest(
+  entries: readonly ServerRequestEntry[],
+): ToolRequestUserInputEntry | null {
+  const userInputRequests = entries.filter(
+    (entry): entry is ToolRequestUserInputEntry => entry.kind === "tool-user-input",
+  );
+  if (userInputRequests.length !== 1) {
+    return null;
+  }
+
+  return userInputRequests[0] ?? null;
+}
 
 function SessionConversationMainContentView({
   activeTurnId,
@@ -197,10 +213,37 @@ export function SessionConversationBottomPanelController({
   draftState,
   composerStateInput,
   showWorkingIndicator,
+  supportsUserInputRequestCustomResponse,
   ...bottomPanelProps
 }: SessionConversationBottomPanelControllerProps): React.JSX.Element {
+  const userInputRequestCustomResponseTarget = useMemo(() => {
+    if (supportsUserInputRequestCustomResponse !== true) {
+      return null;
+    }
+
+    const pendingUserInputRequest = resolveSinglePendingUserInputRequest(
+      bottomPanelProps.serverRequestPanelEntries,
+    );
+    if (pendingUserInputRequest === null) {
+      return null;
+    }
+
+    return {
+      isResponding: bottomPanelProps.isRespondingToServerRequest,
+      requestId: pendingUserInputRequest.requestId,
+      respond: bottomPanelProps.onRespondToServerRequest,
+    };
+  }, [
+    bottomPanelProps.isRespondingToServerRequest,
+    bottomPanelProps.onRespondToServerRequest,
+    bottomPanelProps.serverRequestPanelEntries,
+    supportsUserInputRequestCustomResponse,
+  ]);
   const composerUiState = useSessionComposerState({
-    composerStateInput,
+    composerStateInput: {
+      ...composerStateInput,
+      userInputRequestCustomResponseTarget,
+    },
     draftState,
   });
 

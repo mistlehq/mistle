@@ -19,6 +19,7 @@ export const DesignerBehaviorInstructionBlock: MistleManagedInstructionBlock = {
     "## Decision Requests",
     "",
     '- When asking which sandbox profile should run or receive a workflow, always include "Create a new sandbox profile" alongside recommended existing profiles.',
+    "- If a dashboard-control user input response contains `customResponse.text`, treat it as the user's custom response to the pending decision; it may be an unlisted answer or a request to change direction.",
     "",
     "## Blueprint Rules",
     "",

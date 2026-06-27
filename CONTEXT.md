@@ -136,6 +136,10 @@ _Avoid_: Approval request when the user is choosing configuration rather than gr
 A user's explicit choice not to answer a pending **User input request**, allowing the runtime to continue handling the active turn without treating the choice as a full turn interruption.
 _Avoid_: Runtime approval decline, turn interruption
 
+**User input request custom response**:
+A user-authored response submitted through the composer for a pending **User input request**, either to provide an unlisted answer or redirect the conversation.
+_Avoid_: Steer message, turn interruption, cancellation
+
 **Dashboard control action**:
 A runtime-requested action handled by the dashboard client to control browser-owned workspace state.
 _Avoid_: MCP tool when the action is handled by the browser rather than Mistle resource access
@@ -837,6 +841,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Future **Mistle Designer** work may read and refresh scoped **Provider configuration resources** needed for the current setup path.
 - Future **Mistle Designer** work may make **Provider configuration changes** only after explicit user approval.
 - **Runtime approval requests** are the generic mechanism for surfacing side-effecting runtime tool calls to the user; product or provider writes still require an explicit supported operation path after approval.
+- A **User input request** may be resolved by a structured answer, a **User input request custom response**, or **User input request cancellation**.
 - First-pass **Mistle Designer sessions** do not require detailed durable activity history for **Provider configuration changes**.
 - Publishing the first **Sandbox profile version** is publish-worthy when no **Source sandbox profile version** exists.
 - Publishing the first **Sandbox profile version** does not require a **Source sandbox profile version**.

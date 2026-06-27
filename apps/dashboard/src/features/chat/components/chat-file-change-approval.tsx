@@ -1,12 +1,13 @@
 import {
   ApprovalDecisionButtons,
   type FileChangeApprovalRequestEntry,
+  type RespondToServerRequest,
 } from "../../session-agents/server-requests/index.js";
 
 type ChatFileChangeApprovalProps = {
   approvalRequest: FileChangeApprovalRequestEntry;
   isRespondingToServerRequest: boolean;
-  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  onRespondToServerRequest: RespondToServerRequest;
 };
 
 export function ChatFileChangeApproval({

@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { ChatComposer } from "../../chat/components/chat-composer.js";
 import type { PendingSessionBlueprintComment } from "../session-blueprint-comment.js";
 import type { PendingSessionDiffComment } from "../session-diff-comment.js";
 import {
@@ -84,6 +85,9 @@ function SessionComposerStateHarness(input: {
   composerText: string;
   configControlsDisabled?: boolean;
   configUpdating?: boolean;
+  customResponseRequestId?: string | number;
+  customResponseIsResponding?: boolean;
+  failCustomResponse?: boolean;
   deferNativeQueue?: boolean;
   deferSubmit?: boolean;
   enableNativeQueueTurn?: boolean;
@@ -95,6 +99,7 @@ function SessionComposerStateHarness(input: {
   pendingBlueprintComments?: readonly PendingSessionBlueprintComment[];
   pendingDiffComments: readonly PendingSessionDiffComment[];
   placeholderText?: string | undefined;
+  renderComposer?: boolean;
   selectedModel?: string | null;
   shouldFailSubmit?: boolean;
   unavailableTypedRuntimeCommands?: readonly {
@@ -115,6 +120,10 @@ function SessionComposerStateHarness(input: {
   >([]);
   const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null);
   const [nativeQueueSubmissionCount, setNativeQueueSubmissionCount] = useState(0);
+  const [serverRequestResponse, setServerRequestResponse] = useState<{
+    requestId: string | number;
+    result: unknown;
+  } | null>(null);
   const [transcriptPrompt, setTranscriptPrompt] = useState<string | null>(null);
   const [resolveSkillMentions, setResolveSkillMentions] = useState<boolean | null>(null);
   const [collaborationModeSettings, setCollaborationModeSettings] =
@@ -253,6 +262,24 @@ function SessionComposerStateHarness(input: {
       ...(input.unavailableTypedRuntimeCommands === undefined
         ? {}
         : { unavailableTypedRuntimeCommands: input.unavailableTypedRuntimeCommands }),
+      ...(input.customResponseRequestId === undefined
+        ? {}
+        : {
+            userInputRequestCustomResponseTarget: {
+              isResponding: input.customResponseIsResponding ?? false,
+              requestId: input.customResponseRequestId,
+              respond: async (requestId, result) => {
+                if (input.failCustomResponse === true) {
+                  throw new Error("Could not submit custom response.");
+                }
+
+                setServerRequestResponse({
+                  requestId,
+                  result,
+                });
+              },
+            },
+          }),
     },
     draftState: {
       composerDraft,
@@ -327,6 +354,9 @@ function SessionComposerStateHarness(input: {
         {JSON.stringify(submittedSelectedSkillMentions)}
       </div>
       <div data-testid="queued-prompt">{queuedPrompt ?? ""}</div>
+      <div data-testid="server-request-response">
+        {serverRequestResponse === null ? "" : JSON.stringify(serverRequestResponse)}
+      </div>
       <div data-testid="native-queue-submission-count">{String(nativeQueueSubmissionCount)}</div>
       <div data-testid="transcript-prompt">{transcriptPrompt ?? ""}</div>
       <div data-testid="resolve-skill-mentions">
@@ -349,6 +379,7 @@ function SessionComposerStateHarness(input: {
         {composerState.queuedPrompts.map((queuedPrompt) => queuedPrompt.text).join("|")}
       </div>
       <div data-testid="status-message">{composerState.statusMessage?.message ?? ""}</div>
+      {input.renderComposer === true ? <ChatComposer {...composerState.composerViewModel} /> : null}
     </div>
   );
 }
@@ -398,6 +429,133 @@ describe("useSessionComposerState", () => {
     expect(screen.getByTestId("placeholder-text").textContent).toBe(
       "Ask the Setup Assistant to write, fix, or update the setup script",
     );
+  });
+
+  it("uses the custom response placeholder for a pending user input request", () => {
+    render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        composerText="Use Slack instead"
+        customResponseRequestId="request-user-input-1"
+        pendingDiffComments={[]}
+        renderComposer
+      />,
+    );
+
+    expect(screen.getByTestId("submit-mode").textContent).toBe("custom-response");
+    expect(screen.getByTestId("placeholder-text").textContent).toBe("Type a custom response...");
+    expect(screen.getByRole("button", { name: "Respond" })).toBeTruthy();
+  });
+
+  it("keeps the custom response placeholder for an empty pending user input request", () => {
+    render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        composerText=""
+        customResponseRequestId="request-user-input-1"
+        pendingDiffComments={[]}
+      />,
+    );
+
+    expect(screen.getByTestId("submit-mode").textContent).toBe("interrupt");
+    expect(screen.getByTestId("placeholder-text").textContent).toBe("Type a custom response...");
+  });
+
+  it("disables custom response submission while the pending request is responding", () => {
+    render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        composerText="Use Slack instead"
+        customResponseIsResponding
+        customResponseRequestId="request-user-input-1"
+        pendingDiffComments={[]}
+      />,
+    );
+
+    expect(screen.getByTestId("submit-mode").textContent).toBe("custom-response");
+    expect(screen.getByTestId("submit-disabled").textContent).toBe("true");
+  });
+
+  it("keeps custom response submission enabled while config updates are pending", () => {
+    render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        composerText="Use Slack instead"
+        configUpdating
+        customResponseRequestId="request-user-input-1"
+        pendingDiffComments={[]}
+      />,
+    );
+
+    expect(screen.getByTestId("submit-mode").textContent).toBe("custom-response");
+    expect(screen.getByTestId("submit-disabled").textContent).toBe("false");
+  });
+
+  it("submits composer text as a custom response to a pending user input request", async () => {
+    render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        composerText="  Use Slack instead  "
+        customResponseRequestId="request-user-input-1"
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("server-request-response").textContent).toBe(
+        JSON.stringify({
+          requestId: "request-user-input-1",
+          result: {
+            customResponse: {
+              text: "Use Slack instead",
+            },
+          },
+        }),
+      );
+    });
+    expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("");
+  });
+
+  it("keeps composer text when custom response submission fails", async () => {
+    render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        composerText="Use Slack instead"
+        customResponseRequestId="request-user-input-1"
+        failCustomResponse
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status-message").textContent).toBe(
+        "Could not submit custom response.",
+      );
+    });
+    expect(screen.getByTestId("server-request-response").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("Use Slack instead");
+  });
+
+  it("blocks custom responses with attachments instead of dropping them", () => {
+    render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        composerText="Use Slack instead"
+        customResponseRequestId="request-user-input-1"
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add PDF" }));
+
+    expect(screen.getByTestId("submit-disabled").textContent).toBe("true");
+    expect(screen.getByTestId("pending-attachments").textContent).toBe("requirements.pdf");
+    expect(screen.getByTestId("server-request-response").textContent).toBe("");
   });
 
   it("executes available runtime composer commands without submitting prompt text", () => {

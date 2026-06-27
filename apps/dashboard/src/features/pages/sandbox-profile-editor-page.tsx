@@ -3112,6 +3112,10 @@ function SetupScriptAssistantPanel(input: {
                     conversationPane.chatState.activeTurnId !== null &&
                     conversationPane.chatState.status === "inProgress"
                   }
+                  supportsUserInputRequestCustomResponse={
+                    conversationPane.serverRequestsState.supportsUserInputRequestCustomResponse ??
+                    false
+                  }
                 />
               </div>
             ) : null}

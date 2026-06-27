@@ -2,7 +2,10 @@ import { AnimatedStatusText } from "@mistle/ui";
 import { CaretRightIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
-import type { ServerRequestEntry } from "../../session-agents/server-requests/index.js";
+import type {
+  RespondToServerRequest,
+  ServerRequestEntry,
+} from "../../session-agents/server-requests/index.js";
 import type {
   ChatSemanticGroupDetailKind,
   ChatSemanticGroupEntry,
@@ -19,7 +22,7 @@ import { ChatSemanticGroupItemOutput } from "./chat-semantic-group-item-output.j
 type ChatSemanticGroupProps = {
   block: ChatSemanticGroupEntry;
   isRespondingToServerRequest: boolean;
-  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  onRespondToServerRequest: RespondToServerRequest;
   pendingServerRequests: readonly ServerRequestEntry[];
 };
 

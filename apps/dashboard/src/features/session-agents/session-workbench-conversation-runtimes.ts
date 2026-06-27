@@ -31,7 +31,7 @@ import {
   resolvePiExtensionUIResponse,
   type UsePiSessionStateResult,
 } from "./pi/session-state/index.js";
-import type { ServerRequestEntry } from "./server-requests/index.js";
+import type { RespondToServerRequest, ServerRequestEntry } from "./server-requests/index.js";
 import { SessionRuntimeWorkbenchCapabilities } from "./session-runtime-workbench-capabilities.js";
 
 type SessionConversationChatState = Pick<
@@ -42,7 +42,8 @@ type SessionConversationChatState = Pick<
 type SessionWorkbenchServerRequestsState = {
   isRespondingToServerRequest: boolean;
   pendingServerRequests: readonly ServerRequestEntry[];
-  respondToServerRequest: (requestId: string | number, result: unknown) => void;
+  respondToServerRequest: RespondToServerRequest;
+  supportsUserInputRequestCustomResponse?: boolean;
 };
 
 export type SessionWorkbenchRuntimeAdapter = {
@@ -240,6 +241,7 @@ export function buildCodexConversationRuntime(input: {
       isRespondingToServerRequest: input.serverRequests.isRespondingToServerRequest,
       pendingServerRequests: input.serverRequests.pendingServerRequests,
       respondToServerRequest: input.serverRequests.respondToServerRequest,
+      supportsUserInputRequestCustomResponse: true,
     },
   };
 }

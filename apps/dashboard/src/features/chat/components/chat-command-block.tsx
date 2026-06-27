@@ -1,4 +1,7 @@
-import type { CommandApprovalRequestEntry } from "../../session-agents/server-requests/index.js";
+import type {
+  CommandApprovalRequestEntry,
+  RespondToServerRequest,
+} from "../../session-agents/server-requests/index.js";
 import type { ChatCommandEntry } from "../chat-types.js";
 import { ChatCommandApproval } from "./chat-command-approval.js";
 
@@ -6,7 +9,7 @@ type ChatCommandBlockProps = {
   approvalRequest: CommandApprovalRequestEntry | null;
   block: ChatCommandEntry;
   isRespondingToServerRequest: boolean;
-  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  onRespondToServerRequest: RespondToServerRequest;
 };
 
 function shouldRenderCommandAsCodeBlock(command: string | null): boolean {
