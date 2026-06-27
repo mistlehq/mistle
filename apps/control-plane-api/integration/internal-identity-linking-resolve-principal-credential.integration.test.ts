@@ -114,6 +114,81 @@ describe.concurrent("internal identity-linking principal credential resolution",
     });
   });
 
+  it("resolves the active provider config when no identity-link connection is selected", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-internal-identity-linking-resolve-provider@example.com",
+    });
+    await seedGitHubPrincipalCredential(env, {
+      accessToken: "ghu_provider_selected_token",
+      accessTokenExpiresAt: "2030-01-01T00:00:00.000Z",
+      credentialId: "upc_internal_identity_linking_resolve_provider",
+      providerConfigId: "ilp_internal_identity_linking_resolve_provider",
+      principalId: "uep_internal_identity_linking_resolve_provider",
+      refreshToken: "ghr_provider_selected_refresh_token",
+      refreshTokenExpiresAt: "2030-06-01T00:00:00.000Z",
+      session,
+      targetKey: "github-internal-identity-linking-resolve-provider",
+    });
+
+    const response = await resolvePrincipalCredential(env, {
+      organizationId: session.organizationId,
+      actingUserId: session.userId,
+      providerFamily: "github",
+    });
+
+    expect(response.status).toBe(200);
+    expect(ResolvePrincipalCredentialResponseSchema.parse(await response.json())).toMatchObject({
+      kind: "value",
+      value: "ghu_provider_selected_token",
+      expiresAt: "2030-01-01T00:00:00.000Z",
+    });
+  });
+
+  it("rejects provider-only resolution when multiple active provider configs exist", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-internal-identity-linking-resolve-ambiguous@example.com",
+    });
+    await seedGitHubPrincipalCredential(env, {
+      accessToken: "ghu_ambiguous_first_token",
+      accessTokenExpiresAt: "2030-01-01T00:00:00.000Z",
+      credentialId: "upc_internal_identity_linking_resolve_ambiguous_first",
+      providerConfigId: "ilp_internal_identity_linking_resolve_ambiguous_first",
+      principalId: "uep_internal_identity_linking_resolve_ambiguous_first",
+      refreshToken: "ghr_ambiguous_first_refresh_token",
+      refreshTokenExpiresAt: "2030-06-01T00:00:00.000Z",
+      session,
+      targetKey: "github-internal-identity-linking-resolve-ambiguous-first",
+    });
+    await seedGitHubPrincipalCredential(env, {
+      accessToken: "ghu_ambiguous_second_token",
+      accessTokenExpiresAt: "2030-01-01T00:00:00.000Z",
+      credentialId: "upc_internal_identity_linking_resolve_ambiguous_second",
+      providerConfigId: "ilp_internal_identity_linking_resolve_ambiguous_second",
+      principalId: "uep_internal_identity_linking_resolve_ambiguous_second",
+      refreshToken: "ghr_ambiguous_second_refresh_token",
+      refreshTokenExpiresAt: "2030-06-01T00:00:00.000Z",
+      session,
+      targetKey: "github-internal-identity-linking-resolve-ambiguous-second",
+    });
+
+    const response = await resolvePrincipalCredential(env, {
+      organizationId: session.organizationId,
+      actingUserId: session.userId,
+      providerFamily: "github",
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      code: InternalIdentityLinkingErrorCodes.INVALID_PROVIDER_CONFIG_INPUT,
+      message:
+        "Multiple active identity-linking provider configs were found for provider 'github'.",
+    });
+  });
+
   it("refreshes an expired GitHub credential and persists updated secrets", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-internal-identity-linking-refresh-success@example.com",
@@ -335,7 +410,7 @@ async function resolvePrincipalCredential(
     organizationId: string;
     actingUserId: string;
     providerFamily: string;
-    integrationConnectionId: string;
+    integrationConnectionId?: string;
   },
 ) {
   return await env.controlPlaneApi.http.fetch(

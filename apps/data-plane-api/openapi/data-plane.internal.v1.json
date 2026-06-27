@@ -520,7 +520,6 @@
                                         "required": [
                                           "kind",
                                           "providerFamily",
-                                          "integrationConnectionId",
                                           "actingUserRequired",
                                           "resolutionMode"
                                         ],
@@ -656,7 +655,6 @@
                                   "required": [
                                     "kind",
                                     "providerFamily",
-                                    "integrationConnectionId",
                                     "actingUserRequired",
                                     "resolutionMode"
                                   ],
@@ -3067,7 +3065,6 @@
                                           "required": [
                                             "kind",
                                             "providerFamily",
-                                            "integrationConnectionId",
                                             "actingUserRequired",
                                             "resolutionMode"
                                           ],
@@ -3203,7 +3200,6 @@
                                     "required": [
                                       "kind",
                                       "providerFamily",
-                                      "integrationConnectionId",
                                       "actingUserRequired",
                                       "resolutionMode"
                                     ],

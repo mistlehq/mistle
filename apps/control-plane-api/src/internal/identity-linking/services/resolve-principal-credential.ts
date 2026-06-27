@@ -31,7 +31,7 @@ type ResolvePrincipalCredentialInput = {
   organizationId: string;
   actingUserId: string;
   providerFamily: string;
-  integrationConnectionId: string;
+  integrationConnectionId?: string;
   credentialKind?: string;
 };
 
@@ -46,6 +46,49 @@ type LoadedCredential = {
   accessTokenExpiresAt: string | null;
   refreshTokenExpiresAt: string | null;
 };
+
+async function resolvePrincipalCredentialProviderContext(
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+  },
+  input: ResolvePrincipalCredentialInput,
+): ReturnType<typeof resolveIdentityLinkProviderContextOrThrow> {
+  if (input.integrationConnectionId !== undefined) {
+    return await resolveIdentityLinkProviderContextOrThrow(ctx, {
+      organizationId: input.organizationId,
+      providerFamily: input.providerFamily,
+      integrationConnectionId: input.integrationConnectionId,
+      requiredConfigStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+    });
+  }
+
+  const providerConfigs = await ctx.db.query.organizationIdentityLinkProviderConfigs.findMany({
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.organizationId, input.organizationId),
+        eq(table.providerFamily, input.providerFamily),
+        eq(table.status, OrganizationIdentityLinkProviderConfigStatus.ACTIVE),
+      ),
+  });
+
+  if (providerConfigs.length > 1) {
+    throw new InternalIdentityLinkingError(
+      InternalIdentityLinkingErrorCodes.INVALID_PROVIDER_CONFIG_INPUT,
+      400,
+      `Multiple active identity-linking provider configs were found for provider '${input.providerFamily}'.`,
+    );
+  }
+
+  return await resolveIdentityLinkProviderContextOrThrow(ctx, {
+    organizationId: input.organizationId,
+    providerFamily: input.providerFamily,
+    ...(providerConfigs[0] === undefined
+      ? {}
+      : { organizationProviderConfigId: providerConfigs[0].id }),
+    requiredConfigStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+  });
+}
 
 class CredentialResolutionStateError extends Error {
   readonly code:
@@ -357,12 +400,7 @@ export async function resolvePrincipalCredential(
   },
   input: ResolvePrincipalCredentialInput,
 ): Promise<IntegrationCredentialResolverResult> {
-  const providerContext = await resolveIdentityLinkProviderContextOrThrow(ctx, {
-    organizationId: input.organizationId,
-    providerFamily: input.providerFamily,
-    integrationConnectionId: input.integrationConnectionId,
-    requiredConfigStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
-  });
+  const providerContext = await resolvePrincipalCredentialProviderContext(ctx, input);
   const identityLinkingRuntime = await resolveIdentityLinkingRuntimeContextOrThrow({
     db: ctx.db,
     integrationRegistry: ctx.integrationRegistry,

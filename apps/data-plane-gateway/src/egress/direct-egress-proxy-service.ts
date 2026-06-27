@@ -1224,7 +1224,9 @@ function directEgressCredentialResolverLogFields(
   }
 
   return {
-    routeCredentialConnectionId: credentialResolver.integrationConnectionId,
+    ...(credentialResolver.integrationConnectionId === undefined
+      ? {}
+      : { routeCredentialConnectionId: credentialResolver.integrationConnectionId }),
     ...(credentialResolver.credentialKind === undefined
       ? {}
       : { routeCredentialKind: credentialResolver.credentialKind }),

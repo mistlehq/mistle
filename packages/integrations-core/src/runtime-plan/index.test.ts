@@ -1016,6 +1016,55 @@ describe("assembleCompiledRuntimePlan", () => {
     expect(plan.egressRoutes[0]?.requestMiddleware).toEqual(["append-session-link-to-openai-text"]);
   });
 
+  it("allows linked-principal egress routes to resolve by provider family", () => {
+    const plan = CompiledRuntimePlanSchema.parse({
+      sandboxProfileId: "sbp_123",
+      version: 7,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
+      egressRoutes: [
+        {
+          egressRuleId: "egress_rule_linear",
+          bindingId: "bind_linear",
+          familyId: "linear",
+          variantId: "linear-default",
+          match: {
+            hosts: ["api.linear.app"],
+          },
+          upstream: {
+            baseUrl: "https://api.linear.app",
+          },
+          authInjection: {
+            type: "bearer",
+            target: "authorization",
+          },
+          credentialResolver: {
+            kind: "linked_principal",
+            providerFamily: "linear",
+            credentialKind: "linear_oauth_user_token",
+            actingUserRequired: true,
+            resolutionMode: "preferred",
+          },
+        },
+      ],
+      artifacts: [],
+      workspaceSources: [],
+      runtimeClients: [],
+      agentRuntimes: [],
+    });
+
+    expect(plan.egressRoutes[0]?.credentialResolver).toEqual({
+      kind: "linked_principal",
+      providerFamily: "linear",
+      credentialKind: "linear_oauth_user_token",
+      actingUserRequired: true,
+      resolutionMode: "preferred",
+    });
+  });
+
   it("preserves header credential prefixes in egress routes", () => {
     const plan = CompiledRuntimePlanSchema.parse({
       sandboxProfileId: "sbp_123",

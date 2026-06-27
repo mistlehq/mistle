@@ -40,7 +40,7 @@ const EgressCredentialResolverSchema = z.discriminatedUnion("kind", [
     .object({
       kind: z.literal("linked_principal"),
       providerFamily: z.string().min(1),
-      integrationConnectionId: z.string().min(1),
+      integrationConnectionId: z.string().min(1).optional(),
       credentialKind: z.string().min(1).optional(),
       actingUserRequired: z.boolean(),
       resolutionMode: z.enum(["required", "preferred"]),
@@ -746,9 +746,11 @@ function normalizeCredentialResolver(
   return {
     kind: "linked_principal",
     providerFamily: resolver.providerFamily,
-    integrationConnectionId: resolver.integrationConnectionId,
     actingUserRequired: resolver.actingUserRequired,
     resolutionMode: resolver.resolutionMode,
+    ...(resolver.integrationConnectionId === undefined
+      ? {}
+      : { integrationConnectionId: resolver.integrationConnectionId }),
     ...(resolver.credentialKind === undefined ? {} : { credentialKind: resolver.credentialKind }),
   };
 }
@@ -809,7 +811,7 @@ function compareCredentialResolvers(
   }
 
   if (left.integrationConnectionId !== right.integrationConnectionId) {
-    return left.integrationConnectionId.localeCompare(right.integrationConnectionId);
+    return (left.integrationConnectionId ?? "").localeCompare(right.integrationConnectionId ?? "");
   }
 
   if (left.credentialKind !== right.credentialKind) {
