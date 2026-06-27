@@ -16,6 +16,12 @@ type ResourceIdentityCandidate = {
   externalId?: string;
   handle: string;
 };
+type ExistingResourceForAttributeMatch = {
+  id: string;
+  handle: string;
+  status: string;
+  removedAt: string | null;
+};
 
 export async function applySuccessfulResourceSync(input: {
   db: ControlPlaneDatabase;
@@ -152,6 +158,14 @@ export async function applySuccessfulResourceSync(input: {
       attributeDefinitions: input.attributeDefinitions ?? [],
     });
 
+    for (const resourceId of attributeBearingAccessibleExistingResourceIds({
+      attributes: input.discoveredAttributes ?? [],
+      existingByExternalId,
+      existingByHandle,
+    })) {
+      matchedExistingIds.add(resourceId);
+    }
+
     const accessibleIdsToMarkUnavailable = existingResources
       .filter(
         (existingResource) =>
@@ -190,6 +204,32 @@ export async function applySuccessfulResourceSync(input: {
 
     return true;
   });
+}
+
+function attributeBearingAccessibleExistingResourceIds(input: {
+  attributes: ReadonlyArray<DiscoveredIntegrationResourceAttribute>;
+  existingByExternalId: ReadonlyMap<string, ExistingResourceForAttributeMatch>;
+  existingByHandle: ReadonlyMap<string, ExistingResourceForAttributeMatch>;
+}): ReadonlySet<string> {
+  const resourceIds = new Set<string>();
+
+  for (const attribute of input.attributes) {
+    const existingResource =
+      attribute.resourceExternalId === undefined
+        ? input.existingByHandle.get(attribute.resourceHandle)
+        : input.existingByExternalId.get(attribute.resourceExternalId);
+
+    if (
+      existingResource !== undefined &&
+      existingResource.handle === attribute.resourceHandle &&
+      existingResource.status === IntegrationConnectionResourceStatuses.ACCESSIBLE &&
+      existingResource.removedAt === null
+    ) {
+      resourceIds.add(existingResource.id);
+    }
+  }
+
+  return resourceIds;
 }
 
 async function applyResourceAttributes(input: {

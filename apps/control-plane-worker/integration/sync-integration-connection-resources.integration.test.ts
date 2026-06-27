@@ -482,7 +482,7 @@ describe.concurrent("sync integration connection resources", () => {
     ]);
   });
 
-  it("persists attributes for currently accessible resources that are not in the resource snapshot", async ({
+  it("keeps attribute-bearing accessible resources available when they are not in the resource snapshot", async ({
     env,
   }) => {
     await seedGitHubConnection({
@@ -561,6 +561,21 @@ describe.concurrent("sync integration connection resources", () => {
       expect.objectContaining({
         resourceExternalId: "2",
         attributeValue: "false",
+        removedAt: null,
+      }),
+    );
+
+    const persistedResource =
+      await env.controlPlaneDb.query.integrationConnectionResources.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.connectionId, "icn_sync_resource_attributes_existing_resource"),
+            eq(table.handle, "bob"),
+          ),
+      });
+    expect(persistedResource).toEqual(
+      expect.objectContaining({
+        status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
         removedAt: null,
       }),
     );
