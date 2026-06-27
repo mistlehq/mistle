@@ -420,12 +420,33 @@ export type IntegrationResourceDefinition = {
   displayNamePlural: string;
   description?: string;
   credential?: IntegrationResourceCredentialRef | IntegrationResourceCredentialSelector;
+  attributeDefinitions?: ReadonlyArray<IntegrationResourceAttributeDefinition>;
+};
+
+export type IntegrationResourceAttributeValueType = "boolean" | "number" | "string";
+
+export type IntegrationResourceAttributeDefinition = {
+  key: string;
+  valueType: IntegrationResourceAttributeValueType;
+  displayName?: string;
+  description?: string;
+  actorPolicyEligible?: boolean;
 };
 
 export type DiscoveredIntegrationResource = {
   externalId?: string;
   handle: string;
   displayName: string;
+  metadata: Record<string, unknown>;
+};
+
+export type DiscoveredIntegrationResourceAttribute = {
+  resourceKind: string;
+  resourceExternalId?: string;
+  resourceHandle: string;
+  key: string;
+  value: string;
+  valueType: IntegrationResourceAttributeValueType;
   metadata: Record<string, unknown>;
 };
 
@@ -446,6 +467,7 @@ export type ListConnectionResourcesInput<
 
 export type ListConnectionResourcesResult = {
   resources: ReadonlyArray<DiscoveredIntegrationResource>;
+  attributes?: ReadonlyArray<DiscoveredIntegrationResourceAttribute>;
 };
 
 export type IntegrationResourceSyncTrigger = {
