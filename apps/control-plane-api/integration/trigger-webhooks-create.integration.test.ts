@@ -2,7 +2,7 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
-import { TriggerKinds } from "@mistle/db/control-plane";
+import { TriggerKinds, type WebhookTriggerActorPolicy } from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
@@ -18,6 +18,36 @@ import {
 const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
+
+const GitHubOrgMemberActorPolicy: WebhookTriggerActorPolicy = {
+  anyOf: [
+    {
+      kind: "relationship",
+      relationshipKind: "belongs_to",
+      actorSet: {
+        resourceKind: "org",
+        externalId: "MDEyOk9yZ2FuaXphdGlvbjE=",
+      },
+      scope: {
+        resourceKind: "org",
+        externalId: "MDEyOk9yZ2FuaXphdGlvbjE=",
+      },
+    },
+    {
+      kind: "resource",
+      actor: {
+        resourceKind: "user",
+        handle: "octocat",
+      },
+    },
+    {
+      kind: "attribute",
+      attributeKey: "is_bot",
+      attributeValue: "false",
+      valueType: "boolean",
+    },
+  ],
+};
 
 describe.concurrent("trigger webhooks create integration", () => {
   it("creates a webhook trigger in the authenticated user's active organization", async ({
@@ -47,6 +77,7 @@ describe.concurrent("trigger webhooks create integration", () => {
           integrationWebhookSourceId: "iws_trigger_webhook_create",
           sandboxProfileId: "sbp_trigger_webhook_create",
           sandboxProfileVersion: 3,
+          actorPolicy: GitHubOrgMemberActorPolicy,
         }),
       ),
     });
@@ -60,6 +91,7 @@ describe.concurrent("trigger webhooks create integration", () => {
     expect(body.eventConditions).toEqual([
       {
         eventType: GitHubIssueCommentCreatedEventType,
+        actorPolicy: GitHubOrgMemberActorPolicy,
         payloadFilter: {
           op: "eq",
           path: ["action"],
@@ -88,6 +120,7 @@ describe.concurrent("trigger webhooks create integration", () => {
     }
     expect(persistedWebhook.integrationWebhookSourceId).toBe("iws_trigger_webhook_create");
     expect(persistedWebhook.instructions).toBe("Prefer concise triage summaries.");
+    expect(persistedWebhook.eventConditions).toEqual(body.eventConditions);
 
     const persistedTarget = await env.controlPlaneDb.query.triggerTargets.findFirst({
       where: (table, { eq }) => eq(table.triggerId, body.id),
@@ -121,6 +154,7 @@ describe.concurrent("trigger webhooks create integration", () => {
       profileVersion: 3,
       targetId: "tgt_trigger_webhook_duplicate",
       name: "GitHub Issue Comments",
+      actorPolicy: GitHubOrgMemberActorPolicy,
       primaryRepositoryId: "mistlehq/platform",
     });
 
@@ -143,6 +177,7 @@ describe.concurrent("trigger webhooks create integration", () => {
     expect(body.eventConditions).toEqual([
       {
         eventType: GitHubIssueCommentCreatedEventType,
+        actorPolicy: GitHubOrgMemberActorPolicy,
         payloadFilter: {
           op: "eq",
           path: ["action"],

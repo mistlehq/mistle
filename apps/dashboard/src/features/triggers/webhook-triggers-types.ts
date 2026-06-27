@@ -16,9 +16,90 @@ const WebhookTriggerTargetSchema = z
   })
   .strict();
 
+const WebhookTriggerActorPolicyResourceReferenceSchema = z.union([
+  z
+    .object({
+      resourceKind: z.string().min(1),
+      resourceId: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      resourceKind: z.string().min(1),
+      externalId: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      resourceKind: z.string().min(1),
+      handle: z.string().min(1),
+    })
+    .strict(),
+]);
+
+const WebhookTriggerActorPolicyAttributeRuleSchema = z
+  .object({
+    kind: z.literal("attribute"),
+    attributeKey: z.string().min(1),
+    attributeValue: z.string().min(1),
+    valueType: z.enum(["boolean", "number", "string"]),
+  })
+  .strict()
+  .superRefine((rule, ctx) => {
+    if (
+      rule.valueType === "boolean" &&
+      rule.attributeValue !== "true" &&
+      rule.attributeValue !== "false"
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Boolean actor policy attribute values must be exactly 'true' or 'false'.",
+        path: ["attributeValue"],
+      });
+      return;
+    }
+
+    if (rule.valueType === "number") {
+      const numericValue = Number(rule.attributeValue);
+      if (!Number.isFinite(numericValue) || String(numericValue) !== rule.attributeValue) {
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "Number actor policy attribute values must be canonical finite JavaScript numbers.",
+          path: ["attributeValue"],
+        });
+      }
+    }
+  });
+
+const WebhookTriggerActorPolicyRuleSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("resource"),
+      actor: WebhookTriggerActorPolicyResourceReferenceSchema,
+    })
+    .strict(),
+  WebhookTriggerActorPolicyAttributeRuleSchema,
+  z
+    .object({
+      kind: z.literal("relationship"),
+      relationshipKind: z.string().min(1),
+      actorSet: WebhookTriggerActorPolicyResourceReferenceSchema,
+      scope: WebhookTriggerActorPolicyResourceReferenceSchema,
+    })
+    .strict(),
+]);
+
+const WebhookTriggerActorPolicySchema = z
+  .object({
+    anyOf: z.array(WebhookTriggerActorPolicyRuleSchema).min(1),
+  })
+  .strict();
+
 const WebhookTriggerEventConditionSchema = z
   .object({
     eventType: z.string().min(1),
+    actorPolicy: WebhookTriggerActorPolicySchema.optional(),
     payloadFilter: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
@@ -48,6 +129,7 @@ export const DeleteWebhookTriggerResultSchema = z
   .strict();
 
 export type WebhookTrigger = z.infer<typeof WebhookTriggerSchema>;
+export type WebhookTriggerActorPolicy = z.infer<typeof WebhookTriggerActorPolicySchema>;
 export type DeleteWebhookTriggerResult = z.infer<typeof DeleteWebhookTriggerResultSchema>;
 
 export type CreateWebhookTriggerInput = CreateWebhookTriggerRequest;

@@ -4,6 +4,7 @@ import {
   IntegrationConnectionStatuses,
   IntegrationWebhookSourceStatuses,
   SandboxProfileVersionStates,
+  type WebhookTriggerActorPolicy,
 } from "@mistle/db/control-plane";
 import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "@mistle/integrations-core";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
@@ -149,6 +150,7 @@ export async function seedPersistedWebhookTrigger(
     targetId: string;
     name: string;
     enabled?: boolean;
+    actorPolicy?: WebhookTriggerActorPolicy;
     primaryRepositoryId?: string | null;
     createdAt?: string;
   },
@@ -170,6 +172,7 @@ export async function seedPersistedWebhookTrigger(
     eventConditions: [
       {
         eventType: GitHubIssueCommentCreatedEventType,
+        ...(input.actorPolicy === undefined ? {} : { actorPolicy: input.actorPolicy }),
         payloadFilter: {
           op: "eq",
           path: ["action"],
@@ -200,6 +203,7 @@ export function createWebhookTriggerRequestBody(input: {
   integrationWebhookSourceId: string;
   sandboxProfileId: string;
   sandboxProfileVersion?: number;
+  actorPolicy?: WebhookTriggerActorPolicy;
   primaryRepositoryId?: string | null;
 }) {
   return {
@@ -209,6 +213,7 @@ export function createWebhookTriggerRequestBody(input: {
     eventConditions: [
       {
         eventType: GitHubIssueCommentCreatedEventType,
+        ...(input.actorPolicy === undefined ? {} : { actorPolicy: input.actorPolicy }),
         payloadFilter: {
           op: "eq",
           path: ["action"],

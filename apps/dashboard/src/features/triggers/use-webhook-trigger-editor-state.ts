@@ -194,7 +194,12 @@ async function invalidateTriggersListQuery(queryClient: QueryClient): Promise<vo
 function applyWebhookTriggerValueChange(input: {
   values: WebhookTriggerFormValues;
   key: keyof WebhookTriggerFormValues;
-  value: string | boolean | string[] | WebhookTriggerFormValues["eventParameterRules"];
+  value:
+    | string
+    | boolean
+    | string[]
+    | WebhookTriggerFormValues["eventActorPolicies"]
+    | WebhookTriggerFormValues["eventParameterRules"];
   eventOptions: readonly WebhookTriggerEventOption[];
 }): WebhookTriggerFormValues {
   const nextValues: WebhookTriggerFormValues = {
@@ -203,6 +208,16 @@ function applyWebhookTriggerValueChange(input: {
   };
 
   if (input.key === "eventIds") {
+    nextValues.eventActorPolicies = Object.fromEntries(
+      nextValues.eventIds.flatMap((triggerId) => {
+        const actorPolicy = nextValues.eventActorPolicies?.[triggerId];
+        if (actorPolicy === undefined) {
+          return [];
+        }
+
+        return [[triggerId, actorPolicy]];
+      }),
+    );
     nextValues.eventParameterRules = Object.fromEntries(
       nextValues.eventIds.map((triggerId) => [
         triggerId,
@@ -366,7 +381,12 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
   onSubmit: () => void;
   onValueChange: (
     key: keyof WebhookTriggerFormValues,
-    value: string | boolean | string[] | WebhookTriggerFormValues["eventParameterRules"],
+    value:
+      | string
+      | boolean
+      | string[]
+      | WebhookTriggerFormValues["eventActorPolicies"]
+      | WebhookTriggerFormValues["eventParameterRules"],
   ) => void;
 } {
   const queryClient = useQueryClient();
@@ -644,7 +664,12 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
 
   function onValueChange(
     key: keyof WebhookTriggerFormValues,
-    value: string | boolean | string[] | WebhookTriggerFormValues["eventParameterRules"],
+    value:
+      | string
+      | boolean
+      | string[]
+      | WebhookTriggerFormValues["eventActorPolicies"]
+      | WebhookTriggerFormValues["eventParameterRules"],
   ): void {
     const nextValues = applyWebhookTriggerValueChange({
       values: formValues,

@@ -258,6 +258,12 @@ export {
 } from "./provider-resource-association-delivery-processors.js";
 export {
   webhookTriggers,
+  type WebhookTriggerActorPolicy,
+  type WebhookTriggerActorPolicyAttributeRule,
+  type WebhookTriggerActorPolicyRelationshipRule,
+  type WebhookTriggerActorPolicyResourceReference,
+  type WebhookTriggerActorPolicyRule,
+  type WebhookTriggerActorPolicySpecificActorRule,
   type WebhookTriggerEventCondition,
   type InsertWebhookTrigger,
   type WebhookTrigger,

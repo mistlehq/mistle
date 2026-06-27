@@ -16302,6 +16302,66 @@ export interface paths {
             conversationKeyTemplate: string;
             enabled?: boolean;
             eventConditions: {
+              actorPolicy?: {
+                anyOf: (
+                  | {
+                      actor:
+                        | {
+                            resourceId: string;
+                            resourceKind: string;
+                          }
+                        | {
+                            externalId: string;
+                            resourceKind: string;
+                          }
+                        | {
+                            handle: string;
+                            resourceKind: string;
+                          };
+                      /** @enum {string} */
+                      kind: "resource";
+                    }
+                  | {
+                      attributeKey: string;
+                      attributeValue: string;
+                      /** @enum {string} */
+                      kind: "attribute";
+                      /** @enum {string} */
+                      valueType: "boolean" | "number" | "string";
+                    }
+                  | {
+                      actorSet:
+                        | {
+                            resourceId: string;
+                            resourceKind: string;
+                          }
+                        | {
+                            externalId: string;
+                            resourceKind: string;
+                          }
+                        | {
+                            handle: string;
+                            resourceKind: string;
+                          };
+                      /** @enum {string} */
+                      kind: "relationship";
+                      relationshipKind: string;
+                      scope:
+                        | {
+                            resourceId: string;
+                            resourceKind: string;
+                          }
+                        | {
+                            externalId: string;
+                            resourceKind: string;
+                          }
+                        | {
+                            handle: string;
+                            resourceKind: string;
+                          };
+                    }
+                )[];
+              };
               eventType: string;
               payloadFilter?: {
                 [key: string]: unknown;
@@ -16332,6 +16392,66 @@ export interface paths {
               createdAt: string;
               enabled: boolean;
               eventConditions: {
+                actorPolicy?: {
+                  anyOf: (
+                    | {
+                        actor:
+                          | {
+                              resourceId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              externalId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              handle: string;
+                              resourceKind: string;
+                            };
+                        /** @enum {string} */
+                        kind: "resource";
+                      }
+                    | {
+                        attributeKey: string;
+                        attributeValue: string;
+                        /** @enum {string} */
+                        kind: "attribute";
+                        /** @enum {string} */
+                        valueType: "boolean" | "number" | "string";
+                      }
+                    | {
+                        actorSet:
+                          | {
+                              resourceId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              externalId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              handle: string;
+                              resourceKind: string;
+                            };
+                        /** @enum {string} */
+                        kind: "relationship";
+                        relationshipKind: string;
+                        scope:
+                          | {
+                              resourceId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              externalId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              handle: string;
+                              resourceKind: string;
+                            };
+                      }
+                  )[];
+                };
                 eventType: string;
                 payloadFilter?: {
                   [key: string]: unknown;
@@ -16443,6 +16563,66 @@ export interface paths {
               createdAt: string;
               enabled: boolean;
               eventConditions: {
+                actorPolicy?: {
+                  anyOf: (
+                    | {
+                        actor:
+                          | {
+                              resourceId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              externalId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              handle: string;
+                              resourceKind: string;
+                            };
+                        /** @enum {string} */
+                        kind: "resource";
+                      }
+                    | {
+                        attributeKey: string;
+                        attributeValue: string;
+                        /** @enum {string} */
+                        kind: "attribute";
+                        /** @enum {string} */
+                        valueType: "boolean" | "number" | "string";
+                      }
+                    | {
+                        actorSet:
+                          | {
+                              resourceId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              externalId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              handle: string;
+                              resourceKind: string;
+                            };
+                        /** @enum {string} */
+                        kind: "relationship";
+                        relationshipKind: string;
+                        scope:
+                          | {
+                              resourceId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              externalId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              handle: string;
+                              resourceKind: string;
+                            };
+                      }
+                  )[];
+                };
                 eventType: string;
                 payloadFilter?: {
                   [key: string]: unknown;
@@ -16615,6 +16795,66 @@ export interface paths {
             conversationKeyTemplate?: string;
             enabled?: boolean;
             eventConditions?: {
+              actorPolicy?: {
+                anyOf: (
+                  | {
+                      actor:
+                        | {
+                            resourceId: string;
+                            resourceKind: string;
+                          }
+                        | {
+                            externalId: string;
+                            resourceKind: string;
+                          }
+                        | {
+                            handle: string;
+                            resourceKind: string;
+                          };
+                      /** @enum {string} */
+                      kind: "resource";
+                    }
+                  | {
+                      attributeKey: string;
+                      attributeValue: string;
+                      /** @enum {string} */
+                      kind: "attribute";
+                      /** @enum {string} */
+                      valueType: "boolean" | "number" | "string";
+                    }
+                  | {
+                      actorSet:
+                        | {
+                            resourceId: string;
+                            resourceKind: string;
+                          }
+                        | {
+                            externalId: string;
+                            resourceKind: string;
+                          }
+                        | {
+                            handle: string;
+                            resourceKind: string;
+                          };
+                      /** @enum {string} */
+                      kind: "relationship";
+                      relationshipKind: string;
+                      scope:
+                        | {
+                            resourceId: string;
+                            resourceKind: string;
+                          }
+                        | {
+                            externalId: string;
+                            resourceKind: string;
+                          }
+                        | {
+                            handle: string;
+                            resourceKind: string;
+                          };
+                    }
+                )[];
+              };
               eventType: string;
               payloadFilter?: {
                 [key: string]: unknown;
@@ -16645,6 +16885,66 @@ export interface paths {
               createdAt: string;
               enabled: boolean;
               eventConditions: {
+                actorPolicy?: {
+                  anyOf: (
+                    | {
+                        actor:
+                          | {
+                              resourceId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              externalId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              handle: string;
+                              resourceKind: string;
+                            };
+                        /** @enum {string} */
+                        kind: "resource";
+                      }
+                    | {
+                        attributeKey: string;
+                        attributeValue: string;
+                        /** @enum {string} */
+                        kind: "attribute";
+                        /** @enum {string} */
+                        valueType: "boolean" | "number" | "string";
+                      }
+                    | {
+                        actorSet:
+                          | {
+                              resourceId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              externalId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              handle: string;
+                              resourceKind: string;
+                            };
+                        /** @enum {string} */
+                        kind: "relationship";
+                        relationshipKind: string;
+                        scope:
+                          | {
+                              resourceId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              externalId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              handle: string;
+                              resourceKind: string;
+                            };
+                      }
+                  )[];
+                };
                 eventType: string;
                 payloadFilter?: {
                   [key: string]: unknown;
@@ -16767,6 +17067,66 @@ export interface paths {
               createdAt: string;
               enabled: boolean;
               eventConditions: {
+                actorPolicy?: {
+                  anyOf: (
+                    | {
+                        actor:
+                          | {
+                              resourceId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              externalId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              handle: string;
+                              resourceKind: string;
+                            };
+                        /** @enum {string} */
+                        kind: "resource";
+                      }
+                    | {
+                        attributeKey: string;
+                        attributeValue: string;
+                        /** @enum {string} */
+                        kind: "attribute";
+                        /** @enum {string} */
+                        valueType: "boolean" | "number" | "string";
+                      }
+                    | {
+                        actorSet:
+                          | {
+                              resourceId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              externalId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              handle: string;
+                              resourceKind: string;
+                            };
+                        /** @enum {string} */
+                        kind: "relationship";
+                        relationshipKind: string;
+                        scope:
+                          | {
+                              resourceId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              externalId: string;
+                              resourceKind: string;
+                            }
+                          | {
+                              handle: string;
+                              resourceKind: string;
+                            };
+                      }
+                  )[];
+                };
                 eventType: string;
                 payloadFilter?: {
                   [key: string]: unknown;

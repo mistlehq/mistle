@@ -79,7 +79,11 @@ type CommonCreateTriggerFormValues = Pick<
 type CreateTriggerFormValues = CommonCreateTriggerFormValues &
   Pick<
     WebhookTriggerFormValues,
-    "conversationKeyTemplate" | "instructions" | "eventIds" | "eventParameterRules"
+    | "conversationKeyTemplate"
+    | "instructions"
+    | "eventActorPolicies"
+    | "eventIds"
+    | "eventParameterRules"
   > &
   Pick<ScheduledTriggerFormValues, "conversationMode" | "cronExpression" | "timezone">;
 
@@ -153,6 +157,9 @@ function toWebhookValues(values: CreateTriggerFormValues): WebhookTriggerFormVal
     inputTemplate: values.inputTemplate,
     instructions: values.instructions,
     conversationKeyTemplate: values.conversationKeyTemplate,
+    ...(values.eventActorPolicies === undefined
+      ? {}
+      : { eventActorPolicies: values.eventActorPolicies }),
     eventIds: values.eventIds,
     eventParameterRules: values.eventParameterRules,
   };
@@ -260,6 +267,16 @@ function applyEventIdsChange(input: {
   const nextValues: CreateTriggerFormValues = {
     ...input.values,
     eventIds: input.eventIds,
+    eventActorPolicies: Object.fromEntries(
+      input.eventIds.flatMap((triggerId) => {
+        const actorPolicy = input.values.eventActorPolicies?.[triggerId];
+        if (actorPolicy === undefined) {
+          return [];
+        }
+
+        return [[triggerId, actorPolicy]];
+      }),
+    ),
     eventParameterRules: Object.fromEntries(
       input.eventIds.map((triggerId) => {
         const eventOptionId = resolveWebhookTriggerEventOptionIdFromConditionId(triggerId);

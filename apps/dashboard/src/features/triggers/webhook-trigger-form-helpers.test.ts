@@ -22,7 +22,7 @@ import {
   createGithubPullRequestReviewRequestedEventOption,
   GitHubWebhookSourceId,
 } from "./webhook-trigger-test-fixtures.js";
-import type { WebhookTrigger } from "./webhook-triggers-types.js";
+import type { WebhookTrigger, WebhookTriggerActorPolicy } from "./webhook-triggers-types.js";
 
 const GitHubConnectionId = "conn_github";
 const SlackConnectionId = "conn_slack";
@@ -399,6 +399,7 @@ const BaseFormValues: WebhookTriggerFormValues = {
   instructions: "",
   conversationKeyTemplate: "{{event.id}}",
   eventIds: [PullRequestConditionId0],
+  eventActorPolicies: {},
   eventParameterRules: {},
   remainingPayloadFilter: null,
 };
@@ -414,6 +415,7 @@ describe("toWebhookTriggerFormValues", () => {
       instructions: "",
       conversationKeyTemplate: "",
       eventIds: [],
+      eventActorPolicies: {},
       eventParameterRules: {},
       remainingPayloadFilter: null,
     });
@@ -429,6 +431,7 @@ describe("toWebhookTriggerFormValues", () => {
       instructions: "Use the repository conventions.",
       conversationKeyTemplate: "{{event.repository.id}}",
       eventIds: [PushConditionId0, PullRequestConditionId1],
+      eventActorPolicies: {},
       eventParameterRules: {},
       remainingPayloadFilter: {
         [PullRequestConditionId1]: {
@@ -438,6 +441,47 @@ describe("toWebhookTriggerFormValues", () => {
         },
       },
     });
+  });
+
+  it("preserves actor policies that do not have visible editor controls yet", () => {
+    const actorPolicy: WebhookTriggerActorPolicy = {
+      anyOf: [
+        {
+          kind: "relationship",
+          relationshipKind: "belongs_to",
+          actorSet: {
+            resourceKind: "org",
+            externalId: "MDEyOk9yZ2FuaXphdGlvbjE=",
+          },
+          scope: {
+            resourceKind: "org",
+            externalId: "MDEyOk9yZ2FuaXphdGlvbjE=",
+          },
+        },
+      ],
+    };
+
+    const formValues = toWebhookTriggerFormValues(
+      withWebhookTriggerEventConditions({
+        trigger: SampleTrigger,
+        eventConditions: [
+          {
+            eventType: "github.issue_comment.created",
+            actorPolicy,
+          },
+        ],
+      }),
+    );
+
+    expect(formValues.eventActorPolicies).toEqual({
+      [IssueCommentConditionId0]: actorPolicy,
+    });
+    expect(toUpdateWebhookTriggerPayload(formValues, GitHubEventOptions).eventConditions).toEqual([
+      {
+        eventType: "github.issue_comment.created",
+        actorPolicy,
+      },
+    ]);
   });
 
   it("accepts custom stored templates", () => {
