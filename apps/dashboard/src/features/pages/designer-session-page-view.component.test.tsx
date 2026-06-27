@@ -814,14 +814,14 @@ describe("DesignerCanvasWorkspace", () => {
     expect(screen.queryByTestId("designer-blueprint-add-comment-hint-classify-issue")).toBeNull();
   });
 
-  it("centers the first blueprint node horizontally near the top of the canvas viewport", () => {
+  it("centers the blueprint graph horizontally near the top of the canvas viewport", () => {
     expect(
       resolveDesignerBlueprintInitialFocusViewport({
-        nodePosition: { x: 120, y: 24 },
+        graphBounds: { x: 120, y: 24, width: 760, height: 520 },
         width: 1000,
       }),
     ).toEqual({
-      x: 253,
+      x: 25,
       y: 33.2,
       zoom: 0.95,
     });

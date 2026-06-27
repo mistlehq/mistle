@@ -1,5 +1,6 @@
 import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
+import { Button } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
@@ -39,6 +40,7 @@ import {
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 import { renderSessionWorkbenchContentStory } from "./session-story-support.js";
+import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 const IntegrationRegistry = createBrowserIntegrationRegistry();
@@ -432,6 +434,99 @@ function DesignerSessionWithCanvasStory(input?: {
   );
 }
 
+function DesignerSessionCanvasFirstOpenStory(): React.JSX.Element {
+  const blueprintTab = getStoryDesignerBlueprintCanvasTabs()[0];
+  const [tabs, setTabs] = useState<readonly DesignerSession["canvasTabs"][number][]>([]);
+  const [activeTabHref, setActiveTabHref] = useState<string | null>(null);
+
+  if (blueprintTab === undefined) {
+    throw new Error("Designer blueprint story tab is missing.");
+  }
+
+  function openBlueprint(): void {
+    setTabs([blueprintTab]);
+    setActiveTabHref(DesignerBlueprintCurrentTabHref);
+  }
+
+  function closeBlueprint(): void {
+    setTabs([]);
+    setActiveTabHref(null);
+  }
+
+  function removeCanvasTab(tabId: string): void {
+    setTabs((currentTabs) => currentTabs.filter((tab) => tab.id !== tabId));
+    setActiveTabHref(null);
+  }
+
+  function updateCanvasTabs(nextTabs: readonly DesignerSession["canvasTabs"][number][]): void {
+    setTabs([...nextTabs]);
+  }
+
+  return (
+    <DesignerCanvasStoryRuntime>
+      <div className="h-screen min-h-0 overflow-hidden">
+        <SessionWorkbenchPageView
+          alert={null}
+          bottomPanel={<></>}
+          isBottomPanelVisible={false}
+          isSecondaryPanelVisible={tabs.length > 0}
+          mainContent={
+            <div className="flex h-full min-h-0 items-start justify-end p-4">
+              <div className="flex gap-2">
+                <Button onClick={openBlueprint} size="sm" type="button">
+                  Open blueprint
+                </Button>
+                <Button onClick={closeBlueprint} size="sm" type="button" variant="outline">
+                  Reset
+                </Button>
+              </div>
+            </div>
+          }
+          mainContentLayout={{ scroll: "contained", width: "full" }}
+          primaryBottomPanel={
+            <SessionConversationBottomPanelDraftController
+              chatEntries={StoryDesignerSessionConversationEntries}
+              clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
+              clearPendingDiffComments={function clearPendingDiffComments() {}}
+              composerStateInput={StoryDesignerSessionComposerStateInput}
+              draftResetKey="designer-session-canvas-first-open"
+              isRespondingToServerRequest={false}
+              onRespondToServerRequest={noopRespondToServerRequest}
+              pendingBlueprintComments={[]}
+              pendingDiffComments={[]}
+              serverRequestPanelEntries={[]}
+            />
+          }
+          primaryPanelDefaultSize={40}
+          sandboxInstanceId="sbi_designer_canvas_first_open_story"
+          secondaryPanel={
+            <div className="h-full min-h-0 min-w-0 overflow-hidden bg-background">
+              <main className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+                <DesignerCanvasWorkspace
+                  activeTabHref={activeTabHref}
+                  mountDockviewWhenEmpty
+                  onAddBlueprintComment={function onAddBlueprintComment() {}}
+                  onActiveTabHrefChange={setActiveTabHref}
+                  onDeleteBlueprintComment={function onDeleteBlueprintComment() {}}
+                  onTabClose={removeCanvasTab}
+                  onTabsChange={updateCanvasTabs}
+                  onUpdateBlueprintComment={function onUpdateBlueprintComment() {}}
+                  pendingBlueprintComments={[]}
+                  tabs={tabs}
+                />
+              </main>
+            </div>
+          }
+          secondaryPanelDefaultSize={60}
+          secondaryPanelLayoutKey="designer-canvas-first-open-story"
+          secondaryPanelMinSize="20rem"
+          secondaryPanelMountMode="persistent-collapsible"
+        />
+      </div>
+    </DesignerCanvasStoryRuntime>
+  );
+}
+
 function useDesignerBlueprintCommentStoryState(input: {
   initialPendingBlueprintComments: readonly PendingSessionBlueprintComment[];
 }): {
@@ -790,6 +885,16 @@ export const SessionWithCanvas: Story = {
   },
   render: function RenderSessionWithCanvasStory(): React.JSX.Element {
     return <DesignerSessionWithCanvasStory />;
+  },
+};
+
+export const CanvasFirstOpen: Story = {
+  decorators: [withDashboardWorkspaceStory],
+  parameters: {
+    customWorkbenchStory: true,
+  },
+  render: function RenderCanvasFirstOpenStory(): React.JSX.Element {
+    return <DesignerSessionCanvasFirstOpenStory />;
   },
 };
 

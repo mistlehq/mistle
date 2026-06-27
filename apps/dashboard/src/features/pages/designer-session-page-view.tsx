@@ -1115,26 +1115,26 @@ function DesignerBlueprintInitialFocus(input: {
 }): React.JSX.Element | null {
   const reactFlow = useReactFlow<DesignerBlueprintVisualNode, DesignerBlueprintGraphEdge>();
   const width = useStore((state) => state.width);
-  const initialFocusNode =
-    input.graph.initialFocusNodeId === undefined
-      ? undefined
-      : input.graph.nodes.find((node) => node.id === input.graph.initialFocusNodeId);
+  const graphBounds = useMemo(
+    () => getDesignerBlueprintGraphBounds(input.graph.nodes),
+    [input.graph.nodes],
+  );
 
   // ReactFlow owns the viewport imperatively; render props and remounting cannot
   // focus the measured canvas once its store reports a usable width.
   useEffect(() => {
-    if (initialFocusNode === undefined || width <= 0) {
+    if (graphBounds === null || width <= 0) {
       return;
     }
 
     void reactFlow.setViewport(
       resolveDesignerBlueprintInitialFocusViewport({
-        nodePosition: initialFocusNode.position,
+        graphBounds,
         width,
       }),
       { duration: 0 },
     );
-  }, [initialFocusNode, reactFlow, width]);
+  }, [graphBounds, reactFlow, width]);
 
   return null;
 }
@@ -1522,18 +1522,51 @@ async function buildDesignerBlueprintGraph(input: {
 }
 
 export function resolveDesignerBlueprintInitialFocusViewport(input: {
-  nodePosition: { x: number; y: number };
+  graphBounds: DesignerBlueprintGraphBounds;
   width: number;
 }): Viewport {
   return {
     x:
       input.width / 2 -
-      (input.nodePosition.x + DesignerBlueprintNodeWidth / 2) *
-        DesignerBlueprintInitialViewport.zoom,
+      (input.graphBounds.x + input.graphBounds.width / 2) * DesignerBlueprintInitialViewport.zoom,
     y:
       DesignerBlueprintInitialFocusTopPadding -
-      input.nodePosition.y * DesignerBlueprintInitialViewport.zoom,
+      input.graphBounds.y * DesignerBlueprintInitialViewport.zoom,
     zoom: DesignerBlueprintInitialViewport.zoom,
+  };
+}
+
+type DesignerBlueprintGraphBounds = {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+};
+
+function getDesignerBlueprintGraphBounds(
+  nodes: readonly DesignerBlueprintLayoutNode[],
+): DesignerBlueprintGraphBounds | null {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const node of nodes) {
+    minX = Math.min(minX, node.position.x);
+    minY = Math.min(minY, node.position.y);
+    maxX = Math.max(maxX, node.position.x + DesignerBlueprintNodeWidth);
+    maxY = Math.max(maxY, node.position.y + getDesignerBlueprintNodeHeight(node.data));
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+    return null;
+  }
+
+  return {
+    height: maxY - minY,
+    width: maxX - minX,
+    x: minX,
+    y: minY,
   };
 }
 
