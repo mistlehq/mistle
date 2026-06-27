@@ -22,7 +22,7 @@ describe("Mistle capability catalog", () => {
           eventCount: expect.any(Number),
         },
         providerResources: {
-          resourceKindCount: 5,
+          resourceKindCount: 6,
         },
       },
     });

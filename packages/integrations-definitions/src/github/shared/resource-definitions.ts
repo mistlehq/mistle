@@ -81,6 +81,19 @@ export function createGitHubResourceDefinitions(input: {
         }),
     },
     {
+      kind: "org",
+      selectionMode: IntegrationResourceSelectionModes.MULTI,
+      bindingField: "organizations",
+      displayNameSingular: "organization",
+      displayNamePlural: "organizations",
+      description: "GitHub organizations that own repositories accessible to this connection.",
+      credential: ({ connection }) =>
+        resolveGitHubResourceCredential({
+          apiKeyCredential: gitHubRepositoryApiKeyResourceCredential,
+          connection,
+        }),
+    },
+    {
       kind: "team",
       selectionMode: IntegrationResourceSelectionModes.MULTI,
       bindingField: "teams",
@@ -113,11 +126,11 @@ export function createGitHubResourceDefinitions(input: {
 export const GitHubResourceSyncTriggers: ReadonlyArray<IntegrationResourceSyncTrigger> = [
   {
     eventType: "github.installation_repositories.added",
-    resourceKinds: ["repository", "user"],
+    resourceKinds: ["repository", "user", "org"],
   },
   {
     eventType: "github.installation_repositories.removed",
-    resourceKinds: ["repository", "user"],
+    resourceKinds: ["repository", "user", "org"],
   },
   {
     eventType: "github.member.added",

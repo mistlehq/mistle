@@ -1395,7 +1395,7 @@ describe.concurrent("control-plane worker integration webhook event handling", (
   });
 
   it("returns resource sync requests for webhook-triggered provider resources", async ({ env }) => {
-    const resourceSyncKinds: readonly ["repository", "user"] = ["repository", "user"];
+    const resourceSyncKinds: readonly ["repository", "user", "org"] = ["repository", "user", "org"];
     const scope = await seedWebhookEventScope({
       env,
       suffix: createSuffix("resource_sync"),

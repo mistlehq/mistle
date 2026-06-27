@@ -199,6 +199,12 @@ describe.concurrent("integration connections list integration", () => {
             syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
           },
           {
+            kind: "org",
+            selectionMode: "multi",
+            count: 0,
+            syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+          },
+          {
             kind: "team",
             selectionMode: "multi",
             count: 0,
@@ -261,6 +267,12 @@ describe.concurrent("integration connections list integration", () => {
           },
           {
             kind: "user",
+            selectionMode: "multi",
+            count: 0,
+            syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+          },
+          {
+            kind: "org",
             selectionMode: "multi",
             count: 0,
             syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,

@@ -18,10 +18,11 @@ import { z } from "zod";
 import { RefreshAllIntegrationConnectionResourcesResponseSchema } from "../src/integration-connections/refresh-all-integration-connection-resources/schema.js";
 import { RefreshIntegrationConnectionResourcesResponseSchema } from "../src/integration-connections/refresh-integration-connection-resources/schema.js";
 
-const GitHubResourceKinds: readonly ["repository", "branch", "user", "team", "bot"] = [
+const GitHubResourceKinds: readonly ["repository", "branch", "user", "org", "team", "bot"] = [
   "repository",
   "branch",
   "user",
+  "org",
   "team",
   "bot",
 ];
@@ -267,7 +268,7 @@ describe.concurrent("integration connection resources refresh integration", () =
   });
 });
 
-type ResourceRefreshKind = "repository" | "branch" | "user" | "team" | "bot" | "channel";
+type ResourceRefreshKind = "repository" | "branch" | "user" | "org" | "team" | "bot" | "channel";
 
 async function refreshAllResources(
   env: IntegrationTestEnvironment,
