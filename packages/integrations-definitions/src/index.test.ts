@@ -1330,6 +1330,22 @@ describe("integrations-definitions index", () => {
             },
           ],
         },
+        {
+          id: "oauth2-authorization-code",
+          label: "Linear OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect Linear",
+              helperText: "Authorize Linear access with your Linear OAuth application.",
+              showCallbackUrl: true,
+            },
+            reauthorize: {
+              actionLabel: "Re-authorize",
+              pendingLabel: "Starting...",
+            },
+          },
+        },
       ],
     });
     expect(linearDefinition?.mcp).toBeDefined();

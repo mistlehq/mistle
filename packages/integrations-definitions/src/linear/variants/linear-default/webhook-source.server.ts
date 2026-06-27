@@ -6,7 +6,7 @@ import {
 import { z } from "zod";
 
 import { buildIntegrationWebhookCallbackUrl } from "../../../shared/webhook-callback-url.server.js";
-import { LinearConnectionConfigSchema, type LinearConnectionConfig } from "./auth.js";
+import { LinearApiKeyConnectionConfigSchema, type LinearConnectionConfig } from "./auth.js";
 import {
   LinearManagedWebhookResourceTypes,
   LinearWebhookPermissionRequirements,
@@ -434,7 +434,7 @@ export const LinearWebhookSourceCapability: IntegrationWebhookSourceCapability<
 > = {
   lifecycle: IntegrationWebhookSourceLifecycles.MANAGED,
   supportsConnection(input) {
-    return LinearConnectionConfigSchema.safeParse(input.connection.config).success;
+    return LinearApiKeyConnectionConfigSchema.safeParse(input.connection.config).success;
   },
   async describeSource(input) {
     const endpointKey = input.source.endpointKey;
@@ -496,7 +496,7 @@ export const LinearWebhookSourceCapability: IntegrationWebhookSourceCapability<
   },
   async refreshTriggerCapabilities(input) {
     LinearWebhookTriggerCapabilitiesRefreshBodySchema.parse(input.body);
-    LinearConnectionConfigSchema.parse(input.connection.config);
+    LinearApiKeyConnectionConfigSchema.parse(input.connection.config);
 
     if (input.source.remoteRegistrationId === undefined) {
       throw new Error(

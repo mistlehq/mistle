@@ -1,6 +1,6 @@
 import { type CompileBindingInput, type CompileBindingResult } from "@mistle/integrations-core";
 
-import { LinearCredentialSlotKeys, resolveLinearCredentialSecretType } from "./auth.js";
+import { resolveLinearCredential } from "./auth.js";
 import type { LinearBindingConfig } from "./binding-config-schema.js";
 import { LinearRequestMiddlewareIds } from "./egress-request-middleware.js";
 import type { LinearTargetConfig } from "./target-config-schema.js";
@@ -19,7 +19,7 @@ const LinearMcpBaseUrl = "https://mcp.linear.app/mcp";
 
 function createLinearMcpRoute(input: {
   connectionId: string;
-  credentialSecretType: "api_key";
+  credential: ReturnType<typeof resolveLinearCredential>;
 }): NonNullable<CompileBindingResult["egressRoutes"][number]> {
   return {
     match: {
@@ -35,15 +35,15 @@ function createLinearMcpRoute(input: {
     credentialResolver: {
       kind: "integration_connection",
       connectionId: input.connectionId,
-      secretType: input.credentialSecretType,
-      slotKey: LinearCredentialSlotKeys.API_KEY,
+      secretType: input.credential.secretType,
+      slotKey: input.credential.slotKey,
     },
     requestMiddleware: [LinearRequestMiddlewareIds.APPEND_SESSION_LINK_TO_MCP_MARKDOWN],
   };
 }
 
 export function compileLinearBinding(input: LinearCompileBindingInput): CompileBindingResult {
-  const credentialSecretType = resolveLinearCredentialSecretType(input.connection.config);
+  const credential = resolveLinearCredential(input.connection.config);
   const includesLinearMcp = input.binding.config.tools.includes(LinearToolIds.LINEAR_MCP);
 
   return {
@@ -58,21 +58,21 @@ export function compileLinearBinding(input: LinearCompileBindingInput): CompileB
           baseUrl: LinearApiBaseUrl,
         },
         authInjection: {
-          type: "header",
+          type: credential.authInjectionType,
           target: "authorization",
         },
         credentialResolver: {
           kind: "integration_connection",
           connectionId: input.connection.id,
-          secretType: credentialSecretType,
-          slotKey: LinearCredentialSlotKeys.API_KEY,
+          secretType: credential.secretType,
+          slotKey: credential.slotKey,
         },
       },
       ...(includesLinearMcp
         ? [
             createLinearMcpRoute({
               connectionId: input.connection.id,
-              credentialSecretType,
+              credential,
             }),
           ]
         : []),
