@@ -18,6 +18,15 @@ const SlackBotTokenResourceCredential: IntegrationResourceCredentialRef = {
 export function createSlackResourceDefinitions(): ReadonlyArray<IntegrationResourceDefinition> {
   return [
     {
+      kind: "workspace",
+      selectionMode: IntegrationResourceSelectionModes.SINGLE,
+      bindingField: "workspace",
+      displayNameSingular: "workspace",
+      displayNamePlural: "workspaces",
+      description: "The Slack workspace connected to this Slack app installation.",
+      credential: SlackBotTokenResourceCredential,
+    },
+    {
       kind: "channel",
       selectionMode: IntegrationResourceSelectionModes.MULTI,
       bindingField: "channels",
@@ -34,6 +43,29 @@ export function createSlackResourceDefinitions(): ReadonlyArray<IntegrationResou
       displayNamePlural: "users",
       description: "Slack users accessible to this connection, including bot users.",
       credential: SlackBotTokenResourceCredential,
+      attributeDefinitions: [
+        {
+          key: "is_bot",
+          valueType: "boolean",
+          displayName: "Bot user",
+          description: "Whether Slack identifies this user as a bot account.",
+          actorPolicyEligible: true,
+        },
+        {
+          key: "is_app_user",
+          valueType: "boolean",
+          displayName: "App user",
+          description: "Whether Slack identifies this user as an app user.",
+          actorPolicyEligible: true,
+        },
+        {
+          key: "is_workflow_bot",
+          valueType: "boolean",
+          displayName: "Workflow bot",
+          description: "Whether Slack identifies this user as a workflow bot.",
+          actorPolicyEligible: true,
+        },
+      ],
     },
     {
       kind: "user_group",

@@ -229,6 +229,214 @@ describe.concurrent("sync integration connection resources", () => {
     }
   });
 
+  it("syncs the Slack workspace resource through the real control-plane credential resolver", async ({
+    env,
+  }) => {
+    const slackApi = await startSimulatedSlackApi();
+
+    try {
+      const slackConnection = await createSlackConnection({
+        env,
+        targetKey: "slack-default-sync-resources-workspace",
+        connectionName: "Slack Sync Resources Workspace",
+        apiBaseUrl: `${slackApi.baseUrl}/api`,
+        email: "integration-new-sync-resources-slack-workspace@example.com",
+      });
+
+      await expect(
+        syncIntegrationConnectionResources(
+          {
+            db: env.controlPlaneDb,
+            integrationRegistry: createIntegrationRegistry(),
+            controlPlaneInternalClient: createControlPlaneInternalClient(env),
+          },
+          {
+            organizationId: slackConnection.organizationId,
+            connectionId: slackConnection.connectionId,
+            kind: "workspace",
+          },
+        ),
+      ).resolves.toEqual({
+        organizationId: slackConnection.organizationId,
+        connectionId: slackConnection.connectionId,
+        kind: "workspace",
+      });
+
+      const persistedResource =
+        await env.controlPlaneDb.query.integrationConnectionResources.findFirst({
+          where: (table, { and, eq }) =>
+            and(eq(table.connectionId, slackConnection.connectionId), eq(table.kind, "workspace")),
+        });
+      expect(persistedResource).toEqual(
+        expect.objectContaining({
+          externalId: "T123",
+          handle: "T123",
+          displayName: "Mistle",
+          status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
+          removedAt: null,
+          metadata: {
+            name: "Mistle",
+            url: "https://mistle.slack.com/",
+            authenticatedUserName: "mistlebot",
+            authenticatedUserId: "U_BOT",
+            authenticatedBotId: "B123",
+          },
+        }),
+      );
+
+      const persistedState =
+        await env.controlPlaneDb.query.integrationConnectionResourceStates.findFirst({
+          where: (table, { and, eq }) =>
+            and(eq(table.connectionId, slackConnection.connectionId), eq(table.kind, "workspace")),
+        });
+      expect(persistedState).toEqual(
+        expect.objectContaining({
+          syncState: IntegrationConnectionResourceSyncStates.READY,
+          totalCount: 1,
+          lastErrorCode: null,
+          lastErrorMessage: null,
+        }),
+      );
+    } finally {
+      await slackApi.stop();
+    }
+  });
+
+  it("syncs Slack user resources with normalized actor attributes", async ({ env }) => {
+    const slackApi = await startSimulatedSlackApi();
+
+    try {
+      const slackConnection = await createSlackConnection({
+        env,
+        targetKey: "slack-default-sync-resources-user-attributes",
+        connectionName: "Slack Sync Resources User Attributes",
+        apiBaseUrl: `${slackApi.baseUrl}/api`,
+        email: "integration-new-sync-resources-slack-user-attributes@example.com",
+      });
+
+      await expect(
+        syncIntegrationConnectionResources(
+          {
+            db: env.controlPlaneDb,
+            integrationRegistry: createIntegrationRegistry(),
+            controlPlaneInternalClient: createControlPlaneInternalClient(env),
+          },
+          {
+            organizationId: slackConnection.organizationId,
+            connectionId: slackConnection.connectionId,
+            kind: "user",
+          },
+        ),
+      ).resolves.toEqual({
+        organizationId: slackConnection.organizationId,
+        connectionId: slackConnection.connectionId,
+        kind: "user",
+      });
+
+      const persistedResources =
+        await env.controlPlaneDb.query.integrationConnectionResources.findMany({
+          where: (table, { and, eq }) =>
+            and(eq(table.connectionId, slackConnection.connectionId), eq(table.kind, "user")),
+          orderBy: (table, { asc }) => [asc(table.handle)],
+        });
+      expect(
+        persistedResources.map((resource) => ({
+          externalId: resource.externalId,
+          handle: resource.handle,
+          displayName: resource.displayName,
+          status: resource.status,
+          removedAt: resource.removedAt,
+        })),
+      ).toEqual([
+        {
+          externalId: "U_BOT",
+          handle: "U_BOT",
+          displayName: "Deploy Bot",
+          status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
+          removedAt: null,
+        },
+        {
+          externalId: "U_HUMAN",
+          handle: "U_HUMAN",
+          displayName: "Casey",
+          status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
+          removedAt: null,
+        },
+      ]);
+
+      const persistedAttributes =
+        await env.controlPlaneDb.query.integrationConnectionResourceAttributes.findMany({
+          where: (table, { and, eq }) =>
+            and(
+              eq(table.connectionId, slackConnection.connectionId),
+              eq(table.resourceKind, "user"),
+            ),
+          orderBy: (table, { asc }) => [asc(table.resourceHandle), asc(table.attributeKey)],
+        });
+      expect(
+        persistedAttributes.map((attribute) => ({
+          resourceExternalId: attribute.resourceExternalId,
+          resourceHandle: attribute.resourceHandle,
+          attributeKey: attribute.attributeKey,
+          attributeValue: attribute.attributeValue,
+          valueType: attribute.valueType,
+          removedAt: attribute.removedAt,
+        })),
+      ).toEqual([
+        {
+          resourceExternalId: "U_BOT",
+          resourceHandle: "U_BOT",
+          attributeKey: "is_app_user",
+          attributeValue: "true",
+          valueType: "boolean",
+          removedAt: null,
+        },
+        {
+          resourceExternalId: "U_BOT",
+          resourceHandle: "U_BOT",
+          attributeKey: "is_bot",
+          attributeValue: "true",
+          valueType: "boolean",
+          removedAt: null,
+        },
+        {
+          resourceExternalId: "U_BOT",
+          resourceHandle: "U_BOT",
+          attributeKey: "is_workflow_bot",
+          attributeValue: "false",
+          valueType: "boolean",
+          removedAt: null,
+        },
+        {
+          resourceExternalId: "U_HUMAN",
+          resourceHandle: "U_HUMAN",
+          attributeKey: "is_app_user",
+          attributeValue: "false",
+          valueType: "boolean",
+          removedAt: null,
+        },
+        {
+          resourceExternalId: "U_HUMAN",
+          resourceHandle: "U_HUMAN",
+          attributeKey: "is_bot",
+          attributeValue: "false",
+          valueType: "boolean",
+          removedAt: null,
+        },
+        {
+          resourceExternalId: "U_HUMAN",
+          resourceHandle: "U_HUMAN",
+          attributeKey: "is_workflow_bot",
+          attributeValue: "false",
+          valueType: "boolean",
+          removedAt: null,
+        },
+      ]);
+    } finally {
+      await slackApi.stop();
+    }
+  });
+
   it("ignores an older successful snapshot after a newer sync has already started", async ({
     env,
   }) => {
@@ -1923,13 +2131,6 @@ function handleSimulatedSlackApiRequest(request: IncomingMessage, response: Serv
     return;
   }
 
-  const requestUrl = new URL(request.url, "http://127.0.0.1");
-  if (requestUrl.pathname !== "/api/conversations.list") {
-    response.writeHead(404);
-    response.end("Not found.");
-    return;
-  }
-
   if (request.headers.authorization !== "Bearer xoxb-test-token") {
     response.writeHead(401, {
       "content-type": "application/json",
@@ -1943,7 +2144,91 @@ function handleSimulatedSlackApiRequest(request: IncomingMessage, response: Serv
     return;
   }
 
+  const requestUrl = new URL(request.url, "http://127.0.0.1");
   response.setHeader("content-type", "application/json");
+  if (requestUrl.pathname === "/api/auth.test") {
+    if (request.headers["content-type"] !== "application/x-www-form-urlencoded") {
+      response.writeHead(415, {
+        "content-type": "application/json",
+      });
+      response.end(
+        JSON.stringify({
+          ok: false,
+          error: "missing_post_type",
+        }),
+      );
+      return;
+    }
+
+    // This simulator is intentionally limited to the documented Slack
+    // `auth.test` response fields consumed by the integration definition:
+    // https://docs.slack.dev/reference/methods/auth.test/
+    response.end(
+      JSON.stringify({
+        ok: true,
+        url: "https://mistle.slack.com/",
+        team: "Mistle",
+        user: "mistlebot",
+        team_id: "T123",
+        user_id: "U_BOT",
+        bot_id: "B123",
+      }),
+    );
+    return;
+  }
+
+  if (requestUrl.pathname === "/api/users.list") {
+    // This simulator is intentionally limited to the documented Slack
+    // `users.list` response fields consumed by the integration definition:
+    // https://docs.slack.dev/reference/methods/users.list/
+    response.end(
+      JSON.stringify({
+        ok: true,
+        members: [
+          {
+            id: "U_HUMAN",
+            team_id: "T123",
+            name: "casey",
+            real_name: "Casey Low",
+            deleted: false,
+            is_bot: false,
+            is_app_user: false,
+            profile: {
+              display_name: "Casey",
+              real_name: "Casey Low",
+            },
+          },
+          {
+            id: "U_BOT",
+            name: "deploybot",
+            deleted: false,
+            is_bot: true,
+            is_app_user: true,
+            is_workflow_bot: false,
+            profile: {
+              real_name: "Deploy Bot",
+            },
+          },
+          {
+            id: "U_DELETED",
+            name: "deleted-user",
+            deleted: true,
+          },
+        ],
+        response_metadata: {
+          next_cursor: "",
+        },
+      }),
+    );
+    return;
+  }
+
+  if (requestUrl.pathname !== "/api/conversations.list") {
+    response.writeHead(404);
+    response.end("Not found.");
+    return;
+  }
+
   // This simulator is intentionally limited to the documented Slack
   // `conversations.list` response fields consumed by the integration
   // definition:
