@@ -450,6 +450,52 @@ export type DiscoveredIntegrationResourceAttribute = {
   metadata: Record<string, unknown>;
 };
 
+export type DiscoveredIntegrationResourceRelationshipScope = {
+  scopeKind: string;
+  scopeExternalId?: string;
+  scopeHandle: string;
+};
+
+export type IntegrationResourceRelationshipScopeDefinition = {
+  scopeKind: string;
+  displayName?: string;
+  description?: string;
+};
+
+export type IntegrationResourceRelationshipCredentialSelectorInput = {
+  connection: IntegrationConnection;
+  relationshipKind: string;
+  scope: DiscoveredIntegrationResourceRelationshipScope;
+};
+
+export type IntegrationResourceRelationshipCredentialSelector = (
+  input: IntegrationResourceRelationshipCredentialSelectorInput,
+) => IntegrationResourceCredentialRef | undefined;
+
+export type IntegrationResourceRelationshipDefinition = {
+  relationshipKind: string;
+  subjectResourceKind: string;
+  objectResourceKind: string;
+  displayName?: string;
+  description?: string;
+  credential?: IntegrationResourceCredentialRef | IntegrationResourceRelationshipCredentialSelector;
+  scopeDefinitions: ReadonlyArray<IntegrationResourceRelationshipScopeDefinition>;
+};
+
+export type DiscoveredIntegrationResourceRelationship = {
+  relationshipKind: string;
+  subjectResourceKind: string;
+  subjectExternalId?: string;
+  subjectHandle: string;
+  objectResourceKind: string;
+  objectExternalId?: string;
+  objectHandle: string;
+  scopeKind: string;
+  scopeExternalId?: string;
+  scopeHandle: string;
+  metadata: Record<string, unknown>;
+};
+
 export type ListConnectionResourcesInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -468,6 +514,26 @@ export type ListConnectionResourcesInput<
 export type ListConnectionResourcesResult = {
   resources: ReadonlyArray<DiscoveredIntegrationResource>;
   attributes?: ReadonlyArray<DiscoveredIntegrationResourceAttribute>;
+};
+
+export type ListConnectionResourceRelationshipsInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  relationshipKind: string;
+  scope: DiscoveredIntegrationResourceRelationshipScope;
+  credential?: IntegrationCredentialResolverResult;
+};
+
+export type ListConnectionResourceRelationshipsResult = {
+  relationships: ReadonlyArray<DiscoveredIntegrationResourceRelationship>;
 };
 
 export type IntegrationResourceSyncTrigger = {
@@ -3018,6 +3084,7 @@ export type IntegrationDefinition<
   associatedResourceEvents?: IntegrationAssociatedResourceEventsCapability<TConnectionConfig>;
   webhookTriggerCapabilitiesRefreshUi?: IntegrationWebhookTriggerCapabilitiesRefreshUi | undefined;
   resourceDefinitions?: ReadonlyArray<IntegrationResourceDefinition>;
+  resourceRelationshipDefinitions?: ReadonlyArray<IntegrationResourceRelationshipDefinition>;
   resourceSyncTriggers?: ReadonlyArray<IntegrationResourceSyncTrigger>;
   egressRequestMiddleware?: ReadonlyArray<IntegrationEgressRequestMiddleware>;
   resolveEgressCredentialResolver?(
@@ -3035,6 +3102,13 @@ export type IntegrationDefinition<
       TConnectionConfig
     >,
   ): MaybePromise<ListConnectionResourcesResult>;
+  listConnectionResourceRelationships?(
+    input: ListConnectionResourceRelationshipsInput<
+      ParsedSchemaOutput<TTargetConfigSchema>,
+      ParsedSchemaOutput<TTargetSecretsSchema>,
+      TConnectionConfig
+    >,
+  ): MaybePromise<ListConnectionResourceRelationshipsResult>;
   mcp?: IntegrationMcpDefinition<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TBindingConfigSchema>,
