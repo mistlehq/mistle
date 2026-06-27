@@ -1316,6 +1316,9 @@ describe("integrations-definitions index", () => {
       variantId: "linear-default",
       kind: "connector",
       displayName: "Linear",
+      identityLinking: {
+        eligibleConnectionMethodIds: ["linear-oauth-app"],
+      },
       connectionMethods: [
         {
           id: "api-key",
@@ -1329,6 +1332,26 @@ describe("integrations-definitions index", () => {
               slotKey: "linear.linear-default.api-key.api-key",
             },
           ],
+        },
+        {
+          id: "linear-oauth-app",
+          label: "Linear OAuth app",
+          kind: "form",
+          secretFields: [
+            {
+              name: "clientSecret",
+              label: "OAuth client secret",
+              inputType: "password",
+              slotKey: "linear.linear-default.linear-oauth-app.client-secret",
+            },
+          ],
+          ui: {
+            create: {
+              submitLabel: "Save Linear OAuth app",
+              helperText:
+                "Stores the Linear OAuth app client used for organization identity linking.",
+            },
+          },
         },
         {
           id: "oauth2-authorization-code",

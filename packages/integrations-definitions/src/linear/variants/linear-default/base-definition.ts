@@ -11,15 +11,22 @@ import {
   LinearApiKeyConnectionConfigSchema,
   LinearOAuth2ConnectionConfigSchema,
   LinearOAuth2ConnectionStartConfigSchema,
+  LinearOAuthAppConnectionConfigSchema,
+  LinearConnectionMethodIds,
+  LinearCredentialSecretTypes,
   LinearCredentialSlotKeys,
 } from "./auth.js";
 import { resolveLinearBindingConfigForm } from "./binding-config-form.js";
 import { LinearBindingConfigSchema } from "./binding-config-schema.js";
 import { compileLinearBinding } from "./compile-binding.js";
-import { LinearConnectionConfigForm } from "./connection-config-form.js";
+import {
+  LinearApiKeyConnectionConfigForm,
+  LinearOAuthAppConnectionConfigForm,
+} from "./connection-config-form.js";
 import { LinearSupportedWebhookEvents } from "./supported-webhook-events.js";
 import { LinearTargetConfigSchema } from "./target-config-schema.js";
 import { LinearToolIds } from "./tool-ids.js";
+import { validateLinearBindingWriteContext } from "./validate-binding-write-context.js";
 
 const LinearTargetSecretSchema = z.object({}).strict();
 
@@ -41,6 +48,10 @@ export const LinearBaseDefinition: LinearBaseIntegrationDefinition = {
   targetSecretSchema: LinearTargetSecretSchema,
   bindingConfigSchema: LinearBindingConfigSchema,
   bindingConfigForm: resolveLinearBindingConfigForm,
+  validateBindingWriteContext: validateLinearBindingWriteContext,
+  identityLinking: {
+    eligibleConnectionMethodIds: [LinearConnectionMethodIds.OAUTH_APP],
+  },
   connectionMethods: [
     {
       id: IntegrationConnectionMethodIds.API_KEY,
@@ -57,12 +68,35 @@ export const LinearBaseDefinition: LinearBaseIntegrationDefinition = {
         },
       ],
       configSchema: LinearApiKeyConnectionConfigSchema,
-      configForm: LinearConnectionConfigForm,
+      configForm: LinearApiKeyConnectionConfigForm,
       postCreate: {
         managedWebhookSource: {
           autoCreate: true,
           failureNoticeTitle: "Connection created, webhook setup failed",
           successNoticeTitle: "Linear connection and webhook created successfully",
+        },
+      },
+    },
+    {
+      id: LinearConnectionMethodIds.OAUTH_APP,
+      label: "Linear OAuth app",
+      kind: "form",
+      secretFields: [
+        {
+          name: "clientSecret",
+          label: "OAuth client secret",
+          placeholder: "Linear OAuth app client secret",
+          inputType: "password",
+          secretType: LinearCredentialSecretTypes.OAUTH2_CLIENT_SECRET,
+          slotKey: LinearCredentialSlotKeys.OAUTH_APP_CLIENT_SECRET,
+        },
+      ],
+      configSchema: LinearOAuthAppConnectionConfigSchema,
+      configForm: LinearOAuthAppConnectionConfigForm,
+      ui: {
+        create: {
+          submitLabel: "Save Linear OAuth app",
+          helperText: "Stores the Linear OAuth app client used for organization identity linking.",
         },
       },
     },

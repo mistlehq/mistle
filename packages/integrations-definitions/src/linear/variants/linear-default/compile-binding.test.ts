@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { LinearCredentialSlotKeys, LinearOAuth2CredentialSlotKeys } from "./auth.js";
+import {
+  LinearConnectionMethodIds,
+  LinearCredentialSlotKeys,
+  LinearOAuth2CredentialSlotKeys,
+} from "./auth.js";
 import { compileLinearBinding } from "./compile-binding.js";
 import { LinearRequestMiddlewareIds } from "./egress-request-middleware.js";
 import { LinearToolIds } from "./tool-ids.js";
@@ -239,5 +243,48 @@ describe("compileLinearBinding", () => {
     expect(LinearCredentialSlotKeys.OAUTH2_ACCESS_TOKEN).toBe(
       LinearOAuth2CredentialSlotKeys.accessToken,
     );
+  });
+
+  it("rejects Linear OAuth app setup connections for runtime binding", () => {
+    expect(() =>
+      compileLinearBinding({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        targetKey: "linear-default",
+        target: {
+          familyId: "linear",
+          variantId: "linear-default",
+          enabled: true,
+          config: {},
+          secrets: {},
+        },
+        connection: {
+          id: "icn_123",
+          status: "active",
+          config: {
+            connection_method: LinearConnectionMethodIds.OAUTH_APP,
+            client_id: "linear_client_123",
+          },
+        },
+        binding: {
+          id: "ibd_123",
+          kind: "connector",
+          config: {
+            tools: [],
+          },
+        },
+        refs: {
+          sandboxPaths: {
+            userHomeDir: "/root",
+            workspaceDir: "/root",
+            runtimeDataDir: "/var/lib/mistle",
+            runtimeArtifactDir: "/var/lib/mistle/artifacts",
+            runtimeArtifactBinDir: "/usr/local/bin",
+          },
+          artifactBinPath: (name) => `/usr/local/bin/${name}`,
+        },
+      }),
+    ).toThrow("Unsupported Linear connection method 'linear-oauth-app'.");
   });
 });

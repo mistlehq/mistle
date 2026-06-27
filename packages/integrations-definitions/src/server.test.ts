@@ -252,6 +252,8 @@ describe("integrations-definitions server", () => {
     expect(linearDefinition?.webhookSource).toMatchObject({
       lifecycle: "managed",
     });
+    expect(typeof linearDefinition?.identityLinking?.supportsConnection).toBe("function");
+    expect(typeof linearDefinition?.identityLinking?.startAuthorization).toBe("undefined");
     expect(anthropicDefinition?.kind).toBe("agent");
     expect(openCodeGoDefinition?.kind).toBe("agent");
     expect(openRouterDefinition).toMatchObject({
