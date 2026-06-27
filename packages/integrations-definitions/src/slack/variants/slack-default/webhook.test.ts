@@ -1119,6 +1119,21 @@ describe("slack webhook handler", () => {
         payload: {
           ...createSlackMessagePayload(),
           event: {
+            type: "subteam_members_changed",
+            subteam_id: "S123",
+            added_users: ["U123"],
+            added_users_count: "1",
+            removed_users: [],
+            removed_users_count: "0",
+          },
+          event_id: "Ev138",
+        },
+        expectedEventType: "slack:subteam_members_changed",
+      },
+      {
+        payload: {
+          ...createSlackMessagePayload(),
+          event: {
             type: "subteam_updated",
             subteam: {
               id: "S123",
