@@ -615,6 +615,7 @@ pub enum SandboxInstanceStatus {
     Started,
     Initializing,
     Running,
+    Degraded,
     Reconnecting,
     Stopping,
     Stopped,
@@ -1746,6 +1747,11 @@ mod tests {
             serde_json::from_str::<SandboxInstanceStatus>(r#""initializing""#)
                 .expect("initializing status should decode"),
             SandboxInstanceStatus::Initializing,
+        );
+        assert_eq!(
+            serde_json::from_str::<SandboxInstanceStatus>(r#""degraded""#)
+                .expect("degraded status should decode"),
+            SandboxInstanceStatus::Degraded,
         );
         assert_eq!(
             serde_json::from_str::<SandboxInstanceStatus>(r#""reconnecting""#)

@@ -337,6 +337,7 @@ fn sandbox_status_label(status: &SandboxInstanceStatus) -> &'static str {
         SandboxInstanceStatus::Started => "started",
         SandboxInstanceStatus::Initializing => "initializing",
         SandboxInstanceStatus::Running => "running",
+        SandboxInstanceStatus::Degraded => "degraded",
         SandboxInstanceStatus::Reconnecting => "reconnecting",
         SandboxInstanceStatus::Stopping => "stopping",
         SandboxInstanceStatus::Stopped => "stopped",
@@ -418,6 +419,10 @@ mod tests {
         assert_eq!(
             sandbox_status_label(&SandboxInstanceStatus::Reconnecting),
             "reconnecting",
+        );
+        assert_eq!(
+            sandbox_status_label(&SandboxInstanceStatus::Degraded),
+            "degraded"
         );
         assert_eq!(
             sandbox_status_label(&SandboxInstanceStatus::Stopping),
