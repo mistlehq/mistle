@@ -1,10 +1,19 @@
 import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
-import { Button } from "@mistle/ui";
+import {
+  Button,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from "@mistle/ui";
+import { HouseIcon, LightningIcon, PackageIcon, PuzzlePieceIcon } from "@phosphor-icons/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, NavLink } from "react-router";
 
 import { withDashboardPageStory, withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import type { ChatEntry } from "../chat/chat-types.js";
@@ -19,6 +28,9 @@ import type {
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
 import { createReadySessionComposerStateInput } from "../session-agents/codex/fixtures/session-fixtures.js";
+import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
+import { AppShellView } from "../shell/app-shell-view.js";
+import { AppSidebarHeader } from "../shell/app-sidebar-header.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { DesignerPageView } from "./designer-page-view.js";
@@ -366,6 +378,183 @@ function DesignerPageStory(input: {
         sessionsErrorMessage={input.sessionsErrorMessage ?? null}
       />
     </MemoryRouter>
+  );
+}
+
+type DesignerRouteTransitionStoryRoute = "designer" | "session";
+
+function DesignerRouteToSessionHiddenNavigationStory(): React.JSX.Element {
+  const [route, setRoute] = useState<DesignerRouteTransitionStoryRoute>("designer");
+
+  return (
+    <MemoryRouter initialEntries={["/designer"]}>
+      <AppShellView
+        contentInsetOwner={route === "designer" ? "app-shell" : "child"}
+        mainContent={
+          <DesignerRouteToSessionHiddenNavigationMain route={route} setRoute={setRoute} />
+        }
+        renderSidebarTrigger
+        sidebarContent={<DesignerRouteTransitionSidebarContent />}
+        sidebarDefaultOpen
+        sidebarFooterContent={null}
+        sidebarHeaderContent={
+          <AppSidebarHeader
+            activeOrganizationId="org_mistle"
+            isSigningOut={false}
+            onNavigateToSettings={function onNavigateToSettings() {}}
+            onSignOut={function onSignOut() {}}
+            onSwitchOrganization={function onSwitchOrganization() {}}
+            organizationImageUrl={null}
+            organizationName="Mistle Labs"
+            organizationSummaryErrorMessage={null}
+            organizationSwitcherErrorMessage={null}
+            organizations={[{ id: "org_mistle", name: "Mistle Labs" }]}
+          />
+        }
+        topLoadingBar={<div className="h-0" />}
+        viewportMode={route === "designer" ? "document" : "workspace"}
+      />
+    </MemoryRouter>
+  );
+}
+
+function DesignerRouteToSessionHiddenNavigationMain(input: {
+  route: DesignerRouteTransitionStoryRoute;
+  setRoute: (route: DesignerRouteTransitionStoryRoute) => void;
+}): React.JSX.Element {
+  const { setOpen } = useSidebar();
+  const [prompt, setPrompt] = useState("Build a triaging agent for Linear and GitHub.");
+
+  function openDesignerSession(): void {
+    setOpen(false);
+    input.setRoute("session");
+  }
+
+  function resetDesignerRoute(): void {
+    setOpen(true);
+    input.setRoute("designer");
+  }
+
+  function openDesignerSessionFromStoryClick(event: React.MouseEvent<HTMLDivElement>): void {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+
+    const designerSessionLink = event.target.closest('a[href^="/designer/"]');
+    if (designerSessionLink === null || !event.currentTarget.contains(designerSessionLink)) {
+      return;
+    }
+
+    event.preventDefault();
+    openDesignerSession();
+  }
+
+  if (input.route === "designer") {
+    return (
+      <div className="relative min-h-svh" onClickCapture={openDesignerSessionFromStoryClick}>
+        <div className="absolute top-4 right-4 z-10">
+          <Button onClick={openDesignerSession} size="sm" type="button">
+            Open session
+          </Button>
+        </div>
+        <DesignerPageView
+          createErrorMessage={null}
+          isCreating={false}
+          onOpenSession={openDesignerSession}
+          onPromptChange={setPrompt}
+          onSubmit={openDesignerSession}
+          prompt={prompt}
+          sessions={StoryDesignerSessions}
+          sessionsErrorMessage={null}
+        />
+      </div>
+    );
+  }
+
+  return <DesignerRouteTransitionSessionView onReset={resetDesignerRoute} />;
+}
+
+function DesignerRouteTransitionSessionView(input: { onReset: () => void }): React.JSX.Element {
+  return (
+    <ConversationWorkspaceFrame
+      actions={
+        <Button onClick={input.onReset} size="sm" type="button" variant="outline">
+          Reset
+        </Button>
+      }
+      title={<span className="block truncate text-sm font-medium">Design triage agent</span>}
+    >
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<></>}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible={false}
+        mainContent={
+          <SessionConversationMainContent
+            activeTurnId={null}
+            autoScrollToBottomOnInitialLoad
+            chatEntries={StoryDesignerSessionConversationEntries}
+            initialBottomScrollResetKey="designer-route-to-session-navigation"
+            isRespondingToServerRequest={false}
+            isTurnInProgress={false}
+            onRespondToServerRequest={noopRespondToServerRequest}
+            pendingTurnId={null}
+            serverRequestPanelEntries={[]}
+          />
+        }
+        primaryBottomPanel={
+          <SessionConversationBottomPanelDraftController
+            chatEntries={StoryDesignerSessionConversationEntries}
+            clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
+            clearPendingDiffComments={function clearPendingDiffComments() {}}
+            composerStateInput={StoryDesignerSessionComposerStateInput}
+            draftResetKey="designer-route-to-session-navigation"
+            isRespondingToServerRequest={false}
+            onRespondToServerRequest={noopRespondToServerRequest}
+            pendingBlueprintComments={[]}
+            pendingDiffComments={[]}
+            serverRequestPanelEntries={[]}
+          />
+        }
+        sandboxInstanceId="sbi_designer_route_to_session_navigation_story"
+        secondaryPanel={<></>}
+      />
+    </ConversationWorkspaceFrame>
+  );
+}
+
+function DesignerRouteTransitionSidebarContent(): React.JSX.Element {
+  return (
+    <SidebarGroup className="pt-0">
+      <SidebarGroupContent>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton render={<NavLink to="/" />}>
+              <HouseIcon aria-hidden className="size-5 shrink-0 md:size-4" />
+              <span>Home</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton render={<NavLink to="/integrations" />}>
+              <PuzzlePieceIcon aria-hidden className="size-5 shrink-0 md:size-4" />
+              <span>Integrations</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton render={<NavLink to="/sandbox-profiles" />}>
+              <PackageIcon aria-hidden className="size-5 shrink-0 md:size-4" />
+              <span>Sandbox Profiles</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton render={<NavLink to="/designer" />}>
+              <LightningIcon aria-hidden className="size-5 shrink-0 md:size-4" />
+              <span>Designer</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 }
 
@@ -895,6 +1084,15 @@ export const CanvasFirstOpen: Story = {
   },
   render: function RenderCanvasFirstOpenStory(): React.JSX.Element {
     return <DesignerSessionCanvasFirstOpenStory />;
+  },
+};
+
+export const RouteToSessionHiddenNavigation: Story = {
+  parameters: {
+    customWorkbenchStory: true,
+  },
+  render: function RenderRouteToSessionHiddenNavigationStory(): React.JSX.Element {
+    return <DesignerRouteToSessionHiddenNavigationStory />;
   },
 };
 
