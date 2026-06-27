@@ -301,7 +301,6 @@
                           "required": [
                             "kind",
                             "providerFamily",
-                            "integrationConnectionId",
                             "actingUserRequired",
                             "resolutionMode"
                           ],
@@ -431,13 +430,7 @@
                         "enum": ["required", "preferred"]
                       }
                     },
-                    "required": [
-                      "kind",
-                      "providerFamily",
-                      "integrationConnectionId",
-                      "actingUserRequired",
-                      "resolutionMode"
-                    ],
+                    "required": ["kind", "providerFamily", "actingUserRequired", "resolutionMode"],
                     "additionalProperties": false
                   },
                   {

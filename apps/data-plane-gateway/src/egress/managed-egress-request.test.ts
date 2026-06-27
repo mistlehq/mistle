@@ -115,6 +115,99 @@ describe("buildManagedEgressRequest", () => {
     expect(result.request.headers.get("authorization")).toBe("Bearer workspace-b-token");
   });
 
+  it("does not cache provider-only linked-principal credentials", async () => {
+    const observedBodies: unknown[] = [];
+    const controlPlaneBaseUrl = await startRecordingControlPlane((request, response) => {
+      collectRequestBody(request, (body) => {
+        observedBodies.push(JSON.parse(body));
+        response.writeHead(200, {
+          "content-type": "application/json",
+        });
+        response.end(
+          JSON.stringify({
+            kind: "value",
+            value: `linear-user-token-${String(observedBodies.length)}`,
+          }),
+        );
+      });
+    });
+    const route: CompiledRuntimePlan["egressRoutes"][number] = {
+      egressRuleId: "egress_rule_linear",
+      bindingId: "bind_linear",
+      familyId: "linear",
+      variantId: "linear-default",
+      match: {
+        hosts: ["api.linear.test"],
+        methods: ["POST"],
+      },
+      upstream: {
+        baseUrl: "https://api.linear.test",
+      },
+      authInjection: {
+        type: "bearer",
+        target: "authorization",
+      },
+      credentialResolver: {
+        kind: "linked_principal",
+        providerFamily: "linear",
+        credentialKind: "linear_oauth_user_token",
+        actingUserRequired: true,
+        resolutionMode: "preferred",
+      },
+    };
+    const credentialCache = new CredentialCache({
+      cache: new Cache({ adapter: new InMemoryCacheAdapter() }),
+      defaultTtlSeconds: 300,
+      refreshSkewSeconds: 0,
+      now: () => Date.parse("2026-01-01T00:00:00.000Z"),
+    });
+    const baseInput = {
+      body: undefined,
+      controlPlanePublicBaseUrl: "https://control-plane.test",
+      controlPlaneInternalClient: new ControlPlaneInternalClient({
+        baseUrl: controlPlaneBaseUrl,
+        internalAuthServiceToken: "service-token",
+      }),
+      credentialCache,
+      mcpTokenConfig: {
+        tokenSecret: "mcp-token-secret",
+        tokenIssuer: "data-plane-gateway",
+        tokenAudience: "mistle-mcp",
+      },
+      organizationId: "org_123",
+      request: {
+        actingUserId: "usr_123",
+        authority: "api.linear.test",
+        headers: {},
+        method: "POST",
+        path: "/graphql",
+        scheme: "https",
+      },
+      route,
+      sandboxInstanceId: "sbi_123",
+    } satisfies Parameters<typeof buildManagedEgressRequest>[0];
+
+    const firstResult = await buildManagedEgressRequest(baseInput);
+    const secondResult = await buildManagedEgressRequest(baseInput);
+
+    expect(observedBodies).toEqual([
+      {
+        organizationId: "org_123",
+        actingUserId: "usr_123",
+        providerFamily: "linear",
+        credentialKind: "linear_oauth_user_token",
+      },
+      {
+        organizationId: "org_123",
+        actingUserId: "usr_123",
+        providerFamily: "linear",
+        credentialKind: "linear_oauth_user_token",
+      },
+    ]);
+    expect(firstResult.request.headers.get("authorization")).toBe("Bearer linear-user-token-1");
+    expect(secondResult.request.headers.get("authorization")).toBe("Bearer linear-user-token-2");
+  });
+
   it("applies header credential prefixes when injecting resolved credentials", async () => {
     const controlPlaneBaseUrl = await startRecordingControlPlane((_request, response) => {
       response.writeHead(200, {

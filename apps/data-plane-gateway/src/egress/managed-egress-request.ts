@@ -48,7 +48,7 @@ type CredentialResolverInput =
       credentialResolverKind: "linked_principal";
       organizationId: string;
       providerFamily: string;
-      integrationConnectionId: string;
+      integrationConnectionId?: string;
       actingUserRequired: boolean;
       resolutionMode: "required" | "preferred";
       actingUserId?: string;
@@ -87,7 +87,7 @@ type CredentialResolverRef =
   | {
       kind: "linked_principal";
       providerFamily: string;
-      integrationConnectionId: string;
+      integrationConnectionId?: string;
       actingUserRequired: boolean;
       resolutionMode: "required" | "preferred";
       actingUserId?: string;
@@ -550,9 +550,11 @@ function toCredentialResolverRef(input: {
   return {
     kind: "linked_principal",
     providerFamily: input.resolver.providerFamily,
-    integrationConnectionId: input.resolver.integrationConnectionId,
     actingUserRequired: input.resolver.actingUserRequired,
     resolutionMode: input.resolver.resolutionMode,
+    ...(input.resolver.integrationConnectionId === undefined
+      ? {}
+      : { integrationConnectionId: input.resolver.integrationConnectionId }),
     ...(input.resolver.credentialKind === undefined
       ? {}
       : { credentialKind: input.resolver.credentialKind }),
@@ -624,9 +626,11 @@ function toCredentialResolverInputFromRef(input: {
     credentialResolverKind: "linked_principal",
     organizationId: input.organizationId,
     providerFamily: input.credentialResolver.providerFamily,
-    integrationConnectionId: input.credentialResolver.integrationConnectionId,
     actingUserRequired: input.credentialResolver.actingUserRequired,
     resolutionMode: input.credentialResolver.resolutionMode,
+    ...(input.credentialResolver.integrationConnectionId === undefined
+      ? {}
+      : { integrationConnectionId: input.credentialResolver.integrationConnectionId }),
     ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
     ...(input.credentialResolver.credentialKind === undefined
       ? {}
@@ -787,8 +791,10 @@ function createCredentialCacheKey(input: {
     credentialResolverKind: "linked_principal",
     organizationId: input.resolver.organizationId,
     providerFamily: input.resolver.providerFamily,
-    integrationConnectionId: input.resolver.integrationConnectionId,
     actingUserRequired: input.resolver.actingUserRequired,
+    ...(input.resolver.integrationConnectionId === undefined
+      ? {}
+      : { integrationConnectionId: input.resolver.integrationConnectionId }),
     ...(input.resolver.actingUserId === undefined
       ? {}
       : { actingUserId: input.resolver.actingUserId }),
@@ -796,6 +802,13 @@ function createCredentialCacheKey(input: {
       ? {}
       : { credentialKind: input.resolver.credentialKind }),
   };
+}
+
+function shouldUseCredentialCache(resolver: CredentialResolverInput): boolean {
+  return !(
+    resolver.credentialResolverKind === "linked_principal" &&
+    resolver.integrationConnectionId === undefined
+  );
 }
 
 async function resolveCredentialWithCache(input: {
@@ -814,7 +827,10 @@ async function resolveCredentialWithCache(input: {
       ? {}
       : { testEnvironmentId: input.testEnvironmentId }),
   });
-  const cacheLookup = await input.credentialCache.getWithResult(cacheKey);
+  const useCredentialCache = shouldUseCredentialCache(input.resolver);
+  const cacheLookup = useCredentialCache
+    ? await input.credentialCache.getWithResult(cacheKey)
+    : { result: "miss" as const };
   if (cacheLookup.credential !== undefined) {
     logger.info(
       {
@@ -930,7 +946,9 @@ async function resolveCredentialWithCache(input: {
               );
             })(),
           providerFamily: input.resolver.providerFamily,
-          integrationConnectionId: input.resolver.integrationConnectionId,
+          ...(input.resolver.integrationConnectionId === undefined
+            ? {}
+            : { integrationConnectionId: input.resolver.integrationConnectionId }),
           ...(input.resolver.credentialKind === undefined
             ? {}
             : { credentialKind: input.resolver.credentialKind }),
@@ -943,7 +961,9 @@ async function resolveCredentialWithCache(input: {
       );
   }
 
-  await input.credentialCache.set(cacheKey, resolvedCredential);
+  if (useCredentialCache) {
+    await input.credentialCache.set(cacheKey, resolvedCredential);
+  }
   logger.info(
     {
       ...createCredentialResolutionLogFields({
@@ -1051,7 +1071,9 @@ function createCredentialResolutionLogFields(input: {
       : { credentialKind: input.resolver.credentialKind }),
     credentialProviderFamily: input.resolver.providerFamily,
     credentialResolverKind: input.resolver.credentialResolverKind,
-    integrationConnectionId: input.resolver.integrationConnectionId,
+    ...(input.resolver.integrationConnectionId === undefined
+      ? {}
+      : { integrationConnectionId: input.resolver.integrationConnectionId }),
     organizationId: input.resolver.organizationId,
     ...(input.testEnvironmentId === undefined
       ? {}

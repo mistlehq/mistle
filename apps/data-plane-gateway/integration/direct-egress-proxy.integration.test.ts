@@ -420,6 +420,143 @@ describe.concurrent("direct egress proxy integration", () => {
   );
 
   it(
+    "uses the linked Linear user credential for direct egress GraphQL requests",
+    async ({ env }) => {
+      const uniqueId = randomUUID().replaceAll("-", "");
+      const session = await env.auth.createSession({
+        email: `direct-egress-linear-linked-${uniqueId}@example.com`,
+      });
+      const sandboxInstanceId = typeid("sbi").toString();
+      const upstream = await startSimulatedHttpUpstream({
+        response: {
+          status: 200,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+          },
+          // Simulates Linear GraphQL mutation response envelopes documented at
+          // https://linear.app/developers/graphql.
+          body: JSON.stringify({
+            data: {
+              issueCreate: {
+                success: true,
+              },
+            },
+          }),
+        },
+      });
+      const upstreamUrl = new URL("/graphql", upstream.baseUrl);
+      const targetKey = `linear_direct_egress_${uniqueId}`;
+      const providerConfigId = `ilp_linear_direct_egress_${uniqueId}`;
+      const principalId = `uep_linear_direct_egress_${uniqueId}`;
+      const credentialId = `uec_linear_direct_egress_${uniqueId}`;
+      await upsertLinearIdentityTarget(env, { targetKey });
+      const identityConnectionId = await createLinearOAuthAppConnection(env, {
+        displayName: "Linear Identity OAuth App",
+        sessionCookie: session.cookie,
+        targetKey,
+      });
+      await seedIdentityProviderConfig(env, {
+        configId: providerConfigId,
+        connectionId: identityConnectionId,
+        organizationId: session.organizationId,
+        providerFamily: "linear",
+        status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        targetKey,
+        userId: session.userId,
+      });
+      await seedLinearLinkedPrincipal(env, {
+        organizationId: session.organizationId,
+        userId: session.userId,
+        principalId,
+        providerConfigId,
+        connectionId: identityConnectionId,
+      });
+      await seedPrincipalCredential(env, {
+        credentialId,
+        organizationId: session.organizationId,
+        principalId,
+        providerFamily: "linear",
+        credentialKind: "linear_oauth_user_token",
+      });
+      await insertPrincipalCredentialSecret(env, {
+        organizationId: session.organizationId,
+        credentialId,
+        secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+        plaintext: "linear-linked-user-token",
+      });
+      await insertSandboxInstanceRow({
+        env,
+        organizationId: session.organizationId,
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          egressRoutes: [
+            createRoute({
+              authInjection: {
+                type: "bearer",
+                target: "authorization",
+              },
+              bindingId: `ibd_direct_egress_linear_${uniqueId}`,
+              connectionId: `icn_linear_runtime_${uniqueId}`,
+              egressRuleId: `egress_rule_direct_linear_${uniqueId}`,
+              familyId: "linear",
+              hosts: [upstreamUrl.hostname],
+              methods: ["POST"],
+              pathPrefixes: ["/graphql"],
+              secretType: "api_key",
+              slotKey: "linear.linear-default.api-key.api-key",
+              upstreamBaseUrl: upstream.baseUrl,
+              variantId: "linear-default",
+            }),
+          ],
+        }),
+      });
+
+      try {
+        const response = await env.dataPlaneGateway.http.fetch(
+          `${DirectEgressHttpRoutePath}?target=${encodeURIComponent(upstreamUrl.toString())}`,
+          {
+            method: "POST",
+            headers: {
+              [DirectEgressTokenHeaderName]: `Bearer ${await mintDirectEgressToken({
+                organizationId: session.organizationId,
+                sandboxInstanceId,
+                actingUserId: session.userId,
+              })}`,
+              "content-type": "application/json",
+            },
+            // Linear's GraphQL API accepts mutation documents over POST /graphql:
+            // https://linear.app/developers/graphql.
+            body: JSON.stringify({
+              query:
+                "mutation MistleIssueCreate($input: IssueCreateInput!) { issueCreate(input: $input) { success } }",
+              variables: {},
+            }),
+          },
+        );
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toEqual({
+          data: {
+            issueCreate: {
+              success: true,
+            },
+          },
+        });
+        const request = await withTimeout({
+          label: "waiting for managed Linear GraphQL upstream request",
+          promise: upstream.nextRequest(),
+        });
+        expect(request.method).toBe("POST");
+        expect(request.url).toBe("/graphql");
+        expect(request.headers.authorization).toBe("Bearer linear-linked-user-token");
+      } finally {
+        await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
     "resolves integration credentials for matched managed HTTP routes before forwarding upstream",
     async ({ env }) => {
       const sandboxInstanceId = typeid("sbi").toString();
@@ -1153,6 +1290,108 @@ async function createDatadogBinding(input: {
     connectionId,
     organizationId: session.organizationId,
   };
+}
+
+async function upsertLinearIdentityTarget(
+  env: IntegrationTestEnvironment,
+  input: {
+    targetKey: string;
+  },
+): Promise<void> {
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: "linear",
+      variantId: "linear-default",
+      enabled: true,
+      config: {},
+    })
+    .onConflictDoUpdate({
+      target: env.controlPlaneTables.integrationTargets.targetKey,
+      set: {
+        familyId: "linear",
+        variantId: "linear-default",
+        enabled: true,
+        config: {},
+      },
+    });
+}
+
+async function createLinearOAuthAppConnection(
+  env: IntegrationTestEnvironment,
+  input: {
+    displayName: string;
+    sessionCookie: string;
+    targetKey: string;
+  },
+): Promise<string> {
+  const response = await env.controlPlaneApi.http.fetch(
+    `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/form`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: input.sessionCookie,
+      },
+      body: JSON.stringify({
+        displayName: input.displayName,
+        methodId: "linear-oauth-app",
+        config: {
+          connection_method: "linear-oauth-app",
+          client_id: "linear_client_123",
+        },
+        secrets: {
+          clientSecret: "linear-client-secret",
+        },
+      }),
+    },
+  );
+
+  expect(response.status).toBe(201);
+  const responseBody = await response.json().catch((): unknown => null);
+  if (typeof responseBody !== "object" || responseBody === null || !("id" in responseBody)) {
+    throw new Error("Expected Linear OAuth app connection create response to include id.");
+  }
+
+  const { id } = responseBody;
+  if (typeof id !== "string" || id.length === 0) {
+    throw new Error("Expected Linear OAuth app connection id to be a non-empty string.");
+  }
+
+  return id;
+}
+
+async function seedLinearLinkedPrincipal(
+  env: IntegrationTestEnvironment,
+  input: {
+    organizationId: string;
+    userId: string;
+    principalId: string;
+    providerConfigId: string;
+    connectionId: string;
+  },
+): Promise<void> {
+  await env.controlPlaneDb.insert(env.controlPlaneTables.userExternalPrincipals).values({
+    id: input.principalId,
+    organizationId: input.organizationId,
+    userId: input.userId,
+    providerFamily: "linear",
+    providerSubjectId: "lin_user_123",
+    organizationProviderConfigId: input.providerConfigId,
+    integrationConnectionId: input.connectionId,
+    profile: {
+      displayName: "Linear User",
+      email: "linear-user@example.com",
+    },
+  });
+  await env.controlPlaneDb.insert(env.controlPlaneTables.userExternalPrincipalKeys).values({
+    organizationId: input.organizationId,
+    principalId: input.principalId,
+    providerFamily: "linear",
+    keyType: "user_id",
+    keyValue: "lin_user_123",
+  });
 }
 
 async function expectDatadogProxyRequest(input: {

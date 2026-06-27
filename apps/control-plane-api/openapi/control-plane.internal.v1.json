@@ -569,12 +569,7 @@
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "organizationId",
-                  "actingUserId",
-                  "providerFamily",
-                  "integrationConnectionId"
-                ],
+                "required": ["organizationId", "actingUserId", "providerFamily"],
                 "additionalProperties": false
               }
             }
@@ -1939,7 +1934,6 @@
                                           "required": [
                                             "kind",
                                             "providerFamily",
-                                            "integrationConnectionId",
                                             "actingUserRequired",
                                             "resolutionMode"
                                           ],
@@ -2075,7 +2069,6 @@
                                     "required": [
                                       "kind",
                                       "providerFamily",
-                                      "integrationConnectionId",
                                       "actingUserRequired",
                                       "resolutionMode"
                                     ],

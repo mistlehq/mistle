@@ -7,7 +7,7 @@ export const ResolvePrincipalCredentialRequestSchema = z
     organizationId: z.string().min(1),
     actingUserId: z.string().min(1),
     providerFamily: z.string().min(1),
-    integrationConnectionId: z.string().min(1),
+    integrationConnectionId: z.string().min(1).optional(),
     credentialKind: z.string().min(1).optional(),
   })
   .strict();

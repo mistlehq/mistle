@@ -256,6 +256,7 @@ describe("integrations-definitions server", () => {
     expect(typeof linearDefinition?.identityLinking?.startAuthorization).toBe("function");
     expect(typeof linearDefinition?.identityLinking?.completeAuthorization).toBe("function");
     expect(typeof linearDefinition?.identityLinking?.refreshCredential).toBe("function");
+    expect(typeof linearDefinition?.resolveEgressCredentialResolver).toBe("function");
     expect(anthropicDefinition?.kind).toBe("agent");
     expect(openCodeGoDefinition?.kind).toBe("agent");
     expect(openRouterDefinition).toMatchObject({
