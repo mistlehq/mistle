@@ -7,9 +7,11 @@ import { z } from "zod";
 export const LinearCredentialSecretTypes: {
   API_KEY: "api_key";
   OAUTH2_ACCESS_TOKEN: "oauth2_access_token";
+  OAUTH2_CLIENT_SECRET: "oauth2_client_secret";
 } = {
   API_KEY: "api_key",
   OAUTH2_ACCESS_TOKEN: "oauth2_access_token",
+  OAUTH2_CLIENT_SECRET: "oauth2_client_secret",
 };
 
 export const LinearFamilyId = "linear";
@@ -17,8 +19,10 @@ export const LinearDefaultVariantId = "linear-default";
 
 export const LinearApiKeyCredentialSlotKeys: {
   API_KEY: "linear.linear-default.api-key.api-key";
+  OAUTH_APP_CLIENT_SECRET: "linear.linear-default.linear-oauth-app.client-secret";
 } = {
   API_KEY: "linear.linear-default.api-key.api-key",
+  OAUTH_APP_CLIENT_SECRET: "linear.linear-default.linear-oauth-app.client-secret",
 };
 
 export const LinearOAuth2CredentialSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
@@ -30,6 +34,12 @@ export const LinearCredentialSlotKeys = {
   ...LinearApiKeyCredentialSlotKeys,
   OAUTH2_ACCESS_TOKEN: LinearOAuth2CredentialSlotKeys.accessToken,
 } as const;
+
+export const LinearConnectionMethodIds: {
+  OAUTH_APP: "linear-oauth-app";
+} = {
+  OAUTH_APP: "linear-oauth-app",
+};
 
 export const LinearOAuthScopes: ReadonlyArray<string> = ["read", "write"];
 
@@ -53,9 +63,17 @@ export const LinearOAuth2ConnectionConfigSchema = z
   })
   .strict();
 
+export const LinearOAuthAppConnectionConfigSchema = z
+  .object({
+    connection_method: z.literal(LinearConnectionMethodIds.OAUTH_APP),
+    client_id: z.string().min(1),
+  })
+  .strict();
+
 export const LinearConnectionConfigSchema = z.union([
   LinearApiKeyConnectionConfigSchema,
   LinearOAuth2ConnectionConfigSchema,
+  LinearOAuthAppConnectionConfigSchema,
 ]);
 
 export type LinearOAuth2ConnectionStartConfig = z.output<

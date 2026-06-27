@@ -355,6 +355,9 @@ describe("browser definitions", () => {
   it("keeps linear browser definitions free of server-only webhook hooks", () => {
     expect(LinearBrowserDefinition.webhookHandler).toBeUndefined();
     expect(LinearBrowserDefinition.webhookSource).toBeUndefined();
+    expect(LinearBrowserDefinition.identityLinking).toEqual({
+      eligibleConnectionMethodIds: ["linear-oauth-app"],
+    });
     expect(LinearBrowserDefinition.supportedWebhookEvents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

@@ -1,5 +1,6 @@
 import { LinearBaseDefinition, type LinearBaseIntegrationDefinition } from "./base-definition.js";
 import { AppendSessionLinkToLinearMcpMarkdownRequestMiddleware } from "./egress-request-middleware.server.js";
+import { LinearIdentityLinkingCapability } from "./identity-linking.server.js";
 import {
   LinearAuthorizationRevocationCapability,
   LinearOAuth2AuthorizationCodeCapability,
@@ -11,6 +12,7 @@ export const LinearDefinition: LinearBaseIntegrationDefinition = {
   ...LinearBaseDefinition,
   authorizationRevocation: LinearAuthorizationRevocationCapability,
   egressRequestMiddleware: [AppendSessionLinkToLinearMcpMarkdownRequestMiddleware],
+  identityLinking: LinearIdentityLinkingCapability,
   oauth2AuthorizationCode: LinearOAuth2AuthorizationCodeCapability,
   webhookHandler: LinearWebhookHandler,
   webhookSource: LinearWebhookSourceCapability,
