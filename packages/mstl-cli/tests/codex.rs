@@ -26,6 +26,27 @@ fn codex_requires_api_key_env_var() {
 }
 
 #[test]
+fn codex_without_sandbox_requires_default_profile_before_auth() {
+    let output = Command::new(env!("CARGO_BIN_EXE_mistle"))
+        .args(["codex", "--", "--model", "gpt-5.2"])
+        .env_remove(API_KEY_ENV_VAR)
+        .env_remove(CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR)
+        .env(
+            "XDG_CONFIG_HOME",
+            common::isolated_config_home("codex-missing-default-profile"),
+        )
+        .output()
+        .expect("mistle binary should run");
+
+    assert!(!output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        "missing default profile; run `mistle profile default set <profile-id>` or pass `--sandbox`\n"
+    );
+}
+
+#[test]
 fn codex_rejects_user_supplied_remote_before_reading_auth_env() {
     let output = Command::new(env!("CARGO_BIN_EXE_mistle"))
         .args([

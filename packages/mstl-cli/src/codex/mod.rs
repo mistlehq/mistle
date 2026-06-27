@@ -6,6 +6,7 @@ pub(crate) mod proxy;
 use mstl_core::client::{MistleClient, SandboxInstance, SandboxInstanceStatus};
 use tokio::time::{Instant, sleep};
 
+use crate::cli_config::read_default_profile_id;
 use crate::config::mistle_client;
 use crate::error::CliError;
 
@@ -18,7 +19,7 @@ const SANDBOX_CONNECT_POLL_INTERVAL: Duration = Duration::from_secs(2);
 const SPINNER_INTERVAL: Duration = Duration::from_millis(100);
 const SPINNER_FRAMES: [&str; 4] = ["|", "/", "-", "\\"];
 
-pub(crate) async fn run<W>(sandbox_id: &str, codex_args: Vec<String>, stderr: &mut W) -> i32
+pub(crate) async fn run<W>(sandbox_id: Option<&str>, codex_args: Vec<String>, stderr: &mut W) -> i32
 where
     W: Write,
 {
@@ -32,7 +33,7 @@ where
 }
 
 async fn run_codex_for_sandbox<W>(
-    sandbox_id: &str,
+    sandbox_id: Option<&str>,
     codex_args: Vec<String>,
     stderr: &mut W,
 ) -> Result<(), CliError>
@@ -44,11 +45,13 @@ where
         source,
     })?;
 
+    let sandbox_request = resolve_codex_sandbox_request(sandbox_id)?;
     let client = mistle_client()?;
-    wait_for_connectable_sandbox(&client, sandbox_id, stderr).await?;
+    let sandbox_id = resolve_codex_sandbox_id(&client, sandbox_request)?;
+    wait_for_connectable_sandbox(&client, &sandbox_id, stderr).await?;
 
     let connection_token = client
-        .create_sandbox_instance_connection_token(sandbox_id)
+        .create_sandbox_instance_connection_token(&sandbox_id)
         .map_err(|source| CliError::Client {
             action: "create sandbox connection token",
             source,
@@ -63,6 +66,43 @@ where
         action: "run codex",
         source,
     })
+}
+
+fn resolve_codex_sandbox_request(
+    sandbox_id: Option<&str>,
+) -> Result<CodexSandboxRequest, CliError> {
+    match sandbox_id {
+        Some(sandbox_id) => Ok(CodexSandboxRequest::ExistingSandbox {
+            sandbox_id: sandbox_id.to_owned(),
+        }),
+        None => {
+            let profile_id = read_default_profile_id()?.ok_or(CliError::MissingDefaultProfile)?;
+            Ok(CodexSandboxRequest::DefaultProfile { profile_id })
+        }
+    }
+}
+
+fn resolve_codex_sandbox_id(
+    client: &MistleClient,
+    sandbox_request: CodexSandboxRequest,
+) -> Result<String, CliError> {
+    match sandbox_request {
+        CodexSandboxRequest::ExistingSandbox { sandbox_id } => Ok(sandbox_id),
+        CodexSandboxRequest::DefaultProfile { profile_id } => {
+            let response = client
+                .start_active_sandbox_profile_instance(&profile_id)
+                .map_err(|source| CliError::Client {
+                    action: "create sandbox from default profile",
+                    source,
+                })?;
+            Ok(response.sandbox_instance_id)
+        }
+    }
+}
+
+enum CodexSandboxRequest {
+    ExistingSandbox { sandbox_id: String },
+    DefaultProfile { profile_id: String },
 }
 
 async fn wait_for_connectable_sandbox<W>(
