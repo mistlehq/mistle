@@ -27,9 +27,15 @@ type ResourceIdentity = {
   value: string;
 };
 
+type ResourceIdentityCandidate = {
+  externalId?: string;
+  handle: string;
+};
+
 export function validateDiscoveredResourceAttributes(input: {
   resourceKind: string;
   resources: ReadonlyArray<DiscoveredIntegrationResource>;
+  accessibleResources?: ReadonlyArray<ResourceIdentityCandidate>;
   attributes?: ReadonlyArray<DiscoveredIntegrationResourceAttribute>;
   attributeDefinitions?: ReadonlyArray<IntegrationResourceAttributeDefinition>;
 }): ReadonlyArray<DiscoveredIntegrationResourceAttribute> {
@@ -37,7 +43,10 @@ export function validateDiscoveredResourceAttributes(input: {
     .array(DiscoveredIntegrationResourceAttributeSchema)
     .parse(input.attributes ?? []);
   const definitionsByKey = buildAttributeDefinitionsByKey(input.attributeDefinitions ?? []);
-  const resourcesByIdentity = buildResourceIdentityIndex(input.resources);
+  const resourcesByIdentity = buildResourceIdentityIndex([
+    ...(input.accessibleResources ?? []),
+    ...input.resources,
+  ]);
   const seenAttributeKeys = new Set<string>();
 
   for (const attribute of parsedAttributes) {
@@ -116,12 +125,12 @@ function buildAttributeDefinitionsByKey(
   return definitionsByKey;
 }
 
-function buildResourceIdentityIndex(resources: ReadonlyArray<DiscoveredIntegrationResource>): {
-  byExternalId: ReadonlyMap<string, DiscoveredIntegrationResource>;
-  byHandle: ReadonlyMap<string, DiscoveredIntegrationResource>;
+function buildResourceIdentityIndex(resources: ReadonlyArray<ResourceIdentityCandidate>): {
+  byExternalId: ReadonlyMap<string, ResourceIdentityCandidate>;
+  byHandle: ReadonlyMap<string, ResourceIdentityCandidate>;
 } {
-  const byExternalId = new Map<string, DiscoveredIntegrationResource>();
-  const byHandle = new Map<string, DiscoveredIntegrationResource>();
+  const byExternalId = new Map<string, ResourceIdentityCandidate>();
+  const byHandle = new Map<string, ResourceIdentityCandidate>();
 
   for (const resource of resources) {
     byHandle.set(resource.handle, resource);
@@ -136,8 +145,8 @@ function buildResourceIdentityIndex(resources: ReadonlyArray<DiscoveredIntegrati
 function resolveAttributeResourceIdentity(input: {
   attribute: ParsedDiscoveredIntegrationResourceAttribute;
   resourcesByIdentity: {
-    byExternalId: ReadonlyMap<string, DiscoveredIntegrationResource>;
-    byHandle: ReadonlyMap<string, DiscoveredIntegrationResource>;
+    byExternalId: ReadonlyMap<string, ResourceIdentityCandidate>;
+    byHandle: ReadonlyMap<string, ResourceIdentityCandidate>;
   };
 }): ResourceIdentity {
   const matchedResource =
@@ -159,7 +168,7 @@ function resolveAttributeResourceIdentity(input: {
   return discoveredResourceIdentity(matchedResource);
 }
 
-function discoveredResourceIdentity(resource: DiscoveredIntegrationResource): ResourceIdentity {
+function discoveredResourceIdentity(resource: ResourceIdentityCandidate): ResourceIdentity {
   return resource.externalId === undefined
     ? { kind: "handle", value: resource.handle }
     : { kind: "external_id", value: resource.externalId };

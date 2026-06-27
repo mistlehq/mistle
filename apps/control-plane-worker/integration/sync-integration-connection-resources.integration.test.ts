@@ -10,6 +10,13 @@ import {
   IntegrationConnectionResourceSyncStates,
   IntegrationConnectionStatuses,
 } from "@mistle/db/control-plane";
+import type {
+  AnyIntegrationDefinition,
+  DiscoveredIntegrationResource,
+  DiscoveredIntegrationResourceAttribute,
+  IntegrationResourceAttributeDefinition,
+} from "@mistle/integrations-core";
+import { IntegrationKinds, IntegrationRegistry } from "@mistle/integrations-core";
 import { SlackConnectionMethodIds } from "@mistle/integrations-definitions";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import {
@@ -18,6 +25,7 @@ import {
   TestEnvironmentIdHeader,
 } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
+import { z } from "zod";
 
 import { applySuccessfulResourceSync } from "../openworkflow/sync-integration-connection-resources/apply-successful-resource-sync.js";
 import { markResourceSyncing } from "../openworkflow/sync-integration-connection-resources/mark-resource-syncing.js";
@@ -25,6 +33,17 @@ import { syncIntegrationConnectionResources } from "../openworkflow/sync-integra
 
 const InternalServiceToken = "integration-new-internal-service-token";
 const SlackAppId = "A0123456789";
+const UserAttributeDefinitions: ReadonlyArray<IntegrationResourceAttributeDefinition> = [
+  {
+    key: "is_bot",
+    valueType: "boolean",
+    actorPolicyEligible: true,
+  },
+  {
+    key: "actor_type",
+    valueType: "string",
+  },
+];
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "control-plane-worker"],
@@ -337,7 +356,870 @@ describe.concurrent("sync integration connection resources", () => {
       },
     ]);
   });
+
+  it("persists new resource attributes and updates changed values in a successful snapshot", async ({
+    env,
+  }) => {
+    await seedGitHubConnection({
+      env,
+      organizationId: "org_sync_resource_attributes_upsert",
+      targetKey: "github-cloud-sync-resource-attributes-upsert",
+      connectionId: "icn_sync_resource_attributes_upsert",
+      organizationName: "Sync Resource Attributes Upsert",
+      organizationSlug: "sync-resource-attributes-upsert",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnectionResources).values({
+      id: "rsc_sync_resource_attributes_upsert_alice",
+      connectionId: "icn_sync_resource_attributes_upsert",
+      familyId: "github",
+      kind: "user",
+      externalId: "1",
+      handle: "alice",
+      displayName: "Alice",
+      status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
+      metadata: {},
+      lastSeenAt: "2026-03-09T00:00:00.000Z",
+    });
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.integrationConnectionResourceAttributes)
+      .values({
+        id: "ica_sync_resource_attributes_upsert_is_bot",
+        connectionId: "icn_sync_resource_attributes_upsert",
+        familyId: "github",
+        resourceKind: "user",
+        resourceExternalId: "1",
+        resourceHandle: "alice",
+        attributeKey: "is_bot",
+        attributeValue: "true",
+        valueType: "boolean",
+        metadata: {
+          source: "old",
+        },
+        lastSeenAt: "2026-03-09T00:00:00.000Z",
+      });
+
+    const syncStartedAt = await markResourceSyncing({
+      db: env.controlPlaneDb,
+      connectionId: "icn_sync_resource_attributes_upsert",
+      familyId: "github",
+      kind: "user",
+    });
+
+    await expect(
+      applySuccessfulResourceSync({
+        db: env.controlPlaneDb,
+        connectionId: "icn_sync_resource_attributes_upsert",
+        familyId: "github",
+        kind: "user",
+        syncStartedAt,
+        discoveredResources: [
+          githubUserResource({
+            externalId: "1",
+            handle: "alice",
+            displayName: "Alice Updated",
+          }),
+        ],
+        discoveredAttributes: [
+          githubUserAttribute({
+            resourceExternalId: "1",
+            resourceHandle: "alice",
+            key: "is_bot",
+            value: "false",
+            valueType: "boolean",
+            metadata: {
+              source: "new",
+            },
+          }),
+          githubUserAttribute({
+            resourceExternalId: "1",
+            resourceHandle: "alice",
+            key: "actor_type",
+            value: "User",
+            valueType: "string",
+            metadata: {},
+          }),
+        ],
+        attributeDefinitions: UserAttributeDefinitions,
+      }),
+    ).resolves.toBe(true);
+
+    const persistedAttributes =
+      await env.controlPlaneDb.query.integrationConnectionResourceAttributes.findMany({
+        where: (table, { eq }) => eq(table.connectionId, "icn_sync_resource_attributes_upsert"),
+        orderBy: (table, { asc }) => [asc(table.attributeKey)],
+      });
+    expect(
+      persistedAttributes.map((attribute) => ({
+        resourceExternalId: attribute.resourceExternalId,
+        resourceHandle: attribute.resourceHandle,
+        attributeKey: attribute.attributeKey,
+        attributeValue: attribute.attributeValue,
+        valueType: attribute.valueType,
+        metadata: attribute.metadata,
+        removedAt: attribute.removedAt,
+      })),
+    ).toEqual([
+      {
+        resourceExternalId: "1",
+        resourceHandle: "alice",
+        attributeKey: "actor_type",
+        attributeValue: "User",
+        valueType: "string",
+        metadata: {},
+        removedAt: null,
+      },
+      {
+        resourceExternalId: "1",
+        resourceHandle: "alice",
+        attributeKey: "is_bot",
+        attributeValue: "false",
+        valueType: "boolean",
+        metadata: {
+          source: "new",
+        },
+        removedAt: null,
+      },
+    ]);
+  });
+
+  it("keeps attribute-bearing accessible resources available when they are not in the resource snapshot", async ({
+    env,
+  }) => {
+    await seedGitHubConnection({
+      env,
+      organizationId: "org_sync_resource_attributes_existing_resource",
+      targetKey: "github-cloud-sync-resource-attributes-existing-resource",
+      connectionId: "icn_sync_resource_attributes_existing_resource",
+      organizationName: "Sync Resource Attributes Existing Resource",
+      organizationSlug: "sync-resource-attributes-existing-resource",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnectionResources).values({
+      id: "rsc_sync_resource_attributes_existing_resource_bob",
+      connectionId: "icn_sync_resource_attributes_existing_resource",
+      familyId: "github",
+      kind: "user",
+      externalId: "2",
+      handle: "bob",
+      displayName: "Bob",
+      status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
+      metadata: {},
+      lastSeenAt: "2026-03-09T00:00:00.000Z",
+    });
+    const syncStartedAt = await markResourceSyncing({
+      db: env.controlPlaneDb,
+      connectionId: "icn_sync_resource_attributes_existing_resource",
+      familyId: "github",
+      kind: "user",
+    });
+
+    await expect(
+      applySuccessfulResourceSync({
+        db: env.controlPlaneDb,
+        connectionId: "icn_sync_resource_attributes_existing_resource",
+        familyId: "github",
+        kind: "user",
+        syncStartedAt,
+        discoveredResources: [
+          githubUserResource({
+            externalId: "1",
+            handle: "alice",
+            displayName: "Alice",
+          }),
+        ],
+        discoveredAttributes: [
+          githubUserAttribute({
+            resourceExternalId: "1",
+            resourceHandle: "alice",
+            key: "is_bot",
+            value: "false",
+            valueType: "boolean",
+            metadata: {},
+          }),
+          githubUserAttribute({
+            resourceExternalId: "2",
+            resourceHandle: "bob",
+            key: "is_bot",
+            value: "false",
+            valueType: "boolean",
+            metadata: {},
+          }),
+        ],
+        attributeDefinitions: UserAttributeDefinitions,
+      }),
+    ).resolves.toBe(true);
+
+    const persistedAttribute =
+      await env.controlPlaneDb.query.integrationConnectionResourceAttributes.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.connectionId, "icn_sync_resource_attributes_existing_resource"),
+            eq(table.resourceHandle, "bob"),
+            eq(table.attributeKey, "is_bot"),
+          ),
+      });
+    expect(persistedAttribute).toEqual(
+      expect.objectContaining({
+        resourceExternalId: "2",
+        attributeValue: "false",
+        removedAt: null,
+      }),
+    );
+
+    const persistedResource =
+      await env.controlPlaneDb.query.integrationConnectionResources.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.connectionId, "icn_sync_resource_attributes_existing_resource"),
+            eq(table.handle, "bob"),
+          ),
+      });
+    expect(persistedResource).toEqual(
+      expect.objectContaining({
+        status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
+        removedAt: null,
+      }),
+    );
+  });
+
+  it("marks unseen declared attributes removed without touching unrelated attributes", async ({
+    env,
+  }) => {
+    await seedGitHubConnection({
+      env,
+      organizationId: "org_sync_resource_attributes_stale_cleanup",
+      targetKey: "github-cloud-sync-resource-attributes-stale-cleanup",
+      connectionId: "icn_sync_resource_attributes_stale_cleanup",
+      organizationName: "Sync Resource Attributes Stale Cleanup",
+      organizationSlug: "sync-resource-attributes-stale-cleanup",
+    });
+    await seedGitHubConnection({
+      env,
+      organizationId: "org_sync_resource_attributes_unrelated",
+      targetKey: "github-cloud-sync-resource-attributes-unrelated",
+      connectionId: "icn_sync_resource_attributes_unrelated",
+      organizationName: "Sync Resource Attributes Unrelated",
+      organizationSlug: "sync-resource-attributes-unrelated",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnectionResources).values([
+      {
+        id: "rsc_sync_resource_attributes_stale_cleanup_alice",
+        connectionId: "icn_sync_resource_attributes_stale_cleanup",
+        familyId: "github",
+        kind: "user",
+        externalId: "1",
+        handle: "alice",
+        displayName: "Alice",
+        status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
+        metadata: {},
+        lastSeenAt: "2026-03-09T00:00:00.000Z",
+      },
+      {
+        id: "rsc_sync_resource_attributes_stale_cleanup_bob",
+        connectionId: "icn_sync_resource_attributes_stale_cleanup",
+        familyId: "github",
+        kind: "user",
+        externalId: "2",
+        handle: "bob",
+        displayName: "Bob",
+        status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
+        metadata: {},
+        lastSeenAt: "2026-03-09T00:00:00.000Z",
+      },
+    ]);
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.integrationConnectionResourceAttributes)
+      .values([
+        persistedAttribute({
+          id: "ica_sync_resource_attributes_stale_cleanup_alice_is_bot",
+          connectionId: "icn_sync_resource_attributes_stale_cleanup",
+          resourceExternalId: "1",
+          resourceHandle: "alice",
+          attributeKey: "is_bot",
+          attributeValue: "false",
+          valueType: "boolean",
+        }),
+        persistedAttribute({
+          id: "ica_sync_resource_attributes_stale_cleanup_bob_is_bot",
+          connectionId: "icn_sync_resource_attributes_stale_cleanup",
+          resourceExternalId: "2",
+          resourceHandle: "bob",
+          attributeKey: "is_bot",
+          attributeValue: "false",
+          valueType: "boolean",
+        }),
+        persistedAttribute({
+          id: "ica_sync_resource_attributes_stale_cleanup_bob_actor_type",
+          connectionId: "icn_sync_resource_attributes_stale_cleanup",
+          resourceExternalId: "2",
+          resourceHandle: "bob",
+          attributeKey: "actor_type",
+          attributeValue: "User",
+          valueType: "string",
+        }),
+        persistedAttribute({
+          id: "ica_sync_resource_attributes_unrelated_is_bot",
+          connectionId: "icn_sync_resource_attributes_unrelated",
+          resourceExternalId: "1",
+          resourceHandle: "alice",
+          attributeKey: "is_bot",
+          attributeValue: "false",
+          valueType: "boolean",
+        }),
+      ]);
+
+    const syncStartedAt = await markResourceSyncing({
+      db: env.controlPlaneDb,
+      connectionId: "icn_sync_resource_attributes_stale_cleanup",
+      familyId: "github",
+      kind: "user",
+    });
+
+    await expect(
+      applySuccessfulResourceSync({
+        db: env.controlPlaneDb,
+        connectionId: "icn_sync_resource_attributes_stale_cleanup",
+        familyId: "github",
+        kind: "user",
+        syncStartedAt,
+        discoveredResources: [
+          githubUserResource({
+            externalId: "1",
+            handle: "alice",
+            displayName: "Alice",
+          }),
+        ],
+        discoveredAttributes: [
+          githubUserAttribute({
+            resourceExternalId: "1",
+            resourceHandle: "alice",
+            key: "is_bot",
+            value: "false",
+            valueType: "boolean",
+            metadata: {},
+          }),
+        ],
+        attributeDefinitions: [
+          {
+            key: "is_bot",
+            valueType: "boolean",
+            actorPolicyEligible: true,
+          },
+        ],
+      }),
+    ).resolves.toBe(true);
+
+    const persistedAttributes =
+      await env.controlPlaneDb.query.integrationConnectionResourceAttributes.findMany({
+        where: (table, { inArray }) =>
+          inArray(table.id, [
+            "ica_sync_resource_attributes_stale_cleanup_alice_is_bot",
+            "ica_sync_resource_attributes_stale_cleanup_bob_is_bot",
+            "ica_sync_resource_attributes_stale_cleanup_bob_actor_type",
+            "ica_sync_resource_attributes_unrelated_is_bot",
+          ]),
+        orderBy: (table, { asc }) => [asc(table.id)],
+      });
+    expect(
+      persistedAttributes.map((attribute) => ({
+        id: attribute.id,
+        removed: attribute.removedAt !== null,
+      })),
+    ).toEqual([
+      {
+        id: "ica_sync_resource_attributes_stale_cleanup_alice_is_bot",
+        removed: false,
+      },
+      {
+        id: "ica_sync_resource_attributes_stale_cleanup_bob_actor_type",
+        removed: false,
+      },
+      {
+        id: "ica_sync_resource_attributes_stale_cleanup_bob_is_bot",
+        removed: true,
+      },
+      {
+        id: "ica_sync_resource_attributes_unrelated_is_bot",
+        removed: false,
+      },
+    ]);
+  });
+
+  it("rejects resource attributes whose resource is neither in the snapshot nor currently accessible", async ({
+    env,
+  }) => {
+    await seedGitHubConnection({
+      env,
+      organizationId: "org_sync_resource_attributes_orphan",
+      targetKey: "github-cloud-sync-resource-attributes-orphan",
+      connectionId: "icn_sync_resource_attributes_orphan",
+      organizationName: "Sync Resource Attributes Orphan",
+      organizationSlug: "sync-resource-attributes-orphan",
+    });
+    const syncStartedAt = await markResourceSyncing({
+      db: env.controlPlaneDb,
+      connectionId: "icn_sync_resource_attributes_orphan",
+      familyId: "github",
+      kind: "user",
+    });
+
+    await expect(
+      applySuccessfulResourceSync({
+        db: env.controlPlaneDb,
+        connectionId: "icn_sync_resource_attributes_orphan",
+        familyId: "github",
+        kind: "user",
+        syncStartedAt,
+        discoveredResources: [],
+        discoveredAttributes: [
+          githubUserAttribute({
+            resourceExternalId: "404",
+            resourceHandle: "ghost",
+            key: "is_bot",
+            value: "false",
+            valueType: "boolean",
+            metadata: {},
+          }),
+        ],
+        attributeDefinitions: UserAttributeDefinitions,
+      }),
+    ).rejects.toThrow("Provider returned attribute 'is_bot' for unknown resource 'ghost'.");
+
+    const persistedAttributes =
+      await env.controlPlaneDb.query.integrationConnectionResourceAttributes.findMany({
+        where: (table, { eq }) => eq(table.connectionId, "icn_sync_resource_attributes_orphan"),
+      });
+    expect(persistedAttributes).toEqual([]);
+  });
+
+  it("rejects successful snapshots that omit declared actor-policy attributes", async ({ env }) => {
+    await seedGitHubConnection({
+      env,
+      organizationId: "org_sync_resource_attributes_missing_actor_policy",
+      targetKey: "github-cloud-sync-resource-attributes-missing-actor-policy",
+      connectionId: "icn_sync_resource_attributes_missing_actor_policy",
+      organizationName: "Sync Resource Attributes Missing Actor Policy",
+      organizationSlug: "sync-resource-attributes-missing-actor-policy",
+    });
+    const syncStartedAt = await markResourceSyncing({
+      db: env.controlPlaneDb,
+      connectionId: "icn_sync_resource_attributes_missing_actor_policy",
+      familyId: "github",
+      kind: "user",
+    });
+
+    await expect(
+      applySuccessfulResourceSync({
+        db: env.controlPlaneDb,
+        connectionId: "icn_sync_resource_attributes_missing_actor_policy",
+        familyId: "github",
+        kind: "user",
+        syncStartedAt,
+        discoveredResources: [
+          githubUserResource({
+            externalId: "1",
+            handle: "alice",
+            displayName: "Alice",
+          }),
+        ],
+        discoveredAttributes: [
+          githubUserAttribute({
+            resourceExternalId: "1",
+            resourceHandle: "alice",
+            key: "actor_type",
+            value: "User",
+            valueType: "string",
+            metadata: {},
+          }),
+        ],
+        attributeDefinitions: UserAttributeDefinitions,
+      }),
+    ).rejects.toThrow("Provider omitted actor-policy attribute 'is_bot' for resource 'alice'.");
+  });
+
+  it("rejects resource attributes whose value type does not match the declaration", async ({
+    env,
+  }) => {
+    await seedGitHubConnection({
+      env,
+      organizationId: "org_sync_resource_attributes_wrong_value_type",
+      targetKey: "github-cloud-sync-resource-attributes-wrong-value-type",
+      connectionId: "icn_sync_resource_attributes_wrong_value_type",
+      organizationName: "Sync Resource Attributes Wrong Value Type",
+      organizationSlug: "sync-resource-attributes-wrong-value-type",
+    });
+    const syncStartedAt = await markResourceSyncing({
+      db: env.controlPlaneDb,
+      connectionId: "icn_sync_resource_attributes_wrong_value_type",
+      familyId: "github",
+      kind: "user",
+    });
+
+    await expect(
+      applySuccessfulResourceSync({
+        db: env.controlPlaneDb,
+        connectionId: "icn_sync_resource_attributes_wrong_value_type",
+        familyId: "github",
+        kind: "user",
+        syncStartedAt,
+        discoveredResources: [
+          githubUserResource({
+            externalId: "1",
+            handle: "alice",
+            displayName: "Alice",
+          }),
+        ],
+        discoveredAttributes: [
+          githubUserAttribute({
+            resourceExternalId: "1",
+            resourceHandle: "alice",
+            key: "is_bot",
+            value: "false",
+            valueType: "string",
+            metadata: {},
+          }),
+        ],
+        attributeDefinitions: UserAttributeDefinitions,
+      }),
+    ).rejects.toThrow(
+      "Provider returned attribute 'is_bot' with value type 'string' but declared 'boolean'.",
+    );
+  });
+
+  it("rejects resource attributes with non-canonical boolean values", async ({ env }) => {
+    await seedGitHubConnection({
+      env,
+      organizationId: "org_sync_resource_attributes_noncanonical_boolean",
+      targetKey: "github-cloud-sync-resource-attributes-noncanonical-boolean",
+      connectionId: "icn_sync_resource_attributes_noncanonical_boolean",
+      organizationName: "Sync Resource Attributes Noncanonical Boolean",
+      organizationSlug: "sync-resource-attributes-noncanonical-boolean",
+    });
+    const syncStartedAt = await markResourceSyncing({
+      db: env.controlPlaneDb,
+      connectionId: "icn_sync_resource_attributes_noncanonical_boolean",
+      familyId: "github",
+      kind: "user",
+    });
+
+    await expect(
+      applySuccessfulResourceSync({
+        db: env.controlPlaneDb,
+        connectionId: "icn_sync_resource_attributes_noncanonical_boolean",
+        familyId: "github",
+        kind: "user",
+        syncStartedAt,
+        discoveredResources: [
+          githubUserResource({
+            externalId: "1",
+            handle: "alice",
+            displayName: "Alice",
+          }),
+        ],
+        discoveredAttributes: [
+          githubUserAttribute({
+            resourceExternalId: "1",
+            resourceHandle: "alice",
+            key: "is_bot",
+            value: "False",
+            valueType: "boolean",
+            metadata: {},
+          }),
+        ],
+        attributeDefinitions: UserAttributeDefinitions,
+      }),
+    ).rejects.toThrow(
+      "Provider returned boolean attribute 'is_bot' with non-canonical value 'False'.",
+    );
+  });
+
+  it("does not mutate attributes when a stale successful snapshot is ignored", async ({ env }) => {
+    await seedGitHubConnection({
+      env,
+      organizationId: "org_sync_resource_attributes_stale_snapshot",
+      targetKey: "github-cloud-sync-resource-attributes-stale-snapshot",
+      connectionId: "icn_sync_resource_attributes_stale_snapshot",
+      organizationName: "Sync Resource Attributes Stale Snapshot",
+      organizationSlug: "sync-resource-attributes-stale-snapshot",
+    });
+
+    const firstSyncStartedAt = await markResourceSyncing({
+      db: env.controlPlaneDb,
+      connectionId: "icn_sync_resource_attributes_stale_snapshot",
+      familyId: "github",
+      kind: "user",
+    });
+    const secondSyncStartedAt = await markResourceSyncing({
+      db: env.controlPlaneDb,
+      connectionId: "icn_sync_resource_attributes_stale_snapshot",
+      familyId: "github",
+      kind: "user",
+    });
+
+    await expect(
+      applySuccessfulResourceSync({
+        db: env.controlPlaneDb,
+        connectionId: "icn_sync_resource_attributes_stale_snapshot",
+        familyId: "github",
+        kind: "user",
+        syncStartedAt: secondSyncStartedAt,
+        discoveredResources: [
+          githubUserResource({
+            externalId: "1",
+            handle: "alice",
+            displayName: "Alice",
+          }),
+        ],
+        discoveredAttributes: [
+          githubUserAttribute({
+            resourceExternalId: "1",
+            resourceHandle: "alice",
+            key: "is_bot",
+            value: "false",
+            valueType: "boolean",
+            metadata: {},
+          }),
+        ],
+        attributeDefinitions: UserAttributeDefinitions,
+      }),
+    ).resolves.toBe(true);
+
+    await expect(
+      applySuccessfulResourceSync({
+        db: env.controlPlaneDb,
+        connectionId: "icn_sync_resource_attributes_stale_snapshot",
+        familyId: "github",
+        kind: "user",
+        syncStartedAt: firstSyncStartedAt,
+        discoveredResources: [
+          githubUserResource({
+            externalId: "1",
+            handle: "alice",
+            displayName: "Alice",
+          }),
+        ],
+        discoveredAttributes: [
+          githubUserAttribute({
+            resourceExternalId: "1",
+            resourceHandle: "alice",
+            key: "is_bot",
+            value: "true",
+            valueType: "boolean",
+            metadata: {},
+          }),
+        ],
+        attributeDefinitions: UserAttributeDefinitions,
+      }),
+    ).resolves.toBe(false);
+
+    const persistedAttribute =
+      await env.controlPlaneDb.query.integrationConnectionResourceAttributes.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.connectionId, "icn_sync_resource_attributes_stale_snapshot"),
+            eq(table.resourceHandle, "alice"),
+            eq(table.attributeKey, "is_bot"),
+          ),
+      });
+    expect(persistedAttribute?.attributeValue).toBe("false");
+  });
+
+  it("persists attributes returned by the integration resource sync workflow", async ({ env }) => {
+    await seedAttributeProviderConnection({ env });
+    const registry = createAttributeProviderRegistry();
+
+    await expect(
+      syncIntegrationConnectionResources(
+        {
+          db: env.controlPlaneDb,
+          integrationRegistry: registry,
+        },
+        {
+          organizationId: "org_sync_resource_attributes_workflow",
+          connectionId: "icn_sync_resource_attributes_workflow",
+          kind: "user",
+        },
+      ),
+    ).resolves.toEqual({
+      organizationId: "org_sync_resource_attributes_workflow",
+      connectionId: "icn_sync_resource_attributes_workflow",
+      kind: "user",
+    });
+
+    const persistedAttribute =
+      await env.controlPlaneDb.query.integrationConnectionResourceAttributes.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.connectionId, "icn_sync_resource_attributes_workflow"),
+            eq(table.resourceHandle, "alice"),
+            eq(table.attributeKey, "is_bot"),
+          ),
+      });
+    expect(persistedAttribute).toEqual(
+      expect.objectContaining({
+        familyId: "attribute-test",
+        resourceKind: "user",
+        resourceExternalId: "1",
+        attributeValue: "false",
+        valueType: "boolean",
+        metadata: {
+          source: "workflow",
+        },
+        removedAt: null,
+      }),
+    );
+  });
 });
+
+function githubUserResource(input: {
+  externalId: string;
+  handle: string;
+  displayName: string;
+}): DiscoveredIntegrationResource {
+  return {
+    externalId: input.externalId,
+    handle: input.handle,
+    displayName: input.displayName,
+    metadata: {},
+  };
+}
+
+function githubUserAttribute(input: {
+  resourceExternalId: string;
+  resourceHandle: string;
+  key: string;
+  value: string;
+  valueType: DiscoveredIntegrationResourceAttribute["valueType"];
+  metadata: Record<string, unknown>;
+}): DiscoveredIntegrationResourceAttribute {
+  return {
+    resourceKind: "user",
+    resourceExternalId: input.resourceExternalId,
+    resourceHandle: input.resourceHandle,
+    key: input.key,
+    value: input.value,
+    valueType: input.valueType,
+    metadata: input.metadata,
+  };
+}
+
+function persistedAttribute(input: {
+  id: string;
+  connectionId: string;
+  resourceExternalId: string;
+  resourceHandle: string;
+  attributeKey: string;
+  attributeValue: string;
+  valueType: DiscoveredIntegrationResourceAttribute["valueType"];
+}): {
+  id: string;
+  connectionId: string;
+  familyId: string;
+  resourceKind: string;
+  resourceExternalId: string;
+  resourceHandle: string;
+  attributeKey: string;
+  attributeValue: string;
+  valueType: DiscoveredIntegrationResourceAttribute["valueType"];
+  metadata: Record<string, unknown>;
+  lastSeenAt: string;
+} {
+  return {
+    id: input.id,
+    connectionId: input.connectionId,
+    familyId: "github",
+    resourceKind: "user",
+    resourceExternalId: input.resourceExternalId,
+    resourceHandle: input.resourceHandle,
+    attributeKey: input.attributeKey,
+    attributeValue: input.attributeValue,
+    valueType: input.valueType,
+    metadata: {},
+    lastSeenAt: "2026-03-09T00:00:00.000Z",
+  };
+}
+
+function createAttributeProviderRegistry(): IntegrationRegistry {
+  const registry = new IntegrationRegistry();
+  registry.register(createAttributeProviderDefinition());
+  return registry;
+}
+
+function createAttributeProviderDefinition(): AnyIntegrationDefinition {
+  return {
+    familyId: "attribute-test",
+    variantId: "default",
+    kind: IntegrationKinds.CONNECTOR,
+    displayName: "Attribute Test",
+    logoKey: "github",
+    targetConfigSchema: z.object({}).strict(),
+    targetSecretSchema: z.object({}).strict(),
+    bindingConfigSchema: z.object({}).strict(),
+    connectionMethods: [],
+    resourceDefinitions: [
+      {
+        kind: "user",
+        selectionMode: "multi",
+        bindingField: "users",
+        displayNameSingular: "User",
+        displayNamePlural: "Users",
+        attributeDefinitions: UserAttributeDefinitions,
+      },
+    ],
+    listConnectionResources: () => ({
+      resources: [
+        githubUserResource({
+          externalId: "1",
+          handle: "alice",
+          displayName: "Alice",
+        }),
+      ],
+      attributes: [
+        githubUserAttribute({
+          resourceExternalId: "1",
+          resourceHandle: "alice",
+          key: "is_bot",
+          value: "false",
+          valueType: "boolean",
+          metadata: {
+            source: "workflow",
+          },
+        }),
+      ],
+    }),
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [],
+      runtimeClients: [],
+    }),
+  };
+}
+
+async function seedAttributeProviderConnection(input: {
+  env: IntegrationTestEnvironment;
+}): Promise<void> {
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.organizations).values({
+    id: "org_sync_resource_attributes_workflow",
+    name: "Sync Resource Attributes Workflow",
+    slug: "sync-resource-attributes-workflow",
+  });
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.integrationTargets).values({
+    targetKey: "attribute-test-sync-resource-attributes-workflow",
+    familyId: "attribute-test",
+    variantId: "default",
+    enabled: true,
+    config: {},
+  });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationConnections)
+    .values({
+      id: "icn_sync_resource_attributes_workflow",
+      organizationId: "org_sync_resource_attributes_workflow",
+      targetKey: "attribute-test-sync-resource-attributes-workflow",
+      displayName: "Sync Resource Attributes Workflow",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {},
+    });
+}
 
 async function seedGitHubConnection(input: {
   env: IntegrationTestEnvironment;

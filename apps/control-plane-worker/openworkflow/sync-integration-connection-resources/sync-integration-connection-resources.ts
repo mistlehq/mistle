@@ -1,5 +1,9 @@
 import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
-import { IntegrationConnectionStatuses, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import {
+  IntegrationConnectionResourceStatuses,
+  IntegrationConnectionStatuses,
+  type ControlPlaneDatabase,
+} from "@mistle/db/control-plane";
 import type {
   AnyIntegrationDefinition,
   IntegrationResolvedTarget,
@@ -184,9 +188,26 @@ export async function syncIntegrationConnectionResources(
     });
 
     const discoveredResources = validateDiscoveredResources(listedResources.resources);
-    validateDiscoveredResourceAttributes({
+    const accessibleResources = await deps.db.query.integrationConnectionResources.findMany({
+      columns: {
+        externalId: true,
+        handle: true,
+      },
+      where: (table, { and, eq, isNull }) =>
+        and(
+          eq(table.connectionId, connection.id),
+          eq(table.kind, input.kind),
+          eq(table.status, IntegrationConnectionResourceStatuses.ACCESSIBLE),
+          isNull(table.removedAt),
+        ),
+    });
+    const discoveredAttributes = validateDiscoveredResourceAttributes({
       resourceKind: input.kind,
       resources: discoveredResources,
+      accessibleResources: accessibleResources.map((resource) => ({
+        ...(resource.externalId === null ? {} : { externalId: resource.externalId }),
+        handle: resource.handle,
+      })),
       ...(listedResources.attributes === undefined
         ? {}
         : { attributes: listedResources.attributes }),
@@ -202,6 +223,10 @@ export async function syncIntegrationConnectionResources(
       kind: input.kind,
       syncStartedAt,
       discoveredResources,
+      discoveredAttributes,
+      ...(resourceDefinition.attributeDefinitions === undefined
+        ? {}
+        : { attributeDefinitions: resourceDefinition.attributeDefinitions }),
     });
     if (!appliedSuccessfully) {
       return {
