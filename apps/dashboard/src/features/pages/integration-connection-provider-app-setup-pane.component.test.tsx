@@ -88,6 +88,7 @@ function renderProviderAppSetupPane(input?: {
   connection?: IntegrationConnection;
   initialEntry?: string;
   methodId?: string;
+  navigate?: (nextHref: string) => void | Promise<void>;
   organizationName?: string | null;
   routeSegment?: string;
   webhookCallbackUrl?: string;
@@ -146,6 +147,7 @@ function renderProviderAppSetupPane(input?: {
             },
           })}
           methodId={methodId}
+          navigate={input?.navigate ?? (() => {})}
           organizationName={organizationName}
           routeSegment={routeSegment}
           setupStartForm={resolveIntegrationSetupStartFormOrThrow({

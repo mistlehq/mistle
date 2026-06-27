@@ -842,7 +842,7 @@ describe("DesignerCanvasWorkspace", () => {
   it("centers the blueprint graph horizontally near the top of the canvas viewport", () => {
     expect(
       resolveDesignerBlueprintInitialFocusViewport({
-        graphBounds: { x: 120, y: 24, width: 760, height: 520 },
+        graphBounds: { x: 120, y: 24, width: 760 },
         width: 1000,
       }),
     ).toEqual({

@@ -237,6 +237,7 @@ function IntegrationConnectionSetupPageContent(
     >
       {renderIntegrationConnectionSetupPane({
         connection,
+        navigate,
         organizationName,
         searchParams,
         setupRoute,

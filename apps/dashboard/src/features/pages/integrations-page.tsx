@@ -535,6 +535,7 @@ export function IntegrationsPage(input?: {
         selectedConnectionId={directoryState.activeDetailConnectionId}
         selectedConnectionBody={renderSelectedConnectionSetupBody({
           connection: selectedDetailConnection,
+          navigate,
           organizationName: organizationSummary.query.isSuccess
             ? organizationSummary.query.data.name
             : null,
@@ -600,6 +601,7 @@ export function IntegrationsPage(input?: {
 
 export function renderSelectedConnectionSetupBody(input: {
   connection: IntegrationConnection | undefined;
+  navigate: (href: string) => void | Promise<void>;
   organizationName: string | null;
   setupFlow: IntegrationConnectionSetupRoute | null;
 }): React.JSX.Element | undefined {
@@ -609,6 +611,7 @@ export function renderSelectedConnectionSetupBody(input: {
 
   return renderIntegrationConnectionSetupPane({
     connection: input.connection,
+    navigate: input.navigate,
     organizationName: input.organizationName ?? undefined,
     setupRoute: input.setupFlow,
   });

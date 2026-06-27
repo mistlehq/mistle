@@ -983,7 +983,6 @@ type DesignerBlueprintGraphEdge = Edge;
 
 type DesignerBlueprintGraph = {
   edges: DesignerBlueprintGraphEdge[];
-  initialFocusNodeId?: string;
   nodes: DesignerBlueprintLayoutNode[];
 };
 
@@ -1515,9 +1514,6 @@ async function buildDesignerBlueprintGraph(input: {
       position: positionByNodeId.get(node.id) ?? node.position,
     })),
     edges: displayEdges,
-    ...(input.blueprint.items[0] === undefined
-      ? {}
-      : { initialFocusNodeId: input.blueprint.items[0].id }),
   };
 }
 
@@ -1537,7 +1533,6 @@ export function resolveDesignerBlueprintInitialFocusViewport(input: {
 }
 
 type DesignerBlueprintGraphBounds = {
-  height: number;
   width: number;
   x: number;
   y: number;
@@ -1549,13 +1544,11 @@ function getDesignerBlueprintGraphBounds(
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
 
   for (const node of nodes) {
     minX = Math.min(minX, node.position.x);
     minY = Math.min(minY, node.position.y);
     maxX = Math.max(maxX, node.position.x + DesignerBlueprintNodeWidth);
-    maxY = Math.max(maxY, node.position.y + getDesignerBlueprintNodeHeight(node.data));
   }
 
   if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
@@ -1563,7 +1556,6 @@ function getDesignerBlueprintGraphBounds(
   }
 
   return {
-    height: maxY - minY,
     width: maxX - minX,
     x: minX,
     y: minY,
