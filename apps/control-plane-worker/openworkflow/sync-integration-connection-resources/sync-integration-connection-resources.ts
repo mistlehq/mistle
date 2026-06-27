@@ -24,6 +24,7 @@ import { resolveResourceCredential } from "./resolve-resource-credential.js";
 import { resolveResourceSyncFailure } from "./resolve-resource-sync-failure.js";
 import { resolveTargetSecrets } from "./resolve-target-secrets.js";
 import { validateDiscoveredResourceAttributes } from "./validate-discovered-resource-attributes.js";
+import { validateDiscoveredResourceRelationships } from "./validate-discovered-resource-relationships.js";
 import { validateDiscoveredResources } from "./validate-discovered-resources.js";
 
 const UnknownRecordSchema = z.record(z.string(), z.unknown());
@@ -215,6 +216,10 @@ export async function syncIntegrationConnectionResources(
         ? {}
         : { attributeDefinitions: resourceDefinition.attributeDefinitions }),
     });
+    const discoveredRelationships = validateListedResourceRelationships({
+      definition,
+      relationships: listedResources.relationships ?? [],
+    });
 
     const appliedSuccessfully = await applySuccessfulResourceSync({
       db: deps.db,
@@ -224,6 +229,7 @@ export async function syncIntegrationConnectionResources(
       syncStartedAt,
       discoveredResources,
       discoveredAttributes,
+      discoveredRelationships,
       ...(resourceDefinition.attributeDefinitions === undefined
         ? {}
         : { attributeDefinitions: resourceDefinition.attributeDefinitions }),
@@ -264,6 +270,78 @@ export async function syncIntegrationConnectionResources(
     connectionId: input.connectionId,
     kind: input.kind,
   };
+}
+
+function validateListedResourceRelationships(input: {
+  definition: AnyIntegrationDefinition;
+  relationships: ListConnectionResourcesResult["relationships"];
+}) {
+  const relationships = input.relationships ?? [];
+  const relationshipDefinitions = input.definition.resourceRelationshipDefinitions ?? [];
+  const relationshipsByDefinitionAndScope = new Map<
+    string,
+    {
+      relationshipKind: string;
+      subjectResourceKind: string;
+      objectResourceKind: string;
+      scope: {
+        scopeKind: string;
+        scopeExternalId?: string;
+        scopeHandle: string;
+      };
+      relationships: NonNullable<ListConnectionResourcesResult["relationships"]>;
+    }
+  >();
+
+  for (const relationship of relationships) {
+    const relationshipDefinition = relationshipDefinitions.find(
+      (candidate) =>
+        candidate.relationshipKind === relationship.relationshipKind &&
+        candidate.subjectResourceKind === relationship.subjectResourceKind &&
+        candidate.objectResourceKind === relationship.objectResourceKind &&
+        candidate.scopeDefinitions.some(
+          (scopeDefinition) => scopeDefinition.scopeKind === relationship.scopeKind,
+        ),
+    );
+    if (relationshipDefinition === undefined) {
+      throw new Error(
+        `Provider returned undeclared relationship '${relationship.relationshipKind}' from '${relationship.subjectResourceKind}' to '${relationship.objectResourceKind}' scoped by '${relationship.scopeKind}'.`,
+      );
+    }
+
+    const scope = {
+      scopeKind: relationship.scopeKind,
+      ...(relationship.scopeExternalId === undefined
+        ? {}
+        : { scopeExternalId: relationship.scopeExternalId }),
+      scopeHandle: relationship.scopeHandle,
+    };
+    const key = JSON.stringify([
+      relationship.relationshipKind,
+      relationship.subjectResourceKind,
+      relationship.objectResourceKind,
+      relationship.scopeKind,
+      relationship.scopeExternalId ?? null,
+      relationship.scopeHandle,
+    ]);
+    const existing = relationshipsByDefinitionAndScope.get(key);
+    if (existing === undefined) {
+      relationshipsByDefinitionAndScope.set(key, {
+        relationshipKind: relationship.relationshipKind,
+        subjectResourceKind: relationship.subjectResourceKind,
+        objectResourceKind: relationship.objectResourceKind,
+        scope,
+        relationships: [relationship],
+      });
+      continue;
+    }
+
+    existing.relationships = [...existing.relationships, relationship];
+  }
+
+  return [...relationshipsByDefinitionAndScope.values()].flatMap((group) =>
+    validateDiscoveredResourceRelationships(group),
+  );
 }
 
 function findResourceDefinition(
