@@ -1,15 +1,7 @@
 import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import {
-  createMemoryRouter,
-  createRoutesFromElements,
-  Outlet,
-  Route,
-  RouterProvider,
-} from "react-router";
+import { useState } from "react";
 import { z } from "zod";
 
 import { getDashboardStoryControlPlaneApiOrigin } from "../../storybook/dashboard-story-config.js";
@@ -23,18 +15,17 @@ import {
 import type { ManagedWebhookSetupResult } from "../integrations/integrations-service-shared.js";
 import type {
   IntegrationConnection,
-  IntegrationTarget,
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
-import { ROUTE_HANDLES } from "../navigation/route-handles.js";
-import { SESSION_QUERY_KEY } from "../shell/session-query.js";
-import { IntegrationConnectionCreatePage } from "./integration-connection-create-page.js";
-import { IntegrationsPage } from "./integrations-page.js";
 import {
-  createStoryConnectionMethods,
-  IntegrationSettingsAddFlowStory,
-} from "./organization-integrations-settings-page-story-support.js";
-import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
+  createIntegrationStoryQueryClient,
+  createIntegrationStoryTarget,
+  createJsonStoryResponse,
+  IntegrationSetupRouteStory,
+  type IntegrationStoryControlPlaneHandler,
+  setIntegrationStoryDirectoryData,
+  setIntegrationStoryWebhookSources,
+} from "./integration-setup-flow-story-support.js";
 
 const IntegrationRegistry = createBrowserIntegrationRegistry();
 const StoryNow = "2026-04-27T00:00:00.000Z";
@@ -83,30 +74,18 @@ function getJiraDefinitionOrThrow(): AnyIntegrationDefinition {
 
 const JiraDefinition = getJiraDefinitionOrThrow();
 
-function createJiraTargetFixture(): IntegrationTarget {
-  return {
-    targetKey: "jira-default",
-    familyId: JiraDefinition.familyId,
-    variantId: JiraDefinition.variantId,
-    kind: JiraDefinition.kind,
-    enabled: true,
-    config: {},
-    displayName: JiraDefinition.displayName,
-    description: JiraDefinition.description ?? "",
-    ...(JiraDefinition.logoKey === undefined ? {} : { logoKey: JiraDefinition.logoKey }),
-    connectionMethods: createStoryConnectionMethods(JiraDefinition),
-    webhookSource:
-      JiraDefinition.webhookSource === undefined
-        ? undefined
-        : {
-            lifecycle: JiraDefinition.webhookSource.lifecycle,
-            requiresSourceSelection: true,
-          },
-    targetHealth: {
-      configStatus: "valid",
-    },
-  };
-}
+const JiraTarget = createIntegrationStoryTarget({
+  definition: JiraDefinition,
+  config: {},
+  ...(JiraDefinition.webhookSource === undefined
+    ? {}
+    : {
+        webhookSource: {
+          lifecycle: JiraDefinition.webhookSource.lifecycle,
+          requiresSourceSelection: true,
+        },
+      }),
+});
 
 function createJiraConnection(input?: {
   id?: string;
@@ -177,29 +156,6 @@ function createJiraWebhookSource(input?: { connectionId?: string }): Integration
   };
 }
 
-function createJsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "content-type": "application/json",
-    },
-  });
-}
-
-function createPageResponse<T>(items: readonly T[]): {
-  items: readonly T[];
-  totalResults: number;
-  nextPage: null;
-  previousPage: null;
-} {
-  return {
-    items,
-    totalResults: items.length,
-    nextPage: null,
-    previousPage: null,
-  };
-}
-
 const StoryCreateFormConnectionRequestBodySchema = z.object({
   displayName: z.string(),
   methodId: z.enum([
@@ -211,192 +167,78 @@ const StoryCreateFormConnectionRequestBodySchema = z.object({
   secrets: z.record(z.string(), z.string()),
 });
 
-function createStoryQueryClient(input: {
-  connections?: readonly IntegrationConnection[];
-  webhookSources?: readonly IntegrationWebhookSource[];
-}): QueryClient {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        gcTime: Infinity,
-        refetchOnMount: false,
-        refetchOnReconnect: false,
-        refetchOnWindowFocus: false,
-        retry: false,
-        staleTime: Infinity,
-      },
-    },
-  });
-
-  queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
-    targets: [createJiraTargetFixture()],
-    connections: [...(input.connections ?? [])],
-  });
-  queryClient.setQueryData(SESSION_QUERY_KEY, {
-    session: {
-      activeOrganizationId: "org_mistle",
-    },
-  });
-
-  for (const source of input.webhookSources ?? []) {
-    queryClient.setQueryData(
-      ["integration-webhook-sources", source.integrationConnectionId],
-      [source],
-    );
-  }
-
-  return queryClient;
-}
-
-function useJiraStoryControlPlane(input: {
+function createJiraStoryControlPlaneHandler(input: {
   managedWebhookSetup: ManagedWebhookSetupResult;
-  queryClient: QueryClient;
-}): void {
-  useEffect(() => {
-    const originalFetch = globalThis.fetch;
+}): IntegrationStoryControlPlaneHandler {
+  return async ({ directoryData, method, path, queryClient, request }) => {
+    if (method === "POST" && path === "/v1/integration/connections/jira-default/form") {
+      const requestBody: unknown = await request.json();
+      const body = StoryCreateFormConnectionRequestBodySchema.parse(requestBody);
+      const createdConnection = createJiraConnection({
+        id: "icn_jira_created",
+        displayName: body.displayName,
+        methodId: body.methodId,
+      });
 
-    globalThis.fetch = async (
-      resource: RequestInfo | URL,
-      init?: RequestInit,
-    ): Promise<Response> => {
-      const request = resource instanceof Request ? resource : new Request(resource, init);
-      const url = new URL(request.url);
-      const storyControlPlaneApiOrigin = getDashboardStoryControlPlaneApiOrigin();
+      setIntegrationStoryDirectoryData(queryClient, {
+        targets: directoryData.targets,
+        connections: [...directoryData.connections, createdConnection],
+      });
 
-      if (url.origin !== storyControlPlaneApiOrigin) {
-        return originalFetch(resource, init);
-      }
-
-      const method = request.method.toUpperCase();
-      const path = url.pathname;
-      const directoryData = input.queryClient.getQueryData<{
-        targets: readonly IntegrationTarget[];
-        connections: readonly IntegrationConnection[];
-      }>(SETTINGS_INTEGRATIONS_QUERY_KEY) ?? { targets: [], connections: [] };
-
-      if (method === "GET" && path === "/v1/integration/targets") {
-        return createJsonResponse(createPageResponse(directoryData.targets));
-      }
-
-      if (method === "GET" && path === "/v1/integration/connections") {
-        return createJsonResponse(createPageResponse(directoryData.connections));
-      }
-
-      const webhookSourcesMatch = path.match(
-        /^\/v1\/integration\/connections\/([^/]+)\/webhook-sources$/,
-      );
-      if (method === "GET" && webhookSourcesMatch !== null) {
-        const connectionId = decodeURIComponent(webhookSourcesMatch[1] ?? "");
-        return createJsonResponse(
-          input.queryClient.getQueryData<readonly IntegrationWebhookSource[]>([
-            "integration-webhook-sources",
-            connectionId,
-          ]) ?? [],
-        );
-      }
-
-      if (method === "POST" && path === "/v1/integration/connections/jira-default/form") {
-        const requestBody: unknown = await request.json();
-        const body = StoryCreateFormConnectionRequestBodySchema.parse(requestBody);
-        const createdConnection = createJiraConnection({
-          id: "icn_jira_created",
-          displayName: body.displayName,
-          methodId: body.methodId,
+      if (
+        body.methodId === "jira-personal-api-token" &&
+        input.managedWebhookSetup.status === "created"
+      ) {
+        setIntegrationStoryWebhookSources({
+          connectionId: createdConnection.id,
+          queryClient,
+          webhookSources: [createJiraWebhookSource({ connectionId: createdConnection.id })],
         });
-
-        input.queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
-          targets: directoryData.targets,
-          connections: [...directoryData.connections, createdConnection],
-        });
-
-        if (
-          body.methodId === "jira-personal-api-token" &&
-          input.managedWebhookSetup.status === "created"
-        ) {
-          input.queryClient.setQueryData(
-            ["integration-webhook-sources", createdConnection.id],
-            [createJiraWebhookSource({ connectionId: createdConnection.id })],
-          );
-        }
-
-        return createJsonResponse(
-          {
-            ...createdConnection,
-            config: body.config,
-            ...(body.methodId === "jira-personal-api-token"
-              ? { managedWebhookSetup: input.managedWebhookSetup }
-              : {}),
-          },
-          201,
-        );
       }
 
-      return createJsonResponse(
-        { code: "STORYBOOK_UNHANDLED", message: `${method} ${path} is not handled in Storybook.` },
-        500,
+      return createJsonStoryResponse(
+        {
+          ...createdConnection,
+          config: body.config,
+          ...(body.methodId === "jira-personal-api-token"
+            ? { managedWebhookSetup: input.managedWebhookSetup }
+            : {}),
+        },
+        201,
       );
-    };
+    }
 
-    return () => {
-      globalThis.fetch = originalFetch;
-    };
-  }, [input.managedWebhookSetup, input.queryClient]);
+    return null;
+  };
 }
 
-function StoryQueryClientProvider(input: {
-  managedWebhookSetup: ManagedWebhookSetupResult;
-  queryClient: QueryClient;
-  children: React.ReactNode;
-}): React.JSX.Element {
-  useJiraStoryControlPlane({
-    managedWebhookSetup: input.managedWebhookSetup,
-    queryClient: input.queryClient,
-  });
-
-  return <QueryClientProvider client={input.queryClient}>{input.children}</QueryClientProvider>;
-}
-
-function JiraAddFlowStory(input: {
+export function JiraAddFlowStory(input: {
   initialEntry: JiraAddFlowInitialEntry;
   connections?: readonly IntegrationConnection[];
   webhookSources?: readonly IntegrationWebhookSource[];
   managedWebhookSetup?: ManagedWebhookSetupResult;
 }): React.JSX.Element {
+  const managedWebhookSetup = input.managedWebhookSetup ?? StoryJiraWebhookCreatedSetup;
   const [queryClient] = useState(() =>
-    createStoryQueryClient({
+    createIntegrationStoryQueryClient({
+      targets: [JiraTarget],
       ...(input.connections === undefined ? {} : { connections: input.connections }),
       ...(input.webhookSources === undefined ? {} : { webhookSources: input.webhookSources }),
     }),
   );
-  const [router] = useState(() =>
-    createMemoryRouter(
-      createRoutesFromElements(
-        <Route element={<Outlet />}>
-          <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="/integrations">
-            <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
-              <Route element={<IntegrationsPage />} index />
-              <Route
-                element={<IntegrationConnectionCreatePage />}
-                handle={ROUTE_HANDLES.integrationCreate}
-                path="add"
-              />
-            </Route>
-          </Route>
-        </Route>,
-      ),
-      {
-        initialEntries: [input.initialEntry],
-      },
-    ),
-  );
+  const [handlers] = useState(() => [
+    createJiraStoryControlPlaneHandler({
+      managedWebhookSetup,
+    }),
+  ]);
 
   return (
-    <StoryQueryClientProvider
-      managedWebhookSetup={input.managedWebhookSetup ?? StoryJiraWebhookCreatedSetup}
+    <IntegrationSetupRouteStory
+      handlers={handlers}
+      initialEntries={[input.initialEntry]}
       queryClient={queryClient}
-    >
-      <RouterProvider router={router} />
-    </StoryQueryClientProvider>
+      routeKind="create-and-detail"
+    />
   );
 }
 
@@ -415,55 +257,12 @@ function createJiraResultInitialEntry(
 const pageMeta = {
   title: "Dashboard/Integrations/Setup/Jira",
   decorators: [withDashboardPageStory],
+  excludeStories: ["JiraAddFlowStory"],
 } satisfies Meta;
 
 export default pageMeta;
 
 type PageStory = StoryObj<typeof pageMeta>;
-
-export const AddConnection: PageStory = {
-  render: function RenderStory() {
-    return (
-      <JiraAddFlowStory
-        initialEntry="/integrations/jira-default/add"
-        managedWebhookSetup={StoryJiraWebhookCreatedSetup}
-      />
-    );
-  },
-};
-
-export const AddPersonalApiToken: PageStory = {
-  render: function RenderStory() {
-    return (
-      <IntegrationSettingsAddFlowStory
-        initialMethodId="jira-personal-api-token"
-        variantId="jira-default"
-      />
-    );
-  },
-};
-
-export const AddServiceAccountApiToken: PageStory = {
-  render: function RenderStory() {
-    return (
-      <IntegrationSettingsAddFlowStory
-        initialMethodId="jira-service-account-api-token"
-        variantId="jira-default"
-      />
-    );
-  },
-};
-
-export const AddServiceAccountOAuthClientCredentials: PageStory = {
-  render: function RenderStory() {
-    return (
-      <IntegrationSettingsAddFlowStory
-        initialMethodId="jira-service-account-oauth-client-credentials"
-        variantId="jira-default"
-      />
-    );
-  },
-};
 
 export const WebhookCreated: PageStory = {
   render: function RenderStory() {
