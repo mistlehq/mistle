@@ -46,6 +46,8 @@ function resolveProviderDisplayName(providerFamily: string | null): string | nul
   switch (providerFamily) {
     case "github":
       return "GitHub";
+    case "linear":
+      return "Linear";
     case "slack":
       return "Slack";
     default:

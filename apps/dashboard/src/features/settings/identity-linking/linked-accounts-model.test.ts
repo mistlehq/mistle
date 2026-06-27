@@ -365,7 +365,7 @@ describe("linked-accounts-model", () => {
     });
   });
 
-  it("ignores callback notices for other providers", () => {
+  it("resolves callback notices for non-GitHub providers", () => {
     expect(
       resolveLinkedAccountCallbackNotice({
         providerFamily: "slack",
@@ -376,6 +376,19 @@ describe("linked-accounts-model", () => {
     ).toEqual({
       title: "Slack linked successfully",
       message: "Your Slack account is now linked on Mistle.",
+      variant: "success",
+    });
+
+    expect(
+      resolveLinkedAccountCallbackNotice({
+        providerFamily: "linear",
+        organizationProviderConfigId: "ilp_linear",
+        result: "success",
+        code: null,
+      }),
+    ).toEqual({
+      title: "Linear linked successfully",
+      message: "Your Linear account is now linked on Mistle.",
       variant: "success",
     });
   });

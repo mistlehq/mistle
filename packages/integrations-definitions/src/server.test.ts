@@ -253,7 +253,9 @@ describe("integrations-definitions server", () => {
       lifecycle: "managed",
     });
     expect(typeof linearDefinition?.identityLinking?.supportsConnection).toBe("function");
-    expect(typeof linearDefinition?.identityLinking?.startAuthorization).toBe("undefined");
+    expect(typeof linearDefinition?.identityLinking?.startAuthorization).toBe("function");
+    expect(typeof linearDefinition?.identityLinking?.completeAuthorization).toBe("function");
+    expect(typeof linearDefinition?.identityLinking?.refreshCredential).toBe("function");
     expect(anthropicDefinition?.kind).toBe("agent");
     expect(openCodeGoDefinition?.kind).toBe("agent");
     expect(openRouterDefinition).toMatchObject({
