@@ -19,6 +19,18 @@ pub(crate) enum CliError {
         action: &'static str,
         source: MistleClientError,
     },
+    SandboxFailedBeforeConnect {
+        sandbox_id: String,
+        message: Option<String>,
+    },
+    SandboxStoppedBeforeConnect {
+        sandbox_id: String,
+        status: &'static str,
+    },
+    SandboxConnectTimeout {
+        sandbox_id: String,
+        timeout_seconds: u64,
+    },
     ReadFile {
         path: String,
         source: io::Error,
@@ -83,6 +95,34 @@ impl fmt::Display for CliError {
             }
             Self::Client { action, source } => {
                 write!(formatter, "failed to {action}: {source}")
+            }
+            Self::SandboxFailedBeforeConnect {
+                sandbox_id,
+                message,
+            } => match message {
+                Some(message) => write!(
+                    formatter,
+                    "sandbox `{sandbox_id}` failed before it became connectable: {message}"
+                ),
+                None => write!(
+                    formatter,
+                    "sandbox `{sandbox_id}` failed before it became connectable"
+                ),
+            },
+            Self::SandboxStoppedBeforeConnect { sandbox_id, status } => {
+                write!(
+                    formatter,
+                    "sandbox `{sandbox_id}` entered `{status}` before it became connectable"
+                )
+            }
+            Self::SandboxConnectTimeout {
+                sandbox_id,
+                timeout_seconds,
+            } => {
+                write!(
+                    formatter,
+                    "timed out waiting {timeout_seconds} seconds for sandbox `{sandbox_id}` to become connectable"
+                )
             }
             Self::ReadFile { path, source } => {
                 write!(formatter, "failed to read file `{path}`: {source}")
