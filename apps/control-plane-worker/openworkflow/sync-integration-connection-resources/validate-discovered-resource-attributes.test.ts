@@ -90,6 +90,47 @@ describe("validateDiscoveredResourceAttributes", () => {
     ).toEqual(attributes);
   });
 
+  it("accepts declared attributes for currently accessible resources outside the synced snapshot", () => {
+    const attributes: ReadonlyArray<DiscoveredIntegrationResourceAttribute> = [
+      slackUserAttribute({
+        resourceExternalId: "U123",
+        resourceHandle: "alice",
+        key: "is_bot",
+        value: "false",
+        valueType: "boolean",
+      }),
+      slackUserAttribute({
+        resourceExternalId: "U456",
+        resourceHandle: "bot",
+        key: "display_type",
+        value: "bot",
+        valueType: "string",
+      }),
+    ];
+
+    expect(
+      validateDiscoveredResourceAttributes({
+        resourceKind: "user",
+        resources: [
+          {
+            externalId: "U123",
+            handle: "alice",
+            displayName: "Alice",
+            metadata: {},
+          },
+        ],
+        accessibleResources: [
+          {
+            externalId: "U456",
+            handle: "bot",
+          },
+        ],
+        attributes,
+        attributeDefinitions: SlackUserAttributeDefinitions,
+      }),
+    ).toEqual(attributes);
+  });
+
   it("rejects duplicate attributes for the same resource and key", () => {
     const attributes: ReadonlyArray<DiscoveredIntegrationResourceAttribute> = [
       slackUserAttribute({
