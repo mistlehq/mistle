@@ -9,17 +9,17 @@ import { createTestQueryClient } from "../../test-support/query-client.js";
 import type { RoleChangeDialogState } from "../settings/members/members-capability-policy.js";
 import type { MembersDirectoryInvitationActionState } from "../settings/members/members-directory-model.js";
 import type { OrganizationMembersSettingsPageViewModel } from "../settings/members/organization-members-settings-view-model.js";
-import { OrganizationMembersSettingsPageView } from "./organization-members-settings-page-view.js";
 import {
-  createOrganizationMembersStoryRoleChangeDialog,
-  createOrganizationMembersSettingsPageStoryRoleViewModel,
-  OrganizationMembersStoryInvitations,
-  OrganizationMembersStoryMembers,
-  type OrganizationMembersStoryViewerRole,
-} from "./organization-members-settings-page-view.story-fixtures.js";
+  createOrganizationMembersFixtureRoleChangeDialog,
+  createOrganizationMembersSettingsPageFixtureRoleViewModel,
+  OrganizationMembersFixtureInvitations,
+  OrganizationMembersFixtureMembers,
+  type OrganizationMembersFixtureViewerRole,
+} from "./organization-members-settings-page-view.fixtures.js";
+import { OrganizationMembersSettingsPageView } from "./organization-members-settings-page-view.js";
 
 type OrganizationMembersSettingsPageStoryProps = {
-  viewerRole: OrganizationMembersStoryViewerRole;
+  viewerRole: OrganizationMembersFixtureViewerRole;
   viewModelOverrides?: Partial<OrganizationMembersSettingsPageViewModel>;
 };
 
@@ -28,7 +28,7 @@ function OrganizationMembersSettingsPageStory(
 ): React.JSX.Element {
   return (
     <OrganizationMembersSettingsPageView
-      viewModel={createOrganizationMembersSettingsPageStoryRoleViewModel(
+      viewModel={createOrganizationMembersSettingsPageFixtureRoleViewModel(
         input.viewModelOverrides === undefined
           ? {
               viewerRole: input.viewerRole,
@@ -83,10 +83,10 @@ type Story = StoryObj<typeof meta>;
 function filterStoryMembers(searchValue: string) {
   const normalizedSearch = searchValue.trim().toLowerCase();
   if (normalizedSearch.length === 0) {
-    return OrganizationMembersStoryMembers;
+    return OrganizationMembersFixtureMembers;
   }
 
-  return OrganizationMembersStoryMembers.filter((member) => {
+  return OrganizationMembersFixtureMembers.filter((member) => {
     return (
       member.name.toLowerCase().includes(normalizedSearch) ||
       member.email.toLowerCase().includes(normalizedSearch) ||
@@ -98,10 +98,10 @@ function filterStoryMembers(searchValue: string) {
 function filterStoryInvitations(searchValue: string) {
   const normalizedSearch = searchValue.trim().toLowerCase();
   if (normalizedSearch.length === 0) {
-    return OrganizationMembersStoryInvitations;
+    return OrganizationMembersFixtureInvitations;
   }
 
-  return OrganizationMembersStoryInvitations.filter((invitation) => {
+  return OrganizationMembersFixtureInvitations.filter((invitation) => {
     return (
       invitation.email.toLowerCase().includes(normalizedSearch) ||
       invitation.role.toLowerCase().includes(normalizedSearch) ||
@@ -137,7 +137,7 @@ function renderInteractiveStory(
 
   return (
     <OrganizationMembersSettingsPageView
-      viewModel={createOrganizationMembersSettingsPageStoryRoleViewModel({
+      viewModel={createOrganizationMembersSettingsPageFixtureRoleViewModel({
         viewerRole: args.viewerRole,
         overrides: {
           ...args.viewModelOverrides,
@@ -222,7 +222,7 @@ export const InviteDialogOpen: Story = {
 export const RoleDialogOpen: Story = {
   args: {
     viewModelOverrides: {
-      roleChangeDialog: createOrganizationMembersStoryRoleChangeDialog("mem_storybook", "admin"),
+      roleChangeDialog: createOrganizationMembersFixtureRoleChangeDialog("mem_storybook", "admin"),
     },
   },
 };
@@ -236,7 +236,7 @@ export const PendingActions: Story = {
         action: "resend_invite",
         phase: "pending",
       },
-      invitations: OrganizationMembersStoryInvitations,
+      invitations: OrganizationMembersFixtureInvitations,
       members: [],
       pendingMemberOperation: {
         kind: "change_role",

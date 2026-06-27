@@ -28,11 +28,9 @@ import { AppShellView } from "../shell/app-shell-view.js";
 import type { TriggerListItem } from "../triggers/triggers-types.js";
 import { NewSessionPage } from "./new-session-page.js";
 import { SessionWorkbenchPage } from "./session-workbench-page.js";
+import type { SessionsPageListFilters } from "./sessions-page-fixtures.js";
 import { SessionsPage } from "./sessions-page.js";
-import {
-  createSessionsPageStoryQueryClient,
-  type SessionsPageStoryListFilters,
-} from "./sessions-page.story-fixtures.js";
+import { createSessionsPageStoryQueryClient } from "./sessions-page.story-fixtures.js";
 
 type SessionsStoryHarnessProps = {
   initialEntries: readonly string[];
@@ -56,7 +54,7 @@ type SessionsStoryHarnessProps = {
     } | null;
   };
   sandboxInstancesList?: SandboxInstancesListResult;
-  sandboxInstancesListFilters?: SessionsPageStoryListFilters;
+  sandboxInstancesListFilters?: SessionsPageListFilters;
   sessionsSidebarQueryState?:
     | {
         kind: "success";

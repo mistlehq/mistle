@@ -2,13 +2,13 @@ import { Button } from "@mistle/ui";
 import type React from "react";
 
 import { OrganizationGeneralSettingsPageView } from "../pages/organization-general-settings-page-view.js";
-import { OrganizationMembersSettingsPageView } from "../pages/organization-members-settings-page-view.js";
 import {
-  createOrganizationMembersSettingsPageStoryViewModel,
-  inviteOrganizationMemberStoryRequest,
-  OrganizationMembersStoryCapabilities,
-  OrganizationMembersStoryMembers,
-} from "../pages/organization-members-settings-page-view.story-fixtures.js";
+  createOrganizationMembersSettingsPageFixtureViewModel,
+  inviteOrganizationMemberFixtureRequest,
+  OrganizationMembersFixtureCapabilities,
+  OrganizationMembersFixtureMembers,
+} from "../pages/organization-members-settings-page-view.fixtures.js";
+import { OrganizationMembersSettingsPageView } from "../pages/organization-members-settings-page-view.js";
 import { ProfileSettingsPageView } from "../pages/profile-settings-page-view.js";
 
 export function createSettingsFixtureInviteMembersButton(): React.JSX.Element {
@@ -74,12 +74,12 @@ export function createOrganizationGeneralSettingsFixtureContent(): React.JSX.Ele
 export function createOrganizationMembersSettingsFixtureContent(): React.JSX.Element {
   return (
     <OrganizationMembersSettingsPageView
-      viewModel={createOrganizationMembersSettingsPageStoryViewModel({
-        capabilities: OrganizationMembersStoryCapabilities,
+      viewModel={createOrganizationMembersSettingsPageFixtureViewModel({
+        capabilities: OrganizationMembersFixtureCapabilities,
         invitations: [],
-        inviteMemberRequest: inviteOrganizationMemberStoryRequest,
-        members: OrganizationMembersStoryMembers,
-        total: OrganizationMembersStoryMembers.length,
+        inviteMemberRequest: inviteOrganizationMemberFixtureRequest,
+        members: OrganizationMembersFixtureMembers,
+        total: OrganizationMembersFixtureMembers.length,
       })}
     />
   );

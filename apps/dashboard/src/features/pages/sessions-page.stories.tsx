@@ -7,16 +7,16 @@ import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import type { TriggerListItem } from "../triggers/triggers-types.js";
 import {
   buildSandboxInstanceListItemFixture,
-  buildStoryTriggerListItem,
-  type SessionsPageStoryListFilters,
-} from "./sessions-page.story-fixtures.js";
+  buildTriggerListItemFixture,
+  type SessionsPageListFilters,
+} from "./sessions-page-fixtures.js";
 import { SessionsStoryHarness } from "./sessions-story-harness.js";
 
 type SessionsPageStoryArgs = {
   initialEntries: readonly string[];
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
   sandboxInstancesList?: SandboxInstancesListResult;
-  sandboxInstancesListFilters?: SessionsPageStoryListFilters;
+  sandboxInstancesListFilters?: SessionsPageListFilters;
   triggerOptions?: TriggerListItem[];
 };
 
@@ -191,11 +191,11 @@ export const SpecificTriggerFilter: Story = {
       totalResults: 1,
     },
     triggerOptions: [
-      buildStoryTriggerListItem({
+      buildTriggerListItemFixture({
         id: "atm_slack_mentions",
         name: "Slack app mention received",
       }),
-      buildStoryTriggerListItem({
+      buildTriggerListItemFixture({
         id: "atm_nightly_cleanup",
         name: "Nightly cleanup",
         kind: "schedule",

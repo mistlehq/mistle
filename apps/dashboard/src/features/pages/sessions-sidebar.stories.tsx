@@ -5,8 +5,8 @@ import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbo
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import {
   buildSandboxInstanceListItemFixture,
-  buildStoryLaunchableSandboxProfile,
-} from "./sessions-page.story-fixtures.js";
+  buildLaunchableSandboxProfileFixture,
+} from "./sessions-page-fixtures.js";
 import { SessionsStoryHarness } from "./sessions-story-harness.js";
 
 type SessionsSidebarStoryArgs = {
@@ -116,11 +116,11 @@ const meta = {
     initialEntries: ["/sessions/new"],
     showSessionsSidebar: true,
     launchableProfiles: [
-      buildStoryLaunchableSandboxProfile({
+      buildLaunchableSandboxProfileFixture({
         id: "sbp_profile_alpha",
         displayName: "Alpha Profile",
       }),
-      buildStoryLaunchableSandboxProfile({
+      buildLaunchableSandboxProfileFixture({
         id: "sbp_profile_beta",
         displayName: "Beta Profile",
         latestVersion: 7,

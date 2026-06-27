@@ -30,11 +30,11 @@ import { SessionsRoutes } from "../shell/app-shell-sessions-sidebar-mode.js";
 import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
 import type { TriggerListItem, TriggersListResult } from "../triggers/triggers-types.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
-import { SessionsPage } from "./sessions-page.js";
 import {
   buildSandboxInstanceListItemFixture,
-  buildStoryLaunchableSandboxProfile,
-} from "./sessions-page.story-fixtures.js";
+  buildLaunchableSandboxProfileFixture,
+} from "./sessions-page-fixtures.js";
+import { SessionsPage } from "./sessions-page.js";
 
 function createSessionsPageQueryClient(
   input?: Parameters<typeof createTestQueryClient>[0],
@@ -298,7 +298,7 @@ describe("SessionsPage", () => {
     });
     seedLaunchableSandboxProfiles({
       queryClient,
-      items: [buildStoryLaunchableSandboxProfile({ id: "sbp_launchable" })],
+      items: [buildLaunchableSandboxProfileFixture({ id: "sbp_launchable" })],
     });
 
     renderSessionsPage({

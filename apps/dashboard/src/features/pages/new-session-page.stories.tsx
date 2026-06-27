@@ -5,10 +5,8 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { NewSessionPage } from "./new-session-page.js";
-import {
-  buildStoryLaunchableSandboxProfile,
-  createSessionsPageStoryQueryClient,
-} from "./sessions-page.story-fixtures.js";
+import { buildLaunchableSandboxProfileFixture } from "./sessions-page-fixtures.js";
+import { createSessionsPageStoryQueryClient } from "./sessions-page.story-fixtures.js";
 
 type NewSessionPageStoryArgs = {
   launchableProfiles: LaunchableSandboxProfilesResult["items"];
@@ -45,7 +43,7 @@ const meta = {
   decorators: [withDashboardPageStory],
   args: {
     launchableProfiles: [
-      buildStoryLaunchableSandboxProfile({
+      buildLaunchableSandboxProfileFixture({
         id: "sbp_profile_multi_repo",
         displayName: "Engineering Sandbox",
         repositoryOptions: [
@@ -61,7 +59,7 @@ const meta = {
           },
         ],
       }),
-      buildStoryLaunchableSandboxProfile({
+      buildLaunchableSandboxProfileFixture({
         id: "sbp_profile_single_repo",
         displayName: "Docs Sandbox",
         latestVersion: 7,
@@ -73,7 +71,7 @@ const meta = {
           },
         ],
       }),
-      buildStoryLaunchableSandboxProfile({
+      buildLaunchableSandboxProfileFixture({
         id: "sbp_profile_no_repo",
         displayName: "General Sandbox",
         latestVersion: 2,

@@ -77,7 +77,7 @@ import {
   renderSessionWorkbenchStoryWithChrome,
 } from "./session-story-support.js";
 import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
-import { buildStoryLaunchableSandboxProfile } from "./sessions-page.story-fixtures.js";
+import { buildLaunchableSandboxProfileFixture } from "./sessions-page-fixtures.js";
 import type { SessionPortAccessState } from "./use-session-port-access.js";
 
 const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [
@@ -575,7 +575,7 @@ function NewSessionCreationStory(): React.JSX.Element {
     <NewSessionPageStory
       initialSelectedProfileId="sbp_profile_multi_repo"
       launchableProfiles={[
-        buildStoryLaunchableSandboxProfile({
+        buildLaunchableSandboxProfileFixture({
           id: "sbp_profile_multi_repo",
           displayName: "Engineering Sandbox",
           repositoryOptions: [
@@ -591,7 +591,7 @@ function NewSessionCreationStory(): React.JSX.Element {
             },
           ],
         }),
-        buildStoryLaunchableSandboxProfile({
+        buildLaunchableSandboxProfileFixture({
           id: "sbp_profile_general",
           displayName: "General Sandbox",
           latestVersion: 4,

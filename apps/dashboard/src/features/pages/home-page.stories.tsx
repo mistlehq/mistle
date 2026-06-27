@@ -9,10 +9,10 @@ import { HomePageStoryModels } from "./home-page-view-model.js";
 import { HomePageView } from "./home-page-view.js";
 import { NewSessionForm } from "./new-session-form.js";
 import {
+  buildLaunchableSandboxProfileFixture,
   buildSandboxInstanceListItemFixture,
-  buildStoryLaunchableSandboxProfile,
-  createSessionsPageStoryQueryClient,
-} from "./sessions-page.story-fixtures.js";
+} from "./sessions-page-fixtures.js";
+import { createSessionsPageStoryQueryClient } from "./sessions-page.story-fixtures.js";
 
 function HomePageStoryFrame(args: ComponentProps<typeof HomePageView>): React.JSX.Element {
   return (
@@ -25,7 +25,7 @@ function HomePageStoryFrame(args: ComponentProps<typeof HomePageView>): React.JS
 function CompletedHomePageStory(args: ComponentProps<typeof HomePageView>): React.JSX.Element {
   const queryClient = createSessionsPageStoryQueryClient({
     launchableProfiles: [
-      buildStoryLaunchableSandboxProfile({
+      buildLaunchableSandboxProfileFixture({
         id: "sbp_profile_multi_repo",
         displayName: "Engineering Sandbox",
         repositoryOptions: [
@@ -41,7 +41,7 @@ function CompletedHomePageStory(args: ComponentProps<typeof HomePageView>): Reac
           },
         ],
       }),
-      buildStoryLaunchableSandboxProfile({
+      buildLaunchableSandboxProfileFixture({
         id: "sbp_profile_no_repo",
         displayName: "General Sandbox",
         latestVersion: 2,

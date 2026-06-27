@@ -12,7 +12,7 @@ import { SessionConversationMainContent } from "./session-conversation-pane.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 import { createStorySessionBottomPanel, StorySandboxInstanceId } from "./session-story-support.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
-import { buildSandboxInstanceListItemFixture } from "./sessions-page.story-fixtures.js";
+import { buildSandboxInstanceListItemFixture } from "./sessions-page-fixtures.js";
 
 type ProductWorkbenchVariant = "diff" | "compact";
 

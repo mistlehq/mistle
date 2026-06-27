@@ -3,18 +3,18 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { OrganizationMembersSettingsPageView } from "./organization-members-settings-page-view.js";
 import {
-  createOrganizationMembersSettingsPageStoryRoleViewModel,
-  createOrganizationMembersSettingsPageStoryViewModel,
-  OrganizationMembersStoryInvitations,
-} from "./organization-members-settings-page-view.story-fixtures.js";
+  createOrganizationMembersSettingsPageFixtureRoleViewModel,
+  createOrganizationMembersSettingsPageFixtureViewModel,
+  OrganizationMembersFixtureInvitations,
+} from "./organization-members-settings-page-view.fixtures.js";
+import { OrganizationMembersSettingsPageView } from "./organization-members-settings-page-view.js";
 
 describe("OrganizationMembersSettingsPageView", () => {
   it("renders active and invited tabs with a shared invite action", () => {
     render(
       <OrganizationMembersSettingsPageView
-        viewModel={createOrganizationMembersSettingsPageStoryViewModel()}
+        viewModel={createOrganizationMembersSettingsPageFixtureViewModel()}
       />,
     );
 
@@ -26,7 +26,7 @@ describe("OrganizationMembersSettingsPageView", () => {
   it("hides the invite action for members who cannot manage invitations", () => {
     render(
       <OrganizationMembersSettingsPageView
-        viewModel={createOrganizationMembersSettingsPageStoryRoleViewModel({
+        viewModel={createOrganizationMembersSettingsPageFixtureRoleViewModel({
           viewerRole: "member",
         })}
       />,
@@ -40,7 +40,7 @@ describe("OrganizationMembersSettingsPageView", () => {
 
     render(
       <OrganizationMembersSettingsPageView
-        viewModel={createOrganizationMembersSettingsPageStoryViewModel({
+        viewModel={createOrganizationMembersSettingsPageFixtureViewModel({
           onFilterChange: (nextValue) => {
             filterChanges.push(nextValue);
           },
@@ -56,11 +56,11 @@ describe("OrganizationMembersSettingsPageView", () => {
   it("renders invitation rows when the invitations tab is active", () => {
     render(
       <OrganizationMembersSettingsPageView
-        viewModel={createOrganizationMembersSettingsPageStoryViewModel({
+        viewModel={createOrganizationMembersSettingsPageFixtureViewModel({
           activeFilter: "invitations",
-          invitations: OrganizationMembersStoryInvitations,
+          invitations: OrganizationMembersFixtureInvitations,
           members: [],
-          total: OrganizationMembersStoryInvitations.length,
+          total: OrganizationMembersFixtureInvitations.length,
         })}
       />,
     );
@@ -72,7 +72,7 @@ describe("OrganizationMembersSettingsPageView", () => {
   it("disables pagination controls while the active list is refetching", () => {
     render(
       <OrganizationMembersSettingsPageView
-        viewModel={createOrganizationMembersSettingsPageStoryViewModel({
+        viewModel={createOrganizationMembersSettingsPageFixtureViewModel({
           hasNextPage: true,
           hasPreviousPage: true,
           isListFetching: true,
@@ -91,7 +91,7 @@ describe("OrganizationMembersSettingsPageView", () => {
   it("shows a non-blocking notice when a refetch fails after data has loaded", () => {
     render(
       <OrganizationMembersSettingsPageView
-        viewModel={createOrganizationMembersSettingsPageStoryViewModel({
+        viewModel={createOrganizationMembersSettingsPageFixtureViewModel({
           listErrorNoticeMessage: "Failed to load members.",
         })}
       />,
@@ -105,7 +105,7 @@ describe("OrganizationMembersSettingsPageView", () => {
   it("renders the blocking load error state for the initial directory load failure", () => {
     render(
       <OrganizationMembersSettingsPageView
-        viewModel={createOrganizationMembersSettingsPageStoryViewModel({
+        viewModel={createOrganizationMembersSettingsPageFixtureViewModel({
           members: [],
           total: 0,
           loadErrorMessage: "Failed to load members.",
