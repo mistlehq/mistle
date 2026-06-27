@@ -10,7 +10,6 @@ import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { useOrganizationSummary } from "../shell/use-organization-summary.js";
-import { resolveIntegrationSetupPaneOrThrow } from "./integration-connection-setup-manifest-draft.js";
 import { renderIntegrationConnectionSetupPane } from "./integration-connection-setup-pane-registry.js";
 import { resolveIntegrationConnectionSetupRouteStateOrThrow } from "./integration-connection-setup-state.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
@@ -52,7 +51,6 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
       description={description}
       headerIcon={pageMeta.headerIcon ?? undefined}
       navigate={(nextHref) => navigate(nextHref)}
-      providerAppSetupMode="render"
       redirectWhenComplete
       setupRouteSegment={setupRouteSegment}
       targetKey={targetKey}
@@ -69,7 +67,6 @@ export function EmbeddedIntegrationConnectionSetupPage(input: {
       breadcrumbs={null}
       connectionId={input.embeddedRoute.connectionId}
       navigate={input.embeddedRoute.navigate}
-      providerAppSetupMode="full-dashboard-handoff"
       redirectWhenComplete={false}
       searchParams={input.embeddedRoute.searchParams}
       setupRouteSegment={input.embeddedRoute.setupRouteSegment}
@@ -79,19 +76,6 @@ export function EmbeddedIntegrationConnectionSetupPage(input: {
   );
 }
 
-function buildIntegrationConnectionSetupHref(input: {
-  connectionId: string;
-  searchParams?: URLSearchParams | undefined;
-  setupRouteSegment: string;
-  targetKey: string;
-}): string {
-  const pathname = `/integrations/${encodeURIComponent(input.targetKey)}/${encodeURIComponent(
-    input.connectionId,
-  )}/${encodeURIComponent(input.setupRouteSegment)}/setup`;
-  const search = input.searchParams?.toString() ?? "";
-  return search.length === 0 ? pathname : `${pathname}?${search}`;
-}
-
 type IntegrationConnectionSetupPageContentBaseInput = {
   breadcrumbs: React.ReactNode | null;
   connectionId: string;
@@ -99,25 +83,14 @@ type IntegrationConnectionSetupPageContentBaseInput = {
   headerIcon?: React.ReactNode | undefined;
   navigate: (nextHref: string) => void | Promise<void>;
   redirectWhenComplete: boolean;
+  searchParams?: URLSearchParams | undefined;
   setupRouteSegment: string;
   targetKey: string;
   title: string;
 };
 
-type IntegrationConnectionSetupPageContentInput = IntegrationConnectionSetupPageContentBaseInput &
-  (
-    | {
-        providerAppSetupMode: "render";
-        searchParams?: undefined;
-      }
-    | {
-        providerAppSetupMode: "full-dashboard-handoff";
-        searchParams: URLSearchParams;
-      }
-  );
-
 function IntegrationConnectionSetupPageContent(
-  input: IntegrationConnectionSetupPageContentInput,
+  input: IntegrationConnectionSetupPageContentBaseInput,
 ): React.JSX.Element {
   const {
     breadcrumbs,
@@ -125,7 +98,6 @@ function IntegrationConnectionSetupPageContent(
     description,
     headerIcon,
     navigate,
-    providerAppSetupMode,
     redirectWhenComplete,
     searchParams,
     setupRouteSegment,
@@ -254,49 +226,6 @@ function IntegrationConnectionSetupPageContent(
   }
 
   const setupRoute = setupRouteState.setupRoute;
-  const setupPane = resolveIntegrationSetupPaneOrThrow({
-    connection,
-    setupRoute,
-  });
-  if (providerAppSetupMode === "full-dashboard-handoff" && setupPane.kind === "provider-app") {
-    const fullPageSetupHref = buildIntegrationConnectionSetupHref({
-      connectionId,
-      searchParams,
-      setupRouteSegment,
-      targetKey,
-    });
-
-    return (
-      <PageFrame
-        width="form"
-        breadcrumbs={breadcrumbs}
-        description={description}
-        headerIcon={headerIcon}
-        title={title}
-      >
-        <FormPageSection>
-          <div className="flex flex-col gap-4 p-4">
-            <Notice title="Open setup in the full dashboard">
-              This provider setup uses an external authorization flow. Open it in the full dashboard
-              page so the provider can redirect back correctly.
-            </Notice>
-            <div>
-              <Button
-                onClick={() => {
-                  globalThis.location.assign(fullPageSetupHref);
-                }}
-                type="button"
-                variant="outline"
-              >
-                Open setup page
-              </Button>
-            </div>
-          </div>
-        </FormPageSection>
-      </PageFrame>
-    );
-  }
-
   const organizationName = organizationSummary.query.data?.name;
   return (
     <PageFrame
@@ -309,6 +238,7 @@ function IntegrationConnectionSetupPageContent(
       {renderIntegrationConnectionSetupPane({
         connection,
         organizationName,
+        searchParams,
         setupRoute,
       })}
     </PageFrame>

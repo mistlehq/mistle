@@ -351,13 +351,15 @@ export function ProviderAppSetupPane(input: {
   manifestDraftBuilder: IntegrationSetupAppManifestDraftBuilder;
   methodId: string;
   organizationName?: string | undefined;
-  routeSegment: string;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
+  routeSegment: string;
+  searchParams?: URLSearchParams | undefined;
   setupStartForm: IntegrationFormConnectionMethodSetupStartForm;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [routeSearchParams] = useSearchParams();
+  const searchParams = input.searchParams ?? routeSearchParams;
   const isManifestCreatedReturn = searchParams.get("githubAppManifest") === "created";
   const [setupMode, setSetupMode] = useState<IntegrationConnectionSetupMode>(() =>
     hasProviderAppSetupDraftValues({
