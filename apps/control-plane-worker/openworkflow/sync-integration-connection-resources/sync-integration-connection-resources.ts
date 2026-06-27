@@ -19,6 +19,7 @@ import { markResourceSyncing } from "./mark-resource-syncing.js";
 import { resolveResourceCredential } from "./resolve-resource-credential.js";
 import { resolveResourceSyncFailure } from "./resolve-resource-sync-failure.js";
 import { resolveTargetSecrets } from "./resolve-target-secrets.js";
+import { validateDiscoveredResourceAttributes } from "./validate-discovered-resource-attributes.js";
 import { validateDiscoveredResources } from "./validate-discovered-resources.js";
 
 const UnknownRecordSchema = z.record(z.string(), z.unknown());
@@ -183,6 +184,16 @@ export async function syncIntegrationConnectionResources(
     });
 
     const discoveredResources = validateDiscoveredResources(listedResources.resources);
+    validateDiscoveredResourceAttributes({
+      resourceKind: input.kind,
+      resources: discoveredResources,
+      ...(listedResources.attributes === undefined
+        ? {}
+        : { attributes: listedResources.attributes }),
+      ...(resourceDefinition.attributeDefinitions === undefined
+        ? {}
+        : { attributeDefinitions: resourceDefinition.attributeDefinitions }),
+    });
 
     const appliedSuccessfully = await applySuccessfulResourceSync({
       db: deps.db,
