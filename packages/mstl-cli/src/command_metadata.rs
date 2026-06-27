@@ -63,6 +63,26 @@ pub const PROFILE_GET: CommandMetadata = CommandMetadata {
     description: "Get a sandbox profile",
 };
 
+pub const PROFILE_DEFAULT: CommandMetadata = CommandMetadata {
+    name: "default",
+    description: "Manage the default sandbox profile",
+};
+
+pub const PROFILE_DEFAULT_GET: CommandMetadata = CommandMetadata {
+    name: "get",
+    description: "Get the default sandbox profile",
+};
+
+pub const PROFILE_DEFAULT_SET: CommandMetadata = CommandMetadata {
+    name: "set",
+    description: "Set the default sandbox profile",
+};
+
+pub const PROFILE_DEFAULT_UNSET: CommandMetadata = CommandMetadata {
+    name: "unset",
+    description: "Unset the default sandbox profile",
+};
+
 pub const PROFILE_VERSION: CommandMetadata = CommandMetadata {
     name: "version",
     description: "Manage sandbox profile versions",

@@ -38,6 +38,30 @@ pub(crate) enum CliError {
     EmptyFile {
         path: String,
     },
+    MissingDefaultProfile,
+    ReadConfigFile {
+        path: String,
+        source: io::Error,
+    },
+    ParseConfigFile {
+        path: String,
+        source: serde_json::Error,
+    },
+    InvalidConfigFile {
+        path: String,
+        message: &'static str,
+    },
+    CreateConfigDirectory {
+        path: String,
+        source: io::Error,
+    },
+    WriteConfigFile {
+        path: String,
+        source: io::Error,
+    },
+    SerializeConfigFile {
+        source: serde_json::Error,
+    },
     MissingAuthFile,
     OAuthLoginRequired,
     OrganizationSelectorNotFound {
@@ -129,6 +153,33 @@ impl fmt::Display for CliError {
             }
             Self::EmptyFile { path } => {
                 write!(formatter, "file `{path}` cannot be empty")
+            }
+            Self::MissingDefaultProfile => {
+                write!(
+                    formatter,
+                    "missing default profile; run `mistle profile default set <profile-id>` or pass `--sandbox`"
+                )
+            }
+            Self::ReadConfigFile { path, source } => {
+                write!(formatter, "failed to read config file `{path}`: {source}")
+            }
+            Self::ParseConfigFile { path, source } => {
+                write!(formatter, "failed to parse config file `{path}`: {source}")
+            }
+            Self::InvalidConfigFile { path, message } => {
+                write!(formatter, "invalid config file `{path}`: {message}")
+            }
+            Self::CreateConfigDirectory { path, source } => {
+                write!(
+                    formatter,
+                    "failed to create config directory `{path}`: {source}"
+                )
+            }
+            Self::WriteConfigFile { path, source } => {
+                write!(formatter, "failed to write config file `{path}`: {source}")
+            }
+            Self::SerializeConfigFile { source } => {
+                write!(formatter, "failed to serialize config file: {source}")
             }
             Self::MissingAuthFile => {
                 write!(

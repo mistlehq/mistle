@@ -1,4 +1,5 @@
 mod auth_file;
+mod cli_config;
 mod codex;
 mod command_metadata;
 mod config;
@@ -17,7 +18,8 @@ use std::path::PathBuf;
 use bpaf::{OptionParser, Parser, construct, long, positional, pure};
 
 use crate::command_metadata::{
-    CODEX, CODEX_ARG, LOGIN, LOGOUT, ORG, ORG_LIST, ORG_SELECTOR, ORG_SWITCH, PROFILE, PROFILE_GET,
+    CODEX, CODEX_ARG, LOGIN, LOGOUT, ORG, ORG_LIST, ORG_SELECTOR, ORG_SWITCH, PROFILE,
+    PROFILE_DEFAULT, PROFILE_DEFAULT_GET, PROFILE_DEFAULT_SET, PROFILE_DEFAULT_UNSET, PROFILE_GET,
     PROFILE_ID, PROFILE_LIST, PROFILE_VERSION, PROFILE_VERSION_LIST, PROFILE_VERSION_SETUP_SCRIPT,
     PROFILE_VERSION_SETUP_SCRIPT_SET, PROFILE_VERSION_VALUE, ROOT, SANDBOX, SANDBOX_CREATE,
     SANDBOX_GET, SANDBOX_ID, SANDBOX_LIST, SANDBOX_LIST_AFTER, SANDBOX_LIST_LIMIT,
@@ -47,6 +49,11 @@ enum CliCommand {
     ProfileGet {
         profile_id: String,
     },
+    ProfileDefaultGet,
+    ProfileDefaultSet {
+        profile_id: String,
+    },
+    ProfileDefaultUnset,
     ProfileVersionList {
         profile_id: String,
     },
@@ -67,7 +74,7 @@ enum CliCommand {
         sandbox_id: String,
     },
     Codex {
-        sandbox_id: String,
+        sandbox_id: Option<String>,
         codex_args: Vec<String>,
     },
 }
@@ -133,6 +140,34 @@ fn options() -> OptionParser<CliCommand> {
         .descr(PROFILE_GET.description)
         .command(PROFILE_GET.name);
 
+    let profile_default_get = pure(CliCommand::ProfileDefaultGet)
+        .to_options()
+        .descr(PROFILE_DEFAULT_GET.description)
+        .command(PROFILE_DEFAULT_GET.name);
+    let profile_default_profile_id = positional::<String>(PROFILE_ID.name)
+        .help(PROFILE_ID.description)
+        .guard(
+            |value| !value.trim().is_empty(),
+            "profile id cannot be blank",
+        );
+    let profile_default_set = profile_default_profile_id
+        .map(|profile_id| CliCommand::ProfileDefaultSet { profile_id })
+        .to_options()
+        .descr(PROFILE_DEFAULT_SET.description)
+        .command(PROFILE_DEFAULT_SET.name);
+    let profile_default_unset = pure(CliCommand::ProfileDefaultUnset)
+        .to_options()
+        .descr(PROFILE_DEFAULT_UNSET.description)
+        .command(PROFILE_DEFAULT_UNSET.name);
+    let profile_default = construct!([
+        profile_default_get,
+        profile_default_set,
+        profile_default_unset
+    ])
+    .to_options()
+    .descr(PROFILE_DEFAULT.description)
+    .command(PROFILE_DEFAULT.name);
+
     let profile_version_profile_id = long("profile")
         .help(PROFILE_ID.description)
         .argument::<String>(PROFILE_ID.name)
@@ -176,7 +211,7 @@ fn options() -> OptionParser<CliCommand> {
         .descr(PROFILE_VERSION.description)
         .command(PROFILE_VERSION.name);
 
-    let profile = construct!([profile_list, profile_get, profile_version])
+    let profile = construct!([profile_list, profile_get, profile_default, profile_version])
         .to_options()
         .descr(PROFILE.description)
         .command(PROFILE.name);
@@ -248,7 +283,8 @@ fn options() -> OptionParser<CliCommand> {
         .guard(
             |value| !value.trim().is_empty(),
             "sandbox id cannot be blank",
-        );
+        )
+        .optional();
     let codex_args = positional::<String>(CODEX_ARG.name)
         .strict()
         .help(CODEX_ARG.description)
@@ -281,6 +317,11 @@ where
         CliCommand::OrgSwitch { selector } => org::run_switch(&selector, stdout, stderr),
         CliCommand::ProfileList => profile::run_list(stdout, stderr),
         CliCommand::ProfileGet { profile_id } => profile::run_get(&profile_id, stdout, stderr),
+        CliCommand::ProfileDefaultGet => profile::run_default_get(stdout, stderr),
+        CliCommand::ProfileDefaultSet { profile_id } => {
+            profile::run_default_set(&profile_id, stdout, stderr)
+        }
+        CliCommand::ProfileDefaultUnset => profile::run_default_unset(stdout, stderr),
         CliCommand::ProfileVersionList { profile_id } => {
             profile::run_version_list(&profile_id, stdout, stderr)
         }
@@ -298,6 +339,6 @@ where
         CliCommand::Codex {
             sandbox_id,
             codex_args,
-        } => codex::run(&sandbox_id, codex_args, stderr).await,
+        } => codex::run(sandbox_id.as_deref(), codex_args, stderr).await,
     }
 }

@@ -9,6 +9,9 @@ use mstl_core::client::{
     UpdateSandboxProfileVersionDraftResponse,
 };
 
+use crate::cli_config::{
+    read_default_profile_id, unset_default_profile_id, write_default_profile_id,
+};
 use crate::config::mistle_client;
 use crate::error::CliError;
 use crate::format::{format_bool, format_optional_value};
@@ -43,6 +46,68 @@ where
             Ok(()) => 0,
             Err(error) => {
                 let _ = writeln!(stderr, "failed to write sandbox profile: {error}");
+                1
+            }
+        },
+        Err(error) => {
+            let _ = writeln!(stderr, "{error}");
+            1
+        }
+    }
+}
+
+pub(crate) fn run_default_get<W, E>(stdout: &mut W, stderr: &mut E) -> i32
+where
+    W: Write,
+    E: Write,
+{
+    match read_default_profile_id() {
+        Ok(default_profile_id) => {
+            match write_default_profile(stdout, default_profile_id.as_deref()) {
+                Ok(()) => 0,
+                Err(error) => {
+                    let _ = writeln!(stderr, "failed to write default sandbox profile: {error}");
+                    1
+                }
+            }
+        }
+        Err(error) => {
+            let _ = writeln!(stderr, "{error}");
+            1
+        }
+    }
+}
+
+pub(crate) fn run_default_set<W, E>(profile_id: &str, stdout: &mut W, stderr: &mut E) -> i32
+where
+    W: Write,
+    E: Write,
+{
+    match write_default_profile_id(profile_id) {
+        Ok(_) => match write_default_profile_updated(stdout, profile_id.trim()) {
+            Ok(()) => 0,
+            Err(error) => {
+                let _ = writeln!(stderr, "failed to write default sandbox profile: {error}");
+                1
+            }
+        },
+        Err(error) => {
+            let _ = writeln!(stderr, "{error}");
+            1
+        }
+    }
+}
+
+pub(crate) fn run_default_unset<W, E>(stdout: &mut W, stderr: &mut E) -> i32
+where
+    W: Write,
+    E: Write,
+{
+    match unset_default_profile_id() {
+        Ok(_) => match write_default_profile_unset(stdout) {
+            Ok(()) => 0,
+            Err(error) => {
+                let _ = writeln!(stderr, "failed to write default sandbox profile: {error}");
                 1
             }
         },
@@ -186,6 +251,27 @@ where
     write!(stdout, "{}", render_sandbox_profile(profile))
 }
 
+fn write_default_profile<W>(stdout: &mut W, profile_id: Option<&str>) -> io::Result<()>
+where
+    W: Write,
+{
+    write!(stdout, "{}", render_default_profile(profile_id))
+}
+
+fn write_default_profile_updated<W>(stdout: &mut W, profile_id: &str) -> io::Result<()>
+where
+    W: Write,
+{
+    writeln!(stdout, "Default profile set to {profile_id}")
+}
+
+fn write_default_profile_unset<W>(stdout: &mut W) -> io::Result<()>
+where
+    W: Write,
+{
+    writeln!(stdout, "Default profile unset")
+}
+
 fn write_sandbox_profile_versions<W>(
     stdout: &mut W,
     response: &ListSandboxProfileVersionsResponse,
@@ -220,6 +306,13 @@ fn render_sandbox_profile(profile: &SandboxProfile) -> String {
         profile.created_at,
         profile.updated_at,
     )
+}
+
+fn render_default_profile(profile_id: Option<&str>) -> String {
+    match profile_id {
+        Some(profile_id) => format!("Default profile: {profile_id}\n"),
+        None => "No default profile configured.\n".to_owned(),
+    }
 }
 
 fn render_sandbox_profiles(response: &ListSandboxProfilesResponse) -> String {
