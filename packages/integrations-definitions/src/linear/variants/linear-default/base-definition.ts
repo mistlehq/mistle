@@ -8,7 +8,9 @@ import { z } from "zod";
 
 import {
   type LinearConnectionConfig,
-  LinearConnectionConfigSchema,
+  LinearApiKeyConnectionConfigSchema,
+  LinearOAuth2ConnectionConfigSchema,
+  LinearOAuth2ConnectionStartConfigSchema,
   LinearCredentialSlotKeys,
 } from "./auth.js";
 import { resolveLinearBindingConfigForm } from "./binding-config-form.js";
@@ -54,13 +56,55 @@ export const LinearBaseDefinition: LinearBaseIntegrationDefinition = {
           slotKey: LinearCredentialSlotKeys.API_KEY,
         },
       ],
-      configSchema: LinearConnectionConfigSchema,
+      configSchema: LinearApiKeyConnectionConfigSchema,
       configForm: LinearConnectionConfigForm,
       postCreate: {
         managedWebhookSource: {
           autoCreate: true,
           failureNoticeTitle: "Connection created, webhook setup failed",
           successNoticeTitle: "Linear connection and webhook created successfully",
+        },
+      },
+    },
+    {
+      id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+      label: "Linear OAuth",
+      kind: "redirect",
+      configSchema: LinearOAuth2ConnectionConfigSchema,
+      startConfigSchema: LinearOAuth2ConnectionStartConfigSchema,
+      startConfigForm: () => ({
+        schema: {
+          type: "object",
+          properties: {
+            client_id: {
+              type: "string",
+              title: "OAuth client ID",
+            },
+            client_secret: {
+              type: "string",
+              title: "OAuth client secret",
+            },
+          },
+          required: ["client_id", "client_secret"],
+        },
+        uiSchema: {
+          client_id: {
+            "ui:placeholder": "Linear OAuth client ID",
+          },
+          client_secret: {
+            "ui:widget": "password",
+          },
+        },
+      }),
+      ui: {
+        create: {
+          submitLabel: "Connect Linear",
+          helperText: "Authorize Linear access with your Linear OAuth application.",
+          showCallbackUrl: true,
+        },
+        reauthorize: {
+          actionLabel: "Re-authorize",
+          pendingLabel: "Starting...",
         },
       },
     },
