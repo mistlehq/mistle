@@ -6,70 +6,88 @@ import {
   IntegrationSettingsAddFlowStory,
 } from "./organization-integrations-settings-page-story-support.js";
 
-function OpenAiAddFlowStory(): React.JSX.Element {
-  return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.OpenAI} />;
-}
-
-const meta = {
-  title: "Dashboard/Integrations/OpenAI/AddFlows",
-  component: OpenAiAddFlowStory,
-  decorators: [withDashboardPageStory],
-} satisfies Meta<typeof OpenAiAddFlowStory>;
-
-export default meta;
-
-type Story = StoryObj<typeof meta>;
-
-export const Default: Story = {
-  name: "Default",
-  render: function RenderStory() {
-    return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.OpenAI} />;
-  },
+const OpenAiAddFlowStates: {
+  readonly DEFAULT: "default";
+  readonly START_DEVICE_AUTHORIZATION: "start-device-authorization";
+  readonly PENDING_DEVICE_AUTHORIZATION: "pending-device-authorization";
+  readonly DEVICE_AUTHORIZATION_EXPIRING_SOON: "device-authorization-expiring-soon";
+  readonly EXPIRED_DEVICE_AUTHORIZATION: "expired-device-authorization";
+  readonly FAILED_DEVICE_AUTHORIZATION: "failed-device-authorization";
+} = {
+  DEFAULT: "default",
+  START_DEVICE_AUTHORIZATION: "start-device-authorization",
+  PENDING_DEVICE_AUTHORIZATION: "pending-device-authorization",
+  DEVICE_AUTHORIZATION_EXPIRING_SOON: "device-authorization-expiring-soon",
+  EXPIRED_DEVICE_AUTHORIZATION: "expired-device-authorization",
+  FAILED_DEVICE_AUTHORIZATION: "failed-device-authorization",
 };
 
-export const StartDeviceAuthorization: Story = {
-  name: "Start device authorization",
-  render: function RenderStory() {
+type OpenAiAddFlowState = (typeof OpenAiAddFlowStates)[keyof typeof OpenAiAddFlowStates];
+
+type OpenAiAddFlowStoryArgs = {
+  state: OpenAiAddFlowState;
+};
+
+function OpenAiAddFlowStory(input: OpenAiAddFlowStoryArgs): React.JSX.Element {
+  if (input.state === OpenAiAddFlowStates.START_DEVICE_AUTHORIZATION) {
     return (
       <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.OpenAIDeviceAuthorizationStart} />
     );
-  },
-};
+  }
 
-export const PendingDeviceAuthorization: Story = {
-  name: "Pending device authorization",
-  render: function RenderStory() {
+  if (input.state === OpenAiAddFlowStates.PENDING_DEVICE_AUTHORIZATION) {
     return (
       <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.OpenAIDeviceAuthorizationPending} />
     );
-  },
-};
+  }
 
-export const DeviceAuthorizationExpiringSoon: Story = {
-  name: "Device authorization expiring soon",
-  render: function RenderStory() {
+  if (input.state === OpenAiAddFlowStates.DEVICE_AUTHORIZATION_EXPIRING_SOON) {
     return (
       <IntegrationSettingsAddFlowStory
         {...AddFlowStorySpecs.OpenAIDeviceAuthorizationExpiringSoon}
       />
     );
-  },
-};
+  }
 
-export const ExpiredDeviceAuthorization: Story = {
-  name: "Expired device authorization",
-  render: function RenderStory() {
+  if (input.state === OpenAiAddFlowStates.EXPIRED_DEVICE_AUTHORIZATION) {
     return (
       <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.OpenAIDeviceAuthorizationExpired} />
     );
-  },
-};
+  }
 
-export const FailedDeviceAuthorization: Story = {
-  name: "Failed device authorization",
-  render: function RenderStory() {
+  if (input.state === OpenAiAddFlowStates.FAILED_DEVICE_AUTHORIZATION) {
     return (
       <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.OpenAIDeviceAuthorizationFailed} />
     );
+  }
+
+  return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.OpenAI} />;
+}
+
+const meta = {
+  title: "Dashboard/Integrations/OpenAI/Add Flow States",
+  component: OpenAiAddFlowStory,
+  decorators: [withDashboardPageStory],
+  argTypes: {
+    state: {
+      control: "select",
+      options: [
+        OpenAiAddFlowStates.DEFAULT,
+        OpenAiAddFlowStates.START_DEVICE_AUTHORIZATION,
+        OpenAiAddFlowStates.PENDING_DEVICE_AUTHORIZATION,
+        OpenAiAddFlowStates.DEVICE_AUTHORIZATION_EXPIRING_SOON,
+        OpenAiAddFlowStates.EXPIRED_DEVICE_AUTHORIZATION,
+        OpenAiAddFlowStates.FAILED_DEVICE_AUTHORIZATION,
+      ],
+    },
   },
-};
+  args: {
+    state: OpenAiAddFlowStates.DEFAULT,
+  },
+} satisfies Meta<OpenAiAddFlowStoryArgs>;
+
+export default meta;
+
+type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {};

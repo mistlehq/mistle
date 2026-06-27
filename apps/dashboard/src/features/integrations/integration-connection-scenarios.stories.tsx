@@ -136,166 +136,214 @@ function buildOpenAiChatGptReauthorizationStateStoryProps(input: {
   };
 }
 
+const ConnectionDetailScenarios: {
+  readonly GITHUB_ENTERPRISE_SERVER: "github-enterprise-server";
+  readonly JIRA: "jira";
+  readonly LINEAR: "linear";
+  readonly SLACK: "slack";
+  readonly SLACK_IDENTITY_LINKED: "slack-identity-linked";
+  readonly OPENAI: "openai";
+  readonly OPENAI_CHATGPT_SUBSCRIPTION: "openai-chatgpt-subscription";
+  readonly OPENAI_CHATGPT_REAUTHORIZATION_REQUIRED: "openai-chatgpt-reauthorization-required";
+  readonly OPENAI_CHATGPT_REAUTHORIZE_STARTING: "openai-chatgpt-reauthorize-starting";
+  readonly AWS: "aws";
+  readonly DATADOG: "datadog";
+  readonly PLANETSCALE: "planetscale";
+  readonly PLANETSCALE_REAUTHORIZE_STARTING: "planetscale-reauthorize-starting";
+  readonly PLANETSCALE_REAUTHORIZATION_REQUIRED: "planetscale-reauthorization-required";
+  readonly PLANETSCALE_REAUTHORIZE_ERROR: "planetscale-reauthorize-error";
+  readonly SIGNOZ: "signoz";
+  readonly WASENDERAPI: "wasenderapi";
+  readonly WHAPI: "whapi";
+} = {
+  GITHUB_ENTERPRISE_SERVER: "github-enterprise-server",
+  JIRA: "jira",
+  LINEAR: "linear",
+  SLACK: "slack",
+  SLACK_IDENTITY_LINKED: "slack-identity-linked",
+  OPENAI: "openai",
+  OPENAI_CHATGPT_SUBSCRIPTION: "openai-chatgpt-subscription",
+  OPENAI_CHATGPT_REAUTHORIZATION_REQUIRED: "openai-chatgpt-reauthorization-required",
+  OPENAI_CHATGPT_REAUTHORIZE_STARTING: "openai-chatgpt-reauthorize-starting",
+  AWS: "aws",
+  DATADOG: "datadog",
+  PLANETSCALE: "planetscale",
+  PLANETSCALE_REAUTHORIZE_STARTING: "planetscale-reauthorize-starting",
+  PLANETSCALE_REAUTHORIZATION_REQUIRED: "planetscale-reauthorization-required",
+  PLANETSCALE_REAUTHORIZE_ERROR: "planetscale-reauthorize-error",
+  SIGNOZ: "signoz",
+  WASENDERAPI: "wasenderapi",
+  WHAPI: "whapi",
+};
+
+type ConnectionDetailScenario =
+  (typeof ConnectionDetailScenarios)[keyof typeof ConnectionDetailScenarios];
+
+type ConnectionDetailProviderScenariosStoryArgs = {
+  scenario: ConnectionDetailScenario;
+};
+
+function createConnectionDetailScenarioProps(
+  scenario: ConnectionDetailScenario,
+): Omit<
+  React.ComponentProps<typeof IntegrationConnectionDetailView>,
+  | "onCreateWebhookSource"
+  | "onDeleteWebhookSource"
+  | "onEditAuthentication"
+  | "onRefreshResource"
+  | "onStartProviderAppSetup"
+> {
+  if (scenario === ConnectionDetailScenarios.JIRA) {
+    return withoutStoryHandlers(
+      mergeDetailViewStoryProps(
+        createJiraDetailViewStoryProps(),
+        createJiraWebhookNotConfiguredDetailViewStoryProps(),
+      ),
+    );
+  }
+
+  if (scenario === ConnectionDetailScenarios.LINEAR) {
+    return withoutStoryHandlers(createLinearDetailViewStoryProps());
+  }
+
+  if (scenario === ConnectionDetailScenarios.SLACK) {
+    return withoutStoryHandlers(createSlackDetailViewStoryProps());
+  }
+
+  if (scenario === ConnectionDetailScenarios.SLACK_IDENTITY_LINKED) {
+    return withoutStoryHandlers(buildIdentityLinkedSlackDetailViewStoryProps());
+  }
+
+  if (scenario === ConnectionDetailScenarios.OPENAI) {
+    return withoutStoryHandlers(createOpenAiDetailViewStoryProps());
+  }
+
+  if (scenario === ConnectionDetailScenarios.OPENAI_CHATGPT_SUBSCRIPTION) {
+    return withoutStoryHandlers(createOpenAiChatGptDetailViewStoryProps());
+  }
+
+  if (scenario === ConnectionDetailScenarios.OPENAI_CHATGPT_REAUTHORIZATION_REQUIRED) {
+    return withoutStoryHandlers(
+      buildOpenAiChatGptReauthorizationStateStoryProps({
+        errorMessage: "This connection needs to be re-authorized.",
+        status: "error",
+      }),
+    );
+  }
+
+  if (scenario === ConnectionDetailScenarios.OPENAI_CHATGPT_REAUTHORIZE_STARTING) {
+    return withoutStoryHandlers(
+      buildOpenAiChatGptReauthorizationStateStoryProps({ isPending: true }),
+    );
+  }
+
+  if (scenario === ConnectionDetailScenarios.AWS) {
+    return withoutStoryHandlers(createAwsDetailViewStoryProps());
+  }
+
+  if (scenario === ConnectionDetailScenarios.DATADOG) {
+    return withoutStoryHandlers(createDatadogDetailViewStoryProps());
+  }
+
+  if (scenario === ConnectionDetailScenarios.PLANETSCALE) {
+    return withoutStoryHandlers(createPlanetScaleDetailViewStoryProps());
+  }
+
+  if (scenario === ConnectionDetailScenarios.PLANETSCALE_REAUTHORIZE_STARTING) {
+    return withoutStoryHandlers(
+      buildPlanetScaleReauthorizationStateStoryProps({ isPending: true }),
+    );
+  }
+
+  if (scenario === ConnectionDetailScenarios.PLANETSCALE_REAUTHORIZATION_REQUIRED) {
+    return withoutStoryHandlers(
+      buildPlanetScaleReauthorizationStateStoryProps({
+        errorMessage: "This connection needs to be re-authorized.",
+        status: "error",
+      }),
+    );
+  }
+
+  if (scenario === ConnectionDetailScenarios.PLANETSCALE_REAUTHORIZE_ERROR) {
+    return withoutStoryHandlers(
+      buildPlanetScaleReauthorizationStateStoryProps({
+        errorMessage: "Could not start connection reauthorization.",
+      }),
+    );
+  }
+
+  if (scenario === ConnectionDetailScenarios.SIGNOZ) {
+    return withoutStoryHandlers(createSigNozDetailViewStoryProps());
+  }
+
+  if (scenario === ConnectionDetailScenarios.WASENDERAPI) {
+    return withoutStoryHandlers(createWasenderApiDetailViewStoryProps());
+  }
+
+  if (scenario === ConnectionDetailScenarios.WHAPI) {
+    return withoutStoryHandlers(createWhapiDetailViewStoryProps());
+  }
+
+  return withoutStoryHandlers(createGitHubEnterpriseServerDetailViewStoryProps());
+}
+
+function ConnectionDetailProviderScenariosStory(
+  input: ConnectionDetailProviderScenariosStoryArgs,
+): React.JSX.Element {
+  return (
+    <IntegrationConnectionDetailView
+      {...createConnectionDetailScenarioProps(input.scenario)}
+      onCreateWebhookSource={(_payload: { connectionId: string }) => {}}
+      onDeleteWebhookSource={(_payload: { connectionId: string; webhookSourceId: string }) => {}}
+      onEditAuthentication={(_connectionId: string) => {}}
+      onRefreshResource={(_payload: { connectionId: string; kind: string }) => {}}
+      onStartProviderAppSetup={async (_connectionId: string) => {}}
+      titleEditor={{
+        disabled: false,
+        errorMessageByConnectionId: {},
+        onStartEditing: (_connectionId: string) => {},
+        onSave: async (_connectionId: string, _draftValue: string) => {},
+      }}
+    />
+  );
+}
+
 const meta = {
-  title: "Dashboard/Integrations/Connection Detail",
-  component: IntegrationConnectionDetailView,
+  title: "Dashboard/Integrations/Connection Detail/Provider Scenarios",
+  component: ConnectionDetailProviderScenariosStory,
   decorators: [withDashboardCenteredStory],
-  args: {
-    onCreateWebhookSource: (_input: { connectionId: string }) => {},
-    onDeleteWebhookSource: (_input: { connectionId: string; webhookSourceId: string }) => {},
-    onEditAuthentication: (_connectionId: string) => {},
-    onRefreshResource: (_input: { connectionId: string; kind: string }) => {},
-    onStartProviderAppSetup: async (_connectionId: string) => {},
-    titleEditor: {
-      disabled: false,
-      errorMessageByConnectionId: {},
-      onStartEditing: (_connectionId: string) => {},
-      onSave: async (_connectionId: string, _draftValue: string) => {},
+  argTypes: {
+    scenario: {
+      control: "select",
+      options: [
+        ConnectionDetailScenarios.GITHUB_ENTERPRISE_SERVER,
+        ConnectionDetailScenarios.JIRA,
+        ConnectionDetailScenarios.LINEAR,
+        ConnectionDetailScenarios.SLACK,
+        ConnectionDetailScenarios.SLACK_IDENTITY_LINKED,
+        ConnectionDetailScenarios.OPENAI,
+        ConnectionDetailScenarios.OPENAI_CHATGPT_SUBSCRIPTION,
+        ConnectionDetailScenarios.OPENAI_CHATGPT_REAUTHORIZATION_REQUIRED,
+        ConnectionDetailScenarios.OPENAI_CHATGPT_REAUTHORIZE_STARTING,
+        ConnectionDetailScenarios.AWS,
+        ConnectionDetailScenarios.DATADOG,
+        ConnectionDetailScenarios.PLANETSCALE,
+        ConnectionDetailScenarios.PLANETSCALE_REAUTHORIZE_STARTING,
+        ConnectionDetailScenarios.PLANETSCALE_REAUTHORIZATION_REQUIRED,
+        ConnectionDetailScenarios.PLANETSCALE_REAUTHORIZE_ERROR,
+        ConnectionDetailScenarios.SIGNOZ,
+        ConnectionDetailScenarios.WASENDERAPI,
+        ConnectionDetailScenarios.WHAPI,
+      ],
     },
   },
-} satisfies Meta<typeof IntegrationConnectionDetailView>;
+  args: {
+    scenario: ConnectionDetailScenarios.GITHUB_ENTERPRISE_SERVER,
+  },
+} satisfies Meta<ConnectionDetailProviderScenariosStoryArgs>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const GitHubEnterpriseServer: Story = {
-  name: "GitHub Enterprise Server",
-  args: {
-    ...withoutStoryHandlers(createGitHubEnterpriseServerDetailViewStoryProps()),
-  },
-};
-
-export const Jira: Story = {
-  name: "Jira",
-  args: {
-    ...withoutStoryHandlers(
-      mergeDetailViewStoryProps(
-        createJiraDetailViewStoryProps(),
-        createJiraWebhookNotConfiguredDetailViewStoryProps(),
-      ),
-    ),
-  },
-};
-
-export const Linear: Story = {
-  args: {
-    ...withoutStoryHandlers(createLinearDetailViewStoryProps()),
-  },
-};
-
-export const Slack: Story = {
-  args: {
-    ...withoutStoryHandlers(createSlackDetailViewStoryProps()),
-  },
-};
-
-export const SlackIdentityLinked: Story = {
-  name: "Slack identity linked",
-  args: {
-    ...withoutStoryHandlers(buildIdentityLinkedSlackDetailViewStoryProps()),
-  },
-};
-
-export const OpenAi: Story = {
-  name: "OpenAI",
-  args: {
-    ...withoutStoryHandlers(createOpenAiDetailViewStoryProps()),
-  },
-};
-
-export const OpenAiChatGptSubscription: Story = {
-  name: "OpenAI ChatGPT subscription",
-  args: {
-    ...withoutStoryHandlers(createOpenAiChatGptDetailViewStoryProps()),
-  },
-};
-
-export const OpenAiChatGptReauthorizationRequired: Story = {
-  name: "OpenAI ChatGPT reauthorization required",
-  args: {
-    ...withoutStoryHandlers(
-      buildOpenAiChatGptReauthorizationStateStoryProps({
-        errorMessage: "This connection needs to be re-authorized.",
-        status: "error",
-      }),
-    ),
-  },
-};
-
-export const OpenAiChatGptReauthorizeStarting: Story = {
-  name: "OpenAI ChatGPT reauthorize - starting",
-  args: {
-    ...withoutStoryHandlers(buildOpenAiChatGptReauthorizationStateStoryProps({ isPending: true })),
-  },
-};
-
-export const Aws: Story = {
-  name: "AWS",
-  args: {
-    ...withoutStoryHandlers(createAwsDetailViewStoryProps()),
-  },
-};
-
-export const Datadog: Story = {
-  args: {
-    ...withoutStoryHandlers(createDatadogDetailViewStoryProps()),
-  },
-};
-
-export const PlanetScale: Story = {
-  name: "PlanetScale",
-  args: {
-    ...withoutStoryHandlers(createPlanetScaleDetailViewStoryProps()),
-  },
-};
-
-export const PlanetScaleReauthorizeStarting: Story = {
-  name: "PlanetScale reauthorize - starting",
-  args: {
-    ...withoutStoryHandlers(buildPlanetScaleReauthorizationStateStoryProps({ isPending: true })),
-  },
-};
-
-export const PlanetScaleReauthorizationRequired: Story = {
-  name: "PlanetScale reauthorization required",
-  args: {
-    ...withoutStoryHandlers(
-      buildPlanetScaleReauthorizationStateStoryProps({
-        errorMessage: "This connection needs to be re-authorized.",
-        status: "error",
-      }),
-    ),
-  },
-};
-
-export const PlanetScaleReauthorizeError: Story = {
-  name: "PlanetScale reauthorize - error",
-  args: {
-    ...withoutStoryHandlers(
-      buildPlanetScaleReauthorizationStateStoryProps({
-        errorMessage: "Could not start connection reauthorization.",
-      }),
-    ),
-  },
-};
-
-export const SigNoz: Story = {
-  name: "SigNoz",
-  args: {
-    ...withoutStoryHandlers(createSigNozDetailViewStoryProps()),
-  },
-};
-
-export const WasenderAPI: Story = {
-  name: "WasenderAPI",
-  args: {
-    ...withoutStoryHandlers(createWasenderApiDetailViewStoryProps()),
-  },
-};
-
-export const Whapi: Story = {
-  args: {
-    ...withoutStoryHandlers(createWhapiDetailViewStoryProps()),
-  },
-};
+export const Default: Story = {};

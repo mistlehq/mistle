@@ -54,14 +54,14 @@ const JiraSetupMethods: {
 
 type JiraSetupMethod = (typeof JiraSetupMethods)[keyof typeof JiraSetupMethods];
 
-type IntegrationSetupSwitcherStoryArgs = {
+type IntegrationProviderSetupStatesStoryArgs = {
   jiraMethod: JiraSetupMethod;
   provider: IntegrationSetupProvider;
   slackState: SlackSetupState;
 };
 
-function IntegrationSetupSwitcherStory(
-  input: IntegrationSetupSwitcherStoryArgs,
+function IntegrationProviderSetupStatesStory(
+  input: IntegrationProviderSetupStatesStoryArgs,
 ): React.JSX.Element {
   if (input.provider === IntegrationSetupProviders.GITHUB) {
     return <GitHubAppSetupPageStory connection={createDraftGitHubConnection()} />;
@@ -101,8 +101,8 @@ function IntegrationSetupSwitcherStory(
 }
 
 const pageMeta = {
-  title: "Dashboard/Integrations/Setup/Switcher",
-  component: IntegrationSetupSwitcherStory,
+  title: "Dashboard/Integrations/Setup/Provider Setup States",
+  component: IntegrationProviderSetupStatesStory,
   decorators: [withDashboardPageStory],
   argTypes: {
     provider: {
@@ -133,7 +133,7 @@ const pageMeta = {
     provider: IntegrationSetupProviders.GITHUB,
     slackState: SlackSetupStates.BLANK,
   },
-} satisfies Meta<IntegrationSetupSwitcherStoryArgs>;
+} satisfies Meta<IntegrationProviderSetupStatesStoryArgs>;
 
 export default pageMeta;
 
