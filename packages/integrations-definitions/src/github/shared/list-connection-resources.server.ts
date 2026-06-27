@@ -1,6 +1,7 @@
 import {
   IntegrationConnectionMethodIds,
   type DiscoveredIntegrationResource,
+  type DiscoveredIntegrationResourceRelationship,
   type ListConnectionResourcesInput,
   type ListConnectionResourcesResult,
 } from "@mistle/integrations-core";
@@ -143,6 +144,28 @@ function toUserResource(collaborator: GitHubCollaborator): DiscoveredIntegration
   };
 }
 
+function toOrgMembershipRelationship(input: {
+  member: GitHubCollaborator;
+  orgExternalId: string;
+  orgHandle: string;
+}): DiscoveredIntegrationResourceRelationship {
+  return {
+    relationshipKind: "belongs_to",
+    subjectResourceKind: GitHubUserKind,
+    subjectExternalId: input.member.id.toString(),
+    subjectHandle: input.member.login,
+    objectResourceKind: GitHubOrgKind,
+    objectExternalId: input.orgExternalId,
+    objectHandle: input.orgHandle,
+    scopeKind: GitHubOrgKind,
+    scopeExternalId: input.orgExternalId,
+    scopeHandle: input.orgHandle,
+    metadata: {
+      organizationLogin: input.orgHandle,
+    },
+  };
+}
+
 function toOrgResource(input: { id: string; login: string }): DiscoveredIntegrationResource {
   return {
     externalId: input.id,
@@ -150,6 +173,28 @@ function toOrgResource(input: { id: string; login: string }): DiscoveredIntegrat
     displayName: input.login,
     metadata: {
       login: input.login,
+    },
+  };
+}
+
+function toTeamMembershipRelationship(input: {
+  member: GitHubCollaborator;
+  teamExternalId: string;
+  teamHandle: string;
+}): DiscoveredIntegrationResourceRelationship {
+  return {
+    relationshipKind: "belongs_to",
+    subjectResourceKind: GitHubUserKind,
+    subjectExternalId: input.member.id.toString(),
+    subjectHandle: input.member.login,
+    objectResourceKind: GitHubTeamKind,
+    objectExternalId: input.teamExternalId,
+    objectHandle: input.teamHandle,
+    scopeKind: GitHubTeamKind,
+    scopeExternalId: input.teamExternalId,
+    scopeHandle: input.teamHandle,
+    metadata: {
+      teamHandle: input.teamHandle,
     },
   };
 }
@@ -168,6 +213,29 @@ function toTeamResource(input: {
       name: input.team.name,
       slug: input.team.slug,
     },
+  };
+}
+
+function parseGitHubTeamScopeHandle(scopeHandle: string): {
+  organizationLogin: string;
+  teamSlug: string;
+} {
+  const [organizationLogin, teamSlug, extra] = scopeHandle.split("/");
+  if (
+    organizationLogin === undefined ||
+    organizationLogin.length === 0 ||
+    teamSlug === undefined ||
+    teamSlug.length === 0 ||
+    extra !== undefined
+  ) {
+    throw new Error(
+      `GitHub team relationship listing requires an org-scoped team handle like 'org/team-slug'.`,
+    );
+  }
+
+  return {
+    organizationLogin,
+    teamSlug,
   };
 }
 
@@ -355,6 +423,60 @@ async function listGitHubOrganizationTeams(input: {
 
     if (parsedResponse.length < GitHubPageSize) {
       return teams;
+    }
+  }
+}
+
+async function listGitHubOrganizationMembers(input: {
+  apiBaseUrl: string;
+  token: string;
+  organizationLogin: string;
+}): Promise<ReadonlyArray<GitHubCollaborator>> {
+  const octokit = createGitHubOctokit({
+    apiBaseUrl: input.apiBaseUrl,
+    token: input.token,
+  });
+
+  const members: GitHubCollaborator[] = [];
+  for (let page = 1; ; page += 1) {
+    const response = await octokit.rest.orgs.listMembers({
+      org: input.organizationLogin,
+      per_page: GitHubPageSize,
+      page,
+    });
+    const parsedResponse = z.array(GitHubCollaboratorSchema).parse(response.data);
+    members.push(...parsedResponse);
+
+    if (parsedResponse.length < GitHubPageSize) {
+      return members;
+    }
+  }
+}
+
+async function listGitHubTeamMembers(input: {
+  apiBaseUrl: string;
+  token: string;
+  organizationLogin: string;
+  teamSlug: string;
+}): Promise<ReadonlyArray<GitHubCollaborator>> {
+  const octokit = createGitHubOctokit({
+    apiBaseUrl: input.apiBaseUrl,
+    token: input.token,
+  });
+
+  const members: GitHubCollaborator[] = [];
+  for (let page = 1; ; page += 1) {
+    const response = await octokit.rest.teams.listMembersInOrg({
+      org: input.organizationLogin,
+      team_slug: input.teamSlug,
+      per_page: GitHubPageSize,
+      page,
+    });
+    const parsedResponse = z.array(GitHubCollaboratorSchema).parse(response.data);
+    members.push(...parsedResponse);
+
+    if (parsedResponse.length < GitHubPageSize) {
+      return members;
     }
   }
 }
@@ -685,6 +807,56 @@ async function listGitHubBots(input: {
   return dedupeBotResourcesByExternalId(botResources);
 }
 
+async function listGitHubOrgMembershipRelationships(input: {
+  apiBaseUrl: string;
+  credential: string;
+  scopeExternalId: string;
+  scopeHandle: string;
+}): Promise<ReadonlyArray<DiscoveredIntegrationResourceRelationship>> {
+  const members = await listGitHubOrganizationMembers({
+    apiBaseUrl: input.apiBaseUrl,
+    token: input.credential,
+    organizationLogin: input.scopeHandle,
+  });
+
+  return members
+    .filter((member) => member.type === "User")
+    .map((member) =>
+      toOrgMembershipRelationship({
+        member,
+        orgExternalId: input.scopeExternalId,
+        orgHandle: input.scopeHandle,
+      }),
+    )
+    .sort((left, right) => left.subjectHandle.localeCompare(right.subjectHandle));
+}
+
+async function listGitHubTeamMembershipRelationships(input: {
+  apiBaseUrl: string;
+  credential: string;
+  scopeExternalId: string;
+  scopeHandle: string;
+}): Promise<ReadonlyArray<DiscoveredIntegrationResourceRelationship>> {
+  const { organizationLogin, teamSlug } = parseGitHubTeamScopeHandle(input.scopeHandle);
+  const members = await listGitHubTeamMembers({
+    apiBaseUrl: input.apiBaseUrl,
+    token: input.credential,
+    organizationLogin,
+    teamSlug,
+  });
+
+  return members
+    .filter((member) => member.type === "User")
+    .map((member) =>
+      toTeamMembershipRelationship({
+        member,
+        teamExternalId: input.scopeExternalId,
+        teamHandle: input.scopeHandle,
+      }),
+    )
+    .sort((left, right) => left.subjectHandle.localeCompare(right.subjectHandle));
+}
+
 export async function listGitHubConnectionResources(
   input: GitHubListConnectionResourcesInput,
 ): Promise<ListConnectionResourcesResult> {
@@ -697,6 +869,7 @@ export async function listGitHubConnectionResources(
   }
 
   const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(input.connection.config);
+  const credential = input.credential.value;
   if (
     input.kind === GitHubUserKind &&
     parsedConnectionConfig.connection_method !==
@@ -707,7 +880,7 @@ export async function listGitHubConnectionResources(
 
   const repositories = await listGitHubRepositories({
     apiBaseUrl: input.target.config.apiBaseUrl,
-    credential: input.credential.value,
+    credential,
     connectionConfig: parsedConnectionConfig,
   });
 
@@ -723,7 +896,7 @@ export async function listGitHubConnectionResources(
     return {
       resources: await listGitHubBranches({
         apiBaseUrl: input.target.config.apiBaseUrl,
-        credential: input.credential.value,
+        credential,
         repositories,
       }),
     };
@@ -733,25 +906,59 @@ export async function listGitHubConnectionResources(
     return {
       resources: await listGitHubUsers({
         apiBaseUrl: input.target.config.apiBaseUrl,
-        credential: input.credential.value,
+        credential,
         repositories,
       }),
     };
   }
 
   if (input.kind === GitHubOrgKind) {
+    const resources = listGitHubOrgs(repositories);
+    const relationshipLists = await Promise.all(
+      resources.map((resource) => {
+        if (resource.externalId === undefined) {
+          throw new Error(`GitHub org resource '${resource.handle}' is missing an external id.`);
+        }
+
+        return listGitHubOrgMembershipRelationships({
+          apiBaseUrl: input.target.config.apiBaseUrl,
+          credential,
+          scopeExternalId: resource.externalId,
+          scopeHandle: resource.handle,
+        });
+      }),
+    );
+
     return {
-      resources: listGitHubOrgs(repositories),
+      resources,
+      relationships: relationshipLists.flat(),
     };
   }
 
   if (input.kind === GitHubTeamKind) {
-    return {
-      resources: await listGitHubTeams({
-        apiBaseUrl: input.target.config.apiBaseUrl,
-        credential: input.credential.value,
-        repositories,
+    const resources = await listGitHubTeams({
+      apiBaseUrl: input.target.config.apiBaseUrl,
+      credential,
+      repositories,
+    });
+    const relationshipLists = await Promise.all(
+      resources.map((resource) => {
+        if (resource.externalId === undefined) {
+          throw new Error(`GitHub team resource '${resource.handle}' is missing an external id.`);
+        }
+
+        return listGitHubTeamMembershipRelationships({
+          apiBaseUrl: input.target.config.apiBaseUrl,
+          credential,
+          scopeExternalId: resource.externalId,
+          scopeHandle: resource.handle,
+        });
       }),
+    );
+
+    return {
+      resources,
+      relationships: relationshipLists.flat(),
     };
   }
 
@@ -759,7 +966,7 @@ export async function listGitHubConnectionResources(
     return {
       resources: await listGitHubBots({
         apiBaseUrl: input.target.config.apiBaseUrl,
-        credential: input.credential.value,
+        credential,
         repositories,
       }),
     };
