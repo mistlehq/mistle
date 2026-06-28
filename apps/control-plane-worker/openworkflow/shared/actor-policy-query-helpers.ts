@@ -62,7 +62,7 @@ export async function queryActorPolicyRelationshipScopeReadiness(input: {
   const isReady = await isRelationshipScopeReady({
     db: input.db,
     connectionId: input.connectionId,
-    scopeKind: scopeResource.kind,
+    resourceKind: scopeResource.kind,
   });
 
   if (!isReady) {
@@ -199,7 +199,7 @@ export async function queryActorPolicyResourceRelationship(input: {
   const isReady = await isRelationshipScopeReady({
     db: input.db,
     connectionId: input.connectionId,
-    scopeKind: scopeResource.kind,
+    resourceKind: input.actorSet.resourceKind,
   });
   if (!isReady) {
     return dataUnavailable("relationship_scope_not_ready");
@@ -658,7 +658,7 @@ async function isResourceKindReadyForAttributes(input: {
 async function isRelationshipScopeReady(input: {
   db: ControlPlaneDatabase;
   connectionId: string;
-  scopeKind: string;
+  resourceKind: string;
 }): Promise<boolean> {
   const tables = getControlPlaneDatabaseSchema(input.db);
   const rows = await input.db
@@ -670,7 +670,7 @@ async function isRelationshipScopeReady(input: {
     .where(
       and(
         eq(tables.integrationConnectionResourceStates.connectionId, input.connectionId),
-        eq(tables.integrationConnectionResourceStates.kind, input.scopeKind),
+        eq(tables.integrationConnectionResourceStates.kind, input.resourceKind),
       ),
     )
     .limit(1);
