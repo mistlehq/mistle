@@ -291,6 +291,9 @@ function createMinimalGitHubPayload(input: {
     },
     repository: {
       full_name: "mistlehq/mistle",
+      owner: {
+        login: "mistlehq",
+      },
     },
     sender: {
       login: "octocat",
@@ -779,6 +782,12 @@ describe("GitHubWebhookHandler", () => {
         externalDeliveryId: "delivery_pull_request_team_review_requested",
         providerEventType: "pull_request",
         eventType: "github.pull_request.review_requested",
+        payload: {
+          requested_team: {
+            handle: "mistlehq/platform-reviewers",
+            slug: "platform-reviewers",
+          },
+        },
         occurredAt: "2026-04-02T17:49:43Z",
         sourceOrderKey: "2026-04-02T17:49:43Z#00000000000000002107.00000000000000003201.1",
       },

@@ -58,6 +58,34 @@ function parseJsonPayload(input: Uint8Array): Record<string, unknown> {
   return parsedPayload;
 }
 
+function enrichGitHubWebhookPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const requestedTeam = payload.requested_team;
+  if (!isRecord(requestedTeam)) {
+    return payload;
+  }
+
+  const requestedTeamSlug = requestedTeam.slug;
+  const repository = payload.repository;
+  const repositoryOwner = isRecord(repository) ? repository.owner : undefined;
+  const repositoryOwnerLogin = isRecord(repositoryOwner) ? repositoryOwner.login : undefined;
+  if (
+    typeof requestedTeamSlug !== "string" ||
+    requestedTeamSlug.trim().length === 0 ||
+    typeof repositoryOwnerLogin !== "string" ||
+    repositoryOwnerLogin.trim().length === 0
+  ) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    requested_team: {
+      ...requestedTeam,
+      handle: `${repositoryOwnerLogin.trim()}/${requestedTeamSlug.trim()}`,
+    },
+  };
+}
+
 function resolveProviderEventType(input: Readonly<Record<string, string>>): string {
   const eventTypeHeader = resolveHeaderValue({
     headers: input,
@@ -539,7 +567,7 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
   }
 > = {
   resolveWebhookRequest(input) {
-    const payload = parseJsonPayload(input.rawBody);
+    const payload = enrichGitHubWebhookPayload(parseJsonPayload(input.rawBody));
     const providerEventType = resolveProviderEventType(input.headers);
     const action = resolveCanonicalAction({ providerEventType, payload });
     const eventType = resolveEventType({

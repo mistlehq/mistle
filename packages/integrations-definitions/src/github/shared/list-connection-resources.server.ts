@@ -17,6 +17,7 @@ const GitHubRepositorySchema = z.looseObject({
   full_name: z.string().min(1),
   owner: z
     .looseObject({
+      id: z.union([z.string().min(1), z.number().int()]).optional(),
       login: z.string().min(1),
       type: z.string().min(1).optional(),
     })
@@ -86,6 +87,7 @@ type GitHubListConnectionResourcesInput = ListConnectionResourcesInput<
 const GitHubRepositoryKind = "repository";
 const GitHubBranchKind = "branch";
 const GitHubUserKind = "user";
+const GitHubOrgKind = "org";
 const GitHubTeamKind = "team";
 const GitHubBotKind = "bot";
 const GitHubPageSize = 100;
@@ -141,14 +143,27 @@ function toUserResource(collaborator: GitHubCollaborator): DiscoveredIntegration
   };
 }
 
+function toOrgResource(input: { id: string; login: string }): DiscoveredIntegrationResource {
+  return {
+    externalId: input.id,
+    handle: input.login,
+    displayName: input.login,
+    metadata: {
+      login: input.login,
+    },
+  };
+}
+
 function toTeamResource(input: {
   team: GitHubTeam;
   organizationLogin: string;
 }): DiscoveredIntegrationResource {
   return {
-    handle: input.team.slug,
+    externalId: input.team.id.toString(),
+    handle: `${input.organizationLogin}/${input.team.slug}`,
     displayName: `${input.team.name} (${input.organizationLogin})`,
     metadata: {
+      organizationLogin: input.organizationLogin,
       organizationLogins: [input.organizationLogin],
       name: input.team.name,
       slug: input.team.slug,
@@ -437,44 +452,29 @@ function dedupeUserResourcesByExternalId(
   );
 }
 
-function dedupeTeamResourcesByHandle(
+function dedupeTeamResourcesByExternalId(
   resources: readonly DiscoveredIntegrationResource[],
 ): DiscoveredIntegrationResource[] {
-  const resourcesByHandle = new Map<string, DiscoveredIntegrationResource>();
+  const resourcesByExternalId = new Map<string, DiscoveredIntegrationResource>();
 
   for (const resource of resources) {
-    const existingResource = resourcesByHandle.get(resource.handle);
+    if (resource.externalId === undefined) {
+      throw new Error(`GitHub team resource '${resource.handle}' is missing an external id.`);
+    }
+
+    const existingResource = resourcesByExternalId.get(resource.externalId);
     if (existingResource === undefined) {
-      resourcesByHandle.set(resource.handle, resource);
+      resourcesByExternalId.set(resource.externalId, resource);
       continue;
     }
 
-    const existingOrganizationLogins = parseStringArrayMetadata(
-      existingResource.metadata["organizationLogins"],
-    );
-    const nextOrganizationLogins = parseStringArrayMetadata(
-      resource.metadata["organizationLogins"],
-    );
-    const organizationLogins = [
-      ...new Set([...existingOrganizationLogins, ...nextOrganizationLogins]),
-    ].sort((left, right) => left.localeCompare(right));
-    const teamName =
-      typeof existingResource.metadata["name"] === "string"
-        ? existingResource.metadata["name"]
-        : existingResource.handle;
-
-    resourcesByHandle.set(resource.handle, {
-      ...existingResource,
-      displayName: `${teamName} (${organizationLogins.join(", ")})`,
-      metadata: {
-        ...existingResource.metadata,
-        organizationLogins,
-      },
-    });
+    if (resource.handle < existingResource.handle) {
+      resourcesByExternalId.set(resource.externalId, resource);
+    }
   }
 
-  return Array.from(resourcesByHandle.values()).sort((left, right) =>
-    left.displayName.localeCompare(right.displayName),
+  return Array.from(resourcesByExternalId.values()).sort((left, right) =>
+    left.handle.localeCompare(right.handle),
   );
 }
 
@@ -597,6 +597,38 @@ function listGitHubOrganizationLogins(
   return [...organizationLogins].sort((left, right) => left.localeCompare(right));
 }
 
+function listGitHubOrgs(
+  repositories: readonly GitHubRepository[],
+): ReadonlyArray<DiscoveredIntegrationResource> {
+  const resourcesByExternalId = new Map<string, DiscoveredIntegrationResource>();
+
+  for (const repository of repositories) {
+    if (repository.owner?.type !== "Organization") {
+      continue;
+    }
+
+    if (repository.owner.id === undefined) {
+      throw new Error(
+        `GitHub organization resource '${repository.owner.login}' is missing an external id.`,
+      );
+    }
+
+    const externalId = repository.owner.id.toString();
+    const resource = toOrgResource({
+      id: externalId,
+      login: repository.owner.login,
+    });
+    const existingResource = resourcesByExternalId.get(externalId);
+    if (existingResource === undefined || resource.handle < existingResource.handle) {
+      resourcesByExternalId.set(externalId, resource);
+    }
+  }
+
+  return Array.from(resourcesByExternalId.values()).sort((left, right) =>
+    left.handle.localeCompare(right.handle),
+  );
+}
+
 async function listGitHubTeams(input: {
   apiBaseUrl: string;
   credential: string;
@@ -622,7 +654,7 @@ async function listGitHubTeams(input: {
     );
   }
 
-  return dedupeTeamResourcesByHandle(teamResources);
+  return dedupeTeamResourcesByExternalId(teamResources);
 }
 
 async function listGitHubBots(input: {
@@ -704,6 +736,12 @@ export async function listGitHubConnectionResources(
         credential: input.credential.value,
         repositories,
       }),
+    };
+  }
+
+  if (input.kind === GitHubOrgKind) {
+    return {
+      resources: listGitHubOrgs(repositories),
     };
   }
 

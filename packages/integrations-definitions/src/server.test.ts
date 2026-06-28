@@ -193,6 +193,10 @@ describe("integrations-definitions server", () => {
           bindingField: "teams",
         }),
         expect.objectContaining({
+          kind: "org",
+          bindingField: "organizations",
+        }),
+        expect.objectContaining({
           kind: "bot",
           bindingField: "bots",
         }),
@@ -201,11 +205,11 @@ describe("integrations-definitions server", () => {
     expect(githubCloudDefinition?.resourceSyncTriggers).toEqual([
       {
         eventType: "github.installation_repositories.added",
-        resourceKinds: ["repository", "user"],
+        resourceKinds: ["repository", "user", "org", "team", "bot"],
       },
       {
         eventType: "github.installation_repositories.removed",
-        resourceKinds: ["repository", "user"],
+        resourceKinds: ["repository", "user", "org", "team", "bot"],
       },
       {
         eventType: "github.member.added",
@@ -332,6 +336,10 @@ describe("integrations-definitions server", () => {
         expect.objectContaining({
           kind: "team",
           bindingField: "teams",
+        }),
+        expect.objectContaining({
+          kind: "org",
+          bindingField: "organizations",
         }),
         expect.objectContaining({
           kind: "bot",

@@ -228,7 +228,7 @@ const GitHubRequestedTeamParameter: IntegrationWebhookEventParameterDefinition =
   label: "requested GitHub team",
   kind: "resource-select",
   resourceKind: "team",
-  payloadPath: ["requested_team", "slug"],
+  payloadPath: ["requested_team", "handle"],
   multiValue: true,
   negatedMatchRequiresExists: true,
   prefix: "for team",

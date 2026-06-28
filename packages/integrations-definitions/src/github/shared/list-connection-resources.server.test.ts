@@ -58,7 +58,205 @@ async function startSimulatedGitHubApi(input: {
 }
 
 describe("listGitHubConnectionResources", () => {
-  it("lists GitHub teams for organization-owned accessible repositories and dedupes by slug", async () => {
+  it("lists GitHub organizations from organization-owned accessible repositories", async () => {
+    const seenPaths: string[] = [];
+    const server = await startSimulatedGitHubApi({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        seenPaths.push(`${requestUrl.pathname}?${requestUrl.searchParams.toString()}`);
+        response.setHeader("content-type", "application/json");
+
+        // GitHub REST docs: GET /installation/repositories returns repositories
+        // accessible to an installation, including repository owner objects.
+        if (requestUrl.pathname === "/installation/repositories") {
+          response.end(
+            JSON.stringify({
+              repositories: [
+                {
+                  id: 1001,
+                  full_name: "mistle/app",
+                  owner: {
+                    id: 2001,
+                    login: "mistle",
+                    type: "Organization",
+                  },
+                },
+                {
+                  id: 1002,
+                  full_name: "mistle/api",
+                  owner: {
+                    id: 2001,
+                    login: "mistle",
+                    type: "Organization",
+                  },
+                },
+                {
+                  id: 1003,
+                  full_name: "octocat/playground",
+                  owner: {
+                    id: 3001,
+                    login: "octocat",
+                    type: "User",
+                  },
+                },
+                {
+                  id: 1004,
+                  full_name: "acme/site",
+                  owner: {
+                    id: 2002,
+                    login: "acme",
+                    type: "Organization",
+                  },
+                },
+              ],
+            }),
+          );
+          return;
+        }
+
+        response.writeHead(404);
+        response.end(JSON.stringify({ message: "not found" }));
+      },
+    });
+
+    try {
+      const result = await listGitHubConnectionResources({
+        organizationId: "org_test",
+        targetKey: "github-cloud-test",
+        target: {
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            apiBaseUrl: server.baseUrl,
+            webBaseUrl: "https://github.example",
+          },
+          secrets: {},
+        },
+        connection: {
+          id: "icn_github",
+          status: "active",
+          config: {
+            connection_method: "github-app-installation",
+            app_id: "123",
+            app_slug: "mistle-test",
+            client_id: "Iv1.client",
+            installation_id: "456",
+          },
+        },
+        kind: "org",
+        credential: {
+          kind: "value",
+          value: "github-installation-token",
+        },
+      });
+
+      expect(result.resources).toEqual([
+        {
+          externalId: "2002",
+          handle: "acme",
+          displayName: "acme",
+          metadata: {
+            login: "acme",
+          },
+        },
+        {
+          externalId: "2001",
+          handle: "mistle",
+          displayName: "mistle",
+          metadata: {
+            login: "mistle",
+          },
+        },
+      ]);
+      expect(seenPaths).toEqual(["/installation/repositories?per_page=100&page=1"]);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("rejects GitHub organization resource listing when an organization owner id is missing", async () => {
+    const server = await startSimulatedGitHubApi({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        response.setHeader("content-type", "application/json");
+
+        // GitHub REST docs: repository owner objects include stable node fields,
+        // including numeric owner `id`, in repository API responses.
+        if (requestUrl.pathname === "/installation/repositories") {
+          response.end(
+            JSON.stringify({
+              repositories: [
+                {
+                  id: 1001,
+                  full_name: "mistle/app",
+                  owner: {
+                    login: "mistle",
+                    type: "Organization",
+                  },
+                },
+              ],
+            }),
+          );
+          return;
+        }
+
+        response.writeHead(404);
+        response.end(JSON.stringify({ message: "not found" }));
+      },
+    });
+
+    try {
+      await expect(
+        listGitHubConnectionResources({
+          organizationId: "org_test",
+          targetKey: "github-cloud-test",
+          target: {
+            familyId: "github",
+            variantId: "github-cloud",
+            enabled: true,
+            config: {
+              apiBaseUrl: server.baseUrl,
+              webBaseUrl: "https://github.example",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "icn_github",
+            status: "active",
+            config: {
+              connection_method: "github-app-installation",
+              app_id: "123",
+              app_slug: "mistle-test",
+              client_id: "Iv1.client",
+              installation_id: "456",
+            },
+          },
+          kind: "org",
+          credential: {
+            kind: "value",
+            value: "github-installation-token",
+          },
+        }),
+      ).rejects.toThrow("GitHub organization resource 'mistle' is missing an external id.");
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("lists GitHub teams for organization-owned accessible repositories with stable org-scoped handles", async () => {
     const seenPaths: string[] = [];
     const server = await startSimulatedGitHubApi({
       handler(request, response) {
@@ -80,6 +278,7 @@ describe("listGitHubConnectionResources", () => {
                 id: 1001,
                 full_name: "mistle/app",
                 owner: {
+                  id: 5001,
                   login: "mistle",
                   type: "Organization",
                 },
@@ -88,6 +287,7 @@ describe("listGitHubConnectionResources", () => {
                 id: 1002,
                 full_name: "acme/site",
                 owner: {
+                  id: 5002,
                   login: "acme",
                   type: "Organization",
                 },
@@ -96,6 +296,7 @@ describe("listGitHubConnectionResources", () => {
                 id: 1003,
                 full_name: "octocat/playground",
                 owner: {
+                  id: 5003,
                   login: "octocat",
                   type: "User",
                 },
@@ -181,21 +382,36 @@ describe("listGitHubConnectionResources", () => {
 
       expect(result.resources).toEqual([
         {
-          handle: "platform",
-          displayName: "Platform (acme, mistle)",
+          externalId: "3001",
+          handle: "acme/platform",
+          displayName: "Platform (acme)",
           metadata: {
-            organizationLogins: ["acme", "mistle"],
+            organizationLogin: "acme",
+            organizationLogins: ["acme"],
             name: "Platform",
             slug: "platform",
           },
         },
         {
-          handle: "security",
+          externalId: "3002",
+          handle: "acme/security",
           displayName: "Security (acme)",
           metadata: {
+            organizationLogin: "acme",
             organizationLogins: ["acme"],
             name: "Security",
             slug: "security",
+          },
+        },
+        {
+          externalId: "2001",
+          handle: "mistle/platform",
+          displayName: "Platform (mistle)",
+          metadata: {
+            organizationLogin: "mistle",
+            organizationLogins: ["mistle"],
+            name: "Platform",
+            slug: "platform",
           },
         },
       ]);
