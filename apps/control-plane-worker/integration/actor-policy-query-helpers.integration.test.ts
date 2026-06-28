@@ -5,7 +5,6 @@
 import {
   type IntegrationConnectionResourceStatus,
   IntegrationConnectionResourceAttributeValueTypes,
-  IntegrationConnectionResourceRelationshipSyncStates,
   IntegrationConnectionResourceStatuses,
   IntegrationConnectionResourceSyncStates,
   IntegrationConnectionStatuses,
@@ -51,22 +50,14 @@ describe.concurrent("actor policy query helpers", () => {
         }),
       ],
     });
-    await env.controlPlaneDb
-      .insert(env.controlPlaneTables.integrationConnectionResourceRelationshipStates)
-      .values({
-        connectionId: "icn_actor_policy_scope_ready",
-        familyId: "github",
-        relationshipKind: "belongs_to",
-        scopeResourceId: "rsc_actor_policy_scope_ready_team",
-        scopeKind: "team",
-        scopeExternalId: "team_1",
-        scopeHandle: "mistle/platform",
-        syncState: IntegrationConnectionResourceRelationshipSyncStates.READY,
-        totalCount: 1,
-        lastSyncedAt: Timestamp,
-        lastSyncStartedAt: Timestamp,
-        lastSyncFinishedAt: Timestamp,
-      });
+    await seedReadyRelationshipScope({
+      env,
+      connectionId: "icn_actor_policy_scope_ready",
+      scopeResourceId: "rsc_actor_policy_scope_ready_team",
+      scopeKind: "team",
+      scopeExternalId: "team_1",
+      scopeHandle: "mistle/platform",
+    });
 
     await expect(
       queryActorPolicyRelationshipScopeReadiness({
@@ -236,22 +227,14 @@ describe.concurrent("actor policy query helpers", () => {
         }),
       ],
     });
-    await env.controlPlaneDb
-      .insert(env.controlPlaneTables.integrationConnectionResourceRelationshipStates)
-      .values({
-        connectionId: "icn_actor_policy_relationship",
-        familyId: "github",
-        relationshipKind: "belongs_to",
-        scopeResourceId: "rsc_actor_policy_relationship_team",
-        scopeKind: "team",
-        scopeExternalId: "team_1",
-        scopeHandle: "mistle/platform",
-        syncState: IntegrationConnectionResourceRelationshipSyncStates.READY,
-        totalCount: 1,
-        lastSyncedAt: Timestamp,
-        lastSyncStartedAt: Timestamp,
-        lastSyncFinishedAt: Timestamp,
-      });
+    await seedReadyRelationshipScope({
+      env,
+      connectionId: "icn_actor_policy_relationship",
+      scopeResourceId: "rsc_actor_policy_relationship_team",
+      scopeKind: "team",
+      scopeExternalId: "team_1",
+      scopeHandle: "mistle/platform",
+    });
     await env.controlPlaneDb
       .insert(env.controlPlaneTables.integrationConnectionResourceRelationships)
       .values({
@@ -320,6 +303,90 @@ describe.concurrent("actor policy query helpers", () => {
     });
   });
 
+  it("matches relationships by provider identity when resource rows are synced after relationship rows", async ({
+    env,
+  }) => {
+    await seedConnection({
+      env,
+      connectionId: "icn_actor_policy_relationship_late_resources",
+      organizationId: "org_actor_policy_relationship_late_resources",
+      organizationSlug: "actor-policy-relationship-late-resources",
+      targetKey: "actor-policy-relationship-late-resources",
+    });
+    await seedResources({
+      env,
+      connectionId: "icn_actor_policy_relationship_late_resources",
+      resources: [
+        resource({
+          id: "rsc_actor_policy_relationship_late_resources_alice",
+          kind: "user",
+          externalId: "1001",
+          handle: "alice",
+          displayName: "Alice",
+        }),
+        resource({
+          id: "rsc_actor_policy_relationship_late_resources_team",
+          kind: "team",
+          externalId: "team_1",
+          handle: "mistle/platform",
+          displayName: "Platform",
+        }),
+      ],
+    });
+    await seedReadyRelationshipScope({
+      env,
+      connectionId: "icn_actor_policy_relationship_late_resources",
+      scopeResourceId: "rsc_actor_policy_relationship_late_resources_team",
+      scopeKind: "team",
+      scopeExternalId: "team_1",
+      scopeHandle: "mistle/platform",
+    });
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.integrationConnectionResourceRelationships)
+      .values({
+        id: "irr_actor_policy_relationship_late_resources_alice_team",
+        connectionId: "icn_actor_policy_relationship_late_resources",
+        familyId: "github",
+        relationshipKind: "belongs_to",
+        subjectResourceId: null,
+        subjectResourceKind: "user",
+        subjectExternalId: "1001",
+        subjectHandle: "alice",
+        objectResourceId: null,
+        objectResourceKind: "team",
+        objectExternalId: "team_1",
+        objectHandle: "mistle/platform",
+        scopeResourceId: "rsc_actor_policy_relationship_late_resources_team",
+        scopeKind: "team",
+        scopeExternalId: "team_1",
+        scopeHandle: "mistle/platform",
+        metadata: {},
+        lastSeenAt: Timestamp,
+      });
+
+    await expect(
+      queryActorPolicyResourceRelationship({
+        db: env.controlPlaneDb,
+        connectionId: "icn_actor_policy_relationship_late_resources",
+        relationshipKind: "belongs_to",
+        actor: {
+          resourceKind: "user",
+          resourceId: "rsc_actor_policy_relationship_late_resources_alice",
+        },
+        actorSet: {
+          resourceKind: "team",
+          resourceId: "rsc_actor_policy_relationship_late_resources_team",
+        },
+        scope: {
+          resourceKind: "team",
+          resourceId: "rsc_actor_policy_relationship_late_resources_team",
+        },
+      }),
+    ).resolves.toEqual({
+      state: ActorPolicyQueryResultStates.MATCHED,
+    });
+  });
+
   it("uses provider identity columns for relationship subjects without resource rows", async ({
     env,
   }) => {
@@ -343,22 +410,14 @@ describe.concurrent("actor policy query helpers", () => {
         }),
       ],
     });
-    await env.controlPlaneDb
-      .insert(env.controlPlaneTables.integrationConnectionResourceRelationshipStates)
-      .values({
-        connectionId: "icn_actor_policy_relationship_external_subject",
-        familyId: "github",
-        relationshipKind: "belongs_to",
-        scopeResourceId: "rsc_actor_policy_relationship_external_subject_team",
-        scopeKind: "team",
-        scopeExternalId: "team_1",
-        scopeHandle: "mistle/platform",
-        syncState: IntegrationConnectionResourceRelationshipSyncStates.READY,
-        totalCount: 1,
-        lastSyncedAt: Timestamp,
-        lastSyncStartedAt: Timestamp,
-        lastSyncFinishedAt: Timestamp,
-      });
+    await seedReadyRelationshipScope({
+      env,
+      connectionId: "icn_actor_policy_relationship_external_subject",
+      scopeResourceId: "rsc_actor_policy_relationship_external_subject_team",
+      scopeKind: "team",
+      scopeExternalId: "team_1",
+      scopeHandle: "mistle/platform",
+    });
     await env.controlPlaneDb
       .insert(env.controlPlaneTables.integrationConnectionResourceRelationships)
       .values({
@@ -628,16 +687,12 @@ describe.concurrent("actor policy query helpers", () => {
       ],
     });
     await env.controlPlaneDb
-      .insert(env.controlPlaneTables.integrationConnectionResourceRelationshipStates)
+      .insert(env.controlPlaneTables.integrationConnectionResourceStates)
       .values({
         connectionId: "icn_actor_policy_relationship_unready",
         familyId: "github",
-        relationshipKind: "belongs_to",
-        scopeResourceId: "rsc_actor_policy_relationship_unready_team",
-        scopeKind: "team",
-        scopeExternalId: "team_1",
-        scopeHandle: "mistle/platform",
-        syncState: IntegrationConnectionResourceRelationshipSyncStates.ERROR,
+        kind: "team",
+        syncState: IntegrationConnectionResourceSyncStates.ERROR,
         totalCount: 0,
         lastSyncStartedAt: Timestamp,
         lastSyncFinishedAt: Timestamp,
@@ -719,16 +774,12 @@ async function seedReadyRelationshipScope(input: {
   scopeHandle: string;
 }): Promise<void> {
   await input.env.controlPlaneDb
-    .insert(input.env.controlPlaneTables.integrationConnectionResourceRelationshipStates)
+    .insert(input.env.controlPlaneTables.integrationConnectionResourceStates)
     .values({
       connectionId: input.connectionId,
       familyId: "github",
-      relationshipKind: "belongs_to",
-      scopeResourceId: input.scopeResourceId,
-      scopeKind: input.scopeKind,
-      scopeExternalId: input.scopeExternalId,
-      scopeHandle: input.scopeHandle,
-      syncState: IntegrationConnectionResourceRelationshipSyncStates.READY,
+      kind: input.scopeKind,
+      syncState: IntegrationConnectionResourceSyncStates.READY,
       totalCount: 1,
       lastSyncedAt: Timestamp,
       lastSyncStartedAt: Timestamp,

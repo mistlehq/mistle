@@ -1,12 +1,11 @@
 import {
   type ControlPlaneDatabase,
   type IntegrationConnectionResourceAttributeValueType,
-  IntegrationConnectionResourceRelationshipSyncStates,
   IntegrationConnectionResourceStatuses,
   IntegrationConnectionResourceSyncStates,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
-import { and, eq, isNull, type SQL } from "drizzle-orm";
+import { and, eq, isNull, or, type SQL } from "drizzle-orm";
 
 export const ActorPolicyQueryResultStates = {
   DATA_UNAVAILABLE: "data_unavailable",
@@ -41,6 +40,7 @@ export type ActorPolicyRelationshipScopeReference = ActorPolicyResourceReference
 type ResolvedActorPolicyResource = {
   id: string;
   kind: string;
+  externalId: string | null;
   handle: string;
 };
 
@@ -62,8 +62,7 @@ export async function queryActorPolicyRelationshipScopeReadiness(input: {
   const isReady = await isRelationshipScopeReady({
     db: input.db,
     connectionId: input.connectionId,
-    relationshipKind: input.relationshipKind,
-    scopeResourceId: scopeResource.id,
+    scopeKind: scopeResource.kind,
   });
 
   if (!isReady) {
@@ -200,8 +199,7 @@ export async function queryActorPolicyResourceRelationship(input: {
   const isReady = await isRelationshipScopeReady({
     db: input.db,
     connectionId: input.connectionId,
-    relationshipKind: input.relationshipKind,
-    scopeResourceId: scopeResource.id,
+    scopeKind: scopeResource.kind,
   });
   if (!isReady) {
     return dataUnavailable("relationship_scope_not_ready");
@@ -277,6 +275,7 @@ async function resolveAccessibleResourceById(input: {
     .select({
       id: tables.integrationConnectionResources.id,
       kind: tables.integrationConnectionResources.kind,
+      externalId: tables.integrationConnectionResources.externalId,
       handle: tables.integrationConnectionResources.handle,
     })
     .from(tables.integrationConnectionResources)
@@ -308,6 +307,7 @@ async function resolveAccessibleResourceByExternalId(input: {
     .select({
       id: tables.integrationConnectionResources.id,
       kind: tables.integrationConnectionResources.kind,
+      externalId: tables.integrationConnectionResources.externalId,
       handle: tables.integrationConnectionResources.handle,
     })
     .from(tables.integrationConnectionResources)
@@ -339,6 +339,7 @@ async function resolveAccessibleResourceByHandle(input: {
     .select({
       id: tables.integrationConnectionResources.id,
       kind: tables.integrationConnectionResources.kind,
+      externalId: tables.integrationConnectionResources.externalId,
       handle: tables.integrationConnectionResources.handle,
     })
     .from(tables.integrationConnectionResources)
@@ -469,9 +470,18 @@ function createSubjectRelationshipPredicate(input: {
 }): SQL | undefined {
   const tables = getControlPlaneDatabaseSchema(input.db);
   if (input.resource !== undefined) {
-    return eq(
-      tables.integrationConnectionResourceRelationships.subjectResourceId,
-      input.resource.id,
+    const resolvedResourceIdentityPredicate = createSubjectResolvedResourceIdentityPredicate({
+      db: input.db,
+      resource: input.resource,
+    });
+    return requireSqlPredicate(
+      or(
+        eq(tables.integrationConnectionResourceRelationships.subjectResourceId, input.resource.id),
+        and(
+          isNull(tables.integrationConnectionResourceRelationships.subjectResourceId),
+          resolvedResourceIdentityPredicate,
+        ),
+      ),
     );
   }
 
@@ -501,6 +511,36 @@ function createSubjectRelationshipPredicate(input: {
   return undefined;
 }
 
+function createSubjectResolvedResourceIdentityPredicate(input: {
+  db: ControlPlaneDatabase;
+  resource: ResolvedActorPolicyResource;
+}): SQL {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+  const handlePredicate = and(
+    eq(tables.integrationConnectionResourceRelationships.subjectResourceKind, input.resource.kind),
+    eq(tables.integrationConnectionResourceRelationships.subjectHandle, input.resource.handle),
+  );
+  if (input.resource.externalId === null) {
+    return requireSqlPredicate(handlePredicate);
+  }
+
+  return requireSqlPredicate(
+    or(
+      handlePredicate,
+      and(
+        eq(
+          tables.integrationConnectionResourceRelationships.subjectResourceKind,
+          input.resource.kind,
+        ),
+        eq(
+          tables.integrationConnectionResourceRelationships.subjectExternalId,
+          input.resource.externalId,
+        ),
+      ),
+    ),
+  );
+}
+
 function createObjectRelationshipPredicate(input: {
   db: ControlPlaneDatabase;
   reference: ActorPolicyResourceReference;
@@ -508,9 +548,18 @@ function createObjectRelationshipPredicate(input: {
 }): SQL | undefined {
   const tables = getControlPlaneDatabaseSchema(input.db);
   if (input.resource !== undefined) {
-    return eq(
-      tables.integrationConnectionResourceRelationships.objectResourceId,
-      input.resource.id,
+    const resolvedResourceIdentityPredicate = createObjectResolvedResourceIdentityPredicate({
+      db: input.db,
+      resource: input.resource,
+    });
+    return requireSqlPredicate(
+      or(
+        eq(tables.integrationConnectionResourceRelationships.objectResourceId, input.resource.id),
+        and(
+          isNull(tables.integrationConnectionResourceRelationships.objectResourceId),
+          resolvedResourceIdentityPredicate,
+        ),
+      ),
     );
   }
 
@@ -538,6 +587,44 @@ function createObjectRelationshipPredicate(input: {
   }
 
   return undefined;
+}
+
+function createObjectResolvedResourceIdentityPredicate(input: {
+  db: ControlPlaneDatabase;
+  resource: ResolvedActorPolicyResource;
+}): SQL {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+  const handlePredicate = and(
+    eq(tables.integrationConnectionResourceRelationships.objectResourceKind, input.resource.kind),
+    eq(tables.integrationConnectionResourceRelationships.objectHandle, input.resource.handle),
+  );
+  if (input.resource.externalId === null) {
+    return requireSqlPredicate(handlePredicate);
+  }
+
+  return requireSqlPredicate(
+    or(
+      handlePredicate,
+      and(
+        eq(
+          tables.integrationConnectionResourceRelationships.objectResourceKind,
+          input.resource.kind,
+        ),
+        eq(
+          tables.integrationConnectionResourceRelationships.objectExternalId,
+          input.resource.externalId,
+        ),
+      ),
+    ),
+  );
+}
+
+function requireSqlPredicate(predicate: SQL | undefined): SQL {
+  if (predicate === undefined) {
+    throw new Error("Expected actor policy SQL predicate to be defined.");
+  }
+
+  return predicate;
 }
 
 async function isResourceKindReadyForAttributes(input: {
@@ -571,27 +658,19 @@ async function isResourceKindReadyForAttributes(input: {
 async function isRelationshipScopeReady(input: {
   db: ControlPlaneDatabase;
   connectionId: string;
-  relationshipKind: string;
-  scopeResourceId: string;
+  scopeKind: string;
 }): Promise<boolean> {
   const tables = getControlPlaneDatabaseSchema(input.db);
   const rows = await input.db
     .select({
-      lastSyncedAt: tables.integrationConnectionResourceRelationshipStates.lastSyncedAt,
-      syncState: tables.integrationConnectionResourceRelationshipStates.syncState,
+      lastSyncedAt: tables.integrationConnectionResourceStates.lastSyncedAt,
+      syncState: tables.integrationConnectionResourceStates.syncState,
     })
-    .from(tables.integrationConnectionResourceRelationshipStates)
+    .from(tables.integrationConnectionResourceStates)
     .where(
       and(
-        eq(tables.integrationConnectionResourceRelationshipStates.connectionId, input.connectionId),
-        eq(
-          tables.integrationConnectionResourceRelationshipStates.relationshipKind,
-          input.relationshipKind,
-        ),
-        eq(
-          tables.integrationConnectionResourceRelationshipStates.scopeResourceId,
-          input.scopeResourceId,
-        ),
+        eq(tables.integrationConnectionResourceStates.connectionId, input.connectionId),
+        eq(tables.integrationConnectionResourceStates.kind, input.scopeKind),
       ),
     )
     .limit(1);
@@ -599,7 +678,7 @@ async function isRelationshipScopeReady(input: {
 
   return (
     state !== undefined &&
-    state.syncState === IntegrationConnectionResourceRelationshipSyncStates.READY &&
+    state.syncState === IntegrationConnectionResourceSyncStates.READY &&
     state.lastSyncedAt !== null
   );
 }
