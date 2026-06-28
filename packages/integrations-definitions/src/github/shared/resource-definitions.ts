@@ -126,11 +126,11 @@ export function createGitHubResourceDefinitions(input: {
 export const GitHubResourceSyncTriggers: ReadonlyArray<IntegrationResourceSyncTrigger> = [
   {
     eventType: "github.installation_repositories.added",
-    resourceKinds: ["repository", "user", "org"],
+    resourceKinds: ["repository", "user", "org", "team", "bot"],
   },
   {
     eventType: "github.installation_repositories.removed",
-    resourceKinds: ["repository", "user", "org"],
+    resourceKinds: ["repository", "user", "org", "team", "bot"],
   },
   {
     eventType: "github.member.added",
