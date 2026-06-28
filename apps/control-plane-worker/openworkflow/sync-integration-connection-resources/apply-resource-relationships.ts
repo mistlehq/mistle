@@ -190,10 +190,7 @@ export async function applyResourceRelationships(input: {
           updatedAt: sql`now()`,
         })
         .where(
-          inArray(
-            tables.integrationConnectionResourceRelationships.id,
-            relationshipIdsToRemove,
-          ),
+          inArray(tables.integrationConnectionResourceRelationships.id, relationshipIdsToRemove),
         );
     }
   }
