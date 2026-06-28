@@ -465,6 +465,8 @@ export type IntegrationResourceRelationshipScopeDefinition = {
 export type IntegrationResourceRelationshipCredentialSelectorInput = {
   connection: IntegrationConnection;
   relationshipKind: string;
+  subjectResourceKind: string;
+  objectResourceKind: string;
   scope: DiscoveredIntegrationResourceRelationshipScope;
 };
 
@@ -528,6 +530,8 @@ export type ListConnectionResourceRelationshipsInput<
     config: TConnectionConfig;
   };
   relationshipKind: string;
+  subjectResourceKind: string;
+  objectResourceKind: string;
   scope: DiscoveredIntegrationResourceRelationshipScope;
   credential?: IntegrationCredentialResolverResult;
 };

@@ -12,6 +12,13 @@ const SlackUserGroupScope: DiscoveredIntegrationResourceRelationshipScope = {
   scopeHandle: "engineering",
 };
 
+const SlackUserGroupMembershipRequest = {
+  relationshipKind: "belongs_to",
+  subjectResourceKind: "user",
+  objectResourceKind: "user_group",
+  scope: SlackUserGroupScope,
+};
+
 describe("validateDiscoveredResourceRelationships", () => {
   it("accepts relationships that exactly match the requested kind and scope", () => {
     const relationships: ReadonlyArray<DiscoveredIntegrationResourceRelationship> = [
@@ -34,27 +41,26 @@ describe("validateDiscoveredResourceRelationships", () => {
 
     expect(
       validateDiscoveredResourceRelationships({
-        relationshipKind: "belongs_to",
-        scope: SlackUserGroupScope,
+        ...SlackUserGroupMembershipRequest,
         relationships,
       }),
     ).toEqual(relationships);
   });
 
-  it("accepts omitted relationships as an empty complete scope snapshot", () => {
-    expect(
+  it("rejects omitted relationships instead of treating them as an empty complete scope snapshot", () => {
+    expect(() =>
       validateDiscoveredResourceRelationships({
-        relationshipKind: "belongs_to",
-        scope: SlackUserGroupScope,
+        ...SlackUserGroupMembershipRequest,
+        // @ts-expect-error: malformed provider boundary input should still fail fast at runtime.
+        relationships: undefined,
       }),
-    ).toEqual([]);
+    ).toThrow("Invalid input: expected array");
   });
 
   it("rejects missing required subject, object, and scope identifiers", () => {
     expect(() =>
       validateDiscoveredResourceRelationships({
-        relationshipKind: "belongs_to",
-        scope: SlackUserGroupScope,
+        ...SlackUserGroupMembershipRequest,
         relationships: [
           slackUserGroupMembership({
             subjectExternalId: "",
@@ -72,17 +78,37 @@ describe("validateDiscoveredResourceRelationships", () => {
   it("rejects an empty requested relationship kind", () => {
     expect(() =>
       validateDiscoveredResourceRelationships({
+        ...SlackUserGroupMembershipRequest,
         relationshipKind: "",
-        scope: SlackUserGroupScope,
         relationships: [],
       }),
     ).toThrow("Relationship sync requested an empty relationship kind.");
   });
 
+  it("rejects an empty requested subject resource kind", () => {
+    expect(() =>
+      validateDiscoveredResourceRelationships({
+        ...SlackUserGroupMembershipRequest,
+        subjectResourceKind: "",
+        relationships: [],
+      }),
+    ).toThrow("Relationship sync requested an empty subject resource kind.");
+  });
+
+  it("rejects an empty requested object resource kind", () => {
+    expect(() =>
+      validateDiscoveredResourceRelationships({
+        ...SlackUserGroupMembershipRequest,
+        objectResourceKind: "",
+        relationships: [],
+      }),
+    ).toThrow("Relationship sync requested an empty object resource kind.");
+  });
+
   it("rejects an empty requested scope value", () => {
     expect(() =>
       validateDiscoveredResourceRelationships({
-        relationshipKind: "belongs_to",
+        ...SlackUserGroupMembershipRequest,
         scope: {
           scopeKind: "user_group",
           scopeHandle: "",
@@ -110,8 +136,31 @@ describe("validateDiscoveredResourceRelationships", () => {
 
     expect(() =>
       validateDiscoveredResourceRelationships({
-        relationshipKind: "belongs_to",
-        scope: SlackUserGroupScope,
+        ...SlackUserGroupMembershipRequest,
+        relationships,
+      }),
+    ).toThrow(
+      "Provider returned duplicate relationship 'belongs_to' from 'alice' to 'engineering' in scope 'engineering'.",
+    );
+  });
+
+  it("rejects duplicate relationship handles when one row is enriched with external ids", () => {
+    const relationships: ReadonlyArray<DiscoveredIntegrationResourceRelationship> = [
+      slackUserGroupMembership({
+        subjectExternalId: "U123",
+        subjectHandle: "alice",
+        objectExternalId: "S123",
+        objectHandle: "engineering",
+      }),
+      slackUserGroupMembership({
+        subjectHandle: "alice",
+        objectHandle: "engineering",
+      }),
+    ];
+
+    expect(() =>
+      validateDiscoveredResourceRelationships({
+        ...SlackUserGroupMembershipRequest,
         relationships,
       }),
     ).toThrow(
@@ -137,8 +186,7 @@ describe("validateDiscoveredResourceRelationships", () => {
 
     expect(
       validateDiscoveredResourceRelationships({
-        relationshipKind: "belongs_to",
-        scope: SlackUserGroupScope,
+        ...SlackUserGroupMembershipRequest,
         relationships,
       }),
     ).toEqual(relationships);
@@ -147,8 +195,7 @@ describe("validateDiscoveredResourceRelationships", () => {
   it("rejects relationship kind mismatches", () => {
     expect(() =>
       validateDiscoveredResourceRelationships({
-        relationshipKind: "belongs_to",
-        scope: SlackUserGroupScope,
+        ...SlackUserGroupMembershipRequest,
         relationships: [
           slackUserGroupMembership({
             relationshipKind: "admin_of",
@@ -162,11 +209,46 @@ describe("validateDiscoveredResourceRelationships", () => {
     ).toThrow("Provider returned relationship kind 'admin_of' while syncing 'belongs_to'.");
   });
 
+  it("rejects relationship subject resource kind mismatches", () => {
+    expect(() =>
+      validateDiscoveredResourceRelationships({
+        ...SlackUserGroupMembershipRequest,
+        relationships: [
+          slackUserGroupMembership({
+            subjectResourceKind: "bot",
+            subjectExternalId: "B123",
+            subjectHandle: "build-bot",
+            objectExternalId: "S123",
+            objectHandle: "engineering",
+          }),
+        ],
+      }),
+    ).toThrow("Provider returned relationship subject resource kind 'bot' while syncing 'user'.");
+  });
+
+  it("rejects relationship object resource kind mismatches", () => {
+    expect(() =>
+      validateDiscoveredResourceRelationships({
+        ...SlackUserGroupMembershipRequest,
+        relationships: [
+          slackUserGroupMembership({
+            subjectExternalId: "U123",
+            subjectHandle: "alice",
+            objectResourceKind: "workspace",
+            objectExternalId: "T123",
+            objectHandle: "mistle",
+          }),
+        ],
+      }),
+    ).toThrow(
+      "Provider returned relationship object resource kind 'workspace' while syncing 'user_group'.",
+    );
+  });
+
   it("rejects relationship scope kind mismatches", () => {
     expect(() =>
       validateDiscoveredResourceRelationships({
-        relationshipKind: "belongs_to",
-        scope: SlackUserGroupScope,
+        ...SlackUserGroupMembershipRequest,
         relationships: [
           slackUserGroupMembership({
             subjectExternalId: "U123",
@@ -183,8 +265,7 @@ describe("validateDiscoveredResourceRelationships", () => {
   it("rejects relationship scope external id mismatches", () => {
     expect(() =>
       validateDiscoveredResourceRelationships({
-        relationshipKind: "belongs_to",
-        scope: SlackUserGroupScope,
+        ...SlackUserGroupMembershipRequest,
         relationships: [
           slackUserGroupMembership({
             subjectExternalId: "U123",
@@ -201,8 +282,7 @@ describe("validateDiscoveredResourceRelationships", () => {
   it("rejects relationship scope handle mismatches", () => {
     expect(() =>
       validateDiscoveredResourceRelationships({
-        relationshipKind: "belongs_to",
-        scope: SlackUserGroupScope,
+        ...SlackUserGroupMembershipRequest,
         relationships: [
           slackUserGroupMembership({
             subjectExternalId: "U123",
@@ -219,8 +299,7 @@ describe("validateDiscoveredResourceRelationships", () => {
   it("rejects an omitted relationship scope external id when the request has one", () => {
     expect(() =>
       validateDiscoveredResourceRelationships({
-        relationshipKind: "belongs_to",
-        scope: SlackUserGroupScope,
+        ...SlackUserGroupMembershipRequest,
         relationships: [
           {
             relationshipKind: "belongs_to",

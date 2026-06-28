@@ -36,29 +36,34 @@ type ParsedDiscoveredIntegrationResourceRelationshipScope = z.infer<
   typeof DiscoveredIntegrationResourceRelationshipScopeSchema
 >;
 
-type ResourceIdentity = {
-  kind: "external_id" | "handle";
-  value: string;
-};
-
 export function validateDiscoveredResourceRelationships(input: {
   relationshipKind: string;
+  subjectResourceKind: string;
+  objectResourceKind: string;
   scope: DiscoveredIntegrationResourceRelationshipScope;
-  relationships?: ReadonlyArray<DiscoveredIntegrationResourceRelationship>;
+  relationships: ReadonlyArray<DiscoveredIntegrationResourceRelationship>;
 }): ReadonlyArray<DiscoveredIntegrationResourceRelationship> {
   if (input.relationshipKind.length === 0) {
     throw new Error("Relationship sync requested an empty relationship kind.");
+  }
+  if (input.subjectResourceKind.length === 0) {
+    throw new Error("Relationship sync requested an empty subject resource kind.");
+  }
+  if (input.objectResourceKind.length === 0) {
+    throw new Error("Relationship sync requested an empty object resource kind.");
   }
 
   const scope = DiscoveredIntegrationResourceRelationshipScopeSchema.parse(input.scope);
   const parsedRelationships = z
     .array(DiscoveredIntegrationResourceRelationshipSchema)
-    .parse(input.relationships ?? []);
+    .parse(input.relationships);
   const seenRelationshipKeys = new Set<string>();
 
   for (const relationship of parsedRelationships) {
     validateRelationshipMatchesRequest({
       requestedRelationshipKind: input.relationshipKind,
+      requestedSubjectResourceKind: input.subjectResourceKind,
+      requestedObjectResourceKind: input.objectResourceKind,
       requestedScope: scope,
       relationship,
     });
@@ -77,12 +82,26 @@ export function validateDiscoveredResourceRelationships(input: {
 
 function validateRelationshipMatchesRequest(input: {
   requestedRelationshipKind: string;
+  requestedSubjectResourceKind: string;
+  requestedObjectResourceKind: string;
   requestedScope: ParsedDiscoveredIntegrationResourceRelationshipScope;
   relationship: ParsedDiscoveredIntegrationResourceRelationship;
 }): void {
   if (input.relationship.relationshipKind !== input.requestedRelationshipKind) {
     throw new Error(
       `Provider returned relationship kind '${input.relationship.relationshipKind}' while syncing '${input.requestedRelationshipKind}'.`,
+    );
+  }
+
+  if (input.relationship.subjectResourceKind !== input.requestedSubjectResourceKind) {
+    throw new Error(
+      `Provider returned relationship subject resource kind '${input.relationship.subjectResourceKind}' while syncing '${input.requestedSubjectResourceKind}'.`,
+    );
+  }
+
+  if (input.relationship.objectResourceKind !== input.requestedObjectResourceKind) {
+    throw new Error(
+      `Provider returned relationship object resource kind '${input.relationship.objectResourceKind}' while syncing '${input.requestedObjectResourceKind}'.`,
     );
   }
 
@@ -114,25 +133,10 @@ function discoveredRelationshipKey(
     relationship.scopeExternalId ?? null,
     relationship.scopeHandle,
     relationship.subjectResourceKind,
-    resourceIdentity({
-      externalId: relationship.subjectExternalId,
-      handle: relationship.subjectHandle,
-    }),
+    relationship.subjectHandle,
     relationship.objectResourceKind,
-    resourceIdentity({
-      externalId: relationship.objectExternalId,
-      handle: relationship.objectHandle,
-    }),
+    relationship.objectHandle,
   ]);
-}
-
-function resourceIdentity(input: {
-  externalId: string | undefined;
-  handle: string;
-}): ResourceIdentity {
-  return input.externalId === undefined
-    ? { kind: "handle", value: input.handle }
-    : { kind: "external_id", value: input.externalId };
 }
 
 function normalizeParsedRelationship(
