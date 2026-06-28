@@ -322,6 +322,91 @@ describe.concurrent("internal integration credential resolution", () => {
     });
   });
 
+  it("does not replay concurrent OAuth refreshes for an expired access token", async ({ env }) => {
+    const simulatedOpenAi = await startBlockingOpenAiRefreshServer();
+    try {
+      const session = await env.auth.createSession({
+        email: "integration-internal-credential-oauth-refresh-lock@example.com",
+      });
+      await seedIntegrationTarget(env, {
+        targetKey: "openai-internal-credential-oauth-refresh-lock",
+        familyId: "openai",
+        variantId: "openai-default",
+        config: {
+          api_base_url: "https://api.openai.com",
+          auth_base_url: simulatedOpenAi.url,
+        },
+      });
+      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+        id: "icn_internal_credential_oauth_refresh_lock",
+        organizationId: session.organizationId,
+        targetKey: "openai-internal-credential-oauth-refresh-lock",
+        displayName: "Concurrent OAuth refresh lock",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: "chatgpt-device-code",
+          auth_mode: "chatgpt",
+        },
+      });
+      await insertEncryptedCredential({
+        env,
+        organizationId: session.organizationId,
+        id: "icr_internal_credential_oauth_refresh_lock_access",
+        secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+        plaintext: "expired-oauth-access-token",
+        intendedFamilyId: "openai",
+        connectionId: "icn_internal_credential_oauth_refresh_lock",
+        slotKey: "openai.openai-default.oauth2-authorization-code.access-token",
+        expiresAt: "2020-01-01T00:00:00.000Z",
+      });
+      await insertEncryptedCredential({
+        env,
+        organizationId: session.organizationId,
+        id: "icr_internal_credential_oauth_refresh_lock_refresh",
+        secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+        plaintext: "oauth-refresh-token",
+        intendedFamilyId: "openai",
+        connectionId: "icn_internal_credential_oauth_refresh_lock",
+        slotKey: "openai.openai-default.oauth2-authorization-code.refresh-token",
+      });
+
+      const firstResolve = resolveCredential(env, {
+        connectionId: "icn_internal_credential_oauth_refresh_lock",
+        secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+        slotKey: "openai.openai-default.oauth2-authorization-code.access-token",
+      });
+      await simulatedOpenAi.waitForRefreshRequest();
+
+      const secondResponse = await resolveCredential(env, {
+        connectionId: "icn_internal_credential_oauth_refresh_lock",
+        secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+        slotKey: "openai.openai-default.oauth2-authorization-code.access-token",
+      });
+
+      expect(secondResponse.status).toBe(400);
+      await expect(secondResponse.json()).resolves.toEqual({
+        code: "OAUTH2_REFRESH_FAILED",
+        message:
+          "OAuth 2.0 (Authorization Code) access token refresh for connection 'icn_internal_credential_oauth_refresh_lock' is already in progress.",
+      });
+      expect(simulatedOpenAi.observedRequestCount()).toBe(1);
+
+      simulatedOpenAi.releaseRefreshResponse();
+      const firstResponse = await firstResolve;
+
+      expect(firstResponse.status).toBe(200);
+      expect(ResolveIntegrationCredentialResponseSchema.parse(await firstResponse.json())).toEqual({
+        kind: "value",
+        value: "refreshed-oauth-access-token",
+        expiresAt: expect.any(String),
+      });
+      expect(simulatedOpenAi.observedRequestCount()).toBe(1);
+    } finally {
+      simulatedOpenAi.releaseRefreshResponse();
+      await simulatedOpenAi.close();
+    }
+  });
+
   it("rejects credential resolution without the internal service token", async ({ env }) => {
     const response = await env.controlPlaneApi.http.fetch(
       `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
@@ -566,6 +651,78 @@ async function startSimulatedAwsStsAccessDeniedServer(): Promise<{
     url: `http://127.0.0.1:${String(address.port)}`,
     close: () => closeServer(server),
     observedRequestCount: () => requestCount,
+  };
+}
+
+async function startBlockingOpenAiRefreshServer(): Promise<{
+  url: string;
+  close: () => Promise<void>;
+  observedRequestCount: () => number;
+  releaseRefreshResponse: () => void;
+  waitForRefreshRequest: () => Promise<void>;
+}> {
+  let requestCount = 0;
+  let released = false;
+  let releaseRefreshResponse: (() => void) | undefined;
+  let refreshRequestObserved: (() => void) | undefined;
+  const refreshRequestObservedPromise = new Promise<void>((resolve) => {
+    refreshRequestObserved = resolve;
+  });
+  const releaseRefreshResponsePromise = new Promise<void>((resolve) => {
+    releaseRefreshResponse = resolve;
+  });
+
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+    request.resume();
+    response.setHeader("content-type", "application/json");
+
+    if (request.method === "POST" && requestUrl.pathname === "/oauth/token") {
+      requestCount += 1;
+      refreshRequestObserved?.();
+      releaseRefreshResponsePromise
+        .then(() => {
+          response.end(
+            JSON.stringify({
+              access_token: "refreshed-oauth-access-token",
+              refresh_token: "refreshed-oauth-refresh-token",
+              expires_in: 126_230_400,
+            }),
+          );
+        })
+        .catch(() => {
+          response.destroy();
+        });
+      return;
+    }
+
+    response.statusCode = 404;
+    response.end(JSON.stringify({ message: "Not found." }));
+  });
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+
+  const address = server.address();
+  if (!isAddressInfo(address)) {
+    throw new Error("Expected simulated OpenAI refresh server to listen on a TCP port.");
+  }
+
+  return {
+    url: `http://127.0.0.1:${String(address.port)}`,
+    close: () => closeServer(server),
+    observedRequestCount: () => requestCount,
+    releaseRefreshResponse: () => {
+      if (released) {
+        return;
+      }
+      if (releaseRefreshResponse === undefined) {
+        throw new Error("Expected refresh response release callback.");
+      }
+      released = true;
+      releaseRefreshResponse();
+    },
+    waitForRefreshRequest: () => refreshRequestObservedPromise,
   };
 }
 

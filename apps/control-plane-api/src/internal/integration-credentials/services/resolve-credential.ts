@@ -110,6 +110,7 @@ type OAuth2ClientCredentialsManagedCredentialResolution = {
 const UnknownRecordSchema = z.record(z.string(), z.unknown());
 const StringRecordSchema = z.record(z.string(), z.string());
 const ResolveIntegrationCredentialTracer = trace.getTracer("@mistle/control-plane-api");
+const OAuth2AuthorizationCodeRefreshAdvisoryLockSeed = 20_260_630;
 
 function createResolveCredentialTelemetryAttributes(input: {
   connectionId: string;
@@ -615,9 +616,34 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
     });
   }
 
+  const refreshLockRequired =
+    input.forceRefresh === true ||
+    isCredentialExpired(
+      (
+        await resolveLinkedActiveCredential(input.db, {
+          connectionId: input.connection.id,
+          slotKey: input.accessTokenSlotKey,
+          secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+        })
+      )?.expiresAt ?? null,
+    );
+
   const resolution = await input.db.transaction<OAuth2AuthorizationCodeManagedCredentialResolution>(
     async (tx) => {
       const tables = getControlPlaneDatabaseSchema(tx);
+
+      let refreshLockAcquired = false;
+      if (refreshLockRequired) {
+        refreshLockAcquired = await tryAcquireOAuth2AuthorizationCodeRefreshLock(tx, {
+          connectionId: input.connection.id,
+        });
+        if (!refreshLockAcquired) {
+          return {
+            kind: "refresh-failed",
+            message: `OAuth 2.0 (Authorization Code) access token refresh for connection '${input.connection.id}' is already in progress.`,
+          };
+        }
+      }
 
       const [lockedConnection] = await tx
         .select({
@@ -676,6 +702,18 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
             credential: accessCredential,
           }),
         };
+      }
+
+      if (!refreshLockAcquired) {
+        refreshLockAcquired = await tryAcquireOAuth2AuthorizationCodeRefreshLock(tx, {
+          connectionId: lockedConnection.id,
+        });
+        if (!refreshLockAcquired) {
+          return {
+            kind: "refresh-failed",
+            message: `OAuth 2.0 (Authorization Code) access token refresh for connection '${lockedConnection.id}' is already in progress.`,
+          };
+        }
       }
 
       const refreshCredential = await resolveLinkedActiveCredential(tx, {
@@ -960,6 +998,23 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
   }
 
   return resolution.credential;
+}
+
+async function tryAcquireOAuth2AuthorizationCodeRefreshLock(
+  tx: ControlPlaneTransaction,
+  input: {
+    connectionId: string;
+  },
+): Promise<boolean> {
+  const result = await tx.execute<{ acquired: boolean }>(
+    sql`select pg_try_advisory_xact_lock(hashtextextended(${input.connectionId}, ${OAuth2AuthorizationCodeRefreshAdvisoryLockSeed})) as acquired`,
+  );
+  const row = result.rows[0];
+  if (row === undefined) {
+    throw new Error("Expected OAuth 2.0 refresh lock query to return a row.");
+  }
+
+  return row.acquired;
 }
 
 function resolveConnectionMethodId(config: Record<string, unknown>): string | undefined {
