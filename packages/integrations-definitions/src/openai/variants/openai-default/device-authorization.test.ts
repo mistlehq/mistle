@@ -235,11 +235,26 @@ describe("OpenAI device authorization", () => {
         access_token: "next-access-token",
         refresh_token: "next-refresh-token",
         expires_in: 3600,
+        earliest_refresh_at: 1_803_796_200,
         scope: "openid profile offline_access",
         token_type: "Bearer",
       }),
     ).toMatchObject({
       id_token: "next-id-token",
+      access_token: "next-access-token",
+      refresh_token: "next-refresh-token",
+      earliest_refresh_at: 1_803_796_200,
+    });
+  });
+
+  it("keeps refreshed tokens when optional refresh scheduling metadata is malformed", () => {
+    expect(
+      parseOpenAiRefreshResponse({
+        access_token: "next-access-token",
+        refresh_token: "next-refresh-token",
+        earliest_refresh_at: { value: "unexpected-provider-shape" },
+      }),
+    ).toMatchObject({
       access_token: "next-access-token",
       refresh_token: "next-refresh-token",
     });
@@ -256,6 +271,19 @@ describe("OpenAI device authorization", () => {
         },
       }),
     ).toEqual(new Date("2026-06-24T03:30:00.000Z"));
+  });
+
+  it("resolves the next refresh from numeric OpenAI earliest_refresh_at epoch seconds", () => {
+    expect(
+      OpenAiDeviceAuthorizationOAuth2Capability.resolveNextRefresh?.({
+        buffer: 5 * 60 * 1_000,
+        now: () => new Date("2026-06-24T03:00:00.000Z"),
+        response: {
+          expires_in: 3600,
+          earliest_refresh_at: 1_803_796_200,
+        },
+      }),
+    ).toEqual(new Date("2027-02-28T06:30:00.000Z"));
   });
 
   it("resolves the next refresh from OpenAI expires_in when earliest_refresh_at is missing", () => {

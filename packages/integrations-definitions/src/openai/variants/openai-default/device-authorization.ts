@@ -23,6 +23,7 @@ const OpenAiAuthIssuer = "https://auth.openai.com";
 const OpenAiDeviceAuthorizationClientId = "app_EMoamEEZ73f0CkXaXp7hrann";
 
 const StringOrNumberSchema = z.union([z.string(), z.number()]);
+const OptionalRefreshSchedulingTimestampSchema = z.unknown().optional();
 
 const OpenAiDeviceAuthorizationStartResponseSchema = z
   .object({
@@ -47,7 +48,7 @@ const OpenAiTokenExchangeResponseSchema = z
     access_token: z.string().min(1),
     refresh_token: z.string().min(1),
     expires_in: StringOrNumberSchema.optional(),
-    earliest_refresh_at: z.string().min(1).optional(),
+    earliest_refresh_at: OptionalRefreshSchedulingTimestampSchema,
   })
   .loose();
 
@@ -57,14 +58,14 @@ const OpenAiRefreshResponseSchema = z
     access_token: z.string().min(1).optional(),
     refresh_token: z.string().min(1).optional(),
     expires_in: StringOrNumberSchema.optional(),
-    earliest_refresh_at: z.string().min(1).optional(),
+    earliest_refresh_at: OptionalRefreshSchedulingTimestampSchema,
   })
   .loose();
 
 const OpenAiRefreshSchedulingResponseSchema = z
   .object({
     expires_in: StringOrNumberSchema.optional(),
-    earliest_refresh_at: z.string().min(1).optional(),
+    earliest_refresh_at: OptionalRefreshSchedulingTimestampSchema,
   })
   .loose();
 
@@ -95,6 +96,21 @@ function parsePositiveInteger(input: string | number): number {
   }
 
   return value;
+}
+
+function resolveOpenAiEarliestRefreshAt(input: unknown): Date | undefined {
+  if (typeof input === "string" && input.trim().length > 0) {
+    const parsedDate = new Date(input);
+    return Number.isNaN(parsedDate.getTime()) ? undefined : parsedDate;
+  }
+
+  if (typeof input === "number" && Number.isFinite(input)) {
+    const epochMilliseconds = input >= 1_000_000_000_000 ? input : input * 1_000;
+    const parsedDate = new Date(epochMilliseconds);
+    return Number.isNaN(parsedDate.getTime()) ? undefined : parsedDate;
+  }
+
+  return undefined;
 }
 
 function resolveOpenAiAuthBaseUrl(targetConfig: OpenAiApiKeyTargetConfig): string {
@@ -687,8 +703,8 @@ export const OpenAiDeviceAuthorizationOAuth2Capability: IntegrationOAuth2Authori
 
     const response = parsedResponse.data;
     if (response.earliest_refresh_at !== undefined) {
-      const nextRefreshAt = new Date(response.earliest_refresh_at);
-      if (Number.isNaN(nextRefreshAt.getTime())) {
+      const nextRefreshAt = resolveOpenAiEarliestRefreshAt(response.earliest_refresh_at);
+      if (nextRefreshAt === undefined) {
         input.logger?.warn(
           {
             earliestRefreshAt: response.earliest_refresh_at,
