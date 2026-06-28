@@ -23,6 +23,7 @@ import type { GatewayDrainRegistry } from "../runtime/gateway-drain-registry.js"
 import type { GatewayForwardingReadiness } from "../runtime/gateway-forwarding-readiness.js";
 import type { GatewayLifecycle } from "../runtime/gateway-lifecycle.js";
 import type { DataPlaneGatewayApp } from "../types.js";
+import { normalizeWebSocketCloseReason } from "../websocket-close.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import type { SandboxOperationIngressService } from "./operation-ingress/index.js";
@@ -469,7 +470,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                     },
                     error.message,
                   );
-                  ws.close(CloseCodes.PROTOCOL_ERROR, error.message);
+                  ws.close(CloseCodes.PROTOCOL_ERROR, normalizeWebSocketCloseReason(error.message));
                   return;
                 }
 
@@ -670,7 +671,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 reason: error.message,
               });
             }
-            ws.close(CloseCodes.INTERNAL_ERROR, error.message);
+            ws.close(CloseCodes.INTERNAL_ERROR, normalizeWebSocketCloseReason(error.message));
           },
         };
       },

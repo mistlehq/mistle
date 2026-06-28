@@ -1,4 +1,5 @@
-const MaxWebSocketCloseReasonBytes = 123;
+import { normalizeWebSocketCloseReason } from "../websocket-close.js";
+
 const InternalErrorCloseCode = 1011;
 
 export function normalizeForwardedDirectEgressWebSocketCloseCode(closeCode: number): number {
@@ -10,18 +11,5 @@ export function normalizeForwardedDirectEgressWebSocketCloseCode(closeCode: numb
 }
 
 export function normalizeForwardedDirectEgressWebSocketCloseReason(closeReason: string): string {
-  let normalized = "";
-  let normalizedBytes = 0;
-
-  for (const character of closeReason) {
-    const characterBytes = Buffer.byteLength(character);
-    if (normalizedBytes + characterBytes > MaxWebSocketCloseReasonBytes) {
-      return normalized;
-    }
-
-    normalized += character;
-    normalizedBytes += characterBytes;
-  }
-
-  return normalized;
+  return normalizeWebSocketCloseReason(closeReason);
 }

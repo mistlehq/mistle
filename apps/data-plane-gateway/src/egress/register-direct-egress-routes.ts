@@ -215,7 +215,9 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
               });
               ws.close(
                 WebSocketCloseCodes.POLICY_VIOLATION,
-                error instanceof Error ? error.message : String(error),
+                normalizeForwardedDirectEgressWebSocketCloseReason(
+                  error instanceof Error ? error.message : String(error),
+                ),
               );
             });
         },
@@ -359,7 +361,10 @@ function connectUpstreamWebSocket(input: {
       upstreamUrl: input.upstreamUrl,
     });
     if (input.client.readyState === WebSocket.OPEN) {
-      input.client.close(WebSocketCloseCodes.INTERNAL_ERROR, error.message);
+      input.client.close(
+        WebSocketCloseCodes.INTERNAL_ERROR,
+        normalizeForwardedDirectEgressWebSocketCloseReason(error.message),
+      );
     }
   });
 
