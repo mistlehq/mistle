@@ -333,7 +333,7 @@ function GitHubCreatePageStory(): React.JSX.Element {
       handlers={GitHubStoryControlPlaneHandlers}
       initialEntries={["/integrations/github-cloud/add"]}
       queryClient={queryClient}
-      routeKind="create"
+      routeKind="create-and-setup"
     />
   );
 }

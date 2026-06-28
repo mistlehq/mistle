@@ -352,7 +352,7 @@ function SlackCreatePageStory(): React.JSX.Element {
       handlers={SlackStoryControlPlaneHandlers}
       initialEntries={["/integrations/slack-default/add"]}
       queryClient={queryClient}
-      routeKind="create"
+      routeKind="create-and-setup"
     />
   );
 }

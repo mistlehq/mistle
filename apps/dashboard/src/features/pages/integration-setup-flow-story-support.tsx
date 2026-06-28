@@ -261,7 +261,7 @@ export function IntegrationSetupRouteStory(input: {
   handlers?: readonly IntegrationStoryControlPlaneHandler[];
   initialEntries: IntegrationStoryInitialEntries;
   queryClient: QueryClient;
-  routeKind: "create" | "create-and-detail" | "detail" | "setup";
+  routeKind: "create" | "create-and-detail" | "create-and-setup" | "detail" | "setup";
 }): React.JSX.Element {
   const [router] = useState(() =>
     createMemoryRouter(
@@ -272,14 +272,16 @@ export function IntegrationSetupRouteStory(input: {
               {input.routeKind === "detail" || input.routeKind === "create-and-detail" ? (
                 <Route element={<IntegrationsPage />} index />
               ) : null}
-              {input.routeKind === "create" || input.routeKind === "create-and-detail" ? (
+              {input.routeKind === "create" ||
+              input.routeKind === "create-and-detail" ||
+              input.routeKind === "create-and-setup" ? (
                 <Route
                   element={<IntegrationConnectionCreatePage />}
                   handle={ROUTE_HANDLES.integrationCreate}
                   path="add"
                 />
               ) : null}
-              {input.routeKind === "setup" ? (
+              {input.routeKind === "setup" || input.routeKind === "create-and-setup" ? (
                 <Route
                   element={<IntegrationConnectionSetupPage />}
                   handle={ROUTE_HANDLES.integrationSetup}
