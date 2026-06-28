@@ -75,6 +75,51 @@ export type WebhookTriggerPayloadReference = {
   description: string;
 };
 
+export type WebhookTriggerEventActorResourceReference = {
+  resourceKind: string;
+  externalIdPayloadPath?: string[];
+  handlePayloadPath?: string[];
+  when?: {
+    payloadPath: string[];
+    equals: string;
+  };
+};
+
+export type WebhookTriggerEventActorDefinition = {
+  resourceReferences: readonly WebhookTriggerEventActorResourceReference[];
+};
+
+export type WebhookTriggerActorResourceAttributeDefinition = {
+  key: string;
+  valueType: "boolean" | "number" | "string";
+  displayName?: string;
+  description?: string;
+  actorPolicyEligible?: boolean;
+};
+
+export type WebhookTriggerActorResourceDefinition = {
+  kind: string;
+  selectionMode: "single" | "multi";
+  bindingField: string;
+  displayNameSingular: string;
+  displayNamePlural: string;
+  description?: string;
+  attributeDefinitions?: readonly WebhookTriggerActorResourceAttributeDefinition[];
+};
+
+export type WebhookTriggerActorResourceRelationshipDefinition = {
+  relationshipKind: string;
+  subjectResourceKind: string;
+  objectResourceKind: string;
+  displayName?: string;
+  description?: string;
+  scopeDefinitions: readonly {
+    scopeKind: string;
+    displayName?: string;
+    description?: string;
+  }[];
+};
+
 export type WebhookTriggerEventOption = {
   id: string;
   eventType: string;
@@ -91,6 +136,9 @@ export type WebhookTriggerEventOption = {
   parameters?: readonly WebhookTriggerEventParameterOption[];
   parameterGroups?: readonly WebhookTriggerEventParameterGroup[];
   requirements?: IntegrationWebhookTriggerRequirements;
+  actor?: WebhookTriggerEventActorDefinition;
+  resourceDefinitions?: readonly WebhookTriggerActorResourceDefinition[];
+  resourceRelationshipDefinitions?: readonly WebhookTriggerActorResourceRelationshipDefinition[];
 };
 
 export const WebhookTriggerEventParameterRuleOperators = {

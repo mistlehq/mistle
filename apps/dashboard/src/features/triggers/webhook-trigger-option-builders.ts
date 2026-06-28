@@ -95,6 +95,8 @@ export function resolveWebhookTriggerEventOptionIdFromConditionId(conditionId: s
 
 export function createWebhookTriggerEventOption(input: {
   eventDefinition: IntegrationWebhookEventDefinition;
+  resourceDefinitions?: IntegrationTarget["resourceDefinitions"];
+  resourceRelationshipDefinitions?: IntegrationTarget["resourceRelationshipDefinitions"];
   webhookSourceId: string;
   connectionId: string;
   connectionLabel: string;
@@ -144,6 +146,90 @@ export function createWebhookTriggerEventOption(input: {
     ...(input.eventDefinition.requirements === undefined
       ? {}
       : { requirements: input.eventDefinition.requirements }),
+    ...(input.eventDefinition.actor === undefined
+      ? {}
+      : {
+          actor: {
+            resourceReferences: input.eventDefinition.actor.resourceReferences.map(
+              (resourceReference) => ({
+                resourceKind: resourceReference.resourceKind,
+                ...(resourceReference.externalIdPayloadPath === undefined
+                  ? {}
+                  : { externalIdPayloadPath: [...resourceReference.externalIdPayloadPath] }),
+                ...(resourceReference.handlePayloadPath === undefined
+                  ? {}
+                  : { handlePayloadPath: [...resourceReference.handlePayloadPath] }),
+                ...(resourceReference.when === undefined
+                  ? {}
+                  : {
+                      when: {
+                        payloadPath: [...resourceReference.when.payloadPath],
+                        equals: resourceReference.when.equals,
+                      },
+                    }),
+              }),
+            ),
+          },
+        }),
+    ...(input.resourceDefinitions === undefined
+      ? {}
+      : {
+          resourceDefinitions: input.resourceDefinitions.map((definition) => ({
+            kind: definition.kind,
+            selectionMode: definition.selectionMode,
+            bindingField: definition.bindingField,
+            displayNameSingular: definition.displayNameSingular,
+            displayNamePlural: definition.displayNamePlural,
+            ...(definition.description === undefined
+              ? {}
+              : { description: definition.description }),
+            ...(definition.attributeDefinitions === undefined
+              ? {}
+              : {
+                  attributeDefinitions: definition.attributeDefinitions.map(
+                    (attributeDefinition) => ({
+                      key: attributeDefinition.key,
+                      valueType: attributeDefinition.valueType,
+                      ...(attributeDefinition.displayName === undefined
+                        ? {}
+                        : { displayName: attributeDefinition.displayName }),
+                      ...(attributeDefinition.description === undefined
+                        ? {}
+                        : { description: attributeDefinition.description }),
+                      ...(attributeDefinition.actorPolicyEligible === undefined
+                        ? {}
+                        : { actorPolicyEligible: attributeDefinition.actorPolicyEligible }),
+                    }),
+                  ),
+                }),
+          })),
+        }),
+    ...(input.resourceRelationshipDefinitions === undefined
+      ? {}
+      : {
+          resourceRelationshipDefinitions: input.resourceRelationshipDefinitions.map(
+            (definition) => ({
+              relationshipKind: definition.relationshipKind,
+              subjectResourceKind: definition.subjectResourceKind,
+              objectResourceKind: definition.objectResourceKind,
+              ...(definition.displayName === undefined
+                ? {}
+                : { displayName: definition.displayName }),
+              ...(definition.description === undefined
+                ? {}
+                : { description: definition.description }),
+              scopeDefinitions: definition.scopeDefinitions.map((scopeDefinition) => ({
+                scopeKind: scopeDefinition.scopeKind,
+                ...(scopeDefinition.displayName === undefined
+                  ? {}
+                  : { displayName: scopeDefinition.displayName }),
+                ...(scopeDefinition.description === undefined
+                  ? {}
+                  : { description: scopeDefinition.description }),
+              })),
+            }),
+          ),
+        }),
     ...(category === undefined ? {} : { category }),
     ...(input.eventDefinition.parameters === undefined
       ? {}
@@ -475,6 +561,8 @@ function buildSelectableWebhookTriggerEventOptions(input: {
         supportedEventOptions.push(
           createWebhookTriggerEventOption({
             eventDefinition,
+            resourceDefinitions: target.resourceDefinitions,
+            resourceRelationshipDefinitions: target.resourceRelationshipDefinitions,
             webhookSourceId: source.id,
             connectionId: connection.id,
             connectionLabel: formatWebhookTriggerEventGroupLabel({

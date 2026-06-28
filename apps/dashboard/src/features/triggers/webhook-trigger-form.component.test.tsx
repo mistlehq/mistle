@@ -2,9 +2,11 @@
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import type { TriggerFormShellStatusMessage } from "./trigger-form-shell.js";
 import type { WebhookTriggerEventPickerDisabledState } from "./webhook-trigger-event-picker-state.js";
 import {
@@ -36,6 +38,32 @@ const ConnectionOptions: readonly WebhookTriggerFormOption[] = [
     value: GitHubConnectionId,
     label: GitHubConnectionLabel,
     description: "github-cloud",
+  },
+];
+
+const Connections: readonly IntegrationConnection[] = [
+  {
+    id: GitHubConnectionId,
+    targetKey: "github-cloud",
+    displayName: GitHubConnectionLabel,
+    status: "active",
+    resources: [
+      {
+        kind: "user",
+        selectionMode: "multi",
+        count: 2,
+        syncState: "ready",
+        lastSyncedAt: "2026-06-28T00:00:00.000Z",
+      },
+      {
+        kind: "bot",
+        selectionMode: "multi",
+        count: 1,
+        syncState: "ready",
+      },
+    ],
+    createdAt: "2026-06-28T00:00:00.000Z",
+    updatedAt: "2026-06-28T00:00:00.000Z",
   },
 ];
 
@@ -139,6 +167,7 @@ describe("WebhookTriggerForm", () => {
     triggerPickerDisabledState?: WebhookTriggerEventPickerDisabledState | null;
     sandboxProfileStatusMessage?: TriggerFormShellStatusMessage | undefined;
     webhookEventOptions?: typeof WebhookEventOptions;
+    connections?: readonly IntegrationConnection[];
     fieldErrors?: WebhookTriggerFormFieldErrors;
     primaryRepositoryOptions?: readonly WebhookTriggerFormOption[];
     onDelete?: () => void;
@@ -147,7 +176,12 @@ describe("WebhookTriggerForm", () => {
     onViewActivity?: () => void;
     onValueChange?: (
       key: keyof WebhookTriggerFormValues,
-      value: string | boolean | string[] | WebhookTriggerEventParameterRuleMap,
+      value:
+        | string
+        | boolean
+        | string[]
+        | WebhookTriggerFormValues["eventActorPolicies"]
+        | WebhookTriggerEventParameterRuleMap,
     ) => void;
   };
 
@@ -156,6 +190,7 @@ describe("WebhookTriggerForm", () => {
       <QueryClientProvider client={TestQueryClient}>
         <WebhookTriggerForm
           connectionOptions={ConnectionOptions}
+          connections={input.connections ?? Connections}
           fieldErrors={input.fieldErrors ?? {}}
           formError={null}
           validationSummaryError={null}
@@ -233,6 +268,685 @@ describe("WebhookTriggerForm", () => {
     }
 
     expect(within(groupingFieldCandidate).getByRole("combobox")).toBeDefined();
+  });
+
+  it("shows actor policy controls for events with provider actor metadata", () => {
+    const eventOption = createGithubIssueCommentCreatedEventOption({
+      actor: {
+        resourceReferences: [
+          {
+            resourceKind: "user",
+            handlePayloadPath: ["sender", "login"],
+          },
+        ],
+      },
+      resourceDefinitions: [
+        {
+          kind: "user",
+          selectionMode: "multi",
+          bindingField: "users",
+          displayNameSingular: "user",
+          displayNamePlural: "users",
+          attributeDefinitions: [
+            {
+              key: "is_bot",
+              valueType: "boolean",
+              displayName: "Bot user",
+              actorPolicyEligible: true,
+            },
+          ],
+        },
+      ],
+      resourceRelationshipDefinitions: [
+        {
+          relationshipKind: "belongs_to",
+          subjectResourceKind: "user",
+          objectResourceKind: "team",
+          displayName: "Team members",
+          scopeDefinitions: [
+            {
+              scopeKind: "team",
+            },
+          ],
+        },
+      ],
+    });
+    const conditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: eventOption.id,
+      index: 0,
+    });
+
+    renderFormWithOptions({
+      mode: "create",
+      values: buildFormValues({
+        eventIds: [conditionId],
+        eventParameterRules: {
+          [conditionId]: {},
+        },
+      }),
+      webhookEventOptions: [eventOption],
+    });
+
+    expect(screen.getByText("Allowed actors")).toBeDefined();
+    expect(screen.getByText("GitHub Engineering")).toBeDefined();
+    expect(
+      screen.getByText(
+        "Group actor policies need resource sync readiness before they can be selected.",
+      ),
+    ).toBeDefined();
+  });
+
+  it("writes relationship actor policies for synced actor sets", () => {
+    const eventOption = createGithubIssueCommentCreatedEventOption({
+      actor: {
+        resourceReferences: [
+          {
+            resourceKind: "user",
+            handlePayloadPath: ["sender", "login"],
+          },
+        ],
+      },
+      resourceDefinitions: [
+        {
+          kind: "user",
+          selectionMode: "multi",
+          bindingField: "users",
+          displayNameSingular: "user",
+          displayNamePlural: "users",
+        },
+        {
+          kind: "team",
+          selectionMode: "multi",
+          bindingField: "teams",
+          displayNameSingular: "team",
+          displayNamePlural: "teams",
+        },
+      ],
+      resourceRelationshipDefinitions: [
+        {
+          relationshipKind: "belongs_to",
+          subjectResourceKind: "user",
+          objectResourceKind: "team",
+          displayName: "Team members",
+          scopeDefinitions: [
+            {
+              scopeKind: "team",
+            },
+          ],
+        },
+      ],
+    });
+    const conditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: eventOption.id,
+      index: 0,
+    });
+    let changedKey: keyof WebhookTriggerFormValues | null = null;
+    let changedValue: unknown;
+    TestQueryClient.setQueryData(["trigger-actor-policy-resources", GitHubConnectionId, "team"], {
+      connectionId: GitHubConnectionId,
+      familyId: "github",
+      kind: "team",
+      syncState: "ready",
+      items: [
+        {
+          id: "team-platform",
+          familyId: "github",
+          kind: "team",
+          externalId: "100",
+          handle: "mistle/platform",
+          displayName: "Platform",
+          status: "accessible",
+          metadata: {},
+        },
+      ],
+    });
+
+    renderFormWithOptions({
+      mode: "create",
+      onValueChange: (key, value) => {
+        changedKey = key;
+        changedValue = value;
+      },
+      values: buildFormValues({
+        eventIds: [conditionId],
+        eventActorPolicies: {
+          [conditionId]: {
+            anyOf: [
+              {
+                kind: "resource",
+                actor: {
+                  resourceKind: "user",
+                  resourceId: "user-alice",
+                },
+              },
+            ],
+          },
+        },
+        eventParameterRules: {
+          [conditionId]: {},
+        },
+      }),
+      webhookEventOptions: [eventOption],
+      connections: [
+        {
+          id: GitHubConnectionId,
+          targetKey: "github-cloud",
+          displayName: GitHubConnectionLabel,
+          status: "active",
+          resources: [
+            {
+              kind: "user",
+              selectionMode: "multi",
+              count: 2,
+              syncState: "ready",
+            },
+            {
+              kind: "team",
+              selectionMode: "multi",
+              count: 1,
+              syncState: "ready",
+            },
+          ],
+          createdAt: "2026-06-28T00:00:00.000Z",
+          updatedAt: "2026-06-28T00:00:00.000Z",
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Allowed actors" }));
+    const groupOption = screen.getByRole("option", { name: "Group or set" });
+    expect(groupOption.getAttribute("data-disabled")).toBeNull();
+    fireEvent.mouseMove(groupOption);
+    fireEvent.mouseDown(groupOption, { button: 0 });
+    fireEvent.mouseUp(groupOption, { button: 0 });
+    fireEvent.click(groupOption, { button: 0 });
+
+    expect(changedKey).toBe("eventActorPolicies");
+    expect(changedValue).toEqual({});
+
+    fireEvent.click(screen.getByText("Select group"));
+    const platformOption = screen.getByRole("option", { name: "Platformmistle/platform" });
+    fireEvent.mouseMove(platformOption);
+    fireEvent.mouseDown(platformOption, { button: 0 });
+    fireEvent.mouseUp(platformOption, { button: 0 });
+    fireEvent.click(platformOption, { button: 0 });
+
+    expect(changedKey).toBe("eventActorPolicies");
+    expect(changedValue).toEqual({
+      [conditionId]: {
+        anyOf: [
+          {
+            kind: "relationship",
+            relationshipKind: "belongs_to",
+            actorSet: {
+              resourceKind: "team",
+              resourceId: "team-platform",
+            },
+            scope: {
+              resourceKind: "team",
+              resourceId: "team-platform",
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it("keeps the group picker open while replacing an existing relationship policy", () => {
+    const eventOption = createGithubIssueCommentCreatedEventOption({
+      actor: {
+        resourceReferences: [
+          {
+            resourceKind: "user",
+            handlePayloadPath: ["sender", "login"],
+          },
+        ],
+      },
+      resourceDefinitions: [
+        {
+          kind: "user",
+          selectionMode: "multi",
+          bindingField: "users",
+          displayNameSingular: "user",
+          displayNamePlural: "users",
+        },
+        {
+          kind: "organization",
+          selectionMode: "multi",
+          bindingField: "organizations",
+          displayNameSingular: "organization",
+          displayNamePlural: "organizations",
+        },
+        {
+          kind: "team",
+          selectionMode: "multi",
+          bindingField: "teams",
+          displayNameSingular: "team",
+          displayNamePlural: "teams",
+        },
+      ],
+      resourceRelationshipDefinitions: [
+        {
+          relationshipKind: "belongs_to",
+          subjectResourceKind: "user",
+          objectResourceKind: "organization",
+          displayName: "Organization members",
+          scopeDefinitions: [
+            {
+              scopeKind: "organization",
+            },
+          ],
+        },
+        {
+          relationshipKind: "belongs_to",
+          subjectResourceKind: "user",
+          objectResourceKind: "team",
+          displayName: "Team members",
+          scopeDefinitions: [
+            {
+              scopeKind: "team",
+            },
+          ],
+        },
+      ],
+    });
+    const conditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: eventOption.id,
+      index: 0,
+    });
+    const initialValues = buildFormValues({
+      eventIds: [conditionId],
+      eventActorPolicies: {
+        [conditionId]: {
+          anyOf: [
+            {
+              kind: "relationship",
+              relationshipKind: "belongs_to",
+              actorSet: {
+                resourceKind: "team",
+                resourceId: "team-platform",
+              },
+              scope: {
+                resourceKind: "team",
+                resourceId: "team-platform",
+              },
+            },
+          ],
+        },
+      },
+      eventParameterRules: {
+        [conditionId]: {},
+      },
+    });
+    let latestValues = initialValues;
+
+    function isActorPolicyMap(
+      value: Parameters<NonNullable<RenderFormOptions["onValueChange"]>>[1],
+    ): value is NonNullable<WebhookTriggerFormValues["eventActorPolicies"]> {
+      if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        return false;
+      }
+
+      return Object.values(value).every(
+        (policy) => typeof policy === "object" && policy !== null && "anyOf" in policy,
+      );
+    }
+
+    TestQueryClient.setQueryData(
+      ["trigger-actor-policy-resources", GitHubConnectionId, "organization"],
+      {
+        connectionId: GitHubConnectionId,
+        familyId: "github",
+        kind: "organization",
+        syncState: "ready",
+        items: [
+          {
+            id: "organization-mistle",
+            familyId: "github",
+            kind: "organization",
+            externalId: "200",
+            handle: "mistlehq",
+            displayName: "Mistle",
+            status: "accessible",
+            metadata: {},
+          },
+        ],
+      },
+    );
+    TestQueryClient.setQueryData(["trigger-actor-policy-resources", GitHubConnectionId, "team"], {
+      connectionId: GitHubConnectionId,
+      familyId: "github",
+      kind: "team",
+      syncState: "ready",
+      items: [
+        {
+          id: "team-platform",
+          familyId: "github",
+          kind: "team",
+          externalId: "100",
+          handle: "mistle/platform",
+          displayName: "Platform",
+          status: "accessible",
+          metadata: {},
+        },
+      ],
+    });
+
+    function ControlledForm(): React.JSX.Element {
+      const [values, setValues] = useState(initialValues);
+      latestValues = values;
+
+      return createFormElement({
+        mode: "create",
+        onValueChange: (key, value) => {
+          if (key !== "eventActorPolicies") {
+            return;
+          }
+          if (!isActorPolicyMap(value)) {
+            throw new Error("Expected actor policy map update.");
+          }
+
+          setValues((currentValues) => ({
+            ...currentValues,
+            eventActorPolicies: value,
+          }));
+        },
+        values,
+        webhookEventOptions: [eventOption],
+        connections: [
+          {
+            id: GitHubConnectionId,
+            targetKey: "github-cloud",
+            displayName: GitHubConnectionLabel,
+            status: "active",
+            resources: [
+              {
+                kind: "user",
+                selectionMode: "multi",
+                count: 2,
+                syncState: "ready",
+              },
+              {
+                kind: "organization",
+                selectionMode: "multi",
+                count: 1,
+                syncState: "ready",
+              },
+              {
+                kind: "team",
+                selectionMode: "multi",
+                count: 1,
+                syncState: "ready",
+              },
+            ],
+            createdAt: "2026-06-28T00:00:00.000Z",
+            updatedAt: "2026-06-28T00:00:00.000Z",
+          },
+        ],
+      });
+    }
+
+    render(<ControlledForm />);
+
+    fireEvent.click(screen.getByText("Team members"));
+    const organizationMembersOption = screen.getByRole("option", {
+      name: "Organization members1 synced.",
+    });
+    fireEvent.mouseMove(organizationMembersOption);
+    fireEvent.mouseDown(organizationMembersOption, { button: 0 });
+    fireEvent.mouseUp(organizationMembersOption, { button: 0 });
+    fireEvent.click(organizationMembersOption, { button: 0 });
+
+    expect(screen.getByText("Select group")).toBeDefined();
+
+    fireEvent.click(screen.getByText("Select group"));
+    const organizationOption = screen.getByRole("option", { name: "Mistlemistlehq" });
+    fireEvent.mouseMove(organizationOption);
+    fireEvent.mouseDown(organizationOption, { button: 0 });
+    fireEvent.mouseUp(organizationOption, { button: 0 });
+    fireEvent.click(organizationOption, { button: 0 });
+
+    expect(latestValues.eventActorPolicies).toEqual({
+      [conditionId]: {
+        anyOf: [
+          {
+            kind: "relationship",
+            relationshipKind: "belongs_to",
+            actorSet: {
+              resourceKind: "organization",
+              resourceId: "organization-mistle",
+            },
+            scope: {
+              resourceKind: "organization",
+              resourceId: "organization-mistle",
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it("writes actor type policies without changing payload parameter rules", () => {
+    const eventOption = createGithubIssueCommentCreatedEventOption({
+      actor: {
+        resourceReferences: [
+          {
+            resourceKind: "user",
+            handlePayloadPath: ["sender", "login"],
+          },
+        ],
+      },
+      resourceDefinitions: [
+        {
+          kind: "user",
+          selectionMode: "multi",
+          bindingField: "users",
+          displayNameSingular: "user",
+          displayNamePlural: "users",
+          attributeDefinitions: [
+            {
+              key: "is_bot",
+              valueType: "boolean",
+              displayName: "Bot user",
+              actorPolicyEligible: true,
+            },
+          ],
+        },
+      ],
+    });
+    const conditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: eventOption.id,
+      index: 0,
+    });
+    let changedKey: keyof WebhookTriggerFormValues | null = null;
+    let changedValue: unknown;
+
+    renderFormWithOptions({
+      mode: "create",
+      onValueChange: (key, value) => {
+        changedKey = key;
+        changedValue = value;
+      },
+      values: buildFormValues({
+        eventIds: [conditionId],
+        eventParameterRules: {
+          [conditionId]: {},
+        },
+      }),
+      webhookEventOptions: [eventOption],
+    });
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Allowed actors" }));
+    const actorTypeOption = screen.getByRole("option", { name: "Actor type" });
+    fireEvent.mouseMove(actorTypeOption);
+    fireEvent.mouseDown(actorTypeOption, { button: 0 });
+    fireEvent.mouseUp(actorTypeOption, { button: 0 });
+    fireEvent.click(actorTypeOption, { button: 0 });
+
+    expect(changedKey).toBe("eventActorPolicies");
+    expect(changedValue).toEqual({
+      [conditionId]: {
+        anyOf: [
+          {
+            kind: "attribute",
+            attributeKey: "is_bot",
+            attributeValue: "true",
+            valueType: "boolean",
+          },
+        ],
+      },
+    });
+  });
+
+  it("clears stale actor policies when opening the specific actor picker", () => {
+    const eventOption = createGithubIssueCommentCreatedEventOption({
+      actor: {
+        resourceReferences: [
+          {
+            resourceKind: "user",
+            handlePayloadPath: ["sender", "login"],
+          },
+        ],
+      },
+      resourceDefinitions: [
+        {
+          kind: "user",
+          selectionMode: "multi",
+          bindingField: "users",
+          displayNameSingular: "user",
+          displayNamePlural: "users",
+          attributeDefinitions: [
+            {
+              key: "is_bot",
+              valueType: "boolean",
+              displayName: "Bot user",
+              actorPolicyEligible: true,
+            },
+          ],
+        },
+      ],
+    });
+    const conditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: eventOption.id,
+      index: 0,
+    });
+    let changedKey: keyof WebhookTriggerFormValues | null = null;
+    let changedValue: unknown;
+
+    renderFormWithOptions({
+      mode: "create",
+      onValueChange: (key, value) => {
+        changedKey = key;
+        changedValue = value;
+      },
+      values: buildFormValues({
+        eventIds: [conditionId],
+        eventActorPolicies: {
+          [conditionId]: {
+            anyOf: [
+              {
+                kind: "attribute",
+                attributeKey: "is_bot",
+                attributeValue: "true",
+                valueType: "boolean",
+              },
+            ],
+          },
+        },
+        eventParameterRules: {
+          [conditionId]: {},
+        },
+      }),
+      webhookEventOptions: [eventOption],
+    });
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Allowed actors" }));
+    const specificActorOption = screen.getByRole("option", { name: "Specific actor" });
+    fireEvent.mouseMove(specificActorOption);
+    fireEvent.mouseDown(specificActorOption, { button: 0 });
+    fireEvent.mouseUp(specificActorOption, { button: 0 });
+    fireEvent.click(specificActorOption, { button: 0 });
+
+    expect(changedKey).toBe("eventActorPolicies");
+    expect(changedValue).toEqual({});
+  });
+
+  it("blocks actor type policies until actor resource attributes are synced", () => {
+    const eventOption = createGithubIssueCommentCreatedEventOption({
+      actor: {
+        resourceReferences: [
+          {
+            resourceKind: "user",
+            handlePayloadPath: ["sender", "login"],
+          },
+        ],
+      },
+      resourceDefinitions: [
+        {
+          kind: "user",
+          selectionMode: "multi",
+          bindingField: "users",
+          displayNameSingular: "user",
+          displayNamePlural: "users",
+          attributeDefinitions: [
+            {
+              key: "is_bot",
+              valueType: "boolean",
+              displayName: "Bot user",
+              actorPolicyEligible: true,
+            },
+          ],
+        },
+      ],
+    });
+    const conditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: eventOption.id,
+      index: 0,
+    });
+    let changeCount = 0;
+
+    renderFormWithOptions({
+      mode: "create",
+      onValueChange: () => {
+        changeCount += 1;
+      },
+      values: buildFormValues({
+        eventIds: [conditionId],
+        eventParameterRules: {
+          [conditionId]: {},
+        },
+      }),
+      webhookEventOptions: [eventOption],
+      connections: [
+        {
+          id: GitHubConnectionId,
+          targetKey: "github-cloud",
+          displayName: GitHubConnectionLabel,
+          status: "active",
+          resources: [
+            {
+              kind: "user",
+              selectionMode: "multi",
+              count: 0,
+              syncState: "never-synced",
+            },
+          ],
+          createdAt: "2026-06-28T00:00:00.000Z",
+          updatedAt: "2026-06-28T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(
+      screen.getByText("Actor type policies need actor resource sync to be ready."),
+    ).toBeDefined();
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Allowed actors" }));
+    const actorTypeOption = screen.getByRole("option", { name: "Actor type" });
+    expect(actorTypeOption.getAttribute("data-disabled")).not.toBeNull();
+
+    fireEvent.click(actorTypeOption, { button: 0 });
+    expect(changeCount).toBe(0);
   });
 
   it("hides conversation grouping when no triggers are selected", () => {
@@ -507,6 +1221,7 @@ describe("WebhookTriggerForm", () => {
       <QueryClientProvider client={TestQueryClient}>
         <WebhookTriggerForm
           connectionOptions={ConnectionOptions}
+          connections={Connections}
           fieldErrors={{
             name: "Trigger name is required.",
             sandboxProfileId: "Select a sandbox profile.",
@@ -633,6 +1348,7 @@ describe("WebhookTriggerForm", () => {
       <QueryClientProvider client={TestQueryClient}>
         <WebhookTriggerForm
           connectionOptions={ConnectionOptions}
+          connections={Connections}
           fieldErrors={{
             name: "Trigger name is required.",
             sandboxProfileId: "Select a sandbox profile.",
@@ -679,6 +1395,7 @@ describe("WebhookTriggerForm", () => {
       <QueryClientProvider client={TestQueryClient}>
         <WebhookTriggerForm
           connectionOptions={ConnectionOptions}
+          connections={Connections}
           fieldErrors={{}}
           formError="The selected events do not support this trigger setup."
           validationSummaryError={null}
@@ -711,6 +1428,7 @@ describe("WebhookTriggerForm", () => {
       <QueryClientProvider client={TestQueryClient}>
         <WebhookTriggerForm
           connectionOptions={ConnectionOptions}
+          connections={Connections}
           fieldErrors={{}}
           formError="Could not duplicate trigger."
           formErrorTitle="Trigger could not be duplicated"

@@ -696,8 +696,11 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
   }
 
   function onWebhookValueChange(
-    key: "conversationKeyTemplate" | "eventIds" | "eventParameterRules",
-    value: string | string[] | WebhookTriggerFormValues["eventParameterRules"],
+    ...[key, value]:
+      | ["conversationKeyTemplate", string]
+      | ["eventActorPolicies", WebhookTriggerFormValues["eventActorPolicies"]]
+      | ["eventIds", string[]]
+      | ["eventParameterRules", WebhookTriggerFormValues["eventParameterRules"]]
   ) {
     setFormValues((currentValues) => {
       if (key === "eventIds") {
@@ -708,12 +711,27 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
         });
       }
 
-      const nextValues = {
-        ...currentValues,
-        [key]: value,
-      };
+      if (key === "eventActorPolicies") {
+        if (value === undefined) {
+          const { eventActorPolicies: _eventActorPolicies, ...valuesWithoutActorPolicies } =
+            currentValues;
+          void _eventActorPolicies;
+
+          return valuesWithoutActorPolicies;
+        }
+
+        return {
+          ...currentValues,
+          eventActorPolicies: value,
+        };
+      }
 
       if (key === "eventParameterRules") {
+        const nextValues = {
+          ...currentValues,
+          eventParameterRules: value,
+        };
+
         return {
           ...nextValues,
           conversationKeyTemplate: resolveNormalizedConversationKeyTemplate({
@@ -722,6 +740,11 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
           }),
         };
       }
+
+      const nextValues = {
+        ...currentValues,
+        [key]: value,
+      };
 
       return nextValues;
     });
@@ -750,6 +773,10 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
         return remainingErrors;
       }
 
+      if (key !== "eventParameterRules") {
+        return currentErrors;
+      }
+
       const { eventParameterRules: _eventParameterRules, ...remainingErrors } = currentErrors;
       const nextEventParameterError =
         currentErrors.eventParameterRules === undefined
@@ -757,10 +784,7 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
           : validateWebhookTriggerFormValues(
               toWebhookValues({
                 ...formValues,
-                eventParameterRules:
-                  typeof value === "string" || Array.isArray(value)
-                    ? formValues.eventParameterRules
-                    : value,
+                eventParameterRules: value,
               }),
               webhookEventOptions,
             ).eventParameterRules;
@@ -880,6 +904,7 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
     primaryRepositoryOptions,
     sandboxProfileStatusMessage,
     connectionOptions: eventPrerequisites.connectionOptions,
+    connections: eventPrerequisites.directoryData?.connections ?? [],
     webhookEventOptions,
     triggerPickerDisabledState: selectedProfileTriggerState.disabledState,
     onKindChange,
@@ -1011,6 +1036,7 @@ export function CreateTriggerEditor(input: CreateTriggerEditorProps): React.JSX.
         ) : (
           <WebhookTriggerTypeSpecificSection
             connectionOptions={state.connectionOptions}
+            connections={state.connections}
             disabled={state.isSaving}
             fieldErrors={state.fieldErrors}
             formState={formState}

@@ -13,6 +13,7 @@ import {
 } from "@mistle/ui";
 import type { ReactNode } from "react";
 
+import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
 import {
@@ -20,6 +21,7 @@ import {
   TriggerFormShell,
   type TriggerFormShellStatusMessage,
 } from "./trigger-form-shell.js";
+import { WebhookTriggerActorPolicyFields } from "./webhook-trigger-actor-policy-fields.js";
 import { type WebhookTriggerEventPickerDisabledState } from "./webhook-trigger-event-picker-state.js";
 import {
   WebhookTriggerEventPicker,
@@ -52,9 +54,10 @@ export type { WebhookTriggerEventOptionAvailability } from "./webhook-trigger-ev
 type WebhookTriggerTypeSpecificSectionProps = {
   values: Pick<
     WebhookTriggerFormValues,
-    "conversationKeyTemplate" | "eventIds" | "eventParameterRules"
+    "conversationKeyTemplate" | "eventActorPolicies" | "eventIds" | "eventParameterRules"
   >;
   connectionOptions: readonly WebhookTriggerFormOption[];
+  connections: readonly IntegrationConnection[];
   webhookEventOptions: readonly WebhookTriggerEventOption[];
   triggerPickerDisabledState: WebhookTriggerEventPickerDisabledState | null;
   disabled: boolean;
@@ -63,11 +66,16 @@ type WebhookTriggerTypeSpecificSectionProps = {
     "conversationKeyTemplate" | "eventIds" | "eventParameterRules"
   >;
   formState: ReturnType<typeof resolveWebhookTriggerFormState>;
-  onValueChange: (
-    key: "conversationKeyTemplate" | "eventIds" | "eventParameterRules",
-    value: string | string[] | WebhookTriggerEventParameterRuleMap,
-  ) => void;
+  onValueChange: WebhookTriggerTypeSpecificValueChangeHandler;
 };
+
+type WebhookTriggerTypeSpecificValueChangeHandler = (
+  ...args:
+    | ["conversationKeyTemplate", string]
+    | ["eventActorPolicies", WebhookTriggerFormValues["eventActorPolicies"]]
+    | ["eventIds", string[]]
+    | ["eventParameterRules", WebhookTriggerEventParameterRuleMap]
+) => void;
 
 type WebhookTriggerInstructionsSectionProps = {
   instructionsLabelId: string;
@@ -80,6 +88,7 @@ type WebhookTriggerFormProps = {
   mode: "create" | "edit";
   values: WebhookTriggerFormValues;
   connectionOptions: readonly WebhookTriggerFormOption[];
+  connections: readonly IntegrationConnection[];
   sandboxProfileOptions: readonly WebhookTriggerFormOption[];
   sandboxProfileStatusMessage?: TriggerFormShellStatusMessage | undefined;
   primaryRepositoryOptions?: readonly WebhookTriggerFormOption[];
@@ -95,7 +104,12 @@ type WebhookTriggerFormProps = {
   triggerTypeField?: ReactNode;
   onValueChange: (
     key: WebhookTriggerFormValueKey,
-    value: string | boolean | string[] | WebhookTriggerEventParameterRuleMap,
+    value:
+      | string
+      | boolean
+      | string[]
+      | WebhookTriggerFormValues["eventActorPolicies"]
+      | WebhookTriggerEventParameterRuleMap,
   ) => void;
   onSubmit: () => void;
   onDuplicate: (() => void) | null;
@@ -165,6 +179,17 @@ export function WebhookTriggerTypeSpecificSection(
           eventParameterRules={input.values.eventParameterRules}
         />
       </div>
+
+      <WebhookTriggerActorPolicyFields
+        connections={input.connections}
+        disabled={input.disabled}
+        eventActorPolicies={input.values.eventActorPolicies}
+        onActorPoliciesChange={(policies) => {
+          input.onValueChange("eventActorPolicies", policies);
+        }}
+        selectedEventIds={input.values.eventIds}
+        webhookEventOptions={input.webhookEventOptions}
+      />
 
       {input.values.eventIds.length === 0 ? null : (
         <div className="p-4">
@@ -325,6 +350,7 @@ export function WebhookTriggerForm(input: WebhookTriggerFormProps): React.JSX.El
       typeSpecificSection={
         <WebhookTriggerTypeSpecificSection
           connectionOptions={input.connectionOptions}
+          connections={input.connections}
           disabled={disabled}
           fieldErrors={input.fieldErrors}
           formState={formState}

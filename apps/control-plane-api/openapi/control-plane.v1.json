@@ -17709,6 +17709,133 @@
                             "required": ["lifecycle", "requiresSourceSelection"],
                             "additionalProperties": false
                           },
+                          "resourceDefinitions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "selectionMode": {
+                                  "type": "string",
+                                  "enum": ["single", "multi"]
+                                },
+                                "bindingField": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "displayNameSingular": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "displayNamePlural": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "description": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "attributeDefinitions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "key": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "valueType": {
+                                        "type": "string",
+                                        "enum": ["boolean", "number", "string"]
+                                      },
+                                      "displayName": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "description": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "actorPolicyEligible": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": ["key", "valueType"],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "selectionMode",
+                                "bindingField",
+                                "displayNameSingular",
+                                "displayNamePlural"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "resourceRelationshipDefinitions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "relationshipKind": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "subjectResourceKind": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "objectResourceKind": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "displayName": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "description": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "scopeDefinitions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "scopeKind": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "displayName": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "description": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["scopeKind"],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 1
+                                }
+                              },
+                              "required": [
+                                "relationshipKind",
+                                "subjectResourceKind",
+                                "objectResourceKind",
+                                "scopeDefinitions"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
                           "supportedWebhookEvents": {
                             "type": "array",
                             "items": {
@@ -18052,6 +18179,63 @@
                                     "required": ["id", "label", "kind", "options"],
                                     "additionalProperties": false
                                   }
+                                },
+                                "actor": {
+                                  "type": "object",
+                                  "properties": {
+                                    "resourceReferences": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "resourceKind": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "externalIdPayloadPath": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "minItems": 1
+                                          },
+                                          "handlePayloadPath": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "minItems": 1
+                                          },
+                                          "when": {
+                                            "type": "object",
+                                            "properties": {
+                                              "payloadPath": {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "minItems": 1
+                                              },
+                                              "equals": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["payloadPath", "equals"],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": ["resourceKind"],
+                                        "additionalProperties": false
+                                      },
+                                      "minItems": 1
+                                    }
+                                  },
+                                  "required": ["resourceReferences"],
+                                  "additionalProperties": false
                                 }
                               },
                               "required": ["eventType", "providerEventType", "displayName"],
