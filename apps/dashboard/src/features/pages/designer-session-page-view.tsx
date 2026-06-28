@@ -1095,26 +1095,24 @@ function DesignerBlueprintInitialFocus(input: {
 }): React.JSX.Element | null {
   const reactFlow = useReactFlow<DesignerBlueprintVisualNode, DesignerBlueprintGraphEdge>();
   const width = useStore((state) => state.width);
-  const graphBounds = useMemo(
-    () => getDesignerBlueprintGraphBounds(input.graph.nodes),
-    [input.graph.nodes],
+  const viewport = useMemo(
+    () =>
+      resolveDesignerBlueprintInitialFocusViewportForNodes({
+        nodes: input.graph.nodes,
+        width,
+      }),
+    [input.graph.nodes, width],
   );
 
   // ReactFlow owns the viewport imperatively; render props and remounting cannot
   // focus the measured canvas once its store reports a usable width.
   useEffect(() => {
-    if (graphBounds === null || width <= 0) {
+    if (viewport === null) {
       return;
     }
 
-    void reactFlow.setViewport(
-      resolveDesignerBlueprintInitialFocusViewport({
-        graphBounds,
-        width,
-      }),
-      { duration: 0 },
-    );
-  }, [graphBounds, reactFlow, width]);
+    void reactFlow.setViewport(viewport, { duration: 0 });
+  }, [reactFlow, viewport]);
 
   return null;
 }
@@ -1513,14 +1511,40 @@ export function resolveDesignerBlueprintInitialFocusViewport(input: {
   };
 }
 
+export function resolveDesignerBlueprintInitialFocusViewportForNodes(input: {
+  nodes: readonly DesignerBlueprintPositionedNode[];
+  width: number;
+}): Viewport | null {
+  if (input.width <= 0) {
+    return null;
+  }
+
+  const graphBounds = getDesignerBlueprintGraphBounds(input.nodes);
+  if (graphBounds === null) {
+    return null;
+  }
+
+  return resolveDesignerBlueprintInitialFocusViewport({
+    graphBounds,
+    width: input.width,
+  });
+}
+
 type DesignerBlueprintGraphBounds = {
   width: number;
   x: number;
   y: number;
 };
 
+type DesignerBlueprintPositionedNode = {
+  position: {
+    x: number;
+    y: number;
+  };
+};
+
 function getDesignerBlueprintGraphBounds(
-  nodes: readonly DesignerBlueprintLayoutNode[],
+  nodes: readonly DesignerBlueprintPositionedNode[],
 ): DesignerBlueprintGraphBounds | null {
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;

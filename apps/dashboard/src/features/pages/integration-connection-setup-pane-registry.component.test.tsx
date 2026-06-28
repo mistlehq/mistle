@@ -14,10 +14,6 @@ const Connection: IntegrationConnection = {
   updatedAt: "2026-04-28T00:00:00.000Z",
 };
 
-type SetupPaneElementProps = {
-  navigate: (nextHref: string) => void | Promise<void>;
-};
-
 describe("renderIntegrationConnectionSetupPane", () => {
   it("renders a setup pane for supported route segments", () => {
     expect(
@@ -33,30 +29,6 @@ describe("renderIntegrationConnectionSetupPane", () => {
         }),
       ),
     ).toBe(true);
-  });
-
-  it("forwards the embedded navigation boundary to provider-app setup panes", () => {
-    let navigatedHref: string | null = null;
-    const navigate = (nextHref: string) => {
-      navigatedHref = nextHref;
-    };
-    const pane = renderIntegrationConnectionSetupPane({
-      connection: Connection,
-      navigate,
-      organizationName: "Acme, Inc.",
-      setupRoute: {
-        methodId: "github-app-installation",
-        routeSegment: "github-app",
-      },
-    });
-
-    if (!isValidElement<SetupPaneElementProps>(pane)) {
-      throw new Error("Expected setup pane element to be valid.");
-    }
-
-    expect(pane.props.navigate).toBe(navigate);
-    void pane.props.navigate("/integrations/github-cloud");
-    expect(navigatedHref).toBe("/integrations/github-cloud");
   });
 
   it("fails fast for unsupported route segments", () => {

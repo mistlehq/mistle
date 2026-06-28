@@ -19,7 +19,7 @@ import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import {
   DesignerCanvasWorkspace,
-  resolveDesignerBlueprintInitialFocusViewport,
+  resolveDesignerBlueprintInitialFocusViewportForNodes,
 } from "./designer-session-page-view.js";
 import { OrganizationIntegrationsSettingsPage } from "./organization-integrations-settings-page.js";
 import type {
@@ -578,9 +578,10 @@ describe("DesignerCanvasWorkspace", () => {
   });
 
   it("keeps completed integration setup visible in a Designer canvas tab", async () => {
-    renderDesignerCanvasWorkspace({
-      activeTabHref:
-        "/integrations/wasenderapi-mcp/icn_wasenderapi_complete/provider-configuration/setup",
+    const setupHref =
+      "/integrations/wasenderapi-mcp/icn_wasenderapi_complete/provider-configuration/setup";
+
+    renderDesignerCanvasRoute({
       configureQueryClient: (queryClient) => {
         queryClient.setQueryDefaults(SETTINGS_INTEGRATIONS_QUERY_KEY, {
           staleTime: Infinity,
@@ -593,19 +594,27 @@ describe("DesignerCanvasWorkspace", () => {
           name: "Acme",
         });
       },
-      tabs: [
-        {
-          kind: "route",
-          id: "wasenderapi-setup",
-          title: "Set up WasenderAPI",
-          href: "/integrations/wasenderapi-mcp/icn_wasenderapi_complete/provider-configuration/setup",
-        },
-      ],
+      element: (
+        <StatefulDesignerCanvasWorkspace
+          initialActiveTabHref={setupHref}
+          initialTabs={[
+            {
+              kind: "route",
+              id: "wasenderapi-setup",
+              title: "Set up WasenderAPI",
+              href: setupHref,
+            },
+          ]}
+        />
+      ),
     });
 
     expect(await screen.findByText("Integration setup complete")).toBeDefined();
-    expect(await screen.findByRole("button", { name: "View connection" })).toBeDefined();
     expect(screen.getByText("Set up WasenderAPI")).toBeDefined();
+    fireEvent.click(await screen.findByRole("button", { name: "View connection" }));
+
+    expect(await screen.findAllByText("WasenderAPI production")).not.toHaveLength(0);
+    expect(screen.getAllByText("Personal access token")).not.toHaveLength(0);
     expect(screen.queryByText("Integrations")).toBeNull();
   });
 
@@ -841,8 +850,15 @@ describe("DesignerCanvasWorkspace", () => {
 
   it("centers the blueprint graph horizontally near the top of the canvas viewport", () => {
     expect(
-      resolveDesignerBlueprintInitialFocusViewport({
-        graphBounds: { x: 120, y: 24, width: 760 },
+      resolveDesignerBlueprintInitialFocusViewportForNodes({
+        nodes: [
+          {
+            position: { x: 120, y: 24 },
+          },
+          {
+            position: { x: 600, y: 180 },
+          },
+        ],
         width: 1000,
       }),
     ).toEqual({
@@ -850,6 +866,19 @@ describe("DesignerCanvasWorkspace", () => {
       y: 33.2,
       zoom: 0.95,
     });
+  });
+
+  it("returns no blueprint viewport before the canvas has a measured width", () => {
+    expect(
+      resolveDesignerBlueprintInitialFocusViewportForNodes({
+        nodes: [
+          {
+            position: { x: 120, y: 24 },
+          },
+        ],
+        width: 0,
+      }),
+    ).toBeNull();
   });
 
   it("resolves integration detail tab titles from the integration directory data", async () => {
