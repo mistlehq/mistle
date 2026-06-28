@@ -4,6 +4,7 @@ import {
   type IntegrationResourceCredentialRef,
   type IntegrationResourceCredentialSelectorInput,
   type IntegrationResourceDefinition,
+  type IntegrationResourceRelationshipDefinition,
   type IntegrationResourceSyncTrigger,
 } from "@mistle/integrations-core";
 
@@ -123,6 +124,39 @@ export function createGitHubResourceDefinitions(input: {
   ];
 }
 
+export function createGitHubResourceRelationshipDefinitions(): ReadonlyArray<IntegrationResourceRelationshipDefinition> {
+  return [
+    {
+      relationshipKind: "belongs_to",
+      subjectResourceKind: "user",
+      objectResourceKind: "org",
+      displayName: "Organization members",
+      description: "GitHub users that belong to a GitHub organization.",
+      scopeDefinitions: [
+        {
+          scopeKind: "org",
+          displayName: "Organization",
+          description: "The GitHub organization whose user membership snapshot is synced.",
+        },
+      ],
+    },
+    {
+      relationshipKind: "belongs_to",
+      subjectResourceKind: "user",
+      objectResourceKind: "team",
+      displayName: "Team members",
+      description: "GitHub users that belong to a GitHub team.",
+      scopeDefinitions: [
+        {
+          scopeKind: "team",
+          displayName: "Team",
+          description: "The GitHub team whose user membership snapshot is synced.",
+        },
+      ],
+    },
+  ];
+}
+
 export const GitHubResourceSyncTriggers: ReadonlyArray<IntegrationResourceSyncTrigger> = [
   {
     eventType: "github.installation_repositories.added",
@@ -146,19 +180,19 @@ export const GitHubResourceSyncTriggers: ReadonlyArray<IntegrationResourceSyncTr
   },
   {
     eventType: "github.membership.added",
-    resourceKinds: ["user"],
+    resourceKinds: ["user", "team"],
   },
   {
     eventType: "github.membership.removed",
-    resourceKinds: ["user"],
+    resourceKinds: ["user", "team"],
   },
   {
     eventType: "github.organization.member_added",
-    resourceKinds: ["user"],
+    resourceKinds: ["user", "org"],
   },
   {
     eventType: "github.organization.member_removed",
-    resourceKinds: ["user"],
+    resourceKinds: ["user", "org"],
   },
   {
     eventType: "github.team.added_to_repository",

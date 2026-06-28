@@ -202,6 +202,36 @@ describe("integrations-definitions server", () => {
         }),
       ]),
     );
+    expect(githubCloudDefinition?.resourceRelationshipDefinitions).toEqual([
+      {
+        relationshipKind: "belongs_to",
+        subjectResourceKind: "user",
+        objectResourceKind: "org",
+        displayName: "Organization members",
+        description: "GitHub users that belong to a GitHub organization.",
+        scopeDefinitions: [
+          {
+            scopeKind: "org",
+            displayName: "Organization",
+            description: "The GitHub organization whose user membership snapshot is synced.",
+          },
+        ],
+      },
+      {
+        relationshipKind: "belongs_to",
+        subjectResourceKind: "user",
+        objectResourceKind: "team",
+        displayName: "Team members",
+        description: "GitHub users that belong to a GitHub team.",
+        scopeDefinitions: [
+          {
+            scopeKind: "team",
+            displayName: "Team",
+            description: "The GitHub team whose user membership snapshot is synced.",
+          },
+        ],
+      },
+    ]);
     expect(githubCloudDefinition?.resourceSyncTriggers).toEqual([
       {
         eventType: "github.installation_repositories.added",
@@ -225,19 +255,19 @@ describe("integrations-definitions server", () => {
       },
       {
         eventType: "github.membership.added",
-        resourceKinds: ["user"],
+        resourceKinds: ["user", "team"],
       },
       {
         eventType: "github.membership.removed",
-        resourceKinds: ["user"],
+        resourceKinds: ["user", "team"],
       },
       {
         eventType: "github.organization.member_added",
-        resourceKinds: ["user"],
+        resourceKinds: ["user", "org"],
       },
       {
         eventType: "github.organization.member_removed",
-        resourceKinds: ["user"],
+        resourceKinds: ["user", "org"],
       },
       {
         eventType: "github.team.added_to_repository",

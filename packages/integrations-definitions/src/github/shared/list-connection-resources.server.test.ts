@@ -120,6 +120,40 @@ describe("listGitHubConnectionResources", () => {
           return;
         }
 
+        // GitHub REST docs: GET /orgs/{org}/members lists organization members visible
+        // to the token. GitHub App installation tokens require Members read permission.
+        // https://docs.github.com/en/rest/orgs/members#list-organization-members
+        if (requestUrl.pathname === "/orgs/acme/members") {
+          response.end(
+            JSON.stringify([
+              {
+                id: 4001,
+                login: "ada",
+                type: "User",
+              },
+            ]),
+          );
+          return;
+        }
+
+        if (requestUrl.pathname === "/orgs/mistle/members") {
+          response.end(
+            JSON.stringify([
+              {
+                id: 4002,
+                login: "alice",
+                type: "User",
+              },
+              {
+                id: 4003,
+                login: "github-actions[bot]",
+                type: "Bot",
+              },
+            ]),
+          );
+          return;
+        }
+
         response.writeHead(404);
         response.end(JSON.stringify({ message: "not found" }));
       },
@@ -175,7 +209,43 @@ describe("listGitHubConnectionResources", () => {
           },
         },
       ]);
-      expect(seenPaths).toEqual(["/installation/repositories?per_page=100&page=1"]);
+      expect(result.relationships).toEqual([
+        {
+          relationshipKind: "belongs_to",
+          subjectResourceKind: "user",
+          subjectExternalId: "4001",
+          subjectHandle: "ada",
+          objectResourceKind: "org",
+          objectExternalId: "2002",
+          objectHandle: "acme",
+          scopeKind: "org",
+          scopeExternalId: "2002",
+          scopeHandle: "acme",
+          metadata: {
+            organizationLogin: "acme",
+          },
+        },
+        {
+          relationshipKind: "belongs_to",
+          subjectResourceKind: "user",
+          subjectExternalId: "4002",
+          subjectHandle: "alice",
+          objectResourceKind: "org",
+          objectExternalId: "2001",
+          objectHandle: "mistle",
+          scopeKind: "org",
+          scopeExternalId: "2001",
+          scopeHandle: "mistle",
+          metadata: {
+            organizationLogin: "mistle",
+          },
+        },
+      ]);
+      expect(seenPaths).toEqual([
+        "/installation/repositories?per_page=100&page=1",
+        "/orgs/acme/members?per_page=100&page=1",
+        "/orgs/mistle/members?per_page=100&page=1",
+      ]);
     } finally {
       await server.stop();
     }
@@ -347,6 +417,45 @@ describe("listGitHubConnectionResources", () => {
           return;
         }
 
+        // GitHub REST docs: GET /orgs/{org}/teams/{team_slug}/members lists members
+        // of a team. GitHub App installation tokens require Members read permission.
+        // https://docs.github.com/en/rest/teams/members#list-team-members
+        if (requestUrl.pathname === "/orgs/acme/teams/platform/members") {
+          response.end(
+            JSON.stringify([
+              {
+                id: 4001,
+                login: "ada",
+                type: "User",
+              },
+            ]),
+          );
+          return;
+        }
+
+        if (requestUrl.pathname === "/orgs/acme/teams/security/members") {
+          response.end(JSON.stringify([]));
+          return;
+        }
+
+        if (requestUrl.pathname === "/orgs/mistle/teams/platform/members") {
+          response.end(
+            JSON.stringify([
+              {
+                id: 4002,
+                login: "alice",
+                type: "User",
+              },
+              {
+                id: 4003,
+                login: "github-actions[bot]",
+                type: "Bot",
+              },
+            ]),
+          );
+          return;
+        }
+
         response.writeHead(404);
         response.end(JSON.stringify({ message: "not found" }));
       },
@@ -415,10 +524,45 @@ describe("listGitHubConnectionResources", () => {
           },
         },
       ]);
+      expect(result.relationships).toEqual([
+        {
+          relationshipKind: "belongs_to",
+          subjectResourceKind: "user",
+          subjectExternalId: "4001",
+          subjectHandle: "ada",
+          objectResourceKind: "team",
+          objectExternalId: "3001",
+          objectHandle: "acme/platform",
+          scopeKind: "team",
+          scopeExternalId: "3001",
+          scopeHandle: "acme/platform",
+          metadata: {
+            teamHandle: "acme/platform",
+          },
+        },
+        {
+          relationshipKind: "belongs_to",
+          subjectResourceKind: "user",
+          subjectExternalId: "4002",
+          subjectHandle: "alice",
+          objectResourceKind: "team",
+          objectExternalId: "2001",
+          objectHandle: "mistle/platform",
+          scopeKind: "team",
+          scopeExternalId: "2001",
+          scopeHandle: "mistle/platform",
+          metadata: {
+            teamHandle: "mistle/platform",
+          },
+        },
+      ]);
       expect(seenPaths).toEqual([
         "/user/repos?affiliation=owner%2Ccollaborator%2Corganization_member&sort=full_name&per_page=100&page=1",
         "/orgs/acme/teams?per_page=100&page=1",
         "/orgs/mistle/teams?per_page=100&page=1",
+        "/orgs/acme/teams/platform/members?per_page=100&page=1",
+        "/orgs/acme/teams/security/members?per_page=100&page=1",
+        "/orgs/mistle/teams/platform/members?per_page=100&page=1",
       ]);
     } finally {
       await server.stop();

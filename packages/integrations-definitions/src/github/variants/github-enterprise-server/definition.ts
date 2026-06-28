@@ -5,6 +5,7 @@ import { listGitHubConnectionResources } from "../../shared/list-connection-reso
 import { GitHubEnterpriseServerProviderAppSetupCapability } from "../../shared/provider-app-setup.server.js";
 import { GitHubAssociatedResourceEventsCapability } from "../../shared/provider-resource-association-webhooks.js";
 import {
+  createGitHubResourceRelationshipDefinitions,
   createGitHubResourceDefinitions,
   GitHubResourceSyncTriggers,
 } from "../../shared/resource-definitions.js";
@@ -32,6 +33,7 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerBaseIntegra
   resourceDefinitions: createGitHubResourceDefinitions({
     apiKeySlotKey: GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_API_KEY,
   }),
+  resourceRelationshipDefinitions: createGitHubResourceRelationshipDefinitions(),
   resourceSyncTriggers: GitHubResourceSyncTriggers,
   listConnectionResources: listGitHubConnectionResources,
 };
