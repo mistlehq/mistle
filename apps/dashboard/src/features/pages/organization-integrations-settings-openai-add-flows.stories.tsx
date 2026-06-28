@@ -65,7 +65,7 @@ function OpenAiAddFlowStory(input: OpenAiAddFlowStoryArgs): React.JSX.Element {
 }
 
 const meta = {
-  title: "Dashboard/Integrations/OpenAI/Add Flow States",
+  title: "Dashboard/Integrations/AddConnection/OpenAIStates",
   component: OpenAiAddFlowStory,
   decorators: [withDashboardPageStory],
   argTypes: {

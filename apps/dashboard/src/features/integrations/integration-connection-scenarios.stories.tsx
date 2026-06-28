@@ -309,7 +309,7 @@ function ConnectionDetailProviderScenariosStory(
 }
 
 const meta = {
-  title: "Dashboard/Integrations/Connection Detail/Provider Scenarios",
+  title: "Dashboard/Integrations/ConnectionDetail/ProviderScenarios",
   component: ConnectionDetailProviderScenariosStory,
   decorators: [withDashboardCenteredStory],
   argTypes: {

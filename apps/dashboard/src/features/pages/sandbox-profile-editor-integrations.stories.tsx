@@ -31,7 +31,7 @@ import {
 } from "./sandbox-profile-editor-story-support.js";
 
 const meta = {
-  title: "Dashboard/SandboxProfiles/Editor/Runtime And Connections",
+  title: "Dashboard/SandboxProfiles/Editor/RuntimeAndConnections",
   component: SandboxProfileEditorPageStory,
   decorators: [withDashboardCenteredStory],
   render: function RenderStory(args): React.JSX.Element {

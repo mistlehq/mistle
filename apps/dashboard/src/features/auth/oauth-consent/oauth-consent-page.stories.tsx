@@ -37,7 +37,7 @@ const RequestedScopes = [
 ];
 
 const meta = {
-  title: "Dashboard/Auth/OAuthConsentFlow",
+  title: "Dashboard/Auth/OAuthConsent/Flow",
   component: OAuthConsentStory,
   decorators: [withDashboardPageStory, withDashboardMemoryRouter],
   parameters: {

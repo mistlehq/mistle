@@ -616,7 +616,7 @@ function SlackMissingBotIdentityRepairStory(): React.JSX.Element {
 }
 
 const pageMeta = {
-  title: "Dashboard/Integrations/Setup/Slack App",
+  title: "Dashboard/Integrations/Setup/SlackApp",
   decorators: [withDashboardPageStory],
   excludeStories: ["createDraftSlackConnection", "SlackAppSetupPageStory"],
 } satisfies Meta;

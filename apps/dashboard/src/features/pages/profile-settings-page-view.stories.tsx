@@ -11,7 +11,7 @@ import {
 } from "./profile-settings-page-view.story-fixtures.js";
 
 const meta = {
-  title: "Dashboard/Settings/My Profile/PageView",
+  title: "Dashboard/Settings/MyProfile/PageView",
   component: ProfileSettingsPageView,
   decorators: [withDashboardPageStory],
   render: (args) => <ProfileSettingsPageView {...args} />,

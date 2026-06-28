@@ -19,7 +19,7 @@ function createReadyState(): IntegrationResourceListViewState {
 }
 
 const meta = {
-  title: "Dashboard/Forms/Integration Connection Resource Picker",
+  title: "Dashboard/Forms/IntegrationConnectionResourcePicker",
   component: IntegrationConnectionResourcePickerView,
   decorators: [withDashboardCenteredStory],
   args: {

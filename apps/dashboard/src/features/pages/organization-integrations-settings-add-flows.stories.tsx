@@ -67,7 +67,7 @@ function OrganizationIntegrationsAddFlowStory(
 }
 
 const meta = {
-  title: "Dashboard/Integrations/Add Connection/Provider Forms",
+  title: "Dashboard/Integrations/AddConnection/ProviderForms",
   component: OrganizationIntegrationsAddFlowStory,
   decorators: [withDashboardPageStory],
   argTypes: {

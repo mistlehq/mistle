@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { InvitationAccessView } from "./invitation-access-view.js";
 
 const meta = {
-  title: "Dashboard/Onboarding/InvitationAccessView",
+  title: "Dashboard/Onboarding/InvitationAccess/PageView",
   component: InvitationAccessView,
   parameters: {
     layout: "fullscreen",

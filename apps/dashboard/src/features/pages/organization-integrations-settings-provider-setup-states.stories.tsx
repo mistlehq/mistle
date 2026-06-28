@@ -101,7 +101,7 @@ function IntegrationProviderSetupStatesStory(
 }
 
 const pageMeta = {
-  title: "Dashboard/Integrations/Setup/Provider Setup States",
+  title: "Dashboard/Integrations/Setup/ProviderSetupStates",
   component: IntegrationProviderSetupStatesStory,
   decorators: [withDashboardPageStory],
   argTypes: {

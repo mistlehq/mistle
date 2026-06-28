@@ -11,7 +11,7 @@ import {
 } from "./sandbox-profile-editor-story-support.js";
 
 const meta = {
-  title: "Dashboard/SandboxProfiles/Editor/Draft Trigger Impact",
+  title: "Dashboard/SandboxProfiles/Editor/DraftTriggerImpact",
   component: SandboxProfileEditorPageStory,
   decorators: [withDashboardPageStory],
   parameters: {

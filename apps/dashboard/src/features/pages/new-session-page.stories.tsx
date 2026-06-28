@@ -33,7 +33,7 @@ export function NewSessionPageStory(input: NewSessionPageStoryArgs): React.JSX.E
 }
 
 const meta = {
-  title: "Dashboard/Sessions/New Session Page",
+  title: "Dashboard/Sessions/New/Page",
   component: NewSessionPageStory,
   tags: ["autodocs"],
   excludeStories: ["NewSessionPageStory"],

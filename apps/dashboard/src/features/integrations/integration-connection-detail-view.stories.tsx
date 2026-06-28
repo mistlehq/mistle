@@ -16,7 +16,7 @@ import {
 } from "./integration-story-harness.js";
 
 const meta = {
-  title: "Dashboard/Integrations/Connection Detail/State Examples",
+  title: "Dashboard/Integrations/ConnectionDetail/StateExamples",
   component: IntegrationConnectionDetailView,
   decorators: [withDashboardCenteredStory],
   args: {

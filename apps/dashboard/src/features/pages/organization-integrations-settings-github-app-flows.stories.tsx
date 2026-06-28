@@ -393,7 +393,7 @@ function GitHubInstalledDetailPageStory(): React.JSX.Element {
 }
 
 const pageMeta = {
-  title: "Dashboard/Integrations/Setup/GitHub App",
+  title: "Dashboard/Integrations/Setup/GitHubApp",
   decorators: [withDashboardPageStory],
   excludeStories: ["createDraftGitHubConnection", "GitHubAppSetupPageStory"],
 } satisfies Meta;

@@ -13,7 +13,7 @@ type SessionWorkbenchPageStoryArgs = {
 };
 
 const meta = {
-  title: "Dashboard/Sessions/SessionWorkbench/RoutedPage",
+  title: "Dashboard/Sessions/SessionWorkbench/Page",
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",
