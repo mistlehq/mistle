@@ -14,6 +14,7 @@ import type {
   AnyIntegrationDefinition,
   DiscoveredIntegrationResource,
   DiscoveredIntegrationResourceAttribute,
+  DiscoveredIntegrationResourceRelationship,
   IntegrationResourceAttributeDefinition,
 } from "@mistle/integrations-core";
 import { IntegrationKinds, IntegrationRegistry } from "@mistle/integrations-core";
@@ -1068,6 +1069,418 @@ describe.concurrent("sync integration connection resources", () => {
       }),
     );
   });
+
+  it("marks resource sync as failed when a scoped relationship snapshot is omitted", async ({
+    env,
+  }) => {
+    await seedRelationshipProviderConnection({ env });
+    const registry = createRelationshipProviderRegistry();
+
+    await expect(
+      syncIntegrationConnectionResources(
+        {
+          db: env.controlPlaneDb,
+          integrationRegistry: registry,
+        },
+        {
+          organizationId: "org_sync_relationship_snapshot_required",
+          connectionId: "icn_sync_relationship_snapshot_required",
+          kind: "team",
+        },
+      ),
+    ).rejects.toThrow(
+      "Resource kind 'team' has scoped relationship definitions and must return a relationship snapshot.",
+    );
+
+    const resourceState =
+      await env.controlPlaneDb.query.integrationConnectionResourceStates.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.connectionId, "icn_sync_relationship_snapshot_required"),
+            eq(table.kind, "team"),
+          ),
+      });
+
+    expect(resourceState).toEqual(
+      expect.objectContaining({
+        syncState: IntegrationConnectionResourceSyncStates.ERROR,
+        lastErrorMessage:
+          "Resource kind 'team' has scoped relationship definitions and must return a relationship snapshot.",
+      }),
+    );
+  });
+
+  it("persists relationship snapshots returned by resource sync", async ({ env }) => {
+    await seedGitHubConnection({
+      env,
+      organizationId: "org_sync_resources_relationship_snapshot",
+      targetKey: "github-cloud-sync-resources-relationship-snapshot",
+      connectionId: "icn_sync_resources_relationship_snapshot",
+      organizationName: "Sync Resources Relationship Snapshot",
+      organizationSlug: "sync-resources-relationship-snapshot",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnectionResources).values([
+      persistedResource({
+        id: "rsc_sync_resources_relationship_snapshot_alice",
+        connectionId: "icn_sync_resources_relationship_snapshot",
+        kind: "user",
+        externalId: "1",
+        handle: "alice",
+        displayName: "Alice",
+      }),
+      persistedResource({
+        id: "rsc_sync_resources_relationship_snapshot_bob",
+        connectionId: "icn_sync_resources_relationship_snapshot",
+        kind: "user",
+        externalId: "2",
+        handle: "bob",
+        displayName: "Bob",
+      }),
+      persistedResource({
+        id: "rsc_sync_resources_relationship_snapshot_carla",
+        connectionId: "icn_sync_resources_relationship_snapshot",
+        kind: "user",
+        externalId: "3",
+        handle: "carla",
+        displayName: "Carla",
+      }),
+      persistedResource({
+        id: "rsc_sync_resources_relationship_snapshot_team",
+        connectionId: "icn_sync_resources_relationship_snapshot",
+        kind: "team",
+        externalId: "100",
+        handle: "mistle/backend",
+        displayName: "Backend",
+      }),
+    ]);
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.integrationConnectionResourceRelationships)
+      .values([
+        {
+          id: "irr_sync_resources_relationship_snapshot_bob",
+          connectionId: "icn_sync_resources_relationship_snapshot",
+          familyId: "github",
+          relationshipKind: "belongs_to",
+          subjectResourceId: "rsc_sync_resources_relationship_snapshot_bob",
+          subjectResourceKind: "user",
+          subjectExternalId: "2",
+          subjectHandle: "bob",
+          objectResourceId: "rsc_sync_resources_relationship_snapshot_team",
+          objectResourceKind: "team",
+          objectExternalId: "100",
+          objectHandle: "mistle/backend",
+          scopeResourceId: "rsc_sync_resources_relationship_snapshot_team",
+          scopeKind: "team",
+          scopeExternalId: "100",
+          scopeHandle: "mistle/backend",
+          metadata: {},
+          lastSeenAt: "2026-03-09T00:00:00.000Z",
+        },
+        {
+          id: "irr_sync_resources_relationship_snapshot_carla",
+          connectionId: "icn_sync_resources_relationship_snapshot",
+          familyId: "github",
+          relationshipKind: "belongs_to",
+          subjectResourceId: "rsc_sync_resources_relationship_snapshot_carla",
+          subjectResourceKind: "user",
+          subjectExternalId: "3",
+          subjectHandle: "carla",
+          objectResourceId: "rsc_sync_resources_relationship_snapshot_team",
+          objectResourceKind: "team",
+          objectExternalId: "100",
+          objectHandle: "mistle/backend",
+          scopeResourceId: "rsc_sync_resources_relationship_snapshot_team",
+          scopeKind: "team",
+          scopeExternalId: "100",
+          scopeHandle: "mistle/backend",
+          metadata: {},
+          lastSeenAt: "2026-03-08T00:00:00.000Z",
+          removedAt: "2026-03-08T00:05:00.000Z",
+        },
+      ]);
+
+    const syncStartedAt = await markResourceSyncing({
+      db: env.controlPlaneDb,
+      connectionId: "icn_sync_resources_relationship_snapshot",
+      familyId: "github",
+      kind: "team",
+    });
+    await expect(
+      applySuccessfulResourceSync({
+        db: env.controlPlaneDb,
+        connectionId: "icn_sync_resources_relationship_snapshot",
+        familyId: "github",
+        kind: "team",
+        syncStartedAt,
+        discoveredResources: [
+          githubUserResource({
+            externalId: "100",
+            handle: "mistle/backend",
+            displayName: "Backend",
+          }),
+        ],
+        discoveredRelationships: [
+          teamMembership({
+            subjectExternalId: "1",
+            subjectHandle: "alice",
+            objectExternalId: "100",
+            objectHandle: "mistle/backend",
+            scopeExternalId: "100",
+            scopeHandle: "mistle/backend",
+            metadata: {
+              role: "maintainer",
+            },
+          }),
+        ],
+        relationshipDefinitions: [
+          {
+            relationshipKind: "belongs_to",
+            subjectResourceKind: "user",
+            objectResourceKind: "team",
+            scopeDefinitions: [
+              {
+                scopeKind: "team",
+              },
+            ],
+          },
+        ],
+      }),
+    ).resolves.toBe(true);
+
+    const persistedRelationships =
+      await env.controlPlaneDb.query.integrationConnectionResourceRelationships.findMany({
+        where: (table, { eq }) =>
+          eq(table.connectionId, "icn_sync_resources_relationship_snapshot"),
+        orderBy: (table, { asc }) => asc(table.subjectHandle),
+      });
+
+    expect(persistedRelationships).toHaveLength(3);
+    expect(persistedRelationships[0]).toEqual(
+      expect.objectContaining({
+        subjectResourceId: "rsc_sync_resources_relationship_snapshot_alice",
+        subjectHandle: "alice",
+        objectResourceId: "rsc_sync_resources_relationship_snapshot_team",
+        scopeResourceId: "rsc_sync_resources_relationship_snapshot_team",
+        metadata: {
+          role: "maintainer",
+        },
+        removedAt: null,
+      }),
+    );
+    expect(persistedRelationships[1]).toEqual(
+      expect.objectContaining({
+        subjectResourceId: "rsc_sync_resources_relationship_snapshot_bob",
+        subjectHandle: "bob",
+      }),
+    );
+    expect(persistedRelationships[1]?.removedAt).toBeTruthy();
+    expect(persistedRelationships[2]).toEqual(
+      expect.objectContaining({
+        subjectResourceId: "rsc_sync_resources_relationship_snapshot_carla",
+        subjectHandle: "carla",
+      }),
+    );
+    expect(new Date(persistedRelationships[2]?.removedAt ?? "").toISOString()).toBe(
+      "2026-03-08T00:05:00.000Z",
+    );
+  });
+
+  it("tombstones active relationships when a synced scope has an empty relationship snapshot", async ({
+    env,
+  }) => {
+    await seedGitHubConnection({
+      env,
+      organizationId: "org_sync_resources_empty_relationship_snapshot",
+      targetKey: "github-cloud-sync-resources-empty-relationship-snapshot",
+      connectionId: "icn_sync_resources_empty_relationship_snapshot",
+      organizationName: "Sync Resources Empty Relationship Snapshot",
+      organizationSlug: "sync-resources-empty-relationship-snapshot",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnectionResources).values([
+      persistedResource({
+        id: "rsc_sync_resources_empty_relationship_snapshot_alice",
+        connectionId: "icn_sync_resources_empty_relationship_snapshot",
+        kind: "user",
+        externalId: "1",
+        handle: "alice",
+        displayName: "Alice",
+      }),
+      persistedResource({
+        id: "rsc_sync_resources_empty_relationship_snapshot_team",
+        connectionId: "icn_sync_resources_empty_relationship_snapshot",
+        kind: "team",
+        externalId: "100",
+        handle: "mistle/backend",
+        displayName: "Backend",
+      }),
+    ]);
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.integrationConnectionResourceRelationships)
+      .values({
+        id: "irr_sync_resources_empty_relationship_snapshot_alice",
+        connectionId: "icn_sync_resources_empty_relationship_snapshot",
+        familyId: "github",
+        relationshipKind: "belongs_to",
+        subjectResourceId: "rsc_sync_resources_empty_relationship_snapshot_alice",
+        subjectResourceKind: "user",
+        subjectExternalId: "1",
+        subjectHandle: "alice",
+        objectResourceId: "rsc_sync_resources_empty_relationship_snapshot_team",
+        objectResourceKind: "team",
+        objectExternalId: "100",
+        objectHandle: "mistle/backend",
+        scopeResourceId: "rsc_sync_resources_empty_relationship_snapshot_team",
+        scopeKind: "team",
+        scopeExternalId: "100",
+        scopeHandle: "mistle/backend",
+        metadata: {},
+        lastSeenAt: "2026-03-09T00:00:00.000Z",
+      });
+
+    const syncStartedAt = await markResourceSyncing({
+      db: env.controlPlaneDb,
+      connectionId: "icn_sync_resources_empty_relationship_snapshot",
+      familyId: "github",
+      kind: "team",
+    });
+    await expect(
+      applySuccessfulResourceSync({
+        db: env.controlPlaneDb,
+        connectionId: "icn_sync_resources_empty_relationship_snapshot",
+        familyId: "github",
+        kind: "team",
+        syncStartedAt,
+        discoveredResources: [
+          githubUserResource({
+            externalId: "100",
+            handle: "mistle/backend",
+            displayName: "Backend",
+          }),
+        ],
+        discoveredRelationships: [],
+        relationshipDefinitions: [
+          {
+            relationshipKind: "belongs_to",
+            subjectResourceKind: "user",
+            objectResourceKind: "team",
+            scopeDefinitions: [
+              {
+                scopeKind: "team",
+              },
+            ],
+          },
+        ],
+      }),
+    ).resolves.toBe(true);
+
+    const persistedRelationship =
+      await env.controlPlaneDb.query.integrationConnectionResourceRelationships.findFirst({
+        where: (table, { eq }) =>
+          eq(table.id, "irr_sync_resources_empty_relationship_snapshot_alice"),
+      });
+
+    expect(persistedRelationship?.removedAt).toBeTruthy();
+  });
+
+  it("tombstones active relationships for a synced scope after its handle changes", async ({
+    env,
+  }) => {
+    await seedGitHubConnection({
+      env,
+      organizationId: "org_sync_resources_relationship_scope_renamed",
+      targetKey: "github-cloud-sync-resources-relationship-scope-renamed",
+      connectionId: "icn_sync_resources_relationship_scope_renamed",
+      organizationName: "Sync Resources Relationship Scope Renamed",
+      organizationSlug: "sync-resources-relationship-scope-renamed",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnectionResources).values([
+      persistedResource({
+        id: "rsc_sync_resources_relationship_scope_renamed_alice",
+        connectionId: "icn_sync_resources_relationship_scope_renamed",
+        kind: "user",
+        externalId: "1",
+        handle: "alice",
+        displayName: "Alice",
+      }),
+      persistedResource({
+        id: "rsc_sync_resources_relationship_scope_renamed_team",
+        connectionId: "icn_sync_resources_relationship_scope_renamed",
+        kind: "team",
+        externalId: "100",
+        handle: "mistle/platform",
+        displayName: "Platform",
+      }),
+    ]);
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.integrationConnectionResourceRelationships)
+      .values({
+        id: "irr_sync_resources_relationship_scope_renamed_alice",
+        connectionId: "icn_sync_resources_relationship_scope_renamed",
+        familyId: "github",
+        relationshipKind: "belongs_to",
+        subjectResourceId: "rsc_sync_resources_relationship_scope_renamed_alice",
+        subjectResourceKind: "user",
+        subjectExternalId: "1",
+        subjectHandle: "alice",
+        objectResourceId: "rsc_sync_resources_relationship_scope_renamed_team",
+        objectResourceKind: "team",
+        objectExternalId: "100",
+        objectHandle: "mistle/backend",
+        scopeResourceId: "rsc_sync_resources_relationship_scope_renamed_team",
+        scopeKind: "team",
+        scopeExternalId: "100",
+        scopeHandle: "mistle/backend",
+        metadata: {},
+        lastSeenAt: "2026-03-09T00:00:00.000Z",
+      });
+
+    const syncStartedAt = await markResourceSyncing({
+      db: env.controlPlaneDb,
+      connectionId: "icn_sync_resources_relationship_scope_renamed",
+      familyId: "github",
+      kind: "team",
+    });
+    await expect(
+      applySuccessfulResourceSync({
+        db: env.controlPlaneDb,
+        connectionId: "icn_sync_resources_relationship_scope_renamed",
+        familyId: "github",
+        kind: "team",
+        syncStartedAt,
+        discoveredResources: [
+          githubUserResource({
+            externalId: "100",
+            handle: "mistle/platform",
+            displayName: "Platform",
+          }),
+        ],
+        discoveredRelationships: [],
+        relationshipDefinitions: [
+          {
+            relationshipKind: "belongs_to",
+            subjectResourceKind: "user",
+            objectResourceKind: "team",
+            scopeDefinitions: [
+              {
+                scopeKind: "team",
+              },
+            ],
+          },
+        ],
+      }),
+    ).resolves.toBe(true);
+
+    const persistedRelationship =
+      await env.controlPlaneDb.query.integrationConnectionResourceRelationships.findFirst({
+        where: (table, { eq }) =>
+          eq(table.id, "irr_sync_resources_relationship_scope_renamed_alice"),
+      });
+
+    expect(persistedRelationship?.removedAt).toBeTruthy();
+  });
 });
 
 function githubUserResource(input: {
@@ -1080,6 +1493,63 @@ function githubUserResource(input: {
     handle: input.handle,
     displayName: input.displayName,
     metadata: {},
+  };
+}
+
+function persistedResource(input: {
+  id: string;
+  connectionId: string;
+  kind: string;
+  externalId: string;
+  handle: string;
+  displayName: string;
+}): {
+  id: string;
+  connectionId: string;
+  familyId: string;
+  kind: string;
+  externalId: string;
+  handle: string;
+  displayName: string;
+  status: typeof IntegrationConnectionResourceStatuses.ACCESSIBLE;
+  metadata: Record<string, unknown>;
+  lastSeenAt: string;
+} {
+  return {
+    id: input.id,
+    connectionId: input.connectionId,
+    familyId: "github",
+    kind: input.kind,
+    externalId: input.externalId,
+    handle: input.handle,
+    displayName: input.displayName,
+    status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
+    metadata: {},
+    lastSeenAt: "2026-03-09T00:00:00.000Z",
+  };
+}
+
+function teamMembership(input: {
+  subjectExternalId: string;
+  subjectHandle: string;
+  objectExternalId: string;
+  objectHandle: string;
+  scopeExternalId: string;
+  scopeHandle: string;
+  metadata: Record<string, unknown>;
+}): DiscoveredIntegrationResourceRelationship {
+  return {
+    relationshipKind: "belongs_to",
+    subjectResourceKind: "user",
+    subjectExternalId: input.subjectExternalId,
+    subjectHandle: input.subjectHandle,
+    objectResourceKind: "team",
+    objectExternalId: input.objectExternalId,
+    objectHandle: input.objectHandle,
+    scopeKind: "team",
+    scopeExternalId: input.scopeExternalId,
+    scopeHandle: input.scopeHandle,
+    metadata: input.metadata,
   };
 }
 
@@ -1194,6 +1664,61 @@ function createAttributeProviderDefinition(): AnyIntegrationDefinition {
   };
 }
 
+function createRelationshipProviderRegistry(): IntegrationRegistry {
+  const registry = new IntegrationRegistry();
+  registry.register(createRelationshipProviderDefinition());
+  return registry;
+}
+
+function createRelationshipProviderDefinition(): AnyIntegrationDefinition {
+  return {
+    familyId: "relationship-test",
+    variantId: "default",
+    kind: IntegrationKinds.CONNECTOR,
+    displayName: "Relationship Test",
+    logoKey: "github",
+    targetConfigSchema: z.object({}).strict(),
+    targetSecretSchema: z.object({}).strict(),
+    bindingConfigSchema: z.object({}).strict(),
+    connectionMethods: [],
+    resourceDefinitions: [
+      {
+        kind: "team",
+        selectionMode: "multi",
+        bindingField: "teams",
+        displayNameSingular: "Team",
+        displayNamePlural: "Teams",
+      },
+    ],
+    resourceRelationshipDefinitions: [
+      {
+        relationshipKind: "belongs_to",
+        subjectResourceKind: "user",
+        objectResourceKind: "team",
+        scopeDefinitions: [
+          {
+            scopeKind: "team",
+          },
+        ],
+      },
+    ],
+    listConnectionResources: () => ({
+      resources: [
+        githubUserResource({
+          externalId: "100",
+          handle: "mistle/backend",
+          displayName: "Backend",
+        }),
+      ],
+    }),
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [],
+      runtimeClients: [],
+    }),
+  };
+}
+
 async function seedAttributeProviderConnection(input: {
   env: IntegrationTestEnvironment;
 }): Promise<void> {
@@ -1216,6 +1741,33 @@ async function seedAttributeProviderConnection(input: {
       organizationId: "org_sync_resource_attributes_workflow",
       targetKey: "attribute-test-sync-resource-attributes-workflow",
       displayName: "Sync Resource Attributes Workflow",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {},
+    });
+}
+
+async function seedRelationshipProviderConnection(input: {
+  env: IntegrationTestEnvironment;
+}): Promise<void> {
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.organizations).values({
+    id: "org_sync_relationship_snapshot_required",
+    name: "Sync Relationship Snapshot Required",
+    slug: "sync-relationship-snapshot-required",
+  });
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.integrationTargets).values({
+    targetKey: "relationship-test-sync-relationship-snapshot-required",
+    familyId: "relationship-test",
+    variantId: "default",
+    enabled: true,
+    config: {},
+  });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationConnections)
+    .values({
+      id: "icn_sync_relationship_snapshot_required",
+      organizationId: "org_sync_relationship_snapshot_required",
+      targetKey: "relationship-test-sync-relationship-snapshot-required",
+      displayName: "Sync Relationship Snapshot Required",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {},
     });

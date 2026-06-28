@@ -7,9 +7,13 @@ import {
 import type {
   DiscoveredIntegrationResource,
   DiscoveredIntegrationResourceAttribute,
+  DiscoveredIntegrationResourceRelationship,
   IntegrationResourceAttributeDefinition,
+  IntegrationResourceRelationshipDefinition,
 } from "@mistle/integrations-core";
 import { and, eq, inArray, sql } from "drizzle-orm";
+
+import { applyResourceRelationships } from "./apply-resource-relationships.js";
 
 type ControlPlaneTransaction = Parameters<Parameters<ControlPlaneDatabase["transaction"]>[0]>[0];
 type ResourceIdentityCandidate = {
@@ -31,7 +35,9 @@ export async function applySuccessfulResourceSync(input: {
   syncStartedAt: string;
   discoveredResources: ReadonlyArray<DiscoveredIntegrationResource>;
   discoveredAttributes?: ReadonlyArray<DiscoveredIntegrationResourceAttribute>;
+  discoveredRelationships?: ReadonlyArray<DiscoveredIntegrationResourceRelationship>;
   attributeDefinitions?: ReadonlyArray<IntegrationResourceAttributeDefinition>;
+  relationshipDefinitions?: ReadonlyArray<IntegrationResourceRelationshipDefinition>;
 }): Promise<boolean> {
   return input.db.transaction(async (tx) => {
     const tables = getControlPlaneDatabaseSchema(tx);
@@ -156,6 +162,15 @@ export async function applySuccessfulResourceSync(input: {
         })),
       discoveredAttributes: input.discoveredAttributes ?? [],
       attributeDefinitions: input.attributeDefinitions ?? [],
+    });
+    await applyResourceRelationships({
+      tx,
+      connectionId: input.connectionId,
+      familyId: input.familyId,
+      syncedResourceKind: input.kind,
+      discoveredResources: input.discoveredResources,
+      discoveredRelationships: input.discoveredRelationships ?? [],
+      relationshipDefinitions: input.relationshipDefinitions ?? [],
     });
 
     for (const resourceId of attributeBearingAccessibleExistingResourceIds({
