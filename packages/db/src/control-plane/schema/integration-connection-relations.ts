@@ -1,7 +1,6 @@
 import { relations } from "drizzle-orm";
 
 import { integrationConnectionResourceAttributes } from "./integration-connection-resource-attributes.js";
-import { integrationConnectionResourceRelationshipStates } from "./integration-connection-resource-relationship-states.js";
 import { integrationConnectionResourceRelationships } from "./integration-connection-resource-relationships.js";
 import { integrationConnectionResourceStates } from "./integration-connection-resource-states.js";
 import { integrationConnectionResources } from "./integration-connection-resources.js";
@@ -14,7 +13,6 @@ import { users } from "./users.js";
 
 export function defineIntegrationConnectionRelations(input: {
   integrationConnectionResourceAttributes: typeof integrationConnectionResourceAttributes;
-  integrationConnectionResourceRelationshipStates: typeof integrationConnectionResourceRelationshipStates;
   integrationConnectionResourceRelationships: typeof integrationConnectionResourceRelationships;
   integrationConnectionResourceStates: typeof integrationConnectionResourceStates;
   integrationConnectionResources: typeof integrationConnectionResources;
@@ -33,7 +31,6 @@ export function defineIntegrationConnectionRelations(input: {
         references: [input.integrationTargets.targetKey],
       }),
       resourceAttributes: many(input.integrationConnectionResourceAttributes),
-      resourceRelationshipStates: many(input.integrationConnectionResourceRelationshipStates),
       resourceRelationships: many(input.integrationConnectionResourceRelationships),
       resources: many(input.integrationConnectionResources),
       resourceStates: many(input.integrationConnectionResourceStates),
@@ -58,21 +55,6 @@ export function defineIntegrationConnectionRelations(input: {
       connection: one(input.integrationConnections, {
         fields: [input.integrationConnectionResourceAttributes.connectionId],
         references: [input.integrationConnections.id],
-      }),
-    }),
-  );
-
-  const integrationConnectionResourceRelationshipStatesRelations = relations(
-    input.integrationConnectionResourceRelationshipStates,
-    ({ one }) => ({
-      connection: one(input.integrationConnections, {
-        fields: [input.integrationConnectionResourceRelationshipStates.connectionId],
-        references: [input.integrationConnections.id],
-      }),
-      scopeResource: one(input.integrationConnectionResources, {
-        fields: [input.integrationConnectionResourceRelationshipStates.scopeResourceId],
-        references: [input.integrationConnectionResources.id],
-        relationName: "relationshipStateScopeResource",
       }),
     }),
   );
@@ -161,7 +143,6 @@ export function defineIntegrationConnectionRelations(input: {
 
   return {
     integrationConnectionResourceAttributesRelations,
-    integrationConnectionResourceRelationshipStatesRelations,
     integrationConnectionResourceRelationshipsRelations,
     integrationConnectionResourcesRelations,
     integrationConnectionResourceStatesRelations,
@@ -174,7 +155,6 @@ export function defineIntegrationConnectionRelations(input: {
 
 const defaultRelations = defineIntegrationConnectionRelations({
   integrationConnectionResourceAttributes,
-  integrationConnectionResourceRelationshipStates,
   integrationConnectionResourceRelationships,
   integrationConnectionResourceStates,
   integrationConnectionResources,
@@ -189,8 +169,6 @@ const defaultRelations = defineIntegrationConnectionRelations({
 export const integrationConnectionsRelations = defaultRelations.integrationConnectionsRelations;
 export const integrationConnectionResourceAttributesRelations =
   defaultRelations.integrationConnectionResourceAttributesRelations;
-export const integrationConnectionResourceRelationshipStatesRelations =
-  defaultRelations.integrationConnectionResourceRelationshipStatesRelations;
 export const integrationConnectionResourceRelationshipsRelations =
   defaultRelations.integrationConnectionResourceRelationshipsRelations;
 export const integrationConnectionResourcesRelations =

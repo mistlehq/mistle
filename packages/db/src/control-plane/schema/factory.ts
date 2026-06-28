@@ -10,7 +10,6 @@ import { defineIntegrationConnectionDeviceAuthorizationAttempts } from "./integr
 import { defineIntegrationConnectionRedirectSessions } from "./integration-connection-redirect-sessions.js";
 import { defineIntegrationConnectionRelations } from "./integration-connection-relations.js";
 import { defineIntegrationConnectionResourceAttributes } from "./integration-connection-resource-attributes.js";
-import { defineIntegrationConnectionResourceRelationshipStates } from "./integration-connection-resource-relationship-states.js";
 import { defineIntegrationConnectionResourceRelationships } from "./integration-connection-resource-relationships.js";
 import { defineIntegrationConnectionResourceStates } from "./integration-connection-resource-states.js";
 import { defineIntegrationConnectionResources } from "./integration-connection-resources.js";
@@ -92,8 +91,6 @@ export function createControlPlaneDbSchema(schemaName: string) {
   const integrationConnectionRedirectSessions = defineIntegrationConnectionRedirectSessions(schema);
   const integrationConnectionResourceAttributes =
     defineIntegrationConnectionResourceAttributes(schema);
-  const integrationConnectionResourceRelationshipStates =
-    defineIntegrationConnectionResourceRelationshipStates(schema);
   const integrationConnectionResourceRelationships =
     defineIntegrationConnectionResourceRelationships(schema);
   const integrationConnectionResourceStates = defineIntegrationConnectionResourceStates(schema);
@@ -148,7 +145,6 @@ export function createControlPlaneDbSchema(schemaName: string) {
   const webhookTriggers = defineWebhookTriggers(schema);
   const integrationConnectionRelations = defineIntegrationConnectionRelations({
     integrationConnectionResourceAttributes,
-    integrationConnectionResourceRelationshipStates,
     integrationConnectionResourceRelationships,
     integrationConnectionResourceStates,
     integrationConnectionResources,
@@ -177,7 +173,6 @@ export function createControlPlaneDbSchema(schemaName: string) {
     integrationConnectionDeviceAuthorizationAttempts,
     integrationConnectionRedirectSessions,
     integrationConnectionResourceAttributes,
-    integrationConnectionResourceRelationshipStates,
     integrationConnectionResourceRelationships,
     integrationConnectionResourceStates,
     integrationConnectionResources,
