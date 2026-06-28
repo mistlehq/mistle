@@ -15,6 +15,7 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
           {
             db: resources.db,
             tables: resources.tables,
+            runtimeStateReader: resources.runtimeStateReader,
           },
           {
             sandboxInstanceId: params.id,
@@ -27,6 +28,7 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
           {
             db: resources.db,
             tables: resources.tables,
+            runtimeStateReader: resources.runtimeStateReader,
           },
           {
             sandboxInstanceId: params.id,

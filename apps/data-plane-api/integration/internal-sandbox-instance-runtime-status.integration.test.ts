@@ -128,6 +128,18 @@ it("reports a persisted running sandbox as reconnecting until the gateway runtim
       runtimePlan,
     });
 
+    await expect(
+      clientFor(env).applySandboxRuntimeLifecycleEvent({
+        sandboxInstanceId,
+        kind: "bootstrap_detached",
+        ownerLeaseId: "stale_lease_integration_new_get_reconnecting",
+      }),
+    ).resolves.toMatchObject({
+      status: "ok",
+      sandboxInstanceId,
+      lifecycleStatus: SandboxInstanceStatuses.RUNNING,
+    });
+
     await clientFor(env).applySandboxRuntimeLifecycleEvent({
       sandboxInstanceId,
       kind: "bootstrap_degraded",

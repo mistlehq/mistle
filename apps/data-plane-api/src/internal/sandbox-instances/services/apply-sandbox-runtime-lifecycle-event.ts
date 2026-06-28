@@ -12,10 +12,12 @@ import {
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { logger } from "../../../logger.js";
+import type { SandboxRuntimeStateReader } from "../../../runtime-state/sandbox-runtime-state-reader.js";
 
 type ApplySandboxRuntimeLifecycleEventContext = {
   db: DataPlaneDatabase;
   tables: Pick<DataPlaneTables, "sandboxInstances">;
+  runtimeStateReader: SandboxRuntimeStateReader;
 };
 
 export type SandboxRuntimeLifecycleEventKind =
@@ -52,6 +54,37 @@ export async function applySandboxRuntimeLifecycleEvent(
   ctx: ApplySandboxRuntimeLifecycleEventContext,
   input: ApplySandboxRuntimeLifecycleEventInput,
 ): Promise<ApplySandboxRuntimeLifecycleEventResponse> {
+  const ownerLeaseMatched = await isRuntimeLifecycleEventOwnerCurrent(ctx, input);
+  if (!ownerLeaseMatched) {
+    const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
+      columns: {
+        status: true,
+      },
+      where: (table, { and, eq, isNull }) =>
+        and(eq(table.id, input.sandboxInstanceId), isNull(table.deletedAt)),
+    });
+    if (sandboxInstance === undefined) {
+      throw new Error(`Sandbox instance '${input.sandboxInstanceId}' was not found.`);
+    }
+
+    logger.info(
+      {
+        eventName: "sandbox.runtime_lifecycle.stale_owner_ignored",
+        sandboxInstanceId: input.sandboxInstanceId,
+        kind: input.kind,
+        ownerLeaseId: input.ownerLeaseId,
+        status: sandboxInstance.status,
+      },
+      "Ignored stale sandbox runtime lifecycle event.",
+    );
+
+    return {
+      status: "ok",
+      sandboxInstanceId: input.sandboxInstanceId,
+      lifecycleStatus: sandboxInstance.status,
+    };
+  }
+
   const transitionResult = await ctx.db.transaction(async (tx) => {
     const sandboxInstance = await tx.query.sandboxInstances.findFirst({
       columns: {
@@ -152,6 +185,29 @@ export async function applySandboxRuntimeLifecycleEvent(
     sandboxInstanceId: input.sandboxInstanceId,
     lifecycleStatus: transitionResult.lifecycleStatus,
   };
+}
+
+async function isRuntimeLifecycleEventOwnerCurrent(
+  ctx: ApplySandboxRuntimeLifecycleEventContext,
+  input: ApplySandboxRuntimeLifecycleEventInput,
+): Promise<boolean> {
+  if (input.kind !== "bootstrap_detached") {
+    return true;
+  }
+
+  const snapshot = await ctx.runtimeStateReader.readSnapshot({
+    sandboxInstanceId: input.sandboxInstanceId,
+    nowMs: Date.now(),
+  });
+
+  if (snapshot.ownerLeaseId === null && snapshot.attachment === null) {
+    return true;
+  }
+
+  return (
+    snapshot.ownerLeaseId === input.ownerLeaseId ||
+    snapshot.attachment?.ownerLeaseId === input.ownerLeaseId
+  );
 }
 
 function resolveLifecycleEvent(input: {
