@@ -420,7 +420,6 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
             navigate: navigateEmbeddedCanvasRoute,
             searchParams: route.searchParams,
             setSearchParams: (nextSearchParams) => {
-              setEmbeddedLocationState(undefined);
               const nextHref = buildDesignerCanvasHref({
                 pathname:
                   route.targetKey === null
@@ -459,12 +458,7 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
             searchParams: route.searchParams,
             setupRouteSegment: route.setupRouteSegment,
             targetKey: route.targetKey,
-            navigate: (nextHref) => {
-              navigateDesignerCanvasTab({
-                href: nextHref,
-                params,
-              });
-            },
+            navigate: navigateEmbeddedCanvasRoute,
           }}
         />
       </DesignerCanvasEmbeddedSurface>
@@ -477,12 +471,7 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
         <EmbeddedSandboxProfileEditorPage
           embeddedRoute={{
             href: route.href,
-            navigate: (nextHref) => {
-              navigateDesignerCanvasTab({
-                href: nextHref,
-                params,
-              });
-            },
+            navigate: navigateEmbeddedCanvasRoute,
             profileId: route.profileId,
           }}
         />
@@ -501,10 +490,7 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
                 pathname: "/triggers",
                 searchParams: nextSearchParams,
               });
-              navigateDesignerCanvasTab({
-                href: nextHref,
-                params,
-              });
+              navigateEmbeddedCanvasRoute(nextHref);
             },
           }}
         />
@@ -518,12 +504,7 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
         <TriggerCreatePage
           embeddedRoute={{
             searchParams: route.searchParams,
-            navigate: (nextHref) => {
-              navigateDesignerCanvasTab({
-                href: nextHref,
-                params,
-              });
-            },
+            navigate: navigateEmbeddedCanvasRoute,
           }}
         />
       </DesignerCanvasEmbeddedSurface>

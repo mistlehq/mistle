@@ -76,7 +76,7 @@ export function EmbeddedIntegrationConnectionSetupPage(input: {
   );
 }
 
-type IntegrationConnectionSetupPageContentBaseInput = {
+type IntegrationConnectionSetupPageContentInput = {
   breadcrumbs: React.ReactNode | null;
   connectionId: string;
   description?: string | undefined;
@@ -90,7 +90,7 @@ type IntegrationConnectionSetupPageContentBaseInput = {
 };
 
 function IntegrationConnectionSetupPageContent(
-  input: IntegrationConnectionSetupPageContentBaseInput,
+  input: IntegrationConnectionSetupPageContentInput,
 ): React.JSX.Element {
   const {
     breadcrumbs,
