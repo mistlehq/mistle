@@ -205,11 +205,11 @@ describe("integrations-definitions server", () => {
     expect(githubCloudDefinition?.resourceSyncTriggers).toEqual([
       {
         eventType: "github.installation_repositories.added",
-        resourceKinds: ["repository", "user", "org"],
+        resourceKinds: ["repository", "user", "org", "team", "bot"],
       },
       {
         eventType: "github.installation_repositories.removed",
-        resourceKinds: ["repository", "user", "org"],
+        resourceKinds: ["repository", "user", "org", "team", "bot"],
       },
       {
         eventType: "github.member.added",
