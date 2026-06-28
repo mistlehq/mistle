@@ -82,7 +82,7 @@ describe("validateDiscoveredResourceRelationships", () => {
         relationshipKind: "",
         relationships: [],
       }),
-    ).toThrow("Relationship sync requested an empty relationship kind.");
+    ).toThrow("Resource sync relationship validation requested an empty relationship kind.");
   });
 
   it("rejects an empty requested subject resource kind", () => {
@@ -92,7 +92,7 @@ describe("validateDiscoveredResourceRelationships", () => {
         subjectResourceKind: "",
         relationships: [],
       }),
-    ).toThrow("Relationship sync requested an empty subject resource kind.");
+    ).toThrow("Resource sync relationship validation requested an empty subject resource kind.");
   });
 
   it("rejects an empty requested object resource kind", () => {
@@ -102,7 +102,7 @@ describe("validateDiscoveredResourceRelationships", () => {
         objectResourceKind: "",
         relationships: [],
       }),
-    ).toThrow("Relationship sync requested an empty object resource kind.");
+    ).toThrow("Resource sync relationship validation requested an empty object resource kind.");
   });
 
   it("rejects an empty requested scope value", () => {

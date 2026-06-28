@@ -44,13 +44,17 @@ export function validateDiscoveredResourceRelationships(input: {
   relationships: ReadonlyArray<DiscoveredIntegrationResourceRelationship>;
 }): ReadonlyArray<DiscoveredIntegrationResourceRelationship> {
   if (input.relationshipKind.length === 0) {
-    throw new Error("Relationship sync requested an empty relationship kind.");
+    throw new Error("Resource sync relationship validation requested an empty relationship kind.");
   }
   if (input.subjectResourceKind.length === 0) {
-    throw new Error("Relationship sync requested an empty subject resource kind.");
+    throw new Error(
+      "Resource sync relationship validation requested an empty subject resource kind.",
+    );
   }
   if (input.objectResourceKind.length === 0) {
-    throw new Error("Relationship sync requested an empty object resource kind.");
+    throw new Error(
+      "Resource sync relationship validation requested an empty object resource kind.",
+    );
   }
 
   const scope = DiscoveredIntegrationResourceRelationshipScopeSchema.parse(input.scope);

@@ -462,25 +462,12 @@ export type IntegrationResourceRelationshipScopeDefinition = {
   description?: string;
 };
 
-export type IntegrationResourceRelationshipCredentialSelectorInput = {
-  connection: IntegrationConnection;
-  relationshipKind: string;
-  subjectResourceKind: string;
-  objectResourceKind: string;
-  scope: DiscoveredIntegrationResourceRelationshipScope;
-};
-
-export type IntegrationResourceRelationshipCredentialSelector = (
-  input: IntegrationResourceRelationshipCredentialSelectorInput,
-) => IntegrationResourceCredentialRef | undefined;
-
 export type IntegrationResourceRelationshipDefinition = {
   relationshipKind: string;
   subjectResourceKind: string;
   objectResourceKind: string;
   displayName?: string;
   description?: string;
-  credential?: IntegrationResourceCredentialRef | IntegrationResourceRelationshipCredentialSelector;
   scopeDefinitions: ReadonlyArray<IntegrationResourceRelationshipScopeDefinition>;
 };
 
@@ -516,28 +503,7 @@ export type ListConnectionResourcesInput<
 export type ListConnectionResourcesResult = {
   resources: ReadonlyArray<DiscoveredIntegrationResource>;
   attributes?: ReadonlyArray<DiscoveredIntegrationResourceAttribute>;
-};
-
-export type ListConnectionResourceRelationshipsInput<
-  TTargetConfig = Record<string, unknown>,
-  TTargetSecrets = Record<string, string>,
-  TConnectionConfig = Record<string, unknown>,
-> = {
-  organizationId: string;
-  targetKey: string;
-  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
-  connection: IntegrationConnection & {
-    config: TConnectionConfig;
-  };
-  relationshipKind: string;
-  subjectResourceKind: string;
-  objectResourceKind: string;
-  scope: DiscoveredIntegrationResourceRelationshipScope;
-  credential?: IntegrationCredentialResolverResult;
-};
-
-export type ListConnectionResourceRelationshipsResult = {
-  relationships: ReadonlyArray<DiscoveredIntegrationResourceRelationship>;
+  relationships?: ReadonlyArray<DiscoveredIntegrationResourceRelationship>;
 };
 
 export type IntegrationResourceSyncTrigger = {
@@ -3106,13 +3072,6 @@ export type IntegrationDefinition<
       TConnectionConfig
     >,
   ): MaybePromise<ListConnectionResourcesResult>;
-  listConnectionResourceRelationships?(
-    input: ListConnectionResourceRelationshipsInput<
-      ParsedSchemaOutput<TTargetConfigSchema>,
-      ParsedSchemaOutput<TTargetSecretsSchema>,
-      TConnectionConfig
-    >,
-  ): MaybePromise<ListConnectionResourceRelationshipsResult>;
   mcp?: IntegrationMcpDefinition<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TBindingConfigSchema>,
