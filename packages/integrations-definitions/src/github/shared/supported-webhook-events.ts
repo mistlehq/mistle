@@ -329,6 +329,29 @@ function createGitHubWebhookRequirements(
   };
 }
 
+const GitHubSenderEventActor = {
+  resourceReferences: [
+    {
+      resourceKind: "user",
+      externalIdPayloadPath: ["sender", "id"],
+      handlePayloadPath: ["sender", "login"],
+      when: {
+        payloadPath: ["sender", "type"],
+        equals: "User",
+      },
+    },
+    {
+      resourceKind: "bot",
+      externalIdPayloadPath: ["sender", "id"],
+      handlePayloadPath: ["sender", "login"],
+      when: {
+        payloadPath: ["sender", "type"],
+        equals: "Bot",
+      },
+    },
+  ],
+} satisfies IntegrationWebhookEventDefinition["actor"];
+
 function createGitHubWebhookEventDefinition(input: {
   eventType: string;
   providerEventType: string;
@@ -342,6 +365,7 @@ function createGitHubWebhookEventDefinition(input: {
     description: string;
     template: string;
   }[];
+  actor?: IntegrationWebhookEventDefinition["actor"];
   parameters?: readonly IntegrationWebhookEventParameterDefinition[];
   parameterGroups?: readonly IntegrationWebhookEventParameterGroupDefinition[];
 }): IntegrationWebhookEventDefinition {
@@ -357,6 +381,7 @@ function createGitHubWebhookEventDefinition(input: {
     ...(input.conversationKeyOptions === undefined
       ? {}
       : { conversationKeyOptions: input.conversationKeyOptions }),
+    actor: input.actor ?? GitHubSenderEventActor,
     ...(input.parameters === undefined ? {} : { parameters: input.parameters }),
     ...(input.parameterGroups === undefined ? {} : { parameterGroups: input.parameterGroups }),
   };

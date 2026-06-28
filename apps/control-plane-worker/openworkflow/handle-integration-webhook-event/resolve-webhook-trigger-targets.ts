@@ -3,13 +3,27 @@ import {
   type ControlPlaneDatabase,
   type WebhookTriggerEventCondition,
 } from "@mistle/db/control-plane";
+import type {
+  IntegrationRegistry,
+  IntegrationWebhookEventActorDefinition,
+} from "@mistle/integrations-core";
 import { parseWebhookPayloadFilter } from "@mistle/webhooks";
 
+import { logWebhookDeliveryEvent } from "../shared/webhook-delivery-telemetry.js";
 import { evaluateWebhookPayloadFilter } from "../shared/webhook-payload-filter-evaluator.js";
+import {
+  resolveWebhookTriggerActorPolicy,
+  type ResolvedWebhookTriggerActorPolicyResult,
+} from "./resolve-webhook-trigger-actor-policy.js";
 
 type ResolveWebhookTriggerTargetsInput = {
   organizationId: string;
+  integrationConnectionId: string;
   integrationWebhookSourceId: string;
+  targetKey: string;
+  webhookEventId: string;
+  externalDeliveryId: string | null;
+  integrationRegistry: IntegrationRegistry;
   eventType: string;
   payload: Record<string, unknown>;
 };
@@ -22,18 +36,39 @@ export type ResolvedWebhookTriggerTarget = {
   conversationKeyTemplate: string;
 };
 
-function isWebhookTriggerMatched(input: {
+async function isWebhookTriggerMatched(input: {
+  db: ControlPlaneDatabase;
+  integrationConnectionId: string;
+  actorDefinition: IntegrationWebhookEventActorDefinition | undefined;
   eventType: string;
   payload: Record<string, unknown>;
+  triggerId: string;
+  webhookEventId: string;
+  externalDeliveryId: string | null;
+  targetKey: string;
   eventConditions: readonly WebhookTriggerEventCondition[];
-}): boolean {
+}): Promise<boolean> {
   for (const condition of input.eventConditions) {
     if (condition.eventType !== input.eventType) {
       continue;
     }
 
     if (condition.payloadFilter === undefined || condition.payloadFilter === null) {
-      return true;
+      const actorPolicyMatched = await isActorPolicyMatched({
+        db: input.db,
+        integrationConnectionId: input.integrationConnectionId,
+        actorDefinition: input.actorDefinition,
+        actorPolicy: condition.actorPolicy,
+        payload: input.payload,
+        triggerId: input.triggerId,
+        webhookEventId: input.webhookEventId,
+        externalDeliveryId: input.externalDeliveryId,
+        targetKey: input.targetKey,
+      });
+      if (actorPolicyMatched) {
+        return true;
+      }
+      continue;
     }
 
     const filter = parseWebhookPayloadFilter(condition.payloadFilter);
@@ -43,7 +78,20 @@ function isWebhookTriggerMatched(input: {
         payload: input.payload,
       })
     ) {
-      return true;
+      const actorPolicyMatched = await isActorPolicyMatched({
+        db: input.db,
+        integrationConnectionId: input.integrationConnectionId,
+        actorDefinition: input.actorDefinition,
+        actorPolicy: condition.actorPolicy,
+        payload: input.payload,
+        triggerId: input.triggerId,
+        webhookEventId: input.webhookEventId,
+        externalDeliveryId: input.externalDeliveryId,
+        targetKey: input.targetKey,
+      });
+      if (actorPolicyMatched) {
+        return true;
+      }
     }
   }
 
@@ -74,16 +122,30 @@ export async function resolveWebhookTriggerTargets(
       ),
   });
   const enabledTriggersById = new Set(enabledTriggers.map((trigger) => trigger.id));
+  const enabledCandidateWebhookTriggers = candidateWebhookTriggers.filter((trigger) =>
+    enabledTriggersById.has(trigger.triggerId),
+  );
+  const actorDefinition = hasActorPolicy(enabledCandidateWebhookTriggers)
+    ? await resolveWebhookEventActorDefinition({
+        db,
+        integrationRegistry: input.integrationRegistry,
+        targetKey: input.targetKey,
+        eventType: input.eventType,
+      })
+    : undefined;
 
   const eligibleWebhookTriggers: { triggerId: string; conversationKeyTemplate: string }[] = [];
-  for (const candidateWebhookTrigger of candidateWebhookTriggers) {
-    if (!enabledTriggersById.has(candidateWebhookTrigger.triggerId)) {
-      continue;
-    }
-
-    const matched = isWebhookTriggerMatched({
+  for (const candidateWebhookTrigger of enabledCandidateWebhookTriggers) {
+    const matched = await isWebhookTriggerMatched({
+      db,
+      integrationConnectionId: input.integrationConnectionId,
+      actorDefinition,
       eventType: input.eventType,
       payload: input.payload,
+      triggerId: candidateWebhookTrigger.triggerId,
+      webhookEventId: input.webhookEventId,
+      externalDeliveryId: input.externalDeliveryId,
+      targetKey: input.targetKey,
       eventConditions: candidateWebhookTrigger.eventConditions,
     });
     if (!matched) {
@@ -134,4 +196,106 @@ export async function resolveWebhookTriggerTargets(
   }
 
   return resolvedTargets;
+}
+
+function hasActorPolicy(
+  webhookTriggers: ReadonlyArray<{
+    eventConditions: readonly WebhookTriggerEventCondition[];
+  }>,
+): boolean {
+  return webhookTriggers.some((trigger) =>
+    trigger.eventConditions.some((condition) => condition.actorPolicy !== undefined),
+  );
+}
+
+async function resolveWebhookEventActorDefinition(input: {
+  db: ControlPlaneDatabase;
+  integrationRegistry: IntegrationRegistry;
+  targetKey: string;
+  eventType: string;
+}): Promise<IntegrationWebhookEventActorDefinition | undefined> {
+  const target = await input.db.query.integrationTargets.findFirst({
+    columns: {
+      familyId: true,
+      variantId: true,
+    },
+    where: (table, { eq }) => eq(table.targetKey, input.targetKey),
+  });
+  if (target === undefined) {
+    throw new Error(`Integration target '${input.targetKey}' was not found.`);
+  }
+
+  const definition = input.integrationRegistry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+  if (definition === undefined) {
+    throw new Error(
+      `Integration definition '${target.familyId}::${target.variantId}' was not found.`,
+    );
+  }
+
+  const eventDefinition = definition.supportedWebhookEvents?.find(
+    (candidate) => candidate.eventType === input.eventType,
+  );
+
+  return eventDefinition?.actor;
+}
+
+async function isActorPolicyMatched(input: {
+  db: ControlPlaneDatabase;
+  integrationConnectionId: string;
+  actorDefinition: IntegrationWebhookEventActorDefinition | undefined;
+  actorPolicy: WebhookTriggerEventCondition["actorPolicy"];
+  payload: Record<string, unknown>;
+  triggerId: string;
+  webhookEventId: string;
+  externalDeliveryId: string | null;
+  targetKey: string;
+}): Promise<boolean> {
+  const result = await resolveWebhookTriggerActorPolicy({
+    db: input.db,
+    connectionId: input.integrationConnectionId,
+    actorDefinition: input.actorDefinition,
+    actorPolicy: input.actorPolicy,
+    payload: input.payload,
+  });
+  if (result.status === "matched") {
+    return true;
+  }
+
+  logActorPolicySkipped({
+    result,
+    triggerId: input.triggerId,
+    webhookEventId: input.webhookEventId,
+    externalDeliveryId: input.externalDeliveryId,
+    integrationConnectionId: input.integrationConnectionId,
+    targetKey: input.targetKey,
+  });
+  return false;
+}
+
+function logActorPolicySkipped(input: {
+  result: Extract<ResolvedWebhookTriggerActorPolicyResult, { status: "skipped" }>;
+  triggerId: string;
+  webhookEventId: string;
+  externalDeliveryId: string | null;
+  integrationConnectionId: string;
+  targetKey: string;
+}): void {
+  logWebhookDeliveryEvent({
+    eventName: "trigger_match.actor_policy_skipped",
+    message: "Skipped trigger match because the webhook actor policy was not satisfied.",
+    telemetryContext: {
+      webhookEventId: input.webhookEventId,
+      externalDeliveryId: input.externalDeliveryId ?? undefined,
+      integrationConnectionId: input.integrationConnectionId,
+      targetKey: input.targetKey,
+    },
+    attributes: {
+      "mistle.trigger.id": input.triggerId,
+      "mistle.trigger.actor_policy.skip_reason": input.result.reason,
+      "mistle.trigger.actor_policy.skip_detail": input.result.detail,
+    },
+  });
 }

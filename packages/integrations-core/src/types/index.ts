@@ -2674,6 +2674,22 @@ export type IntegrationWebhookTriggerCapabilities = {
   permissions?: ReadonlyArray<IntegrationWebhookTriggerProviderPermissionRequirement> | undefined;
 };
 
+export type IntegrationWebhookEventActorReferenceCondition = {
+  payloadPath: readonly string[];
+  equals: string;
+};
+
+export type IntegrationWebhookEventActorResourceReference = {
+  resourceKind: string;
+  externalIdPayloadPath?: readonly string[] | undefined;
+  handlePayloadPath?: readonly string[] | undefined;
+  when?: IntegrationWebhookEventActorReferenceCondition | undefined;
+};
+
+export type IntegrationWebhookEventActorDefinition = {
+  resourceReferences: readonly IntegrationWebhookEventActorResourceReference[];
+};
+
 /**
  * A normalized webhook event that an integration exposes to the rest of
  * Mistle. These definitions drive trigger event pickers, payload previews,
@@ -2703,6 +2719,7 @@ export type IntegrationWebhookEventDefinition = {
         template: string;
       }>
     | undefined;
+  actor?: IntegrationWebhookEventActorDefinition | undefined;
   parameters?: ReadonlyArray<IntegrationWebhookEventParameterDefinition> | undefined;
   parameterGroups?: ReadonlyArray<IntegrationWebhookEventParameterGroupDefinition> | undefined;
   requirements?: IntegrationWebhookTriggerRequirements | undefined;

@@ -289,6 +289,7 @@ function createSlackWebhookEventDefinition(input: {
     description: string;
     template: string;
   }[];
+  actor?: IntegrationWebhookEventDefinition["actor"];
   parameters?: readonly IntegrationWebhookEventParameterDefinition[];
 }): IntegrationWebhookEventDefinition {
   return {
@@ -299,9 +300,20 @@ function createSlackWebhookEventDefinition(input: {
     requirements: input.requirements,
     payloadReferences: input.payloadReferences,
     conversationKeyOptions: input.conversationKeyOptions,
+    ...(input.actor === undefined ? {} : { actor: input.actor }),
     ...(input.parameters === undefined ? {} : { parameters: input.parameters }),
   };
 }
+
+const SlackUserEventActor = {
+  resourceReferences: [
+    {
+      resourceKind: "user",
+      externalIdPayloadPath: ["event", "user"],
+      handlePayloadPath: ["event", "user"],
+    },
+  ],
+} satisfies IntegrationWebhookEventDefinition["actor"];
 
 export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefinition[] = [
   createSlackWebhookEventDefinition({
@@ -312,6 +324,7 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     requirements: SlackMessageRequirements,
     payloadReferences: SlackMessagePayloadReferences,
     conversationKeyOptions: [SlackChannelConversationKeyOption, SlackThreadConversationKeyOption],
+    actor: SlackUserEventActor,
     parameters: [
       createSlackInvocationTokenParameter(),
       SlackChannelParameter,
@@ -333,6 +346,7 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     ),
     payloadReferences: SlackMessagePayloadReferences,
     conversationKeyOptions: [SlackChannelConversationKeyOption, SlackThreadConversationKeyOption],
+    actor: SlackUserEventActor,
     parameters: [
       createSlackInvocationTokenParameter(),
       SlackChannelParameter,
@@ -355,6 +369,7 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
       SlackThreadConversationKeyOption,
       SlackReactedMessageConversationKeyOption,
     ],
+    actor: SlackUserEventActor,
     parameters: [
       SlackChannelParameter,
       SlackReactionNameParameter,
@@ -377,6 +392,7 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
       SlackThreadConversationKeyOption,
       SlackReactedMessageConversationKeyOption,
     ],
+    actor: SlackUserEventActor,
     parameters: [
       SlackChannelParameter,
       SlackReactionNameParameter,

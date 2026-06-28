@@ -16,6 +16,7 @@ import {
   IntegrationWebhookEventStatuses,
   ProviderResourceAssociationDeliveryProcessorStatuses,
   ProviderResourceAssociationDeliveryStatuses,
+  type WebhookTriggerActorPolicy,
 } from "@mistle/db/control-plane";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import type { CompiledRuntimePlan } from "@mistle/integrations-core";
@@ -46,6 +47,7 @@ const InternalServiceToken = "integration-new-internal-service-token";
 const OpenAiAgentTargetConfig = {
   api_base_url: "https://api.openai.com/v1",
 };
+const ResourceTimestamp = "2026-03-09T00:00:00.000Z";
 
 describe.concurrent("control-plane worker integration webhook event handling", () => {
   it("queues trigger runs for matching webhook triggers", async ({ env }) => {
@@ -179,6 +181,331 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       },
     );
 
+    expect(preparedEvent.triggerRunIds).toHaveLength(1);
+
+    const queuedRuns = await env.controlPlaneDb.query.triggerRuns.findMany({
+      where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+    });
+    expect(queuedRuns).toHaveLength(1);
+    expect(queuedRuns[0]).toMatchObject({
+      triggerId: scope.triggerId,
+      triggerTargetId: scope.triggerTargetId,
+      status: TriggerRunStatuses.QUEUED,
+    });
+  });
+
+  it("queues trigger runs when the webhook actor policy matches the event actor", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("actor_policy_match"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          actorPolicy: {
+            anyOf: [
+              {
+                kind: "resource",
+                actor: {
+                  resourceKind: "user",
+                  externalId: "1001",
+                },
+              },
+            ],
+          },
+        },
+      ],
+      payload: {
+        installation: {
+          id: 12345,
+        },
+        delivery: {
+          id: "delivery_actor_policy_match_payload",
+        },
+        sender: {
+          id: 1001,
+          login: "octocat",
+          type: "User",
+        },
+      },
+      externalEventId: "evt_actor_policy_match",
+      externalDeliveryId: "delivery_actor_policy_match",
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      finalized: false,
+    });
+    expect(preparedEvent.triggerRunIds).toHaveLength(1);
+
+    const queuedRuns = await env.controlPlaneDb.query.triggerRuns.findMany({
+      where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+    });
+    expect(queuedRuns).toHaveLength(1);
+    expect(queuedRuns[0]).toMatchObject({
+      triggerId: scope.triggerId,
+      triggerTargetId: scope.triggerTargetId,
+      status: TriggerRunStatuses.QUEUED,
+    });
+  });
+
+  it("ignores matching webhook trigger conditions when the webhook actor policy does not match", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("actor_policy_no_match"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          actorPolicy: {
+            anyOf: [
+              {
+                kind: "resource",
+                actor: {
+                  resourceKind: "user",
+                  externalId: "9999",
+                },
+              },
+            ],
+          },
+        },
+      ],
+      payload: {
+        installation: {
+          id: 12345,
+        },
+        delivery: {
+          id: "delivery_actor_policy_no_match_payload",
+        },
+        sender: {
+          id: 1001,
+          login: "octocat",
+          type: "User",
+        },
+      },
+      externalEventId: "evt_actor_policy_no_match",
+      externalDeliveryId: "delivery_actor_policy_no_match",
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.IGNORED,
+      triggerRunIds: [],
+      finalized: true,
+    });
+
+    const queuedRuns = await env.controlPlaneDb.query.triggerRuns.findMany({
+      where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+    });
+    expect(queuedRuns).toEqual([]);
+  });
+
+  it("continues checking later event conditions after an actor policy miss", async ({ env }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("actor_policy_next_condition"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          actorPolicy: {
+            anyOf: [
+              {
+                kind: "resource",
+                actor: {
+                  resourceKind: "user",
+                  externalId: "9999",
+                },
+              },
+            ],
+          },
+        },
+        {
+          eventType: "github.issue_comment.created",
+          payloadFilter: {
+            op: "contains_token",
+            path: ["comment", "body"],
+            value: "@mistlebot",
+          },
+        },
+      ],
+      payload: {
+        installation: {
+          id: 12345,
+        },
+        delivery: {
+          id: "delivery_actor_policy_next_condition_payload",
+        },
+        comment: {
+          body: "please run @mistlebot",
+        },
+        sender: {
+          id: 1001,
+          login: "octocat",
+          type: "User",
+        },
+      },
+      externalEventId: "evt_actor_policy_next_condition",
+      externalDeliveryId: "delivery_actor_policy_next_condition",
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      finalized: false,
+    });
+    expect(preparedEvent.triggerRunIds).toHaveLength(1);
+  });
+
+  it("queues trigger runs when the event actor belongs to a policy actor set", async ({ env }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("actor_policy_relationship"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          actorPolicy: {
+            anyOf: [
+              {
+                kind: "relationship",
+                relationshipKind: "belongs_to",
+                actorSet: {
+                  resourceKind: "org",
+                  externalId: "5001",
+                },
+                scope: {
+                  resourceKind: "org",
+                  externalId: "5001",
+                },
+              },
+            ],
+          },
+        },
+      ],
+      payload: {
+        installation: {
+          id: 12345,
+        },
+        delivery: {
+          id: "delivery_actor_policy_relationship_payload",
+        },
+        sender: {
+          id: 1001,
+          login: "octocat",
+          type: "User",
+        },
+      },
+      externalEventId: "evt_actor_policy_relationship",
+      externalDeliveryId: "delivery_actor_policy_relationship",
+    });
+    await seedActorPolicyRelationshipResources({
+      env,
+      connectionId: scope.connectionId,
+      familyId: "github",
+      actorResource: {
+        id: "rsc_actor_policy_relationship_user",
+        kind: "user",
+        externalId: "1001",
+        handle: "octocat",
+        displayName: "Octocat",
+      },
+      actorSetResource: {
+        id: "rsc_actor_policy_relationship_org",
+        kind: "org",
+        externalId: "5001",
+        handle: "mistle",
+        displayName: "Mistle",
+      },
+      relationshipKind: "belongs_to",
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      finalized: false,
+    });
     expect(preparedEvent.triggerRunIds).toHaveLength(1);
 
     const queuedRuns = await env.controlPlaneDb.query.triggerRuns.findMany({
@@ -1522,6 +1849,7 @@ type SeedWebhookEventScopeInput = {
   providerEventType: string;
   eventConditions?: {
     eventType: string;
+    actorPolicy?: WebhookTriggerActorPolicy;
     payloadFilter?: Record<string, unknown>;
   }[];
   payload: Record<string, unknown>;
@@ -1541,6 +1869,89 @@ type SeededWebhookEventScope = {
   webhookSourceId: string;
   targetKey: string;
 };
+
+type ActorPolicyRelationshipResourceSeed = {
+  id: string;
+  kind: string;
+  externalId: string;
+  handle: string;
+  displayName: string;
+};
+
+async function seedActorPolicyRelationshipResources(input: {
+  env: IntegrationTestEnvironment;
+  connectionId: string;
+  familyId: string;
+  actorResource: ActorPolicyRelationshipResourceSeed;
+  actorSetResource: ActorPolicyRelationshipResourceSeed;
+  relationshipKind: string;
+}): Promise<void> {
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationConnectionResources)
+    .values([
+      {
+        id: input.actorResource.id,
+        connectionId: input.connectionId,
+        familyId: input.familyId,
+        kind: input.actorResource.kind,
+        externalId: input.actorResource.externalId,
+        handle: input.actorResource.handle,
+        displayName: input.actorResource.displayName,
+        metadata: {},
+        lastSeenAt: ResourceTimestamp,
+      },
+      {
+        id: input.actorSetResource.id,
+        connectionId: input.connectionId,
+        familyId: input.familyId,
+        kind: input.actorSetResource.kind,
+        externalId: input.actorSetResource.externalId,
+        handle: input.actorSetResource.handle,
+        displayName: input.actorSetResource.displayName,
+        metadata: {},
+        lastSeenAt: ResourceTimestamp,
+      },
+    ]);
+
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationConnectionResourceRelationshipStates)
+    .values({
+      connectionId: input.connectionId,
+      familyId: input.familyId,
+      relationshipKind: input.relationshipKind,
+      scopeResourceId: input.actorSetResource.id,
+      scopeKind: input.actorSetResource.kind,
+      scopeExternalId: input.actorSetResource.externalId,
+      scopeHandle: input.actorSetResource.handle,
+      syncState: IntegrationConnectionResourceRelationshipSyncStates.READY,
+      totalCount: 1,
+      lastSyncedAt: ResourceTimestamp,
+      lastSyncStartedAt: ResourceTimestamp,
+      lastSyncFinishedAt: ResourceTimestamp,
+    });
+
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationConnectionResourceRelationships)
+    .values({
+      connectionId: input.connectionId,
+      familyId: input.familyId,
+      relationshipKind: input.relationshipKind,
+      subjectResourceId: input.actorResource.id,
+      subjectResourceKind: input.actorResource.kind,
+      subjectExternalId: input.actorResource.externalId,
+      subjectHandle: input.actorResource.handle,
+      objectResourceId: input.actorSetResource.id,
+      objectResourceKind: input.actorSetResource.kind,
+      objectExternalId: input.actorSetResource.externalId,
+      objectHandle: input.actorSetResource.handle,
+      scopeResourceId: input.actorSetResource.id,
+      scopeKind: input.actorSetResource.kind,
+      scopeExternalId: input.actorSetResource.externalId,
+      scopeHandle: input.actorSetResource.handle,
+      metadata: {},
+      lastSeenAt: ResourceTimestamp,
+    });
+}
 
 async function seedWebhookEventScope(
   input: SeedWebhookEventScopeInput,
