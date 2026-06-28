@@ -231,6 +231,7 @@ function LoadedWebhookTriggerEditor(input: {
   const form = (
     <WebhookTriggerForm
       connectionOptions={state.connectionOptions}
+      connections={state.connections}
       fieldErrors={state.fieldErrors}
       formError={state.formError}
       formErrorTitle={state.formErrorTitle}

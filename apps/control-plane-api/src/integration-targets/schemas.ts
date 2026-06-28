@@ -190,6 +190,28 @@ const IntegrationWebhookEventParameterGroupDefinitionSchema = z
   })
   .strict();
 
+const IntegrationWebhookEventActorReferenceConditionSchema = z
+  .object({
+    payloadPath: z.array(z.string().min(1)).min(1),
+    equals: z.string().min(1),
+  })
+  .strict();
+
+const IntegrationWebhookEventActorResourceReferenceSchema = z
+  .object({
+    resourceKind: z.string().min(1),
+    externalIdPayloadPath: z.array(z.string().min(1)).min(1).optional(),
+    handlePayloadPath: z.array(z.string().min(1)).min(1).optional(),
+    when: IntegrationWebhookEventActorReferenceConditionSchema.optional(),
+  })
+  .strict();
+
+const IntegrationWebhookEventActorDefinitionSchema = z
+  .object({
+    resourceReferences: z.array(IntegrationWebhookEventActorResourceReferenceSchema).min(1),
+  })
+  .strict();
+
 export const IntegrationWebhookEventDefinitionSchema = z
   .object({
     eventType: z.string().min(1),
@@ -221,6 +243,7 @@ export const IntegrationWebhookEventDefinitionSchema = z
       .optional(),
     parameters: z.array(IntegrationWebhookEventParameterDefinitionSchema).optional(),
     parameterGroups: z.array(IntegrationWebhookEventParameterGroupDefinitionSchema).optional(),
+    actor: IntegrationWebhookEventActorDefinitionSchema.optional(),
   })
   .strict();
 
@@ -241,6 +264,47 @@ const IntegrationWebhookSourceMetadataSchema = z
   })
   .strict();
 
+const IntegrationResourceAttributeDefinitionSchema = z
+  .object({
+    key: z.string().min(1),
+    valueType: z.enum(["boolean", "number", "string"]),
+    displayName: z.string().min(1).optional(),
+    description: z.string().min(1).optional(),
+    actorPolicyEligible: z.boolean().optional(),
+  })
+  .strict();
+
+const IntegrationResourceDefinitionSchema = z
+  .object({
+    kind: z.string().min(1),
+    selectionMode: z.enum(["single", "multi"]),
+    bindingField: z.string().min(1),
+    displayNameSingular: z.string().min(1),
+    displayNamePlural: z.string().min(1),
+    description: z.string().min(1).optional(),
+    attributeDefinitions: z.array(IntegrationResourceAttributeDefinitionSchema).optional(),
+  })
+  .strict();
+
+const IntegrationResourceRelationshipScopeDefinitionSchema = z
+  .object({
+    scopeKind: z.string().min(1),
+    displayName: z.string().min(1).optional(),
+    description: z.string().min(1).optional(),
+  })
+  .strict();
+
+const IntegrationResourceRelationshipDefinitionSchema = z
+  .object({
+    relationshipKind: z.string().min(1),
+    subjectResourceKind: z.string().min(1),
+    objectResourceKind: z.string().min(1),
+    displayName: z.string().min(1).optional(),
+    description: z.string().min(1).optional(),
+    scopeDefinitions: z.array(IntegrationResourceRelationshipScopeDefinitionSchema).min(1),
+  })
+  .strict();
+
 export const IntegrationTargetSchema = z
   .object({
     targetKey: z.string().min(1),
@@ -254,6 +318,10 @@ export const IntegrationTargetSchema = z
     logoKey: z.string().min(1).optional(),
     connectionMethods: z.array(IntegrationConnectionMethodSchema).min(1).optional(),
     webhookSource: IntegrationWebhookSourceMetadataSchema.optional(),
+    resourceDefinitions: z.array(IntegrationResourceDefinitionSchema).optional(),
+    resourceRelationshipDefinitions: z
+      .array(IntegrationResourceRelationshipDefinitionSchema)
+      .optional(),
     supportedWebhookEvents: z.array(IntegrationWebhookEventDefinitionSchema).optional(),
     supportedAssociatedResourceEvents: z
       .array(IntegrationAssociatedResourceEventDefinitionSchema)

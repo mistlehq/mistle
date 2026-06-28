@@ -81,6 +81,59 @@ describe("resolveTargetMetadata", () => {
     );
   });
 
+  it("preserves webhook actor and resource relationship metadata from integration definitions", () => {
+    const metadata = resolveTargetMetadata({
+      familyId: "slack",
+      variantId: "slack-default",
+      displayNameOverride: null,
+      descriptionOverride: null,
+    });
+
+    expect(metadata.supportedWebhookEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: "slack:app_mention",
+          actor: {
+            resourceReferences: [
+              {
+                resourceKind: "user",
+                externalIdPayloadPath: ["event", "user"],
+                handlePayloadPath: ["event", "user"],
+              },
+            ],
+          },
+        }),
+      ]),
+    );
+    expect(metadata.resourceDefinitions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "user",
+          attributeDefinitions: expect.arrayContaining([
+            expect.objectContaining({
+              key: "is_bot",
+              actorPolicyEligible: true,
+            }),
+          ]),
+        }),
+      ]),
+    );
+    expect(metadata.resourceRelationshipDefinitions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          relationshipKind: "belongs_to",
+          subjectResourceKind: "user",
+          objectResourceKind: "workspace",
+          scopeDefinitions: [
+            expect.objectContaining({
+              scopeKind: "workspace",
+            }),
+          ],
+        }),
+      ]),
+    );
+  });
+
   it("preserves associated resource event filter metadata from integration definitions", () => {
     const metadata = resolveTargetMetadata({
       familyId: "github",

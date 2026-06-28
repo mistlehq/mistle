@@ -3,6 +3,90 @@ import { describe, expect, it } from "vitest";
 import { IntegrationTargetSchema } from "./integrations-service-shared.js";
 
 describe("IntegrationTargetSchema", () => {
+  it("parses actor policy target metadata used by webhook trigger controls", () => {
+    const parsed = IntegrationTargetSchema.parse({
+      targetKey: "slack-default",
+      familyId: "slack",
+      variantId: "slack-default",
+      kind: "connector",
+      enabled: true,
+      config: {},
+      displayName: "Slack",
+      description: "Slack",
+      resourceDefinitions: [
+        {
+          kind: "user",
+          selectionMode: "multi",
+          bindingField: "users",
+          displayNameSingular: "user",
+          displayNamePlural: "users",
+          attributeDefinitions: [
+            {
+              key: "is_bot",
+              valueType: "boolean",
+              displayName: "Bot user",
+              actorPolicyEligible: true,
+            },
+          ],
+        },
+      ],
+      resourceRelationshipDefinitions: [
+        {
+          relationshipKind: "belongs_to",
+          subjectResourceKind: "user",
+          objectResourceKind: "workspace",
+          displayName: "Workspace members",
+          scopeDefinitions: [
+            {
+              scopeKind: "workspace",
+              displayName: "Workspace",
+            },
+          ],
+        },
+      ],
+      supportedWebhookEvents: [
+        {
+          eventType: "slack.app_mention",
+          providerEventType: "app_mention",
+          displayName: "App mention",
+          actor: {
+            resourceReferences: [
+              {
+                resourceKind: "user",
+                externalIdPayloadPath: ["event", "user"],
+                when: {
+                  payloadPath: ["event", "type"],
+                  equals: "app_mention",
+                },
+              },
+            ],
+          },
+        },
+      ],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    });
+
+    expect(parsed.supportedWebhookEvents?.[0]?.actor?.resourceReferences[0]).toEqual({
+      resourceKind: "user",
+      externalIdPayloadPath: ["event", "user"],
+      when: {
+        payloadPath: ["event", "type"],
+        equals: "app_mention",
+      },
+    });
+    expect(parsed.resourceDefinitions?.[0]?.attributeDefinitions?.[0]).toMatchObject({
+      key: "is_bot",
+      actorPolicyEligible: true,
+    });
+    expect(parsed.resourceRelationshipDefinitions?.[0]).toMatchObject({
+      relationshipKind: "belongs_to",
+      subjectResourceKind: "user",
+      objectResourceKind: "workspace",
+    });
+  });
+
   it("parses device-authorization connection methods", () => {
     const parsed = IntegrationTargetSchema.parse({
       targetKey: "openai-default",

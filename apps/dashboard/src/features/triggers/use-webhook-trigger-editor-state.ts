@@ -359,6 +359,7 @@ export function resolveWebhookTriggerEditInitialValues(input: {
 
 export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEditorStateInput): {
   connectionOptions: readonly WebhookTriggerFormOption[];
+  connections: readonly IntegrationConnection[];
   sandboxProfileOptions: readonly WebhookTriggerFormOption[];
   primaryRepositoryOptions: readonly WebhookTriggerFormOption[];
   sandboxProfileStatusMessage?: TriggerFormShellStatusMessage | undefined;
@@ -787,6 +788,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
 
   return {
     connectionOptions: input.connectionOptions,
+    connections: input.directoryData.connections,
     sandboxProfileOptions,
     primaryRepositoryOptions,
     sandboxProfileStatusMessage,

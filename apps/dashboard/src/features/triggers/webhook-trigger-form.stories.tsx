@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { PageFrame } from "../shared/page-frame.js";
 import type { TriggerFormShellStatusMessage } from "./trigger-form-shell.js";
 import { TriggerTypeDisplayField, TriggerTypeSelectField } from "./trigger-type-field.js";
@@ -77,6 +78,61 @@ const ConnectionOptions: readonly WebhookTriggerFormOption[] = [
     value: StorySlackConnectionId,
     label: "Slack Engineering",
     description: "slack-default",
+  },
+];
+
+const Connections: readonly IntegrationConnection[] = [
+  {
+    id: StoryGitHubConnectionId,
+    targetKey: "github-cloud",
+    displayName: "GitHub Engineering",
+    status: "active",
+    resources: [
+      {
+        kind: "user",
+        selectionMode: "multi",
+        count: 42,
+        syncState: "ready",
+        lastSyncedAt: "2026-06-28T00:00:00.000Z",
+      },
+      {
+        kind: "bot",
+        selectionMode: "multi",
+        count: 2,
+        syncState: "ready",
+      },
+    ],
+    createdAt: "2026-06-28T00:00:00.000Z",
+    updatedAt: "2026-06-28T00:00:00.000Z",
+  },
+  {
+    id: StorySlackConnectionId,
+    targetKey: "slack-default",
+    displayName: "Slack Engineering",
+    status: "active",
+    resources: [
+      {
+        kind: "user",
+        selectionMode: "multi",
+        count: 118,
+        syncState: "ready",
+        lastSyncedAt: "2026-06-28T00:00:00.000Z",
+      },
+      {
+        kind: "workspace",
+        selectionMode: "single",
+        count: 1,
+        syncState: "ready",
+      },
+      {
+        kind: "user_group",
+        selectionMode: "multi",
+        count: 7,
+        syncState: "ready",
+      },
+    ],
+    createdAt: "2026-06-28T00:00:00.000Z",
+    updatedAt: "2026-06-28T00:00:00.000Z",
   },
 ];
 
@@ -334,6 +390,7 @@ export function WebhookTriggerFormStoryHarness(input: {
       <PageFrame width="form" title={pageTitle}>
         <WebhookTriggerForm
           connectionOptions={input.connectionOptions ?? ConnectionOptions}
+          connections={Connections}
           fieldErrors={fieldErrors}
           formError={input.formError ?? null}
           validationSummaryError={validationSummaryError}

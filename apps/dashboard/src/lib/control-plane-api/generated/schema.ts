@@ -6230,6 +6230,35 @@ export interface paths {
                 /** @enum {string} */
                 kind: "agent" | "git" | "connector" | "sandbox";
                 logoKey?: string;
+                resourceDefinitions?: {
+                  attributeDefinitions?: {
+                    actorPolicyEligible?: boolean;
+                    description?: string;
+                    displayName?: string;
+                    key: string;
+                    /** @enum {string} */
+                    valueType: "boolean" | "number" | "string";
+                  }[];
+                  bindingField: string;
+                  description?: string;
+                  displayNamePlural: string;
+                  displayNameSingular: string;
+                  kind: string;
+                  /** @enum {string} */
+                  selectionMode: "single" | "multi";
+                }[];
+                resourceRelationshipDefinitions?: {
+                  description?: string;
+                  displayName?: string;
+                  objectResourceKind: string;
+                  relationshipKind: string;
+                  scopeDefinitions: {
+                    description?: string;
+                    displayName?: string;
+                    scopeKind: string;
+                  }[];
+                  subjectResourceKind: string;
+                }[];
                 supportedAssociatedResourceEvents?: {
                   displayName: string;
                   eventType: string;
@@ -6298,6 +6327,17 @@ export interface paths {
                   resourceKind: string;
                 }[];
                 supportedWebhookEvents?: {
+                  actor?: {
+                    resourceReferences: {
+                      externalIdPayloadPath?: string[];
+                      handlePayloadPath?: string[];
+                      resourceKind: string;
+                      when?: {
+                        equals: string;
+                        payloadPath: string[];
+                      };
+                    }[];
+                  };
                   category?: string;
                   conversationKeyOptions?: {
                     description: string;

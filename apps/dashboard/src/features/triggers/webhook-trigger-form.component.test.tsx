@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import type { TriggerFormShellStatusMessage } from "./trigger-form-shell.js";
 import type { WebhookTriggerEventPickerDisabledState } from "./webhook-trigger-event-picker-state.js";
 import {
@@ -36,6 +37,32 @@ const ConnectionOptions: readonly WebhookTriggerFormOption[] = [
     value: GitHubConnectionId,
     label: GitHubConnectionLabel,
     description: "github-cloud",
+  },
+];
+
+const Connections: readonly IntegrationConnection[] = [
+  {
+    id: GitHubConnectionId,
+    targetKey: "github-cloud",
+    displayName: GitHubConnectionLabel,
+    status: "active",
+    resources: [
+      {
+        kind: "user",
+        selectionMode: "multi",
+        count: 2,
+        syncState: "ready",
+        lastSyncedAt: "2026-06-28T00:00:00.000Z",
+      },
+      {
+        kind: "bot",
+        selectionMode: "multi",
+        count: 1,
+        syncState: "ready",
+      },
+    ],
+    createdAt: "2026-06-28T00:00:00.000Z",
+    updatedAt: "2026-06-28T00:00:00.000Z",
   },
 ];
 
@@ -139,6 +166,7 @@ describe("WebhookTriggerForm", () => {
     triggerPickerDisabledState?: WebhookTriggerEventPickerDisabledState | null;
     sandboxProfileStatusMessage?: TriggerFormShellStatusMessage | undefined;
     webhookEventOptions?: typeof WebhookEventOptions;
+    connections?: readonly IntegrationConnection[];
     fieldErrors?: WebhookTriggerFormFieldErrors;
     primaryRepositoryOptions?: readonly WebhookTriggerFormOption[];
     onDelete?: () => void;
@@ -147,7 +175,12 @@ describe("WebhookTriggerForm", () => {
     onViewActivity?: () => void;
     onValueChange?: (
       key: keyof WebhookTriggerFormValues,
-      value: string | boolean | string[] | WebhookTriggerEventParameterRuleMap,
+      value:
+        | string
+        | boolean
+        | string[]
+        | WebhookTriggerFormValues["eventActorPolicies"]
+        | WebhookTriggerEventParameterRuleMap,
     ) => void;
   };
 
@@ -156,6 +189,7 @@ describe("WebhookTriggerForm", () => {
       <QueryClientProvider client={TestQueryClient}>
         <WebhookTriggerForm
           connectionOptions={ConnectionOptions}
+          connections={input.connections ?? Connections}
           fieldErrors={input.fieldErrors ?? {}}
           formError={null}
           validationSummaryError={null}
@@ -233,6 +267,222 @@ describe("WebhookTriggerForm", () => {
     }
 
     expect(within(groupingFieldCandidate).getByRole("combobox")).toBeDefined();
+  });
+
+  it("shows actor policy controls for events with provider actor metadata", () => {
+    const eventOption = createGithubIssueCommentCreatedEventOption({
+      actor: {
+        resourceReferences: [
+          {
+            resourceKind: "user",
+            handlePayloadPath: ["sender", "login"],
+          },
+        ],
+      },
+      resourceDefinitions: [
+        {
+          kind: "user",
+          selectionMode: "multi",
+          bindingField: "users",
+          displayNameSingular: "user",
+          displayNamePlural: "users",
+          attributeDefinitions: [
+            {
+              key: "is_bot",
+              valueType: "boolean",
+              displayName: "Bot user",
+              actorPolicyEligible: true,
+            },
+          ],
+        },
+      ],
+      resourceRelationshipDefinitions: [
+        {
+          relationshipKind: "belongs_to",
+          subjectResourceKind: "user",
+          objectResourceKind: "team",
+          displayName: "Team members",
+          scopeDefinitions: [
+            {
+              scopeKind: "team",
+            },
+          ],
+        },
+      ],
+    });
+    const conditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: eventOption.id,
+      index: 0,
+    });
+
+    renderFormWithOptions({
+      mode: "create",
+      values: buildFormValues({
+        eventIds: [conditionId],
+        eventParameterRules: {
+          [conditionId]: {},
+        },
+      }),
+      webhookEventOptions: [eventOption],
+    });
+
+    expect(screen.getByText("Allowed actors")).toBeDefined();
+    expect(screen.getByText("GitHub Engineering")).toBeDefined();
+    expect(
+      screen.getByText(
+        "Group actor policies need relationship sync readiness before they can be selected.",
+      ),
+    ).toBeDefined();
+  });
+
+  it("writes actor type policies without changing payload parameter rules", () => {
+    const eventOption = createGithubIssueCommentCreatedEventOption({
+      actor: {
+        resourceReferences: [
+          {
+            resourceKind: "user",
+            handlePayloadPath: ["sender", "login"],
+          },
+        ],
+      },
+      resourceDefinitions: [
+        {
+          kind: "user",
+          selectionMode: "multi",
+          bindingField: "users",
+          displayNameSingular: "user",
+          displayNamePlural: "users",
+          attributeDefinitions: [
+            {
+              key: "is_bot",
+              valueType: "boolean",
+              displayName: "Bot user",
+              actorPolicyEligible: true,
+            },
+          ],
+        },
+      ],
+    });
+    const conditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: eventOption.id,
+      index: 0,
+    });
+    let changedKey: keyof WebhookTriggerFormValues | null = null;
+    let changedValue: unknown;
+
+    renderFormWithOptions({
+      mode: "create",
+      onValueChange: (key, value) => {
+        changedKey = key;
+        changedValue = value;
+      },
+      values: buildFormValues({
+        eventIds: [conditionId],
+        eventParameterRules: {
+          [conditionId]: {},
+        },
+      }),
+      webhookEventOptions: [eventOption],
+    });
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Allowed actors" }));
+    const actorTypeOption = screen.getByRole("option", { name: "Actor type" });
+    fireEvent.mouseMove(actorTypeOption);
+    fireEvent.mouseDown(actorTypeOption, { button: 0 });
+    fireEvent.mouseUp(actorTypeOption, { button: 0 });
+    fireEvent.click(actorTypeOption, { button: 0 });
+
+    expect(changedKey).toBe("eventActorPolicies");
+    expect(changedValue).toEqual({
+      [conditionId]: {
+        anyOf: [
+          {
+            kind: "attribute",
+            attributeKey: "is_bot",
+            attributeValue: "true",
+            valueType: "boolean",
+          },
+        ],
+      },
+    });
+  });
+
+  it("blocks actor type policies until actor resource attributes are synced", () => {
+    const eventOption = createGithubIssueCommentCreatedEventOption({
+      actor: {
+        resourceReferences: [
+          {
+            resourceKind: "user",
+            handlePayloadPath: ["sender", "login"],
+          },
+        ],
+      },
+      resourceDefinitions: [
+        {
+          kind: "user",
+          selectionMode: "multi",
+          bindingField: "users",
+          displayNameSingular: "user",
+          displayNamePlural: "users",
+          attributeDefinitions: [
+            {
+              key: "is_bot",
+              valueType: "boolean",
+              displayName: "Bot user",
+              actorPolicyEligible: true,
+            },
+          ],
+        },
+      ],
+    });
+    const conditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: eventOption.id,
+      index: 0,
+    });
+    let changeCount = 0;
+
+    renderFormWithOptions({
+      mode: "create",
+      onValueChange: () => {
+        changeCount += 1;
+      },
+      values: buildFormValues({
+        eventIds: [conditionId],
+        eventParameterRules: {
+          [conditionId]: {},
+        },
+      }),
+      webhookEventOptions: [eventOption],
+      connections: [
+        {
+          id: GitHubConnectionId,
+          targetKey: "github-cloud",
+          displayName: GitHubConnectionLabel,
+          status: "active",
+          resources: [
+            {
+              kind: "user",
+              selectionMode: "multi",
+              count: 0,
+              syncState: "never-synced",
+            },
+          ],
+          createdAt: "2026-06-28T00:00:00.000Z",
+          updatedAt: "2026-06-28T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(
+      screen.getByText("Actor type policies need actor resource sync to be ready."),
+    ).toBeDefined();
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Allowed actors" }));
+    const actorTypeOption = screen.getByRole("option", { name: "Actor type" });
+    expect(actorTypeOption.getAttribute("data-disabled")).not.toBeNull();
+
+    fireEvent.click(actorTypeOption, { button: 0 });
+    expect(changeCount).toBe(0);
   });
 
   it("hides conversation grouping when no triggers are selected", () => {
@@ -507,6 +757,7 @@ describe("WebhookTriggerForm", () => {
       <QueryClientProvider client={TestQueryClient}>
         <WebhookTriggerForm
           connectionOptions={ConnectionOptions}
+          connections={Connections}
           fieldErrors={{
             name: "Trigger name is required.",
             sandboxProfileId: "Select a sandbox profile.",
@@ -633,6 +884,7 @@ describe("WebhookTriggerForm", () => {
       <QueryClientProvider client={TestQueryClient}>
         <WebhookTriggerForm
           connectionOptions={ConnectionOptions}
+          connections={Connections}
           fieldErrors={{
             name: "Trigger name is required.",
             sandboxProfileId: "Select a sandbox profile.",
@@ -679,6 +931,7 @@ describe("WebhookTriggerForm", () => {
       <QueryClientProvider client={TestQueryClient}>
         <WebhookTriggerForm
           connectionOptions={ConnectionOptions}
+          connections={Connections}
           fieldErrors={{}}
           formError="The selected events do not support this trigger setup."
           validationSummaryError={null}
@@ -711,6 +964,7 @@ describe("WebhookTriggerForm", () => {
       <QueryClientProvider client={TestQueryClient}>
         <WebhookTriggerForm
           connectionOptions={ConnectionOptions}
+          connections={Connections}
           fieldErrors={{}}
           formError="Could not duplicate trigger."
           formErrorTitle="Trigger could not be duplicated"

@@ -13,6 +13,9 @@ import type {
   IntegrationFormConnectionMethodSetupPaneMetadata,
   IntegrationFormConnectionMethodSetupStartForm,
   IntegrationKind,
+  IntegrationResourceDefinition,
+  IntegrationResourceRelationshipDefinition,
+  IntegrationWebhookEventActorDefinition,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
   IntegrationWebhookEventParameterGroupDefinition,
@@ -89,6 +92,18 @@ type ResolvedWebhookEventParameterGroup = {
   }[];
 };
 
+type ResolvedWebhookEventActorDefinition = {
+  resourceReferences: {
+    resourceKind: string;
+    externalIdPayloadPath?: string[];
+    handlePayloadPath?: string[];
+    when?: {
+      payloadPath: string[];
+      equals: string;
+    };
+  }[];
+};
+
 type ResolvedWebhookEvent = {
   eventType: string;
   providerEventType: string;
@@ -116,6 +131,7 @@ type ResolvedWebhookEvent = {
   }[];
   parameters?: ResolvedWebhookEventParameter[];
   parameterGroups?: ResolvedWebhookEventParameterGroup[];
+  actor?: ResolvedWebhookEventActorDefinition;
 };
 
 type ResolvedAssociatedResourceEvent = {
@@ -193,9 +209,32 @@ export type ResolvedIntegrationTargetMetadata = {
     lifecycle: IntegrationWebhookSourceLifecycle;
     requiresSourceSelection: boolean;
   };
+  resourceDefinitions?: ResolvedResourceDefinition[];
+  resourceRelationshipDefinitions?: ResolvedResourceRelationshipDefinition[];
   supportedWebhookEvents?: ResolvedWebhookEvent[];
   supportedAssociatedResourceEvents?: ResolvedAssociatedResourceEvent[];
 };
+
+type ResolvedResourceDefinition = Pick<
+  IntegrationResourceDefinition,
+  | "kind"
+  | "selectionMode"
+  | "bindingField"
+  | "displayNameSingular"
+  | "displayNamePlural"
+  | "description"
+  | "attributeDefinitions"
+>;
+
+type ResolvedResourceRelationshipDefinition = Pick<
+  IntegrationResourceRelationshipDefinition,
+  | "relationshipKind"
+  | "subjectResourceKind"
+  | "objectResourceKind"
+  | "displayName"
+  | "description"
+  | "scopeDefinitions"
+>;
 
 type ResolvedSetupCompletionRequirement =
   | IntegrationFormConnectionMethodSetupCompletionRequirementLeaf
@@ -701,6 +740,30 @@ function cloneWebhookEventParameterGroups(
   }));
 }
 
+function cloneWebhookEventActor(
+  actor: IntegrationWebhookEventActorDefinition,
+): ResolvedWebhookEventActorDefinition {
+  return {
+    resourceReferences: actor.resourceReferences.map((reference) => ({
+      resourceKind: reference.resourceKind,
+      ...(reference.externalIdPayloadPath === undefined
+        ? {}
+        : { externalIdPayloadPath: [...reference.externalIdPayloadPath] }),
+      ...(reference.handlePayloadPath === undefined
+        ? {}
+        : { handlePayloadPath: [...reference.handlePayloadPath] }),
+      ...(reference.when === undefined
+        ? {}
+        : {
+            when: {
+              payloadPath: [...reference.when.payloadPath],
+              equals: reference.when.equals,
+            },
+          }),
+    })),
+  };
+}
+
 function cloneWebhookEvents(
   events: readonly IntegrationWebhookEventDefinition[],
 ): ResolvedWebhookEvent[] {
@@ -757,6 +820,60 @@ function cloneWebhookEvents(
       : {
           parameterGroups: cloneWebhookEventParameterGroups(eventDefinition.parameterGroups),
         }),
+    ...(eventDefinition.actor === undefined
+      ? {}
+      : { actor: cloneWebhookEventActor(eventDefinition.actor) }),
+  }));
+}
+
+function cloneResourceDefinitions(
+  definitions: readonly IntegrationResourceDefinition[],
+): ResolvedResourceDefinition[] {
+  return definitions.map((definition) => ({
+    kind: definition.kind,
+    selectionMode: definition.selectionMode,
+    bindingField: definition.bindingField,
+    displayNameSingular: definition.displayNameSingular,
+    displayNamePlural: definition.displayNamePlural,
+    ...(definition.description === undefined ? {} : { description: definition.description }),
+    ...(definition.attributeDefinitions === undefined
+      ? {}
+      : {
+          attributeDefinitions: definition.attributeDefinitions.map((attributeDefinition) => ({
+            key: attributeDefinition.key,
+            valueType: attributeDefinition.valueType,
+            ...(attributeDefinition.displayName === undefined
+              ? {}
+              : { displayName: attributeDefinition.displayName }),
+            ...(attributeDefinition.description === undefined
+              ? {}
+              : { description: attributeDefinition.description }),
+            ...(attributeDefinition.actorPolicyEligible === undefined
+              ? {}
+              : { actorPolicyEligible: attributeDefinition.actorPolicyEligible }),
+          })),
+        }),
+  }));
+}
+
+function cloneResourceRelationshipDefinitions(
+  definitions: readonly IntegrationResourceRelationshipDefinition[],
+): ResolvedResourceRelationshipDefinition[] {
+  return definitions.map((definition) => ({
+    relationshipKind: definition.relationshipKind,
+    subjectResourceKind: definition.subjectResourceKind,
+    objectResourceKind: definition.objectResourceKind,
+    ...(definition.displayName === undefined ? {} : { displayName: definition.displayName }),
+    ...(definition.description === undefined ? {} : { description: definition.description }),
+    scopeDefinitions: definition.scopeDefinitions.map((scopeDefinition) => ({
+      scopeKind: scopeDefinition.scopeKind,
+      ...(scopeDefinition.displayName === undefined
+        ? {}
+        : { displayName: scopeDefinition.displayName }),
+      ...(scopeDefinition.description === undefined
+        ? {}
+        : { description: scopeDefinition.description }),
+    })),
   }));
 }
 
@@ -840,6 +957,16 @@ function buildResolvedIntegrationTargetMetadata(input: {
             lifecycle: input.definition.webhookSource.lifecycle,
             requiresSourceSelection: true,
           },
+        }),
+    ...(input.definition.resourceDefinitions === undefined
+      ? {}
+      : { resourceDefinitions: cloneResourceDefinitions(input.definition.resourceDefinitions) }),
+    ...(input.definition.resourceRelationshipDefinitions === undefined
+      ? {}
+      : {
+          resourceRelationshipDefinitions: cloneResourceRelationshipDefinitions(
+            input.definition.resourceRelationshipDefinitions,
+          ),
         }),
     ...(input.definition.supportedWebhookEvents === undefined
       ? {}
