@@ -194,6 +194,7 @@ function resolveSlackEventClassification(input: {
     providerEventType === "team_join" ||
     providerEventType === "user_change" ||
     providerEventType === "subteam_created" ||
+    providerEventType === "subteam_members_changed" ||
     providerEventType === "subteam_updated"
   ) {
     return {

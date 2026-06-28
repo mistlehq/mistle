@@ -104,6 +104,12 @@ const SlackUserGroupsListResponseSchema = z.looseObject({
   error: z.string().min(1).optional(),
 });
 
+const SlackUserGroupUsersListResponseSchema = z.looseObject({
+  ok: z.boolean(),
+  users: z.array(z.string().min(1)).optional(),
+  error: z.string().min(1).optional(),
+});
+
 type SlackListConnectionResourcesInput = ListConnectionResourcesInput<
   SlackTargetConfig,
   SlackTargetSecrets,
@@ -149,6 +155,13 @@ function buildSlackUserGroupsListUrl(input: { apiBaseUrl: string }): URL {
   const apiUrl = new URL(buildUrlWithPath(input.apiBaseUrl, "/usergroups.list"));
   apiUrl.searchParams.set("include_disabled", "false");
   apiUrl.searchParams.set("include_users", "false");
+  return apiUrl;
+}
+
+function buildSlackUserGroupUsersListUrl(input: { apiBaseUrl: string; userGroupId: string }): URL {
+  const apiUrl = new URL(buildUrlWithPath(input.apiBaseUrl, "/usergroups.users.list"));
+  apiUrl.searchParams.set("usergroup", input.userGroupId);
+  apiUrl.searchParams.set("include_disabled", "false");
   return apiUrl;
 }
 
@@ -303,6 +316,28 @@ function toDiscoveredWorkspaceMembership(input: {
     scopeHandle: input.workspaceHandle,
     metadata: {
       teamId: input.user.team_id,
+    },
+  };
+}
+
+function toDiscoveredUserGroupMembership(input: {
+  userId: string;
+  userGroupExternalId: string;
+  userGroupHandle: string;
+}): DiscoveredIntegrationResourceRelationship {
+  return {
+    relationshipKind: "belongs_to",
+    subjectResourceKind: SlackUserKind,
+    subjectExternalId: input.userId,
+    subjectHandle: input.userId,
+    objectResourceKind: SlackUserGroupKind,
+    objectExternalId: input.userGroupExternalId,
+    objectHandle: input.userGroupHandle,
+    scopeKind: SlackUserGroupKind,
+    scopeExternalId: input.userGroupExternalId,
+    scopeHandle: input.userGroupHandle,
+    metadata: {
+      userGroupId: input.userGroupExternalId,
     },
   };
 }
@@ -518,6 +553,53 @@ async function listSlackWorkspaceMembershipRelationships(input: {
     .sort((left, right) => left.subjectHandle.localeCompare(right.subjectHandle));
 }
 
+async function listSlackUserGroupMembershipRelationships(input: {
+  apiBaseUrl: string;
+  botToken: string;
+  scopeExternalId: string;
+  scopeHandle: string;
+}): Promise<ReadonlyArray<DiscoveredIntegrationResourceRelationship>> {
+  const response = await fetch(
+    buildSlackUserGroupUsersListUrl({
+      apiBaseUrl: input.apiBaseUrl,
+      userGroupId: input.scopeExternalId,
+    }),
+    {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${input.botToken}`,
+        accept: "application/json",
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Slack usergroups.users.list request failed with status ${String(response.status)}.`,
+    );
+  }
+
+  const parsedPayload = SlackUserGroupUsersListResponseSchema.parse(await response.json());
+  if (!parsedPayload.ok) {
+    throw new Error(
+      `Slack usergroups.users.list returned an error${parsedPayload.error === undefined ? "." : `: ${parsedPayload.error}.`}`,
+    );
+  }
+  if (parsedPayload.users === undefined) {
+    throw new Error("Slack usergroups.users.list response is missing users.");
+  }
+
+  return parsedPayload.users
+    .map((userId) =>
+      toDiscoveredUserGroupMembership({
+        userId,
+        userGroupExternalId: input.scopeExternalId,
+        userGroupHandle: input.scopeHandle,
+      }),
+    )
+    .sort((left, right) => left.subjectHandle.localeCompare(right.subjectHandle));
+}
+
 async function listSlackUserGroups(input: {
   apiBaseUrl: string;
   botToken: string;
@@ -565,11 +647,12 @@ export async function listSlackConnectionResources(
   }
 
   SlackConnectionConfigSchema.parse(input.connection.config);
+  const botToken = input.credential.value;
 
   if (input.kind === SlackWorkspaceKind) {
     const resources = await listSlackWorkspace({
       apiBaseUrl: input.target.config.apiBaseUrl,
-      botToken: input.credential.value,
+      botToken,
     });
     const workspace = resources[0];
     if (workspace === undefined || workspace.externalId === undefined) {
@@ -580,7 +663,7 @@ export async function listSlackConnectionResources(
       resources,
       relationships: await listSlackWorkspaceMembershipRelationships({
         apiBaseUrl: input.target.config.apiBaseUrl,
-        botToken: input.credential.value,
+        botToken,
         scopeExternalId: workspace.externalId,
         scopeHandle: workspace.handle,
       }),
@@ -591,7 +674,7 @@ export async function listSlackConnectionResources(
     return {
       resources: await listSlackChannels({
         apiBaseUrl: input.target.config.apiBaseUrl,
-        botToken: input.credential.value,
+        botToken,
       }),
     };
   }
@@ -599,16 +682,33 @@ export async function listSlackConnectionResources(
   if (input.kind === SlackUserKind) {
     return await listSlackUserResources({
       apiBaseUrl: input.target.config.apiBaseUrl,
-      botToken: input.credential.value,
+      botToken,
     });
   }
 
   if (input.kind === SlackUserGroupKind) {
-    return {
-      resources: await listSlackUserGroups({
-        apiBaseUrl: input.target.config.apiBaseUrl,
-        botToken: input.credential.value,
+    const resources = await listSlackUserGroups({
+      apiBaseUrl: input.target.config.apiBaseUrl,
+      botToken,
+    });
+    const relationshipLists = await Promise.all(
+      resources.map((resource) => {
+        if (resource.externalId === undefined) {
+          throw new Error("Slack user group resource listing returned a user group without an id.");
+        }
+
+        return listSlackUserGroupMembershipRelationships({
+          apiBaseUrl: input.target.config.apiBaseUrl,
+          botToken,
+          scopeExternalId: resource.externalId,
+          scopeHandle: resource.handle,
+        });
       }),
+    );
+
+    return {
+      resources,
+      relationships: relationshipLists.flat(),
     };
   }
 

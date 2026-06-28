@@ -96,6 +96,20 @@ export function createSlackResourceRelationshipDefinitions(): ReadonlyArray<Inte
         },
       ],
     },
+    {
+      relationshipKind: "belongs_to",
+      subjectResourceKind: "user",
+      objectResourceKind: "user_group",
+      displayName: "User group members",
+      description: "Slack users that belong to a Slack user group.",
+      scopeDefinitions: [
+        {
+          scopeKind: "user_group",
+          displayName: "User group",
+          description: "The Slack user group whose user membership snapshot is synced.",
+        },
+      ],
+    },
   ];
 }
 
@@ -142,6 +156,10 @@ export const SlackResourceSyncTriggers: ReadonlyArray<IntegrationResourceSyncTri
   },
   {
     eventType: "slack:subteam_updated",
+    resourceKinds: ["user_group"],
+  },
+  {
+    eventType: "slack:subteam_members_changed",
     resourceKinds: ["user_group"],
   },
 ];

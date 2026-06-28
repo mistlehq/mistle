@@ -26,6 +26,7 @@ export const SlackAppManifestBotEvents = [
   "reaction_added",
   "reaction_removed",
   "subteam_created",
+  "subteam_members_changed",
   "subteam_updated",
   "team_join",
   "user_change",

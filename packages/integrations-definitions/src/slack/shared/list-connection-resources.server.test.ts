@@ -578,7 +578,7 @@ describe("listSlackConnectionResources", () => {
     }
   });
 
-  it("lists active Slack user groups without requesting membership lists", async () => {
+  it("lists active Slack user groups with membership relationships", async () => {
     const seenUrls: string[] = [];
     const server = await startTestServer({
       handler(request, response) {
@@ -592,33 +592,51 @@ describe("listSlackConnectionResources", () => {
         seenUrls.push(requestUrl.toString());
         response.setHeader("content-type", "application/json");
 
-        // Grounded in Slack's documented usergroups.list response shape:
-        // https://docs.slack.dev/reference/methods/usergroups.list/
-        response.end(
-          JSON.stringify({
-            ok: true,
-            usergroups: [
-              {
-                id: "S_ENG",
-                team_id: "T123",
-                is_usergroup: true,
-                name: "Engineering",
-                description: "Engineering team",
-                handle: "eng",
-                is_external: false,
-                date_delete: 0,
-                user_count: "12",
-              },
-              {
-                id: "S_DISABLED",
-                is_usergroup: true,
-                name: "Disabled Group",
-                handle: "old-team",
-                date_delete: 1_710_000_000,
-              },
-            ],
-          }),
-        );
+        if (requestUrl.pathname === "/api/usergroups.list") {
+          // Grounded in Slack's documented usergroups.list response shape:
+          // https://docs.slack.dev/reference/methods/usergroups.list/
+          response.end(
+            JSON.stringify({
+              ok: true,
+              usergroups: [
+                {
+                  id: "S_ENG",
+                  team_id: "T123",
+                  is_usergroup: true,
+                  name: "Engineering",
+                  description: "Engineering team",
+                  handle: "eng",
+                  is_external: false,
+                  date_delete: 0,
+                  user_count: "12",
+                },
+                {
+                  id: "S_DISABLED",
+                  is_usergroup: true,
+                  name: "Disabled Group",
+                  handle: "old-team",
+                  date_delete: 1_710_000_000,
+                },
+              ],
+            }),
+          );
+          return;
+        }
+
+        if (requestUrl.pathname === "/api/usergroups.users.list") {
+          // Grounded in Slack's documented usergroups.users.list response shape:
+          // https://docs.slack.dev/reference/methods/usergroups.users.list/
+          response.end(
+            JSON.stringify({
+              ok: true,
+              users: ["U_HUMAN", "U_BOT"],
+            }),
+          );
+          return;
+        }
+
+        response.writeHead(404);
+        response.end("Unexpected Slack API method.");
       },
     });
 
@@ -651,6 +669,7 @@ describe("listSlackConnectionResources", () => {
 
       expect(seenUrls).toEqual([
         "http://127.0.0.1/api/usergroups.list?include_disabled=false&include_users=false",
+        "http://127.0.0.1/api/usergroups.users.list?usergroup=S_ENG&include_disabled=false",
       ]);
       expect(result).toEqual({
         resources: [
@@ -667,6 +686,38 @@ describe("listSlackConnectionResources", () => {
               isUserGroup: true,
               isExternal: false,
               dateDelete: 0,
+            },
+          },
+        ],
+        relationships: [
+          {
+            relationshipKind: "belongs_to",
+            subjectResourceKind: "user",
+            subjectExternalId: "U_BOT",
+            subjectHandle: "U_BOT",
+            objectResourceKind: "user_group",
+            objectExternalId: "S_ENG",
+            objectHandle: "S_ENG",
+            scopeKind: "user_group",
+            scopeExternalId: "S_ENG",
+            scopeHandle: "S_ENG",
+            metadata: {
+              userGroupId: "S_ENG",
+            },
+          },
+          {
+            relationshipKind: "belongs_to",
+            subjectResourceKind: "user",
+            subjectExternalId: "U_HUMAN",
+            subjectHandle: "U_HUMAN",
+            objectResourceKind: "user_group",
+            objectExternalId: "S_ENG",
+            objectHandle: "S_ENG",
+            scopeKind: "user_group",
+            scopeExternalId: "S_ENG",
+            scopeHandle: "S_ENG",
+            metadata: {
+              userGroupId: "S_ENG",
             },
           },
         ],

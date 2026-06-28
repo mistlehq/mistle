@@ -573,6 +573,16 @@ describe("integrations-definitions server", () => {
           }),
         ],
       }),
+      expect.objectContaining({
+        relationshipKind: "belongs_to",
+        subjectResourceKind: "user",
+        objectResourceKind: "user_group",
+        scopeDefinitions: [
+          expect.objectContaining({
+            scopeKind: "user_group",
+          }),
+        ],
+      }),
     ]);
     expect(slackDefinition?.resourceSyncTriggers).toEqual([
       {
@@ -617,6 +627,10 @@ describe("integrations-definitions server", () => {
       },
       {
         eventType: "slack:subteam_updated",
+        resourceKinds: ["user_group"],
+      },
+      {
+        eventType: "slack:subteam_members_changed",
         resourceKinds: ["user_group"],
       },
     ]);
