@@ -209,7 +209,12 @@ async function prepareWebhookEventWork(
 ): Promise<PrepareIntegrationWebhookEventOutput> {
   const resolvedTargets = await resolveWebhookTriggerTargets(ctx.db, {
     organizationId: input.webhookEvent.organizationId,
+    integrationConnectionId: input.webhookEvent.integrationConnectionId,
     integrationWebhookSourceId: input.integrationWebhookSourceId,
+    targetKey: input.webhookEvent.targetKey,
+    webhookEventId: input.webhookEvent.id,
+    externalDeliveryId: input.webhookEvent.externalDeliveryId,
+    integrationRegistry: ctx.integrationRegistry,
     eventType: input.webhookEvent.eventType,
     payload: input.webhookEvent.payload,
   });

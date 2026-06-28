@@ -245,6 +245,15 @@ describe("SlackSupportedWebhookEvents", () => {
           template: "slack:message:{{payload.event.item.channel}}:{{payload.event.item.ts}}",
         },
       ],
+      actor: {
+        resourceReferences: [
+          {
+            resourceKind: "user",
+            externalIdPayloadPath: ["event", "user"],
+            handlePayloadPath: ["event", "user"],
+          },
+        ],
+      },
       parameters: [
         {
           id: "channel",
@@ -286,5 +295,63 @@ describe("SlackSupportedWebhookEvents", () => {
         },
       ],
     });
+  });
+
+  it("declares event actors for Slack user-authored events", () => {
+    expect(
+      SlackSupportedWebhookEvents.map((eventDefinition) => ({
+        eventType: eventDefinition.eventType,
+        actor: eventDefinition.actor,
+      })),
+    ).toEqual([
+      {
+        eventType: "slack:message",
+        actor: {
+          resourceReferences: [
+            {
+              resourceKind: "user",
+              externalIdPayloadPath: ["event", "user"],
+              handlePayloadPath: ["event", "user"],
+            },
+          ],
+        },
+      },
+      {
+        eventType: "slack:app_mention",
+        actor: {
+          resourceReferences: [
+            {
+              resourceKind: "user",
+              externalIdPayloadPath: ["event", "user"],
+              handlePayloadPath: ["event", "user"],
+            },
+          ],
+        },
+      },
+      {
+        eventType: "slack:reaction_added",
+        actor: {
+          resourceReferences: [
+            {
+              resourceKind: "user",
+              externalIdPayloadPath: ["event", "user"],
+              handlePayloadPath: ["event", "user"],
+            },
+          ],
+        },
+      },
+      {
+        eventType: "slack:reaction_removed",
+        actor: {
+          resourceReferences: [
+            {
+              resourceKind: "user",
+              externalIdPayloadPath: ["event", "user"],
+              handlePayloadPath: ["event", "user"],
+            },
+          ],
+        },
+      },
+    ]);
   });
 });
