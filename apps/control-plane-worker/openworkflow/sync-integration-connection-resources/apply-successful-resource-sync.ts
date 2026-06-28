@@ -9,6 +9,7 @@ import type {
   DiscoveredIntegrationResourceAttribute,
   DiscoveredIntegrationResourceRelationship,
   IntegrationResourceAttributeDefinition,
+  IntegrationResourceRelationshipDefinition,
 } from "@mistle/integrations-core";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
@@ -36,6 +37,7 @@ export async function applySuccessfulResourceSync(input: {
   discoveredAttributes?: ReadonlyArray<DiscoveredIntegrationResourceAttribute>;
   discoveredRelationships?: ReadonlyArray<DiscoveredIntegrationResourceRelationship>;
   attributeDefinitions?: ReadonlyArray<IntegrationResourceAttributeDefinition>;
+  relationshipDefinitions?: ReadonlyArray<IntegrationResourceRelationshipDefinition>;
 }): Promise<boolean> {
   return input.db.transaction(async (tx) => {
     const tables = getControlPlaneDatabaseSchema(tx);
@@ -165,7 +167,10 @@ export async function applySuccessfulResourceSync(input: {
       tx,
       connectionId: input.connectionId,
       familyId: input.familyId,
+      syncedResourceKind: input.kind,
+      discoveredResources: input.discoveredResources,
       discoveredRelationships: input.discoveredRelationships ?? [],
+      relationshipDefinitions: input.relationshipDefinitions ?? [],
     });
 
     for (const resourceId of attributeBearingAccessibleExistingResourceIds({

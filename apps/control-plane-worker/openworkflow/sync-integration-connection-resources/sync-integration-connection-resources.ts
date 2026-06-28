@@ -218,7 +218,8 @@ export async function syncIntegrationConnectionResources(
     });
     const discoveredRelationships = validateListedResourceRelationships({
       definition,
-      relationships: listedResources.relationships ?? [],
+      resourceKind: input.kind,
+      relationships: listedResources.relationships,
     });
 
     const appliedSuccessfully = await applySuccessfulResourceSync({
@@ -233,6 +234,9 @@ export async function syncIntegrationConnectionResources(
       ...(resourceDefinition.attributeDefinitions === undefined
         ? {}
         : { attributeDefinitions: resourceDefinition.attributeDefinitions }),
+      ...(definition.resourceRelationshipDefinitions === undefined
+        ? {}
+        : { relationshipDefinitions: definition.resourceRelationshipDefinitions }),
     });
     if (!appliedSuccessfully) {
       return {
@@ -274,10 +278,22 @@ export async function syncIntegrationConnectionResources(
 
 function validateListedResourceRelationships(input: {
   definition: AnyIntegrationDefinition;
+  resourceKind: string;
   relationships: ListConnectionResourcesResult["relationships"];
 }) {
-  const relationships = input.relationships ?? [];
   const relationshipDefinitions = input.definition.resourceRelationshipDefinitions ?? [];
+  const requiresRelationshipSnapshot = relationshipDefinitions.some((definition) =>
+    definition.scopeDefinitions.some(
+      (scopeDefinition) => scopeDefinition.scopeKind === input.resourceKind,
+    ),
+  );
+  if (requiresRelationshipSnapshot && input.relationships === undefined) {
+    throw new Error(
+      `Resource kind '${input.resourceKind}' has scoped relationship definitions and must return a relationship snapshot.`,
+    );
+  }
+
+  const relationships = input.relationships ?? [];
   const relationshipsByDefinitionAndScope = new Map<
     string,
     {

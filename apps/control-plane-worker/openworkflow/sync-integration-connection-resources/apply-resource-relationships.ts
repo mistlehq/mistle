@@ -3,7 +3,11 @@ import {
   type ControlPlaneDatabase,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
-import type { DiscoveredIntegrationResourceRelationship } from "@mistle/integrations-core";
+import type {
+  DiscoveredIntegrationResource,
+  DiscoveredIntegrationResourceRelationship,
+  IntegrationResourceRelationshipDefinition,
+} from "@mistle/integrations-core";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 type ControlPlaneTransaction = Parameters<Parameters<ControlPlaneDatabase["transaction"]>[0]>[0];
@@ -26,14 +30,25 @@ export async function applyResourceRelationships(input: {
   tx: ControlPlaneTransaction;
   connectionId: string;
   familyId: string;
+  syncedResourceKind: string;
+  discoveredResources: ReadonlyArray<DiscoveredIntegrationResource>;
   discoveredRelationships: ReadonlyArray<DiscoveredIntegrationResourceRelationship>;
+  relationshipDefinitions: ReadonlyArray<IntegrationResourceRelationshipDefinition>;
 }): Promise<void> {
-  if (input.discoveredRelationships.length === 0) {
+  const completeScopeKeys = completeRelationshipScopeKeys({
+    syncedResourceKind: input.syncedResourceKind,
+    discoveredResources: input.discoveredResources,
+    relationshipDefinitions: input.relationshipDefinitions,
+  });
+  if (input.discoveredRelationships.length === 0 && completeScopeKeys.size === 0) {
     return;
   }
 
   const tables = getControlPlaneDatabaseSchema(input.tx);
-  const resourceKinds = relationshipResourceKinds(input.discoveredRelationships);
+  const resourceKinds = relationshipResourceKinds({
+    syncedResourceKind: input.syncedResourceKind,
+    relationships: input.discoveredRelationships,
+  });
   const resourceIndex = buildResourceIndex(
     await input.tx.query.integrationConnectionResources.findMany({
       columns: {
@@ -51,7 +66,9 @@ export async function applyResourceRelationships(input: {
         ),
     }),
   );
-  const seenRelationshipKeysByScope = new Map<string, Set<string>>();
+  const seenRelationshipKeysByScope = new Map<string, Set<string>>(
+    [...completeScopeKeys].map((scopeKey) => [scopeKey, new Set<string>()]),
+  );
 
   for (const relationship of input.discoveredRelationships) {
     const scopeResource = resolveScopeResource({
@@ -159,6 +176,14 @@ export async function applyResourceRelationships(input: {
             tables.integrationConnectionResourceRelationships.relationshipKind,
             scope.relationshipKind,
           ),
+          eq(
+            tables.integrationConnectionResourceRelationships.subjectResourceKind,
+            scope.subjectResourceKind,
+          ),
+          eq(
+            tables.integrationConnectionResourceRelationships.objectResourceKind,
+            scope.objectResourceKind,
+          ),
           eq(tables.integrationConnectionResourceRelationships.scopeKind, scope.scopeKind),
           eq(tables.integrationConnectionResourceRelationships.scopeHandle, scope.scopeHandle),
           isNull(tables.integrationConnectionResourceRelationships.removedAt),
@@ -196,18 +221,48 @@ export async function applyResourceRelationships(input: {
   }
 }
 
-function relationshipResourceKinds(
-  relationships: ReadonlyArray<DiscoveredIntegrationResourceRelationship>,
-): string[] {
-  const resourceKinds = new Set<string>();
+function relationshipResourceKinds(input: {
+  syncedResourceKind: string;
+  relationships: ReadonlyArray<DiscoveredIntegrationResourceRelationship>;
+}): string[] {
+  const resourceKinds = new Set<string>([input.syncedResourceKind]);
 
-  for (const relationship of relationships) {
+  for (const relationship of input.relationships) {
     resourceKinds.add(relationship.scopeKind);
     resourceKinds.add(relationship.subjectResourceKind);
     resourceKinds.add(relationship.objectResourceKind);
   }
 
   return [...resourceKinds];
+}
+
+function completeRelationshipScopeKeys(input: {
+  syncedResourceKind: string;
+  discoveredResources: ReadonlyArray<DiscoveredIntegrationResource>;
+  relationshipDefinitions: ReadonlyArray<IntegrationResourceRelationshipDefinition>;
+}): Set<string> {
+  const scopeKeys = new Set<string>();
+  const scopedRelationshipDefinitions = input.relationshipDefinitions.filter((definition) =>
+    definition.scopeDefinitions.some(
+      (scopeDefinition) => scopeDefinition.scopeKind === input.syncedResourceKind,
+    ),
+  );
+
+  for (const resource of input.discoveredResources) {
+    for (const definition of scopedRelationshipDefinitions) {
+      scopeKeys.add(
+        resourceRelationshipScopeKey({
+          relationshipKind: definition.relationshipKind,
+          subjectResourceKind: definition.subjectResourceKind,
+          objectResourceKind: definition.objectResourceKind,
+          scopeKind: input.syncedResourceKind,
+          scopeHandle: resource.handle,
+        }),
+      );
+    }
+  }
+
+  return scopeKeys;
 }
 
 function buildResourceIndex(resources: ReadonlyArray<PersistedResource>): {
@@ -343,32 +398,46 @@ function resourceIdentityKey(
 
 function resourceRelationshipScopeKey(input: {
   relationshipKind: string;
+  subjectResourceKind: string;
+  objectResourceKind: string;
   scopeKind: string;
   scopeHandle: string;
 }): string {
-  return JSON.stringify([input.relationshipKind, input.scopeKind, input.scopeHandle]);
+  return JSON.stringify([
+    input.relationshipKind,
+    input.subjectResourceKind,
+    input.objectResourceKind,
+    input.scopeKind,
+    input.scopeHandle,
+  ]);
 }
 
 function parseRelationshipScopeKey(scopeKey: string): {
   relationshipKind: string;
+  subjectResourceKind: string;
+  objectResourceKind: string;
   scopeKind: string;
   scopeHandle: string;
 } {
   const parsed: unknown = JSON.parse(scopeKey);
   if (
     !Array.isArray(parsed) ||
-    parsed.length !== 3 ||
+    parsed.length !== 5 ||
     typeof parsed[0] !== "string" ||
     typeof parsed[1] !== "string" ||
-    typeof parsed[2] !== "string"
+    typeof parsed[2] !== "string" ||
+    typeof parsed[3] !== "string" ||
+    typeof parsed[4] !== "string"
   ) {
     throw new Error("Expected serialized relationship scope key.");
   }
 
   return {
     relationshipKind: parsed[0],
-    scopeKind: parsed[1],
-    scopeHandle: parsed[2],
+    subjectResourceKind: parsed[1],
+    objectResourceKind: parsed[2],
+    scopeKind: parsed[3],
+    scopeHandle: parsed[4],
   };
 }
 
