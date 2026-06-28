@@ -191,7 +191,7 @@ describe("compileClaudeCodeRuntime", () => {
         {
           processKey: ClaudeCodeRuntimeServerProcessKey,
           command: {
-            args: ["mise", "exec", "node@25.0.0", "--", "node", ClaudeCodeRuntimeServerPath],
+            args: ["mise", "exec", "node@26.4.0", "--", "node", ClaudeCodeRuntimeServerPath],
             cwd: ClaudeCodeRuntimeServerPackageDir,
           },
           readiness: {
@@ -291,7 +291,7 @@ describe("compileClaudeCodeRuntime", () => {
 
     expect(installSteps).toContainEqual({
       op: "mise_install",
-      tools: ["node@25.0.0"],
+      tools: ["node@26.4.0"],
       timeoutMs: 120000,
     });
     expect(installSteps).toContainEqual({
@@ -300,7 +300,7 @@ describe("compileClaudeCodeRuntime", () => {
         args: [
           "mise",
           "exec",
-          "node@25.0.0",
+          "node@26.4.0",
           "--",
           "npm",
           "install",
@@ -309,7 +309,7 @@ describe("compileClaudeCodeRuntime", () => {
           "--omit=dev",
           "--no-audit",
           "--no-fund",
-          "@anthropic-ai/claude-agent-sdk@0.3.193",
+          "@anthropic-ai/claude-agent-sdk@0.3.195",
           "ws@8.21.0",
         ],
         timeoutMs: 120000,
