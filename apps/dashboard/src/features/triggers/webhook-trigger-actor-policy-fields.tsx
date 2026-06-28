@@ -17,6 +17,7 @@ import { useState } from "react";
 import {
   listIntegrationConnectionResources,
   type IntegrationConnection,
+  type IntegrationConnectionResource,
 } from "../integrations/integrations-service.js";
 import type {
   WebhookTriggerActorResourceAttributeDefinition,
@@ -57,6 +58,9 @@ type ActorSetPolicyOption = {
   label: string;
   description?: string;
   relationshipDefinition: WebhookTriggerActorResourceRelationshipDefinition;
+  resourceKind: string;
+  scopeKind: string;
+  summary: NonNullable<IntegrationConnection["resources"]>[number] | undefined;
 };
 
 function uniqueStrings(values: readonly string[]): string[] {
@@ -173,6 +177,27 @@ function resolveSelectedResourceKind(input: {
     input.actorResourceKinds.find((resourceKind) => resourceKind.summary?.syncState === "ready")
       ?.kind ??
     input.actorResourceKinds[0]?.kind ??
+    ""
+  );
+}
+
+function resolveSelectedActorSetOptionId(input: {
+  policy: WebhookTriggerActorPolicy | undefined;
+  options: readonly ActorSetPolicyOption[];
+}): string {
+  const [rule] = input.policy?.anyOf ?? [];
+  if (rule?.kind !== "relationship") {
+    return input.options.find((option) => option.summary?.syncState === "ready")?.id ?? "";
+  }
+
+  return (
+    input.options.find(
+      (option) =>
+        option.relationshipDefinition.relationshipKind === rule.relationshipKind &&
+        option.resourceKind === rule.actorSet.resourceKind &&
+        option.scopeKind === rule.scope.resourceKind,
+    )?.id ??
+    input.options.find((option) => option.summary?.syncState === "ready")?.id ??
     ""
   );
 }
@@ -312,24 +337,41 @@ function resolveSelectedAttributeOptionId(input: {
 
 function resolveActorSetOptions(input: {
   actorResourceKinds: readonly ActorPolicyResourceKind[];
+  connection: IntegrationConnection | undefined;
   eventOption: WebhookTriggerEventOption;
 }): ActorSetPolicyOption[] {
   const actorKinds = new Set(input.actorResourceKinds.map((resourceKind) => resourceKind.kind));
 
   return (input.eventOption.resourceRelationshipDefinitions ?? [])
     .filter((definition) => actorKinds.has(definition.subjectResourceKind))
-    .map((definition) => ({
-      id: `${definition.relationshipKind}:${definition.objectResourceKind}`,
-      label:
-        definition.displayName ??
-        `${formatResourceKindLabel({
-          resourceDefinitions: input.eventOption.resourceDefinitions,
-          kind: definition.objectResourceKind,
-          plural: false,
-        })} members`,
-      ...(definition.description === undefined ? {} : { description: definition.description }),
-      relationshipDefinition: definition,
-    }));
+    .flatMap((definition) => {
+      const scopeDefinition = definition.scopeDefinitions.find(
+        (candidate) => candidate.scopeKind === definition.objectResourceKind,
+      );
+      if (scopeDefinition === undefined) {
+        return [];
+      }
+
+      return [
+        {
+          id: `${definition.relationshipKind}:${definition.objectResourceKind}:${scopeDefinition.scopeKind}`,
+          label:
+            definition.displayName ??
+            `${formatResourceKindLabel({
+              resourceDefinitions: input.eventOption.resourceDefinitions,
+              kind: definition.objectResourceKind,
+              plural: false,
+            })} members`,
+          ...(definition.description === undefined ? {} : { description: definition.description }),
+          relationshipDefinition: definition,
+          resourceKind: definition.objectResourceKind,
+          scopeKind: scopeDefinition.scopeKind,
+          summary: input.connection?.resources?.find(
+            (summary) => summary.kind === definition.objectResourceKind,
+          ),
+        },
+      ];
+    });
 }
 
 function SpecificActorPolicyFields(input: {
@@ -466,6 +508,162 @@ function resolveSelectedResourceId(policy: WebhookTriggerActorPolicy | undefined
   return rule.actor.resourceId;
 }
 
+function resolveSelectedActorSetResourceId(policy: WebhookTriggerActorPolicy | undefined): string {
+  const [rule] = policy?.anyOf ?? [];
+  if (rule?.kind !== "relationship" || !("resourceId" in rule.actorSet)) {
+    return "";
+  }
+
+  return rule.actorSet.resourceId;
+}
+
+function createRelationshipActorPolicy(input: {
+  option: ActorSetPolicyOption;
+  resource: IntegrationConnectionResource;
+}): WebhookTriggerActorPolicy {
+  return {
+    anyOf: [
+      {
+        kind: "relationship",
+        relationshipKind: input.option.relationshipDefinition.relationshipKind,
+        actorSet: {
+          resourceKind: input.resource.kind,
+          resourceId: input.resource.id,
+        },
+        scope: {
+          resourceKind: input.option.scopeKind,
+          resourceId: input.resource.id,
+        },
+      },
+    ],
+  };
+}
+
+function RelationshipActorPolicyFields(input: {
+  actorSetOptions: readonly ActorSetPolicyOption[];
+  conditionId: string;
+  connectionId: string;
+  disabled: boolean;
+  policies: ActorPolicyMap | undefined;
+  policy: WebhookTriggerActorPolicy | undefined;
+  initialOptionId: string;
+  onPoliciesChange: (policies: ActorPolicyMap) => void;
+  onActorSetSelected: () => void;
+}): React.JSX.Element {
+  const [selectedOptionId, setSelectedOptionId] = useState(input.initialOptionId);
+  const selectedOption = input.actorSetOptions.find((option) => option.id === selectedOptionId);
+  const selectedResourceId = resolveSelectedActorSetResourceId(input.policy);
+  const resourcesQuery = useQuery({
+    queryKey: ["trigger-actor-policy-resources", input.connectionId, selectedOption?.resourceKind],
+    queryFn: ({ signal }) => {
+      if (selectedOption === undefined) {
+        throw new Error("Expected selected actor set option.");
+      }
+
+      return listIntegrationConnectionResources({
+        connectionId: input.connectionId,
+        kind: selectedOption.resourceKind,
+        signal,
+      });
+    },
+    enabled: selectedOption?.summary?.syncState === "ready",
+  });
+  const resources = resourcesQuery.data?.items ?? [];
+
+  return (
+    <div className="space-y-2">
+      <Select
+        disabled={input.disabled || input.actorSetOptions.length === 0}
+        onValueChange={(value) => {
+          if (value === null) {
+            return;
+          }
+
+          setSelectedOptionId(value);
+          input.onPoliciesChange(
+            removeActorPolicy({
+              conditionId: input.conditionId,
+              policies: input.policies,
+            }),
+          );
+        }}
+        value={selectedOptionId}
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="Group or set">
+            {selectedOption?.label ?? selectedOptionId}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {input.actorSetOptions.map((option) => (
+            <SelectItem
+              disabled={option.summary?.syncState !== "ready"}
+              key={option.id}
+              value={option.id}
+            >
+              <span>{option.label}</span>
+              <span className="text-muted-foreground block text-xs">
+                {formatSyncStatus(option.summary)}
+              </span>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {selectedOption?.summary?.syncState !== "ready" ? (
+        <Notice>{formatSyncStatus(selectedOption?.summary)}</Notice>
+      ) : (
+        <Select
+          disabled={input.disabled || resourcesQuery.isPending || resourcesQuery.isError}
+          onValueChange={(resourceId) => {
+            if (selectedOption === undefined) {
+              return;
+            }
+
+            const selectedResource = resources.find((resource) => resource.id === resourceId);
+            if (selectedResource === undefined) {
+              return;
+            }
+
+            input.onPoliciesChange(
+              setActorPolicy({
+                conditionId: input.conditionId,
+                policies: input.policies,
+                policy: createRelationshipActorPolicy({
+                  option: selectedOption,
+                  resource: selectedResource,
+                }),
+              }),
+            );
+            input.onActorSetSelected();
+          }}
+          value={selectedResourceId}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue
+              placeholder={
+                resourcesQuery.isPending
+                  ? "Loading groups..."
+                  : resources.length === 0
+                    ? "No synced groups"
+                    : "Select group"
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {resources.map((resource) => (
+              <SelectItem key={resource.id} value={resource.id}>
+                <span>{resource.displayName}</span>
+                <span className="text-muted-foreground block text-xs">{resource.handle}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      {resourcesQuery.isError ? <Notice variant="alert">Could not load groups.</Notice> : null}
+    </div>
+  );
+}
+
 export function WebhookTriggerActorPolicyFields(input: {
   connections: readonly IntegrationConnection[];
   disabled: boolean;
@@ -475,6 +673,9 @@ export function WebhookTriggerActorPolicyFields(input: {
   onActorPoliciesChange: (policies: ActorPolicyMap) => void;
 }): React.JSX.Element | null {
   const [specificActorPickerConditionIds, setSpecificActorPickerConditionIds] = useState<
+    Record<string, true>
+  >({});
+  const [relationshipPickerConditionIds, setRelationshipPickerConditionIds] = useState<
     Record<string, true>
   >({});
   const rows = input.selectedEventIds.flatMap((conditionId) => {
@@ -514,8 +715,17 @@ export function WebhookTriggerActorPolicyFields(input: {
         });
         const actorSetOptions = resolveActorSetOptions({
           actorResourceKinds,
+          connection,
           eventOption: row.eventOption,
         });
+        const selectedActorSetOptionId = resolveSelectedActorSetOptionId({
+          policy,
+          options: actorSetOptions,
+        });
+        const relationshipPickerOpen = relationshipPickerConditionIds[row.conditionId] === true;
+        const hasReadyActorSetOptions = actorSetOptions.some(
+          (option) => option.summary?.syncState === "ready",
+        );
         const hasEligibleAttributeDefinitions = actorResourceKinds.some((actorResourceKind) => {
           const resourceDefinition = row.eventOption.resourceDefinitions?.find(
             (definition) => definition.kind === actorResourceKind.kind,
@@ -552,6 +762,12 @@ export function WebhookTriggerActorPolicyFields(input: {
                           openPickers: currentOpenPickers,
                         }),
                       );
+                      setRelationshipPickerConditionIds((currentOpenPickers) =>
+                        removeSpecificActorPicker({
+                          conditionId: row.conditionId,
+                          openPickers: currentOpenPickers,
+                        }),
+                      );
                       input.onActorPoliciesChange(
                         removeActorPolicy({
                           conditionId: row.conditionId,
@@ -573,6 +789,12 @@ export function WebhookTriggerActorPolicyFields(input: {
                           openPickers: currentOpenPickers,
                         }),
                       );
+                      setRelationshipPickerConditionIds((currentOpenPickers) =>
+                        removeSpecificActorPicker({
+                          conditionId: row.conditionId,
+                          openPickers: currentOpenPickers,
+                        }),
+                      );
                       input.onActorPoliciesChange(
                         setActorPolicy({
                           conditionId: row.conditionId,
@@ -584,7 +806,34 @@ export function WebhookTriggerActorPolicyFields(input: {
                     }
 
                     if (value === ActorPolicyModes.SPECIFIC) {
+                      setRelationshipPickerConditionIds((currentOpenPickers) =>
+                        removeSpecificActorPicker({
+                          conditionId: row.conditionId,
+                          openPickers: currentOpenPickers,
+                        }),
+                      );
                       setSpecificActorPickerConditionIds((currentOpenPickers) =>
+                        addSpecificActorPicker({
+                          conditionId: row.conditionId,
+                          openPickers: currentOpenPickers,
+                        }),
+                      );
+                      input.onActorPoliciesChange(
+                        removeActorPolicy({
+                          conditionId: row.conditionId,
+                          policies: input.eventActorPolicies,
+                        }),
+                      );
+                    }
+
+                    if (value === ActorPolicyModes.RELATIONSHIP) {
+                      setSpecificActorPickerConditionIds((currentOpenPickers) =>
+                        removeSpecificActorPicker({
+                          conditionId: row.conditionId,
+                          openPickers: currentOpenPickers,
+                        }),
+                      );
+                      setRelationshipPickerConditionIds((currentOpenPickers) =>
                         addSpecificActorPicker({
                           conditionId: row.conditionId,
                           openPickers: currentOpenPickers,
@@ -621,7 +870,10 @@ export function WebhookTriggerActorPolicyFields(input: {
                     >
                       Specific actor
                     </SelectItem>
-                    <SelectItem disabled value={ActorPolicyModes.RELATIONSHIP}>
+                    <SelectItem
+                      disabled={!hasReadyActorSetOptions}
+                      value={ActorPolicyModes.RELATIONSHIP}
+                    >
                       Group or set
                     </SelectItem>
                   </SelectContent>
@@ -692,7 +944,28 @@ export function WebhookTriggerActorPolicyFields(input: {
                   />
                 ) : null}
 
-                {actorSetOptions.length === 0 ? null : (
+                {mode === ActorPolicyModes.RELATIONSHIP || relationshipPickerOpen ? (
+                  <RelationshipActorPolicyFields
+                    actorSetOptions={actorSetOptions}
+                    conditionId={row.conditionId}
+                    connectionId={row.eventOption.connectionId}
+                    disabled={input.disabled}
+                    onPoliciesChange={input.onActorPoliciesChange}
+                    policies={input.eventActorPolicies}
+                    policy={policy}
+                    initialOptionId={selectedActorSetOptionId}
+                    onActorSetSelected={() => {
+                      setRelationshipPickerConditionIds((currentOpenPickers) =>
+                        removeSpecificActorPicker({
+                          conditionId: row.conditionId,
+                          openPickers: currentOpenPickers,
+                        }),
+                      );
+                    }}
+                  />
+                ) : null}
+
+                {actorSetOptions.length === 0 || hasReadyActorSetOptions ? null : (
                   <Notice>
                     Group actor policies need resource sync readiness before they can be selected.
                   </Notice>

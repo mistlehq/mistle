@@ -335,6 +335,162 @@ describe("WebhookTriggerForm", () => {
     ).toBeDefined();
   });
 
+  it("writes relationship actor policies for synced actor sets", () => {
+    const eventOption = createGithubIssueCommentCreatedEventOption({
+      actor: {
+        resourceReferences: [
+          {
+            resourceKind: "user",
+            handlePayloadPath: ["sender", "login"],
+          },
+        ],
+      },
+      resourceDefinitions: [
+        {
+          kind: "user",
+          selectionMode: "multi",
+          bindingField: "users",
+          displayNameSingular: "user",
+          displayNamePlural: "users",
+        },
+        {
+          kind: "team",
+          selectionMode: "multi",
+          bindingField: "teams",
+          displayNameSingular: "team",
+          displayNamePlural: "teams",
+        },
+      ],
+      resourceRelationshipDefinitions: [
+        {
+          relationshipKind: "belongs_to",
+          subjectResourceKind: "user",
+          objectResourceKind: "team",
+          displayName: "Team members",
+          scopeDefinitions: [
+            {
+              scopeKind: "team",
+            },
+          ],
+        },
+      ],
+    });
+    const conditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: eventOption.id,
+      index: 0,
+    });
+    let changedKey: keyof WebhookTriggerFormValues | null = null;
+    let changedValue: unknown;
+    TestQueryClient.setQueryData(["trigger-actor-policy-resources", GitHubConnectionId, "team"], {
+      connectionId: GitHubConnectionId,
+      familyId: "github",
+      kind: "team",
+      syncState: "ready",
+      items: [
+        {
+          id: "team-platform",
+          familyId: "github",
+          kind: "team",
+          externalId: "100",
+          handle: "mistle/platform",
+          displayName: "Platform",
+          status: "accessible",
+          metadata: {},
+        },
+      ],
+    });
+
+    renderFormWithOptions({
+      mode: "create",
+      onValueChange: (key, value) => {
+        changedKey = key;
+        changedValue = value;
+      },
+      values: buildFormValues({
+        eventIds: [conditionId],
+        eventActorPolicies: {
+          [conditionId]: {
+            anyOf: [
+              {
+                kind: "resource",
+                actor: {
+                  resourceKind: "user",
+                  resourceId: "user-alice",
+                },
+              },
+            ],
+          },
+        },
+        eventParameterRules: {
+          [conditionId]: {},
+        },
+      }),
+      webhookEventOptions: [eventOption],
+      connections: [
+        {
+          id: GitHubConnectionId,
+          targetKey: "github-cloud",
+          displayName: GitHubConnectionLabel,
+          status: "active",
+          resources: [
+            {
+              kind: "user",
+              selectionMode: "multi",
+              count: 2,
+              syncState: "ready",
+            },
+            {
+              kind: "team",
+              selectionMode: "multi",
+              count: 1,
+              syncState: "ready",
+            },
+          ],
+          createdAt: "2026-06-28T00:00:00.000Z",
+          updatedAt: "2026-06-28T00:00:00.000Z",
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Allowed actors" }));
+    const groupOption = screen.getByRole("option", { name: "Group or set" });
+    expect(groupOption.getAttribute("data-disabled")).toBeNull();
+    fireEvent.mouseMove(groupOption);
+    fireEvent.mouseDown(groupOption, { button: 0 });
+    fireEvent.mouseUp(groupOption, { button: 0 });
+    fireEvent.click(groupOption, { button: 0 });
+
+    expect(changedKey).toBe("eventActorPolicies");
+    expect(changedValue).toEqual({});
+
+    fireEvent.click(screen.getByText("Select group"));
+    const platformOption = screen.getByRole("option", { name: "Platformmistle/platform" });
+    fireEvent.mouseMove(platformOption);
+    fireEvent.mouseDown(platformOption, { button: 0 });
+    fireEvent.mouseUp(platformOption, { button: 0 });
+    fireEvent.click(platformOption, { button: 0 });
+
+    expect(changedKey).toBe("eventActorPolicies");
+    expect(changedValue).toEqual({
+      [conditionId]: {
+        anyOf: [
+          {
+            kind: "relationship",
+            relationshipKind: "belongs_to",
+            actorSet: {
+              resourceKind: "team",
+              resourceId: "team-platform",
+            },
+            scope: {
+              resourceKind: "team",
+              resourceId: "team-platform",
+            },
+          },
+        ],
+      },
+    });
+  });
+
   it("writes actor type policies without changing payload parameter rules", () => {
     const eventOption = createGithubIssueCommentCreatedEventOption({
       actor: {
