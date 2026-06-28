@@ -1233,6 +1233,18 @@ describe.concurrent("sync integration connection resources", () => {
             },
           }),
         ],
+        relationshipDefinitions: [
+          {
+            relationshipKind: "belongs_to",
+            subjectResourceKind: "user",
+            objectResourceKind: "team",
+            scopeDefinitions: [
+              {
+                scopeKind: "team",
+              },
+            ],
+          },
+        ],
       }),
     ).resolves.toBe(true);
 
@@ -1367,6 +1379,104 @@ describe.concurrent("sync integration connection resources", () => {
       await env.controlPlaneDb.query.integrationConnectionResourceRelationships.findFirst({
         where: (table, { eq }) =>
           eq(table.id, "irr_sync_resources_empty_relationship_snapshot_alice"),
+      });
+
+    expect(persistedRelationship?.removedAt).toBeTruthy();
+  });
+
+  it("tombstones active relationships for a synced scope after its handle changes", async ({
+    env,
+  }) => {
+    await seedGitHubConnection({
+      env,
+      organizationId: "org_sync_resources_relationship_scope_renamed",
+      targetKey: "github-cloud-sync-resources-relationship-scope-renamed",
+      connectionId: "icn_sync_resources_relationship_scope_renamed",
+      organizationName: "Sync Resources Relationship Scope Renamed",
+      organizationSlug: "sync-resources-relationship-scope-renamed",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnectionResources).values([
+      persistedResource({
+        id: "rsc_sync_resources_relationship_scope_renamed_alice",
+        connectionId: "icn_sync_resources_relationship_scope_renamed",
+        kind: "user",
+        externalId: "1",
+        handle: "alice",
+        displayName: "Alice",
+      }),
+      persistedResource({
+        id: "rsc_sync_resources_relationship_scope_renamed_team",
+        connectionId: "icn_sync_resources_relationship_scope_renamed",
+        kind: "team",
+        externalId: "100",
+        handle: "mistle/platform",
+        displayName: "Platform",
+      }),
+    ]);
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.integrationConnectionResourceRelationships)
+      .values({
+        id: "irr_sync_resources_relationship_scope_renamed_alice",
+        connectionId: "icn_sync_resources_relationship_scope_renamed",
+        familyId: "github",
+        relationshipKind: "belongs_to",
+        subjectResourceId: "rsc_sync_resources_relationship_scope_renamed_alice",
+        subjectResourceKind: "user",
+        subjectExternalId: "1",
+        subjectHandle: "alice",
+        objectResourceId: "rsc_sync_resources_relationship_scope_renamed_team",
+        objectResourceKind: "team",
+        objectExternalId: "100",
+        objectHandle: "mistle/backend",
+        scopeResourceId: "rsc_sync_resources_relationship_scope_renamed_team",
+        scopeKind: "team",
+        scopeExternalId: "100",
+        scopeHandle: "mistle/backend",
+        metadata: {},
+        lastSeenAt: "2026-03-09T00:00:00.000Z",
+      });
+
+    const syncStartedAt = await markResourceSyncing({
+      db: env.controlPlaneDb,
+      connectionId: "icn_sync_resources_relationship_scope_renamed",
+      familyId: "github",
+      kind: "team",
+    });
+    await expect(
+      applySuccessfulResourceSync({
+        db: env.controlPlaneDb,
+        connectionId: "icn_sync_resources_relationship_scope_renamed",
+        familyId: "github",
+        kind: "team",
+        syncStartedAt,
+        discoveredResources: [
+          githubUserResource({
+            externalId: "100",
+            handle: "mistle/platform",
+            displayName: "Platform",
+          }),
+        ],
+        discoveredRelationships: [],
+        relationshipDefinitions: [
+          {
+            relationshipKind: "belongs_to",
+            subjectResourceKind: "user",
+            objectResourceKind: "team",
+            scopeDefinitions: [
+              {
+                scopeKind: "team",
+              },
+            ],
+          },
+        ],
+      }),
+    ).resolves.toBe(true);
+
+    const persistedRelationship =
+      await env.controlPlaneDb.query.integrationConnectionResourceRelationships.findFirst({
+        where: (table, { eq }) =>
+          eq(table.id, "irr_sync_resources_relationship_scope_renamed_alice"),
       });
 
     expect(persistedRelationship?.removedAt).toBeTruthy();

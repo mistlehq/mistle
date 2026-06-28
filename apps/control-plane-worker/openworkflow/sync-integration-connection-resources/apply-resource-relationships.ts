@@ -8,7 +8,7 @@ import type {
   DiscoveredIntegrationResourceRelationship,
   IntegrationResourceRelationshipDefinition,
 } from "@mistle/integrations-core";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 type ControlPlaneTransaction = Parameters<Parameters<ControlPlaneDatabase["transaction"]>[0]>[0];
 
@@ -26,6 +26,15 @@ type ResourceIdentity = {
   handle: string;
 };
 
+type CompleteRelationshipScope = {
+  relationshipKind: string;
+  subjectResourceKind: string;
+  objectResourceKind: string;
+  scopeKind: string;
+  scopeHandle: string;
+  scopeResourceId: string;
+};
+
 export async function applyResourceRelationships(input: {
   tx: ControlPlaneTransaction;
   connectionId: string;
@@ -35,15 +44,6 @@ export async function applyResourceRelationships(input: {
   discoveredRelationships: ReadonlyArray<DiscoveredIntegrationResourceRelationship>;
   relationshipDefinitions: ReadonlyArray<IntegrationResourceRelationshipDefinition>;
 }): Promise<void> {
-  const completeScopeKeys = completeRelationshipScopeKeys({
-    syncedResourceKind: input.syncedResourceKind,
-    discoveredResources: input.discoveredResources,
-    relationshipDefinitions: input.relationshipDefinitions,
-  });
-  if (input.discoveredRelationships.length === 0 && completeScopeKeys.size === 0) {
-    return;
-  }
-
   const tables = getControlPlaneDatabaseSchema(input.tx);
   const resourceKinds = relationshipResourceKinds({
     syncedResourceKind: input.syncedResourceKind,
@@ -66,8 +66,18 @@ export async function applyResourceRelationships(input: {
         ),
     }),
   );
+  const completeScopes = completeRelationshipScopes({
+    syncedResourceKind: input.syncedResourceKind,
+    discoveredResources: input.discoveredResources,
+    relationshipDefinitions: input.relationshipDefinitions,
+    resourceIndex,
+  });
+  if (input.discoveredRelationships.length === 0 && completeScopes.length === 0) {
+    return;
+  }
+
   const seenRelationshipKeysByScope = new Map<string, Set<string>>(
-    [...completeScopeKeys].map((scopeKey) => [scopeKey, new Set<string>()]),
+    completeScopes.map((scope) => [resourceRelationshipScopeKey(scope), new Set<string>()]),
   );
 
   for (const relationship of input.discoveredRelationships) {
@@ -158,8 +168,9 @@ export async function applyResourceRelationships(input: {
       });
   }
 
-  for (const [scopeKey, seenRelationshipKeys] of seenRelationshipKeysByScope) {
-    const scope = parseRelationshipScopeKey(scopeKey);
+  for (const scope of completeScopes) {
+    const seenRelationshipKeys =
+      seenRelationshipKeysByScope.get(resourceRelationshipScopeKey(scope)) ?? new Set<string>();
     const existingRelationships = await input.tx
       .select({
         id: tables.integrationConnectionResourceRelationships.id,
@@ -167,6 +178,7 @@ export async function applyResourceRelationships(input: {
         subjectHandle: tables.integrationConnectionResourceRelationships.subjectHandle,
         objectResourceKind: tables.integrationConnectionResourceRelationships.objectResourceKind,
         objectHandle: tables.integrationConnectionResourceRelationships.objectHandle,
+        scopeHandle: tables.integrationConnectionResourceRelationships.scopeHandle,
       })
       .from(tables.integrationConnectionResourceRelationships)
       .where(
@@ -185,7 +197,13 @@ export async function applyResourceRelationships(input: {
             scope.objectResourceKind,
           ),
           eq(tables.integrationConnectionResourceRelationships.scopeKind, scope.scopeKind),
-          eq(tables.integrationConnectionResourceRelationships.scopeHandle, scope.scopeHandle),
+          or(
+            eq(tables.integrationConnectionResourceRelationships.scopeHandle, scope.scopeHandle),
+            eq(
+              tables.integrationConnectionResourceRelationships.scopeResourceId,
+              scope.scopeResourceId,
+            ),
+          ),
           isNull(tables.integrationConnectionResourceRelationships.removedAt),
         ),
       );
@@ -201,7 +219,7 @@ export async function applyResourceRelationships(input: {
               objectResourceKind: relationship.objectResourceKind,
               objectHandle: relationship.objectHandle,
               scopeKind: scope.scopeKind,
-              scopeHandle: scope.scopeHandle,
+              scopeHandle: relationship.scopeHandle,
             }),
           ),
       )
@@ -236,12 +254,16 @@ function relationshipResourceKinds(input: {
   return [...resourceKinds];
 }
 
-function completeRelationshipScopeKeys(input: {
+function completeRelationshipScopes(input: {
   syncedResourceKind: string;
   discoveredResources: ReadonlyArray<DiscoveredIntegrationResource>;
   relationshipDefinitions: ReadonlyArray<IntegrationResourceRelationshipDefinition>;
-}): Set<string> {
-  const scopeKeys = new Set<string>();
+  resourceIndex: {
+    byKindAndExternalId: ReadonlyMap<string, PersistedResource>;
+    byKindAndHandle: ReadonlyMap<string, PersistedResource>;
+  };
+}): CompleteRelationshipScope[] {
+  const scopes: CompleteRelationshipScope[] = [];
   const scopedRelationshipDefinitions = input.relationshipDefinitions.filter((definition) =>
     definition.scopeDefinitions.some(
       (scopeDefinition) => scopeDefinition.scopeKind === input.syncedResourceKind,
@@ -249,20 +271,31 @@ function completeRelationshipScopeKeys(input: {
   );
 
   for (const resource of input.discoveredResources) {
+    const scopeResource = resolveResource({
+      resourceKind: input.syncedResourceKind,
+      identity: {
+        externalId: resource.externalId,
+        handle: resource.handle,
+      },
+      resourceIndex: input.resourceIndex,
+    });
+    if (scopeResource === undefined) {
+      continue;
+    }
+
     for (const definition of scopedRelationshipDefinitions) {
-      scopeKeys.add(
-        resourceRelationshipScopeKey({
-          relationshipKind: definition.relationshipKind,
-          subjectResourceKind: definition.subjectResourceKind,
-          objectResourceKind: definition.objectResourceKind,
-          scopeKind: input.syncedResourceKind,
-          scopeHandle: resource.handle,
-        }),
-      );
+      scopes.push({
+        relationshipKind: definition.relationshipKind,
+        subjectResourceKind: definition.subjectResourceKind,
+        objectResourceKind: definition.objectResourceKind,
+        scopeKind: input.syncedResourceKind,
+        scopeHandle: resource.handle,
+        scopeResourceId: scopeResource.id,
+      });
     }
   }
 
-  return scopeKeys;
+  return scopes;
 }
 
 function buildResourceIndex(resources: ReadonlyArray<PersistedResource>): {
@@ -410,35 +443,6 @@ function resourceRelationshipScopeKey(input: {
     input.scopeKind,
     input.scopeHandle,
   ]);
-}
-
-function parseRelationshipScopeKey(scopeKey: string): {
-  relationshipKind: string;
-  subjectResourceKind: string;
-  objectResourceKind: string;
-  scopeKind: string;
-  scopeHandle: string;
-} {
-  const parsed: unknown = JSON.parse(scopeKey);
-  if (
-    !Array.isArray(parsed) ||
-    parsed.length !== 5 ||
-    typeof parsed[0] !== "string" ||
-    typeof parsed[1] !== "string" ||
-    typeof parsed[2] !== "string" ||
-    typeof parsed[3] !== "string" ||
-    typeof parsed[4] !== "string"
-  ) {
-    throw new Error("Expected serialized relationship scope key.");
-  }
-
-  return {
-    relationshipKind: parsed[0],
-    subjectResourceKind: parsed[1],
-    objectResourceKind: parsed[2],
-    scopeKind: parsed[3],
-    scopeHandle: parsed[4],
-  };
 }
 
 function resourceRelationshipStorageKey(input: {
