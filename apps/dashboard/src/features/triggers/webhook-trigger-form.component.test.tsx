@@ -330,7 +330,7 @@ describe("WebhookTriggerForm", () => {
     expect(screen.getByText("GitHub Engineering")).toBeDefined();
     expect(
       screen.getByText(
-        "Group actor policies need relationship sync readiness before they can be selected.",
+        "Group actor policies need resource sync readiness before they can be selected.",
       ),
     ).toBeDefined();
   });
@@ -405,6 +405,79 @@ describe("WebhookTriggerForm", () => {
         ],
       },
     });
+  });
+
+  it("clears stale actor policies when opening the specific actor picker", () => {
+    const eventOption = createGithubIssueCommentCreatedEventOption({
+      actor: {
+        resourceReferences: [
+          {
+            resourceKind: "user",
+            handlePayloadPath: ["sender", "login"],
+          },
+        ],
+      },
+      resourceDefinitions: [
+        {
+          kind: "user",
+          selectionMode: "multi",
+          bindingField: "users",
+          displayNameSingular: "user",
+          displayNamePlural: "users",
+          attributeDefinitions: [
+            {
+              key: "is_bot",
+              valueType: "boolean",
+              displayName: "Bot user",
+              actorPolicyEligible: true,
+            },
+          ],
+        },
+      ],
+    });
+    const conditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: eventOption.id,
+      index: 0,
+    });
+    let changedKey: keyof WebhookTriggerFormValues | null = null;
+    let changedValue: unknown;
+
+    renderFormWithOptions({
+      mode: "create",
+      onValueChange: (key, value) => {
+        changedKey = key;
+        changedValue = value;
+      },
+      values: buildFormValues({
+        eventIds: [conditionId],
+        eventActorPolicies: {
+          [conditionId]: {
+            anyOf: [
+              {
+                kind: "attribute",
+                attributeKey: "is_bot",
+                attributeValue: "true",
+                valueType: "boolean",
+              },
+            ],
+          },
+        },
+        eventParameterRules: {
+          [conditionId]: {},
+        },
+      }),
+      webhookEventOptions: [eventOption],
+    });
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Allowed actors" }));
+    const specificActorOption = screen.getByRole("option", { name: "Specific actor" });
+    fireEvent.mouseMove(specificActorOption);
+    fireEvent.mouseDown(specificActorOption, { button: 0 });
+    fireEvent.mouseUp(specificActorOption, { button: 0 });
+    fireEvent.click(specificActorOption, { button: 0 });
+
+    expect(changedKey).toBe("eventActorPolicies");
+    expect(changedValue).toEqual({});
   });
 
   it("blocks actor type policies until actor resource attributes are synced", () => {

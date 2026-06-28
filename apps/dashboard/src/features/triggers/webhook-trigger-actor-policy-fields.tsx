@@ -199,12 +199,22 @@ function setActorPolicy(input: {
   };
 }
 
-function removeDraftMode(input: {
+function addSpecificActorPicker(input: {
   conditionId: string;
-  modes: Record<string, ActorPolicyMode>;
-}): Record<string, ActorPolicyMode> {
+  openPickers: Record<string, true>;
+}): Record<string, true> {
+  return {
+    ...input.openPickers,
+    [input.conditionId]: true,
+  };
+}
+
+function removeSpecificActorPicker(input: {
+  conditionId: string;
+  openPickers: Record<string, true>;
+}): Record<string, true> {
   return Object.fromEntries(
-    Object.entries(input.modes).filter(([conditionId]) => conditionId !== input.conditionId),
+    Object.entries(input.openPickers).filter(([conditionId]) => conditionId !== input.conditionId),
   );
 }
 
@@ -331,6 +341,7 @@ function SpecificActorPolicyFields(input: {
   policy: WebhookTriggerActorPolicy | undefined;
   initialResourceKind: string;
   onPoliciesChange: (policies: ActorPolicyMap) => void;
+  onSpecificActorSelected: () => void;
 }): React.JSX.Element {
   const [selectedResourceKind, setSelectedResourceKind] = useState(input.initialResourceKind);
   const selectedKind = input.actorResourceKinds.find(
@@ -359,6 +370,12 @@ function SpecificActorPolicyFields(input: {
           }
 
           setSelectedResourceKind(value);
+          input.onPoliciesChange(
+            removeActorPolicy({
+              conditionId: input.conditionId,
+              policies: input.policies,
+            }),
+          );
         }}
         value={selectedResourceKind}
       >
@@ -410,6 +427,7 @@ function SpecificActorPolicyFields(input: {
                 },
               }),
             );
+            input.onSpecificActorSelected();
           }}
           value={selectedResourceId}
         >
@@ -456,7 +474,9 @@ export function WebhookTriggerActorPolicyFields(input: {
   webhookEventOptions: readonly WebhookTriggerEventOption[];
   onActorPoliciesChange: (policies: ActorPolicyMap) => void;
 }): React.JSX.Element | null {
-  const [draftModes, setDraftModes] = useState<Record<string, ActorPolicyMode>>({});
+  const [specificActorPickerConditionIds, setSpecificActorPickerConditionIds] = useState<
+    Record<string, true>
+  >({});
   const rows = input.selectedEventIds.flatMap((conditionId) => {
     const eventOptionId = resolveWebhookTriggerEventOptionIdFromConditionId(conditionId);
     const eventOption = input.webhookEventOptions.find((option) => option.id === eventOptionId);
@@ -482,8 +502,8 @@ export function WebhookTriggerActorPolicyFields(input: {
           eventOption: row.eventOption,
         });
         const policy = input.eventActorPolicies?.[row.conditionId];
-        const persistedMode = resolveActorPolicyMode(policy);
-        const mode = draftModes[row.conditionId] ?? persistedMode;
+        const mode = resolveActorPolicyMode(policy);
+        const specificActorPickerOpen = specificActorPickerConditionIds[row.conditionId] === true;
         const attributeOptions = resolveAttributeOptions({
           actorResourceKinds,
           resourceDefinitions: row.eventOption.resourceDefinitions,
@@ -526,8 +546,11 @@ export function WebhookTriggerActorPolicyFields(input: {
                   disabled={input.disabled || mode === ActorPolicyModes.CUSTOM}
                   onValueChange={(value) => {
                     if (value === ActorPolicyModes.ANYONE) {
-                      setDraftModes((currentModes) =>
-                        removeDraftMode({ conditionId: row.conditionId, modes: currentModes }),
+                      setSpecificActorPickerConditionIds((currentOpenPickers) =>
+                        removeSpecificActorPicker({
+                          conditionId: row.conditionId,
+                          openPickers: currentOpenPickers,
+                        }),
                       );
                       input.onActorPoliciesChange(
                         removeActorPolicy({
@@ -544,8 +567,11 @@ export function WebhookTriggerActorPolicyFields(input: {
                         return;
                       }
 
-                      setDraftModes((currentModes) =>
-                        removeDraftMode({ conditionId: row.conditionId, modes: currentModes }),
+                      setSpecificActorPickerConditionIds((currentOpenPickers) =>
+                        removeSpecificActorPicker({
+                          conditionId: row.conditionId,
+                          openPickers: currentOpenPickers,
+                        }),
                       );
                       input.onActorPoliciesChange(
                         setActorPolicy({
@@ -558,10 +584,18 @@ export function WebhookTriggerActorPolicyFields(input: {
                     }
 
                     if (value === ActorPolicyModes.SPECIFIC) {
-                      setDraftModes((currentModes) => ({
-                        ...currentModes,
-                        [row.conditionId]: ActorPolicyModes.SPECIFIC,
-                      }));
+                      setSpecificActorPickerConditionIds((currentOpenPickers) =>
+                        addSpecificActorPicker({
+                          conditionId: row.conditionId,
+                          openPickers: currentOpenPickers,
+                        }),
+                      );
+                      input.onActorPoliciesChange(
+                        removeActorPolicy({
+                          conditionId: row.conditionId,
+                          policies: input.eventActorPolicies,
+                        }),
+                      );
                     }
                   }}
                   value={mode}
@@ -634,7 +668,7 @@ export function WebhookTriggerActorPolicyFields(input: {
                   </Select>
                 ) : null}
 
-                {mode === ActorPolicyModes.SPECIFIC ? (
+                {mode === ActorPolicyModes.SPECIFIC || specificActorPickerOpen ? (
                   <SpecificActorPolicyFields
                     actorResourceKinds={actorResourceKinds}
                     conditionId={row.conditionId}
@@ -647,13 +681,20 @@ export function WebhookTriggerActorPolicyFields(input: {
                       policy,
                       actorResourceKinds,
                     })}
+                    onSpecificActorSelected={() => {
+                      setSpecificActorPickerConditionIds((currentOpenPickers) =>
+                        removeSpecificActorPicker({
+                          conditionId: row.conditionId,
+                          openPickers: currentOpenPickers,
+                        }),
+                      );
+                    }}
                   />
                 ) : null}
 
                 {actorSetOptions.length === 0 ? null : (
                   <Notice>
-                    Group actor policies need relationship sync readiness before they can be
-                    selected.
+                    Group actor policies need resource sync readiness before they can be selected.
                   </Notice>
                 )}
               </div>
