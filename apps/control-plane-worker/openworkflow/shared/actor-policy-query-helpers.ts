@@ -44,34 +44,6 @@ type ResolvedActorPolicyResource = {
   handle: string;
 };
 
-export async function queryActorPolicyRelationshipScopeReadiness(input: {
-  db: ControlPlaneDatabase;
-  connectionId: string;
-  relationshipKind: string;
-  scope: ActorPolicyRelationshipScopeReference;
-}): Promise<ActorPolicyQueryResult> {
-  const scopeResource = await resolveAccessibleResource({
-    db: input.db,
-    connectionId: input.connectionId,
-    reference: input.scope,
-  });
-  if (scopeResource === undefined) {
-    return dataUnavailable("relationship_scope_resource_unavailable");
-  }
-
-  const isReady = await isRelationshipScopeReady({
-    db: input.db,
-    connectionId: input.connectionId,
-    resourceKind: scopeResource.kind,
-  });
-
-  if (!isReady) {
-    return dataUnavailable("relationship_scope_not_ready");
-  }
-
-  return matched();
-}
-
 export async function queryActorPolicyResourceAttribute(input: {
   db: ControlPlaneDatabase;
   connectionId: string;
@@ -196,13 +168,13 @@ export async function queryActorPolicyResourceRelationship(input: {
     return dataUnavailable("relationship_scope_resource_unavailable");
   }
 
-  const isReady = await isRelationshipScopeReady({
+  const isReady = await isActorSetResourceKindReadyForRelationships({
     db: input.db,
     connectionId: input.connectionId,
     resourceKind: input.actorSet.resourceKind,
   });
   if (!isReady) {
-    return dataUnavailable("relationship_scope_not_ready");
+    return dataUnavailable("actor_set_resource_kind_not_ready");
   }
 
   const tables = getControlPlaneDatabaseSchema(input.db);
@@ -655,7 +627,7 @@ async function isResourceKindReadyForAttributes(input: {
   );
 }
 
-async function isRelationshipScopeReady(input: {
+async function isActorSetResourceKindReadyForRelationships(input: {
   db: ControlPlaneDatabase;
   connectionId: string;
   resourceKind: string;

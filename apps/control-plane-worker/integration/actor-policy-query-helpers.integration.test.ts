@@ -17,7 +17,6 @@ import { describe, expect } from "vitest";
 
 import {
   ActorPolicyQueryResultStates,
-  queryActorPolicyRelationshipScopeReadiness,
   queryActorPolicyResourceAttribute,
   queryActorPolicyResourceRelationship,
 } from "../openworkflow/shared/actor-policy-query-helpers.js";
@@ -29,66 +28,6 @@ const it = createIntegrationTest({
 });
 
 describe.concurrent("actor policy query helpers", () => {
-  it("returns explicit readiness states for relationship scopes", async ({ env }) => {
-    await seedConnection({
-      env,
-      connectionId: "icn_actor_policy_scope_ready",
-      organizationId: "org_actor_policy_scope_ready",
-      organizationSlug: "actor-policy-scope-ready",
-      targetKey: "actor-policy-scope-ready",
-    });
-    await seedResources({
-      env,
-      connectionId: "icn_actor_policy_scope_ready",
-      resources: [
-        resource({
-          id: "rsc_actor_policy_scope_ready_team",
-          kind: "team",
-          externalId: "team_1",
-          handle: "mistle/platform",
-          displayName: "Platform",
-        }),
-      ],
-    });
-    await seedReadyRelationshipScope({
-      env,
-      connectionId: "icn_actor_policy_scope_ready",
-      scopeResourceId: "rsc_actor_policy_scope_ready_team",
-      scopeKind: "team",
-      scopeExternalId: "team_1",
-      scopeHandle: "mistle/platform",
-    });
-
-    await expect(
-      queryActorPolicyRelationshipScopeReadiness({
-        db: env.controlPlaneDb,
-        connectionId: "icn_actor_policy_scope_ready",
-        relationshipKind: "belongs_to",
-        scope: {
-          resourceKind: "team",
-          resourceId: "rsc_actor_policy_scope_ready_team",
-        },
-      }),
-    ).resolves.toEqual({
-      state: ActorPolicyQueryResultStates.MATCHED,
-    });
-
-    await expect(
-      queryActorPolicyRelationshipScopeReadiness({
-        db: env.controlPlaneDb,
-        connectionId: "icn_actor_policy_scope_ready",
-        relationshipKind: "belongs_to",
-        scope: {
-          resourceKind: "team",
-          handle: "mistle/backend",
-        },
-      }),
-    ).resolves.toEqual({
-      state: ActorPolicyQueryResultStates.DATA_UNAVAILABLE,
-      reason: "relationship_scope_resource_unavailable",
-    });
-  });
-
   it("matches actor attributes only when actor resources and declared attribute data are ready", async ({
     env,
   }) => {
@@ -753,7 +692,9 @@ describe.concurrent("actor policy query helpers", () => {
     });
   });
 
-  it("does not answer membership when the relationship scope is not ready", async ({ env }) => {
+  it("does not answer membership when the actor set resource kind is not ready", async ({
+    env,
+  }) => {
     await seedConnection({
       env,
       connectionId: "icn_actor_policy_relationship_unready",
@@ -815,7 +756,7 @@ describe.concurrent("actor policy query helpers", () => {
       }),
     ).resolves.toEqual({
       state: ActorPolicyQueryResultStates.DATA_UNAVAILABLE,
-      reason: "relationship_scope_not_ready",
+      reason: "actor_set_resource_kind_not_ready",
     });
   });
 });
