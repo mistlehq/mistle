@@ -1098,6 +1098,14 @@ describe.concurrent("sync integration connection resources", () => {
         displayName: "Bob",
       }),
       persistedResource({
+        id: "rsc_sync_resources_relationship_snapshot_carla",
+        connectionId: "icn_sync_resources_relationship_snapshot",
+        kind: "user",
+        externalId: "3",
+        handle: "carla",
+        displayName: "Carla",
+      }),
+      persistedResource({
         id: "rsc_sync_resources_relationship_snapshot_team",
         connectionId: "icn_sync_resources_relationship_snapshot",
         kind: "team",
@@ -1108,26 +1116,49 @@ describe.concurrent("sync integration connection resources", () => {
     ]);
     await env.controlPlaneDb
       .insert(env.controlPlaneTables.integrationConnectionResourceRelationships)
-      .values({
-        id: "irr_sync_resources_relationship_snapshot_bob",
-        connectionId: "icn_sync_resources_relationship_snapshot",
-        familyId: "github",
-        relationshipKind: "belongs_to",
-        subjectResourceId: "rsc_sync_resources_relationship_snapshot_bob",
-        subjectResourceKind: "user",
-        subjectExternalId: "2",
-        subjectHandle: "bob",
-        objectResourceId: "rsc_sync_resources_relationship_snapshot_team",
-        objectResourceKind: "team",
-        objectExternalId: "100",
-        objectHandle: "mistle/backend",
-        scopeResourceId: "rsc_sync_resources_relationship_snapshot_team",
-        scopeKind: "team",
-        scopeExternalId: "100",
-        scopeHandle: "mistle/backend",
-        metadata: {},
-        lastSeenAt: "2026-03-09T00:00:00.000Z",
-      });
+      .values([
+        {
+          id: "irr_sync_resources_relationship_snapshot_bob",
+          connectionId: "icn_sync_resources_relationship_snapshot",
+          familyId: "github",
+          relationshipKind: "belongs_to",
+          subjectResourceId: "rsc_sync_resources_relationship_snapshot_bob",
+          subjectResourceKind: "user",
+          subjectExternalId: "2",
+          subjectHandle: "bob",
+          objectResourceId: "rsc_sync_resources_relationship_snapshot_team",
+          objectResourceKind: "team",
+          objectExternalId: "100",
+          objectHandle: "mistle/backend",
+          scopeResourceId: "rsc_sync_resources_relationship_snapshot_team",
+          scopeKind: "team",
+          scopeExternalId: "100",
+          scopeHandle: "mistle/backend",
+          metadata: {},
+          lastSeenAt: "2026-03-09T00:00:00.000Z",
+        },
+        {
+          id: "irr_sync_resources_relationship_snapshot_carla",
+          connectionId: "icn_sync_resources_relationship_snapshot",
+          familyId: "github",
+          relationshipKind: "belongs_to",
+          subjectResourceId: "rsc_sync_resources_relationship_snapshot_carla",
+          subjectResourceKind: "user",
+          subjectExternalId: "3",
+          subjectHandle: "carla",
+          objectResourceId: "rsc_sync_resources_relationship_snapshot_team",
+          objectResourceKind: "team",
+          objectExternalId: "100",
+          objectHandle: "mistle/backend",
+          scopeResourceId: "rsc_sync_resources_relationship_snapshot_team",
+          scopeKind: "team",
+          scopeExternalId: "100",
+          scopeHandle: "mistle/backend",
+          metadata: {},
+          lastSeenAt: "2026-03-08T00:00:00.000Z",
+          removedAt: "2026-03-08T00:05:00.000Z",
+        },
+      ]);
 
     const syncStartedAt = await markResourceSyncing({
       db: env.controlPlaneDb,
@@ -1172,7 +1203,7 @@ describe.concurrent("sync integration connection resources", () => {
         orderBy: (table, { asc }) => asc(table.subjectHandle),
       });
 
-    expect(persistedRelationships).toHaveLength(2);
+    expect(persistedRelationships).toHaveLength(3);
     expect(persistedRelationships[0]).toEqual(
       expect.objectContaining({
         subjectResourceId: "rsc_sync_resources_relationship_snapshot_alice",
@@ -1192,6 +1223,15 @@ describe.concurrent("sync integration connection resources", () => {
       }),
     );
     expect(persistedRelationships[1]?.removedAt).toBeTruthy();
+    expect(persistedRelationships[2]).toEqual(
+      expect.objectContaining({
+        subjectResourceId: "rsc_sync_resources_relationship_snapshot_carla",
+        subjectHandle: "carla",
+      }),
+    );
+    expect(new Date(persistedRelationships[2]?.removedAt ?? "").toISOString()).toBe(
+      "2026-03-08T00:05:00.000Z",
+    );
   });
 });
 
