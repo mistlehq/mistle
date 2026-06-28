@@ -450,6 +450,41 @@ export type DiscoveredIntegrationResourceAttribute = {
   metadata: Record<string, unknown>;
 };
 
+export type DiscoveredIntegrationResourceRelationshipScope = {
+  scopeKind: string;
+  scopeExternalId?: string;
+  scopeHandle: string;
+};
+
+export type IntegrationResourceRelationshipScopeDefinition = {
+  scopeKind: string;
+  displayName?: string;
+  description?: string;
+};
+
+export type IntegrationResourceRelationshipDefinition = {
+  relationshipKind: string;
+  subjectResourceKind: string;
+  objectResourceKind: string;
+  displayName?: string;
+  description?: string;
+  scopeDefinitions: ReadonlyArray<IntegrationResourceRelationshipScopeDefinition>;
+};
+
+export type DiscoveredIntegrationResourceRelationship = {
+  relationshipKind: string;
+  subjectResourceKind: string;
+  subjectExternalId?: string;
+  subjectHandle: string;
+  objectResourceKind: string;
+  objectExternalId?: string;
+  objectHandle: string;
+  scopeKind: string;
+  scopeExternalId?: string;
+  scopeHandle: string;
+  metadata: Record<string, unknown>;
+};
+
 export type ListConnectionResourcesInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -468,6 +503,7 @@ export type ListConnectionResourcesInput<
 export type ListConnectionResourcesResult = {
   resources: ReadonlyArray<DiscoveredIntegrationResource>;
   attributes?: ReadonlyArray<DiscoveredIntegrationResourceAttribute>;
+  relationships?: ReadonlyArray<DiscoveredIntegrationResourceRelationship>;
 };
 
 export type IntegrationResourceSyncTrigger = {
@@ -3018,6 +3054,7 @@ export type IntegrationDefinition<
   associatedResourceEvents?: IntegrationAssociatedResourceEventsCapability<TConnectionConfig>;
   webhookTriggerCapabilitiesRefreshUi?: IntegrationWebhookTriggerCapabilitiesRefreshUi | undefined;
   resourceDefinitions?: ReadonlyArray<IntegrationResourceDefinition>;
+  resourceRelationshipDefinitions?: ReadonlyArray<IntegrationResourceRelationshipDefinition>;
   resourceSyncTriggers?: ReadonlyArray<IntegrationResourceSyncTrigger>;
   egressRequestMiddleware?: ReadonlyArray<IntegrationEgressRequestMiddleware>;
   resolveEgressCredentialResolver?(

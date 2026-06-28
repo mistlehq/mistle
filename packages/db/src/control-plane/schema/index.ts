@@ -62,7 +62,6 @@ export {
 } from "./integration-connection-credentials.js";
 export {
   integrationConnectionResourceAttributesRelations,
-  integrationConnectionResourceRelationshipStatesRelations,
   integrationConnectionResourceRelationshipsRelations,
   integrationConnectionResourcesRelations,
   integrationConnectionResourceStatesRelations,
@@ -78,13 +77,6 @@ export {
   type IntegrationConnectionResourceAttribute,
   type IntegrationConnectionResourceAttributeValueType,
 } from "./integration-connection-resource-attributes.js";
-export {
-  integrationConnectionResourceRelationshipStates,
-  IntegrationConnectionResourceRelationshipSyncStates,
-  type InsertIntegrationConnectionResourceRelationshipState,
-  type IntegrationConnectionResourceRelationshipState,
-  type IntegrationConnectionResourceRelationshipSyncState,
-} from "./integration-connection-resource-relationship-states.js";
 export {
   integrationConnectionResourceRelationships,
   type InsertIntegrationConnectionResourceRelationship,
