@@ -153,7 +153,7 @@ describe("listSlackConnectionResources", () => {
 
       expect(seenRequests).toEqual([
         "POST http://127.0.0.1/api/auth.test application/x-www-form-urlencoded",
-        "GET http://127.0.0.1/api/users.list?limit=200 ",
+        "GET http://127.0.0.1/api/users.list?limit=200&team_id=T123 ",
       ]);
       expect(result).toEqual({
         resources: [

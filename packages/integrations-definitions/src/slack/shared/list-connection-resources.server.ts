@@ -129,9 +129,16 @@ function buildSlackConversationsListUrl(input: { apiBaseUrl: string; cursor?: st
   return apiUrl;
 }
 
-function buildSlackUsersListUrl(input: { apiBaseUrl: string; cursor?: string }): URL {
+function buildSlackUsersListUrl(input: {
+  apiBaseUrl: string;
+  cursor?: string;
+  teamId?: string;
+}): URL {
   const apiUrl = new URL(buildUrlWithPath(input.apiBaseUrl, "/users.list"));
   apiUrl.searchParams.set("limit", SlackUsersListLimit);
+  if (input.teamId !== undefined) {
+    apiUrl.searchParams.set("team_id", input.teamId);
+  }
   if (input.cursor !== undefined && input.cursor.length > 0) {
     apiUrl.searchParams.set("cursor", input.cursor);
   }
@@ -416,6 +423,7 @@ async function listSlackWorkspace(input: {
 async function listSlackUsers(input: {
   apiBaseUrl: string;
   botToken: string;
+  teamId?: string;
 }): Promise<ReadonlyArray<SlackUser>> {
   const users: SlackUser[] = [];
   let nextCursor: string | undefined;
@@ -425,6 +433,7 @@ async function listSlackUsers(input: {
       buildSlackUsersListUrl({
         apiBaseUrl: input.apiBaseUrl,
         ...(nextCursor === undefined ? {} : { cursor: nextCursor }),
+        ...(input.teamId === undefined ? {} : { teamId: input.teamId }),
       }),
       {
         method: "GET",
@@ -492,6 +501,7 @@ async function listSlackWorkspaceMembershipRelationships(input: {
   const users = await listSlackUsers({
     apiBaseUrl: input.apiBaseUrl,
     botToken: input.botToken,
+    teamId: input.scopeExternalId,
   });
 
   return users
