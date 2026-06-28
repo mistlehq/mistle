@@ -529,12 +529,33 @@ describe("integrations-definitions server", () => {
     });
     expect(slackDefinition?.resourceDefinitions).toEqual([
       expect.objectContaining({
+        kind: "workspace",
+        bindingField: "workspace",
+      }),
+      expect.objectContaining({
         kind: "channel",
         bindingField: "channels",
       }),
       expect.objectContaining({
         kind: "user",
         bindingField: "users",
+        attributeDefinitions: [
+          expect.objectContaining({
+            key: "is_bot",
+            valueType: "boolean",
+            actorPolicyEligible: true,
+          }),
+          expect.objectContaining({
+            key: "is_app_user",
+            valueType: "boolean",
+            actorPolicyEligible: true,
+          }),
+          expect.objectContaining({
+            key: "is_workflow_bot",
+            valueType: "boolean",
+            actorPolicyEligible: true,
+          }),
+        ],
       }),
       expect.objectContaining({
         kind: "user_group",

@@ -1,5 +1,6 @@
 import { buildUrlWithPath } from "@mistle/http";
 import type {
+  DiscoveredIntegrationResourceAttribute,
   DiscoveredIntegrationResource,
   ListConnectionResourcesInput,
   ListConnectionResourcesResult,
@@ -14,6 +15,7 @@ import type { SlackTargetConfig } from "../variants/slack-default/target-config-
 import type { SlackTargetSecrets } from "../variants/slack-default/target-secret-schema.js";
 
 const SlackChannelKind = "channel";
+const SlackWorkspaceKind = "workspace";
 const SlackUserKind = "user";
 const SlackUserGroupKind = "user_group";
 const SlackUsersListLimit = "200";
@@ -72,6 +74,17 @@ const SlackUsersListResponseSchema = z.looseObject({
     .optional(),
 });
 
+const SlackAuthTestResponseSchema = z.looseObject({
+  ok: z.boolean(),
+  url: z.url().optional(),
+  team: z.string().min(1).optional(),
+  team_id: z.string().min(1).optional(),
+  user: z.string().min(1).optional(),
+  user_id: z.string().min(1).optional(),
+  bot_id: z.string().min(1).optional(),
+  error: z.string().min(1).optional(),
+});
+
 const SlackUserGroupSchema = z.looseObject({
   id: z.string().min(1),
   team_id: z.string().optional(),
@@ -98,7 +111,12 @@ type SlackListConnectionResourcesInput = ListConnectionResourcesInput<
 
 type SlackConversation = z.output<typeof SlackConversationSchema>;
 type SlackUser = z.output<typeof SlackUserSchema>;
+type SlackAuthTestResponse = z.output<typeof SlackAuthTestResponseSchema>;
 type SlackUserGroup = z.output<typeof SlackUserGroupSchema>;
+
+function buildSlackAuthTestUrl(input: { apiBaseUrl: string }): URL {
+  return new URL(buildUrlWithPath(input.apiBaseUrl, "/auth.test"));
+}
 
 function buildSlackConversationsListUrl(input: { apiBaseUrl: string; cursor?: string }): URL {
   const apiUrl = new URL(buildUrlWithPath(input.apiBaseUrl, "/conversations.list"));
@@ -158,6 +176,23 @@ function toDiscoveredChannelResource(
   };
 }
 
+function toDiscoveredWorkspaceResource(
+  authTest: SlackAuthTestResponse & { team_id: string },
+): DiscoveredIntegrationResource {
+  return {
+    externalId: authTest.team_id,
+    handle: authTest.team_id,
+    displayName: authTest.team ?? authTest.team_id,
+    metadata: {
+      ...(authTest.team === undefined ? {} : { name: authTest.team }),
+      ...(authTest.url === undefined ? {} : { url: authTest.url }),
+      ...(authTest.user === undefined ? {} : { authenticatedUserName: authTest.user }),
+      ...(authTest.user_id === undefined ? {} : { authenticatedUserId: authTest.user_id }),
+      ...(authTest.bot_id === undefined ? {} : { authenticatedBotId: authTest.bot_id }),
+    },
+  };
+}
+
 function resolveSlackUserDisplayName(user: SlackUser): string {
   const profileDisplayName = user.profile?.display_name?.trim() ?? "";
   if (profileDisplayName.length > 0) {
@@ -202,6 +237,44 @@ function toDiscoveredUserResource(user: SlackUser): DiscoveredIntegrationResourc
       isWorkflowBot: user.is_workflow_bot ?? false,
     },
   };
+}
+
+function toDiscoveredUserAttribute(input: {
+  user: SlackUser;
+  key: string;
+  value: boolean;
+}): DiscoveredIntegrationResourceAttribute {
+  return {
+    resourceKind: SlackUserKind,
+    resourceExternalId: input.user.id,
+    resourceHandle: input.user.id,
+    key: input.key,
+    value: input.value ? "true" : "false",
+    valueType: "boolean",
+    metadata: {},
+  };
+}
+
+function toDiscoveredUserAttributes(
+  user: SlackUser,
+): ReadonlyArray<DiscoveredIntegrationResourceAttribute> {
+  return [
+    toDiscoveredUserAttribute({
+      user,
+      key: "is_bot",
+      value: user.is_bot ?? false,
+    }),
+    toDiscoveredUserAttribute({
+      user,
+      key: "is_app_user",
+      value: user.is_app_user ?? false,
+    }),
+    toDiscoveredUserAttribute({
+      user,
+      key: "is_workflow_bot",
+      value: user.is_workflow_bot ?? false,
+    }),
+  ];
 }
 
 function toDiscoveredUserGroupResource(userGroup: SlackUserGroup): DiscoveredIntegrationResource {
@@ -280,11 +353,49 @@ async function listSlackChannels(input: {
   return channels.sort((left, right) => left.displayName.localeCompare(right.displayName));
 }
 
-async function listSlackUsers(input: {
+async function listSlackWorkspace(input: {
   apiBaseUrl: string;
   botToken: string;
 }): Promise<ReadonlyArray<DiscoveredIntegrationResource>> {
+  const response = await fetch(
+    buildSlackAuthTestUrl({
+      apiBaseUrl: input.apiBaseUrl,
+    }),
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${input.botToken}`,
+        accept: "application/json",
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams(),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Slack auth.test request failed with status ${String(response.status)}.`);
+  }
+
+  const parsedPayload = SlackAuthTestResponseSchema.parse(await response.json());
+  if (!parsedPayload.ok) {
+    throw new Error(
+      `Slack auth.test returned an error${parsedPayload.error === undefined ? "." : `: ${parsedPayload.error}.`}`,
+    );
+  }
+
+  if (parsedPayload.team_id === undefined) {
+    throw new Error("Slack auth.test response is missing required `team_id`.");
+  }
+
+  return [toDiscoveredWorkspaceResource({ ...parsedPayload, team_id: parsedPayload.team_id })];
+}
+
+async function listSlackUsers(input: {
+  apiBaseUrl: string;
+  botToken: string;
+}): Promise<ListConnectionResourcesResult> {
   const users: DiscoveredIntegrationResource[] = [];
+  const attributes: DiscoveredIntegrationResourceAttribute[] = [];
   let nextCursor: string | undefined;
 
   for (;;) {
@@ -319,6 +430,7 @@ async function listSlackUsers(input: {
       }
 
       users.push(toDiscoveredUserResource(user));
+      attributes.push(...toDiscoveredUserAttributes(user));
     }
 
     const candidateCursor = parsedPayload.response_metadata?.next_cursor?.trim() ?? "";
@@ -329,7 +441,13 @@ async function listSlackUsers(input: {
     nextCursor = candidateCursor;
   }
 
-  return users.sort((left, right) => left.displayName.localeCompare(right.displayName));
+  return {
+    resources: users.sort((left, right) => left.displayName.localeCompare(right.displayName)),
+    attributes: attributes.sort((left, right) => {
+      const resourceComparison = left.resourceHandle.localeCompare(right.resourceHandle);
+      return resourceComparison === 0 ? left.key.localeCompare(right.key) : resourceComparison;
+    }),
+  };
 }
 
 async function listSlackUserGroups(input: {
@@ -380,6 +498,15 @@ export async function listSlackConnectionResources(
 
   SlackConnectionConfigSchema.parse(input.connection.config);
 
+  if (input.kind === SlackWorkspaceKind) {
+    return {
+      resources: await listSlackWorkspace({
+        apiBaseUrl: input.target.config.apiBaseUrl,
+        botToken: input.credential.value,
+      }),
+    };
+  }
+
   if (input.kind === SlackChannelKind) {
     return {
       resources: await listSlackChannels({
@@ -390,12 +517,10 @@ export async function listSlackConnectionResources(
   }
 
   if (input.kind === SlackUserKind) {
-    return {
-      resources: await listSlackUsers({
-        apiBaseUrl: input.target.config.apiBaseUrl,
-        botToken: input.credential.value,
-      }),
-    };
+    return await listSlackUsers({
+      apiBaseUrl: input.target.config.apiBaseUrl,
+      botToken: input.credential.value,
+    });
   }
 
   if (input.kind === SlackUserGroupKind) {

@@ -58,6 +58,89 @@ async function startTestServer(input: {
 }
 
 describe("listSlackConnectionResources", () => {
+  it("lists the connected Slack workspace from auth.test", async () => {
+    const seenRequests: string[] = [];
+    const server = await startTestServer({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        seenRequests.push(
+          `${request.method ?? "GET"} ${requestUrl.toString()} ${String(request.headers["content-type"] ?? "")}`,
+        );
+        response.setHeader("content-type", "application/json");
+
+        // Grounded in Slack's documented auth.test response shape:
+        // https://docs.slack.dev/reference/methods/auth.test/
+        response.end(
+          JSON.stringify({
+            ok: true,
+            url: "https://mistle.slack.com/",
+            team: "Mistle",
+            user: "mistlebot",
+            team_id: "T123",
+            user_id: "U_BOT",
+            bot_id: "B123",
+          }),
+        );
+      },
+    });
+
+    try {
+      const result = await listSlackConnectionResources({
+        organizationId: "org_test",
+        targetKey: "slack-default-test",
+        target: {
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            apiBaseUrl: `${server.baseUrl}/api`,
+          },
+          secrets: {},
+        },
+        connection: {
+          id: "icn_slack",
+          status: "active",
+          config: {
+            connection_method: "slack-bot-token",
+          },
+        },
+        kind: "workspace",
+        credential: {
+          kind: "value",
+          value: "xoxb-test-token",
+        },
+      });
+
+      expect(seenRequests).toEqual([
+        "POST http://127.0.0.1/api/auth.test application/x-www-form-urlencoded",
+      ]);
+      expect(result).toEqual({
+        resources: [
+          {
+            externalId: "T123",
+            handle: "T123",
+            displayName: "Mistle",
+            metadata: {
+              name: "Mistle",
+              url: "https://mistle.slack.com/",
+              authenticatedUserName: "mistlebot",
+              authenticatedUserId: "U_BOT",
+              authenticatedBotId: "B123",
+            },
+          },
+        ],
+      });
+    } finally {
+      await server.stop();
+    }
+  });
+
   it("lists public and private channels, excludes archived and non-channel conversations, and paginates", async () => {
     const seenUrls: string[] = [];
     const server = await startTestServer({
@@ -379,6 +462,62 @@ describe("listSlackConnectionResources", () => {
               isAppUser: true,
               isWorkflowBot: false,
             },
+          },
+        ],
+        attributes: [
+          {
+            resourceKind: "user",
+            resourceExternalId: "U_BOT",
+            resourceHandle: "U_BOT",
+            key: "is_app_user",
+            value: "true",
+            valueType: "boolean",
+            metadata: {},
+          },
+          {
+            resourceKind: "user",
+            resourceExternalId: "U_BOT",
+            resourceHandle: "U_BOT",
+            key: "is_bot",
+            value: "true",
+            valueType: "boolean",
+            metadata: {},
+          },
+          {
+            resourceKind: "user",
+            resourceExternalId: "U_BOT",
+            resourceHandle: "U_BOT",
+            key: "is_workflow_bot",
+            value: "false",
+            valueType: "boolean",
+            metadata: {},
+          },
+          {
+            resourceKind: "user",
+            resourceExternalId: "U_HUMAN",
+            resourceHandle: "U_HUMAN",
+            key: "is_app_user",
+            value: "false",
+            valueType: "boolean",
+            metadata: {},
+          },
+          {
+            resourceKind: "user",
+            resourceExternalId: "U_HUMAN",
+            resourceHandle: "U_HUMAN",
+            key: "is_bot",
+            value: "false",
+            valueType: "boolean",
+            metadata: {},
+          },
+          {
+            resourceKind: "user",
+            resourceExternalId: "U_HUMAN",
+            resourceHandle: "U_HUMAN",
+            key: "is_workflow_bot",
+            value: "false",
+            valueType: "boolean",
+            metadata: {},
           },
         ],
       });
