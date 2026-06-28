@@ -271,6 +271,83 @@ describe.concurrent("control-plane worker integration webhook event handling", (
     });
   });
 
+  it("queues trigger runs when the webhook actor policy matches the event actor handle before resource sync", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("actor_policy_handle_payload_match"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      eventConditions: [
+        {
+          eventType: "github.issue_comment.created",
+          actorPolicy: {
+            anyOf: [
+              {
+                kind: "resource",
+                actor: {
+                  resourceKind: "user",
+                  handle: "octocat",
+                },
+              },
+            ],
+          },
+        },
+      ],
+      payload: {
+        installation: {
+          id: 12345,
+        },
+        delivery: {
+          id: "delivery_actor_policy_handle_payload_match_payload",
+        },
+        sender: {
+          id: 1001,
+          login: "octocat",
+          type: "User",
+        },
+      },
+      externalEventId: "evt_actor_policy_handle_payload_match",
+      externalDeliveryId: "delivery_actor_policy_handle_payload_match",
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      finalized: false,
+    });
+    expect(preparedEvent.triggerRunIds).toHaveLength(1);
+
+    const queuedRuns = await env.controlPlaneDb.query.triggerRuns.findMany({
+      where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+    });
+    expect(queuedRuns).toHaveLength(1);
+    expect(queuedRuns[0]).toMatchObject({
+      triggerId: scope.triggerId,
+      triggerTargetId: scope.triggerTargetId,
+      status: TriggerRunStatuses.QUEUED,
+    });
+  });
+
   it("ignores matching webhook trigger conditions when the webhook actor policy does not match", async ({
     env,
   }) => {
@@ -1914,16 +1991,12 @@ async function seedActorPolicyRelationshipResources(input: {
     ]);
 
   await input.env.controlPlaneDb
-    .insert(input.env.controlPlaneTables.integrationConnectionResourceRelationshipStates)
+    .insert(input.env.controlPlaneTables.integrationConnectionResourceStates)
     .values({
       connectionId: input.connectionId,
       familyId: input.familyId,
-      relationshipKind: input.relationshipKind,
-      scopeResourceId: input.actorSetResource.id,
-      scopeKind: input.actorSetResource.kind,
-      scopeExternalId: input.actorSetResource.externalId,
-      scopeHandle: input.actorSetResource.handle,
-      syncState: IntegrationConnectionResourceRelationshipSyncStates.READY,
+      kind: input.actorSetResource.kind,
+      syncState: IntegrationConnectionResourceSyncStates.READY,
       totalCount: 1,
       lastSyncedAt: ResourceTimestamp,
       lastSyncStartedAt: ResourceTimestamp,

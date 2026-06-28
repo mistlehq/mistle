@@ -41,7 +41,11 @@ export type ResolvedWebhookTriggerActorPolicyResult =
       detail: string;
     };
 
-type ResolvedWebhookEventActor = ActorPolicyResourceReference;
+type ResolvedWebhookEventActor = {
+  resourceKind: string;
+  externalId?: string | undefined;
+  handle?: string | undefined;
+};
 
 type ResolvedActorPolicyResource = {
   id: string;
@@ -107,21 +111,16 @@ function resolveWebhookEventActor(input: {
       payload: input.payload,
       payloadPath: reference.externalIdPayloadPath,
     });
-    if (externalId !== undefined) {
-      return {
-        resourceKind: reference.resourceKind,
-        externalId,
-      };
-    }
-
     const handle = resolvePayloadReferenceValue({
       payload: input.payload,
       payloadPath: reference.handlePayloadPath,
     });
-    if (handle !== undefined) {
+
+    if (externalId !== undefined || handle !== undefined) {
       return {
         resourceKind: reference.resourceKind,
-        handle,
+        ...(externalId === undefined ? {} : { externalId }),
+        ...(handle === undefined ? {} : { handle }),
       };
     }
   }
@@ -250,7 +249,7 @@ async function evaluateActorPolicyRule(input: {
     return await queryActorPolicyResourceAttribute({
       db: input.db,
       connectionId: input.connectionId,
-      actor: input.actor,
+      actor: createEventActorResourceReference(input.actor),
       attributeKey: input.rule.attributeKey,
       attributeValue: input.rule.attributeValue,
       valueType: input.rule.valueType,
@@ -261,7 +260,7 @@ async function evaluateActorPolicyRule(input: {
     db: input.db,
     connectionId: input.connectionId,
     relationshipKind: input.rule.relationshipKind,
-    actor: input.actor,
+    actor: createEventActorResourceReference(input.actor),
     actorSet: input.rule.actorSet,
     scope: input.rule.scope,
   });
@@ -285,7 +284,7 @@ async function evaluateSpecificActorRule(input: {
   const eventActorResource = await resolveActorPolicyResource({
     db: input.db,
     connectionId: input.connectionId,
-    reference: input.eventActor,
+    reference: createEventActorResourceReference(input.eventActor),
   });
   if (eventActorResource === undefined) {
     return dataUnavailable("actor_resource_unavailable");
@@ -307,15 +306,35 @@ function compareDirectReference(
   eventActor: ResolvedWebhookEventActor,
   policyActor: WebhookTriggerActorPolicyResourceReference,
 ): boolean | undefined {
-  if ("externalId" in eventActor && "externalId" in policyActor) {
+  if (eventActor.externalId !== undefined && "externalId" in policyActor) {
     return eventActor.externalId === policyActor.externalId;
   }
 
-  if ("handle" in eventActor && "handle" in policyActor) {
+  if (eventActor.handle !== undefined && "handle" in policyActor) {
     return eventActor.handle === policyActor.handle;
   }
 
   return undefined;
+}
+
+function createEventActorResourceReference(
+  actor: ResolvedWebhookEventActor,
+): ActorPolicyResourceReference {
+  if (actor.externalId !== undefined) {
+    return {
+      resourceKind: actor.resourceKind,
+      externalId: actor.externalId,
+    };
+  }
+
+  if (actor.handle !== undefined) {
+    return {
+      resourceKind: actor.resourceKind,
+      handle: actor.handle,
+    };
+  }
+
+  throw new Error("Resolved webhook event actor is missing externalId and handle.");
 }
 
 async function resolveActorPolicyResource(input: {
