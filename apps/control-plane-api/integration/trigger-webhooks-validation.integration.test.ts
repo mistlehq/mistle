@@ -181,6 +181,97 @@ describe.concurrent("trigger webhooks validation integration", () => {
     expect(body.message).toContain("Invalid eventConditions payloadFilter");
   });
 
+  it("rejects invalid actor policies on create", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-trigger-webhooks-invalid-actor-policy-create@example.com",
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_trigger_webhook_invalid_actor_policy_create",
+      webhookSourceId: "iws_trigger_webhook_invalid_actor_policy_create",
+      profileId: "sbp_trigger_webhook_invalid_actor_policy_create",
+      profileVersion: 1,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/triggers/webhooks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        ...createWebhookTriggerRequestBody({
+          name: "Invalid actor policy",
+          integrationWebhookSourceId: "iws_trigger_webhook_invalid_actor_policy_create",
+          sandboxProfileId: "sbp_trigger_webhook_invalid_actor_policy_create",
+          sandboxProfileVersion: 1,
+        }),
+        eventConditions: [
+          {
+            eventType: GitHubIssueCommentCreatedEventType,
+            actorPolicy: {
+              anyOf: [],
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const body = CreateTriggerWebhookBadRequestResponseSchema.parse(await response.json());
+    expect(body.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("rejects non-canonical actor attribute policy values on create", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-trigger-webhooks-invalid-actor-attribute-create@example.com",
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_trigger_webhook_invalid_actor_attribute_create",
+      webhookSourceId: "iws_trigger_webhook_invalid_actor_attribute_create",
+      profileId: "sbp_trigger_webhook_invalid_actor_attribute_create",
+      profileVersion: 1,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/triggers/webhooks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        ...createWebhookTriggerRequestBody({
+          name: "Invalid actor attribute",
+          integrationWebhookSourceId: "iws_trigger_webhook_invalid_actor_attribute_create",
+          sandboxProfileId: "sbp_trigger_webhook_invalid_actor_attribute_create",
+          sandboxProfileVersion: 1,
+        }),
+        eventConditions: [
+          {
+            eventType: GitHubIssueCommentCreatedEventType,
+            actorPolicy: {
+              anyOf: [
+                {
+                  kind: "attribute",
+                  attributeKey: "is_bot",
+                  attributeValue: "maybe",
+                  valueType: "boolean",
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const body = CreateTriggerWebhookBadRequestResponseSchema.parse(await response.json());
+    expect(body.code).toBe("VALIDATION_ERROR");
+  });
+
   it("rejects invalid condition payload filters on update", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-trigger-webhooks-invalid-filter-update@example.com",
@@ -230,5 +321,62 @@ describe.concurrent("trigger webhooks validation integration", () => {
     const body = UpdateTriggerWebhookBadRequestResponseSchema.parse(await response.json());
     expect(body.code).toBe("VALIDATION_ERROR");
     expect(body.message).toContain("Invalid eventConditions payloadFilter");
+  });
+
+  it("rejects ambiguous actor resource references on update", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-trigger-webhooks-invalid-actor-policy-update@example.com",
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_trigger_webhook_invalid_actor_policy_update",
+      webhookSourceId: "iws_trigger_webhook_invalid_actor_policy_update",
+      profileId: "sbp_trigger_webhook_invalid_actor_policy_update",
+      profileVersion: 2,
+    });
+    await seedPersistedWebhookTrigger(env, {
+      triggerId: "atm_trigger_webhook_invalid_actor_policy_update",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_trigger_webhook_invalid_actor_policy_update",
+      profileId: "sbp_trigger_webhook_invalid_actor_policy_update",
+      profileVersion: 2,
+      targetId: "atg_trigger_webhook_invalid_actor_policy_update",
+      name: "Needs valid actor policy update",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/triggers/webhooks/atm_trigger_webhook_invalid_actor_policy_update",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          eventConditions: [
+            {
+              eventType: GitHubIssueCommentCreatedEventType,
+              actorPolicy: {
+                anyOf: [
+                  {
+                    kind: "resource",
+                    actor: {
+                      resourceKind: "user",
+                      externalId: "U123",
+                      handle: "octocat",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const body = UpdateTriggerWebhookBadRequestResponseSchema.parse(await response.json());
+    expect(body.code).toBe("VALIDATION_ERROR");
   });
 });

@@ -2,7 +2,7 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
-import { IntegrationBindingKinds } from "@mistle/db/control-plane";
+import { IntegrationBindingKinds, type WebhookTriggerActorPolicy } from "@mistle/db/control-plane";
 import { NotFoundResponseSchema } from "@mistle/http/errors.js";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
@@ -18,6 +18,40 @@ import {
 const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
+
+const SlackWorkspaceActorPolicy: WebhookTriggerActorPolicy = {
+  anyOf: [
+    {
+      kind: "relationship",
+      relationshipKind: "belongs_to",
+      actorSet: {
+        resourceKind: "workspace",
+        externalId: "T123",
+      },
+      scope: {
+        resourceKind: "workspace",
+        externalId: "T123",
+      },
+    },
+  ],
+};
+
+const GitHubTeamActorPolicy: WebhookTriggerActorPolicy = {
+  anyOf: [
+    {
+      kind: "relationship",
+      relationshipKind: "belongs_to",
+      actorSet: {
+        resourceKind: "team",
+        externalId: "T_kwDOAAAB",
+      },
+      scope: {
+        resourceKind: "team",
+        externalId: "T_kwDOAAAB",
+      },
+    },
+  ],
+};
 
 describe.concurrent("trigger webhooks update and delete integration", () => {
   it("gets and updates a webhook trigger while preserving omitted PATCH fields", async ({
@@ -58,6 +92,7 @@ describe.concurrent("trigger webhooks update and delete integration", () => {
       profileVersion: 7,
       targetId: "atg_trigger_webhook_update",
       name: "Before",
+      actorPolicy: SlackWorkspaceActorPolicy,
       createdAt: "2026-02-05T00:00:00.000Z",
     });
 
@@ -74,6 +109,7 @@ describe.concurrent("trigger webhooks update and delete integration", () => {
     expect(getBody.name).toBe("Before");
     expect(getBody.integrationWebhookSourceId).toBe("iws_trigger_webhook_update_001");
     expect(getBody.instructions).toBe("Prefer deterministic reproduction steps.");
+    expect(getBody.eventConditions[0]?.actorPolicy).toEqual(SlackWorkspaceActorPolicy);
     expect(getBody.target.sandboxProfileVersion).toBe(7);
 
     const patchResponse = await env.controlPlaneApi.http.fetch(
@@ -102,6 +138,7 @@ describe.concurrent("trigger webhooks update and delete integration", () => {
     expect(patchBody.name).toBe("After");
     expect(patchBody.enabled).toBe(false);
     expect(patchBody.integrationWebhookSourceId).toBe("iws_trigger_webhook_update_002");
+    expect(patchBody.eventConditions[0]?.actorPolicy).toEqual(SlackWorkspaceActorPolicy);
     expect(patchBody.instructions).toBeNull();
     expect(patchBody.idempotencyKeyTemplate).toBeNull();
     expect(patchBody.target.sandboxProfileId).toBe("sbp_trigger_webhook_update");
@@ -115,9 +152,38 @@ describe.concurrent("trigger webhooks update and delete integration", () => {
       throw new Error("Expected updated webhook config row.");
     }
     expect(persistedWebhook.inputTemplate).toBe("Handle payload");
+    expect(persistedWebhook.eventConditions[0]?.actorPolicy).toEqual(SlackWorkspaceActorPolicy);
     expect(persistedWebhook.instructions).toBeNull();
     expect(persistedWebhook.conversationKeyTemplate).toBe("{{payload.issue.node_id}}");
     expect(persistedWebhook.idempotencyKeyTemplate).toBeNull();
+
+    const policyPatchResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/triggers/webhooks/atm_trigger_webhook_update",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          eventConditions: [
+            {
+              eventType: "github.issue_comment.created",
+              actorPolicy: GitHubTeamActorPolicy,
+              payloadFilter: {
+                op: "eq",
+                path: ["action"],
+                value: "created",
+              },
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(policyPatchResponse.status).toBe(200);
+    const policyPatchBody = TriggerWebhookSchema.parse(await policyPatchResponse.json());
+    expect(policyPatchBody.eventConditions[0]?.actorPolicy).toEqual(GitHubTeamActorPolicy);
   });
 
   it("sets and clears the selected primary repository", async ({ env }) => {

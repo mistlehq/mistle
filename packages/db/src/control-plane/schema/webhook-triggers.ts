@@ -7,7 +7,50 @@ import { triggers } from "./triggers.js";
 
 export type WebhookTriggerEventCondition = {
   eventType: string;
+  actorPolicy?: WebhookTriggerActorPolicy | undefined;
   payloadFilter?: Record<string, unknown> | null | undefined;
+};
+
+export type WebhookTriggerActorPolicyResourceReference =
+  | {
+      resourceKind: string;
+      resourceId: string;
+    }
+  | {
+      resourceKind: string;
+      externalId: string;
+    }
+  | {
+      resourceKind: string;
+      handle: string;
+    };
+
+export type WebhookTriggerActorPolicyAttributeRule = {
+  kind: "attribute";
+  attributeKey: string;
+  attributeValue: string;
+  valueType: "boolean" | "number" | "string";
+};
+
+export type WebhookTriggerActorPolicyRelationshipRule = {
+  kind: "relationship";
+  actorSet: WebhookTriggerActorPolicyResourceReference;
+  relationshipKind: string;
+  scope: WebhookTriggerActorPolicyResourceReference;
+};
+
+export type WebhookTriggerActorPolicySpecificActorRule = {
+  kind: "resource";
+  actor: WebhookTriggerActorPolicyResourceReference;
+};
+
+export type WebhookTriggerActorPolicyRule =
+  | WebhookTriggerActorPolicyAttributeRule
+  | WebhookTriggerActorPolicyRelationshipRule
+  | WebhookTriggerActorPolicySpecificActorRule;
+
+export type WebhookTriggerActorPolicy = {
+  anyOf: WebhookTriggerActorPolicyRule[];
 };
 
 export function defineWebhookTriggers(schema: PgSchema) {

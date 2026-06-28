@@ -7205,6 +7205,222 @@
                           "type": "string",
                           "minLength": 1
                         },
+                        "actorPolicy": {
+                          "type": "object",
+                          "properties": {
+                            "anyOf": {
+                              "type": "array",
+                              "items": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["resource"]
+                                      },
+                                      "actor": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "resourceId": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "resourceId"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "externalId": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "externalId"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "handle": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "handle"],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["kind", "actor"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["attribute"]
+                                      },
+                                      "attributeKey": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "attributeValue": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "valueType": {
+                                        "type": "string",
+                                        "enum": ["boolean", "number", "string"]
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "attributeKey",
+                                      "attributeValue",
+                                      "valueType"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["relationship"]
+                                      },
+                                      "relationshipKind": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "actorSet": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "resourceId": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "resourceId"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "externalId": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "externalId"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "handle": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "handle"],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      },
+                                      "scope": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "resourceId": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "resourceId"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "externalId": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "externalId"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "handle": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "handle"],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["kind", "relationshipKind", "actorSet", "scope"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "minItems": 1
+                            }
+                          },
+                          "required": ["anyOf"],
+                          "additionalProperties": false
+                        },
                         "payloadFilter": {
                           "type": ["object", "null"],
                           "additionalProperties": {}
@@ -7299,6 +7515,222 @@
                           "eventType": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "actorPolicy": {
+                            "type": "object",
+                            "properties": {
+                              "anyOf": {
+                                "type": "array",
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": ["resource"]
+                                        },
+                                        "actor": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "resourceId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "resourceId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "externalId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "externalId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "handle": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "handle"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["kind", "actor"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": ["attribute"]
+                                        },
+                                        "attributeKey": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "attributeValue": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "valueType": {
+                                          "type": "string",
+                                          "enum": ["boolean", "number", "string"]
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attributeKey",
+                                        "attributeValue",
+                                        "valueType"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": ["relationship"]
+                                        },
+                                        "relationshipKind": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "actorSet": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "resourceId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "resourceId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "externalId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "externalId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "handle": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "handle"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        },
+                                        "scope": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "resourceId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "resourceId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "externalId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "externalId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "handle": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "handle"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["kind", "relationshipKind", "actorSet", "scope"],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "minItems": 1
+                              }
+                            },
+                            "required": ["anyOf"],
+                            "additionalProperties": false
                           },
                           "payloadFilter": {
                             "type": ["object", "null"],
@@ -7529,6 +7961,222 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "actorPolicy": {
+                            "type": "object",
+                            "properties": {
+                              "anyOf": {
+                                "type": "array",
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": ["resource"]
+                                        },
+                                        "actor": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "resourceId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "resourceId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "externalId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "externalId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "handle": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "handle"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["kind", "actor"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": ["attribute"]
+                                        },
+                                        "attributeKey": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "attributeValue": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "valueType": {
+                                          "type": "string",
+                                          "enum": ["boolean", "number", "string"]
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attributeKey",
+                                        "attributeValue",
+                                        "valueType"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": ["relationship"]
+                                        },
+                                        "relationshipKind": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "actorSet": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "resourceId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "resourceId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "externalId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "externalId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "handle": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "handle"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        },
+                                        "scope": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "resourceId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "resourceId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "externalId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "externalId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "handle": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "handle"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["kind", "relationshipKind", "actorSet", "scope"],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "minItems": 1
+                              }
+                            },
+                            "required": ["anyOf"],
+                            "additionalProperties": false
+                          },
                           "payloadFilter": {
                             "type": ["object", "null"],
                             "additionalProperties": {}
@@ -7743,6 +8391,222 @@
                           "type": "string",
                           "minLength": 1
                         },
+                        "actorPolicy": {
+                          "type": "object",
+                          "properties": {
+                            "anyOf": {
+                              "type": "array",
+                              "items": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["resource"]
+                                      },
+                                      "actor": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "resourceId": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "resourceId"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "externalId": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "externalId"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "handle": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "handle"],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["kind", "actor"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["attribute"]
+                                      },
+                                      "attributeKey": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "attributeValue": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "valueType": {
+                                        "type": "string",
+                                        "enum": ["boolean", "number", "string"]
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "attributeKey",
+                                      "attributeValue",
+                                      "valueType"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["relationship"]
+                                      },
+                                      "relationshipKind": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "actorSet": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "resourceId": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "resourceId"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "externalId": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "externalId"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "handle": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "handle"],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      },
+                                      "scope": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "resourceId": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "resourceId"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "externalId": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "externalId"],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "resourceKind": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "handle": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            },
+                                            "required": ["resourceKind", "handle"],
+                                            "additionalProperties": false
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": ["kind", "relationshipKind", "actorSet", "scope"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "minItems": 1
+                            }
+                          },
+                          "required": ["anyOf"],
+                          "additionalProperties": false
+                        },
                         "payloadFilter": {
                           "type": ["object", "null"],
                           "additionalProperties": {}
@@ -7828,6 +8692,222 @@
                           "eventType": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "actorPolicy": {
+                            "type": "object",
+                            "properties": {
+                              "anyOf": {
+                                "type": "array",
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": ["resource"]
+                                        },
+                                        "actor": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "resourceId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "resourceId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "externalId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "externalId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "handle": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "handle"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["kind", "actor"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": ["attribute"]
+                                        },
+                                        "attributeKey": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "attributeValue": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "valueType": {
+                                          "type": "string",
+                                          "enum": ["boolean", "number", "string"]
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attributeKey",
+                                        "attributeValue",
+                                        "valueType"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": ["relationship"]
+                                        },
+                                        "relationshipKind": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "actorSet": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "resourceId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "resourceId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "externalId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "externalId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "handle": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "handle"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        },
+                                        "scope": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "resourceId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "resourceId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "externalId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "externalId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "handle": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "handle"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["kind", "relationshipKind", "actorSet", "scope"],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "minItems": 1
+                              }
+                            },
+                            "required": ["anyOf"],
+                            "additionalProperties": false
                           },
                           "payloadFilter": {
                             "type": ["object", "null"],
@@ -8202,6 +9282,222 @@
                           "eventType": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "actorPolicy": {
+                            "type": "object",
+                            "properties": {
+                              "anyOf": {
+                                "type": "array",
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": ["resource"]
+                                        },
+                                        "actor": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "resourceId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "resourceId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "externalId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "externalId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "handle": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "handle"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["kind", "actor"],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": ["attribute"]
+                                        },
+                                        "attributeKey": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "attributeValue": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "valueType": {
+                                          "type": "string",
+                                          "enum": ["boolean", "number", "string"]
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attributeKey",
+                                        "attributeValue",
+                                        "valueType"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": ["relationship"]
+                                        },
+                                        "relationshipKind": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "actorSet": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "resourceId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "resourceId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "externalId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "externalId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "handle": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "handle"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        },
+                                        "scope": {
+                                          "anyOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "resourceId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "resourceId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "externalId": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "externalId"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "resourceKind": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "handle": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["resourceKind", "handle"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": ["kind", "relationshipKind", "actorSet", "scope"],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "minItems": 1
+                              }
+                            },
+                            "required": ["anyOf"],
+                            "additionalProperties": false
                           },
                           "payloadFilter": {
                             "type": ["object", "null"],

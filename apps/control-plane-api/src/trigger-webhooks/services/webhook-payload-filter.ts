@@ -1,13 +1,53 @@
 import { BadRequestError } from "@mistle/http/errors.js";
 import { parseWebhookPayloadFilter } from "@mistle/webhooks";
 
+import { TriggerWebhookActorPolicySchema } from "../schemas.js";
+
+export type WebhookTriggerActorPolicyResourceReferenceInput =
+  | {
+      resourceKind: string;
+      resourceId: string;
+    }
+  | {
+      resourceKind: string;
+      externalId: string;
+    }
+  | {
+      resourceKind: string;
+      handle: string;
+    };
+
+export type WebhookTriggerActorPolicyRuleInput =
+  | {
+      kind: "resource";
+      actor: WebhookTriggerActorPolicyResourceReferenceInput;
+    }
+  | {
+      kind: "attribute";
+      attributeKey: string;
+      attributeValue: string;
+      valueType: "boolean" | "number" | "string";
+    }
+  | {
+      kind: "relationship";
+      relationshipKind: string;
+      actorSet: WebhookTriggerActorPolicyResourceReferenceInput;
+      scope: WebhookTriggerActorPolicyResourceReferenceInput;
+    };
+
+export type WebhookTriggerActorPolicyInput = {
+  anyOf: WebhookTriggerActorPolicyRuleInput[];
+};
+
 export type WebhookTriggerEventConditionInput = {
   eventType: string;
+  actorPolicy?: WebhookTriggerActorPolicyInput | undefined;
   payloadFilter?: Record<string, unknown> | null | undefined;
 };
 
 export type NormalizedWebhookTriggerEventCondition = {
   eventType: string;
+  actorPolicy?: WebhookTriggerActorPolicyInput | undefined;
   payloadFilter?: Record<string, unknown> | undefined;
 };
 
@@ -35,6 +75,16 @@ function normalizeConditionPayloadFilter(
   return payloadFilter;
 }
 
+function normalizeActorPolicy(
+  actorPolicy: WebhookTriggerActorPolicyInput | undefined,
+): WebhookTriggerActorPolicyInput | undefined {
+  if (actorPolicy === undefined) {
+    return undefined;
+  }
+
+  return TriggerWebhookActorPolicySchema.parse(actorPolicy);
+}
+
 export function normalizeWebhookTriggerEventConditions(
   eventConditions: readonly WebhookTriggerEventConditionInput[],
 ): NormalizedWebhookTriggerEventCondition[] {
@@ -46,10 +96,12 @@ export function normalizeWebhookTriggerEventConditions(
   }
 
   return eventConditions.map((condition) => {
+    const actorPolicy = normalizeActorPolicy(condition.actorPolicy);
     const payloadFilter = normalizeConditionPayloadFilter(condition.payloadFilter);
 
     return {
       eventType: condition.eventType,
+      ...(actorPolicy === undefined ? {} : { actorPolicy }),
       ...(payloadFilter === undefined ? {} : { payloadFilter }),
     };
   });

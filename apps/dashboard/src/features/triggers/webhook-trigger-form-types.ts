@@ -1,4 +1,5 @@
 import type { WebhookTriggerEventParameterRuleMap } from "./webhook-trigger-event-types.js";
+import type { WebhookTriggerActorPolicy } from "./webhook-triggers-types.js";
 
 export type WebhookTriggerFormOption = {
   value: string;
@@ -18,6 +19,7 @@ export type WebhookTriggerFormValues = {
   instructions: string;
   conversationKeyTemplate: string;
   eventIds: string[];
+  eventActorPolicies?: Record<string, WebhookTriggerActorPolicy>;
   eventParameterRules: WebhookTriggerEventParameterRuleMap;
   remainingPayloadFilter?: Record<string, unknown> | null;
 };

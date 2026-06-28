@@ -137,6 +137,7 @@ export function toWebhookTriggerFormValues(
       instructions: "",
       conversationKeyTemplate: "",
       eventIds: [],
+      eventActorPolicies: {},
       eventParameterRules: {},
       remainingPayloadFilter: null,
     };
@@ -165,6 +166,16 @@ export function toWebhookTriggerFormValues(
       }),
     ),
   });
+  const eventActorPolicies = Object.fromEntries(
+    trigger.eventConditions.flatMap((condition, index) => {
+      const conditionId = selectedEventIds[index];
+      if (conditionId === undefined || condition.actorPolicy === undefined) {
+        return [];
+      }
+
+      return [[conditionId, condition.actorPolicy]];
+    }),
+  );
 
   return {
     name: trigger.name,
@@ -175,6 +186,7 @@ export function toWebhookTriggerFormValues(
     instructions: trigger.instructions ?? "",
     conversationKeyTemplate: trigger.conversationKeyTemplate,
     eventIds: selectedEventIds,
+    eventActorPolicies,
     eventParameterRules: extractedEventParameterRules.eventParameterRules,
     remainingPayloadFilter: extractedEventParameterRules.remainingPayloadFilter,
   };
@@ -290,12 +302,14 @@ function toEventConditionsValue(input: {
     const eventOption = input.eventOptions.find((option) => option.id === eventOptionId);
     const eventType = eventOption?.eventType ?? eventOptionId.split("::").slice(1).join("::");
     const payloadFilter = payloadFiltersByConditionId[conditionId];
+    const actorPolicy = input.values.eventActorPolicies?.[conditionId];
     if (payloadFilter !== undefined) {
       assertConditionPayloadFilter(payloadFilter);
     }
 
     return {
       eventType,
+      ...(actorPolicy === undefined ? {} : { actorPolicy }),
       ...(payloadFilter === undefined ? {} : { payloadFilter }),
     };
   });

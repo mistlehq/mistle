@@ -76,6 +76,7 @@ const FormValues: WebhookTriggerFormValues = {
       eventType: "github.issue_comment.created",
     }),
   ],
+  eventActorPolicies: {},
   eventParameterRules: {},
 };
 
