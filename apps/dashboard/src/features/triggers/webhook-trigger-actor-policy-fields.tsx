@@ -383,6 +383,7 @@ function SpecificActorPolicyFields(input: {
   policy: WebhookTriggerActorPolicy | undefined;
   initialResourceKind: string;
   onPoliciesChange: (policies: ActorPolicyMap) => void;
+  onResourceKindChanging: () => void;
   onSpecificActorSelected: () => void;
 }): React.JSX.Element {
   const [selectedResourceKind, setSelectedResourceKind] = useState(input.initialResourceKind);
@@ -412,6 +413,7 @@ function SpecificActorPolicyFields(input: {
           }
 
           setSelectedResourceKind(value);
+          input.onResourceKindChanging();
           input.onPoliciesChange(
             removeActorPolicy({
               conditionId: input.conditionId,
@@ -548,6 +550,7 @@ function RelationshipActorPolicyFields(input: {
   policy: WebhookTriggerActorPolicy | undefined;
   initialOptionId: string;
   onPoliciesChange: (policies: ActorPolicyMap) => void;
+  onActorSetOptionChanging: () => void;
   onActorSetSelected: () => void;
 }): React.JSX.Element {
   const [selectedOptionId, setSelectedOptionId] = useState(input.initialOptionId);
@@ -580,6 +583,7 @@ function RelationshipActorPolicyFields(input: {
           }
 
           setSelectedOptionId(value);
+          input.onActorSetOptionChanging();
           input.onPoliciesChange(
             removeActorPolicy({
               conditionId: input.conditionId,
@@ -933,6 +937,14 @@ export function WebhookTriggerActorPolicyFields(input: {
                       policy,
                       actorResourceKinds,
                     })}
+                    onResourceKindChanging={() => {
+                      setSpecificActorPickerConditionIds((currentOpenPickers) =>
+                        addSpecificActorPicker({
+                          conditionId: row.conditionId,
+                          openPickers: currentOpenPickers,
+                        }),
+                      );
+                    }}
                     onSpecificActorSelected={() => {
                       setSpecificActorPickerConditionIds((currentOpenPickers) =>
                         removeSpecificActorPicker({
@@ -954,6 +966,14 @@ export function WebhookTriggerActorPolicyFields(input: {
                     policies={input.eventActorPolicies}
                     policy={policy}
                     initialOptionId={selectedActorSetOptionId}
+                    onActorSetOptionChanging={() => {
+                      setRelationshipPickerConditionIds((currentOpenPickers) =>
+                        addSpecificActorPicker({
+                          conditionId: row.conditionId,
+                          openPickers: currentOpenPickers,
+                        }),
+                      );
+                    }}
                     onActorSetSelected={() => {
                       setRelationshipPickerConditionIds((currentOpenPickers) =>
                         removeSpecificActorPicker({

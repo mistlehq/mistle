@@ -2,6 +2,7 @@
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
@@ -484,6 +485,240 @@ describe("WebhookTriggerForm", () => {
             scope: {
               resourceKind: "team",
               resourceId: "team-platform",
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it("keeps the group picker open while replacing an existing relationship policy", () => {
+    const eventOption = createGithubIssueCommentCreatedEventOption({
+      actor: {
+        resourceReferences: [
+          {
+            resourceKind: "user",
+            handlePayloadPath: ["sender", "login"],
+          },
+        ],
+      },
+      resourceDefinitions: [
+        {
+          kind: "user",
+          selectionMode: "multi",
+          bindingField: "users",
+          displayNameSingular: "user",
+          displayNamePlural: "users",
+        },
+        {
+          kind: "organization",
+          selectionMode: "multi",
+          bindingField: "organizations",
+          displayNameSingular: "organization",
+          displayNamePlural: "organizations",
+        },
+        {
+          kind: "team",
+          selectionMode: "multi",
+          bindingField: "teams",
+          displayNameSingular: "team",
+          displayNamePlural: "teams",
+        },
+      ],
+      resourceRelationshipDefinitions: [
+        {
+          relationshipKind: "belongs_to",
+          subjectResourceKind: "user",
+          objectResourceKind: "organization",
+          displayName: "Organization members",
+          scopeDefinitions: [
+            {
+              scopeKind: "organization",
+            },
+          ],
+        },
+        {
+          relationshipKind: "belongs_to",
+          subjectResourceKind: "user",
+          objectResourceKind: "team",
+          displayName: "Team members",
+          scopeDefinitions: [
+            {
+              scopeKind: "team",
+            },
+          ],
+        },
+      ],
+    });
+    const conditionId = createWebhookTriggerEventConditionId({
+      eventOptionId: eventOption.id,
+      index: 0,
+    });
+    const initialValues = buildFormValues({
+      eventIds: [conditionId],
+      eventActorPolicies: {
+        [conditionId]: {
+          anyOf: [
+            {
+              kind: "relationship",
+              relationshipKind: "belongs_to",
+              actorSet: {
+                resourceKind: "team",
+                resourceId: "team-platform",
+              },
+              scope: {
+                resourceKind: "team",
+                resourceId: "team-platform",
+              },
+            },
+          ],
+        },
+      },
+      eventParameterRules: {
+        [conditionId]: {},
+      },
+    });
+    let latestValues = initialValues;
+
+    function isActorPolicyMap(
+      value: Parameters<NonNullable<RenderFormOptions["onValueChange"]>>[1],
+    ): value is NonNullable<WebhookTriggerFormValues["eventActorPolicies"]> {
+      if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        return false;
+      }
+
+      return Object.values(value).every(
+        (policy) => typeof policy === "object" && policy !== null && "anyOf" in policy,
+      );
+    }
+
+    TestQueryClient.setQueryData(
+      ["trigger-actor-policy-resources", GitHubConnectionId, "organization"],
+      {
+        connectionId: GitHubConnectionId,
+        familyId: "github",
+        kind: "organization",
+        syncState: "ready",
+        items: [
+          {
+            id: "organization-mistle",
+            familyId: "github",
+            kind: "organization",
+            externalId: "200",
+            handle: "mistlehq",
+            displayName: "Mistle",
+            status: "accessible",
+            metadata: {},
+          },
+        ],
+      },
+    );
+    TestQueryClient.setQueryData(["trigger-actor-policy-resources", GitHubConnectionId, "team"], {
+      connectionId: GitHubConnectionId,
+      familyId: "github",
+      kind: "team",
+      syncState: "ready",
+      items: [
+        {
+          id: "team-platform",
+          familyId: "github",
+          kind: "team",
+          externalId: "100",
+          handle: "mistle/platform",
+          displayName: "Platform",
+          status: "accessible",
+          metadata: {},
+        },
+      ],
+    });
+
+    function ControlledForm(): React.JSX.Element {
+      const [values, setValues] = useState(initialValues);
+      latestValues = values;
+
+      return createFormElement({
+        mode: "create",
+        onValueChange: (key, value) => {
+          if (key !== "eventActorPolicies") {
+            return;
+          }
+          if (!isActorPolicyMap(value)) {
+            throw new Error("Expected actor policy map update.");
+          }
+
+          setValues((currentValues) => ({
+            ...currentValues,
+            eventActorPolicies: value,
+          }));
+        },
+        values,
+        webhookEventOptions: [eventOption],
+        connections: [
+          {
+            id: GitHubConnectionId,
+            targetKey: "github-cloud",
+            displayName: GitHubConnectionLabel,
+            status: "active",
+            resources: [
+              {
+                kind: "user",
+                selectionMode: "multi",
+                count: 2,
+                syncState: "ready",
+              },
+              {
+                kind: "organization",
+                selectionMode: "multi",
+                count: 1,
+                syncState: "ready",
+              },
+              {
+                kind: "team",
+                selectionMode: "multi",
+                count: 1,
+                syncState: "ready",
+              },
+            ],
+            createdAt: "2026-06-28T00:00:00.000Z",
+            updatedAt: "2026-06-28T00:00:00.000Z",
+          },
+        ],
+      });
+    }
+
+    render(<ControlledForm />);
+
+    fireEvent.click(screen.getByText("Team members"));
+    const organizationMembersOption = screen.getByRole("option", {
+      name: "Organization members1 synced.",
+    });
+    fireEvent.mouseMove(organizationMembersOption);
+    fireEvent.mouseDown(organizationMembersOption, { button: 0 });
+    fireEvent.mouseUp(organizationMembersOption, { button: 0 });
+    fireEvent.click(organizationMembersOption, { button: 0 });
+
+    expect(screen.getByText("Select group")).toBeDefined();
+
+    fireEvent.click(screen.getByText("Select group"));
+    const organizationOption = screen.getByRole("option", { name: "Mistlemistlehq" });
+    fireEvent.mouseMove(organizationOption);
+    fireEvent.mouseDown(organizationOption, { button: 0 });
+    fireEvent.mouseUp(organizationOption, { button: 0 });
+    fireEvent.click(organizationOption, { button: 0 });
+
+    expect(latestValues.eventActorPolicies).toEqual({
+      [conditionId]: {
+        anyOf: [
+          {
+            kind: "relationship",
+            relationshipKind: "belongs_to",
+            actorSet: {
+              resourceKind: "organization",
+              resourceId: "organization-mistle",
+            },
+            scope: {
+              resourceKind: "organization",
+              resourceId: "organization-mistle",
             },
           },
         ],
