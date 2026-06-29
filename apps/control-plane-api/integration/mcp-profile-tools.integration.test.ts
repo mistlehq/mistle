@@ -154,6 +154,7 @@ describe.concurrent("MCP profile tools integration", () => {
       "integration_connection_resources_list",
       "integration_connection_resources_refresh",
       "integration_connections_list",
+      "integration_setup_status_get",
       "integration_targets_list",
       "integration_webhook_sources_list",
       "list_supported_capabilities",

@@ -77,6 +77,14 @@ _Code name_: designer
 Mistle-owned instructions that guide **Mistle Designer** behavior inside a **Mistle Designer session**.
 _Avoid_: Repo guidance, contributor instructions, Designer instructions when the source of authority is ambiguous
 
+**Designer runtime reference**:
+A generated, read-only reference artifact made available inside a **Mistle Designer session** for runtime lookup without becoming part of **Designer managed instructions**.
+_Avoid_: Designer managed instructions, hand-authored runtime docs
+
+**Designer integration catalog**:
+A **Designer runtime reference** that lists static integration metadata such as provider aliases, integration target identities, setup methods, supported resource kinds, and known provider caveats.
+_Avoid_: Integration connection state, organization integration status, hand-authored provider docs
+
 **Designer recommendation**:
 A structured setup recommendation produced by **Mistle Designer** for integrations, triggers, provider configuration resources, or sandbox profile configuration.
 _Avoid_: Chat suggestion when the recommendation has selectable product state

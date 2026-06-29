@@ -37,6 +37,8 @@
     "test": "vitest run -c vitest.config.ts",
     "test:integration": "vitest run -c vitest.integration.config.ts",
     "test:property": "vitest run -c vitest.property.config.ts --passWithNoTests",
+    "designer:integration-catalog:generate": "node --conditions=workspace-src --import tsx scripts/designer-integration-catalog/generate.ts",
+    "designer:integration-catalog:check": "node --conditions=workspace-src --import tsx scripts/designer-integration-catalog/check.ts",
     "openapi:generate": "node --conditions=workspace-src --import tsx scripts/openapi/generate-spec.ts",
     "openapi:check": "node --conditions=workspace-src --import tsx scripts/openapi/check-spec-drift.ts",
     "format": "oxfmt .",

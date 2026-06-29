@@ -56,6 +56,7 @@ import type {
 } from "../schemas.js";
 import { createDesignerBehaviorInstructionBlock } from "./designer-behavior-instructions.js";
 import { createDesignerContextInstructionBlock } from "./designer-context-instructions.js";
+import { createDesignerIntegrationCatalogSetupFile } from "./designer-runtime-reference-files.js";
 
 type DesignerSessionActor = {
   kind: SandboxInstanceStarterKind;
@@ -321,6 +322,17 @@ function createDesignerRuntimePlan(input: {
     },
     mcpServers,
   });
+  const runtimeClientsWithDesignerReferences = runtimeClientsWithMcpConfig.map((runtimeClient) =>
+    runtimeClient.clientId === "codex-cli"
+      ? {
+          ...runtimeClient,
+          setup: {
+            ...runtimeClient.setup,
+            files: [...runtimeClient.setup.files, createDesignerIntegrationCatalogSetupFile()],
+          },
+        }
+      : runtimeClient,
+  );
   const artifacts = compileDesignerRuntimeArtifacts({
     artifacts: codexRuntime.artifacts ?? [],
     organizationId: input.organizationId,
@@ -337,7 +349,7 @@ function createDesignerRuntimePlan(input: {
     egressRoutes,
     artifacts,
     workspaceSources: [],
-    runtimeClients: runtimeClientsWithMcpConfig,
+    runtimeClients: runtimeClientsWithDesignerReferences,
     agentRuntimes: codexRuntime.agentRuntimes,
   });
 }

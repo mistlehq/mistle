@@ -22,6 +22,10 @@ import {
   ListDesignerSessionsResponseSchema,
   SaveDesignerSelectedProviderResourcesResponseSchema,
 } from "../src/designer/index.js";
+import {
+  DesignerIntegrationCatalogFileId,
+  DesignerIntegrationCatalogRuntimePath,
+} from "../src/designer/runtime-references/designer-integration-catalog.js";
 import { SandboxInstancesConflictResponseSchema } from "../src/sandbox-instances/index.js";
 import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
 import {
@@ -297,6 +301,18 @@ describe.concurrent("designer sessions integration", () => {
       "mistle-designer-behavior",
       "mistle-designer-initial-request",
     ]);
+    const designerIntegrationCatalog = queuedWorkflowInput.runtimePlan.runtimeClients
+      .flatMap((client) => client.setup.files)
+      .find((file) => file.fileId === DesignerIntegrationCatalogFileId);
+    expect(designerIntegrationCatalog).toMatchObject({
+      path: DesignerIntegrationCatalogRuntimePath,
+      mode: 420,
+      writeMode: "overwrite",
+    });
+    expect(designerIntegrationCatalog?.content).toContain("# Designer Integration Catalog");
+    expect(designerIntegrationCatalog?.content).toContain(
+      "Integration target key: `linear-default`",
+    );
 
     const listResponse = await env.controlPlaneApi.http.fetch("/v1/designer/sessions", {
       headers: {
