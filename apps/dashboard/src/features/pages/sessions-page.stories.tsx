@@ -2,14 +2,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { userEvent, within } from "storybook/test";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
-import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
-import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
-import type { TriggerListItem } from "../triggers/triggers-types.js";
 import {
   buildSandboxInstanceListItemFixture,
   buildTriggerListItemFixture,
   type SessionsPageListFilters,
-} from "./sessions-page-fixtures.js";
+} from "../../test-support/sessions-page-fixtures.js";
+import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
+import type { TriggerListItem } from "../triggers/triggers-types.js";
 import { SessionsStoryHarness } from "./sessions-story-harness.js";
 
 type SessionsPageStoryArgs = {

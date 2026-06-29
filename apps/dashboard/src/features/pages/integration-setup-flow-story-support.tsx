@@ -184,6 +184,8 @@ export function IntegrationStoryControlPlaneProvider(input: {
   handlers?: readonly IntegrationStoryControlPlaneHandler[];
   queryClient: QueryClient;
 }): React.JSX.Element {
+  // Storybook stories need to synchronize with the browser fetch boundary so page code can
+  // exercise the real dashboard query paths without a running control-plane service.
   useEffect(() => {
     const originalFetch = globalThis.fetch;
 

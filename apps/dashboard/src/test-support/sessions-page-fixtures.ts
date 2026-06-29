@@ -1,6 +1,6 @@
-import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
-import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
-import type { TriggerListItem } from "../triggers/triggers-types.js";
+import type { LaunchableSandboxProfile } from "../features/sandbox-profiles/sandbox-profiles-types.js";
+import type { SandboxInstanceListItem } from "../features/sessions/sessions-types.js";
+import type { TriggerListItem } from "../features/triggers/triggers-types.js";
 
 export type SessionsPageListFilters = {
   search: string;

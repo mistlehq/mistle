@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MemoryRouter } from "react-router";
 
+import { buildSandboxInstanceListItemFixture } from "../../test-support/sessions-page-fixtures.js";
 import type { ChatEntry } from "../chat/chat-types.js";
 import { buildSessionsShellSidebarItems } from "../navigation/sessions-shell-sidebar.js";
 import { SessionsSidebarHeader } from "../navigation/sessions-sidebar-header.js";
@@ -12,7 +13,6 @@ import { SessionConversationMainContent } from "./session-conversation-pane.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 import { createStorySessionBottomPanel, StorySandboxInstanceId } from "./session-story-support.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
-import { buildSandboxInstanceListItemFixture } from "./sessions-page-fixtures.js";
 
 type ProductWorkbenchVariant = "diff" | "compact";
 

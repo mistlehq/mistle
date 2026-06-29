@@ -4,14 +4,14 @@ import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import {
+  buildLaunchableSandboxProfileFixture,
+  buildSandboxInstanceListItemFixture,
+} from "../../test-support/sessions-page-fixtures.js";
 import { HomePageFrame } from "./home-page-frame.js";
 import { HomePageStoryModels } from "./home-page-view-model.js";
 import { HomePageView } from "./home-page-view.js";
 import { NewSessionForm } from "./new-session-form.js";
-import {
-  buildLaunchableSandboxProfileFixture,
-  buildSandboxInstanceListItemFixture,
-} from "./sessions-page-fixtures.js";
 import { createSessionsPageStoryQueryClient } from "./sessions-page.story-fixtures.js";
 
 function HomePageStoryFrame(args: ComponentProps<typeof HomePageView>): React.JSX.Element {

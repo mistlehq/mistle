@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { buildLaunchableSandboxProfileFixture } from "../../test-support/sessions-page-fixtures.js";
 import { noopRespondToServerRequest } from "../chat/components/chat-story-support.js";
 import {
   IntegrationConnectionDetailView,
@@ -77,7 +78,6 @@ import {
   renderSessionWorkbenchStoryWithChrome,
 } from "./session-story-support.js";
 import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
-import { buildLaunchableSandboxProfileFixture } from "./sessions-page-fixtures.js";
 import type { SessionPortAccessState } from "./use-session-port-access.js";
 
 const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [

@@ -7,10 +7,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import { buildLaunchableSandboxProfileFixture } from "../../test-support/sessions-page-fixtures.js";
 import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { NewSessionPage, shouldClearSelectedProfile } from "./new-session-page.js";
-import { buildLaunchableSandboxProfileFixture } from "./sessions-page-fixtures.js";
 
 function createNewSessionPageQueryClient(input?: {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];

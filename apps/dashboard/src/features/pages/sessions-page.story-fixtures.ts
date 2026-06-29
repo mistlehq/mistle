@@ -1,6 +1,10 @@
 import { QueryClient } from "@tanstack/react-query";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
+import {
+  buildLaunchableSandboxProfileFixture,
+  type SessionsPageListFilters,
+} from "../../test-support/sessions-page-fixtures.js";
 import { organizationLogoQueryKey } from "../organizations/organization-logo-query.js";
 import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -11,10 +15,6 @@ import {
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
 import type { TriggerListItem, TriggersListResult } from "../triggers/triggers-types.js";
-import {
-  buildLaunchableSandboxProfileFixture,
-  type SessionsPageListFilters,
-} from "./sessions-page-fixtures.js";
 
 type SessionsSidebarQueryState =
   | {

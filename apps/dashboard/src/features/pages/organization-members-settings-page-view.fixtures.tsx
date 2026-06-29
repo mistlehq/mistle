@@ -173,12 +173,12 @@ export function createOrganizationMembersSettingsPageFixtureViewModel(
     overrides.pendingMemberOperation ?? null;
   const roleChangeDialog = overrides.roleChangeDialog ?? null;
   const activeFilter = overrides.activeFilter ?? "members";
+  const emptyMembers: SettingsMember[] = [];
+  const emptyInvitations: SettingsInvitation[] = [];
   const defaultMembers =
-    activeFilter === "members" ? OrganizationMembersFixtureMembers : ([] as SettingsMember[]);
+    activeFilter === "members" ? OrganizationMembersFixtureMembers : emptyMembers;
   const defaultInvitations =
-    activeFilter === "invitations"
-      ? OrganizationMembersFixtureInvitations
-      : ([] as SettingsInvitation[]);
+    activeFilter === "invitations" ? OrganizationMembersFixtureInvitations : emptyInvitations;
   const members = overrides.members ?? defaultMembers;
   const invitations = overrides.invitations ?? defaultInvitations;
 

@@ -12,6 +12,7 @@ import {
   useParams,
 } from "react-router";
 
+import type { SessionsPageListFilters } from "../../test-support/sessions-page-fixtures.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -28,7 +29,6 @@ import { AppShellView } from "../shell/app-shell-view.js";
 import type { TriggerListItem } from "../triggers/triggers-types.js";
 import { NewSessionPage } from "./new-session-page.js";
 import { SessionWorkbenchPage } from "./session-workbench-page.js";
-import type { SessionsPageListFilters } from "./sessions-page-fixtures.js";
 import { SessionsPage } from "./sessions-page.js";
 import { createSessionsPageStoryQueryClient } from "./sessions-page.story-fixtures.js";
 

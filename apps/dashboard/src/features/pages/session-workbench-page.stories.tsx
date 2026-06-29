@@ -2,7 +2,7 @@ import type { SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
-import { buildSandboxInstanceListItemFixture } from "./sessions-page-fixtures.js";
+import { buildSandboxInstanceListItemFixture } from "../../test-support/sessions-page-fixtures.js";
 import { SessionsStoryHarness } from "./sessions-story-harness.js";
 
 type SessionWorkbenchPageStoryArgs = {
