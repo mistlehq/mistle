@@ -216,6 +216,29 @@ describe("ChatMarkdownMessage", () => {
     expect(container.textContent).toContain("Loose list item 00");
     expect(container.textContent).toContain("continuation paragraph");
   });
+
+  it("does not split inside longer fenced code blocks", () => {
+    const codeLines = Array.from(
+      { length: 170 },
+      (_, index) => `const line${String(index).padStart(3, "0")} = "inside a long fence";`,
+    ).join("\n");
+    const text = [
+      "````md",
+      "A literal nested fence follows:",
+      "```",
+      "",
+      codeLines,
+      "",
+      "````",
+      "",
+      "After the fence.",
+    ].join("\n");
+
+    const { container } = render(<ChatMarkdownMessage isStreaming text={text} />);
+
+    expect(container.querySelectorAll(".chat-markdown-content")).toHaveLength(1);
+    expect(container.textContent).toContain("After the fence.");
+  });
 });
 
 function getAnimationChunk(container: HTMLElement, text: string): Element {

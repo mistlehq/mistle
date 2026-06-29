@@ -29,6 +29,11 @@ type StreamingMarkdownSegment = {
   text: string;
 };
 
+type MarkdownFenceState = {
+  character: "`" | "~";
+  length: number;
+};
+
 type BaseChatMarkdownContentProps = ChatMarkdownContentProps & {
   isStreaming: boolean;
   SerializedStreamingBlock?: NonNullable<StreamdownProps["BlockComponent"]>;
@@ -362,7 +367,7 @@ function splitStreamingMarkdownSegments(text: string): readonly StreamingMarkdow
   const segments: StreamingMarkdownSegment[] = [];
   let segmentStartIndex = 0;
   let lineStartIndex = 0;
-  let fencedBlockMarker: "`" | "~" | null = null;
+  let fenceState: MarkdownFenceState | null = null;
 
   while (lineStartIndex < text.length) {
     const nextNewlineIndex = text.indexOf("\n", lineStartIndex);
@@ -370,21 +375,11 @@ function splitStreamingMarkdownSegments(text: string): readonly StreamingMarkdow
     const line = text.slice(lineStartIndex, lineEndIndex);
     const trimmedLine = line.trim();
 
-    if (
-      trimmedLine.startsWith("```") &&
-      (fencedBlockMarker === null || fencedBlockMarker === "`")
-    ) {
-      fencedBlockMarker = fencedBlockMarker === "`" ? null : "`";
-    } else if (
-      trimmedLine.startsWith("~~~") &&
-      (fencedBlockMarker === null || fencedBlockMarker === "~")
-    ) {
-      fencedBlockMarker = fencedBlockMarker === "~" ? null : "~";
-    }
+    fenceState = updateMarkdownFenceState(fenceState, trimmedLine);
 
     const remainingCharacters = text.length - lineEndIndex;
     const canFreezeSegment =
-      fencedBlockMarker === null &&
+      fenceState === null &&
       trimmedLine.length === 0 &&
       canSegmentStreamingMarkdownAtBoundary(text, {
         lineStartIndex,
@@ -412,6 +407,51 @@ function splitStreamingMarkdownSegments(text: string): readonly StreamingMarkdow
   });
 
   return segments;
+}
+
+function updateMarkdownFenceState(
+  currentFenceState: MarkdownFenceState | null,
+  trimmedLine: string,
+): MarkdownFenceState | null {
+  const fence = readOpeningMarkdownFence(trimmedLine);
+  if (fence === null) {
+    return currentFenceState;
+  }
+
+  if (currentFenceState === null) {
+    return fence;
+  }
+
+  if (fence.character !== currentFenceState.character || fence.length < currentFenceState.length) {
+    return currentFenceState;
+  }
+
+  return null;
+}
+
+function readOpeningMarkdownFence(trimmedLine: string): MarkdownFenceState | null {
+  const fenceCharacter = trimmedLine.at(0);
+  if (fenceCharacter !== "`" && fenceCharacter !== "~") {
+    return null;
+  }
+
+  let fenceLength = 0;
+  for (const character of trimmedLine) {
+    if (character !== fenceCharacter) {
+      break;
+    }
+
+    fenceLength += 1;
+  }
+
+  if (fenceLength < 3) {
+    return null;
+  }
+
+  return {
+    character: fenceCharacter,
+    length: fenceLength,
+  };
 }
 
 function canSegmentStreamingMarkdownText(text: string): boolean {
