@@ -9,7 +9,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@mistle/ui";
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import { PageHeaderSidebarTriggerProvider } from "../shared/page-header-sidebar-trigger-context.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
@@ -95,9 +95,9 @@ function AppShellSidebarEntrySync(input: {
   const { setOpenMobile } = useSidebar();
   const appliedSidebarEntryKeyRef = useRef<string | null>(null);
 
-  // Synchronizes sidebar posture with router entry because location changes can come from links,
-  // history navigation, or redirects outside this shell's event handlers.
-  useEffect(() => {
+  // Synchronizes route-owned sidebar posture before paint because route changes can arrive outside
+  // this shell's event handlers.
+  useLayoutEffect(() => {
     if (entryState !== "collapsed") {
       appliedSidebarEntryKeyRef.current = null;
       return;

@@ -4,17 +4,17 @@ import { SidebarProvider } from "@mistle/ui";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { DesignerSessionLoadingPage } from "./designer-session-page.js";
+import { DesignerSessionPendingPage } from "./designer-session-page.js";
 
-describe("DesignerSessionLoadingPage", () => {
-  it("renders a visible workspace preparation state", () => {
+describe("DesignerSessionPendingPage", () => {
+  it("renders stable Designer chrome without chat preparation status", () => {
     render(
       <SidebarProvider>
-        <DesignerSessionLoadingPage />
+        <DesignerSessionPendingPage />
       </SidebarProvider>,
     );
 
     expect(screen.getByText("Designer")).toBeTruthy();
-    expect(screen.getByRole("status", { name: "Preparing chat" })).toBeTruthy();
+    expect(screen.queryByRole("status", { name: "Preparing chat" })).toBeNull();
   });
 });
