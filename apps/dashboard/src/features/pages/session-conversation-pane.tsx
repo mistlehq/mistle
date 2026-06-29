@@ -1,4 +1,4 @@
-import { memo, startTransition, useCallback, useMemo, useState } from "react";
+import { memo, startTransition, useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import type React from "react";
 
 import type { ChatEntry } from "../chat/chat-types.js";
@@ -81,7 +81,14 @@ type SessionConversationBottomPanelDraftControllerProps = Omit<
     | "pendingDiffComments"
   > & {
     draftResetKey: string;
+    draftStore?: SessionConversationComposerDraftStore;
   };
+
+export type SessionConversationComposerDraftStore = {
+  getSnapshot: () => ComposerDraft;
+  setDraft: (nextDraft: ComposerDraft) => void;
+  subscribe: (listener: () => void) => () => void;
+};
 
 function resolveSinglePendingUserInputRequest(
   entries: readonly ServerRequestEntry[],
@@ -175,6 +182,31 @@ function SessionConversationMainContentView({
       )}
     </div>
   );
+}
+
+export function createSessionConversationComposerDraftStore(): SessionConversationComposerDraftStore {
+  let composerDraft = createComposerDraft("");
+  const listeners = new Set<() => void>();
+
+  return {
+    getSnapshot: () => composerDraft,
+    setDraft: (nextDraft: ComposerDraft): void => {
+      if (areComposerDraftsEqual(composerDraft, nextDraft)) {
+        return;
+      }
+
+      composerDraft = nextDraft;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+    subscribe: (listener: () => void): (() => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
 }
 
 export const SessionConversationMainContent = memo(SessionConversationMainContentView);
@@ -283,6 +315,7 @@ export function SessionConversationBottomPanelController({
 function SessionConversationBottomPanelDraftControllerView({
   clearPendingBlueprintComments,
   clearPendingDiffComments,
+  draftStore,
   draftResetKey,
   pendingBlueprintComments,
   pendingDiffComments,
@@ -296,6 +329,7 @@ function SessionConversationBottomPanelDraftControllerView({
       controllerProps={controllerProps}
       pendingBlueprintComments={pendingBlueprintComments}
       pendingDiffComments={pendingDiffComments}
+      {...(draftStore === undefined ? {} : { draftStore })}
     />
   );
 }
@@ -307,6 +341,86 @@ SessionConversationBottomPanelDraftController.displayName =
   "SessionConversationBottomPanelDraftController";
 
 function SessionConversationBottomPanelDraftOwner({
+  clearPendingBlueprintComments,
+  clearPendingDiffComments,
+  controllerProps,
+  draftStore,
+  pendingBlueprintComments,
+  pendingDiffComments,
+}: {
+  clearPendingBlueprintComments: SessionComposerDraftState["clearPendingBlueprintComments"];
+  clearPendingDiffComments: SessionComposerDraftState["clearPendingDiffComments"];
+  controllerProps: Omit<SessionConversationBottomPanelControllerProps, "draftState">;
+  draftStore?: SessionConversationComposerDraftStore;
+  pendingBlueprintComments: SessionComposerDraftState["pendingBlueprintComments"];
+  pendingDiffComments: SessionComposerDraftState["pendingDiffComments"];
+}): React.JSX.Element {
+  if (draftStore !== undefined) {
+    return (
+      <SessionConversationBottomPanelExternalDraftOwner
+        clearPendingBlueprintComments={clearPendingBlueprintComments}
+        clearPendingDiffComments={clearPendingDiffComments}
+        controllerProps={controllerProps}
+        draftStore={draftStore}
+        pendingBlueprintComments={pendingBlueprintComments}
+        pendingDiffComments={pendingDiffComments}
+      />
+    );
+  }
+
+  return (
+    <SessionConversationBottomPanelLocalDraftOwner
+      clearPendingBlueprintComments={clearPendingBlueprintComments}
+      clearPendingDiffComments={clearPendingDiffComments}
+      controllerProps={controllerProps}
+      pendingBlueprintComments={pendingBlueprintComments}
+      pendingDiffComments={pendingDiffComments}
+    />
+  );
+}
+
+function SessionConversationBottomPanelExternalDraftOwner({
+  clearPendingBlueprintComments,
+  clearPendingDiffComments,
+  controllerProps,
+  draftStore,
+  pendingBlueprintComments,
+  pendingDiffComments,
+}: {
+  clearPendingBlueprintComments: SessionComposerDraftState["clearPendingBlueprintComments"];
+  clearPendingDiffComments: SessionComposerDraftState["clearPendingDiffComments"];
+  controllerProps: Omit<SessionConversationBottomPanelControllerProps, "draftState">;
+  draftStore: SessionConversationComposerDraftStore;
+  pendingBlueprintComments: SessionComposerDraftState["pendingBlueprintComments"];
+  pendingDiffComments: SessionComposerDraftState["pendingDiffComments"];
+}): React.JSX.Element {
+  const composerDraft = useSyncExternalStore(
+    draftStore.subscribe,
+    draftStore.getSnapshot,
+    draftStore.getSnapshot,
+  );
+
+  const handleComposerDraftChange = useCallback(
+    (nextComposerDraft: ComposerDraft): void => {
+      draftStore.setDraft(nextComposerDraft);
+    },
+    [draftStore],
+  );
+
+  return (
+    <SessionConversationBottomPanelDraftStateController
+      clearPendingBlueprintComments={clearPendingBlueprintComments}
+      clearPendingDiffComments={clearPendingDiffComments}
+      composerDraft={composerDraft}
+      controllerProps={controllerProps}
+      onComposerDraftChange={handleComposerDraftChange}
+      pendingBlueprintComments={pendingBlueprintComments}
+      pendingDiffComments={pendingDiffComments}
+    />
+  );
+}
+
+function SessionConversationBottomPanelLocalDraftOwner({
   clearPendingBlueprintComments,
   clearPendingDiffComments,
   controllerProps,
@@ -331,6 +445,36 @@ function SessionConversationBottomPanelDraftOwner({
     });
   }, []);
 
+  return (
+    <SessionConversationBottomPanelDraftStateController
+      clearPendingBlueprintComments={clearPendingBlueprintComments}
+      clearPendingDiffComments={clearPendingDiffComments}
+      composerDraft={composerDraft}
+      controllerProps={controllerProps}
+      onComposerDraftChange={handleComposerDraftChange}
+      pendingBlueprintComments={pendingBlueprintComments}
+      pendingDiffComments={pendingDiffComments}
+    />
+  );
+}
+
+function SessionConversationBottomPanelDraftStateController({
+  clearPendingBlueprintComments,
+  clearPendingDiffComments,
+  composerDraft,
+  controllerProps,
+  onComposerDraftChange,
+  pendingBlueprintComments,
+  pendingDiffComments,
+}: {
+  clearPendingBlueprintComments: SessionComposerDraftState["clearPendingBlueprintComments"];
+  clearPendingDiffComments: SessionComposerDraftState["clearPendingDiffComments"];
+  composerDraft: ComposerDraft;
+  controllerProps: Omit<SessionConversationBottomPanelControllerProps, "draftState">;
+  onComposerDraftChange: (nextComposerDraft: ComposerDraft) => void;
+  pendingBlueprintComments: SessionComposerDraftState["pendingBlueprintComments"];
+  pendingDiffComments: SessionComposerDraftState["pendingDiffComments"];
+}): React.JSX.Element {
   const draftState = useMemo(
     () => ({
       composerDraft,
@@ -338,13 +482,13 @@ function SessionConversationBottomPanelDraftOwner({
       pendingDiffComments,
       clearPendingBlueprintComments,
       clearPendingDiffComments,
-      setComposerDraft: handleComposerDraftChange,
+      setComposerDraft: onComposerDraftChange,
     }),
     [
       clearPendingBlueprintComments,
       clearPendingDiffComments,
       composerDraft,
-      handleComposerDraftChange,
+      onComposerDraftChange,
       pendingBlueprintComments,
       pendingDiffComments,
     ],

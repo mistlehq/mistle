@@ -26,6 +26,7 @@ import type { SessionComposerBootstrapPhase } from "./session-composer/session-c
 import {
   SessionConversationBottomPanelDraftController,
   SessionConversationMainContent,
+  createSessionConversationComposerDraftStore,
 } from "./session-conversation-pane.js";
 import type {
   PendingSessionDiffComment,
@@ -764,6 +765,10 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
     sandboxInstanceId: input.sandboxInstanceId,
     triggerConversation: workbench.sandboxStatusQuery.data?.triggerConversation ?? null,
   });
+  const conversationComposerDraftStore = useMemo(
+    () => createSessionConversationComposerDraftStore(),
+    [conversationScopedComposerRenderKey],
+  );
 
   useDocumentTitle(sessionDocumentTitle);
 
@@ -1012,6 +1017,7 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
               clearPendingBlueprintComments={handleClearPendingBlueprintComments}
               clearPendingDiffComments={handleClearPendingDiffComments}
               composerStateInput={conversationPane.composerStateInput}
+              draftStore={conversationComposerDraftStore}
               draftResetKey={conversationScopedComposerRenderKey}
               isRespondingToServerRequest={
                 conversationPane.serverRequestsState.isRespondingToServerRequest

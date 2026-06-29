@@ -26,6 +26,7 @@ import {
   SessionConversationBottomPanelController,
   SessionConversationBottomPanelDraftController,
   SessionConversationMainContent,
+  createSessionConversationComposerDraftStore,
 } from "./session-conversation-pane.js";
 
 const UploadedImageFixture: UploadedSandboxFile = {
@@ -341,6 +342,39 @@ function DraftOwnedComposerHarness(): React.JSX.Element {
   );
 }
 
+function StoreBackedDraftOwnedComposerHarness(): React.JSX.Element {
+  const [isComposerMounted, setComposerMounted] = useState(true);
+  const draftStore = useMemo(() => createSessionConversationComposerDraftStore(), []);
+
+  return (
+    <div>
+      <button
+        onClick={() => {
+          setComposerMounted((currentIsComposerMounted) => !currentIsComposerMounted);
+        }}
+        type="button"
+      >
+        Toggle composer
+      </button>
+      {isComposerMounted ? (
+        <SessionConversationBottomPanelDraftController
+          chatEntries={[]}
+          clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
+          clearPendingDiffComments={function clearPendingDiffComments() {}}
+          composerStateInput={createReadySessionComposerStateInput()}
+          draftResetKey="thread-1"
+          draftStore={draftStore}
+          isRespondingToServerRequest={false}
+          onRespondToServerRequest={function onRespondToServerRequest() {}}
+          pendingBlueprintComments={[]}
+          pendingDiffComments={[]}
+          serverRequestPanelEntries={[]}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 function defineElementRect(
   element: HTMLElement,
   input: {
@@ -477,6 +511,22 @@ describe("SessionConversationBottomPanel", () => {
 
     await waitFor(() => {
       expect(readComposerText()).toBe("");
+    });
+  });
+
+  it("preserves a store-backed composer draft across composer unmounts", async () => {
+    render(<StoreBackedDraftOwnedComposerHarness />);
+
+    replaceComposerText("draft survives panel transitions");
+    expect(readComposerText()).toBe("draft survives panel transitions");
+
+    fireEvent.click(screen.getByRole("button", { name: "Toggle composer" }));
+    expect(screen.queryByRole("textbox")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Toggle composer" }));
+
+    await waitFor(() => {
+      expect(readComposerText()).toBe("draft survives panel transitions");
     });
   });
 
