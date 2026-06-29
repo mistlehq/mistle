@@ -16,7 +16,6 @@ export type AppRouteHandle = {
   appShellInsetOwner?: "app-shell" | "child";
   appShellViewportMode?: "document" | "workspace";
   sidebarEntryState?: "collapsed";
-  sidebarDefaultOpen?: boolean;
   sidebarTriggerOwner?: "none" | "page-frame" | "workspace";
   breadcrumbIcon?: RouteNodeValue;
   breadcrumb?: RouteTextValue;
@@ -41,7 +40,6 @@ export type AppPageMeta = {
   appShellInsetOwner: "app-shell" | "child";
   appShellViewportMode: "document" | "workspace";
   sidebarEntryState: "collapsed" | null;
-  sidebarDefaultOpen: boolean | null;
   sidebarTriggerOwner: "none" | "page-frame" | "workspace";
   title: string | null;
   headerIcon: React.ReactNode | null;
@@ -142,7 +140,6 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   const appShellInsetOwner = handle["appShellInsetOwner"];
   const appShellViewportMode = handle["appShellViewportMode"];
   const sidebarEntryState = handle["sidebarEntryState"];
-  const sidebarDefaultOpen = handle["sidebarDefaultOpen"];
   const sidebarTriggerOwner = handle["sidebarTriggerOwner"];
   const breadcrumb = handle["breadcrumb"];
   const breadcrumbIcon = handle["breadcrumbIcon"];
@@ -165,10 +162,6 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
 
   if (sidebarEntryState === "collapsed") {
     parsedHandle.sidebarEntryState = sidebarEntryState;
-  }
-
-  if (typeof sidebarDefaultOpen === "boolean") {
-    parsedHandle.sidebarDefaultOpen = sidebarDefaultOpen;
   }
 
   if (
@@ -224,7 +217,6 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
     parsedHandle.appShellInsetOwner === undefined &&
     parsedHandle.appShellViewportMode === undefined &&
     parsedHandle.sidebarEntryState === undefined &&
-    parsedHandle.sidebarDefaultOpen === undefined &&
     parsedHandle.sidebarTriggerOwner === undefined &&
     parsedHandle.breadcrumbIcon === undefined &&
     parsedHandle.breadcrumb === undefined &&
@@ -388,7 +380,6 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
       appShellInsetOwner: "app-shell",
       appShellViewportMode: "document",
       sidebarEntryState: null,
-      sidebarDefaultOpen: null,
       sidebarTriggerOwner: "page-frame",
     };
   }
@@ -417,7 +408,6 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
         appShellInsetOwner: handle.appShellInsetOwner ?? "app-shell",
         appShellViewportMode: handle.appShellViewportMode ?? "document",
         sidebarEntryState: handle.sidebarEntryState ?? null,
-        sidebarDefaultOpen: handle.sidebarDefaultOpen ?? null,
         sidebarTriggerOwner: handle.sidebarTriggerOwner ?? "page-frame",
       };
     }
@@ -430,7 +420,6 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
     appShellInsetOwner: "app-shell",
     appShellViewportMode: "document",
     sidebarEntryState: null,
-    sidebarDefaultOpen: null,
     sidebarTriggerOwner: "page-frame",
   };
 }

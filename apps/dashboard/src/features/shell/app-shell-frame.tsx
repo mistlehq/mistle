@@ -52,7 +52,6 @@ export type AppShellFrame = Pick<
   | "contentInsetOwner"
   | "renderSidebarTrigger"
   | "sidebarContent"
-  | "sidebarDefaultOpen"
   | "sidebarEntryKey"
   | "sidebarEntryState"
   | "sidebarFooterContent"
@@ -109,11 +108,6 @@ export function resolveAppShellFrame(input: {
   return {
     contentInsetOwner: input.pageMeta.appShellInsetOwner,
     renderSidebarTrigger: input.pageMeta.sidebarTriggerOwner === "page-frame",
-    ...(input.pageMeta.sidebarDefaultOpen === null
-      ? {}
-      : {
-          sidebarDefaultOpen: input.pageMeta.sidebarDefaultOpen,
-        }),
     sidebarEntryKey: input.locationPathname,
     sidebarEntryState: input.pageMeta.sidebarEntryState,
     sidebarContent: showDedicatedSessionsSidebar ? (

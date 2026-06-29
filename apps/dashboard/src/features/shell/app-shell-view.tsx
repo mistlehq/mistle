@@ -42,22 +42,6 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
   const sidebarEntryState = input.sidebarEntryState ?? null;
   const sidebarEntryKey = input.sidebarEntryKey ?? "";
   const [sidebarOpen, setSidebarOpen] = useState(input.sidebarDefaultOpen ?? true);
-  const appliedSidebarEntryKeyRef = useRef<string | null>(null);
-
-  // Synchronizes sidebar posture with router entry because location changes can come from links,
-  // history navigation, or redirects outside this shell's event handlers.
-  useEffect(() => {
-    if (sidebarEntryState !== "collapsed") {
-      return;
-    }
-
-    if (appliedSidebarEntryKeyRef.current === sidebarEntryKey) {
-      return;
-    }
-
-    appliedSidebarEntryKeyRef.current = sidebarEntryKey;
-    setSidebarOpen(false);
-  }, [sidebarEntryKey, sidebarEntryState]);
 
   return (
     <SidebarProvider
@@ -66,6 +50,11 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
       open={sidebarOpen}
       style={SidebarWidthStyle}
     >
+      <AppShellSidebarEntrySync
+        entryKey={sidebarEntryKey}
+        entryState={sidebarEntryState}
+        setSidebarOpen={setSidebarOpen}
+      />
       <Sidebar>
         {input.sidebarHeaderContent === null ? null : (
           <SidebarHeader className={input.sidebarHeaderClassName}>
@@ -93,6 +82,34 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
       </SidebarInset>
     </SidebarProvider>
   );
+}
+
+function AppShellSidebarEntrySync(input: {
+  entryKey: string;
+  entryState: "collapsed" | null;
+  setSidebarOpen: (open: boolean) => void;
+}): null {
+  const { entryKey, entryState, setSidebarOpen } = input;
+  const { setOpenMobile } = useSidebar();
+  const appliedSidebarEntryKeyRef = useRef<string | null>(null);
+
+  // Synchronizes sidebar posture with router entry because location changes can come from links,
+  // history navigation, or redirects outside this shell's event handlers.
+  useEffect(() => {
+    if (entryState !== "collapsed") {
+      return;
+    }
+
+    if (appliedSidebarEntryKeyRef.current === entryKey) {
+      return;
+    }
+
+    appliedSidebarEntryKeyRef.current = entryKey;
+    setSidebarOpen(false);
+    setOpenMobile(false);
+  }, [entryKey, entryState, setOpenMobile, setSidebarOpen]);
+
+  return null;
 }
 
 function AppShellPageHeaderSidebarTriggerProvider(input: {

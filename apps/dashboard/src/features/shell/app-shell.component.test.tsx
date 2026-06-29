@@ -40,7 +40,6 @@ describe("resolveAppShellFrame", () => {
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
         sidebarEntryState: null,
-        sidebarDefaultOpen: null,
         sidebarTriggerOwner: "workspace",
         title: "Sessions",
         headerIcon: null,
@@ -94,7 +93,6 @@ describe("resolveAppShellFrame", () => {
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
         sidebarEntryState: null,
-        sidebarDefaultOpen: null,
         sidebarTriggerOwner: "workspace",
         title: "Sessions",
         headerIcon: null,
@@ -142,7 +140,6 @@ describe("resolveAppShellFrame", () => {
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
         sidebarEntryState: null,
-        sidebarDefaultOpen: null,
         sidebarTriggerOwner: "page-frame",
         title: "Home",
         headerIcon: null,
@@ -187,7 +184,6 @@ describe("resolveAppShellFrame", () => {
         appShellInsetOwner: "child",
         appShellViewportMode: "document",
         sidebarEntryState: null,
-        sidebarDefaultOpen: null,
         sidebarTriggerOwner: "page-frame",
         title: "Integrations",
         headerIcon: null,
@@ -225,7 +221,6 @@ describe("resolveAppShellFrame", () => {
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "workspace",
         sidebarEntryState: "collapsed",
-        sidebarDefaultOpen: null,
         sidebarTriggerOwner: "workspace",
         title: "Designer",
         headerIcon: null,
@@ -238,6 +233,5 @@ describe("resolveAppShellFrame", () => {
 
     expect(frame.sidebarEntryKey).toBe("/designer/dsn_123");
     expect(frame.sidebarEntryState).toBe("collapsed");
-    expect(frame.sidebarDefaultOpen).toBeUndefined();
   });
 });

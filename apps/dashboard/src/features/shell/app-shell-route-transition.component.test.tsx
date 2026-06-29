@@ -31,25 +31,38 @@ function RouteAwareShell(): React.JSX.Element {
 
 function DesignerEntryRoute(): React.JSX.Element {
   const navigate = useNavigate();
+  const { openMobile, setOpenMobile } = useSidebar();
 
   return (
-    <Button
-      onClick={() => {
-        void navigate("/designer/dsn_story");
-      }}
-      type="button"
-    >
-      Start Designer session
-    </Button>
+    <div>
+      <p>{openMobile ? "Mobile navigation open" : "Mobile navigation closed"}</p>
+      <Button
+        onClick={() => {
+          setOpenMobile(true);
+        }}
+        type="button"
+      >
+        Open mobile navigation
+      </Button>
+      <Button
+        onClick={() => {
+          void navigate("/designer/dsn_story");
+        }}
+        type="button"
+      >
+        Start Designer session
+      </Button>
+    </div>
   );
 }
 
 function DesignerSessionRoute(): React.JSX.Element {
-  const { toggleSidebar } = useSidebar();
+  const { openMobile, toggleSidebar } = useSidebar();
 
   return (
     <div>
       <p>Designer workspace</p>
+      <p>{openMobile ? "Mobile navigation open" : "Mobile navigation closed"}</p>
       <Button onClick={toggleSidebar} type="button">
         Toggle navigation
       </Button>
@@ -95,12 +108,19 @@ describe("App shell route transitions", () => {
     expect(originalSidebar.getAttribute("data-state")).toBe("expanded");
 
     await act(async () => {
+      screen.getByRole("button", { name: "Open mobile navigation" }).click();
+    });
+
+    expect(screen.getByText("Mobile navigation open")).toBeTruthy();
+
+    await act(async () => {
       screen.getByRole("button", { name: "Start Designer session" }).click();
     });
 
     expect(await screen.findByText("Designer workspace")).toBeTruthy();
     expect(getDesktopSidebar(view.container)).toBe(originalSidebar);
     expect(getDesktopSidebar(view.container).getAttribute("data-state")).toBe("collapsed");
+    expect(screen.getByText("Mobile navigation closed")).toBeTruthy();
 
     await act(async () => {
       screen.getByRole("button", { name: "Toggle navigation" }).click();
