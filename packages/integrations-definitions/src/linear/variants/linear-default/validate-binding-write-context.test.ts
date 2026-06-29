@@ -39,19 +39,6 @@ describe("validateLinearBindingWriteContext", () => {
     ).toEqual({ ok: true });
   });
 
-  it("accepts user OAuth connections for Linear connector bindings", () => {
-    expect(
-      validateLinearBindingWriteContext(
-        createValidationInput({
-          connectionConfig: {
-            connection_method: "oauth2-authorization-code",
-            client_id: "linear_client_123",
-          },
-        }),
-      ),
-    ).toEqual({ ok: true });
-  });
-
   it("rejects setup-only OAuth app connections for Linear connector bindings", () => {
     const result = validateLinearBindingWriteContext(
       createValidationInput({

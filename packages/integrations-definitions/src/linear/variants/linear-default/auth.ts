@@ -1,16 +1,11 @@
-import {
-  createOAuth2AuthorizationCodeCredentialSlotKeys,
-  IntegrationConnectionMethodIds,
-} from "@mistle/integrations-core";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { z } from "zod";
 
 export const LinearCredentialSecretTypes: {
   API_KEY: "api_key";
-  OAUTH2_ACCESS_TOKEN: "oauth2_access_token";
   OAUTH2_CLIENT_SECRET: "oauth2_client_secret";
 } = {
   API_KEY: "api_key",
-  OAUTH2_ACCESS_TOKEN: "oauth2_access_token",
   OAUTH2_CLIENT_SECRET: "oauth2_client_secret",
 };
 
@@ -25,14 +20,8 @@ export const LinearApiKeyCredentialSlotKeys: {
   OAUTH_APP_CLIENT_SECRET: "linear.linear-default.linear-oauth-app.client-secret",
 };
 
-export const LinearOAuth2CredentialSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
-  familyId: LinearFamilyId,
-  variantId: LinearDefaultVariantId,
-});
-
 export const LinearCredentialSlotKeys = {
   ...LinearApiKeyCredentialSlotKeys,
-  OAUTH2_ACCESS_TOKEN: LinearOAuth2CredentialSlotKeys.accessToken,
 } as const;
 
 export const LinearConnectionMethodIds: {
@@ -41,27 +30,11 @@ export const LinearConnectionMethodIds: {
   OAUTH_APP: "linear-oauth-app",
 };
 
-export const LinearOAuthScopes: ReadonlyArray<string> = ["read", "write"];
-
 export const LinearApiKeyConnectionConfigSchema = z
   .object({
     connection_method: z.literal(IntegrationConnectionMethodIds.API_KEY),
   })
   .loose();
-
-export const LinearOAuth2ConnectionStartConfigSchema = z
-  .object({
-    client_id: z.string().min(1),
-    client_secret: z.string().min(1),
-  })
-  .strict();
-
-export const LinearOAuth2ConnectionConfigSchema = z
-  .object({
-    connection_method: z.literal(IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE),
-    client_id: z.string().min(1),
-  })
-  .strict();
 
 export const LinearOAuthAppConnectionConfigSchema = z
   .object({
@@ -72,19 +45,15 @@ export const LinearOAuthAppConnectionConfigSchema = z
 
 export const LinearConnectionConfigSchema = z.union([
   LinearApiKeyConnectionConfigSchema,
-  LinearOAuth2ConnectionConfigSchema,
   LinearOAuthAppConnectionConfigSchema,
 ]);
 
-export type LinearOAuth2ConnectionStartConfig = z.output<
-  typeof LinearOAuth2ConnectionStartConfigSchema
->;
 export type LinearConnectionConfig = z.output<typeof LinearConnectionConfigSchema>;
 
 export function resolveLinearCredential(input: unknown): {
-  secretType: "api_key" | "oauth2_access_token";
+  secretType: "api_key";
   slotKey: string;
-  authInjectionType: "header" | "bearer";
+  authInjectionType: "header";
 } {
   const parsedConnectionConfig = LinearConnectionConfigSchema.parse(input);
 
@@ -96,24 +65,11 @@ export function resolveLinearCredential(input: unknown): {
     };
   }
 
-  if (
-    parsedConnectionConfig.connection_method ===
-    IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE
-  ) {
-    return {
-      authInjectionType: "bearer",
-      secretType: LinearCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
-      slotKey: LinearCredentialSlotKeys.OAUTH2_ACCESS_TOKEN,
-    };
-  }
-
   throw new Error(
     `Unsupported Linear connection method '${parsedConnectionConfig.connection_method}'.`,
   );
 }
 
-export function resolveLinearCredentialSecretType(
-  input: unknown,
-): "api_key" | "oauth2_access_token" {
+export function resolveLinearCredentialSecretType(input: unknown): "api_key" {
   return resolveLinearCredential(input).secretType;
 }
