@@ -18,6 +18,7 @@ import type { OpenIntegrationConnectionEditorInput } from "./integration-connect
 
 const Definitions = createBrowserDefinitionsBundle();
 const IntegrationRegistry = createIntegrationFormRegistry(Definitions);
+const ConnectionMethodConfigPropertyKey = "connection_method";
 
 type JsonObject = Record<string, unknown>;
 
@@ -97,6 +98,39 @@ function resolveVisiblePropertyKeys(input: {
   return Object.keys(properties).filter(
     (propertyKey) => readUiWidget(input.uiSchema, propertyKey) !== "hidden",
   );
+}
+
+function hideFormConnectionMethodConfigField(input: {
+  schema: RJSFSchema;
+  uiSchema: UiSchema<JsonObject, RJSFSchema>;
+  methodId: IntegrationConnectionMethodId;
+}): {
+  schema: RJSFSchema;
+  uiSchema: UiSchema<JsonObject, RJSFSchema>;
+} {
+  const properties = resolveRecord(input.schema.properties);
+  const connectionMethodProperty = resolveRecord(properties[ConnectionMethodConfigPropertyKey]);
+  const connectionMethodUiSchema = resolveRecord(input.uiSchema[ConnectionMethodConfigPropertyKey]);
+
+  return {
+    schema: {
+      ...input.schema,
+      properties: {
+        ...properties,
+        [ConnectionMethodConfigPropertyKey]: {
+          ...connectionMethodProperty,
+          default: input.methodId,
+        },
+      },
+    },
+    uiSchema: {
+      ...input.uiSchema,
+      [ConnectionMethodConfigPropertyKey]: {
+        ...connectionMethodUiSchema,
+        "ui:widget": "hidden",
+      },
+    },
+  };
 }
 
 export function resolveConnectionMethodFormUiModel(input: {
@@ -188,8 +222,19 @@ export function resolveConnectionMethodFormUiModel(input: {
     },
   });
 
-  const schema = resolveRjsfSchema(resolvedForm.schema);
-  const uiSchema = resolveRjsfUiSchema(resolvedForm.uiSchema ?? {});
+  const resolvedSchema = resolveRjsfSchema(resolvedForm.schema);
+  const resolvedUiSchema = resolveRjsfUiSchema(resolvedForm.uiSchema ?? {});
+  const { schema, uiSchema } =
+    methodDefinition.kind === "form"
+      ? hideFormConnectionMethodConfigField({
+          schema: resolvedSchema,
+          uiSchema: resolvedUiSchema,
+          methodId: input.methodId,
+        })
+      : {
+          schema: resolvedSchema,
+          uiSchema: resolvedUiSchema,
+        };
   const value = applySchemaDefaultsToFormData({
     schema: resolveRecord(schema),
     formData: input.currentValue,
