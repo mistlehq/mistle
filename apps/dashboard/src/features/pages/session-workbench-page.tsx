@@ -1,7 +1,6 @@
-import { SidebarTrigger, useSidebar } from "@mistle/ui";
 import { useParams, useSearchParams } from "react-router";
 
-import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
+import { WorkspaceSidebarTrigger } from "../shared/workspace-sidebar-trigger.js";
 import { SessionWorkbenchFullPage } from "./session-workbench-full-page.js";
 
 export function shouldResetConversationScopedComposerStateForActiveConversationChange(input: {
@@ -30,7 +29,7 @@ export function SessionWorkbenchPage(): React.JSX.Element {
       key={sandboxInstanceId ?? "missing-session"}
       documentTitleFallback="Session"
       frameTitle="Session"
-      leadingControl={<SessionWorkspaceSidebarTrigger />}
+      leadingControl={<WorkspaceSidebarTrigger />}
       requestedRuntimeConversationId={requestedRuntimeConversationId}
       sandboxInstanceId={sandboxInstanceId}
       searchParams={searchParams}
@@ -38,15 +37,4 @@ export function SessionWorkbenchPage(): React.JSX.Element {
       setSearchParams={setSearchParams}
     />
   );
-}
-
-function SessionWorkspaceSidebarTrigger(): React.JSX.Element | null {
-  const { isMobile, openMobile, state } = useSidebar();
-  const shouldShowSidebarTrigger = shouldRenderSidebarTrigger({
-    isMobile,
-    openMobile,
-    sidebarState: state,
-  });
-
-  return shouldShowSidebarTrigger ? <SidebarTrigger className="-ml-1" /> : null;
 }

@@ -9,6 +9,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@mistle/ui";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import { PageHeaderSidebarTriggerProvider } from "../shared/page-header-sidebar-trigger-context.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
@@ -27,6 +28,8 @@ export interface AppShellViewProps {
   contentInsetOwner: "app-shell" | "child";
   mainContent: React.ReactNode;
   renderSidebarTrigger: boolean;
+  sidebarEntryKey?: string;
+  sidebarEntryState?: "collapsed" | null;
   topLoadingBar: React.ReactNode;
   viewportMode: "document" | "workspace";
 }
@@ -36,15 +39,24 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
     contentInsetOwner: input.contentInsetOwner,
     viewportMode: input.viewportMode,
   });
-  const sidebarProviderKey =
-    input.sidebarDefaultOpen === false ? "default-collapsed" : "default-expanded";
+  const sidebarEntryState = input.sidebarEntryState ?? null;
+  const sidebarEntryKey = input.sidebarEntryKey ?? "";
+  const initialSidebarOpen =
+    sidebarEntryState === "collapsed" ? false : (input.sidebarDefaultOpen ?? true);
+  const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen);
 
   return (
     <SidebarProvider
-      defaultOpen={input.sidebarDefaultOpen ?? true}
-      key={sidebarProviderKey}
+      defaultOpen={initialSidebarOpen}
+      onOpenChange={setSidebarOpen}
+      open={sidebarOpen}
       style={SidebarWidthStyle}
     >
+      <AppShellSidebarEntrySync
+        entryKey={sidebarEntryKey}
+        entryState={sidebarEntryState}
+        setSidebarOpen={setSidebarOpen}
+      />
       <Sidebar>
         {input.sidebarHeaderContent === null ? null : (
           <SidebarHeader className={input.sidebarHeaderClassName}>
@@ -72,6 +84,35 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
       </SidebarInset>
     </SidebarProvider>
   );
+}
+
+function AppShellSidebarEntrySync(input: {
+  entryKey: string;
+  entryState: "collapsed" | null;
+  setSidebarOpen: (open: boolean) => void;
+}): null {
+  const { entryKey, entryState, setSidebarOpen } = input;
+  const { setOpenMobile } = useSidebar();
+  const appliedSidebarEntryKeyRef = useRef<string | null>(null);
+
+  // Synchronizes route-owned sidebar posture before paint because route changes can arrive outside
+  // this shell's event handlers.
+  useLayoutEffect(() => {
+    if (entryState !== "collapsed") {
+      appliedSidebarEntryKeyRef.current = null;
+      return;
+    }
+
+    if (appliedSidebarEntryKeyRef.current === entryKey) {
+      return;
+    }
+
+    appliedSidebarEntryKeyRef.current = entryKey;
+    setSidebarOpen(false);
+    setOpenMobile(false);
+  }, [entryKey, entryState, setOpenMobile, setSidebarOpen]);
+
+  return null;
 }
 
 function AppShellPageHeaderSidebarTriggerProvider(input: {

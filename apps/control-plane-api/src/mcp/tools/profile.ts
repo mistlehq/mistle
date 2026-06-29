@@ -1,4 +1,7 @@
-import type { IntegrationBindingKind } from "@mistle/db/control-plane";
+import {
+  SandboxProfileVersionSnapshotJobStates,
+  type IntegrationBindingKind,
+} from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import type { McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 
@@ -12,6 +15,7 @@ import { getProfileVersionMaintenanceScript } from "../../sandbox-profiles/servi
 import { getProfileVersionPublishability } from "../../sandbox-profiles/services/get-profile-version-publishability.js";
 import { getProfileVersionSetupScript } from "../../sandbox-profiles/services/get-profile-version-setup-script.js";
 import { getProfile } from "../../sandbox-profiles/services/get-profile.js";
+import { listProfileVersions } from "../../sandbox-profiles/services/list-profile-versions.js";
 import { listProfiles } from "../../sandbox-profiles/services/list-profiles.js";
 import { publishProfileVersion } from "../../sandbox-profiles/services/publish-profile-version.js";
 import { putProfileVersionDraft } from "../../sandbox-profiles/services/put-profile-version-draft.js";
@@ -48,6 +52,19 @@ const MutatingToolAnnotations: ToolAnnotations = {
   idempotentHint: true,
   openWorldHint: false,
 };
+
+const SnapshotReadinessStatuses = {
+  DRAFT: "draft",
+  MATERIALIZING: "materializing",
+  FAILED: "failed",
+  USABLE: "usable",
+  BLOCKED: "blocked",
+} as const;
+
+const SnapshotReadinessBlockedReasons = {
+  MISSING_SNAPSHOT_JOB: "missing_snapshot_job",
+  MISSING_USABLE_SNAPSHOT: "missing_usable_snapshot",
+} as const;
 
 export function registerProfileTools(server: McpServer, context: MistleMcpServerContext): void {
   server.registerTool(
@@ -452,6 +469,60 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
   );
 
   server.registerTool(
+    "profile_version_snapshot_status_get",
+    {
+      title: "Get sandbox profile version snapshot status",
+      description:
+        "Get whether a sandbox profile version is usable, still materializing its snapshot, failed, or not yet published. Use this after publishing before creating triggers or starting sessions.",
+      inputSchema: mcpSandboxProfileVersionParamsSchema,
+      annotations: {
+        ...ReadOnlyToolAnnotations,
+        title: "Get sandbox profile version snapshot status",
+      },
+    },
+    async ({ profileId, version }) => {
+      requireMcpToolPermission(
+        context.organizationActor,
+        OrganizationPermissions.SANDBOX_PROFILE_READ,
+      );
+      requireMcpSandboxProfileScope(context.organizationActor, {
+        profileId,
+        version,
+      });
+
+      const profileVersions = await listProfileVersions(
+        {
+          db: context.db,
+        },
+        {
+          organizationId: context.organizationActor.organizationId,
+          profileId,
+        },
+      );
+      const profileVersion = profileVersions.versions.find((candidate) => {
+        return candidate.version === version;
+      });
+
+      if (profileVersion === undefined) {
+        throw new BadRequestError(
+          "BAD_REQUEST",
+          `Sandbox profile '${profileId}' version '${String(version)}' was not found.`,
+        );
+      }
+
+      return structuredResult({
+        profileId,
+        version,
+        state: profileVersion.state,
+        ...resolveSnapshotReadiness(profileVersion),
+        usable: profileVersion.usable,
+        isActive: profileVersion.isActive,
+        latestSnapshotJob: profileVersion.latestSnapshotJob,
+      });
+    },
+  );
+
+  server.registerTool(
     "profile_version_publish",
     {
       title: "Publish sandbox profile version",
@@ -719,6 +790,72 @@ function requireMcpSandboxProviderForResources(input: {
   }
 
   throw new BadRequestError("BAD_REQUEST", "Sandbox resources require a sandbox provider.");
+}
+
+type ProfileVersionSnapshotStatusInput = Awaited<
+  ReturnType<typeof listProfileVersions>
+>["versions"][number];
+
+type ProfileVersionSnapshotReadiness =
+  | {
+      status: Exclude<
+        (typeof SnapshotReadinessStatuses)[keyof typeof SnapshotReadinessStatuses],
+        typeof SnapshotReadinessStatuses.BLOCKED
+      >;
+      blockedReason: null;
+    }
+  | {
+      status: typeof SnapshotReadinessStatuses.BLOCKED;
+      blockedReason: (typeof SnapshotReadinessBlockedReasons)[keyof typeof SnapshotReadinessBlockedReasons];
+    };
+
+function resolveSnapshotReadiness(
+  profileVersion: ProfileVersionSnapshotStatusInput,
+): ProfileVersionSnapshotReadiness {
+  if (profileVersion.state === "draft") {
+    return {
+      status: SnapshotReadinessStatuses.DRAFT,
+      blockedReason: null,
+    };
+  }
+  if (profileVersion.usable) {
+    return {
+      status: SnapshotReadinessStatuses.USABLE,
+      blockedReason: null,
+    };
+  }
+
+  const latestSnapshotJob = profileVersion.latestSnapshotJob;
+  if (latestSnapshotJob === null) {
+    return {
+      status: SnapshotReadinessStatuses.BLOCKED,
+      blockedReason: SnapshotReadinessBlockedReasons.MISSING_SNAPSHOT_JOB,
+    };
+  }
+  switch (latestSnapshotJob.state) {
+    case SandboxProfileVersionSnapshotJobStates.FAILED:
+      return {
+        status: SnapshotReadinessStatuses.FAILED,
+        blockedReason: null,
+      };
+    case SandboxProfileVersionSnapshotJobStates.SUCCEEDED:
+      return {
+        status: SnapshotReadinessStatuses.BLOCKED,
+        blockedReason: SnapshotReadinessBlockedReasons.MISSING_USABLE_SNAPSHOT,
+      };
+    case SandboxProfileVersionSnapshotJobStates.QUEUED:
+    case SandboxProfileVersionSnapshotJobStates.RUNNING:
+      return {
+        status: SnapshotReadinessStatuses.MATERIALIZING,
+        blockedReason: null,
+      };
+  }
+
+  const unhandledState: never = latestSnapshotJob.state;
+  throw new BadRequestError(
+    "BAD_REQUEST",
+    `Unsupported snapshot materialization job state '${String(unhandledState)}'.`,
+  );
 }
 
 function requireMcpDraftUpdateField(input: {

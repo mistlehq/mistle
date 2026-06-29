@@ -28,6 +28,14 @@ _Avoid_: Active version, latest version when publish materialization state matte
 A prepared sandbox image for a published **Sandbox profile version**.
 _Avoid_: Template, cache
 
+**Snapshot materialization**:
+The asynchronous lifecycle work that prepares a usable **Snapshot** for a published **Sandbox profile version** when an existing **Snapshot** cannot be reused.
+_Avoid_: Publish when referring to preparation after the version has already become immutable
+
+**Usable sandbox profile version**:
+A published **Sandbox profile version** that has a usable **Snapshot** and can be used to start **Sandbox sessions** or advance **Trigger** targets.
+_Avoid_: Published version when readiness matters
+
 **Base image**:
 The configured starting sandbox image used before profile-specific preparation.
 _Avoid_: Profile image
@@ -716,6 +724,9 @@ _Avoid_: Schema mismatch prompt, refresh modal
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
+- Publishing a **Sandbox profile version** makes the version immutable, but may still require **Snapshot materialization** before the version is usable.
+- A **Sandbox profile version** can be published but not usable while its publish-triggered **Snapshot materialization** is queued or running.
+- **Triggers** and **Sandbox sessions** depend on a **Usable sandbox profile version**, not merely a published **Sandbox profile version**.
 - A **Publish-worthy change** is evaluated against the draft's **Source sandbox profile version**.
 - A draft **Sandbox profile version**'s **Source sandbox profile version** is the latest earlier published **Sandbox profile version**.
 - **Sandbox profile version configuration** excludes external dependency state, snapshot image state, snapshot job history, and other lifecycle timestamps.

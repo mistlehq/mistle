@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -291,6 +291,10 @@ describe("SessionWorkbenchPageView", () => {
       />,
     );
 
+    expect(screen.getByTestId("session-workbench-main-group").className).toContain(
+      "session-workbench-main-group-animated",
+    );
+
     await waitFor(() => {
       expect(screen.getByTestId("session-workbench-primary-panel").getAttribute("style")).toContain(
         "flex: 40 1 0px;",
@@ -299,6 +303,170 @@ describe("SessionWorkbenchPageView", () => {
         screen.getByTestId("session-workbench-secondary-panel").getAttribute("style"),
       ).toContain("flex: 60 1 0px;");
     });
+  });
+
+  it("uses the slow transition class only for the configured first persistent secondary panel open", () => {
+    const { rerender } = render(
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<div>Terminal workspace</div>}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible={false}
+        mainContent={<div>Conversation body</div>}
+        primaryBottomPanel={<div>Composer</div>}
+        primaryPanelDefaultSize={40}
+        sandboxInstanceId="sbi_test"
+        secondaryPanel={<div>Designer canvas</div>}
+        secondaryPanelDefaultSize={60}
+        secondaryPanelFirstOpenTransitionMode="slow"
+        secondaryPanelLayoutKey="slow-first-open"
+        secondaryPanelMountMode="persistent-collapsible"
+      />,
+    );
+
+    rerender(
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<div>Terminal workspace</div>}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible
+        mainContent={<div>Conversation body</div>}
+        primaryBottomPanel={<div>Composer</div>}
+        primaryPanelDefaultSize={40}
+        sandboxInstanceId="sbi_test"
+        secondaryPanel={<div>Designer canvas</div>}
+        secondaryPanelDefaultSize={60}
+        secondaryPanelFirstOpenTransitionMode="slow"
+        secondaryPanelLayoutKey="slow-first-open"
+        secondaryPanelMountMode="persistent-collapsible"
+      />,
+    );
+
+    const mainGroup = screen.getByTestId("session-workbench-main-group");
+    expect(mainGroup.classList.contains("session-workbench-main-group-animated-slow")).toBe(true);
+    expect(mainGroup.classList.contains("session-workbench-main-group-animated")).toBe(false);
+    fireEvent.transitionEnd(screen.getByTestId("session-workbench-primary-panel"), {
+      propertyName: "flex-grow",
+    });
+
+    rerender(
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<div>Terminal workspace</div>}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible={false}
+        mainContent={<div>Conversation body</div>}
+        primaryBottomPanel={<div>Composer</div>}
+        primaryPanelDefaultSize={40}
+        sandboxInstanceId="sbi_test"
+        secondaryPanel={<div>Designer canvas</div>}
+        secondaryPanelDefaultSize={60}
+        secondaryPanelFirstOpenTransitionMode="slow"
+        secondaryPanelLayoutKey="slow-first-open"
+        secondaryPanelMountMode="persistent-collapsible"
+      />,
+    );
+
+    expect(mainGroup.classList.contains("session-workbench-main-group-animated")).toBe(true);
+    expect(mainGroup.classList.contains("session-workbench-main-group-animated-slow")).toBe(false);
+  });
+
+  it("resizes a persistent secondary panel with stored layout when the resize key changes", async () => {
+    const originalOffsetWidth = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "offsetWidth",
+    );
+    const originalLocalStorage = Object.getOwnPropertyDescriptor(window, "localStorage");
+    const storageValues = new Map<string, string>();
+    const localStorage = {
+      getItem(key: string): string | null {
+        return storageValues.get(key) ?? null;
+      },
+      removeItem(key: string): void {
+        storageValues.delete(key);
+      },
+      setItem(key: string, value: string): void {
+        storageValues.set(key, value);
+      },
+    };
+    const storageKey =
+      "react-resizable-panels:dashboard:session-workbench:main:sbi_test:designer-canvas-resize-intent:session-workbench-primary-panel:session-workbench-secondary-panel";
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: localStorage,
+    });
+    Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+      configurable: true,
+      get(): number {
+        return 1000;
+      },
+    });
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        "session-workbench-primary-panel": 70,
+        "session-workbench-secondary-panel": 30,
+      }),
+    );
+
+    try {
+      const { rerender } = render(
+        <SessionWorkbenchPageView
+          alert={null}
+          bottomPanel={<div>Terminal workspace</div>}
+          isBottomPanelVisible={false}
+          isSecondaryPanelVisible
+          mainContent={<div>Conversation body</div>}
+          primaryBottomPanel={<div>Composer</div>}
+          primaryPanelDefaultSize={40}
+          sandboxInstanceId="sbi_test"
+          secondaryPanel={<div>Conversation navigator</div>}
+          secondaryPanelDefaultSize={60}
+          secondaryPanelLayoutKey="designer-canvas-resize-intent"
+          secondaryPanelMountMode="persistent-collapsible"
+          secondaryPanelResizeKey="conversation-navigator"
+        />,
+      );
+
+      expect(
+        screen.getByTestId("session-workbench-secondary-panel").getAttribute("style"),
+      ).toContain("flex: 30 1 0px;");
+
+      rerender(
+        <SessionWorkbenchPageView
+          alert={null}
+          bottomPanel={<div>Terminal workspace</div>}
+          isBottomPanelVisible={false}
+          isSecondaryPanelVisible
+          mainContent={<div>Conversation body</div>}
+          primaryBottomPanel={<div>Composer</div>}
+          primaryPanelDefaultSize={40}
+          sandboxInstanceId="sbi_test"
+          secondaryPanel={<div>Designer canvas</div>}
+          secondaryPanelDefaultSize={60}
+          secondaryPanelLayoutKey="designer-canvas-resize-intent"
+          secondaryPanelMountMode="persistent-collapsible"
+          secondaryPanelResizeKey="designer-canvas-open"
+        />,
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("session-workbench-secondary-panel").getAttribute("style"),
+        ).toContain("flex: 60 1 0px;");
+      });
+    } finally {
+      if (originalLocalStorage === undefined) {
+        Reflect.deleteProperty(window, "localStorage");
+      } else {
+        Object.defineProperty(window, "localStorage", originalLocalStorage);
+      }
+      if (originalOffsetWidth === undefined) {
+        Reflect.deleteProperty(HTMLElement.prototype, "offsetWidth");
+      } else {
+        Object.defineProperty(HTMLElement.prototype, "offsetWidth", originalOffsetWidth);
+      }
+    }
   });
 
   it("keeps the terminal panel collapsed when the secondary panel layout key changes", async () => {

@@ -239,6 +239,8 @@ const meta = {
     ),
     renderSidebarTrigger: true,
     sidebarDefaultOpen: true,
+    sidebarEntryKey: "/sessions",
+    sidebarEntryState: null,
     showSessionsSidebar: false,
     sidebarContent: null,
     sidebarFooterContent: <ErrorNotice message={null} />,

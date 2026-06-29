@@ -52,7 +52,8 @@ export type AppShellFrame = Pick<
   | "contentInsetOwner"
   | "renderSidebarTrigger"
   | "sidebarContent"
-  | "sidebarDefaultOpen"
+  | "sidebarEntryKey"
+  | "sidebarEntryState"
   | "sidebarFooterContent"
   | "sidebarHeaderClassName"
   | "sidebarHeaderContent"
@@ -97,6 +98,8 @@ export function resolveAppShellFrame(input: {
       ),
       sidebarHeaderClassName: "pb-0",
       sidebarHeaderContent: <SettingsBackButton onBack={input.handleBackToApp} />,
+      sidebarEntryKey: input.locationPathname,
+      sidebarEntryState: input.pageMeta.sidebarEntryState,
       topLoadingBar: <TopLoadingBar />,
       viewportMode: input.pageMeta.appShellViewportMode,
     };
@@ -105,11 +108,8 @@ export function resolveAppShellFrame(input: {
   return {
     contentInsetOwner: input.pageMeta.appShellInsetOwner,
     renderSidebarTrigger: input.pageMeta.sidebarTriggerOwner === "page-frame",
-    ...(input.pageMeta.sidebarDefaultOpen === null
-      ? {}
-      : {
-          sidebarDefaultOpen: input.pageMeta.sidebarDefaultOpen,
-        }),
+    sidebarEntryKey: input.locationPathname,
+    sidebarEntryState: input.pageMeta.sidebarEntryState,
     sidebarContent: showDedicatedSessionsSidebar ? (
       <div className="animate-in fade-in-0 duration-200">
         <SessionsSidebarHeader

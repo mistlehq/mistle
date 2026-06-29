@@ -28,6 +28,7 @@ const DefaultTerminalPanelHeightPx = 320;
 const ResizablePanelStorageKeyPrefix = "react-resizable-panels:";
 
 type SessionWorkbenchSecondaryPanelMountMode = "visible-only" | "persistent-collapsible";
+type SessionWorkbenchSecondaryPanelTransitionMode = "standard" | "slow";
 type PanelDefaultLayout = Record<string, number>;
 
 type SessionWorkbenchAlert = {
@@ -54,6 +55,8 @@ type SessionWorkbenchPageViewProps = {
   secondaryPanelLayoutKey?: string;
   secondaryPanelMinSize?: string;
   secondaryPanelMountMode?: SessionWorkbenchSecondaryPanelMountMode;
+  secondaryPanelFirstOpenTransitionMode?: SessionWorkbenchSecondaryPanelTransitionMode;
+  secondaryPanelResizeKey?: string | null;
   primaryPanelMinSize?: string;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
@@ -81,8 +84,10 @@ export function SessionWorkbenchPageView({
   primaryPanelDefaultSize,
   secondaryPanelDefaultSize,
   secondaryPanelLayoutKey = "default",
+  secondaryPanelFirstOpenTransitionMode = "standard",
   secondaryPanelMinSize = "20%",
   secondaryPanelMountMode = "visible-only",
+  secondaryPanelResizeKey = null,
   primaryPanelMinSize = "25%",
   mainContent,
   primaryBottomPanel,
@@ -92,7 +97,8 @@ export function SessionWorkbenchPageView({
   secondaryPanel,
   isSecondaryPanelVisible,
 }: SessionWorkbenchPageViewProps): React.JSX.Element {
-  const [isSecondaryPanelTransitioning, setSecondaryPanelTransitioning] = useState(false);
+  const [secondaryPanelTransitionMode, setSecondaryPanelTransitionMode] =
+    useState<SessionWorkbenchSecondaryPanelTransitionMode | null>(null);
   const bottomPanelRef = useRef<PanelImperativeHandle | null>(null);
   const secondaryPanelRef = useRef<PanelImperativeHandle | null>(null);
   const hasAppliedBottomPanelVisibilityRef = useRef(false);
@@ -100,6 +106,8 @@ export function SessionWorkbenchPageView({
   const initialStoredLayoutByGroupRef = useRef(new Map<string, boolean>());
   const previousBottomPanelVisibilityRef = useRef<boolean | null>(null);
   const previousBottomPanelGroupKeyRef = useRef<string | null>(null);
+  const hasAppliedSlowSecondaryPanelFirstOpenTransitionRef = useRef(false);
+  const previousSecondaryPanelResizeKeyRef = useRef<string | null>(secondaryPanelResizeKey);
   const previousSecondaryPanelVisibilityRef = useRef<boolean | null>(null);
   const sandboxInstanceKey = sandboxInstanceId ?? "missing-session";
   const isSecondaryPanelMounted =
@@ -163,7 +171,7 @@ export function SessionWorkbenchPageView({
       return;
     }
 
-    setSecondaryPanelTransitioning(false);
+    setSecondaryPanelTransitionMode(null);
   }, []);
 
   useLayoutEffect(() => {
@@ -219,17 +227,33 @@ export function SessionWorkbenchPageView({
       return;
     }
     hasAppliedSecondaryPanelVisibilityRef.current = true;
-    if (wasSecondaryPanelVisible !== null) {
-      setSecondaryPanelTransitioning(true);
+    const shouldAnimateVisibilityChange = wasSecondaryPanelVisible !== null;
+    if (shouldAnimateVisibilityChange) {
+      const shouldUseSlowFirstOpenTransition =
+        isSecondaryPanelVisible &&
+        secondaryPanelFirstOpenTransitionMode === "slow" &&
+        !hasAppliedSlowSecondaryPanelFirstOpenTransitionRef.current;
+      if (shouldUseSlowFirstOpenTransition) {
+        hasAppliedSlowSecondaryPanelFirstOpenTransitionRef.current = true;
+      }
+      setSecondaryPanelTransitionMode(shouldUseSlowFirstOpenTransition ? "slow" : "standard");
     }
 
     if (!isSecondaryPanelVisible) {
+      if (shouldAnimateVisibilityChange) {
+        const collapseFrame = window.requestAnimationFrame(() => {
+          secondaryPanelHandle.collapse();
+        });
+        return () => {
+          window.cancelAnimationFrame(collapseFrame);
+        };
+      }
+
       secondaryPanelHandle.collapse();
       return;
     }
 
-    secondaryPanelHandle.expand();
-    if (
+    const shouldSkipDefaultResize =
       wasSecondaryPanelVisible === true ||
       hasInitialStoredMainPanelLayout ||
       hasStoredResizablePanelLayout({
@@ -238,8 +262,22 @@ export function SessionWorkbenchPageView({
         panelIds: mainPanelIds,
         storage: layoutStorage,
       }) ||
-      secondaryPanelDefaultSize === undefined
-    ) {
+      secondaryPanelDefaultSize === undefined;
+
+    if (shouldAnimateVisibilityChange) {
+      const openFrame = window.requestAnimationFrame(() => {
+        secondaryPanelHandle.expand();
+        if (!shouldSkipDefaultResize) {
+          secondaryPanelHandle.resize(String(secondaryPanelDefaultSize));
+        }
+      });
+      return () => {
+        window.cancelAnimationFrame(openFrame);
+      };
+    }
+
+    secondaryPanelHandle.expand();
+    if (shouldSkipDefaultResize) {
       return;
     }
 
@@ -255,8 +293,44 @@ export function SessionWorkbenchPageView({
     ignoredCollapsedPanelId,
     isSecondaryPanelVisible,
     mainPanelGroupId,
+    secondaryPanelFirstOpenTransitionMode,
     secondaryPanelDefaultSize,
     secondaryPanelMountMode,
+  ]);
+
+  useLayoutEffect(() => {
+    if (secondaryPanelMountMode !== "persistent-collapsible") {
+      return;
+    }
+
+    const previousResizeKey = previousSecondaryPanelResizeKeyRef.current;
+    previousSecondaryPanelResizeKeyRef.current = secondaryPanelResizeKey;
+    if (
+      secondaryPanelResizeKey === null ||
+      previousResizeKey === secondaryPanelResizeKey ||
+      !isSecondaryPanelVisible ||
+      secondaryPanelDefaultSize === undefined
+    ) {
+      return;
+    }
+
+    const secondaryPanelHandle = secondaryPanelRef.current;
+    if (secondaryPanelHandle === null) {
+      return;
+    }
+
+    const resizeFrame = resizePanelToPercentageOnNextFrame({
+      percentage: secondaryPanelDefaultSize,
+      panel: secondaryPanelHandle,
+    });
+    return () => {
+      window.cancelAnimationFrame(resizeFrame);
+    };
+  }, [
+    isSecondaryPanelVisible,
+    secondaryPanelDefaultSize,
+    secondaryPanelMountMode,
+    secondaryPanelResizeKey,
   ]);
 
   if (sandboxInstanceId === null) {
@@ -370,7 +444,12 @@ export function SessionWorkbenchPageView({
       <ResizablePanelGroup
         className={cn(
           "min-h-0 flex-1",
-          isSecondaryPanelTransitioning ? "session-workbench-main-group-animated" : null,
+          secondaryPanelTransitionMode === "standard"
+            ? "session-workbench-main-group-animated"
+            : null,
+          secondaryPanelTransitionMode === "slow"
+            ? "session-workbench-main-group-animated-slow"
+            : null,
         )}
         defaultLayout={mainPanelDefaultLayout}
         id="session-workbench-main-group"
@@ -536,7 +615,7 @@ function resizePanelToPercentageOnNextFrame(input: {
   percentage: number;
 }): number {
   return window.requestAnimationFrame(() => {
-    input.panel.resize(formatResizablePanelPercentage(input.percentage));
+    input.panel.resize(String(input.percentage));
   });
 }
 
