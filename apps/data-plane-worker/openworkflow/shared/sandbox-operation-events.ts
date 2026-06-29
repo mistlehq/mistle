@@ -8,7 +8,11 @@ import {
 import type { MistleLogger } from "@mistle/logging";
 import type { Clock } from "@mistle/time";
 
+import { recordSandboxOperationPhaseDuration } from "./sandbox-operation-telemetry.js";
+
 export type WorkerSandboxLifecycleEventRecorder = {
+  nowMs: () => number;
+  operationKind: SandboxOperationKind;
   record: (input: {
     attributes?: Record<string, unknown>;
     message: string;
@@ -26,6 +30,8 @@ export function createWorkerSandboxLifecycleEventRecorder(input: {
   sandboxInstanceId: string;
 }): WorkerSandboxLifecycleEventRecorder {
   return {
+    nowMs: () => input.clock.nowMs(),
+    operationKind: input.operationKind,
     record: async (event) => {
       try {
         await insertSandboxOperationEvent(input.db, {
@@ -70,6 +76,8 @@ export async function recordWorkerSandboxLifecyclePhase<Output>(
   },
   fn: () => Promise<Output> | Output,
 ): Promise<Output> {
+  const startedAtMs = recorder.nowMs();
+  const startedAt = new Date(startedAtMs).toISOString();
   await recorder.record({
     message: input.startedMessage,
     phase: input.phase,
@@ -79,18 +87,46 @@ export async function recordWorkerSandboxLifecyclePhase<Output>(
 
   try {
     const output = await fn();
-    await recorder.record({
-      message: input.completedMessage,
+    const timingAttributes = createLifecyclePhaseTimingAttributes({
+      completedAtMs: recorder.nowMs(),
+      startedAtMs,
+    });
+    recordSandboxOperationPhaseDuration({
+      durationMs: timingAttributes.durationMs,
+      operationKind: recorder.operationKind,
       phase: input.phase,
       status: "completed",
       ...(input.attributes === undefined ? {} : { attributes: input.attributes }),
     });
+    await recorder.record({
+      attributes: {
+        ...(input.attributes ?? {}),
+        ...timingAttributes,
+        startedAt,
+      },
+      message: input.completedMessage,
+      phase: input.phase,
+      status: "completed",
+    });
     return output;
   } catch (error) {
+    const timingAttributes = createLifecyclePhaseTimingAttributes({
+      completedAtMs: recorder.nowMs(),
+      startedAtMs,
+    });
+    recordSandboxOperationPhaseDuration({
+      durationMs: timingAttributes.durationMs,
+      operationKind: recorder.operationKind,
+      phase: input.phase,
+      status: "failed",
+      ...(input.attributes === undefined ? {} : { attributes: input.attributes }),
+    });
     await recorder.record({
       attributes: {
         ...(input.attributes ?? {}),
         error: formatLifecycleEventError(error),
+        ...timingAttributes,
+        startedAt,
       },
       message: input.failedMessage,
       phase: input.phase,
@@ -98,6 +134,98 @@ export async function recordWorkerSandboxLifecyclePhase<Output>(
     });
     throw error;
   }
+}
+
+export async function recordWorkerSandboxLifecycleBooleanPhase(
+  recorder: WorkerSandboxLifecycleEventRecorder,
+  input: {
+    attributes?: Record<string, unknown>;
+    completedMessage: string;
+    erroredMessage: string;
+    failedAttributes?: Record<string, unknown>;
+    failedMessage: string;
+    phase: SandboxLifecyclePhase;
+    startedMessage: string;
+  },
+  fn: () => Promise<boolean> | boolean,
+): Promise<boolean> {
+  const startedAtMs = recorder.nowMs();
+  const startedAt = new Date(startedAtMs).toISOString();
+  await recorder.record({
+    message: input.startedMessage,
+    phase: input.phase,
+    status: "started",
+    ...(input.attributes === undefined ? {} : { attributes: input.attributes }),
+  });
+
+  try {
+    const output = await fn();
+    const status = output ? "completed" : "failed";
+    const timingAttributes = createLifecyclePhaseTimingAttributes({
+      completedAtMs: recorder.nowMs(),
+      startedAtMs,
+    });
+    recordSandboxOperationPhaseDuration({
+      durationMs: timingAttributes.durationMs,
+      operationKind: recorder.operationKind,
+      phase: input.phase,
+      status,
+      ...(input.attributes === undefined ? {} : { attributes: input.attributes }),
+    });
+    await recorder.record({
+      attributes: {
+        ...(input.attributes ?? {}),
+        ...(output ? {} : (input.failedAttributes ?? {})),
+        ...timingAttributes,
+        startedAt,
+      },
+      message: output ? input.completedMessage : input.failedMessage,
+      phase: input.phase,
+      status,
+    });
+    return output;
+  } catch (error) {
+    const timingAttributes = createLifecyclePhaseTimingAttributes({
+      completedAtMs: recorder.nowMs(),
+      startedAtMs,
+    });
+    recordSandboxOperationPhaseDuration({
+      durationMs: timingAttributes.durationMs,
+      operationKind: recorder.operationKind,
+      phase: input.phase,
+      status: "failed",
+      ...(input.attributes === undefined ? {} : { attributes: input.attributes }),
+    });
+    await recorder.record({
+      attributes: {
+        ...(input.attributes ?? {}),
+        error: formatLifecycleEventError(error),
+        ...timingAttributes,
+        startedAt,
+      },
+      message: input.erroredMessage,
+      phase: input.phase,
+      status: "failed",
+    });
+    throw error;
+  }
+}
+
+export function createLifecyclePhaseTimingAttributes(input: {
+  completedAtMs: number;
+  startedAtMs: number;
+}): {
+  completedAt: string;
+  durationMs: number;
+} {
+  if (input.completedAtMs < input.startedAtMs) {
+    throw new Error("Sandbox lifecycle phase completed before it started.");
+  }
+
+  return {
+    completedAt: new Date(input.completedAtMs).toISOString(),
+    durationMs: input.completedAtMs - input.startedAtMs,
+  };
 }
 
 function formatLifecycleEventError(error: unknown): string {

@@ -1203,6 +1203,11 @@ export interface paths {
               id: string;
               sandboxProfileId: string;
               sandboxProfileVersion: number;
+              startupOperation: {
+                operationId: string;
+                /** @enum {string} */
+                operationKind: "start" | "resume";
+              } | null;
               /** @enum {string} */
               status:
                 | "pending"

@@ -24,6 +24,10 @@ export async function getSandboxInstance(
   failureMessage: string | null;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
+  startupOperation: {
+    operationId: string;
+    operationKind: "start" | "resume";
+  } | null;
   associatedResourceEventRouting: AssociatedResourceEventRouting | null;
 }> {
   const sandboxInstance = await dataPlaneClient.getSandboxInstance({
@@ -45,6 +49,7 @@ export async function getSandboxInstance(
     failureMessage: sandboxInstance.failureMessage,
     sandboxProfileId: sandboxInstance.sandboxProfileId,
     sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+    startupOperation: sandboxInstance.startupOperation,
     associatedResourceEventRouting:
       sandboxInstance.runtimePlan?.associatedResourceEventRouting ?? null,
   };

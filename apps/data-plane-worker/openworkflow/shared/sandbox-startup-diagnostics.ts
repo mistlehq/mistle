@@ -1,9 +1,17 @@
 import type { MistleLogger } from "@mistle/logging";
 import type { SandboxProvider, SandboxRuntimeControl } from "@mistle/sandbox";
-import { SpanStatusCode, trace, type Attributes, type Span } from "@opentelemetry/api";
+import { metrics, SpanStatusCode, trace, type Attributes, type Span } from "@opentelemetry/api";
 import { z } from "zod";
 
 const StartupDiagnosticsTracer = trace.getTracer("@mistle/data-plane-worker");
+const StartupDiagnosticsMeter = metrics.getMeter("@mistle/data-plane-worker/sandbox-startup");
+const SandboxStartupDiagnosticPhaseDurationMs = StartupDiagnosticsMeter.createHistogram(
+  "mistle.sandbox.startup.diagnostic_phase.duration",
+  {
+    description: "Duration of sandboxd-reported sandbox startup and resume diagnostic phases.",
+    unit: "ms",
+  },
+);
 
 const SandboxStartupDiagnosticRecordSchema = z
   .object({
@@ -246,6 +254,12 @@ export async function emitSandboxStartupDiagnosticPhaseTimings(input: {
     }
 
     for (const phaseTiming of phaseTimings) {
+      recordSandboxStartupDiagnosticPhaseDuration({
+        durationMs: phaseTiming.durationMs,
+        operationKind: input.operationKind,
+        phase: phaseTiming.phase,
+        runtimeProvider: input.runtimeProvider,
+      });
       input.logger.info(
         {
           ...baseAttributes,
@@ -266,6 +280,19 @@ export async function emitSandboxStartupDiagnosticPhaseTimings(input: {
       "Failed to collect sandbox startup diagnostic phase timings.",
     );
   }
+}
+
+function recordSandboxStartupDiagnosticPhaseDuration(input: {
+  durationMs: number;
+  operationKind: SandboxStartupDiagnosticRecord["operationKind"];
+  phase: string;
+  runtimeProvider: SandboxProvider;
+}): void {
+  SandboxStartupDiagnosticPhaseDurationMs.record(input.durationMs, {
+    "mistle.sandbox.runtime_provider": input.runtimeProvider,
+    "mistle.sandbox.startup_operation_kind": input.operationKind,
+    "mistle.sandbox.startup_phase": input.phase,
+  });
 }
 
 export async function emitSandboxStartupDiagnostics(input: {

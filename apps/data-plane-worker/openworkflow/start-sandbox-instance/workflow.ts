@@ -22,6 +22,7 @@ import { formatPersistedFailureMessage } from "../shared/format-persisted-failur
 import { markSandboxInstanceStarting } from "../shared/mark-sandbox-instance-starting.js";
 import {
   createWorkerSandboxLifecycleEventRecorder,
+  recordWorkerSandboxLifecycleBooleanPhase,
   recordWorkerSandboxLifecyclePhase,
 } from "../shared/sandbox-operation-events.js";
 import {
@@ -1004,44 +1005,42 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         providerSandboxId: startedSandbox.providerSandboxId,
         runtimeProvider: startedSandbox.runtimeProvider,
       };
-      await operationEvents.record({
-        attributes: readinessAttributes,
-        message: "Sandbox runtime readiness wait started.",
-        phase: "ready",
-        status: "started",
-      });
-      didSandboxBecomeReady = await step.run(
-        { name: "wait-for-sandbox-runtime-readiness" },
-        async () => {
-          logger.info(
-            {
-              providerSandboxId: startedSandbox.providerSandboxId,
-              timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
-              pollIntervalMs: ctx.tunnelReadinessPolicy.pollIntervalMs,
-            },
-            "Waiting for sandbox runtime readiness.",
-          );
-          return waitForSandboxRuntimeReadiness(
-            {
-              runtimeStateReader: ctx.runtimeStateReader,
-              policy: ctx.tunnelReadinessPolicy,
-              clock: ctx.clock,
-              sleeper: ctx.sleeper,
-            },
-            {
-              sandboxInstanceId: startedSandbox.sandboxInstanceId,
-            },
-          );
-        },
-      );
-      if (didSandboxBecomeReady) {
-        await operationEvents.record({
+      didSandboxBecomeReady = await recordWorkerSandboxLifecycleBooleanPhase(
+        operationEvents,
+        {
           attributes: readinessAttributes,
-          message: "Sandbox runtime readiness wait completed.",
+          completedMessage: "Sandbox runtime readiness wait completed.",
+          erroredMessage: "Sandbox runtime readiness wait failed.",
+          failedAttributes: {
+            timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
+          },
+          failedMessage: "Sandbox runtime readiness timed out.",
           phase: "ready",
-          status: "completed",
-        });
-      }
+          startedMessage: "Sandbox runtime readiness wait started.",
+        },
+        async () =>
+          step.run({ name: "wait-for-sandbox-runtime-readiness" }, async () => {
+            logger.info(
+              {
+                providerSandboxId: startedSandbox.providerSandboxId,
+                timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
+                pollIntervalMs: ctx.tunnelReadinessPolicy.pollIntervalMs,
+              },
+              "Waiting for sandbox runtime readiness.",
+            );
+            return waitForSandboxRuntimeReadiness(
+              {
+                runtimeStateReader: ctx.runtimeStateReader,
+                policy: ctx.tunnelReadinessPolicy,
+                clock: ctx.clock,
+                sleeper: ctx.sleeper,
+              },
+              {
+                sandboxInstanceId: startedSandbox.sandboxInstanceId,
+              },
+            );
+          }),
+      );
       logger.info(
         {
           providerSandboxId: startedSandbox.providerSandboxId,
@@ -1051,15 +1050,6 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       );
     } catch (error) {
       rethrowDurableStepErrorForRetry(error);
-      await operationEvents.record({
-        attributes: {
-          providerSandboxId: startedSandbox.providerSandboxId,
-          runtimeProvider: startedSandbox.runtimeProvider,
-        },
-        message: "Sandbox runtime readiness wait failed.",
-        phase: "ready",
-        status: "failed",
-      });
       logger.error(
         {
           err: error,
@@ -1104,16 +1094,6 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     }
 
     if (!didSandboxBecomeReady) {
-      await operationEvents.record({
-        attributes: {
-          providerSandboxId: startedSandbox.providerSandboxId,
-          runtimeProvider: startedSandbox.runtimeProvider,
-          timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
-        },
-        message: "Sandbox runtime readiness timed out.",
-        phase: "ready",
-        status: "failed",
-      });
       logger.error(
         {
           providerSandboxId: startedSandbox.providerSandboxId,

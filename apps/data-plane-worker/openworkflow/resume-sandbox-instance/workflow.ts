@@ -23,9 +23,13 @@ import { formatPersistedFailureMessage } from "../shared/format-persisted-failur
 import { markSandboxInstanceStarting } from "../shared/mark-sandbox-instance-starting.js";
 import {
   createWorkerSandboxLifecycleEventRecorder,
+  recordWorkerSandboxLifecycleBooleanPhase,
   recordWorkerSandboxLifecyclePhase,
 } from "../shared/sandbox-operation-events.js";
-import { emitSandboxStartupDiagnostics } from "../shared/sandbox-startup-diagnostics.js";
+import {
+  emitSandboxStartupDiagnosticPhaseTimings,
+  emitSandboxStartupDiagnostics,
+} from "../shared/sandbox-startup-diagnostics.js";
 import {
   createSandboxUsageEventIdempotencyKey,
   recordWorkerSandboxUsageEvent,
@@ -537,35 +541,34 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         providerSandboxId: resumedRuntime.providerSandboxId,
         runtimeProvider: resumedRuntime.runtimeProvider,
       };
-      await operationEvents.record({
-        attributes: readinessAttributes,
-        message: "Resumed sandbox runtime readiness wait started.",
-        phase: "ready",
-        status: "started",
-      });
-      resumedSandboxRuntimeReady = await step.run(
-        { name: "wait-for-resumed-sandbox-runtime-readiness" },
+      resumedSandboxRuntimeReady = await recordWorkerSandboxLifecycleBooleanPhase(
+        operationEvents,
+        {
+          attributes: readinessAttributes,
+          completedMessage: "Resumed sandbox runtime readiness wait completed.",
+          erroredMessage: "Resumed sandbox runtime readiness wait failed.",
+          failedAttributes: {
+            timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
+          },
+          failedMessage: "Resumed sandbox runtime readiness timed out.",
+          phase: "ready",
+          startedMessage: "Resumed sandbox runtime readiness wait started.",
+        },
         async () =>
-          waitForSandboxRuntimeReadiness(
-            {
-              runtimeStateReader: ctx.runtimeStateReader,
-              policy: ctx.tunnelReadinessPolicy,
-              clock: ctx.clock,
-              sleeper: ctx.sleeper,
-            },
-            {
-              sandboxInstanceId: input.sandboxInstanceId,
-            },
+          step.run({ name: "wait-for-resumed-sandbox-runtime-readiness" }, async () =>
+            waitForSandboxRuntimeReadiness(
+              {
+                runtimeStateReader: ctx.runtimeStateReader,
+                policy: ctx.tunnelReadinessPolicy,
+                clock: ctx.clock,
+                sleeper: ctx.sleeper,
+              },
+              {
+                sandboxInstanceId: input.sandboxInstanceId,
+              },
+            ),
           ),
       );
-      await operationEvents.record({
-        attributes: readinessAttributes,
-        message: resumedSandboxRuntimeReady
-          ? "Resumed sandbox runtime readiness wait completed."
-          : "Resumed sandbox runtime readiness timed out.",
-        phase: "ready",
-        status: resumedSandboxRuntimeReady ? "completed" : "failed",
-      });
     } catch (error) {
       rethrowResumeDurableStepErrorForRetry(error);
       await handleResumeFailure({
@@ -619,6 +622,15 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         },
       );
       await emitSandboxStartupDiagnostics({
+        logger,
+        sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        sandboxInstanceId: resumedRuntime.sandboxInstanceId,
+        runtimeProvider: resumedRuntime.runtimeProvider,
+        operation: "activate",
+        operationKind: "resume",
+      });
+      await emitSandboxStartupDiagnosticPhaseTimings({
         logger,
         sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
         providerSandboxId: resumedRuntime.providerSandboxId,
