@@ -27,8 +27,9 @@ export function OrganizationApiKeysSettingsPage(): React.JSX.Element {
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
+  const { pathname, search, state } = location;
   const [createdApiKeyNotice, setCreatedApiKeyNotice] = useState<CreatedApiKeyNotice | null>(() =>
-    readCreatedApiKeyNotice(location.state),
+    readCreatedApiKeyNotice(state),
   );
   const { title, description } = resolvePageFrameText(pageMeta, "API Keys");
   const queryKey = apiKeysQueryKey(activeOrganizationId);
@@ -44,15 +45,15 @@ export function OrganizationApiKeysSettingsPage(): React.JSX.Element {
   });
 
   useEffect(() => {
-    if (readCreatedApiKeyNotice(location.state) === null) {
+    if (readCreatedApiKeyNotice(state) === null) {
       return;
     }
 
-    void navigate(location.pathname + location.search, {
+    void navigate(pathname + search, {
       replace: true,
       state: null,
     });
-  }, [location.pathname, location.search, location.state, navigate]);
+  }, [navigate, pathname, search, state]);
 
   return (
     <PageFrame
