@@ -1014,7 +1014,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           failedAttributes: {
             timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
           },
-          failedMessage: "Sandbox runtime readiness timed out.",
+          failedMessage: "Sandbox runtime readiness wait timed out.",
           phase: "ready",
           startedMessage: "Sandbox runtime readiness wait started.",
         },

@@ -19,6 +19,7 @@ import * as resumeSandboxInstance from "./sandbox-instances/resume-sandbox-insta
 import * as searchSandboxInstances from "./sandbox-instances/search-sandbox-instances/index.js";
 import * as stopSandboxInstance from "./sandbox-instances/stop-sandbox-instance/index.js";
 import * as materializeSnapshotJob from "./sandbox-profile-version-snapshot-jobs/materialize-snapshot-job/index.js";
+import * as sandboxUsageSummary from "./sandbox-usage/summary/index.js";
 
 export function createInternalSandboxRoutes(): AppRoutes<typeof INTERNAL_SANDBOX_ROUTE_BASE_PATH> {
   const routes = new OpenAPIHono<AppContextBindings>({
@@ -48,6 +49,7 @@ export function createInternalSandboxRoutes(): AppRoutes<typeof INTERNAL_SANDBOX
   routes.openapi(stopSandboxInstance.route, stopSandboxInstance.handler);
   routes.openapi(putSandboxInstanceDeadline.route, putSandboxInstanceDeadline.handler);
   routes.openapi(deleteSandboxInstanceDeadline.route, deleteSandboxInstanceDeadline.handler);
+  routes.openapi(sandboxUsageSummary.route, sandboxUsageSummary.handler);
 
   return {
     basePath: INTERNAL_SANDBOX_ROUTE_BASE_PATH,

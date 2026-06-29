@@ -35,6 +35,7 @@ import { OrganizationGeneralSettingsPage } from "./features/pages/organization-g
 import { OrganizationIdentityLinkingSettingsPage } from "./features/pages/organization-identity-linking-settings-page.js";
 import { OrganizationIntegrationsSettingsPage } from "./features/pages/organization-integrations-settings-page.js";
 import { OrganizationMembersSettingsPage } from "./features/pages/organization-members-settings-page.js";
+import { OrganizationUsageSettingsPage } from "./features/pages/organization-usage-settings-page.js";
 import { PortAccessRedirectPage } from "./features/pages/port-access-redirect-page.js";
 import { ProfileSettingsPage } from "./features/pages/profile-settings-page.js";
 import {
@@ -202,6 +203,11 @@ export const APP_ROUTES = createRoutesFromElements(
               element={<OrganizationIdentityLinkingSettingsPage />}
               handle={ROUTE_HANDLES.settingsOrganizationIdentityLinking}
               path="identity-linking"
+            />
+            <Route
+              element={<OrganizationUsageSettingsPage />}
+              handle={ROUTE_HANDLES.settingsOrganizationUsage}
+              path="usage"
             />
             <Route
               element={<OrganizationBillingSettingsPage />}

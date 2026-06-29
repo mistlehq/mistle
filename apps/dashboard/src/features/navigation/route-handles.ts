@@ -354,6 +354,12 @@ export const ROUTE_HANDLES = {
     title: "Billing",
     description: "",
   },
+  settingsOrganizationUsage: {
+    sidebarTriggerOwner: "page-frame",
+    breadcrumb: "Usage",
+    title: "Usage",
+    description: "",
+  },
   settingsOrganizationApiKeys: {
     sidebarTriggerOwner: "page-frame",
     breadcrumb: "API Keys",
@@ -380,6 +386,7 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_KEYS = [
   "settingsOrganizationMembers",
   "settingsOrganizationIdentityLinking",
   "settingsOrganizationSandboxes",
+  "settingsOrganizationUsage",
   "settingsOrganizationBilling",
   "settingsOrganizationApiKeys",
   "settingsOrganizationApiKeysNew",
@@ -394,6 +401,7 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT: {
   settingsOrganizationMembers: ROUTE_HANDLES.settingsOrganizationMembers,
   settingsOrganizationIdentityLinking: ROUTE_HANDLES.settingsOrganizationIdentityLinking,
   settingsOrganizationSandboxes: ROUTE_HANDLES.settingsOrganizationSandboxes,
+  settingsOrganizationUsage: ROUTE_HANDLES.settingsOrganizationUsage,
   settingsOrganizationBilling: ROUTE_HANDLES.settingsOrganizationBilling,
   settingsOrganizationApiKeys: ROUTE_HANDLES.settingsOrganizationApiKeys,
   settingsOrganizationApiKeysNew: ROUTE_HANDLES.settingsOrganizationApiKeysNew,

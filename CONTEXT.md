@@ -541,6 +541,14 @@ _Avoid_: Jira org, Jira organization, site URL when referring only to the editab
 A live sandbox execution environment for an agent session.
 _Avoid_: Chat session when referring to runtime tools or sandbox state
 
+**Sandbox hours**:
+The wall-clock runtime accumulated by sandbox execution environments during a usage period.
+_Avoid_: Compute hours when the value is not weighted by configured compute resources
+
+**Allocated resource-hours**:
+The sandbox runtime accumulated after weighting by configured resource allocation, such as vCPU count, memory capacity, or disk capacity.
+_Avoid_: Resource usage when referring to allocation rather than actual utilization
+
 **Mistle sandbox provider**:
 The customer-facing **Sandbox provider** option where Mistle operates the sandbox and manages the underlying provider choice.
 _Avoid_: Managed provider, managed Docker, managed E2B, managed Tensorlake
