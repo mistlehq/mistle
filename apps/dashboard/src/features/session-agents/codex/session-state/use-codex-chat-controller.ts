@@ -36,6 +36,8 @@ import { readCodexThreadState } from "./codex-thread-read-state.js";
 
 const CodexChatDeltaFlushDelayMs = 80;
 
+type PendingChatNotificationFlushPriority = "sync" | "transition";
+
 function createSteerEntryId(): string {
   return `steer:${crypto.randomUUID()}`;
 }
@@ -204,23 +206,33 @@ export function useCodexChatController(input: {
     pendingChatNotificationFlushHandleRef.current = null;
   }, []);
 
-  const flushPendingChatNotifications = useCallback((): void => {
-    cancelPendingChatNotificationFlush();
-    const pendingNotifications = pendingChatNotificationsRef.current;
-    if (pendingNotifications.length === 0) {
-      return;
-    }
-
-    pendingChatNotificationsRef.current = [];
-    startTransition(() => {
-      for (const notification of coalesceCodexChatNotifications(pendingNotifications)) {
-        dispatchChatAction({
-          type: "notification_received",
-          notification,
-        });
+  const flushPendingChatNotifications = useCallback(
+    (priority: PendingChatNotificationFlushPriority = "sync"): void => {
+      cancelPendingChatNotificationFlush();
+      const pendingNotifications = pendingChatNotificationsRef.current;
+      if (pendingNotifications.length === 0) {
+        return;
       }
-    });
-  }, [cancelPendingChatNotificationFlush]);
+
+      pendingChatNotificationsRef.current = [];
+      const dispatchCoalescedNotifications = (): void => {
+        for (const notification of coalesceCodexChatNotifications(pendingNotifications)) {
+          dispatchChatAction({
+            type: "notification_received",
+            notification,
+          });
+        }
+      };
+
+      if (priority === "transition") {
+        startTransition(dispatchCoalescedNotifications);
+        return;
+      }
+
+      dispatchCoalescedNotifications();
+    },
+    [cancelPendingChatNotificationFlush],
+  );
 
   const clearPendingChatNotifications = useCallback((): void => {
     cancelPendingChatNotificationFlush();
@@ -247,10 +259,9 @@ export function useCodexChatController(input: {
       if (isCoalescibleCodexChatNotification(notification)) {
         pendingChatNotificationsRef.current.push(notification);
         if (pendingChatNotificationFlushHandleRef.current === null) {
-          pendingChatNotificationFlushHandleRef.current = systemScheduler.schedule(
-            flushPendingChatNotifications,
-            CodexChatDeltaFlushDelayMs,
-          );
+          pendingChatNotificationFlushHandleRef.current = systemScheduler.schedule(() => {
+            flushPendingChatNotifications("transition");
+          }, CodexChatDeltaFlushDelayMs);
         }
         return;
       }
