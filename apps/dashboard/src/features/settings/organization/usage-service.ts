@@ -94,9 +94,8 @@ export async function getOrganizationUsage(input: {
   return parseOrganizationUsageResponse(await response.json().catch((): unknown => null));
 }
 
-export function resolveCurrentUsageMonth(): string {
-  const now = new Date();
-  return `${String(now.getFullYear()).padStart(4, "0")}-${String(now.getMonth() + 1).padStart(
+export function resolveCurrentUsageMonth(now = new Date()): string {
+  return `${String(now.getUTCFullYear()).padStart(4, "0")}-${String(now.getUTCMonth() + 1).padStart(
     2,
     "0",
   )}`;

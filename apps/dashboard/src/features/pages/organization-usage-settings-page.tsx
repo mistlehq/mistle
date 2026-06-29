@@ -100,6 +100,9 @@ function toUsageViewProps(
     period: {
       range: formatPeriodRange(response.period),
     },
+    measurement: {
+      notice: resolveMeasurementNotice(response.measurement, response.period),
+    },
     summaryMetrics: [
       {
         id: "sandbox-hours",
@@ -157,6 +160,25 @@ function toUsageViewProps(
       }),
     ),
   };
+}
+
+function resolveMeasurementNotice(
+  measurement: OrganizationUsageResponse["measurement"],
+  period: OrganizationUsageResponse["period"],
+): string | null {
+  if (measurement.complete) {
+    return null;
+  }
+
+  if (measurement.measuredFrom === null) {
+    return "Usage measurement has not recorded data for this period yet.";
+  }
+
+  if (Date.parse(measurement.measuredFrom) > Date.parse(period.start)) {
+    return `Usage is measured from ${formatMonthDay(new Date(measurement.measuredFrom))}; earlier usage in this period may be missing.`;
+  }
+
+  return "This usage period is still in progress. Totals include usage measured so far.";
 }
 
 function toBreakdownRow(input: {

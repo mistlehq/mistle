@@ -18,7 +18,16 @@ export const SandboxUsageSummaryInputSchema = z
     periodEnd: z.iso.datetime(),
     requestedAt: z.iso.datetime(),
   })
-  .strict();
+  .strict()
+  .superRefine((input, ctx) => {
+    if (Date.parse(input.periodEnd) <= Date.parse(input.periodStart)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Usage period end must be after period start.",
+        path: ["periodEnd"],
+      });
+    }
+  });
 
 const SandboxUsageTotalsSchema = z
   .object({

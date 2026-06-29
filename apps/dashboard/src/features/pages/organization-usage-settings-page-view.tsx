@@ -1,4 +1,5 @@
 import {
+  Notice,
   OverflowTooltipText,
   Table,
   TableBody,
@@ -38,6 +39,9 @@ export type OrganizationUsageSettingsPageViewProps = {
   period: {
     range: string;
   };
+  measurement: {
+    notice: string | null;
+  };
   summaryMetrics: readonly OrganizationUsageSummaryMetric[];
   dailyUsage: readonly OrganizationUsageDailyPoint[];
   profileBreakdown: readonly OrganizationUsageBreakdownRow[];
@@ -59,6 +63,10 @@ export function OrganizationUsageSettingsPageView(
           </div>
         }
       />
+
+      {props.measurement.notice === null ? null : (
+        <Notice variant="warning">{props.measurement.notice}</Notice>
+      )}
 
       <section className="grid gap-3 md:grid-cols-6">
         {props.summaryMetrics.map((metric) => (
@@ -112,14 +120,17 @@ function SummaryMetricCard(input: { metric: OrganizationUsageSummaryMetric }): R
 function DailyUsageChart(input: {
   points: readonly OrganizationUsageDailyPoint[];
 }): React.JSX.Element {
-  const visiblePoints = input.points.filter((point) => point.sandboxHours > 0);
-  const maxSandboxHours = Math.max(...visiblePoints.map((point) => point.sandboxHours), 1);
+  if (input.points.length === 0) {
+    return <p className="text-sm text-muted-foreground">No daily usage data is available.</p>;
+  }
+
+  const maxSandboxHours = Math.max(...input.points.map((point) => point.sandboxHours), 1);
   const axisMax = Math.ceil(maxSandboxHours / 10) * 10;
   const axisTicks = [axisMax, axisMax * 0.75, axisMax * 0.5, axisMax * 0.25, 0];
   const chartColumnWidthPx = 44;
-  const chartMinContentWidthPx = Math.max(visiblePoints.length * chartColumnWidthPx, 720);
+  const chartMinContentWidthPx = Math.max(input.points.length * chartColumnWidthPx, 720);
   const chartGridStyle = {
-    gridTemplateColumns: `repeat(${String(visiblePoints.length)}, ${String(chartColumnWidthPx)}px)`,
+    gridTemplateColumns: `repeat(${String(input.points.length)}, ${String(chartColumnWidthPx)}px)`,
   };
 
   return (
@@ -153,8 +164,11 @@ function DailyUsageChart(input: {
                 />
               ))}
               <div className="relative z-10 grid h-full items-end gap-2" style={chartGridStyle}>
-                {visiblePoints.map((point, index) => {
-                  const heightPercent = Math.max((point.sandboxHours / axisMax) * 100, 3);
+                {input.points.map((point, index) => {
+                  const heightPercent =
+                    point.sandboxHours === 0
+                      ? 0
+                      : Math.max((point.sandboxHours / axisMax) * 100, 3);
 
                   return (
                     <div
@@ -163,10 +177,14 @@ function DailyUsageChart(input: {
                     >
                       <div
                         aria-label={`${point.day}: ${formatHours(point.sandboxHours)}, ${point.runCount} runs`}
-                        className="relative w-full max-w-8 rounded-t bg-primary transition-colors group-hover:bg-primary/80"
+                        className={
+                          point.sandboxHours === 0
+                            ? "relative min-h-px w-full max-w-8 bg-muted transition-colors group-hover:bg-muted-foreground/30"
+                            : "relative w-full max-w-8 rounded-t bg-primary transition-colors group-hover:bg-primary/80"
+                        }
                         style={{ height: `${heightPercent}%` }}
                       />
-                      <div className={getChartTooltipClassName(index, visiblePoints.length)}>
+                      <div className={getChartTooltipClassName(index, input.points.length)}>
                         <div className="font-medium text-popover-foreground">{point.day}</div>
                         <div className="mt-1 text-muted-foreground">
                           {formatHours(point.sandboxHours)} sandbox hours
@@ -187,7 +205,7 @@ function DailyUsageChart(input: {
               width: "100%",
             }}
           >
-            {visiblePoints.map((point) => (
+            {input.points.map((point) => (
               <span key={point.day}>{formatXAxisDay(point.day)}</span>
             ))}
           </div>

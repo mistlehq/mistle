@@ -154,7 +154,12 @@ export async function readSandboxUsageSummary(
     },
     measurement: {
       measuredFrom,
-      complete: measuredFrom !== null && Date.parse(input.periodStart) >= Date.parse(measuredFrom),
+      complete: isUsageMeasurementComplete({
+        measuredFrom,
+        periodEnd: input.periodEnd,
+        periodStart: input.periodStart,
+        requestedAt: input.requestedAt,
+      }),
     },
     summary: aggregate.summary,
     dailyUsage: [...aggregate.dailyUsage],
@@ -168,6 +173,19 @@ export async function readSandboxUsageSummary(
     })),
     activityBreakdown: [...aggregate.activityBreakdown],
   };
+}
+
+export function isUsageMeasurementComplete(input: {
+  measuredFrom: string | null;
+  periodEnd: string;
+  periodStart: string;
+  requestedAt: string;
+}): boolean {
+  return (
+    input.measuredFrom !== null &&
+    Date.parse(input.periodStart) >= Date.parse(input.measuredFrom) &&
+    Date.parse(input.requestedAt) >= Date.parse(input.periodEnd)
+  );
 }
 
 export function normalizeDatabaseTimestampToIso(value: string): string {

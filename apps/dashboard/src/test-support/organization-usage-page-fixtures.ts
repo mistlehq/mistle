@@ -5,6 +5,9 @@ export function createOrganizationUsagePrototypeProps(): OrganizationUsageSettin
     period: {
       range: "Jun 1-30, 2026",
     },
+    measurement: {
+      notice: null,
+    },
     summaryMetrics: [
       {
         id: "sandbox-hours",
@@ -154,6 +157,9 @@ export function createOrganizationUsageEmptyMeasuredProps(): OrganizationUsageSe
   return {
     period: {
       range: "Jun 1-30, 2026",
+    },
+    measurement: {
+      notice: null,
     },
     summaryMetrics: [
       {
