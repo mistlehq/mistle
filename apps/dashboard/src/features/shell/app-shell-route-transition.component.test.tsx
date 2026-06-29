@@ -57,6 +57,7 @@ function DesignerEntryRoute(): React.JSX.Element {
 }
 
 function DesignerSessionRoute(): React.JSX.Element {
+  const navigate = useNavigate();
   const { openMobile, toggleSidebar } = useSidebar();
 
   return (
@@ -65,6 +66,14 @@ function DesignerSessionRoute(): React.JSX.Element {
       <p>{openMobile ? "Mobile navigation open" : "Mobile navigation closed"}</p>
       <Button onClick={toggleSidebar} type="button">
         Toggle navigation
+      </Button>
+      <Button
+        onClick={() => {
+          void navigate("/designer");
+        }}
+        type="button"
+      >
+        Back to Designer entry
       </Button>
     </div>
   );
@@ -127,5 +136,18 @@ describe("App shell route transitions", () => {
     });
 
     expect(getDesktopSidebar(view.container).getAttribute("data-state")).toBe("expanded");
+
+    await act(async () => {
+      screen.getByRole("button", { name: "Back to Designer entry" }).click();
+    });
+
+    expect(await screen.findByRole("button", { name: "Start Designer session" })).toBeTruthy();
+
+    await act(async () => {
+      screen.getByRole("button", { name: "Start Designer session" }).click();
+    });
+
+    expect(await screen.findByText("Designer workspace")).toBeTruthy();
+    expect(getDesktopSidebar(view.container).getAttribute("data-state")).toBe("collapsed");
   });
 });

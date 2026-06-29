@@ -1,4 +1,3 @@
-import { SidebarTrigger, useSidebar } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
@@ -26,7 +25,7 @@ import {
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
 import { PageFrame } from "../shared/page-frame.js";
-import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
+import { WorkspaceSidebarTrigger } from "../shared/workspace-sidebar-trigger.js";
 import {
   mergeDesignerCanvasTabSnapshotIntoLatestTabs,
   removeDesignerCanvasTabFromLatestTabs,
@@ -246,7 +245,7 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
   };
 }
 
-export function DesignerSessionPage(): React.JSX.Element | null {
+export function DesignerSessionPage(): React.JSX.Element {
   const sessionId = useDesignerSessionId();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedRuntimeConversationId = searchParams.get("conversationId");
@@ -265,10 +264,7 @@ export function DesignerSessionPage(): React.JSX.Element | null {
 
   if (designerSessionQuery.isError) {
     return (
-      <ConversationWorkspaceFrame
-        title="Designer"
-        leadingControl={<DesignerSessionSidebarTrigger />}
-      >
+      <ConversationWorkspaceFrame title="Designer" leadingControl={<WorkspaceSidebarTrigger />}>
         <PageFrame width="normal">
           <div className="grid gap-2 py-10">
             <h1 className="text-base font-medium">Could not load Designer session</h1>
@@ -296,7 +292,7 @@ export function DesignerSessionPage(): React.JSX.Element | null {
 
 export function DesignerSessionLoadingPage(): React.JSX.Element {
   return (
-    <ConversationWorkspaceFrame title="Designer" leadingControl={<DesignerSessionSidebarTrigger />}>
+    <ConversationWorkspaceFrame title="Designer" leadingControl={<WorkspaceSidebarTrigger />}>
       <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center px-4 py-6">
         <SessionStartupStatus state="preparing_conversation" />
       </div>
@@ -397,7 +393,7 @@ function LoadedDesignerSessionPage(input: {
         portAccess: false,
         repository: false,
       }}
-      leadingControl={<DesignerSessionSidebarTrigger />}
+      leadingControl={<WorkspaceSidebarTrigger />}
       requestedRuntimeConversationId={input.requestedRuntimeConversationId}
       sandboxInstanceId={input.designerSession.sandboxInstanceId}
       mintConnectionToken={mintConnectionToken}
@@ -441,15 +437,4 @@ function LoadedDesignerSessionPage(input: {
       setSearchParams={input.setSearchParams}
     />
   );
-}
-
-function DesignerSessionSidebarTrigger(): React.JSX.Element | null {
-  const { isMobile, openMobile, state } = useSidebar();
-  const shouldShowSidebarTrigger = shouldRenderSidebarTrigger({
-    isMobile,
-    openMobile,
-    sidebarState: state,
-  });
-
-  return shouldShowSidebarTrigger ? <SidebarTrigger className="-ml-1" /> : null;
 }

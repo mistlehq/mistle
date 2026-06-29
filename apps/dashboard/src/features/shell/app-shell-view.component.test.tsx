@@ -43,6 +43,25 @@ describe("AppShellView", () => {
     expect(getDesktopSidebar(view.container).getAttribute("data-state")).toBe("expanded");
   });
 
+  it("initializes collapsed when directly rendering a collapsed workspace route", () => {
+    const view = render(
+      <AppShellView
+        contentInsetOwner="app-shell"
+        mainContent={<div>Page content</div>}
+        renderSidebarTrigger={false}
+        sidebarContent={<div>Navigation</div>}
+        sidebarEntryKey="/designer/dsn_123"
+        sidebarEntryState="collapsed"
+        sidebarFooterContent={null}
+        sidebarHeaderContent={null}
+        topLoadingBar={null}
+        viewportMode="workspace"
+      />,
+    );
+
+    expect(getDesktopSidebar(view.container).getAttribute("data-state")).toBe("collapsed");
+  });
+
   it("collapses the mounted sidebar once when entering a collapsed workspace route", async () => {
     const view = render(
       <AppShellView

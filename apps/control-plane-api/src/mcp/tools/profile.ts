@@ -1,4 +1,7 @@
-import type { IntegrationBindingKind } from "@mistle/db/control-plane";
+import {
+  SandboxProfileVersionSnapshotJobStates,
+  type IntegrationBindingKind,
+} from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import type { McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 
@@ -829,23 +832,30 @@ function resolveSnapshotReadiness(
       blockedReason: SnapshotReadinessBlockedReasons.MISSING_SNAPSHOT_JOB,
     };
   }
-  if (latestSnapshotJob.state === "failed") {
-    return {
-      status: SnapshotReadinessStatuses.FAILED,
-      blockedReason: null,
-    };
-  }
-  if (latestSnapshotJob.state === "succeeded") {
-    return {
-      status: SnapshotReadinessStatuses.BLOCKED,
-      blockedReason: SnapshotReadinessBlockedReasons.MISSING_USABLE_SNAPSHOT,
-    };
+  switch (latestSnapshotJob.state) {
+    case SandboxProfileVersionSnapshotJobStates.FAILED:
+      return {
+        status: SnapshotReadinessStatuses.FAILED,
+        blockedReason: null,
+      };
+    case SandboxProfileVersionSnapshotJobStates.SUCCEEDED:
+      return {
+        status: SnapshotReadinessStatuses.BLOCKED,
+        blockedReason: SnapshotReadinessBlockedReasons.MISSING_USABLE_SNAPSHOT,
+      };
+    case SandboxProfileVersionSnapshotJobStates.QUEUED:
+    case SandboxProfileVersionSnapshotJobStates.RUNNING:
+      return {
+        status: SnapshotReadinessStatuses.MATERIALIZING,
+        blockedReason: null,
+      };
   }
 
-  return {
-    status: SnapshotReadinessStatuses.MATERIALIZING,
-    blockedReason: null,
-  };
+  const unhandledState: never = latestSnapshotJob.state;
+  throw new BadRequestError(
+    "BAD_REQUEST",
+    `Unsupported snapshot materialization job state '${String(unhandledState)}'.`,
+  );
 }
 
 function requireMcpDraftUpdateField(input: {

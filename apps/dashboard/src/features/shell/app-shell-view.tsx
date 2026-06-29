@@ -41,11 +41,13 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
   });
   const sidebarEntryState = input.sidebarEntryState ?? null;
   const sidebarEntryKey = input.sidebarEntryKey ?? "";
-  const [sidebarOpen, setSidebarOpen] = useState(input.sidebarDefaultOpen ?? true);
+  const initialSidebarOpen =
+    sidebarEntryState === "collapsed" ? false : (input.sidebarDefaultOpen ?? true);
+  const [sidebarOpen, setSidebarOpen] = useState(initialSidebarOpen);
 
   return (
     <SidebarProvider
-      defaultOpen={input.sidebarDefaultOpen ?? true}
+      defaultOpen={initialSidebarOpen}
       onOpenChange={setSidebarOpen}
       open={sidebarOpen}
       style={SidebarWidthStyle}
@@ -97,6 +99,7 @@ function AppShellSidebarEntrySync(input: {
   // history navigation, or redirects outside this shell's event handlers.
   useEffect(() => {
     if (entryState !== "collapsed") {
+      appliedSidebarEntryKeyRef.current = null;
       return;
     }
 

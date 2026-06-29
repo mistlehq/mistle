@@ -732,7 +732,9 @@ describe.concurrent("MCP profile tools integration", () => {
     },
   );
 
-  it("publishes a draft profile version without starting a sandbox session", async ({ env }) => {
+  it("publishes a draft profile version and reports snapshot materialization status", async ({
+    env,
+  }) => {
     const session = await env.auth.createSession({
       email: "integration-new-mcp-profile-publish@example.com",
     });
@@ -791,69 +793,24 @@ describe.concurrent("MCP profile tools integration", () => {
       where: (table, { eq }) => eq(table.id, "sbp_mcp_profile_publish"),
     });
     expect(profile?.activeVersion).toBeNull();
-  });
 
-  it("reports newly published profile snapshot materialization status", async ({ env }) => {
-    const session = await env.auth.createSession({
-      email: "integration-new-mcp-profile-publish-status@example.com",
-    });
-    const token = await createApiKeyToken({
-      cookie: session.cookie,
-      env,
-      name: "MCP profile snapshot status reader",
-      permissions: [
-        OrganizationPermissions.SANDBOX_PROFILE_READ,
-        OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
-      ],
-    });
-
-    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
-      sandboxProfileRow({
-        id: "sbp_mcp_profile_publish_status",
-        organizationId: session.organizationId,
-        displayName: "MCP Profile Publish Status",
-        createdAt: "2026-05-04T00:00:00.000Z",
-      }),
-    );
-    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
-      sandboxProfileVersionRow({
-        sandboxProfileId: "sbp_mcp_profile_publish_status",
-        version: 1,
-        state: SandboxProfileVersionStates.DRAFT,
-        setupScript: "echo publish status",
-        sandboxProvider: SandboxProvider.DOCKER,
-      }),
-    );
-
-    const publishResult = await callMcpTool({
-      env,
-      token,
-      name: "profile_version_publish",
-      arguments: {
-        profileId: "sbp_mcp_profile_publish_status",
-        version: 1,
-      },
-    });
-    expect(publishResult.isError).toBeUndefined();
-    const published = PublishSandboxProfileVersionResponseSchema.parse(
-      publishResult.structuredContent,
-    );
-    expect(published.snapshotAction.kind).toBe("created");
+    if (published.snapshotAction.kind !== "created") {
+      throw new Error("Expected profile publish to create snapshot materialization work.");
+    }
 
     const statusResult = await callMcpTool({
       env,
       token,
       name: "profile_version_snapshot_status_get",
       arguments: {
-        profileId: "sbp_mcp_profile_publish_status",
+        profileId: "sbp_mcp_profile_publish",
         version: 1,
       },
     });
 
-    expect(statusResult.isError).toBeUndefined();
     const status = ProfileVersionSnapshotStatusResponseSchema.parse(statusResult.structuredContent);
     expect(status).toMatchObject({
-      profileId: "sbp_mcp_profile_publish_status",
+      profileId: "sbp_mcp_profile_publish",
       version: 1,
       state: SandboxProfileVersionStates.PUBLISHED,
       status: "materializing",
