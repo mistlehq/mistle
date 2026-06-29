@@ -134,7 +134,6 @@ const UserInputCustomResponseComposerStateInput: React.ComponentProps<
 };
 
 const LongTranscriptStreamingTurnId = "long-transcript-streaming-turn";
-const LongTranscriptStreamingMaxChunks = 160;
 
 function createLongTranscriptAssistantText(input: {
   paragraphCount: number;
@@ -412,7 +411,7 @@ function LongTranscriptStreamingHarness(): React.JSX.Element {
     [],
   );
   const [streamingChunkCount, setStreamingChunkCount] = useState(1);
-  const [isStreaming, setStreaming] = useState(false);
+  const [isStreaming, setStreaming] = useState(true);
   const entries = useMemo(
     () =>
       createLongTranscriptStreamingEntries({
@@ -422,9 +421,7 @@ function LongTranscriptStreamingHarness(): React.JSX.Element {
     [completedEntries, streamingChunkCount],
   );
   const appendStreamingChunk = useCallback((): void => {
-    setStreamingChunkCount((currentChunkCount) =>
-      Math.min(currentChunkCount + 1, LongTranscriptStreamingMaxChunks),
-    );
+    setStreamingChunkCount((currentChunkCount) => currentChunkCount + 1);
   }, []);
   const resetStreamingChunks = useCallback((): void => {
     setStreaming(false);
@@ -440,14 +437,7 @@ function LongTranscriptStreamingHarness(): React.JSX.Element {
     }
 
     const intervalId = window.setInterval(() => {
-      setStreamingChunkCount((currentChunkCount) => {
-        const nextChunkCount = Math.min(currentChunkCount + 1, LongTranscriptStreamingMaxChunks);
-        if (nextChunkCount >= LongTranscriptStreamingMaxChunks) {
-          setStreaming(false);
-        }
-
-        return nextChunkCount;
-      });
+      setStreamingChunkCount((currentChunkCount) => currentChunkCount + 1);
     }, 80);
 
     return () => {

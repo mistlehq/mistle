@@ -96,6 +96,27 @@ function resolveSinglePendingUserInputRequest(
   return userInputRequests[0] ?? null;
 }
 
+function areComposerDraftsEqual(currentDraft: ComposerDraft, nextDraft: ComposerDraft): boolean {
+  if (currentDraft.text !== nextDraft.text) {
+    return false;
+  }
+
+  if (currentDraft.selectedSkillMentions.length !== nextDraft.selectedSkillMentions.length) {
+    return false;
+  }
+
+  return currentDraft.selectedSkillMentions.every((currentMention, index) => {
+    const nextMention = nextDraft.selectedSkillMentions[index];
+    return (
+      nextMention !== undefined &&
+      currentMention.name === nextMention.name &&
+      currentMention.sourcePath === nextMention.sourcePath &&
+      currentMention.range.start === nextMention.range.start &&
+      currentMention.range.end === nextMention.range.end
+    );
+  });
+}
+
 function SessionConversationMainContentView({
   activeTurnId,
   isTurnInProgress,
@@ -294,12 +315,13 @@ function SessionConversationBottomPanelDraftOwner({
 }): React.JSX.Element {
   const [composerDraft, setComposerDraft] = useState(() => createComposerDraft(""));
 
-  const handleComposerDraftChange = useCallback(
-    (nextComposerDraft: React.SetStateAction<ComposerDraft>): void => {
-      setComposerDraft(nextComposerDraft);
-    },
-    [],
-  );
+  const handleComposerDraftChange = useCallback((nextComposerDraft: ComposerDraft): void => {
+    setComposerDraft((currentComposerDraft) =>
+      areComposerDraftsEqual(currentComposerDraft, nextComposerDraft)
+        ? currentComposerDraft
+        : nextComposerDraft,
+    );
+  }, []);
 
   const draftState = useMemo(
     () => ({
