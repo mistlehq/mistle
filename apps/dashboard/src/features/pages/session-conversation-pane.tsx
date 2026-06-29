@@ -48,7 +48,6 @@ type SessionConversationMainContentProps = {
 };
 
 type SessionConversationSharedPanelProps = {
-  chatEntries?: readonly ChatEntry[];
   serverRequestPanelEntries: readonly ServerRequestEntry[];
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: RespondToServerRequest;

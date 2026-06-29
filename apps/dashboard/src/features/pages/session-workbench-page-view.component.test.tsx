@@ -123,7 +123,6 @@ function WorkbenchLongTranscriptTypingHarness(): React.JSX.Element {
       mainContentScrollContainerRef={scrollContainerRef}
       primaryBottomPanel={
         <SessionConversationBottomPanelDraftController
-          chatEntries={chatEntries}
           clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
           clearPendingDiffComments={function clearPendingDiffComments() {}}
           composerStateInput={createReadySessionComposerStateInput()}

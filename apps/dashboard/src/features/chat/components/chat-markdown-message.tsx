@@ -21,8 +21,6 @@ type ChatMarkdownContentProps = {
   text: string;
 };
 
-type StreamingChatMarkdownContentProps = ChatMarkdownContentProps;
-
 type StreamingMarkdownSegment = {
   isLive: boolean;
   key: string;
@@ -73,11 +71,7 @@ type SerializedStreamingAnimationBlockState = {
 };
 
 type SerializedStreamingAnimationPlugin = {
-  prepareBlock: (blockIndex: number) => SerializedStreamingAnimationBlockPlugin;
-};
-
-type SerializedStreamingAnimationBlockPlugin = {
-  rehypePlugin: RehypePlugin;
+  prepareBlock: (blockIndex: number) => RehypePlugin;
 };
 
 const SerializedStreamingAnimationExcludedTags = new Set([
@@ -165,9 +159,7 @@ function createSerializedStreamingAnimationPlugin(): SerializedStreamingAnimatio
         value: `serializedStreamingAnimation$${String(pluginId)}`,
       });
 
-      return {
-        rehypePlugin: serializedStreamingAnimationPlugin,
-      };
+      return serializedStreamingAnimationPlugin;
     },
   };
 }
@@ -542,7 +534,7 @@ export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Elemen
   );
 }
 
-function StreamingChatMarkdownContent(props: StreamingChatMarkdownContentProps): JSX.Element {
+function StreamingChatMarkdownContent(props: ChatMarkdownContentProps): JSX.Element {
   const streamingMarkdownSegments = useMemo(
     () => splitStreamingMarkdownSegments(props.text),
     [props.text],
@@ -594,17 +586,15 @@ const StaticStreamingChatMarkdownSegment = memo(function StaticStreamingChatMark
   );
 });
 
-function AnimatedStreamingChatMarkdownContent(
-  props: StreamingChatMarkdownContentProps,
-): JSX.Element {
+function AnimatedStreamingChatMarkdownContent(props: ChatMarkdownContentProps): JSX.Element {
   const [streamingAnimationPlugin] = useState(createSerializedStreamingAnimationPlugin);
   const SerializedStreamingBlock = useMemo(() => {
     return function SerializedStreamingBlock(blockProps: BlockProps): JSX.Element {
       const blockAnimationPlugin = streamingAnimationPlugin.prepareBlock(blockProps.index);
       const rehypePlugins =
         blockProps.rehypePlugins === undefined
-          ? [blockAnimationPlugin.rehypePlugin]
-          : [...blockProps.rehypePlugins, blockAnimationPlugin.rehypePlugin];
+          ? [blockAnimationPlugin]
+          : [...blockProps.rehypePlugins, blockAnimationPlugin];
 
       return <Block {...blockProps} rehypePlugins={rehypePlugins} />;
     };

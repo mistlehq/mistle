@@ -142,7 +142,6 @@ function RenderedComposerPaneHarness(input: {
 
   return (
     <SessionConversationBottomPanelController
-      chatEntries={[]}
       composerStateInput={{
         ...createReadySessionComposerStateInput(),
         clearSessionErrorMessage: () => {
@@ -190,7 +189,6 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
       </button>
       <div data-testid="started-prompts">{startedPrompts.join(" | ")}</div>
       <SessionConversationBottomPanelController
-        chatEntries={[]}
         composerStateInput={{
           ...readyComposerStateInput,
           turnControl: {
@@ -297,7 +295,6 @@ function LongTranscriptComposerHarness(): React.JSX.Element {
         serverRequestPanelEntries={[]}
       />
       <SessionConversationBottomPanel
-        chatEntries={chatEntries}
         composerViewModel={{
           ...SessionComposerFixtureProps,
           composerDraft,
@@ -327,7 +324,6 @@ function DraftOwnedComposerHarness(): React.JSX.Element {
         Switch conversation
       </button>
       <SessionConversationBottomPanelDraftController
-        chatEntries={[]}
         clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
         clearPendingDiffComments={function clearPendingDiffComments() {}}
         composerStateInput={createReadySessionComposerStateInput()}
@@ -358,7 +354,6 @@ function StoreBackedDraftOwnedComposerHarness(): React.JSX.Element {
       </button>
       {isComposerMounted ? (
         <SessionConversationBottomPanelDraftController
-          chatEntries={[]}
           clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
           clearPendingDiffComments={function clearPendingDiffComments() {}}
           composerStateInput={createReadySessionComposerStateInput()}
@@ -567,7 +562,6 @@ describe("SessionConversationBottomPanel", () => {
   it("renders the session status message above the composer", () => {
     render(
       <SessionConversationBottomPanel
-        chatEntries={[]}
         composerViewModel={{
           ...SessionComposerFixtureProps,
         }}
@@ -593,7 +587,6 @@ describe("SessionConversationBottomPanel", () => {
   it("renders a working indicator directly above the composer when a turn is active", () => {
     render(
       <SessionConversationBottomPanel
-        chatEntries={[]}
         composerViewModel={{
           ...SessionComposerFixtureProps,
         }}
@@ -612,7 +605,6 @@ describe("SessionConversationBottomPanel", () => {
   it("hides the working indicator while a pending server request is shown", () => {
     render(
       <SessionConversationBottomPanel
-        chatEntries={[]}
         composerViewModel={{
           ...SessionComposerFixtureProps,
         }}

@@ -294,17 +294,17 @@ function getAnimationValueFromStyleMs(element: Element, property: string): numbe
     throw new Error("Expected animated chunk to include an inline animation style.");
   }
 
-  const delayDeclaration = style
+  const matchingDeclaration = style
     .split(";")
     .find((declaration) => declaration.trim().startsWith(property));
-  if (delayDeclaration === undefined) {
+  if (matchingDeclaration === undefined) {
     throw new Error(`Expected animation style to include ${property} ${style}`);
   }
 
-  const delayMsText = delayDeclaration.split(":").at(1)?.trim();
-  if (delayMsText === undefined || !delayMsText.endsWith("ms")) {
+  const propertyValueText = matchingDeclaration.split(":").at(1)?.trim();
+  if (propertyValueText === undefined || !propertyValueText.endsWith("ms")) {
     throw new Error(`Expected animation delay in milliseconds: ${style}`);
   }
 
-  return Number(delayMsText.slice(0, -2));
+  return Number(propertyValueText.slice(0, -2));
 }

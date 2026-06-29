@@ -10,6 +10,7 @@ import {
   buildChatTurnGroups,
   type ChatAssistantBlock,
   type ChatTurnContentSegment,
+  type ChatTurnGroup,
 } from "../chat-view-model.js";
 import {
   findCommandApprovalRequest,
@@ -31,31 +32,12 @@ type ChatThreadProps = {
 };
 
 type ChatThreadTurnGroupProps = {
-  group: ReturnType<typeof buildChatTurnGroups>[number];
+  group: ChatTurnGroup;
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: RespondToServerRequest;
   onUserMessageAction?: (actionId: string) => void;
   pendingServerRequests: readonly ServerRequestEntry[];
 };
-
-function getAssistantBlockSpacingClass(input: {
-  block: ChatEntry;
-  previousBlock: ChatEntry | null;
-}): string {
-  if (input.previousBlock === null) {
-    return "";
-  }
-
-  if (input.previousBlock.kind === "semantic-group" && input.block.kind === "semantic-group") {
-    return "mt-1.5";
-  }
-
-  if (input.previousBlock.kind === "assistant-message" && input.block.kind === "semantic-group") {
-    return "mt-1";
-  }
-
-  return "mt-2";
-}
 
 function getAssistantBlockSpacingStyle(input: {
   block: ChatEntry;
@@ -201,10 +183,6 @@ function ChatThreadTurnGroupView({
       >
         {blocks.map((block, index) => {
           const previousBlock = index === 0 ? null : (blocks[index - 1] ?? null);
-          const spacingClassName = getAssistantBlockSpacingClass({
-            block,
-            previousBlock,
-          });
           const spacingStyle = getAssistantBlockSpacingStyle({
             block,
             previousBlock,
@@ -284,7 +262,6 @@ function ChatThreadTurnGroupView({
 
           return (
             <div
-              className={spacingClassName}
               data-chat-assistant-block
               data-chat-block-kind={block.kind}
               key={block.id}
