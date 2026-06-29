@@ -1,5 +1,5 @@
 import type { RouteHandler } from "@hono/zod-openapi";
-import { withHttpErrorHandler } from "@mistle/http/errors.js";
+import { ForbiddenError, withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
 import { withRequiredOrganizationActor } from "../../middleware/with-required-organization-actor.js";
@@ -15,6 +15,11 @@ const routeHandler = async (
   const params = ctx.req.valid("param");
   const body = ctx.req.valid("json");
   requireDesignerOrganizationActor(organizationActor);
+  // The dashboard action is Designer-mediated, but the persisted mutation is a sandbox profile draft write.
+  if (!organizationActor.permissions.includes(OrganizationPermissions.SANDBOX_PROFILE_UPDATE)) {
+    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
+  }
+
   const receipt = await saveDesignerSelectedProviderResources(
     {
       db: ctx.get("db"),

@@ -49,7 +49,7 @@ export const route = createRoute({
       },
     },
     403: {
-      description: "Active organization is required.",
+      description: "Required organization permissions are missing.",
       content: {
         "application/json": {
           schema: ForbiddenResponseSchema,

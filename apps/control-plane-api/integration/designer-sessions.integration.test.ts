@@ -95,6 +95,34 @@ describe.concurrent("designer sessions integration", () => {
     );
     await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
       integrationTargetRow({
+        targetKey: "github-designer-dashboard-resource-save-old",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_designer_dashboard_resource_save_old",
+        organizationId: session.organizationId,
+        targetKey: "github-designer-dashboard-resource-save-old",
+        displayName: "Old GitHub Dashboard Resource Save",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          app_id: "123",
+          app_slug: "mistle-test",
+          client_id: "Iv1.test",
+          installation_id: "789",
+        },
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
         targetKey: "openai-designer-dashboard-resource-save",
         variantId: "openai-default",
         enabled: true,
@@ -170,7 +198,7 @@ describe.concurrent("designer sessions integration", () => {
     );
     await env.controlPlaneDb
       .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
-      .values(
+      .values([
         sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_designer_dashboard_resource_save_agent",
           sandboxProfileId: "sbp_designer_dashboard_resource_save",
@@ -179,7 +207,17 @@ describe.concurrent("designer sessions integration", () => {
           kind: IntegrationBindingKinds.AGENT,
           config: {},
         }),
-      );
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_designer_dashboard_resource_save_git",
+          sandboxProfileId: "sbp_designer_dashboard_resource_save",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_designer_dashboard_resource_save_old",
+          kind: IntegrationBindingKinds.GIT,
+          config: {
+            repositories: ["mistlehq/old"],
+          },
+        }),
+      ]);
 
     const response = await env.controlPlaneApi.http.fetch(
       "/v1/designer/sessions/dsn_dashboard_resource_save/dashboard-actions/save-selected-provider-resources",
@@ -213,7 +251,8 @@ describe.concurrent("designer sessions integration", () => {
       resourceKind: "repository",
       bindingIntent: "git-repositories",
       selectedHandles: ["mistlehq/mistle", "mistlehq/docs"],
-      createdBinding: true,
+      bindingId: "ibd_designer_dashboard_resource_save_git",
+      createdBinding: false,
     });
 
     const bindings =

@@ -384,24 +384,6 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
-  it("shows a selected user input answer in the transcript", () => {
-    const activeTurn = startTurn();
-    const state = reduceCodexChatState(activeTurn, {
-      type: "user_input_response_submitted",
-      entryId: "user-input-response_1",
-      turnId: "turn_123",
-      responseText: "Use Gmail for the first workflow",
-    });
-
-    expect(state.entries).toContainEqual({
-      id: "user-input-response_1",
-      turnId: "turn_123",
-      kind: "user-message",
-      text: "Use Gmail for the first workflow",
-      status: "completed",
-    });
-  });
-
   it("removes the steer delete action once the request is sending", () => {
     const activeTurn = startTurn();
     const queued = reduceCodexChatState(activeTurn, {

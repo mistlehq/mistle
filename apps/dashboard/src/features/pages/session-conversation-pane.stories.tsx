@@ -390,7 +390,6 @@ function UserInputCustomResponseHarness(): React.JSX.Element {
     mainContentScrollContainerRef: scrollContainerRef,
     primaryBottomPanel: (
       <SessionConversationBottomPanelController
-        chatEntries={chatEntries}
         composerStateInput={UserInputCustomResponseComposerStateInput}
         draftState={draftState}
         isRespondingToServerRequest={false}

@@ -272,9 +272,7 @@ async function maybeApplyDashboardUserInputSubmitAction(input: {
     const answerIndex = answers.findIndex((answer) => answer.id === question.id);
     const answer = answers[answerIndex];
     if (answer === undefined || !Array.isArray(answer.value)) {
-      throw new Error(
-        "Sandbox profile draft binding resource selection requires selected handles.",
-      );
+      throw new Error("Saving selected provider resources requires selected handles.");
     }
     const selectedHandles = answer.value;
 

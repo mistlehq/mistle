@@ -2708,6 +2708,134 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/designer/sessions/{sessionId}/dashboard-actions/save-selected-provider-resources": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          sessionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            bindingIntent: string;
+            connectionId: string;
+            resourceKind: string;
+            selectedHandles: string[];
+            targetDraft: {
+              profileId: string;
+              version: number;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Save selected provider resources to a sandbox profile draft. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              bindingId: string;
+              bindingIntent: string;
+              connectionId: string;
+              createdBinding: boolean;
+              /** @enum {string} */
+              kind: "sandbox-profile-draft-provider-resources-saved";
+              profileId: string;
+              resourceKind: string;
+              selectedHandles: string[];
+              version: number;
+            };
+          };
+        };
+        /** @description Dashboard action input is invalid. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "DESIGNER_DASHBOARD_ACTION_INVALID_INPUT";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Required organization permissions are missing. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Designer session was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "DESIGNER_SESSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/home": {
     parameters: {
       query?: never;

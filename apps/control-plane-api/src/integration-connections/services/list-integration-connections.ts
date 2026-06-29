@@ -124,7 +124,7 @@ export async function listIntegrationConnections(
         }),
         fetchPage: async ({ direction, cursor, limitPlusOne }) =>
           db.query.integrationConnections.findMany({
-            where: (table, { and, eq, gt, lt }) => {
+            where: (table, { and, gt, lt }) => {
               const scope = buildIntegrationConnectionsListScope(table, input);
 
               if (cursor === undefined) {

@@ -4977,6 +4977,263 @@
         }
       }
     },
+    "/v1/designer/sessions/{sessionId}/dashboard-actions/save-selected-provider-resources": {
+      "post": {
+        "tags": ["Designer"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^dsn_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "sessionId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targetDraft": {
+                    "type": "object",
+                    "properties": {
+                      "profileId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+                      },
+                      "version": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    },
+                    "required": ["profileId", "version"],
+                    "additionalProperties": false
+                  },
+                  "connectionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "resourceKind": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "selectedHandles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "maxItems": 500
+                  },
+                  "bindingIntent": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  }
+                },
+                "required": [
+                  "targetDraft",
+                  "connectionId",
+                  "resourceKind",
+                  "selectedHandles",
+                  "bindingIntent"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Save selected provider resources to a sandbox profile draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": ["sandbox-profile-draft-provider-resources-saved"]
+                    },
+                    "profileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "connectionId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "resourceKind": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "bindingIntent": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "bindingId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "selectedHandles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "createdBinding": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "profileId",
+                    "version",
+                    "connectionId",
+                    "resourceKind",
+                    "bindingIntent",
+                    "bindingId",
+                    "selectedHandles",
+                    "createdBinding"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dashboard action input is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["DESIGNER_DASHBOARD_ACTION_INVALID_INPUT"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Required organization permissions are missing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Designer session was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["DESIGNER_SESSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/triggers": {
       "get": {
         "tags": ["Triggers"],

@@ -3,6 +3,7 @@ import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   type IntegrationBindingKind,
+  type SandboxProfileVersionIntegrationBinding,
 } from "@mistle/db/control-plane";
 import {
   IntegrationResourceSelectionModes,
@@ -34,26 +35,6 @@ type SaveDesignerSelectedProviderResourcesInput = {
   sessionId: string;
   body: SaveDesignerSelectedProviderResourcesBody;
 };
-
-function toIntegrationBindingKind(kind: string): IntegrationBindingKind {
-  if (kind === IntegrationBindingKinds.AGENT) {
-    return IntegrationBindingKinds.AGENT;
-  }
-  if (kind === IntegrationBindingKinds.GIT) {
-    return IntegrationBindingKinds.GIT;
-  }
-  if (kind === IntegrationBindingKinds.CONNECTOR) {
-    return IntegrationBindingKinds.CONNECTOR;
-  }
-  if (kind === IntegrationBindingKinds.SANDBOX) {
-    return IntegrationBindingKinds.SANDBOX;
-  }
-
-  throw new DesignerBadRequestError(
-    DesignerBadRequestCodes.DESIGNER_DASHBOARD_ACTION_INVALID_INPUT,
-    `Binding intent cannot target unsupported integration kind '${kind}'.`,
-  );
-}
 
 function createBindingFieldValue(input: {
   selectionMode: string;
@@ -98,6 +79,22 @@ export async function saveDesignerSelectedProviderResources(
       `Designer session '${input.sessionId}' was not found.`,
     );
   }
+  const targetProfile = await db.query.sandboxProfiles.findFirst({
+    columns: {
+      id: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.id, input.body.targetDraft.profileId),
+        eq(table.organizationId, input.organizationId),
+      ),
+  });
+  if (targetProfile === undefined) {
+    throw new DesignerBadRequestError(
+      DesignerBadRequestCodes.DESIGNER_DASHBOARD_ACTION_INVALID_INPUT,
+      "Target sandbox profile draft was not found.",
+    );
+  }
 
   const connection = await db.query.integrationConnections.findFirst({
     columns: {
@@ -115,14 +112,14 @@ export async function saveDesignerSelectedProviderResources(
     );
   }
 
-  const target = await db.query.integrationTargets.findFirst({
+  const selectedTarget = await db.query.integrationTargets.findFirst({
     columns: {
       familyId: true,
       variantId: true,
     },
     where: (table, { eq }) => eq(table.targetKey, connection.targetKey),
   });
-  if (target === undefined) {
+  if (selectedTarget === undefined) {
     throw new DesignerBadRequestError(
       DesignerBadRequestCodes.DESIGNER_DASHBOARD_ACTION_INVALID_INPUT,
       `Integration target '${connection.targetKey}' could not be resolved.`,
@@ -130,8 +127,8 @@ export async function saveDesignerSelectedProviderResources(
   }
 
   const definition = integrationRegistry.getDefinitionOrThrow({
-    familyId: target.familyId,
-    variantId: target.variantId,
+    familyId: selectedTarget.familyId,
+    variantId: selectedTarget.variantId,
   });
   const resourceDefinition = definition.resourceDefinitions?.find(
     (candidate) => candidate.kind === input.body.resourceKind,
@@ -154,7 +151,7 @@ export async function saveDesignerSelectedProviderResources(
     );
   }
 
-  const bindingKind = toIntegrationBindingKind(definition.kind);
+  const bindingKind: IntegrationBindingKind = definition.kind;
   const selectedHandles = dedupeStrings(input.body.selectedHandles);
   const currentBindings = await db.query.sandboxProfileVersionIntegrationBindings.findMany({
     where: (table, { and, eq }) =>
@@ -164,8 +161,15 @@ export async function saveDesignerSelectedProviderResources(
       ),
     orderBy: (table, { asc }) => [asc(table.id)],
   });
-  const targetBinding = currentBindings.find(
-    (binding) => binding.connectionId === connection.id && binding.kind === bindingKind,
+  const targetBinding = await findProviderResourceTargetBinding(
+    { db, integrationRegistry },
+    {
+      organizationId: input.organizationId,
+      bindings: currentBindings,
+      bindingKind,
+      familyId: selectedTarget.familyId,
+      selectedConnectionId: connection.id,
+    },
   );
   const createdBinding = targetBinding === undefined;
   const nextFieldValue = createBindingFieldValue({
@@ -237,4 +241,72 @@ function dedupeStrings(values: readonly string[]): string[] {
   }
 
   return deduped;
+}
+
+async function findProviderResourceTargetBinding(
+  { db, integrationRegistry }: Pick<DesignerDashboardActionsContext, "db" | "integrationRegistry">,
+  input: {
+    organizationId: string;
+    bindings: readonly SandboxProfileVersionIntegrationBinding[];
+    bindingKind: IntegrationBindingKind;
+    familyId: string;
+    selectedConnectionId: string;
+  },
+): Promise<SandboxProfileVersionIntegrationBinding | undefined> {
+  const exactConnectionBinding = input.bindings.find(
+    (binding) =>
+      binding.kind === input.bindingKind && binding.connectionId === input.selectedConnectionId,
+  );
+  if (exactConnectionBinding !== undefined) {
+    return exactConnectionBinding;
+  }
+
+  if (input.bindingKind !== IntegrationBindingKinds.GIT) {
+    return undefined;
+  }
+
+  for (const binding of input.bindings) {
+    if (binding.kind !== input.bindingKind) {
+      continue;
+    }
+
+    const connection = await db.query.integrationConnections.findFirst({
+      columns: {
+        id: true,
+        targetKey: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.id, binding.connectionId), eq(table.organizationId, input.organizationId)),
+    });
+    if (connection === undefined) {
+      throw new DesignerBadRequestError(
+        DesignerBadRequestCodes.DESIGNER_DASHBOARD_ACTION_INVALID_INPUT,
+        `Existing integration binding '${binding.id}' references missing connection '${binding.connectionId}'.`,
+      );
+    }
+
+    const target = await db.query.integrationTargets.findFirst({
+      columns: {
+        familyId: true,
+        variantId: true,
+      },
+      where: (table, { eq }) => eq(table.targetKey, connection.targetKey),
+    });
+    if (target === undefined) {
+      throw new DesignerBadRequestError(
+        DesignerBadRequestCodes.DESIGNER_DASHBOARD_ACTION_INVALID_INPUT,
+        `Existing integration binding '${binding.id}' references unresolved target '${connection.targetKey}'.`,
+      );
+    }
+
+    const definition = integrationRegistry.getDefinitionOrThrow({
+      familyId: target.familyId,
+      variantId: target.variantId,
+    });
+    if (definition.kind === input.bindingKind && target.familyId === input.familyId) {
+      return binding;
+    }
+  }
+
+  return undefined;
 }
