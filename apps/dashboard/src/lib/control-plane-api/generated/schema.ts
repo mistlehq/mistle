@@ -6109,6 +6109,14 @@ export interface paths {
                           submitLabel: string;
                         };
                       };
+                      ui?: {
+                        create?: {
+                          helperText: string;
+                          showCallbackUrl?: boolean;
+                          showIdentityLinkingCallbackUrl?: boolean;
+                          submitLabel: string;
+                        };
+                      };
                     }
                   | {
                       connectionDetail?: {
@@ -6156,6 +6164,7 @@ export interface paths {
                         create: {
                           helperText: string;
                           showCallbackUrl?: boolean;
+                          showIdentityLinkingCallbackUrl?: boolean;
                           submitLabel: string;
                         };
                         reauthorize?: {

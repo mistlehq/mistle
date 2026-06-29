@@ -112,7 +112,7 @@ function resolveCreateSubmitLabel(method: IntegrationConnectionMethod | null): s
     return method.ui.create.submitLabel;
   }
 
-  return "Add connection";
+  return method?.ui?.create?.submitLabel ?? "Add connection";
 }
 
 function buildOAuth2AuthorizationCodeRedirectUrl(input: { targetKey: string }): string {
@@ -122,10 +122,48 @@ function buildOAuth2AuthorizationCodeRedirectUrl(input: { targetKey: string }): 
   ).toString();
 }
 
+function buildIdentityLinkingCallbackUrl(input: { providerFamily: string }): string {
+  return new URL(
+    `/p/identity-linking/callbacks/${encodeURIComponent(input.providerFamily)}`,
+    getDashboardConfig().controlPlaneApiOrigin,
+  ).toString();
+}
+
 function renderAuthCreateHelper(input: {
   editor: Extract<IntegrationConnectionEditorState, { mode: "create" }>;
   method: IntegrationConnectionMethod | null;
 }) {
+  if (input.method?.kind === "form") {
+    const createUi = input.method.ui?.create;
+    if (createUi === undefined) {
+      return null;
+    }
+
+    if (createUi.showIdentityLinkingCallbackUrl !== true) {
+      return <Notice>{createUi.helperText}</Notice>;
+    }
+
+    return (
+      <Notice>
+        <div className="flex flex-col gap-3">
+          <p className="text-muted-foreground text-sm">
+            {createUi.helperText} To let users link their accounts, add this redirect URI to the
+            provider app.
+          </p>
+          <CopyableValue
+            copyAriaLabel="Copy identity-linking redirect URI"
+            copyTitle="Copy identity-linking redirect URI"
+            label="Identity Linking redirect URI"
+            variant="inline"
+            value={buildIdentityLinkingCallbackUrl({
+              providerFamily: input.editor.targetFamilyId,
+            })}
+          />
+        </div>
+      </Notice>
+    );
+  }
+
   if (input.method?.kind !== "redirect") {
     return null;
   }

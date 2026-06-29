@@ -95,6 +95,7 @@ export const LinearBaseDefinition: LinearBaseIntegrationDefinition = {
         create: {
           submitLabel: "Save Linear OAuth app",
           helperText: "Stores Linear OAuth app credentials for organization identity linking.",
+          showIdentityLinkingCallbackUrl: true,
         },
       },
     },

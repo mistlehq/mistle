@@ -21,6 +21,7 @@ const IntegrationConnectionMethodCreateUiSchema = z
     submitLabel: z.string().min(1),
     helperText: z.string().min(1),
     showCallbackUrl: z.boolean().optional(),
+    showIdentityLinkingCallbackUrl: z.boolean().optional(),
   })
   .strict();
 
@@ -229,6 +230,12 @@ export const IntegrationTargetSchema = z
               createBehavior: z.enum(["single-step", "draft-then-setup"]).optional(),
               postCreate: IntegrationFormConnectionMethodPostCreateMetadataSchema.optional(),
               setupFlow: IntegrationFormConnectionMethodSetupFlowMetadataSchema.optional(),
+              ui: z
+                .object({
+                  create: IntegrationConnectionMethodCreateUiSchema.optional(),
+                })
+                .strict()
+                .optional(),
               secretFields: z
                 .array(
                   z

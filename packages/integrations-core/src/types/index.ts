@@ -617,6 +617,7 @@ export type IntegrationConnectionMethodCreateUi = {
   submitLabel: string;
   helperText: string;
   showCallbackUrl?: boolean | undefined;
+  showIdentityLinkingCallbackUrl?: boolean | undefined;
 };
 
 export type IntegrationConnectionMethodReauthorizeUi = {

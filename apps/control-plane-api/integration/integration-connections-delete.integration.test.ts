@@ -156,6 +156,7 @@ describe.concurrent("integration connections delete integration", () => {
     try {
       await seedRevocationFailureTarget(env, {
         revocationUrl: simulatedProvider.revocationUrl,
+        webhookDeleteUrl: simulatedProvider.webhookDeleteUrl,
         targetKey,
       });
       await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
@@ -189,17 +190,21 @@ describe.concurrent("integration connections delete integration", () => {
     }
   });
 
-  it("does not revoke provider authorization when local deletion rolls back", async ({ env }) => {
+  it("deletes the connection and revokes provider authorization when managed webhook cleanup fails", async ({
+    env,
+  }) => {
     const simulatedProvider = await startSimulatedRevocationFailureProvider();
     const session = await env.auth.createSession({
-      email: "integration-new-connections-delete-revocation-after-rollback@example.com",
+      email: "integration-new-connections-delete-webhook-cleanup-failure@example.com",
     });
-    const connectionId = "icn_integration_new_delete_revocation_after_rollback";
-    const targetKey = "revocation_failure_connections_delete_after_rollback";
+    const connectionId = "icn_integration_new_delete_webhook_cleanup_failure";
+    const sourceId = "iws_integration_new_delete_webhook_cleanup_failure";
+    const targetKey = "revocation_failure_connections_delete_webhook_cleanup_failure";
 
     try {
       await seedRevocationFailureTarget(env, {
         revocationUrl: simulatedProvider.revocationUrl,
+        webhookDeleteUrl: simulatedProvider.webhookDeleteUrl,
         targetKey,
       });
       await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
@@ -213,31 +218,30 @@ describe.concurrent("integration connections delete integration", () => {
         },
       });
       await env.controlPlaneDb.insert(env.controlPlaneTables.integrationWebhookSources).values({
-        id: "iws_integration_new_delete_revocation_after_rollback",
+        id: sourceId,
         organizationId: session.organizationId,
         integrationConnectionId: connectionId,
         targetKey,
-        endpointKey: "ep_integration_new_delete_revocation_after_rollback",
+        endpointKey: "ep_integration_new_delete_webhook_cleanup_failure",
         status: "active",
       });
 
-      await expect(
-        deleteIntegrationConnection(
-          {
-            db: env.controlPlaneDb,
-            integrationRegistry: createRevocationFailureIntegrationRegistry(),
-            integrationsConfig: IntegrationIntegrationsConfig,
-            controlPlaneBaseUrl: env.controlPlaneApi.hostBaseUrl,
-          },
-          {
-            organizationId: session.organizationId,
-            connectionId,
-          },
-        ),
-      ).rejects.toThrow("Simulated provider webhook deletion failure.");
+      await deleteIntegrationConnection(
+        {
+          db: env.controlPlaneDb,
+          integrationRegistry: createRevocationFailureIntegrationRegistry(),
+          integrationsConfig: IntegrationIntegrationsConfig,
+          controlPlaneBaseUrl: env.controlPlaneApi.hostBaseUrl,
+        },
+        {
+          organizationId: session.organizationId,
+          connectionId,
+        },
+      );
 
-      expect(simulatedProvider.requests).toEqual([]);
-      await expectConnectionPresent(env, connectionId);
+      expect(simulatedProvider.requests).toEqual(["POST /webhook-delete", "POST /revoke"]);
+      await expectConnectionMissing(env, connectionId);
+      await expectWebhookSourceMissing(env, sourceId);
     } finally {
       await simulatedProvider.stop();
     }
@@ -389,11 +393,13 @@ type SimulatedRevocationFailureProvider = {
   revocationUrl: string;
   requests: string[];
   stop: () => Promise<void>;
+  webhookDeleteUrl: string;
 };
 
 const RevocationFailureTargetConfigSchema = z
   .object({
     revocation_url: z.url(),
+    webhook_delete_url: z.url(),
   })
   .strict();
 const EmptyRevocationFailureConfigSchema = z.object({}).strict();
@@ -447,8 +453,13 @@ const RevocationFailureIntegrationDefinition: IntegrationDefinition<
         providerMetadata: input.source.providerMetadata,
       };
     },
-    deleteRegistration() {
-      throw new Error("Simulated provider webhook deletion failure.");
+    async deleteRegistration(input) {
+      const response = await fetch(input.target.config.webhook_delete_url, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        throw new Error("Simulated provider webhook deletion failure.");
+      }
     },
   },
   compileBinding() {
@@ -487,6 +498,7 @@ async function startSimulatedRevocationFailureProvider(): Promise<SimulatedRevoc
     revocationUrl: `http://127.0.0.1:${address.port.toString()}/revoke`,
     requests,
     stop: () => close(server),
+    webhookDeleteUrl: `http://127.0.0.1:${address.port.toString()}/webhook-delete`,
   };
 }
 
@@ -495,6 +507,7 @@ async function seedRevocationFailureTarget(
   input: {
     revocationUrl: string;
     targetKey: string;
+    webhookDeleteUrl: string;
   },
 ): Promise<void> {
   await env.controlPlaneDb
@@ -506,6 +519,7 @@ async function seedRevocationFailureTarget(
       enabled: true,
       config: {
         revocation_url: input.revocationUrl,
+        webhook_delete_url: input.webhookDeleteUrl,
       },
     })
     .onConflictDoUpdate({
@@ -516,6 +530,7 @@ async function seedRevocationFailureTarget(
         enabled: true,
         config: {
           revocation_url: input.revocationUrl,
+          webhook_delete_url: input.webhookDeleteUrl,
         },
       },
     });
