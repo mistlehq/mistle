@@ -318,6 +318,7 @@ export async function startProfileInstance(
       organizationId: serviceInput.organizationId,
       profileId: serviceInput.profileId,
       profileVersion: serviceInput.profileVersion,
+      mergeRuntimeSetupFiles: launchImage.compileImage.source === "snapshot",
       image: launchImage.compileImage,
     },
   );

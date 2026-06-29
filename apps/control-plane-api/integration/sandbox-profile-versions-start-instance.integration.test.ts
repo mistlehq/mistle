@@ -789,6 +789,13 @@ describe.concurrent("sandbox profile version start instance integration", () => 
       source: "snapshot",
       imageRef: "sha256:snapshot-launch-image",
     });
+    expect(
+      queuedWorkflowInput.runtimePlan.runtimeClients[0]?.setup.files.find(
+        (file) => file.fileId === "codex_config",
+      ),
+    ).toMatchObject({
+      writeMode: "merge",
+    });
   });
 
   it("queues launches with the profile version agent runtime", async ({ env }) => {
@@ -941,6 +948,13 @@ describe.concurrent("sandbox profile version start instance integration", () => 
       sandboxInstanceId: body.sandboxInstanceId,
     });
     expect(queuedWorkflowInput.sandboxInstanceId).toBe(body.sandboxInstanceId);
+    expect(
+      queuedWorkflowInput.runtimePlan.runtimeClients[0]?.setup.files.find(
+        (file) => file.fileId === "codex_config",
+      ),
+    ).toMatchObject({
+      writeMode: "if-absent",
+    });
   });
 
   it("starts the session in the selected primary repository", async ({ env }) => {
