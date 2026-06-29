@@ -2,6 +2,7 @@ import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import { expect, userEvent, within } from "storybook/test";
 import { z } from "zod";
 
 import { getDashboardStoryControlPlaneApiOrigin } from "../../storybook/dashboard-story-config.js";
@@ -393,7 +394,7 @@ function GitHubInstalledDetailPageStory(): React.JSX.Element {
 }
 
 const pageMeta = {
-  title: "Dashboard/Integrations/Setup/GitHubApp",
+  title: "Dashboard/Integrations/Setup/GitHub App",
   decorators: [withDashboardPageStory],
   excludeStories: ["createDraftGitHubConnection", "GitHubAppSetupPageStory"],
 } satisfies Meta;
@@ -405,6 +406,31 @@ type PageStory = StoryObj<typeof pageMeta>;
 export const AddConnection: PageStory = {
   render: function RenderStory() {
     return <GitHubCreatePageStory />;
+  },
+};
+
+export const SetupWithManifest: PageStory = {
+  name: "Setup with manifest - organization",
+  render: function RenderStory() {
+    return <GitHubAppSetupPageStory connection={createDraftGitHubConnection()} />;
+  },
+};
+
+export const SetupWithManifestPersonalAccount: PageStory = {
+  render: function RenderStory() {
+    return <GitHubAppSetupPageStory connection={createDraftGitHubConnection()} />;
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(await canvas.findByRole("radio", { name: "Personal account" }));
+
+    await expect(canvas.getByRole("radio", { name: "Personal account" })).toBeChecked();
+    await expect(canvas.queryByText("GitHub organization")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("organization_administration")).not.toBeInTheDocument();
+    await expect(canvas.queryByText('"members"')).not.toBeInTheDocument();
+    await expect(canvas.queryByText('"organization"')).not.toBeInTheDocument();
+    await expect(canvas.getByText('"pull_requests"')).toBeVisible();
   },
 };
 

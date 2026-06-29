@@ -126,7 +126,7 @@ export function createJsonStoryResponse(body: unknown, status = 200): Response {
   });
 }
 
-export function createPageStoryResponse<T>(items: readonly T[]): {
+function createPageStoryResponse<T>(items: readonly T[]): {
   items: readonly T[];
   totalResults: number;
   nextPage: null;
@@ -140,9 +140,7 @@ export function createPageStoryResponse<T>(items: readonly T[]): {
   };
 }
 
-export function getIntegrationStoryDirectoryData(
-  queryClient: QueryClient,
-): IntegrationStoryDirectoryData {
+function getIntegrationStoryDirectoryData(queryClient: QueryClient): IntegrationStoryDirectoryData {
   return (
     queryClient.getQueryData<IntegrationStoryDirectoryData>(SETTINGS_INTEGRATIONS_QUERY_KEY) ?? {
       targets: [],
@@ -261,7 +259,7 @@ export function IntegrationSetupRouteStory(input: {
   handlers?: readonly IntegrationStoryControlPlaneHandler[];
   initialEntries: IntegrationStoryInitialEntries;
   queryClient: QueryClient;
-  routeKind: "create" | "create-and-detail" | "create-and-setup" | "detail" | "setup";
+  routeKind: "create-and-detail" | "create-and-setup" | "detail" | "setup";
 }): React.JSX.Element {
   const [router] = useState(() =>
     createMemoryRouter(
@@ -272,9 +270,7 @@ export function IntegrationSetupRouteStory(input: {
               {input.routeKind === "detail" || input.routeKind === "create-and-detail" ? (
                 <Route element={<IntegrationsPage />} index />
               ) : null}
-              {input.routeKind === "create" ||
-              input.routeKind === "create-and-detail" ||
-              input.routeKind === "create-and-setup" ? (
+              {input.routeKind === "create-and-detail" || input.routeKind === "create-and-setup" ? (
                 <Route
                   element={<IntegrationConnectionCreatePage />}
                   handle={ROUTE_HANDLES.integrationCreate}

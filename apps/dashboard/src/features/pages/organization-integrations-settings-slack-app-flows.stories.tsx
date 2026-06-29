@@ -616,7 +616,7 @@ function SlackMissingBotIdentityRepairStory(): React.JSX.Element {
 }
 
 const pageMeta = {
-  title: "Dashboard/Integrations/Setup/SlackApp",
+  title: "Dashboard/Integrations/Setup/Slack App",
   decorators: [withDashboardPageStory],
   excludeStories: ["createDraftSlackConnection", "SlackAppSetupPageStory"],
 } satisfies Meta;
@@ -628,6 +628,29 @@ type PageStory = StoryObj<typeof pageMeta>;
 export const AddConnection: PageStory = {
   render: function RenderStory() {
     return <SlackCreatePageStory />;
+  },
+};
+
+export const SetupWithManifest: PageStory = {
+  render: function RenderStory() {
+    return <SlackAppSetupPageStory connection={createDraftSlackConnection()} />;
+  },
+};
+
+export const SetupConfiguredExistingApp: PageStory = {
+  render: function RenderStory() {
+    return (
+      <SlackAppSetupPageStory
+        connection={createDraftSlackConnection({
+          config: {
+            app_id: "A0123456789",
+            client_id: "3555487893074.10993991013813",
+          },
+          configuredSecretNames: ["botToken", "clientSecret", "signingSecret"],
+          externalSubjectId: "T0123456789",
+        })}
+      />
+    );
   },
 };
 

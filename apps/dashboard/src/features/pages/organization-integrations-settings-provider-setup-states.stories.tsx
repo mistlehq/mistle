@@ -64,7 +64,12 @@ function IntegrationProviderSetupStatesStory(
   input: IntegrationProviderSetupStatesStoryArgs,
 ): React.JSX.Element {
   if (input.provider === IntegrationSetupProviders.GITHUB) {
-    return <GitHubAppSetupPageStory connection={createDraftGitHubConnection()} />;
+    return (
+      <GitHubAppSetupPageStory
+        connection={createDraftGitHubConnection()}
+        key={IntegrationSetupProviders.GITHUB}
+      />
+    );
   }
 
   if (input.provider === IntegrationSetupProviders.SLACK) {
@@ -82,22 +87,36 @@ function IntegrationProviderSetupStatesStory(
               })
             : createDraftSlackConnection()
         }
+        key={`${IntegrationSetupProviders.SLACK}:${input.slackState}`}
       />
     );
   }
 
   if (input.provider === IntegrationSetupProviders.JIRA) {
+    if (input.jiraMethod === JiraSetupMethods.CHOOSE_METHOD) {
+      return (
+        <IntegrationSettingsAddFlowStory
+          key={`${IntegrationSetupProviders.JIRA}:${input.jiraMethod}`}
+          variantId="jira-default"
+        />
+      );
+    }
+
     return (
       <IntegrationSettingsAddFlowStory
-        {...(input.jiraMethod === JiraSetupMethods.CHOOSE_METHOD
-          ? {}
-          : { initialMethodId: input.jiraMethod })}
+        initialMethodId={input.jiraMethod}
+        key={`${IntegrationSetupProviders.JIRA}:${input.jiraMethod}`}
         variantId="jira-default"
       />
     );
   }
 
-  return <WasenderApiSetupPageStory connection={createDraftWasenderApiConnection()} />;
+  return (
+    <WasenderApiSetupPageStory
+      connection={createDraftWasenderApiConnection()}
+      key={IntegrationSetupProviders.WASENDERAPI}
+    />
+  );
 }
 
 const pageMeta = {
