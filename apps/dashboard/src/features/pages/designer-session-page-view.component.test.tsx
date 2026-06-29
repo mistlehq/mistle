@@ -13,12 +13,13 @@ import { DesignerBlueprintCurrentTabHref } from "../designer/designer-blueprint-
 import type {
   IntegrationConnection,
   IntegrationTarget,
+  IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import {
   DesignerCanvasWorkspace,
-  resolveDesignerBlueprintInitialFocusViewport,
+  resolveDesignerBlueprintInitialFocusViewportForNodes,
 } from "./designer-session-page-view.js";
 import { OrganizationIntegrationsSettingsPage } from "./organization-integrations-settings-page.js";
 import type {
@@ -183,7 +184,25 @@ const ProviderAppSetupConnection: IntegrationConnection = {
   connectionMethodLabel: "GitHub App installation",
   config: {
     connection_method: "github-app-installation",
+    app_id: "12345",
+    app_slug: "acme-mistle-agent",
+    client_id: "Iv1.created",
   },
+  configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
+  createdAt: "2026-06-25T00:00:00.000Z",
+  updatedAt: "2026-06-25T00:00:00.000Z",
+};
+
+const ProviderAppSetupWebhookSource: IntegrationWebhookSource = {
+  id: "iws_github_provider_app_setup",
+  targetKey: "github-cloud",
+  integrationConnectionId: ProviderAppSetupConnection.id,
+  displayName: "GitHub App webhook",
+  endpointKey: "eps_github_provider_app_setup",
+  callbackUrl:
+    "https://control-plane.example.com/p/integration/webhooks/github-cloud/eps_github_provider_app_setup",
+  status: "active",
+  providerMetadata: {},
   createdAt: "2026-06-25T00:00:00.000Z",
   updatedAt: "2026-06-25T00:00:00.000Z",
 };
@@ -559,9 +578,10 @@ describe("DesignerCanvasWorkspace", () => {
   });
 
   it("keeps completed integration setup visible in a Designer canvas tab", async () => {
-    renderDesignerCanvasWorkspace({
-      activeTabHref:
-        "/integrations/wasenderapi-mcp/icn_wasenderapi_complete/provider-configuration/setup",
+    const setupHref =
+      "/integrations/wasenderapi-mcp/icn_wasenderapi_complete/provider-configuration/setup";
+
+    renderDesignerCanvasRoute({
       configureQueryClient: (queryClient) => {
         queryClient.setQueryDefaults(SETTINGS_INTEGRATIONS_QUERY_KEY, {
           staleTime: Infinity,
@@ -574,23 +594,31 @@ describe("DesignerCanvasWorkspace", () => {
           name: "Acme",
         });
       },
-      tabs: [
-        {
-          kind: "route",
-          id: "wasenderapi-setup",
-          title: "Set up WasenderAPI",
-          href: "/integrations/wasenderapi-mcp/icn_wasenderapi_complete/provider-configuration/setup",
-        },
-      ],
+      element: (
+        <StatefulDesignerCanvasWorkspace
+          initialActiveTabHref={setupHref}
+          initialTabs={[
+            {
+              kind: "route",
+              id: "wasenderapi-setup",
+              title: "Set up WasenderAPI",
+              href: setupHref,
+            },
+          ]}
+        />
+      ),
     });
 
     expect(await screen.findByText("Integration setup complete")).toBeDefined();
-    expect(await screen.findByRole("button", { name: "View connection" })).toBeDefined();
     expect(screen.getByText("Set up WasenderAPI")).toBeDefined();
+    fireEvent.click(await screen.findByRole("button", { name: "View connection" }));
+
+    expect(await screen.findAllByText("WasenderAPI production")).not.toHaveLength(0);
+    expect(screen.getAllByText("Personal access token")).not.toHaveLength(0);
     expect(screen.queryByText("Integrations")).toBeNull();
   });
 
-  it("shows a full-dashboard handoff for embedded provider app setup", async () => {
+  it("renders embedded provider app setup in a Designer canvas tab", async () => {
     const setupHref =
       "/integrations/github-cloud/icn_github_provider_app_setup/github-app/setup?githubAppManifest=created";
 
@@ -604,6 +632,10 @@ describe("DesignerCanvasWorkspace", () => {
           targets: [ProviderAppSetupIntegrationTarget],
           connections: [ProviderAppSetupConnection],
         });
+        queryClient.setQueryData(
+          ["integration-webhook-sources", ProviderAppSetupConnection.id],
+          [ProviderAppSetupWebhookSource],
+        );
       },
       tabs: [
         {
@@ -615,8 +647,10 @@ describe("DesignerCanvasWorkspace", () => {
       ],
     });
 
-    expect(await screen.findByText("Open setup in the full dashboard")).toBeDefined();
-    expect(await screen.findByRole("button", { name: "Open setup page" })).toBeDefined();
+    expect(await screen.findByText("GitHub App created")).toBeDefined();
+    expect(await screen.findByRole("button", { name: "Install GitHub App" })).toBeDefined();
+    expect(screen.getByText("Set up GitHub")).toBeDefined();
+    expect(screen.queryByText("Open setup in the full dashboard")).toBeNull();
   });
 
   it("renders embedded managed-webhook setup notices from route state", async () => {
@@ -814,17 +848,37 @@ describe("DesignerCanvasWorkspace", () => {
     expect(screen.queryByTestId("designer-blueprint-add-comment-hint-classify-issue")).toBeNull();
   });
 
-  it("centers the first blueprint node horizontally near the top of the canvas viewport", () => {
+  it("centers the blueprint graph horizontally near the top of the canvas viewport", () => {
     expect(
-      resolveDesignerBlueprintInitialFocusViewport({
-        nodePosition: { x: 120, y: 24 },
+      resolveDesignerBlueprintInitialFocusViewportForNodes({
+        nodes: [
+          {
+            position: { x: 120, y: 24 },
+          },
+          {
+            position: { x: 600, y: 180 },
+          },
+        ],
         width: 1000,
       }),
     ).toEqual({
-      x: 253,
+      x: 25,
       y: 33.2,
       zoom: 0.95,
     });
+  });
+
+  it("returns no blueprint viewport before the canvas has a measured width", () => {
+    expect(
+      resolveDesignerBlueprintInitialFocusViewportForNodes({
+        nodes: [
+          {
+            position: { x: 120, y: 24 },
+          },
+        ],
+        width: 0,
+      }),
+    ).toBeNull();
   });
 
   it("resolves integration detail tab titles from the integration directory data", async () => {

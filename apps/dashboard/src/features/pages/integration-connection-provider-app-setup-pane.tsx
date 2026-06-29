@@ -6,7 +6,7 @@ import {
 import { Button, CopyableValue, Notice } from "@mistle/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
 
 import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -350,14 +350,16 @@ export function ProviderAppSetupPane(input: {
   connection: IntegrationConnection;
   manifestDraftBuilder: IntegrationSetupAppManifestDraftBuilder;
   methodId: string;
+  navigate: (nextHref: string) => void | Promise<void>;
   organizationName?: string | undefined;
-  routeSegment: string;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
+  routeSegment: string;
+  searchParams?: URLSearchParams | undefined;
   setupStartForm: IntegrationFormConnectionMethodSetupStartForm;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [routeSearchParams] = useSearchParams();
+  const searchParams = input.searchParams ?? routeSearchParams;
   const isManifestCreatedReturn = searchParams.get("githubAppManifest") === "created";
   const [setupMode, setSetupMode] = useState<IntegrationConnectionSetupMode>(() =>
     hasProviderAppSetupDraftValues({
@@ -519,7 +521,7 @@ export function ProviderAppSetupPane(input: {
     }
 
     if (startAction === undefined) {
-      void navigate(`/integrations/${input.connection.targetKey}`);
+      void input.navigate(`/integrations/${input.connection.targetKey}`);
       return;
     }
 
@@ -529,7 +531,7 @@ export function ProviderAppSetupPane(input: {
         await queryClient.invalidateQueries({
           queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
         });
-        void navigate(
+        void input.navigate(
           buildProviderAppSetupCompletionUrl({
             connectionId: input.connection.id,
             completionRedirect: started.completionRedirect,
@@ -575,7 +577,7 @@ export function ProviderAppSetupPane(input: {
       await queryClient.invalidateQueries({
         queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
       });
-      void navigate(
+      void input.navigate(
         buildProviderAppSetupCompletionUrl({
           connectionId: selectedInstallation.connectionId,
           completionRedirect: selectedInstallation.completionRedirect,
@@ -598,7 +600,7 @@ export function ProviderAppSetupPane(input: {
   async function startExistingAppManagementAction(): Promise<void> {
     const startAction = input.providerAppSetup.existingApp.startAction;
     if (startAction === undefined) {
-      void navigate(`/integrations/${input.connection.targetKey}`);
+      void input.navigate(`/integrations/${input.connection.targetKey}`);
       return;
     }
 

@@ -1,5 +1,5 @@
 .session-workbench-main-group-animated > [data-panel] {
-  transition: flex 300ms ease-out;
+  transition: flex 450ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {

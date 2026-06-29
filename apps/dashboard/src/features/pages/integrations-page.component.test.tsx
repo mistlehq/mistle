@@ -64,6 +64,7 @@ describe("renderSelectedConnectionSetupBody", () => {
         <QueryClientProvider client={queryClient}>
           {renderSelectedConnectionSetupBody({
             connection: CreatedGitHubAppConnection,
+            navigate: () => {},
             organizationName: null,
             setupFlow: {
               methodId: "github-app-installation",

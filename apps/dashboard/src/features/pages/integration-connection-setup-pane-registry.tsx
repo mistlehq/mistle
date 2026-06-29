@@ -10,26 +10,25 @@ import {
 } from "./integration-connection-setup-manifest-draft.js";
 import type { IntegrationConnectionSetupRoute } from "./integration-connection-setup-state.js";
 
-type IntegrationConnectionSetupPaneComponent = (input: {
-  connection: IntegrationConnection;
-  organizationName?: string | undefined;
-  setupRoute: IntegrationConnectionSetupRoute;
-}) => React.JSX.Element;
-
 function renderProviderAppSetupPane(input: {
   connection: IntegrationConnection;
+  navigate: (nextHref: string) => void | Promise<void>;
   organizationName?: string | undefined;
+  searchParams?: URLSearchParams | undefined;
   setupRoute: IntegrationConnectionSetupRoute;
 }): React.JSX.Element {
   return (
     <ProviderAppSetupPane
       connection={input.connection}
+      key={input.connection.id}
       manifestDraftBuilder={resolveIntegrationSetupAppManifestDraftBuilderOrThrow({
         connection: input.connection,
         setupRoute: input.setupRoute,
       })}
       methodId={input.setupRoute.methodId}
+      navigate={input.navigate}
       organizationName={input.organizationName}
+      searchParams={input.searchParams}
       routeSegment={input.setupRoute.routeSegment}
       setupStartForm={resolveIntegrationSetupStartFormOrThrow({
         connection: input.connection,
@@ -50,6 +49,7 @@ function renderProviderConfigurationSetupPane(input: {
   return (
     <ProviderConfigurationSetupPane
       connection={input.connection}
+      key={input.connection.id}
       methodId={input.setupRoute.methodId}
       providerConfigurationSetup={resolveIntegrationProviderConfigurationSetupOrThrow({
         connection: input.connection,
@@ -60,42 +60,32 @@ function renderProviderConfigurationSetupPane(input: {
   );
 }
 
-function resolveSetupPane(input: {
-  connection: IntegrationConnection;
-  setupRoute: IntegrationConnectionSetupRoute;
-}): IntegrationConnectionSetupPaneComponent {
-  const setupPane = resolveIntegrationSetupPaneOrThrow(input);
-  if (setupPane.kind === "provider-app") {
-    return renderProviderAppSetupPane;
-  }
-
-  if (setupPane.kind === "provider-configuration") {
-    return renderProviderConfigurationSetupPane;
-  }
-
-  return handleUnsupportedIntegrationSetupPaneKind(setupPane);
-}
-
 function handleUnsupportedIntegrationSetupPaneKind(_setupPane: never): never {
   throw new Error("Unsupported integration setup pane kind.");
 }
 
 export function renderIntegrationConnectionSetupPane(input: {
   connection: IntegrationConnection;
+  navigate: (nextHref: string) => void | Promise<void>;
   organizationName?: string | undefined;
+  searchParams?: URLSearchParams | undefined;
   setupRoute: IntegrationConnectionSetupRoute;
 }): React.JSX.Element {
-  const SetupPane = resolveSetupPane({
+  const setupPane = resolveIntegrationSetupPaneOrThrow({
     connection: input.connection,
     setupRoute: input.setupRoute,
   });
 
-  return (
-    <SetupPane
-      connection={input.connection}
-      key={input.connection.id}
-      organizationName={input.organizationName}
-      setupRoute={input.setupRoute}
-    />
-  );
+  if (setupPane.kind === "provider-app") {
+    return renderProviderAppSetupPane(input);
+  }
+
+  if (setupPane.kind === "provider-configuration") {
+    return renderProviderConfigurationSetupPane({
+      connection: input.connection,
+      setupRoute: input.setupRoute,
+    });
+  }
+
+  return handleUnsupportedIntegrationSetupPaneKind(setupPane);
 }

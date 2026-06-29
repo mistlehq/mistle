@@ -420,7 +420,6 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
             navigate: navigateEmbeddedCanvasRoute,
             searchParams: route.searchParams,
             setSearchParams: (nextSearchParams) => {
-              setEmbeddedLocationState(undefined);
               const nextHref = buildDesignerCanvasHref({
                 pathname:
                   route.targetKey === null
@@ -459,12 +458,7 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
             searchParams: route.searchParams,
             setupRouteSegment: route.setupRouteSegment,
             targetKey: route.targetKey,
-            navigate: (nextHref) => {
-              navigateDesignerCanvasTab({
-                href: nextHref,
-                params,
-              });
-            },
+            navigate: navigateEmbeddedCanvasRoute,
           }}
         />
       </DesignerCanvasEmbeddedSurface>
@@ -477,12 +471,7 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
         <EmbeddedSandboxProfileEditorPage
           embeddedRoute={{
             href: route.href,
-            navigate: (nextHref) => {
-              navigateDesignerCanvasTab({
-                href: nextHref,
-                params,
-              });
-            },
+            navigate: navigateEmbeddedCanvasRoute,
             profileId: route.profileId,
           }}
         />
@@ -501,10 +490,7 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
                 pathname: "/triggers",
                 searchParams: nextSearchParams,
               });
-              navigateDesignerCanvasTab({
-                href: nextHref,
-                params,
-              });
+              navigateEmbeddedCanvasRoute(nextHref);
             },
           }}
         />
@@ -518,12 +504,7 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
         <TriggerCreatePage
           embeddedRoute={{
             searchParams: route.searchParams,
-            navigate: (nextHref) => {
-              navigateDesignerCanvasTab({
-                href: nextHref,
-                params,
-              });
-            },
+            navigate: navigateEmbeddedCanvasRoute,
           }}
         />
       </DesignerCanvasEmbeddedSurface>
@@ -983,7 +964,6 @@ type DesignerBlueprintGraphEdge = Edge;
 
 type DesignerBlueprintGraph = {
   edges: DesignerBlueprintGraphEdge[];
-  initialFocusNodeId?: string;
   nodes: DesignerBlueprintLayoutNode[];
 };
 
@@ -1115,26 +1095,24 @@ function DesignerBlueprintInitialFocus(input: {
 }): React.JSX.Element | null {
   const reactFlow = useReactFlow<DesignerBlueprintVisualNode, DesignerBlueprintGraphEdge>();
   const width = useStore((state) => state.width);
-  const initialFocusNode =
-    input.graph.initialFocusNodeId === undefined
-      ? undefined
-      : input.graph.nodes.find((node) => node.id === input.graph.initialFocusNodeId);
+  const viewport = useMemo(
+    () =>
+      resolveDesignerBlueprintInitialFocusViewportForNodes({
+        nodes: input.graph.nodes,
+        width,
+      }),
+    [input.graph.nodes, width],
+  );
 
   // ReactFlow owns the viewport imperatively; render props and remounting cannot
   // focus the measured canvas once its store reports a usable width.
   useEffect(() => {
-    if (initialFocusNode === undefined || width <= 0) {
+    if (viewport === null) {
       return;
     }
 
-    void reactFlow.setViewport(
-      resolveDesignerBlueprintInitialFocusViewport({
-        nodePosition: initialFocusNode.position,
-        width,
-      }),
-      { duration: 0 },
-    );
-  }, [initialFocusNode, reactFlow, width]);
+    void reactFlow.setViewport(viewport, { duration: 0 });
+  }, [reactFlow, viewport]);
 
   return null;
 }
@@ -1515,25 +1493,77 @@ async function buildDesignerBlueprintGraph(input: {
       position: positionByNodeId.get(node.id) ?? node.position,
     })),
     edges: displayEdges,
-    ...(input.blueprint.items[0] === undefined
-      ? {}
-      : { initialFocusNodeId: input.blueprint.items[0].id }),
   };
 }
 
 export function resolveDesignerBlueprintInitialFocusViewport(input: {
-  nodePosition: { x: number; y: number };
+  graphBounds: DesignerBlueprintGraphBounds;
   width: number;
 }): Viewport {
   return {
     x:
       input.width / 2 -
-      (input.nodePosition.x + DesignerBlueprintNodeWidth / 2) *
-        DesignerBlueprintInitialViewport.zoom,
+      (input.graphBounds.x + input.graphBounds.width / 2) * DesignerBlueprintInitialViewport.zoom,
     y:
       DesignerBlueprintInitialFocusTopPadding -
-      input.nodePosition.y * DesignerBlueprintInitialViewport.zoom,
+      input.graphBounds.y * DesignerBlueprintInitialViewport.zoom,
     zoom: DesignerBlueprintInitialViewport.zoom,
+  };
+}
+
+export function resolveDesignerBlueprintInitialFocusViewportForNodes(input: {
+  nodes: readonly DesignerBlueprintPositionedNode[];
+  width: number;
+}): Viewport | null {
+  if (input.width <= 0) {
+    return null;
+  }
+
+  const graphBounds = getDesignerBlueprintGraphBounds(input.nodes);
+  if (graphBounds === null) {
+    return null;
+  }
+
+  return resolveDesignerBlueprintInitialFocusViewport({
+    graphBounds,
+    width: input.width,
+  });
+}
+
+type DesignerBlueprintGraphBounds = {
+  width: number;
+  x: number;
+  y: number;
+};
+
+type DesignerBlueprintPositionedNode = {
+  position: {
+    x: number;
+    y: number;
+  };
+};
+
+function getDesignerBlueprintGraphBounds(
+  nodes: readonly DesignerBlueprintPositionedNode[],
+): DesignerBlueprintGraphBounds | null {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+
+  for (const node of nodes) {
+    minX = Math.min(minX, node.position.x);
+    minY = Math.min(minY, node.position.y);
+    maxX = Math.max(maxX, node.position.x + DesignerBlueprintNodeWidth);
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+    return null;
+  }
+
+  return {
+    width: maxX - minX,
+    x: minX,
+    y: minY,
   };
 }
 
