@@ -75,6 +75,16 @@ describe("Mistle capability catalog", () => {
         }),
       ]),
     );
+    expect(githubCloud?.capabilities.providerResources.bindingIntents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "git-repositories",
+          bindingKind: "git",
+          bindingField: "repositories",
+          resourceKind: "repository",
+        }),
+      ]),
+    );
   });
 
   it("filters to providers that support the requested capability kind", () => {

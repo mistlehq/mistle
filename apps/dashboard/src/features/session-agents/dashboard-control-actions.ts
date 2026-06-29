@@ -80,13 +80,16 @@ const DesignerUserInputFreeFormSchema = z
   })
   .strict();
 
-const DesignerUserInputSaveSandboxProfileDraftBindingSubmitBehaviorSchema = z
+const DesignerUserInputSaveSelectedProviderResourcesSubmitActionSchema = z
   .object({
-    kind: z.literal("saveSandboxProfileDraftBinding"),
-    profileId: z.string().min(1).max(160),
-    version: z.number().int().min(1),
-    bindingId: z.string().min(1).max(160),
-    configField: z.string().min(1).max(120),
+    kind: z.literal("saveSelectedProviderResourcesToSandboxProfileDraft"),
+    targetDraft: z
+      .object({
+        profileId: z.string().min(1).max(160),
+        version: z.number().int().min(1),
+      })
+      .strict(),
+    bindingIntent: z.string().min(1).max(160),
   })
   .strict();
 
@@ -110,7 +113,7 @@ const DesignerUserInputRequestInputSchema = z
     options: z.array(DesignerUserInputOptionSchema).max(6).optional(),
     freeForm: DesignerUserInputFreeFormSchema.optional(),
     resourceSelection: DesignerUserInputIntegrationConnectionResourceSelectionSchema.optional(),
-    submitBehavior: DesignerUserInputSaveSandboxProfileDraftBindingSubmitBehaviorSchema.optional(),
+    submitAction: DesignerUserInputSaveSelectedProviderResourcesSubmitActionSchema.optional(),
   })
   .strict()
   .refine(
@@ -145,10 +148,10 @@ const DesignerUserInputRequestInputSchema = z
   )
   .refine(
     (input) =>
-      input.submitBehavior?.kind !== "saveSandboxProfileDraftBinding" ||
+      input.submitAction?.kind !== "saveSelectedProviderResourcesToSandboxProfileDraft" ||
       input.inputKind === "integrationConnectionResourceMultiSelect",
     {
-      message: "Save draft submit behavior requires resource selection input.",
+      message: "Save selected provider resources submit action requires resource selection input.",
     },
   );
 
@@ -214,11 +217,8 @@ export type DashboardControlActionHandler = (
 export type DashboardControlActionSupport = {
   supportedActions: readonly string[];
   handleAction: DashboardControlActionHandler;
-  userInputSubmitBehavior?: {
-    sandboxProfileDraftBinding?: {
-      profileId: string;
-      version: number;
-    };
+  userInputSubmitAction?: {
+    designerSessionId: string;
   };
 };
 
@@ -642,36 +642,40 @@ const DesignerUserInputIntegrationConnectionResourceSelectionJsonSchema = {
   required: ["connectionId", "resourceKind", "resourceLabelPlural"],
 };
 
-const DesignerUserInputSubmitBehaviorJsonSchema = {
+const DesignerUserInputSubmitActionJsonSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
     kind: {
       type: "string",
-      enum: ["saveSandboxProfileDraftBinding"],
+      enum: ["saveSelectedProviderResourcesToSandboxProfileDraft"],
     },
-    profileId: {
+    targetDraft: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        profileId: {
+          type: "string",
+          minLength: 1,
+          maxLength: 160,
+          description: "Sandbox profile draft id to update, such as sbp_...",
+        },
+        version: {
+          type: "integer",
+          minimum: 1,
+        },
+      },
+      required: ["profileId", "version"],
+    },
+    bindingIntent: {
       type: "string",
       minLength: 1,
       maxLength: 160,
-    },
-    version: {
-      type: "integer",
-      minimum: 1,
-    },
-    bindingId: {
-      type: "string",
-      minLength: 1,
-      maxLength: 160,
-    },
-    configField: {
-      type: "string",
-      minLength: 1,
-      maxLength: 120,
-      description: "Top-level binding config field to replace with the selected resource handles.",
+      description:
+        "Provider resource binding intent id exposed by the selected integration capability, such as git-repositories.",
     },
   },
-  required: ["kind", "profileId", "version", "bindingId", "configField"],
+  required: ["kind", "targetDraft", "bindingIntent"],
 };
 
 export const DesignerCanvasTabShowDynamicToolSpec = {
@@ -733,7 +737,7 @@ export const DesignerUserInputRequestDynamicToolSpec = {
       },
       freeForm: DesignerUserInputFreeFormJsonSchema,
       resourceSelection: DesignerUserInputIntegrationConnectionResourceSelectionJsonSchema,
-      submitBehavior: DesignerUserInputSubmitBehaviorJsonSchema,
+      submitAction: DesignerUserInputSubmitActionJsonSchema,
     },
     required: ["id", "question"],
     anyOf: [
@@ -765,16 +769,16 @@ export const DesignerUserInputRequestDynamicToolSpec = {
       {
         if: {
           properties: {
-            submitBehavior: {
+            submitAction: {
               properties: {
                 kind: {
-                  const: "saveSandboxProfileDraftBinding",
+                  const: "saveSelectedProviderResourcesToSandboxProfileDraft",
                 },
               },
               required: ["kind"],
             },
           },
-          required: ["submitBehavior"],
+          required: ["submitAction"],
         },
         then: {
           properties: {
@@ -937,9 +941,9 @@ export function createDashboardControlUserInputServerRequest(input: {
                     }),
               },
             }),
-        ...(input.userInput.submitBehavior === undefined
+        ...(input.userInput.submitAction === undefined
           ? {}
-          : { submitBehavior: input.userInput.submitBehavior }),
+          : { submitAction: input.userInput.submitAction }),
         ...(input.userInput.inputKind === "integrationConnectionResourceMultiSelect"
           ? {}
           : {
@@ -999,9 +1003,15 @@ export function createDashboardControlUserInputResponse(input: {
             value: z.union([z.string(), z.array(z.string())]),
             sideEffect: z
               .object({
-                kind: z.literal("sandbox-profile-draft-updated"),
+                kind: z.literal("sandbox-profile-draft-provider-resources-saved"),
                 profileId: z.string().min(1),
                 version: z.number().int().min(1),
+                connectionId: z.string().min(1),
+                resourceKind: z.string().min(1),
+                bindingIntent: z.string().min(1),
+                bindingId: z.string().min(1),
+                selectedHandles: z.array(z.string().min(1)),
+                createdBinding: z.boolean(),
               })
               .optional(),
           }),

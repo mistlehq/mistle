@@ -169,12 +169,13 @@ const ResourceSelectionUserInputEntries: readonly ServerRequestEntry[] = [
           emptyMessage: "No repositories available for this connection.",
           initialSelectedHandles: ["mistlehq/mistle-desktop"],
         },
-        submitBehavior: {
-          kind: "saveSandboxProfileDraftBinding",
-          profileId: "sbp_story_designer",
-          version: 2,
-          bindingId: "spib_story_github",
-          configField: "repositories",
+        submitAction: {
+          kind: "saveSelectedProviderResourcesToSandboxProfileDraft",
+          targetDraft: {
+            profileId: "sbp_story_designer",
+            version: 2,
+          },
+          bindingIntent: "git-repositories",
         },
       },
     ],

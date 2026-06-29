@@ -103,11 +103,28 @@ const DesignerSessionConnectionTokenSchema = z
   })
   .strict();
 
+const SaveDesignerSelectedProviderResourcesReceiptSchema = z
+  .object({
+    kind: z.literal("sandbox-profile-draft-provider-resources-saved"),
+    profileId: z.string().min(1),
+    version: z.number().int().min(1),
+    connectionId: z.string().min(1),
+    resourceKind: z.string().min(1),
+    bindingIntent: z.string().min(1),
+    bindingId: z.string().min(1),
+    selectedHandles: z.array(z.string().min(1)),
+    createdBinding: z.boolean(),
+  })
+  .strict();
+
 export type DesignerSession = z.output<typeof DesignerSessionSchema>;
 export type DesignerSessionListItem = z.output<
   typeof ListDesignerSessionsResponseSchema
 >["items"][number];
 export type DesignerSessionCanvasTab = z.output<typeof DesignerSessionCanvasTabSchema>;
+export type SaveDesignerSelectedProviderResourcesReceipt = z.output<
+  typeof SaveDesignerSelectedProviderResourcesReceiptSchema
+>;
 
 export const designerSessionsQueryKey = ["designer", "sessions"] as const;
 export function designerSessionQueryKey(sessionId: string) {
@@ -305,6 +322,58 @@ export async function putDesignerSessionCanvasTabs(input: {
         operation: "putDesignerSessionCanvasTabs",
         error,
         fallbackMessage: "Could not save Designer canvas tabs.",
+      }),
+    );
+  }
+}
+
+export async function saveDesignerSelectedProviderResources(input: {
+  sessionId: string;
+  targetDraft: {
+    profileId: string;
+    version: number;
+  };
+  connectionId: string;
+  resourceKind: string;
+  selectedHandles: readonly string[];
+  bindingIntent: string;
+  signal?: AbortSignal;
+}): Promise<SaveDesignerSelectedProviderResourcesReceipt> {
+  try {
+    const response = await requestControlPlane({
+      operation: "saveDesignerSelectedProviderResources",
+      method: "POST",
+      pathname: `/v1/designer/sessions/${encodeURIComponent(input.sessionId)}/dashboard-actions/save-selected-provider-resources`,
+      body: {
+        targetDraft: input.targetDraft,
+        connectionId: input.connectionId,
+        resourceKind: input.resourceKind,
+        selectedHandles: input.selectedHandles,
+        bindingIntent: input.bindingIntent,
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not save selected provider resources.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse =
+      SaveDesignerSelectedProviderResourcesReceiptSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new DesignerApiError({
+        operation: "saveDesignerSelectedProviderResources",
+        status: 500,
+        body: responseBody,
+        message: "Save selected provider resources response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new DesignerApiError(
+      normalizeHttpApiError({
+        operation: "saveDesignerSelectedProviderResources",
+        error,
+        fallbackMessage: "Could not save selected provider resources.",
       }),
     );
   }

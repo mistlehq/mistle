@@ -54,8 +54,8 @@ import type {
   DesignerSessionResponse,
   PutDesignerSessionCanvasTabsBody,
 } from "../schemas.js";
-import { DesignerBehaviorInstructionBlock } from "./designer-behavior-instructions.js";
-import { DesignerContextInstructionBlock } from "./designer-context-instructions.js";
+import { createDesignerBehaviorInstructionBlock } from "./designer-behavior-instructions.js";
+import { createDesignerContextInstructionBlock } from "./designer-context-instructions.js";
 
 type DesignerSessionActor = {
   kind: SandboxInstanceStarterKind;
@@ -296,8 +296,8 @@ function createDesignerRuntimePlan(input: {
     codexCliPath: input.codexCliPath,
     egressRoutes,
     managedInstructionBlocks: [
-      DesignerContextInstructionBlock,
-      DesignerBehaviorInstructionBlock,
+      createDesignerContextInstructionBlock(),
+      createDesignerBehaviorInstructionBlock(),
       createDesignerInitialPromptInstructionBlock({
         initialPrompt: input.initialPrompt,
       }),

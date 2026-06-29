@@ -38,6 +38,10 @@ import {
 import type { ChatAttachment, ChatEntry, ChatPlanEntry } from "../../../chat/chat-types.js";
 import type { ChatComposerCommandPanel } from "../../../chat/components/chat-composer.js";
 import {
+  saveDesignerSelectedProviderResources,
+  type SaveDesignerSelectedProviderResourcesReceipt,
+} from "../../../designer/designer-service.js";
+import {
   hasComposerCommand,
   listSkillMentions,
 } from "../../../pages/session-composer/session-composer-trigger-detection.js";
@@ -46,11 +50,6 @@ import {
   sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfileVersionsQueryKey,
 } from "../../../sandbox-profiles/sandbox-profiles-query-keys.js";
-import {
-  getSandboxProfileVersionIntegrationBindings,
-  putSandboxProfileVersionDraft,
-} from "../../../sandbox-profiles/sandbox-profiles-service.js";
-import type { SandboxProfileVersionIntegrationBinding } from "../../../sandbox-profiles/sandbox-profiles-types.js";
 import {
   createDashboardControlUserInputResponse,
   createDashboardControlUserInputServerRequest,
@@ -155,11 +154,7 @@ type UserInputAnswerResult = {
   answers: Array<{
     id: string;
     value: string | string[];
-    sideEffect?: {
-      kind: "sandbox-profile-draft-updated";
-      profileId: string;
-      version: number;
-    };
+    sideEffect?: SaveDesignerSelectedProviderResourcesReceipt;
   }>;
 };
 
@@ -176,10 +171,16 @@ function isUserInputAnswerSideEffect(
 ): value is NonNullable<UserInputAnswerResult["answers"][number]["sideEffect"]> {
   return (
     isRecord(value) &&
-    value["kind"] === "sandbox-profile-draft-updated" &&
+    value["kind"] === "sandbox-profile-draft-provider-resources-saved" &&
     typeof value["profileId"] === "string" &&
     typeof value["version"] === "number" &&
-    Number.isInteger(value["version"])
+    Number.isInteger(value["version"]) &&
+    typeof value["connectionId"] === "string" &&
+    typeof value["resourceKind"] === "string" &&
+    typeof value["bindingIntent"] === "string" &&
+    typeof value["bindingId"] === "string" &&
+    isStringArray(value["selectedHandles"]) &&
+    typeof value["createdBinding"] === "boolean"
   );
 }
 
@@ -232,34 +233,12 @@ function readUserInputResponseTranscriptText(result: unknown): string | null {
   return readUserInputCustomResponseText(result) ?? readUserInputAnswerResponseText(result);
 }
 
-function serializeIntegrationBindingForDraft(binding: SandboxProfileVersionIntegrationBinding): {
-  id: string;
-  connectionId: string;
-  kind: SandboxProfileVersionIntegrationBinding["kind"];
-  config: Record<string, unknown>;
-} {
-  return {
-    id: binding.id,
-    connectionId: binding.connectionId,
-    kind: binding.kind,
-    config: binding.config,
-  };
-}
-
-function resolveResourceSelectionDraftConfigField(resourceKind: string): string {
-  if (resourceKind === "repository") {
-    return "repositories";
-  }
-
-  throw new Error(`Resource kind '${resourceKind}' cannot be saved to a sandbox profile draft.`);
-}
-
-async function maybeApplyDashboardUserInputSubmitBehavior(input: {
+async function maybeApplyDashboardUserInputSubmitAction(input: {
   entries: readonly CodexApprovalRequestEntry[];
   queryClient: QueryClient;
   requestId: string | number;
   result: unknown;
-  submitBehaviorSupport: DashboardControlActionSupport["userInputSubmitBehavior"] | undefined;
+  submitActionSupport: DashboardControlActionSupport["userInputSubmitAction"] | undefined;
 }): Promise<unknown> {
   if (!isUserInputAnswerResult(input.result)) {
     return input.result;
@@ -274,8 +253,8 @@ async function maybeApplyDashboardUserInputSubmitBehavior(input: {
 
   const answers = [...input.result.answers];
   for (const question of entry.questions) {
-    const submitBehavior = question.submitBehavior;
-    if (submitBehavior?.kind !== "saveSandboxProfileDraftBinding") {
+    const submitAction = question.submitAction;
+    if (submitAction?.kind !== "saveSelectedProviderResourcesToSandboxProfileDraft") {
       continue;
     }
 
@@ -283,26 +262,11 @@ async function maybeApplyDashboardUserInputSubmitBehavior(input: {
       question.inputKind !== "integrationConnectionResourceMultiSelect" ||
       question.resourceSelection === undefined
     ) {
-      throw new Error("Sandbox profile draft binding updates require resource selection input.");
+      throw new Error("Saving selected provider resources requires resource selection input.");
     }
 
-    const supportedDraftBinding = input.submitBehaviorSupport?.sandboxProfileDraftBinding;
-    if (supportedDraftBinding === undefined) {
-      throw new Error("Sandbox profile draft binding updates are not supported in this session.");
-    }
-
-    if (
-      submitBehavior.profileId !== supportedDraftBinding.profileId ||
-      submitBehavior.version !== supportedDraftBinding.version
-    ) {
-      throw new Error("Sandbox profile draft binding update target is not allowed.");
-    }
-
-    const expectedConfigField = resolveResourceSelectionDraftConfigField(
-      question.resourceSelection.resourceKind,
-    );
-    if (submitBehavior.configField !== expectedConfigField) {
-      throw new Error("Sandbox profile draft binding config field is not allowed.");
+    if (input.submitActionSupport === undefined) {
+      throw new Error("Saving selected provider resources is not supported in this session.");
     }
 
     const answerIndex = answers.findIndex((answer) => answer.id === question.id);
@@ -314,67 +278,33 @@ async function maybeApplyDashboardUserInputSubmitBehavior(input: {
     }
     const selectedHandles = answer.value;
 
-    const currentBindings = await getSandboxProfileVersionIntegrationBindings({
-      profileId: supportedDraftBinding.profileId,
-      version: supportedDraftBinding.version,
-    });
-    const targetBinding = currentBindings.bindings.find(
-      (binding) => binding.id === submitBehavior.bindingId,
-    );
-    if (targetBinding === undefined) {
-      throw new Error(
-        `Sandbox profile integration binding '${submitBehavior.bindingId}' was not found.`,
-      );
-    }
-    if (targetBinding.connectionId !== question.resourceSelection.connectionId) {
-      throw new Error(
-        "Sandbox profile integration binding does not match the selected connection.",
-      );
-    }
-
-    await putSandboxProfileVersionDraft({
-      profileId: supportedDraftBinding.profileId,
-      version: supportedDraftBinding.version,
-      integrationBindings: {
-        bindings: currentBindings.bindings.map((binding) => {
-          const serializedBinding = serializeIntegrationBindingForDraft(binding);
-          if (binding.id !== submitBehavior.bindingId) {
-            return serializedBinding;
-          }
-
-          return {
-            ...serializedBinding,
-            config: {
-              ...serializedBinding.config,
-              [expectedConfigField]: selectedHandles.slice(),
-            },
-          };
-        }),
-      },
+    const receipt = await saveDesignerSelectedProviderResources({
+      sessionId: input.submitActionSupport.designerSessionId,
+      targetDraft: submitAction.targetDraft,
+      connectionId: question.resourceSelection.connectionId,
+      resourceKind: question.resourceSelection.resourceKind,
+      selectedHandles,
+      bindingIntent: submitAction.bindingIntent,
     });
 
     await Promise.all([
       input.queryClient.invalidateQueries({
         queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
-          profileId: supportedDraftBinding.profileId,
-          version: supportedDraftBinding.version,
+          profileId: receipt.profileId,
+          version: receipt.version,
         }),
       }),
       input.queryClient.invalidateQueries({
-        queryKey: sandboxProfileVersionsQueryKey(supportedDraftBinding.profileId),
+        queryKey: sandboxProfileVersionsQueryKey(receipt.profileId),
       }),
       input.queryClient.invalidateQueries({
-        queryKey: sandboxProfileDetailQueryKey(supportedDraftBinding.profileId),
+        queryKey: sandboxProfileDetailQueryKey(receipt.profileId),
       }),
     ]);
 
     answers[answerIndex] = {
       ...answer,
-      sideEffect: {
-        kind: "sandbox-profile-draft-updated",
-        profileId: supportedDraftBinding.profileId,
-        version: supportedDraftBinding.version,
-      },
+      sideEffect: receipt,
     };
   }
 
@@ -1092,12 +1022,12 @@ export function useCodexSessionState(input: {
         }
         const result = isDashboardControlUserInputRequest
           ? createDashboardControlUserInputResponse({
-              result: await maybeApplyDashboardUserInputSubmitBehavior({
+              result: await maybeApplyDashboardUserInputSubmitAction({
                 entries: serverRequestsState.entries,
                 queryClient,
                 requestId: responseInput.requestId,
                 result: responseInput.result,
-                submitBehaviorSupport: input.dashboardControlActions?.userInputSubmitBehavior,
+                submitActionSupport: input.dashboardControlActions?.userInputSubmitAction,
               }),
             })
           : createCodexServerRequestResponse({

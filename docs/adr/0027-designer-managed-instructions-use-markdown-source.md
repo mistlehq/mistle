@@ -1,0 +1,3 @@
+# Designer managed instructions use Markdown source files
+
+Designer managed instructions are authored as canonical source-controlled Markdown files and loaded into managed instruction blocks each time a **Mistle Designer session** runtime plan is created. Production builds copy those Markdown files into `dist` so deployed sessions use the same source shape as local development, while existing sessions remain immutable because their runtime plan captures the instruction content at creation time. This avoids a dev/prod split between Markdown experiments and TypeScript string literals, and gives prompt iteration a faster edit-Markdown/start-new-session loop without adding a separate local override authority.

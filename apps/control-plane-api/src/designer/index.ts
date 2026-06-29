@@ -10,4 +10,6 @@ export {
   listDesignerSessionsResponseSchema as ListDesignerSessionsResponseSchema,
   putDesignerSessionCanvasTabsBodySchema as PutDesignerSessionCanvasTabsBodySchema,
   putDesignerSessionCanvasTabsResponseSchema as PutDesignerSessionCanvasTabsResponseSchema,
+  saveDesignerSelectedProviderResourcesBodySchema as SaveDesignerSelectedProviderResourcesBodySchema,
+  saveDesignerSelectedProviderResourcesResponseSchema as SaveDesignerSelectedProviderResourcesResponseSchema,
 } from "./schemas.js";

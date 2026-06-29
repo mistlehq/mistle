@@ -10,6 +10,7 @@ import * as getDesignerSession from "./get-designer-session/index.js";
 import * as listDesignerSessions from "./list-designer-sessions/index.js";
 import * as putDesignerSessionCanvasTabsBySandboxInstance from "./put-designer-session-canvas-tabs-by-sandbox-instance/index.js";
 import * as putDesignerSessionCanvasTabs from "./put-designer-session-canvas-tabs/index.js";
+import * as saveSelectedProviderResources from "./save-selected-provider-resources/index.js";
 
 export function createDesignerRoutes(): AppRoutes<typeof DESIGNER_ROUTE_BASE_PATH> {
   const routes = new OpenAPIHono<AppContextBindings>({
@@ -32,6 +33,7 @@ export function createDesignerRoutes(): AppRoutes<typeof DESIGNER_ROUTE_BASE_PAT
   );
   routes.openapi(getDesignerSession.route, getDesignerSession.handler);
   routes.openapi(putDesignerSessionCanvasTabs.route, putDesignerSessionCanvasTabs.handler);
+  routes.openapi(saveSelectedProviderResources.route, saveSelectedProviderResources.handler);
 
   return {
     basePath: DESIGNER_ROUTE_BASE_PATH,

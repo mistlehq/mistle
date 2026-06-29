@@ -2,7 +2,15 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
-import { ApiKeyActorKinds } from "@mistle/db/control-plane";
+import {
+  ApiKeyActorKinds,
+  IntegrationBindingKinds,
+  IntegrationConnectionResourceStatuses,
+  IntegrationConnectionResourceSyncStates,
+  IntegrationConnectionStatuses,
+  SandboxProfileVersionStates,
+} from "@mistle/db/control-plane";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
@@ -12,15 +20,227 @@ import { OrganizationPermissions } from "../src/auth/services/organization-polic
 import {
   DesignerSessionSchema,
   ListDesignerSessionsResponseSchema,
+  SaveDesignerSelectedProviderResourcesResponseSchema,
 } from "../src/designer/index.js";
 import { SandboxInstancesConflictResponseSchema } from "../src/sandbox-instances/index.js";
 import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
+import {
+  integrationConnectionRow,
+  integrationTargetRow,
+  sandboxProfileRow,
+  sandboxProfileVersionIntegrationBindingRow,
+  sandboxProfileVersionRow,
+} from "./helpers/sandbox-profiles.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
 });
 
+const DockerSandboxRuntimeColumns = {
+  sandboxProvider: "docker",
+  sandboxConnectionId: null,
+  sandboxVcpuCount: null,
+  sandboxMemoryMb: null,
+  sandboxDiskMb: null,
+} as const;
+
 describe.concurrent("designer sessions integration", () => {
+  it("saves selected provider resources to a sandbox profile draft through a Designer dashboard action", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-designer-dashboard-resource-save@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: "dsn_dashboard_resource_save",
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_dashboard_resource_save",
+      canvasTabs: [],
+      initialPrompt: "Build a PR review workflow.",
+      createdAt: "2026-06-29T00:00:00.000Z",
+      updatedAt: "2026-06-29T00:00:00.000Z",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "github-designer-dashboard-resource-save",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_designer_dashboard_resource_save",
+        organizationId: session.organizationId,
+        targetKey: "github-designer-dashboard-resource-save",
+        displayName: "GitHub Dashboard Resource Save",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          app_id: "123",
+          app_slug: "mistle-test",
+          client_id: "Iv1.test",
+          installation_id: "456",
+        },
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-designer-dashboard-resource-save",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_designer_dashboard_resource_save_agent",
+        organizationId: session.organizationId,
+        targetKey: "openai-designer-dashboard-resource-save",
+        displayName: "OpenAI Dashboard Resource Save",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.integrationConnectionResourceStates)
+      .values({
+        connectionId: "icn_designer_dashboard_resource_save",
+        familyId: "github",
+        kind: "repository",
+        syncState: IntegrationConnectionResourceSyncStates.READY,
+        totalCount: 2,
+        lastSyncedAt: "2026-06-29T00:00:00.000Z",
+        lastSyncStartedAt: "2026-06-29T00:00:00.000Z",
+        lastSyncFinishedAt: "2026-06-29T00:00:10.000Z",
+        lastErrorCode: null,
+        lastErrorMessage: null,
+      });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnectionResources).values([
+      {
+        id: "rsc_designer_dashboard_resource_save_mistle",
+        connectionId: "icn_designer_dashboard_resource_save",
+        familyId: "github",
+        kind: "repository",
+        externalId: "1001",
+        handle: "mistlehq/mistle",
+        displayName: "mistlehq/mistle",
+        status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
+        metadata: {},
+        lastSeenAt: "2026-06-29T00:00:00.000Z",
+      },
+      {
+        id: "rsc_designer_dashboard_resource_save_docs",
+        connectionId: "icn_designer_dashboard_resource_save",
+        familyId: "github",
+        kind: "repository",
+        externalId: "1002",
+        handle: "mistlehq/docs",
+        displayName: "mistlehq/docs",
+        status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
+        metadata: {},
+        lastSeenAt: "2026-06-29T00:00:00.000Z",
+      },
+    ]);
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_designer_dashboard_resource_save",
+        organizationId: session.organizationId,
+        displayName: "Designer Dashboard Resource Save",
+        createdAt: "2026-06-29T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_designer_dashboard_resource_save",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        ...DockerSandboxRuntimeColumns,
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_designer_dashboard_resource_save_agent",
+          sandboxProfileId: "sbp_designer_dashboard_resource_save",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_designer_dashboard_resource_save_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+      );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/designer/sessions/dsn_dashboard_resource_save/dashboard-actions/save-selected-provider-resources",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          targetDraft: {
+            profileId: "sbp_designer_dashboard_resource_save",
+            version: 1,
+          },
+          connectionId: "icn_designer_dashboard_resource_save",
+          resourceKind: "repository",
+          selectedHandles: ["mistlehq/mistle", "mistlehq/docs", "mistlehq/mistle"],
+          bindingIntent: "git-repositories",
+        }),
+      },
+    );
+
+    const responseBody = await response.json();
+    expect(response.status).toBe(200);
+    const receipt = SaveDesignerSelectedProviderResourcesResponseSchema.parse(responseBody);
+    expect(receipt).toMatchObject({
+      kind: "sandbox-profile-draft-provider-resources-saved",
+      profileId: "sbp_designer_dashboard_resource_save",
+      version: 1,
+      connectionId: "icn_designer_dashboard_resource_save",
+      resourceKind: "repository",
+      bindingIntent: "git-repositories",
+      selectedHandles: ["mistlehq/mistle", "mistlehq/docs"],
+      createdBinding: true,
+    });
+
+    const bindings =
+      await env.controlPlaneDb.query.sandboxProfileVersionIntegrationBindings.findMany({
+        where: (table, { and, eq: whereEq }) =>
+          and(
+            whereEq(table.sandboxProfileId, "sbp_designer_dashboard_resource_save"),
+            whereEq(table.sandboxProfileVersion, 1),
+          ),
+        orderBy: (table, { asc }) => [asc(table.kind)],
+      });
+    expect(bindings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "ibd_designer_dashboard_resource_save_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          connectionId: "icn_designer_dashboard_resource_save_agent",
+          config: {},
+        }),
+        expect.objectContaining({
+          id: receipt.bindingId,
+          kind: IntegrationBindingKinds.GIT,
+          connectionId: "icn_designer_dashboard_resource_save",
+          config: expect.objectContaining({
+            repositories: ["mistlehq/mistle", "mistlehq/docs"],
+          }),
+        }),
+      ]),
+    );
+  });
+
   it("creates, lists, reads, and updates a Designer session in the authenticated organization", async ({
     env,
   }) => {

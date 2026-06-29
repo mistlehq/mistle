@@ -53,12 +53,13 @@ export type ToolRequestUserInputEntry = {
       emptyMessage?: string;
       initialSelectedHandles?: readonly string[];
     };
-    submitBehavior?: {
-      kind: "saveSandboxProfileDraftBinding";
-      profileId: string;
-      version: number;
-      bindingId: string;
-      configField: string;
+    submitAction?: {
+      kind: "saveSelectedProviderResourcesToSandboxProfileDraft";
+      targetDraft: {
+        profileId: string;
+        version: number;
+      };
+      bindingIntent: string;
     };
   }[];
   status: "pending" | "responding";
