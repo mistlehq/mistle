@@ -13,7 +13,10 @@ import {
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { resolveRevokingApiKeyId } from "./organization-api-keys-settings-page-state.js";
-import { OrganizationApiKeysSettingsPageView } from "./organization-api-keys-settings-page-view.js";
+import {
+  OrganizationApiKeysCreateActionLink,
+  OrganizationApiKeysSettingsPageView,
+} from "./organization-api-keys-settings-page-view.js";
 
 type CreatedApiKeyNotice = {
   name: string;
@@ -54,7 +57,11 @@ export function OrganizationApiKeysSettingsPage(): React.JSX.Element {
   }, [location.pathname, location.search, location.state, navigate]);
 
   return (
-    <PageFrame description={description} title={title}>
+    <PageFrame
+      description={description}
+      headerActions={<OrganizationApiKeysCreateActionLink />}
+      title={title}
+    >
       <OrganizationApiKeysSettingsPageView
         apiKeys={apiKeysQuery.data?.items ?? []}
         createdApiKeyNotice={createdApiKeyNotice}

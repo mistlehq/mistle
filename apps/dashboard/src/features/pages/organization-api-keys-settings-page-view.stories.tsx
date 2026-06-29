@@ -6,7 +6,11 @@ import {
   withDashboardPageStory,
 } from "../../storybook/decorators.js";
 import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
-import { OrganizationApiKeysSettingsPageView } from "./organization-api-keys-settings-page-view.js";
+import { PageFrame } from "../shared/page-frame.js";
+import {
+  OrganizationApiKeysCreateActionLink,
+  OrganizationApiKeysSettingsPageView,
+} from "./organization-api-keys-settings-page-view.js";
 
 const ProductionApiKeyId = "apk_story_prod";
 
@@ -14,7 +18,7 @@ const StoryApiKeys = [
   {
     id: ProductionApiKeyId,
     name: "Production deploy key",
-    secretPrefix: "mstl_apk_ED4p8qJIc8ptYvhuD8yyOQ",
+    secretPrefix: "ED4p8qJIc8ptYvhuD8yyOQ",
     permissions: [
       "sandboxProfile:read",
       "sandboxSession:create",
@@ -30,7 +34,7 @@ const StoryApiKeys = [
   {
     id: "apk_story_ci",
     name: "CI runner",
-    secretPrefix: "mstl_apk_A9fZg2qP8xQmN7rT6wLs",
+    secretPrefix: "A9fZg2qP8xQmN7rT6wLs",
     permissions: ["sandboxProfile:read", "sandboxSession:create"],
     expiresAt: null,
     lastUsedAt: "2026-05-19T10:30:00.000Z",
@@ -48,6 +52,11 @@ const meta = {
   title: "Dashboard/Settings/OrganizationApiKeys/PageView",
   component: OrganizationApiKeysSettingsPageView,
   decorators: [withDashboardPageStory, createDashboardMemoryRouterDecorator()],
+  render: (args) => (
+    <PageFrame headerActions={<OrganizationApiKeysCreateActionLink />} title="API Keys">
+      <OrganizationApiKeysSettingsPageView {...args} />
+    </PageFrame>
+  ),
   args: {
     apiKeys: StoryApiKeys,
     createdApiKeyNotice: null,
@@ -92,13 +101,6 @@ export const CreatedToken: Story = {
 export const Empty: Story = {
   args: {
     apiKeys: [],
-  },
-};
-
-export const Loading: Story = {
-  args: {
-    apiKeys: [],
-    isLoading: true,
   },
 };
 

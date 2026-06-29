@@ -9,10 +9,12 @@ import {
   AlertDialogTitle,
   Button,
   CopyableValue,
+  DropdownMenuItem,
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
+  MoreActionsMenu,
   Notice,
   Table,
   TableBody,
@@ -21,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@mistle/ui";
-import { KeyIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { KeyIcon, PlusIcon, ProhibitIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import { ApiKeyMistleResourceAccessSummary } from "../settings/api-keys/api-key-permissions-summary.js";
@@ -50,13 +52,6 @@ export function OrganizationApiKeysSettingsPageView(
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-end gap-3">
-        <RoutedButtonLink to="/settings/organization/api-keys/new">
-          <PlusIcon aria-hidden />
-          Create API key
-        </RoutedButtonLink>
-      </div>
-
       {props.revokeErrorMessage === null ? null : (
         <Notice variant="alert">{props.revokeErrorMessage}</Notice>
       )}
@@ -91,9 +86,7 @@ export function OrganizationApiKeysSettingsPageView(
       {props.listErrorMessage === null ? null : (
         <Notice variant="alert">{props.listErrorMessage}</Notice>
       )}
-      {props.isLoading ? (
-        <p className="text-muted-foreground text-sm">Loading API keys...</p>
-      ) : props.apiKeys.length === 0 ? (
+      {props.isLoading ? null : props.apiKeys.length === 0 ? (
         <Empty>
           <EmptyHeader>
             <KeyIcon aria-hidden className="size-8 text-muted-foreground" />
@@ -104,67 +97,81 @@ export function OrganizationApiKeysSettingsPageView(
           </EmptyHeader>
         </Empty>
       ) : (
-        <Table className="min-w-[48rem]">
+        <Table className="min-w-[64rem] table-fixed">
           <TableHeader className="bg-muted/60">
             <TableRow className="h-9 border-b">
-              <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+              <TableHead className="text-foreground w-[17%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
                 Name
               </TableHead>
-              <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
-                Key
+              <TableHead className="text-foreground w-[26%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                Key prefix
               </TableHead>
-              <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+              <TableHead className="text-foreground w-[14%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
                 Permissions
               </TableHead>
-              <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+              <TableHead className="text-foreground w-[18%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
                 Last used
               </TableHead>
-              <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+              <TableHead className="text-foreground w-[20%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
                 Created
               </TableHead>
-              <TableHead className="text-right text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+              <TableHead className="w-[5%] py-2">
                 <span className="sr-only">Actions</span>
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {props.apiKeys.map((apiKey) => (
-              <TableRow key={apiKey.id}>
-                <TableCell className="font-medium">{apiKey.name}</TableCell>
-                <TableCell>
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                    {apiKey.secretPrefix}...
-                  </code>
-                </TableCell>
-                <TableCell>
-                  <ApiKeyMistleResourceAccessSummary
-                    apiKey={apiKey}
-                    description={
-                      <>
-                        {apiKey.name} can access these Mistle resources. Access is limited by this
-                        API key&apos;s permissions.
-                      </>
-                    }
-                  />
-                </TableCell>
-                <TableCell>{formatNullableDate(apiKey.lastUsedAt, "Never")}</TableCell>
-                <TableCell>{formatDateTime(apiKey.createdAt)}</TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    aria-label={`Revoke ${apiKey.name}`}
-                    disabled={props.revokingApiKeyId !== null}
-                    onClick={() => {
-                      setApiKeyPendingRevoke(apiKey);
-                    }}
-                    size="icon-sm"
-                    type="button"
-                    variant="destructive"
-                  >
-                    <TrashIcon aria-hidden />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
+            {props.apiKeys.map((apiKey) => {
+              const keyPrefixLabel = formatApiKeyPrefixLabel(apiKey.secretPrefix);
+
+              return (
+                <TableRow key={apiKey.id}>
+                  <TableCell className="max-w-0 align-middle font-medium whitespace-normal break-words">
+                    {apiKey.name}
+                  </TableCell>
+                  <TableCell className="max-w-0 align-middle">
+                    <code
+                      className="text-muted-foreground block max-w-full truncate text-xs"
+                      title={keyPrefixLabel}
+                    >
+                      {keyPrefixLabel}
+                    </code>
+                  </TableCell>
+                  <TableCell className="align-middle whitespace-nowrap">
+                    <ApiKeyMistleResourceAccessSummary
+                      apiKey={apiKey}
+                      description={
+                        <>
+                          {apiKey.name} can access these Mistle resources. Access is limited by this
+                          API key&apos;s permissions.
+                        </>
+                      }
+                    />
+                  </TableCell>
+                  <DateTimeTableCell emptyLabel="Never" value={apiKey.lastUsedAt} />
+                  <DateTimeTableCell value={apiKey.createdAt} />
+                  <TableCell className="align-middle text-right">
+                    <div className="flex justify-end">
+                      <MoreActionsMenu
+                        disabled={props.revokingApiKeyId !== null}
+                        triggerLabel={`API key actions for ${apiKey.name}`}
+                        triggerSize="icon-xs"
+                      >
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setApiKeyPendingRevoke(apiKey);
+                          }}
+                          variant="destructive"
+                        >
+                          <ProhibitIcon aria-hidden className="size-4" />
+                          Revoke key
+                        </DropdownMenuItem>
+                      </MoreActionsMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       )}
@@ -201,6 +208,40 @@ export function OrganizationApiKeysSettingsPageView(
         )}
       </AlertDialog>
     </div>
+  );
+}
+
+export function OrganizationApiKeysCreateActionLink(): React.JSX.Element {
+  return (
+    <RoutedButtonLink to="/settings/organization/api-keys/new">
+      <PlusIcon aria-hidden className="size-4" />
+      Create API key
+    </RoutedButtonLink>
+  );
+}
+
+function formatApiKeyPrefixLabel(secretPrefix: string): string {
+  return `mstl_apk_${secretPrefix}`;
+}
+
+function DateTimeTableCell(props: {
+  emptyLabel?: string;
+  value: string | null;
+}): React.JSX.Element {
+  const label = formatNullableDate(props.value, props.emptyLabel ?? "Unknown");
+
+  return (
+    <TableCell className="max-w-0 align-middle whitespace-nowrap">
+      {props.value === null ? (
+        <span className="block truncate" title={label}>
+          {label}
+        </span>
+      ) : (
+        <time className="block truncate" dateTime={props.value} title={label}>
+          {label}
+        </time>
+      )}
+    </TableCell>
   );
 }
 

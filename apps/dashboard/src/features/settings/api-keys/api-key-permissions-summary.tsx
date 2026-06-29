@@ -36,7 +36,7 @@ export function ApiKeyMistleResourceAccessSummary(input: {
     <>
       <Button
         aria-label={`View allowed Mistle resources: ${summaryLabel}`}
-        className="text-muted-foreground"
+        className="text-muted-foreground px-0 hover:bg-transparent"
         onClick={() => {
           setDetailsAreOpen(true);
         }}

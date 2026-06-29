@@ -142,9 +142,7 @@ describe("route handles", () => {
     );
 
     expect(ROUTE_HANDLES.settingsOrganizationApiKeys.title).toBe("API Keys");
-    expect(ROUTE_HANDLES.settingsOrganizationApiKeys.description).toBe(
-      "Manage organization API keys.",
-    );
+    expect(ROUTE_HANDLES.settingsOrganizationApiKeys.description).toBe("");
     expect(ROUTE_HANDLES.settingsOrganizationApiKeysNew.title).toBe("Create API key");
     expect(ROUTE_HANDLES.settingsOrganizationApiKeysNew.description).toBe(
       "Create an organization API key for programmatic access.",
