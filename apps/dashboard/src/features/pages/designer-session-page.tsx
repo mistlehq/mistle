@@ -408,10 +408,12 @@ function LoadedDesignerSessionPage(input: {
         kind: "custom",
         defaultSize: 60,
         diffControlTitle: "Changes are not shown in Designer.",
+        firstOpenTransitionMode: "slow",
         isVisible: input.canvasTabs.length > 0,
         layoutKey: "designer-canvas-60",
         mountMode: "persistent-collapsible",
         minSize: "20rem",
+        resizeKey: input.canvasTabs.length === 0 ? null : "designer-canvas-open",
         renderPanel: ({
           onAddBlueprintComment,
           onDeleteBlueprintComment,

@@ -66,10 +66,12 @@ type SessionWorkbenchFullPageSecondaryPanel =
       kind: "custom";
       diffControlTitle: string;
       defaultSize?: number;
+      firstOpenTransitionMode?: "standard" | "slow";
       isVisible?: boolean;
       layoutKey: string;
       mountMode?: "visible-only" | "persistent-collapsible";
       minSize: string;
+      resizeKey?: string | null;
       renderPanel: (input: {
         onAddBlueprintComment: (comment: PendingSessionBlueprintCommentInput) => void;
         onDeleteBlueprintComment: (commentId: string) => void;
@@ -119,9 +121,11 @@ type SessionWorkbenchSecondaryPanelResolution = {
     SessionWorkbenchPageViewProps,
     | "primaryPanelDefaultSize"
     | "secondaryPanelDefaultSize"
+    | "secondaryPanelFirstOpenTransitionMode"
     | "secondaryPanelLayoutKey"
     | "secondaryPanelMinSize"
     | "secondaryPanelMountMode"
+    | "secondaryPanelResizeKey"
   >;
 };
 
@@ -253,11 +257,19 @@ function resolveSessionWorkbenchSecondaryPanel(input: {
       isVisible,
       pageViewProps: {
         ...resolveSecondaryPanelSizing(input.secondaryPanel.defaultSize),
+        ...(input.secondaryPanel.firstOpenTransitionMode === undefined
+          ? {}
+          : {
+              secondaryPanelFirstOpenTransitionMode: input.secondaryPanel.firstOpenTransitionMode,
+            }),
         secondaryPanelLayoutKey: input.secondaryPanel.layoutKey,
         secondaryPanelMinSize: input.secondaryPanel.minSize,
         ...(input.secondaryPanel.mountMode === undefined
           ? {}
           : { secondaryPanelMountMode: input.secondaryPanel.mountMode }),
+        ...(input.secondaryPanel.resizeKey === undefined
+          ? {}
+          : { secondaryPanelResizeKey: input.secondaryPanel.resizeKey }),
       },
     };
   }

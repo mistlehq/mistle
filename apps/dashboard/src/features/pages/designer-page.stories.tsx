@@ -517,6 +517,7 @@ function DesignerSessionCanvasFirstOpenStory(): React.JSX.Element {
             </div>
           }
           secondaryPanelDefaultSize={60}
+          secondaryPanelFirstOpenTransitionMode="slow"
           secondaryPanelLayoutKey="designer-canvas-first-open-story"
           secondaryPanelMinSize="20rem"
           secondaryPanelMountMode="persistent-collapsible"
