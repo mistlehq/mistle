@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ChatEntry } from "../chat/chat-types.js";
 import {
@@ -133,6 +133,9 @@ const UserInputCustomResponseComposerStateInput: React.ComponentProps<
   },
 };
 
+const LongTranscriptStreamingTurnId = "long-transcript-streaming-turn";
+const LongTranscriptStreamingMaxChunks = 160;
+
 function createLongTranscriptAssistantText(input: {
   paragraphCount: number;
   turnNumber: number;
@@ -177,6 +180,81 @@ function createLongTranscriptEntries(input: {
       },
     ];
   }).flat();
+}
+
+function createStreamingChunkText(chunkNumber: number): string {
+  const paddedChunkNumber = String(chunkNumber).padStart(3, "0");
+  if (chunkNumber % 12 === 0) {
+    return [
+      `Streaming chunk ${paddedChunkNumber}: captured a longer markdown/code update.`,
+      "",
+      "```ts",
+      `const streamedChunk${String(chunkNumber)} = "profile the active streaming turn";`,
+      "```",
+    ].join("\n");
+  }
+
+  if (chunkNumber % 5 === 0) {
+    return [
+      `Streaming chunk ${paddedChunkNumber}:`,
+      "- preserve the old completed transcript",
+      "- update only the active response",
+      "- keep scroll-follow work visible to the profiler",
+    ].join("\n");
+  }
+
+  return [
+    `Streaming chunk ${paddedChunkNumber}.`,
+    "The assistant is appending content to the active turn while a large completed transcript remains mounted above it.",
+  ].join(" ");
+}
+
+function createStreamingAssistantText(chunkCount: number): string {
+  if (chunkCount === 0) {
+    return "Preparing the next streamed response.";
+  }
+
+  return Array.from({ length: chunkCount }, (_, index) => createStreamingChunkText(index + 1)).join(
+    "\n\n",
+  );
+}
+
+function createLongTranscriptStreamingEntries(input: {
+  completedEntries: readonly ChatEntry[];
+  streamingChunkCount: number;
+}): readonly ChatEntry[] {
+  return [
+    ...input.completedEntries,
+    {
+      id: `${LongTranscriptStreamingTurnId}:user`,
+      turnId: LongTranscriptStreamingTurnId,
+      kind: "user-message",
+      status: "completed",
+      text: "Stream a detailed implementation update while keeping the older transcript mounted.",
+    },
+    {
+      id: `${LongTranscriptStreamingTurnId}:assistant`,
+      turnId: LongTranscriptStreamingTurnId,
+      kind: "assistant-message",
+      phase: null,
+      status: "streaming",
+      text: createStreamingAssistantText(input.streamingChunkCount),
+    },
+  ];
+}
+
+function RenderCounter(input: { label: string }): React.JSX.Element {
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+
+  return (
+    <div
+      className="rounded border bg-muted/40 px-2 py-1 font-mono text-[11px] text-muted-foreground"
+      data-testid={`render-counter-${input.label}`}
+    >
+      {input.label}: {renderCountRef.current}
+    </div>
+  );
 }
 
 function UserInputCustomResponseHarness(): React.JSX.Element {
@@ -277,38 +355,178 @@ function LongTranscriptTypingHarness(): React.JSX.Element {
 
   return renderSessionWorkbenchContentStory({
     mainContent: (
-      <SessionConversationMainContent
-        activeTurnId={null}
-        autoScrollToBottomOnInitialLoad
-        chatEntries={entries}
-        initialBottomScrollResetKey="long-transcript-typing"
-        isRespondingToServerRequest={false}
-        isTurnInProgress={false}
-        onRespondToServerRequest={
-          SessionConversationPanePlaygroundBaseArgs.onRespondToServerRequest
-        }
-        pendingTurnId={null}
-        scrollBehavior="follow-streaming-at-bottom"
-        scrollContainerRef={scrollContainerRef}
-        serverRequestPanelEntries={LongTranscriptServerRequestPanelEntries}
-      />
+      <>
+        <div className="px-4 pb-2">
+          <RenderCounter label="isolated-main-content" />
+        </div>
+        <SessionConversationMainContent
+          activeTurnId={null}
+          autoScrollToBottomOnInitialLoad
+          chatEntries={entries}
+          initialBottomScrollResetKey="long-transcript-typing"
+          isRespondingToServerRequest={false}
+          isTurnInProgress={false}
+          onRespondToServerRequest={
+            SessionConversationPanePlaygroundBaseArgs.onRespondToServerRequest
+          }
+          pendingTurnId={null}
+          scrollBehavior="follow-streaming-at-bottom"
+          scrollContainerRef={scrollContainerRef}
+          serverRequestPanelEntries={LongTranscriptServerRequestPanelEntries}
+        />
+      </>
     ),
     mainContentScrollContainerRef: scrollContainerRef,
     primaryBottomPanel: (
-      <SessionConversationBottomPanelDraftController
-        chatEntries={entries}
-        clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
-        clearPendingDiffComments={function clearPendingDiffComments() {}}
-        composerStateInput={LongTranscriptComposerStateInput}
-        draftResetKey="long-transcript-typing"
-        isRespondingToServerRequest={false}
-        onRespondToServerRequest={
-          SessionConversationPanePlaygroundBaseArgs.onRespondToServerRequest
+      <>
+        <div className="pb-2">
+          <RenderCounter label="isolated-composer-owner" />
+        </div>
+        <SessionConversationBottomPanelDraftController
+          chatEntries={entries}
+          clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
+          clearPendingDiffComments={function clearPendingDiffComments() {}}
+          composerStateInput={LongTranscriptComposerStateInput}
+          draftResetKey="long-transcript-typing"
+          isRespondingToServerRequest={false}
+          onRespondToServerRequest={
+            SessionConversationPanePlaygroundBaseArgs.onRespondToServerRequest
+          }
+          pendingBlueprintComments={[]}
+          pendingDiffComments={LongTranscriptPendingDiffComments}
+          serverRequestPanelEntries={LongTranscriptServerRequestPanelEntries}
+        />
+      </>
+    ),
+  });
+}
+
+function LongTranscriptStreamingHarness(): React.JSX.Element {
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const completedEntries = useMemo(
+    () =>
+      createLongTranscriptEntries({
+        assistantParagraphsPerTurn: 2,
+        turnCount: 1000,
+      }),
+    [],
+  );
+  const [streamingChunkCount, setStreamingChunkCount] = useState(1);
+  const [isStreaming, setStreaming] = useState(false);
+  const entries = useMemo(
+    () =>
+      createLongTranscriptStreamingEntries({
+        completedEntries,
+        streamingChunkCount,
+      }),
+    [completedEntries, streamingChunkCount],
+  );
+  const appendStreamingChunk = useCallback((): void => {
+    setStreamingChunkCount((currentChunkCount) =>
+      Math.min(currentChunkCount + 1, LongTranscriptStreamingMaxChunks),
+    );
+  }, []);
+  const resetStreamingChunks = useCallback((): void => {
+    setStreaming(false);
+    setStreamingChunkCount(1);
+  }, []);
+  const toggleStreaming = useCallback((): void => {
+    setStreaming((currentIsStreaming) => !currentIsStreaming);
+  }, []);
+
+  useEffect(() => {
+    if (!isStreaming) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setStreamingChunkCount((currentChunkCount) => {
+        const nextChunkCount = Math.min(currentChunkCount + 1, LongTranscriptStreamingMaxChunks);
+        if (nextChunkCount >= LongTranscriptStreamingMaxChunks) {
+          setStreaming(false);
         }
-        pendingBlueprintComments={[]}
-        pendingDiffComments={LongTranscriptPendingDiffComments}
-        serverRequestPanelEntries={LongTranscriptServerRequestPanelEntries}
-      />
+
+        return nextChunkCount;
+      });
+    }, 80);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isStreaming]);
+
+  return renderSessionWorkbenchContentStory({
+    mainContent: (
+      <>
+        <div className="flex flex-wrap items-center gap-2 px-4 pb-2">
+          <RenderCounter label="streaming-main-content" />
+          <div
+            className="rounded border bg-muted/40 px-2 py-1 font-mono text-[11px] text-muted-foreground"
+            data-testid="streaming-chunk-count"
+          >
+            chunks: {streamingChunkCount}
+          </div>
+          <button
+            className="rounded border bg-background px-2 py-1 text-xs text-foreground shadow-sm hover:bg-muted"
+            onClick={appendStreamingChunk}
+            type="button"
+          >
+            Append chunk
+          </button>
+          <button
+            className="rounded border bg-background px-2 py-1 text-xs text-foreground shadow-sm hover:bg-muted"
+            onClick={toggleStreaming}
+            type="button"
+          >
+            {isStreaming ? "Pause" : "Stream"}
+          </button>
+          <button
+            className="rounded border bg-background px-2 py-1 text-xs text-foreground shadow-sm hover:bg-muted"
+            onClick={resetStreamingChunks}
+            type="button"
+          >
+            Reset
+          </button>
+        </div>
+        <SessionConversationMainContent
+          activeTurnId={LongTranscriptStreamingTurnId}
+          autoScrollToBottomOnInitialLoad
+          chatEntries={entries}
+          initialBottomScrollResetKey="long-transcript-streaming"
+          isRespondingToServerRequest={false}
+          isTurnInProgress
+          onRespondToServerRequest={
+            SessionConversationPanePlaygroundBaseArgs.onRespondToServerRequest
+          }
+          pendingTurnId={null}
+          scrollBehavior="follow-streaming-at-bottom"
+          scrollContainerRef={scrollContainerRef}
+          serverRequestPanelEntries={LongTranscriptServerRequestPanelEntries}
+        />
+      </>
+    ),
+    mainContentScrollContainerRef: scrollContainerRef,
+    primaryBottomPanel: (
+      <>
+        <div className="pb-2">
+          <RenderCounter label="streaming-composer-owner" />
+        </div>
+        <SessionConversationBottomPanelDraftController
+          chatEntries={entries}
+          clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
+          clearPendingDiffComments={function clearPendingDiffComments() {}}
+          composerStateInput={LongTranscriptComposerStateInput}
+          draftResetKey="long-transcript-streaming"
+          isRespondingToServerRequest={false}
+          onRespondToServerRequest={
+            SessionConversationPanePlaygroundBaseArgs.onRespondToServerRequest
+          }
+          pendingBlueprintComments={[]}
+          pendingDiffComments={LongTranscriptPendingDiffComments}
+          serverRequestPanelEntries={LongTranscriptServerRequestPanelEntries}
+          showWorkingIndicator
+        />
+      </>
     ),
   });
 }
@@ -485,6 +703,13 @@ export const LongTranscriptTyping: Story = {
     customWorkbenchStory: true,
   },
   render: LongTranscriptTypingHarness,
+};
+
+export const LongTranscriptStreaming: Story = {
+  parameters: {
+    customWorkbenchStory: true,
+  },
+  render: LongTranscriptStreamingHarness,
 };
 
 export const PendingUserInputCustomResponse: Story = {
