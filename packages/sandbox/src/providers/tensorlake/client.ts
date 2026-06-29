@@ -18,14 +18,8 @@ import {
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
 import { SandboxdStopDirectDaemonCommand } from "../../sandboxd-install.js";
-import {
-  SandboxBaseImageSourceKinds,
-  SandboxInspectDispositions,
-  SandboxInspectStates,
-  SandboxProvider,
-} from "../../types.js";
+import { SandboxInspectDispositions, SandboxInspectStates, SandboxProvider } from "../../types.js";
 import { recordSandboxDaemonReady, sandboxTelemetryErrorCode } from "../telemetry.js";
-import { createTensorlakeSdkImageBuildContext } from "./base-image-builder.js";
 import {
   TensorlakeClientOperationIds,
   TensorlakeCommandExitError,
@@ -320,8 +314,7 @@ export class TensorlakeApiClient implements TensorlakeClient {
   async prepareImage(request: { image: TensorlakeStartImage }): Promise<void> {
     if (
       request.image.kind !== TensorlakeStartImageKinds.IMAGE ||
-      request.image.sourceBaseImageRef === undefined ||
-      this.#config.sandboxd === undefined
+      request.image.sourceBaseImageRef === undefined
     ) {
       return;
     }
@@ -408,48 +401,16 @@ export class TensorlakeApiClient implements TensorlakeClient {
       throw new Error("Tensorlake base image registration requires a source base image ref.");
     }
 
-    if (this.#config.sandboxd === undefined) {
-      throw new Error("Tensorlake missing-image registration requires a sandboxd artifact source.");
-    }
-
-    const buildContext = await createTensorlakeSdkImageBuildContext({
-      kind: SandboxBaseImageSourceKinds.SDK_IMAGE,
-      baseImageRef: image.sourceBaseImageRef,
-      contextPath: process.cwd(),
-      imageId: image.id,
-      sandboxd: this.#config.sandboxd,
-    });
-    let registrationError: unknown;
-
     try {
       await registerTensorlakeSandboxBaseImage({
         apiKey: this.#config.apiKey,
-        contextPath: buildContext.path,
         source: {
           baseImageRef: image.sourceBaseImageRef,
           imageId: image.id,
-          sandboxd: this.#config.sandboxd,
         },
       });
     } catch (error) {
-      registrationError = mapTensorlakeClientError(
-        TensorlakeClientOperationIds.BUILD_BASE_IMAGE,
-        error,
-      );
-    }
-
-    try {
-      await buildContext.cleanup();
-    } catch (cleanupError) {
-      if (registrationError === undefined) {
-        throw cleanupError;
-      }
-
-      console.error(`Failed to remove Tensorlake image build context ${buildContext.path}.`);
-    }
-
-    if (registrationError !== undefined) {
-      throw registrationError;
+      throw mapTensorlakeClientError(TensorlakeClientOperationIds.BUILD_BASE_IMAGE, error);
     }
   }
 

@@ -6,6 +6,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -82,6 +83,7 @@ pub(crate) const MISTLE_SANDBOX_PROFILE_VERSION_ENV_NAME: &str = "MISTLE_SANDBOX
 pub enum SandboxdStateError {
     ApplyRuntimePlan(String),
     ApplyGitIdentity(String),
+    PrepareDeviceLinks(String),
     StartEgressProxy(String),
     RunSetupScript(String),
     StartRuntimeProcesses(String),
@@ -102,6 +104,9 @@ impl fmt::Display for SandboxdStateError {
                     f,
                     "failed to apply git identity from session input: {error}"
                 )
+            }
+            Self::PrepareDeviceLinks(error) => {
+                write!(f, "failed to prepare standard /dev links: {error}")
             }
             Self::StartEgressProxy(error) => {
                 write!(f, "failed to start local egress proxy: {error}")
@@ -241,6 +246,9 @@ impl SandboxdState {
         diagnostics_logger: Option<ActivationDiagnosticsLogger>,
     ) -> Result<Self, SandboxdStateError> {
         let session_input = input.session_input;
+        prepare_standard_dev_links(Path::new("/dev"))
+            .map_err(SandboxdStateError::PrepareDeviceLinks)?;
+
         let runtime_plan: runtime::CompiledRuntimePlan =
             serde_json::from_value(session_input.runtime_plan.clone()).map_err(|error| {
                 let error_text = error.to_string();
@@ -1448,6 +1456,42 @@ fn is_snapshot_preparation_operation(operation_kind: ActivationOperationKind) ->
 
 fn should_run_setup_script_for_activation(should_apply_runtime_plan: bool) -> bool {
     should_apply_runtime_plan
+}
+
+fn prepare_standard_dev_links(dev_directory: &Path) -> Result<(), String> {
+    for (name, target) in [
+        ("fd", "/proc/self/fd"),
+        ("stdin", "/proc/self/fd/0"),
+        ("stdout", "/proc/self/fd/1"),
+        ("stderr", "/proc/self/fd/2"),
+    ] {
+        ensure_dev_link(dev_directory, name, Path::new(target))?;
+    }
+
+    Ok(())
+}
+
+fn ensure_dev_link(dev_directory: &Path, name: &str, target: &Path) -> Result<(), String> {
+    let path = dev_directory.join(name);
+    match fs::read_link(&path) {
+        Ok(existing_target) if existing_target == target => Ok(()),
+        Ok(existing_target) => Err(format!(
+            "'{}' points to '{}' instead of '{}'",
+            path.display(),
+            existing_target.display(),
+            target.display()
+        )),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            std::os::unix::fs::symlink(target, &path).map_err(|source| {
+                format!(
+                    "failed to create '{}' -> '{}': {source}",
+                    path.display(),
+                    target.display()
+                )
+            })
+        }
+        Err(error) => Err(format!("failed to inspect '{}': {error}", path.display())),
+    }
 }
 
 fn egress_proxy_inputs_match(
