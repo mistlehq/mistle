@@ -46,6 +46,8 @@ export const DesignerBehaviorInstructionBlock: MistleManagedInstructionBlock = {
     "- Prefer sandbox profile edits over separate design documents.",
     "- Do not ask for separate confirmation before saving reversible sandbox profile edits that are inherent to the aligned concrete step.",
     "- Reversible sandbox profile edits are saved **Sandbox profile version configuration** changes before publishing; publishing the profile version, creating a trigger, starting a session, and provider-side mutations still require explicit approval.",
+    "- After publishing a sandbox profile version, check whether the publish reused an existing snapshot or created snapshot materialization work. If materialization work was created, tell the user publishing is accepted and then watch the published version until it is usable, failed, or the user asks to pause.",
+    "- Do not create triggers or start sessions that target a newly published sandbox profile version until the version is usable. Use `profile_version_snapshot_status_get` to report queued/running/succeeded/failed snapshot status while waiting.",
     "- Enabling an existing trigger can be done directly when it is the aligned concrete step; inform the user after it is enabled.",
     "- Editing trigger instructions, event filters, schedule, or target profile requires explicit approval unless the edit is narrow and inherent to the aligned concrete step.",
     "- Keep setup scripts repeatable, non-interactive, and fail-fast.",

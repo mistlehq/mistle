@@ -7,6 +7,8 @@ import {
   IntegrationConnectionStatuses,
   PortAccessLinkCreatedByKinds,
   SandboxProfileStatuses,
+  SandboxProfileVersionSnapshotJobStates,
+  SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import {
@@ -23,6 +25,7 @@ import {
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
+import { z } from "zod";
 
 import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
@@ -85,6 +88,41 @@ const DockerSandboxRuntimeColumns = {
   sandboxDiskMb: null,
 } as const;
 
+const ProfileVersionSnapshotStatusResponseSchema = z
+  .object({
+    profileId: z.string().min(1),
+    version: z.number().int().min(1),
+    state: z.enum([SandboxProfileVersionStates.DRAFT, SandboxProfileVersionStates.PUBLISHED]),
+    status: z.enum(["draft", "materializing", "failed", "usable", "blocked"]),
+    blockedReason: z.enum(["missing_snapshot_job"]).nullable(),
+    usable: z.boolean(),
+    isActive: z.boolean(),
+    latestSnapshotJob: z
+      .object({
+        id: z.string().min(1),
+        sandboxInstanceId: z.string().min(1).nullable(),
+        trigger: z.enum([
+          SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+          SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
+          SandboxProfileVersionSnapshotJobTriggers.SCHEDULED_REFRESH,
+        ]),
+        state: z.enum([
+          SandboxProfileVersionSnapshotJobStates.QUEUED,
+          SandboxProfileVersionSnapshotJobStates.RUNNING,
+          SandboxProfileVersionSnapshotJobStates.SUCCEEDED,
+          SandboxProfileVersionSnapshotJobStates.FAILED,
+        ]),
+        errorCode: z.string().min(1).nullable(),
+        errorMessage: z.string().min(1).nullable(),
+        createdAt: z.string().min(1),
+        startedAt: z.string().min(1).nullable(),
+        finishedAt: z.string().min(1).nullable(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
 describe.concurrent("MCP profile tools integration", () => {
   it("lists MCP tools with JSON Schema-compatible input schemas", async ({ env }) => {
     const session = await env.auth.createSession({
@@ -138,6 +176,7 @@ describe.concurrent("MCP profile tools integration", () => {
       "profile_version_integration_bindings_get",
       "profile_version_publish",
       "profile_version_publishability_get",
+      "profile_version_snapshot_status_get",
       "sandbox_instance_get",
       "sandbox_instance_port_access_create",
       "sandbox_operation_events_list",
@@ -752,6 +791,81 @@ describe.concurrent("MCP profile tools integration", () => {
       where: (table, { eq }) => eq(table.id, "sbp_mcp_profile_publish"),
     });
     expect(profile?.activeVersion).toBeNull();
+  });
+
+  it("reports newly published profile snapshot materialization status", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-profile-publish-status@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP profile snapshot status reader",
+      permissions: [
+        OrganizationPermissions.SANDBOX_PROFILE_READ,
+        OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+      ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_mcp_profile_publish_status",
+        organizationId: session.organizationId,
+        displayName: "MCP Profile Publish Status",
+        createdAt: "2026-05-04T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_mcp_profile_publish_status",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo publish status",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const publishResult = await callMcpTool({
+      env,
+      token,
+      name: "profile_version_publish",
+      arguments: {
+        profileId: "sbp_mcp_profile_publish_status",
+        version: 1,
+      },
+    });
+    expect(publishResult.isError).toBeUndefined();
+    const published = PublishSandboxProfileVersionResponseSchema.parse(
+      publishResult.structuredContent,
+    );
+    expect(published.snapshotAction.kind).toBe("created");
+
+    const statusResult = await callMcpTool({
+      env,
+      token,
+      name: "profile_version_snapshot_status_get",
+      arguments: {
+        profileId: "sbp_mcp_profile_publish_status",
+        version: 1,
+      },
+    });
+
+    expect(statusResult.isError).toBeUndefined();
+    const status = ProfileVersionSnapshotStatusResponseSchema.parse(statusResult.structuredContent);
+    expect(status).toMatchObject({
+      profileId: "sbp_mcp_profile_publish_status",
+      version: 1,
+      state: SandboxProfileVersionStates.PUBLISHED,
+      status: "materializing",
+      blockedReason: null,
+      usable: false,
+      isActive: false,
+      latestSnapshotJob: {
+        id: published.snapshotAction.job.id,
+        trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+        state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+      },
+    });
   });
 
   it("gets sandbox profile setup and maintenance scripts with REST response shapes", async ({
