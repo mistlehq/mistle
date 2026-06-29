@@ -158,6 +158,32 @@ describe("ChatMarkdownMessage", () => {
     expect(getAnimationChunk(container, "paragraph.")).toBe(intermediateParagraphChunk);
     expect(secondBulletDelayMs).toBeGreaterThan(firstBulletDelayMs);
   });
+
+  it("renders long streaming markdown with stable static prefix segments", () => {
+    const stablePrefix = Array.from(
+      { length: 140 },
+      (_, index) =>
+        `${
+          index === 0 ? "FrozenAlphaZero " : ""
+        }Stable prefix paragraph ${String(index).padStart(2, "0")} keeps previously streamed content out of the live markdown tail.`,
+    ).join("\n\n");
+    const liveTail =
+      "Live tail paragraph remains animated while streaming continues.\n\n- live bullet one\n- live bullet two";
+
+    const { container } = render(
+      <ChatMarkdownMessage isStreaming text={`${stablePrefix}\n\n${liveTail}`} />,
+    );
+
+    expect(container.querySelectorAll(".chat-markdown-content").length).toBeGreaterThan(1);
+    expect(screen.getByText(/Stable prefix paragraph 00/)).toBeDefined();
+    expect(container.textContent).toContain("live bullet two");
+    expect(getAnimationChunk(container, "Live")).toBeDefined();
+    expect(
+      Array.from(container.querySelectorAll("[data-sd-animate]")).some(
+        (chunk) => chunk.textContent === "FrozenAlphaZero",
+      ),
+    ).toBe(false);
+  });
 });
 
 function getAnimationChunk(container: HTMLElement, text: string): Element {

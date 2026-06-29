@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import type { ComponentProps, JSX } from "react";
 import { Block, defaultRehypePlugins, defaultRemarkPlugins, Streamdown } from "streamdown";
 import type { BlockProps, StreamdownProps } from "streamdown";
@@ -22,6 +22,12 @@ type ChatMarkdownContentProps = {
 };
 
 type StreamingChatMarkdownContentProps = ChatMarkdownContentProps;
+
+type StreamingMarkdownSegment = {
+  isLive: boolean;
+  key: string;
+  text: string;
+};
 
 type BaseChatMarkdownContentProps = ChatMarkdownContentProps & {
   isStreaming: boolean;
@@ -78,6 +84,9 @@ const SerializedStreamingAnimationExcludedTags = new Set([
 ]);
 const SerializedStreamingAnimationDurationMs = 150;
 const SerializedStreamingAnimationStaggerMs = 40;
+const StreamingMarkdownSplitThresholdCharacters = 4_000;
+const StreamingMarkdownStaticSegmentTargetCharacters = 2_000;
+const StreamingMarkdownLiveTailMinimumCharacters = 1_000;
 const FirstMarkdownBlockIndex = 0;
 let nextSerializedStreamingAnimationPluginId = 0;
 
@@ -341,6 +350,62 @@ function getEarlierDelay(leftDelayMs: number | null, rightDelayMs: number | null
   return Math.min(leftDelayMs, rightDelayMs);
 }
 
+function splitStreamingMarkdownSegments(text: string): readonly StreamingMarkdownSegment[] {
+  if (text.length <= StreamingMarkdownSplitThresholdCharacters) {
+    return [{ isLive: true, key: "live", text }];
+  }
+
+  const segments: StreamingMarkdownSegment[] = [];
+  let segmentStartIndex = 0;
+  let lineStartIndex = 0;
+  let fencedBlockMarker: "`" | "~" | null = null;
+
+  while (lineStartIndex < text.length) {
+    const nextNewlineIndex = text.indexOf("\n", lineStartIndex);
+    const lineEndIndex = nextNewlineIndex === -1 ? text.length : nextNewlineIndex + 1;
+    const line = text.slice(lineStartIndex, lineEndIndex);
+    const trimmedLine = line.trim();
+
+    if (
+      trimmedLine.startsWith("```") &&
+      (fencedBlockMarker === null || fencedBlockMarker === "`")
+    ) {
+      fencedBlockMarker = fencedBlockMarker === "`" ? null : "`";
+    } else if (
+      trimmedLine.startsWith("~~~") &&
+      (fencedBlockMarker === null || fencedBlockMarker === "~")
+    ) {
+      fencedBlockMarker = fencedBlockMarker === "~" ? null : "~";
+    }
+
+    const remainingCharacters = text.length - lineEndIndex;
+    const canFreezeSegment =
+      fencedBlockMarker === null &&
+      trimmedLine.length === 0 &&
+      lineEndIndex - segmentStartIndex >= StreamingMarkdownStaticSegmentTargetCharacters &&
+      remainingCharacters >= StreamingMarkdownLiveTailMinimumCharacters;
+
+    if (canFreezeSegment) {
+      segments.push({
+        isLive: false,
+        key: `static:${String(segmentStartIndex)}:${String(lineEndIndex)}`,
+        text: text.slice(segmentStartIndex, lineEndIndex),
+      });
+      segmentStartIndex = lineEndIndex;
+    }
+
+    lineStartIndex = lineEndIndex;
+  }
+
+  segments.push({
+    isLive: true,
+    key: `live:${String(segmentStartIndex)}`,
+    text: text.slice(segmentStartIndex),
+  });
+
+  return segments;
+}
+
 export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Element {
   return (
     <div
@@ -370,6 +435,60 @@ export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Elemen
 }
 
 function StreamingChatMarkdownContent(props: StreamingChatMarkdownContentProps): JSX.Element {
+  const streamingMarkdownSegments = useMemo(
+    () => splitStreamingMarkdownSegments(props.text),
+    [props.text],
+  );
+
+  if (streamingMarkdownSegments.length > 1) {
+    return (
+      <>
+        {streamingMarkdownSegments.map((segment) =>
+          segment.isLive ? (
+            <AnimatedStreamingChatMarkdownContent
+              contentClassName={props.contentClassName}
+              key={segment.key}
+              preserveSoftLineBreaks={props.preserveSoftLineBreaks}
+              text={segment.text}
+            />
+          ) : (
+            <StaticStreamingChatMarkdownSegment
+              contentClassName={props.contentClassName}
+              key={segment.key}
+              preserveSoftLineBreaks={props.preserveSoftLineBreaks}
+              text={segment.text}
+            />
+          ),
+        )}
+      </>
+    );
+  }
+
+  return (
+    <AnimatedStreamingChatMarkdownContent
+      contentClassName={props.contentClassName}
+      preserveSoftLineBreaks={props.preserveSoftLineBreaks}
+      text={props.text}
+    />
+  );
+}
+
+const StaticStreamingChatMarkdownSegment = memo(function StaticStreamingChatMarkdownSegment(
+  props: ChatMarkdownContentProps,
+): JSX.Element {
+  return (
+    <BaseChatMarkdownContent
+      contentClassName={props.contentClassName}
+      isStreaming={false}
+      preserveSoftLineBreaks={props.preserveSoftLineBreaks}
+      text={props.text}
+    />
+  );
+});
+
+function AnimatedStreamingChatMarkdownContent(
+  props: StreamingChatMarkdownContentProps,
+): JSX.Element {
   const [streamingAnimationPlugin] = useState(createSerializedStreamingAnimationPlugin);
   const SerializedStreamingBlock = useMemo(() => {
     return function SerializedStreamingBlock(blockProps: BlockProps): JSX.Element {
