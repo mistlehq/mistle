@@ -12,6 +12,7 @@ import {
 } from "../settings/api-keys/api-keys-service.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
+import { OrganizationApiKeysCreateActionLink } from "./organization-api-keys-settings-page-actions.js";
 import { resolveRevokingApiKeyId } from "./organization-api-keys-settings-page-state.js";
 import { OrganizationApiKeysSettingsPageView } from "./organization-api-keys-settings-page-view.js";
 
@@ -26,8 +27,9 @@ export function OrganizationApiKeysSettingsPage(): React.JSX.Element {
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
+  const { pathname, search, state } = location;
   const [createdApiKeyNotice, setCreatedApiKeyNotice] = useState<CreatedApiKeyNotice | null>(() =>
-    readCreatedApiKeyNotice(location.state),
+    readCreatedApiKeyNotice(state),
   );
   const { title, description } = resolvePageFrameText(pageMeta, "API Keys");
   const queryKey = apiKeysQueryKey(activeOrganizationId);
@@ -43,18 +45,22 @@ export function OrganizationApiKeysSettingsPage(): React.JSX.Element {
   });
 
   useEffect(() => {
-    if (readCreatedApiKeyNotice(location.state) === null) {
+    if (readCreatedApiKeyNotice(state) === null) {
       return;
     }
 
-    void navigate(location.pathname + location.search, {
+    void navigate(pathname + search, {
       replace: true,
       state: null,
     });
-  }, [location.pathname, location.search, location.state, navigate]);
+  }, [navigate, pathname, search, state]);
 
   return (
-    <PageFrame description={description} title={title}>
+    <PageFrame
+      description={description}
+      headerActions={<OrganizationApiKeysCreateActionLink />}
+      title={title}
+    >
       <OrganizationApiKeysSettingsPageView
         apiKeys={apiKeysQuery.data?.items ?? []}
         createdApiKeyNotice={createdApiKeyNotice}

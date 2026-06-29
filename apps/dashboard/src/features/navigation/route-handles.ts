@@ -358,7 +358,7 @@ export const ROUTE_HANDLES = {
     sidebarTriggerOwner: "page-frame",
     breadcrumb: "API Keys",
     title: "API Keys",
-    description: "Manage organization API keys.",
+    description: "",
   },
   settingsOrganizationApiKeysNew: {
     sidebarTriggerOwner: "page-frame",

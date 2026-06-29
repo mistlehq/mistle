@@ -7,16 +7,17 @@ import { describe, expect, it } from "vitest";
 
 import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
 import { OrganizationApiKeyCreatePageView } from "./organization-api-key-create-page-view.js";
+import { OrganizationApiKeysCreateActionLink } from "./organization-api-keys-settings-page-actions.js";
 import { OrganizationApiKeysSettingsPageView } from "./organization-api-keys-settings-page-view.js";
 
 describe("OrganizationApiKeysSettingsPageView", () => {
-  it("renders existing API keys with masked keys and grouped permission details", () => {
+  it("renders existing API keys with comparable key prefixes and grouped permission details", () => {
     renderPage({
       apiKeys: [
         buildApiKey({
           id: "apk_prod",
           name: "Production deploy key",
-          secretPrefix: "mst_live_1234",
+          secretPrefix: "ED4p8qJIc8ptYvhuD8yyOQ",
           permissions: [
             "sandboxProfile:read",
             "sandboxSession:create",
@@ -30,10 +31,12 @@ describe("OrganizationApiKeysSettingsPageView", () => {
     });
 
     const table = screen.getByRole("table");
-    expect(within(table).getByRole("columnheader", { name: "Key" })).toBeTruthy();
+    expect(within(table).getByRole("columnheader", { name: "Key prefix" })).toBeTruthy();
     expect(within(table).queryByRole("columnheader", { name: "Prefix" })).toBeNull();
     expect(screen.getByText("Production deploy key")).toBeTruthy();
-    expect(within(table).getByText("mst_live_1234...")).toBeTruthy();
+    const keyPrefix = within(table).getByText("mstl_apk_ED4p8qJIc8ptYvhuD8yyOQ");
+    expect(keyPrefix).toBeTruthy();
+    expect(keyPrefix.getAttribute("title")).toBe("mstl_apk_ED4p8qJIc8ptYvhuD8yyOQ");
     expect(
       within(table).getByRole("button", {
         name: "View allowed Mistle resources: 3 resources, 1 other permission",
@@ -42,7 +45,9 @@ describe("OrganizationApiKeysSettingsPageView", () => {
     expect(within(table).queryByText("sandboxProfile:read")).toBeNull();
     expect(within(table).queryByText("triggerWebhook:read")).toBeNull();
     expect(within(table).queryByText("unknown:permission")).toBeNull();
-    expect(screen.getByRole("button", { name: "Revoke Production deploy key" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "API key actions for Production deploy key" }),
+    ).toBeTruthy();
 
     fireEvent.click(
       within(table).getByRole("button", {
@@ -68,7 +73,11 @@ describe("OrganizationApiKeysSettingsPageView", () => {
   });
 
   it("links API key creation to a dedicated page", () => {
-    renderPage();
+    render(
+      <MemoryRouter>
+        <OrganizationApiKeysCreateActionLink />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByRole("link", { name: "Create API key" }).getAttribute("href")).toBe(
       "/settings/organization/api-keys/new",
@@ -89,7 +98,10 @@ describe("OrganizationApiKeysSettingsPageView", () => {
       },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Revoke Production deploy key" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "API key actions for Production deploy key" }),
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "Revoke key" }));
 
     expect(screen.getByRole("alertdialog", { name: "Revoke API key?" })).toBeTruthy();
     expect(
@@ -101,7 +113,10 @@ describe("OrganizationApiKeysSettingsPageView", () => {
     expect(revokedApiKeys).toEqual([]);
     expect(screen.queryByRole("alertdialog", { name: "Revoke API key?" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Revoke Production deploy key" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "API key actions for Production deploy key" }),
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "Revoke key" }));
     fireEvent.click(screen.getByRole("button", { name: "Revoke key" }));
 
     expect(revokedApiKeys).toEqual([apiKey]);
@@ -145,6 +160,16 @@ describe("OrganizationApiKeysSettingsPageView", () => {
     expect(
       screen.getByText("Create an API key to access Mistle from scripts or services."),
     ).toBeTruthy();
+  });
+
+  it("does not render local loading copy or empty state while API keys load", () => {
+    renderPage({
+      isLoading: true,
+    });
+
+    expect(screen.queryByText("Loading API keys...")).toBeNull();
+    expect(screen.queryByText("No API keys")).toBeNull();
+    expect(screen.queryByRole("table")).toBeNull();
   });
 });
 
@@ -239,7 +264,7 @@ function buildApiKey(overrides: Partial<ApiKey> & Pick<ApiKey, "id" | "name">): 
   return {
     id,
     name,
-    secretPrefix: "mst_test",
+    secretPrefix: "B7kLm4nP9qRs2TuV5wXyZ1",
     permissions: ["sandboxProfile:read"],
     expiresAt: null,
     lastUsedAt: null,
