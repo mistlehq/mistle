@@ -81,13 +81,9 @@ function AuthCreateOrganizationForm(input: {
         slug: createOrganizationCreateSlug(),
       });
 
-      try {
-        await switchActiveOrganization({
-          organizationId: organization.id,
-        });
-      } catch {
-        // The organization was created; session refresh can recover if the backend made it active.
-      }
+      await switchActiveOrganization({
+        organizationId: organization.id,
+      });
     },
     onSuccess: () => {
       setCreateOrganizationError(null);
