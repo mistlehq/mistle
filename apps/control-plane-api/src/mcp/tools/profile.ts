@@ -60,6 +60,7 @@ const SnapshotReadinessStatuses = {
 
 const SnapshotReadinessBlockedReasons = {
   MISSING_SNAPSHOT_JOB: "missing_snapshot_job",
+  MISSING_USABLE_SNAPSHOT: "missing_usable_snapshot",
 } as const;
 
 export function registerProfileTools(server: McpServer, context: MistleMcpServerContext): void {
@@ -832,6 +833,12 @@ function resolveSnapshotReadiness(
     return {
       status: SnapshotReadinessStatuses.FAILED,
       blockedReason: null,
+    };
+  }
+  if (latestSnapshotJob.state === "succeeded") {
+    return {
+      status: SnapshotReadinessStatuses.BLOCKED,
+      blockedReason: SnapshotReadinessBlockedReasons.MISSING_USABLE_SNAPSHOT,
     };
   }
 
