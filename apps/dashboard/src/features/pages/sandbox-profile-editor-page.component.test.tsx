@@ -3585,6 +3585,7 @@ describe("SandboxProfileEditorPage", () => {
         name: "Close Setup Assistant panel",
       }),
     ).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Setup Assistant conversation" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
 
@@ -3594,7 +3595,6 @@ describe("SandboxProfileEditorPage", () => {
         "Publishing closes the Setup Assistant and stops its temporary sandbox. Any assistant work that has not been saved back to the draft will be lost.",
       ),
     ).toBeTruthy();
-    expect(screen.getByRole("region", { name: "Setup Assistant conversation" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
