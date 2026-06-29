@@ -1,10 +1,10 @@
 import {
   ControlPlaneConstraintIds,
   getControlPlaneDatabaseSchema,
-  type SandboxProfileVersionAgentRuntimeId,
   isControlPlaneUniqueViolation,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 
 import {
   SandboxProfilesConflictCodes,
@@ -37,7 +37,7 @@ type CreateProfileVersionDraftOutput = {
   version: number;
   state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
   publishedAt: string | null;
-  agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+  agentRuntimeId: AgentRuntimeId;
   gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
   mistleMcpApiKeyId: string | null;

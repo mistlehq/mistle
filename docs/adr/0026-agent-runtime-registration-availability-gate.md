@@ -1,0 +1,3 @@
+# Agent runtime registration is the availability gate
+
+Mistle uses one **Agent runtime** catalog: a runtime is not registered until it is ready for sandbox profile selection, runtime-plan compilation, and dashboard session workbench support. The catalog should live with integration definitions rather than in the database schema, while persistence stores the selected runtime id as durable data and control-plane write paths validate profile configuration against the registered runtime catalog. This keeps product availability close to runtime metadata and prevents database constants from becoming a shadow runtime catalog, at the cost of looser DB-adjacent TypeScript exhaustiveness.

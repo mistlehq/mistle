@@ -5,9 +5,9 @@
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import { AgentRuntimeIdCatalog } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
@@ -98,7 +98,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-03-10T00:02:00.000Z",
         setupScript: "echo latest-version-two",
-        agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+        agentRuntimeId: AgentRuntimeIdCatalog.OPENCODE,
         gitCommitSigningIntegrationConnectionId: "icn_version_create_latest_git",
         skillsConfig: {
           originUrl: "https://github.com/mistle/skills.git",
@@ -159,7 +159,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
       version: 3,
       state: SandboxProfileVersionStates.DRAFT,
       publishedAt: null,
-      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+      agentRuntimeId: AgentRuntimeIdCatalog.OPENCODE,
       ...EmptySandboxRuntimeConfig,
       gitCommitSigningIntegrationConnectionId: "icn_version_create_latest_git",
       associatedResourceEventRoutingConfig: {},
@@ -186,9 +186,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
     expect(persistedDraftVersion?.state).toBe(SandboxProfileVersionStates.DRAFT);
     expect(persistedDraftVersion?.publishedAt).toBeNull();
     expect(persistedDraftVersion?.setupScript).toBe("echo latest-version-two");
-    expect(persistedDraftVersion?.agentRuntimeId).toBe(
-      SandboxProfileVersionAgentRuntimeIds.OPENCODE,
-    );
+    expect(persistedDraftVersion?.agentRuntimeId).toBe(AgentRuntimeIdCatalog.OPENCODE);
     expect(persistedDraftVersion?.gitCommitSigningIntegrationConnectionId).toBe(
       "icn_version_create_latest_git",
     );

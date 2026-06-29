@@ -28,6 +28,13 @@
       "import": "./dist/agent-runtimes/server.js",
       "default": "./dist/agent-runtimes/server.js"
     },
+    "./agent-runtimes/catalog": {
+      "types": "./src/agent-runtimes/catalog.ts",
+      "workspace-src": "./src/agent-runtimes/catalog.ts",
+      "node": "./dist/agent-runtimes/catalog.js",
+      "import": "./dist/agent-runtimes/catalog.js",
+      "default": "./dist/agent-runtimes/catalog.js"
+    },
     "./agent-runtimes/codex": {
       "types": "./src/agent-runtimes/codex/index.ts",
       "workspace-src": "./src/agent-runtimes/codex/index.ts",

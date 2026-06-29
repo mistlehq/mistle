@@ -4,7 +4,6 @@ import {
   IntegrationBindingKinds,
   skillsSourceRepos,
   SandboxProfileStatuses,
-  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -16,6 +15,7 @@ import {
   createKeysetPaginationEnvelopeSchema,
   createKeysetPaginationQuerySchema,
 } from "@mistle/http/pagination";
+import { AgentRuntimeIds } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { parseWebhookPayloadFilter } from "@mistle/webhooks";
 import { createSelectSchema } from "drizzle-zod";
 
@@ -39,12 +39,7 @@ const sandboxProfileVersionStateSchema = z.enum([
   SandboxProfileVersionStates.DRAFT,
   SandboxProfileVersionStates.PUBLISHED,
 ]);
-const sandboxProfileVersionAgentRuntimeIdSchema = z.enum([
-  SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE,
-  SandboxProfileVersionAgentRuntimeIds.CODEX,
-  SandboxProfileVersionAgentRuntimeIds.OPENCODE,
-  SandboxProfileVersionAgentRuntimeIds.PI,
-]);
+const sandboxProfileVersionAgentRuntimeIdSchema = z.enum(AgentRuntimeIds);
 const sandboxProfileVersionSnapshotJobTriggerSchema = z.enum([
   SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
   SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,

@@ -7,8 +7,6 @@ import {
   ApiKeyActorKinds,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  SandboxProfileVersionAgentRuntimeIds,
-  type SandboxProfileVersionAgentRuntimeId,
   type SandboxProfileVersionSkillsConfig,
 } from "@mistle/db/control-plane";
 import {
@@ -24,6 +22,10 @@ import {
   OpenAiChatGptResponsesApiBaseUrl,
   OpenAiConnectionMethodIds,
 } from "@mistle/integrations-definitions";
+import {
+  AgentRuntimeIdCatalog,
+  type AgentRuntimeId,
+} from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
@@ -827,7 +829,7 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     await createProfileVersion(env, {
       organizationId: session.organizationId,
       profileId: "sbp_compile_mistle_mcp_opencode",
-      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+      agentRuntimeId: AgentRuntimeIdCatalog.OPENCODE,
       mistleMcpApiKeyId: apiKeyId,
     });
 
@@ -861,7 +863,7 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     await createProfileVersion(env, {
       organizationId: session.organizationId,
       profileId: "sbp_compile_mistle_mcp_claude_code",
-      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE,
+      agentRuntimeId: AgentRuntimeIdCatalog.CLAUDE_CODE,
       mistleMcpApiKeyId: apiKeyId,
     });
     await seedAgentBinding(env, {
@@ -899,7 +901,7 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     await createProfileVersion(env, {
       organizationId: session.organizationId,
       profileId: "sbp_compile_claude_code_skills",
-      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE,
+      agentRuntimeId: AgentRuntimeIdCatalog.CLAUDE_CODE,
       skillsConfig: {
         originUrl: "https://github.com/acme/agent-skills.git",
         selectedSkills: [
@@ -976,7 +978,7 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     await createProfileVersion(env, {
       organizationId: session.organizationId,
       profileId: "sbp_compile_mistle_mcp_pi",
-      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.PI,
+      agentRuntimeId: AgentRuntimeIdCatalog.PI,
       mistleMcpApiKeyId: apiKeyId,
     });
 
@@ -1009,7 +1011,7 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     await createProfileVersion(env, {
       organizationId: session.organizationId,
       profileId: "sbp_compile_associated_resources_codex",
-      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
+      agentRuntimeId: AgentRuntimeIdCatalog.CODEX,
     });
     await seedConnectorBindings(env, {
       organizationId: session.organizationId,
@@ -1044,7 +1046,7 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     await createProfileVersion(env, {
       organizationId: session.organizationId,
       profileId: "sbp_compile_associated_resources_opencode",
-      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+      agentRuntimeId: AgentRuntimeIdCatalog.OPENCODE,
     });
     await seedAgentBinding(env, {
       organizationId: session.organizationId,
@@ -1091,7 +1093,7 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     await createProfileVersion(env, {
       organizationId: session.organizationId,
       profileId: "sbp_compile_associated_resources_pi",
-      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.PI,
+      agentRuntimeId: AgentRuntimeIdCatalog.PI,
     });
     await seedConnectorBindings(env, {
       organizationId: session.organizationId,
@@ -1126,7 +1128,7 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     await createProfileVersion(env, {
       organizationId: session.organizationId,
       profileId: "sbp_compile_associated_resources_slack",
-      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
+      agentRuntimeId: AgentRuntimeIdCatalog.CODEX,
     });
     await seedConnectorBindings(env, {
       organizationId: session.organizationId,
@@ -1432,7 +1434,7 @@ async function createProfileVersion(
     organizationId: string;
     profileId: string;
     setupScript?: string;
-    agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+    agentRuntimeId?: AgentRuntimeId;
     mistleMcpApiKeyId?: string;
     skillsConfig?: SandboxProfileVersionSkillsConfig | null;
   },

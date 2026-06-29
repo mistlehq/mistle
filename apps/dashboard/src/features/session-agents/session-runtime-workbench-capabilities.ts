@@ -1,9 +1,13 @@
+import {
+  AgentRuntimeIdCatalog,
+  type AgentRuntimeId,
+} from "@mistle/integrations-definitions/agent-runtimes/catalog";
+
 import type { SessionComposerModelSelectionInput } from "../pages/session-composer/index.js";
 import type { SessionTerminalContentInset } from "../pages/session-terminal-surface.js";
-import type { SessionMainPanelRuntimeId } from "../pages/use-session-main-panel-handoff.js";
 
 type SessionRuntimeWorkbenchCapability = {
-  runtimeId: SessionMainPanelRuntimeId;
+  runtimeId: AgentRuntimeId;
   displayName: string;
   cliTerminalContentInset: SessionTerminalContentInset;
   composerModelSelection: SessionComposerModelSelectionInput;
@@ -13,7 +17,7 @@ type SessionRuntimeWorkbenchCapability = {
 
 export const SessionRuntimeWorkbenchCapabilities = {
   CODEX: {
-    runtimeId: "codex",
+    runtimeId: AgentRuntimeIdCatalog.CODEX,
     displayName: "Codex",
     cliTerminalContentInset: "default",
     composerModelSelection: {
@@ -24,7 +28,7 @@ export const SessionRuntimeWorkbenchCapabilities = {
     preservesCliLaunchContext: false,
   },
   CLAUDE_CODE: {
-    runtimeId: "claude-code",
+    runtimeId: AgentRuntimeIdCatalog.CLAUDE_CODE,
     displayName: "Claude Code",
     cliTerminalContentInset: "none",
     composerModelSelection: {
@@ -35,7 +39,7 @@ export const SessionRuntimeWorkbenchCapabilities = {
     preservesCliLaunchContext: false,
   },
   OPENCODE: {
-    runtimeId: "opencode",
+    runtimeId: AgentRuntimeIdCatalog.OPENCODE,
     displayName: "OpenCode",
     cliTerminalContentInset: "none",
     composerModelSelection: {
@@ -46,7 +50,7 @@ export const SessionRuntimeWorkbenchCapabilities = {
     preservesCliLaunchContext: true,
   },
   PI: {
-    runtimeId: "pi",
+    runtimeId: AgentRuntimeIdCatalog.PI,
     displayName: "Pi",
     cliTerminalContentInset: "none",
     composerModelSelection: {

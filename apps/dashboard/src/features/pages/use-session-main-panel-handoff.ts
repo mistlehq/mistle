@@ -1,3 +1,4 @@
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { useCallback, useEffect, useReducer, useRef, type RefObject } from "react";
 
@@ -13,7 +14,6 @@ import {
   type MainPanelTransitionState,
 } from "./session-main-panel-handoff-state.js";
 
-type SessionMainPanelRuntimeId = "claude-code" | "codex" | "opencode" | "pi";
 type ChatRestoreConnectionInput =
   | {
       initialCwd?: string | null;
@@ -57,9 +57,9 @@ type SessionMainPanelHandoffRuntime = {
 };
 
 type UseSessionMainPanelHandoffInput = {
-  activeRuntimeIdRef: RefObject<SessionMainPanelRuntimeId>;
+  activeRuntimeIdRef: RefObject<AgentRuntimeId>;
   cliPtyState: ReturnType<typeof useSandboxPtyState>;
-  runtimes: Record<SessionMainPanelRuntimeId, SessionMainPanelHandoffRuntime>;
+  runtimes: Record<AgentRuntimeId, SessionMainPanelHandoffRuntime>;
   selectedRepositoryPathRef: RefObject<string | null>;
   sandboxInstanceId: string | null;
 };
@@ -153,7 +153,6 @@ export type {
   ChatRestoreConnectionInput,
   SessionMainPanelHandoffLifecycle,
   SessionMainPanelHandoffRuntime,
-  SessionMainPanelRuntimeId,
   SessionMainPanelHandoffResult,
   SessionCliLaunchTarget,
   UseSessionMainPanelHandoffInput,

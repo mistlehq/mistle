@@ -164,6 +164,10 @@ _Avoid_: Page tab when the tab belongs to the designer workspace rather than the
 The top-level dashboard resource page for starting, listing, and resuming **Mistle Designer sessions**.
 _Avoid_: Sandbox profile page when the user is managing Designer workspaces rather than a specific profile
 
+**Agent runtime**:
+A registered agent execution environment that can be selected on a **Sandbox profile version** and run conversations inside sandbox-backed Mistle workflows.
+_Avoid_: Experimental runtime when it is not ready for sandbox profile selection and dashboard session workbench support
+
 **Agent runtime connection**:
 An integration connection selected on a **Sandbox profile version** to supply provider access for the selected **Agent runtime**.
 _Avoid_: Agent runtime when referring to the selected connection
@@ -755,6 +759,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A draft **Sandbox profile version**'s **Source sandbox profile version** is the latest earlier published **Sandbox profile version**.
 - **Sandbox profile version configuration** excludes external dependency state, snapshot image state, snapshot job history, and other lifecycle timestamps.
 - **Sandbox profile version configuration** excludes **Sandbox profile** metadata such as the profile display name.
+- A registered **Agent runtime** is ready for sandbox profile selection and dashboard session workbench support.
 - A **Snapshot maintenance script** belongs to a **Sandbox profile version** but is not a **Publish-worthy change** by itself.
 - **Automatic snapshot refresh** belongs to a published **Sandbox profile version** but is not a **Publish-worthy change** by itself.
 - A **Sandbox profile version** without a **Publish-worthy change** should not be publishable.

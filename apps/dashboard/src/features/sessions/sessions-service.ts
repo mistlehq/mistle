@@ -1,3 +1,4 @@
+import { AgentRuntimeIds } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import { z } from "zod";
 
@@ -7,7 +8,7 @@ import { requestControlPlane } from "../api/request-control-plane.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import type { SandboxInstancesListResult, SandboxOperationEventsResult } from "./sessions-types.js";
 
-const AgentRuntimeIdSchema = z.enum(["claude-code", "codex", "opencode", "pi"]);
+const AgentRuntimeIdSchema = z.enum(AgentRuntimeIds);
 
 const StartSandboxProfileInstanceResponseSchema = z
   .object({

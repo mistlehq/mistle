@@ -4,6 +4,7 @@ import {
   createKeysetPaginationEnvelopeSchema,
   createKeysetPaginationQuerySchema,
 } from "@mistle/http/pagination";
+import { AgentRuntimeIds } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 
 import { SandboxInstancesNotFoundCodes } from "./constants.js";
@@ -91,7 +92,7 @@ export const sandboxInstanceStatusResponseSchema = z
     failureMessage: z.string().min(1).nullable(),
     runtimeContext: z
       .object({
-        agentRuntimeId: z.enum(["claude-code", "codex", "opencode", "pi"]).nullable(),
+        agentRuntimeId: z.enum(AgentRuntimeIds).nullable(),
         launchCwd: z.string().min(1).nullable(),
         primaryRepositoryRoot: z.string().min(1).nullable(),
       })

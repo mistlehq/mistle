@@ -1,3 +1,4 @@
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import type {
   CodexJsonRpcClient,
   AgentStreamClient,
@@ -30,7 +31,6 @@ import {
   shouldWaitForTriggerSessionThread,
 } from "./session-workbench-state.js";
 import type { SessionWorkbenchStatus } from "./session-workbench-state.js";
-import { type SessionMainPanelRuntimeId } from "./use-session-main-panel-handoff.js";
 import type { SessionPrimaryRepositoryState } from "./use-session-primary-repository-state.js";
 import {
   useSessionWorkbenchChromeState,
@@ -131,9 +131,7 @@ export function useSessionWorkbenchController(input: {
   const sessionClientRef = useRef<AgentStreamClient | null>(null);
   const rpcClientRef = useRef<CodexJsonRpcClient | null>(null);
   const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
-  const activeHandoffRuntimeIdRef = useRef<SessionMainPanelRuntimeId>(
-    CodexWorkbenchCapabilities.runtimeId,
-  );
+  const activeHandoffRuntimeIdRef = useRef<AgentRuntimeId>(CodexWorkbenchCapabilities.runtimeId);
   const selectedRepositoryPathRef = useRef<string | null>(null);
   const sessionState = useCodexSessionState({
     ensureTransportConnected: transportManager.ensureTransportConnected,

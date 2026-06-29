@@ -106,6 +106,7 @@ export * from "./whapi/browser.js";
 export * from "./xero/browser.js";
 export * from "./zai/index.js";
 export * from "./forms/index.js";
+export * from "./agent-runtimes/catalog.js";
 export * from "./agent-runtimes/provider-selection.js";
 export * from "./registry/agent-runtimes.js";
 export * from "./shared/remote-mcp-server-catalog/index.js";

@@ -1,14 +1,12 @@
 import { randomUUID } from "node:crypto";
 
-import {
-  getControlPlaneDatabaseSchema,
-  type SandboxProfileVersionAgentRuntimeId,
-} from "@mistle/db/control-plane";
+import { getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import {
   SandboxInstancePurposes,
   type SandboxInstanceSource,
   type SandboxInstanceStarterKind,
 } from "@mistle/db/data-plane";
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { and, eq } from "drizzle-orm";
 
 import { compileProfileVersionRuntimePlan } from "../compile-profile-version-runtime-plan.js";
@@ -35,7 +33,7 @@ type StartProfileSetupSandboxInput = {
   purpose:
     | typeof SandboxInstancePurposes.SETUP_ASSISTANT
     | typeof SandboxInstancePurposes.SETUP_CHECK;
-  agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+  agentRuntimeId?: AgentRuntimeId;
   setupScript?: string;
   snapshotPreparationScriptKind?: "setup" | "maintenance";
   mistleMcpCredentialResolver?: {

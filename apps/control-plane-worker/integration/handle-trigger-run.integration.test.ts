@@ -12,9 +12,9 @@ import {
   TriggerRunStatuses,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  SandboxProfileVersionAgentRuntimeIds,
 } from "@mistle/db/control-plane";
 import { OpenAiApiKeyDefinition } from "@mistle/integrations-definitions";
+import { AgentRuntimeIdCatalog } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -203,7 +203,7 @@ describe.concurrent("control-plane worker trigger run handling", () => {
     await env.controlPlaneDb
       .update(env.controlPlaneTables.sandboxProfileVersions)
       .set({
-        agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+        agentRuntimeId: AgentRuntimeIdCatalog.OPENCODE,
       })
       .where(
         eq(env.controlPlaneTables.sandboxProfileVersions.sandboxProfileId, scope.sandboxProfileId),
@@ -386,7 +386,7 @@ describe.concurrent("control-plane worker trigger run handling", () => {
     await env.controlPlaneDb
       .update(env.controlPlaneTables.sandboxProfileVersions)
       .set({
-        agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+        agentRuntimeId: AgentRuntimeIdCatalog.OPENCODE,
       })
       .where(
         eq(env.controlPlaneTables.sandboxProfileVersions.sandboxProfileId, scope.sandboxProfileId),

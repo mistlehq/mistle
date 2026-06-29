@@ -2,11 +2,8 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
-import {
-  SandboxProfileStatuses,
-  SandboxProfileVersionAgentRuntimeIds,
-  SandboxProfileVersionStates,
-} from "@mistle/db/control-plane";
+import { SandboxProfileStatuses, SandboxProfileVersionStates } from "@mistle/db/control-plane";
+import { AgentRuntimeIdCatalog } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { SandboxProvider } from "@mistle/sandbox";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { and, eq } from "drizzle-orm";
@@ -73,7 +70,7 @@ describe.concurrent("sandbox profiles create integration", () => {
     expect(initialVersion.sandboxProfileId).toBe(body.id);
     expect(initialVersion.version).toBe(1);
     expect(initialVersion.state).toBe(SandboxProfileVersionStates.DRAFT);
-    expect(initialVersion.agentRuntimeId).toBe(SandboxProfileVersionAgentRuntimeIds.CODEX);
+    expect(initialVersion.agentRuntimeId).toBe(AgentRuntimeIdCatalog.CODEX);
     expect(initialVersion.publishedAt).toBeNull();
     expect(initialVersion.sandboxProvider).toBe(SandboxProvider.DOCKER);
     expect(initialVersion.sandboxConnectionId).toBeNull();

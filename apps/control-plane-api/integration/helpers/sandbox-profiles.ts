@@ -3,10 +3,10 @@ import {
   type IntegrationConnectionStatus,
   type SandboxProfileVersionSkillsConfig,
   type SandboxProfileAssociatedResourceEventRoutingConfig,
-  type SandboxProfileVersionAgentRuntimeId,
   SandboxProfileStatuses,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 
 export function sandboxProfileRow(input: {
   id: string;
@@ -34,7 +34,7 @@ export function sandboxProfileVersionRow(input: {
   publishedAt?: string | null;
   setupScript?: string | null;
   maintenanceScript?: string | null;
-  agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+  agentRuntimeId?: AgentRuntimeId;
   gitCommitSigningIntegrationConnectionId?: string | null;
   sandboxProvider?: string | null;
   sandboxConnectionId?: string | null;

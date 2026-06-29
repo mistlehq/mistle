@@ -1,3 +1,4 @@
+import { AgentRuntimeIds } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import { z } from "zod";
 
@@ -11,7 +12,7 @@ import {
   DesignerBlueprintDocumentSchema,
 } from "./designer-blueprint-schema.js";
 
-const AgentRuntimeIdSchema = z.enum(["claude-code", "codex", "opencode", "pi"]);
+const AgentRuntimeIdSchema = z.enum(AgentRuntimeIds);
 
 const DesignerSessionRouteCanvasTabSchema = z
   .object({

@@ -1,3 +1,4 @@
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { sql } from "drizzle-orm";
 import {
   bigint,
@@ -24,16 +25,6 @@ export const SandboxProfileVersionStates = {
 
 export type SandboxProfileVersionState =
   (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
-
-export const SandboxProfileVersionAgentRuntimeIds = {
-  CLAUDE_CODE: "claude-code",
-  CODEX: "codex",
-  OPENCODE: "opencode",
-  PI: "pi",
-} as const;
-
-export type SandboxProfileVersionAgentRuntimeId =
-  (typeof SandboxProfileVersionAgentRuntimeIds)[keyof typeof SandboxProfileVersionAgentRuntimeIds];
 
 export type SandboxProfileVersionSkillsConfig = {
   originUrl: string;
@@ -67,10 +58,7 @@ export function defineSandboxProfileVersions(schema: PgSchema) {
       sandboxVcpuCount: bigint("sandbox_vcpu_count", { mode: "number" }),
       sandboxMemoryMb: bigint("sandbox_memory_mb", { mode: "number" }),
       sandboxDiskMb: bigint("sandbox_disk_mb", { mode: "number" }),
-      agentRuntimeId: text("agent_runtime_id")
-        .notNull()
-        .$type<SandboxProfileVersionAgentRuntimeId>()
-        .default(SandboxProfileVersionAgentRuntimeIds.CODEX),
+      agentRuntimeId: text("agent_runtime_id").notNull().$type<AgentRuntimeId>().default("codex"),
       gitCommitSigningIntegrationConnectionId: text("git_commit_signing_integration_connection_id"),
       mistleMcpEnabled: boolean("mistle_mcp_enabled").notNull().default(false),
       mistleMcpApiKeyId: text("mistle_mcp_api_key_id"),

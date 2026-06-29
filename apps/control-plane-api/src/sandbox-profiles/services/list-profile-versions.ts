@@ -1,10 +1,10 @@
 import type {
-  SandboxProfileVersionAgentRuntimeId,
   SandboxProfileVersionSnapshotJobState,
   SandboxProfileVersionSnapshotJobTrigger,
   SandboxProfileVersionState,
 } from "@mistle/db/control-plane";
 import { SandboxProfileVersionStates } from "@mistle/db/control-plane";
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 
 import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "../errors.js";
 import {
@@ -36,7 +36,7 @@ type ListProfileVersionsOutput = {
     version: number;
     state: SandboxProfileVersionState;
     publishedAt: string | null;
-    agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+    agentRuntimeId: AgentRuntimeId;
     gitCommitSigningIntegrationConnectionId: string | null;
     mistleMcpEnabled: boolean;
     mistleMcpApiKeyId: string | null;

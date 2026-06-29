@@ -1,3 +1,4 @@
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { useCallback, type RefObject } from "react";
 
 import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-runtime-workbench-capabilities.js";
@@ -5,7 +6,6 @@ import {
   resolveInitialSelectedRepositoryPath,
   resolveSessionTerminalCwd,
 } from "./session-primary-repository-policy.js";
-import type { SessionMainPanelRuntimeId } from "./use-session-main-panel-handoff.js";
 import {
   useSessionPrimaryRepositoryState,
   type SessionPrimaryRepositoryState,
@@ -31,7 +31,7 @@ type SessionWorkbenchRepositoryControlState = {
 };
 
 export function useSessionWorkbenchRepositoryControl(input: {
-  activeHandoffRuntimeIdRef: RefObject<SessionMainPanelRuntimeId>;
+  activeHandoffRuntimeIdRef: RefObject<AgentRuntimeId>;
   canConnect: boolean;
   codexActiveThreadCwd: string | null | undefined;
   ensureCanSwitchPrimaryRepository: () => Promise<void>;

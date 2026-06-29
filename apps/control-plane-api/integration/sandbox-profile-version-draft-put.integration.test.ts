@@ -6,7 +6,6 @@ import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   OrganizationIdentityLinkProviderConfigStatus,
-  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
@@ -14,6 +13,7 @@ import {
   E2BSandboxRuntimeFamilyId,
   E2BSandboxRuntimeVariantId,
 } from "@mistle/integrations-definitions";
+import { AgentRuntimeIdCatalog } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { SandboxProvider } from "@mistle/sandbox";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
@@ -142,7 +142,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
         },
         body: JSON.stringify({
           setupScript: "pnpm install\npnpm dev:bootstrap",
-          agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+          agentRuntimeId: AgentRuntimeIdCatalog.OPENCODE,
           integrationBindings: {
             bindings: [
               {
@@ -163,7 +163,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
       sandboxProfileId: "sbp_draft_put_001",
       version: 1,
       setupScript: "pnpm install\npnpm dev:bootstrap",
-      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+      agentRuntimeId: AgentRuntimeIdCatalog.OPENCODE,
       ...EmptySandboxRuntimeConfig,
       integrationBindings: {
         bindings: [
@@ -191,7 +191,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     });
     expect(persistedVersion).toEqual({
       setupScript: "pnpm install\npnpm dev:bootstrap",
-      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+      agentRuntimeId: AgentRuntimeIdCatalog.OPENCODE,
     });
   });
 
@@ -859,7 +859,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE,
+          agentRuntimeId: AgentRuntimeIdCatalog.CLAUDE_CODE,
           mistleMcpEnabled: true,
           mistleMcpApiKeyId: mcpCredential.apiKey.id,
         }),
@@ -868,7 +868,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
 
     expect(response.status).toBe(200);
     const responseBody = PutSandboxProfileVersionDraftResponseSchema.parse(await response.json());
-    expect(responseBody.agentRuntimeId).toBe(SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE);
+    expect(responseBody.agentRuntimeId).toBe(AgentRuntimeIdCatalog.CLAUDE_CODE);
     expect(responseBody.mistleMcpEnabled).toBe(true);
     expect(responseBody.mistleMcpApiKeyId).toBe(mcpCredential.apiKey.id);
 
@@ -885,7 +885,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
         ),
     });
     expect(persistedVersion).toEqual({
-      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE,
+      agentRuntimeId: AgentRuntimeIdCatalog.CLAUDE_CODE,
       mistleMcpEnabled: true,
       mistleMcpApiKeyId: mcpCredential.apiKey.id,
     });

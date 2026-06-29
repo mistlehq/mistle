@@ -4,10 +4,10 @@ import type {
   ControlPlaneDatabase,
   ControlPlaneTransaction,
   IntegrationBindingKind,
-  SandboxProfileVersionAgentRuntimeId,
   SandboxProfileVersionSkillsConfig,
 } from "@mistle/db/control-plane";
 import { SandboxProfileVersionStates } from "@mistle/db/control-plane";
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 
 import {
   SandboxProfilePublishabilityIssueCodes,
@@ -52,7 +52,7 @@ type GetProfileVersionPublishabilityOutput = {
 type PublishWorthyProfileVersionFields = {
   version: number;
   setupScript: string | null;
-  agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+  agentRuntimeId: AgentRuntimeId;
   gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
   mistleMcpApiKeyId: string | null;
@@ -73,7 +73,7 @@ type PublishWorthyIntegrationBindingFields = {
 
 type CanonicalPublishWorthyProfileVersionConfig = {
   setupScript: string | null;
-  agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+  agentRuntimeId: AgentRuntimeId;
   gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
   mistleMcpApiKeyId: string | null;

@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+import { AgentRuntimeIds } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 
 const designerBlueprintSerializedSizeLimitBytes = 65_536;
@@ -301,7 +302,7 @@ const designerSessionStartupOperationSchema = z
 
 const designerSessionRuntimeContextSchema = z
   .object({
-    agentRuntimeId: z.enum(["claude-code", "codex", "opencode", "pi"]).nullable(),
+    agentRuntimeId: z.enum(AgentRuntimeIds).nullable(),
     launchCwd: z.string().min(1).nullable(),
     primaryRepositoryRoot: z.string().min(1).nullable(),
   })

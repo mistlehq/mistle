@@ -892,6 +892,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@mistle/integrations-definitions':
+        specifier: workspace:*
+        version: link:../integrations-definitions
       '@mistle/sandbox-lifecycle':
         specifier: workspace:*
         version: link:../sandbox-lifecycle

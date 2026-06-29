@@ -1,9 +1,9 @@
-import type { SandboxProfileVersionAgentRuntimeId } from "@mistle/db/control-plane";
 import {
   SandboxInstancePurposes,
   type SandboxInstanceSource,
   type SandboxInstanceStarterKind,
 } from "@mistle/db/data-plane";
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 
 import type { SandboxProfileVersionResources } from "./profile-version-runtime-config.js";
 import { startProfileSetupSandbox } from "./start-profile-setup-sandbox.js";
@@ -14,7 +14,7 @@ type StartProfileSetupScriptTestRunInput = {
   profileId: string;
   profileVersion: number;
   setupScript: string;
-  agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+  agentRuntimeId?: AgentRuntimeId;
   sandboxRuntimeConfig?: {
     sandboxProvider: string;
     sandboxConnectionId: string | null;

@@ -12,6 +12,10 @@ import {
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { GitHubCredentialSlotKeys } from "@mistle/integrations-definitions";
+import {
+  AgentRuntimeIdCatalog,
+  type AgentRuntimeId,
+} from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
@@ -237,7 +241,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
     });
     expect(queuedWorkflowInput.runtimePlan.agentRuntimes).toMatchObject([
       {
-        runtimeId: "codex",
+        runtimeId: AgentRuntimeIdCatalog.CODEX,
       },
     ]);
     expect(queuedWorkflowInput.runtimePlan.egressRoutes).toEqual([]);
@@ -537,7 +541,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
         },
         body: JSON.stringify({
           setupScript: "echo transient runtime",
-          agentRuntimeId: "opencode",
+          agentRuntimeId: AgentRuntimeIdCatalog.OPENCODE,
           sandboxProvider: "docker",
           sandboxConnectionId: null,
           sandboxResources: null,
@@ -563,10 +567,10 @@ describe.concurrent("sandbox profile version start instance integration", () => 
       provider: "docker",
     });
     expect(queuedWorkflowInput.runtimePlan.agentRuntimes[0]).toMatchObject({
-      runtimeId: "opencode",
+      runtimeId: AgentRuntimeIdCatalog.OPENCODE,
     });
     expect(persistedVersion?.sandboxProvider).toBeNull();
-    expect(persistedVersion?.agentRuntimeId).toBe("codex");
+    expect(persistedVersion?.agentRuntimeId).toBe(AgentRuntimeIdCatalog.CODEX);
   });
 
   it("returns 400 when transient setup script test runtime settings are invalid", async ({
@@ -811,7 +815,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
       connectionId: "icn_start_instance_agent_runtime",
       bindingId: "ibd_start_instance_agent_runtime",
       versionState: SandboxProfileVersionStates.DRAFT,
-      agentRuntimeId: "opencode",
+      agentRuntimeId: AgentRuntimeIdCatalog.OPENCODE,
     });
 
     const response = await env.controlPlaneApi.http.fetch(
@@ -833,7 +837,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
 
     expect(queuedWorkflowInput.runtimePlan.agentRuntimes).toHaveLength(1);
     expect(queuedWorkflowInput.runtimePlan.agentRuntimes[0]).toMatchObject({
-      runtimeId: "opencode",
+      runtimeId: AgentRuntimeIdCatalog.OPENCODE,
       runtimeKey: "opencode-server",
       clientId: "opencode-cli",
       endpointKey: "server",
@@ -1123,7 +1127,7 @@ async function createStartableProfile(input: {
   versionState:
     | typeof SandboxProfileVersionStates.DRAFT
     | typeof SandboxProfileVersionStates.PUBLISHED;
-  agentRuntimeId?: "claude-code" | "codex" | "opencode" | "pi";
+  agentRuntimeId?: AgentRuntimeId;
   snapshotImageId?: string;
   snapshotImageProvider?: "docker" | "e2b" | "tensorlake";
   runtimeColumns?: typeof DockerSandboxRuntimeColumns | typeof TensorlakeSandboxRuntimeColumns;
@@ -1151,7 +1155,7 @@ async function createStartableProfile(input: {
         sandboxProfileId: input.profileId,
         version: 1,
         state: input.versionState,
-        agentRuntimeId: input.agentRuntimeId ?? "codex",
+        agentRuntimeId: input.agentRuntimeId ?? AgentRuntimeIdCatalog.CODEX,
         ...(input.runtimeColumns ?? DockerSandboxRuntimeColumns),
         publishedAt:
           input.versionState === SandboxProfileVersionStates.PUBLISHED
