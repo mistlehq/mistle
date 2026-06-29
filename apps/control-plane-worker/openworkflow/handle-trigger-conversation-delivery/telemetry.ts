@@ -1,8 +1,17 @@
-import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
+import { metrics, SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 
 import { logger } from "../../logger.js";
 
 const TriggerConversationDeliveryTracer = trace.getTracer("@mistle/control-plane-worker");
+const TriggerConversationDeliveryMeter = metrics.getMeter("@mistle/control-plane-worker");
+const SandboxConnectionWaitDurationMs = TriggerConversationDeliveryMeter.createHistogram(
+  "mistle.sandbox.connection_acquisition.wait.duration",
+  {
+    description:
+      "Duration spent waiting for a sandbox to become usable before minting a connection.",
+    unit: "ms",
+  },
+);
 
 export type TriggerConversationDeliveryTelemetryContext = {
   webhookEventId?: string | undefined;
@@ -18,6 +27,7 @@ export type TriggerConversationDeliveryTelemetryContext = {
 
 type DeliveryTelemetryAttributeValue = string | number | boolean;
 type DeliveryTaskLifecycleStatus = "claimed" | "delivering";
+type SandboxConnectionWaitOutcome = "success" | "terminal_failure" | "timeout";
 
 export function resolveTriggerConversationDeliveryTaskLifecycleEvent(input: {
   status: DeliveryTaskLifecycleStatus;
@@ -119,6 +129,23 @@ export function logTriggerConversationDeliveryEvent(input: {
     },
     input.message,
   );
+}
+
+export function recordSandboxConnectionWaitDuration(input: {
+  durationMs: number;
+  outcome: SandboxConnectionWaitOutcome;
+  waitPhase: string;
+  startupOperationKind?: string | undefined;
+  status?: string | undefined;
+}): void {
+  SandboxConnectionWaitDurationMs.record(input.durationMs, {
+    "mistle.sandbox.connection.wait_outcome": input.outcome,
+    "mistle.sandbox.wait_phase": input.waitPhase,
+    ...(input.startupOperationKind === undefined
+      ? {}
+      : { "mistle.sandbox.startup_operation_kind": input.startupOperationKind }),
+    ...(input.status === undefined ? {} : { "mistle.sandbox.status": input.status }),
+  });
 }
 
 function toRecordableError(error: unknown): Error {

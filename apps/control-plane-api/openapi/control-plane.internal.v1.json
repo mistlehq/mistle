@@ -3504,6 +3504,21 @@
                       "type": "integer",
                       "exclusiveMinimum": 0
                     },
+                    "startupOperation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "operationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operationKind": {
+                          "type": "string",
+                          "enum": ["start", "resume"]
+                        }
+                      },
+                      "required": ["operationId", "operationKind"],
+                      "additionalProperties": false
+                    },
                     "associatedResourceEventRouting": {
                       "type": ["object", "null"],
                       "properties": {
@@ -3556,6 +3571,7 @@
                     "failureMessage",
                     "sandboxProfileId",
                     "sandboxProfileVersion",
+                    "startupOperation",
                     "associatedResourceEventRouting"
                   ],
                   "additionalProperties": false

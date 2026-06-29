@@ -28,6 +28,13 @@ export const InternalSandboxRuntimeGetSandboxInstanceResponseSchema = z
     failureMessage: z.string().min(1).nullable(),
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().positive(),
+    startupOperation: z
+      .object({
+        operationId: z.string().min(1),
+        operationKind: z.enum(["start", "resume"]),
+      })
+      .strict()
+      .nullable(),
     associatedResourceEventRouting: AssociatedResourceEventRoutingSchema.nullable(),
   })
   .strict();
