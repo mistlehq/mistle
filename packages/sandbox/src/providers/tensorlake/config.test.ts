@@ -9,7 +9,7 @@ describe("validateTensorlakeSandboxConfig", () => {
     });
   });
 
-  it("accepts a release sandboxd artifact source for missing-image registration", () => {
+  it("accepts a release sandboxd artifact source for runtime repair", () => {
     expect(
       validateTensorlakeSandboxConfig({
         apiKey: "test-api-key",

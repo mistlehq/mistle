@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
@@ -52,6 +53,43 @@ fn activation_policy_only_applies_pre_materialized_snapshot_for_snapshot_prepara
 fn setup_script_policy_follows_runtime_plan_application() {
     assert!(super::should_run_setup_script_for_activation(true));
     assert!(!super::should_run_setup_script_for_activation(false));
+}
+
+#[test]
+fn prepares_missing_standard_dev_links() {
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+
+    super::prepare_standard_dev_links(temp_dir.path())
+        .expect("standard /dev links should be created");
+
+    assert_eq!(
+        fs::read_link(temp_dir.path().join("fd")).expect("fd should be a symlink"),
+        std::path::Path::new("/proc/self/fd")
+    );
+    assert_eq!(
+        fs::read_link(temp_dir.path().join("stdin")).expect("stdin should be a symlink"),
+        std::path::Path::new("/proc/self/fd/0")
+    );
+    assert_eq!(
+        fs::read_link(temp_dir.path().join("stdout")).expect("stdout should be a symlink"),
+        std::path::Path::new("/proc/self/fd/1")
+    );
+    assert_eq!(
+        fs::read_link(temp_dir.path().join("stderr")).expect("stderr should be a symlink"),
+        std::path::Path::new("/proc/self/fd/2")
+    );
+}
+
+#[test]
+fn rejects_unexpected_standard_dev_links() {
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+    std::os::unix::fs::symlink("/unexpected", temp_dir.path().join("stdin"))
+        .expect("unexpected stdin symlink should be created");
+
+    let error = super::prepare_standard_dev_links(temp_dir.path())
+        .expect_err("unexpected stdio link should fail activation preparation");
+
+    assert!(error.contains("points to '/unexpected' instead of '/proc/self/fd/0'"));
 }
 
 #[test]

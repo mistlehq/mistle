@@ -1,58 +1,52 @@
-import { createSandboxImage } from "tensorlake";
-
-import type { SandboxSdkImageBaseImageSource } from "../../types.js";
-import { createTensorlakeSandboxBaseImage } from "./base-image-definition.js";
+import { importSandboxImage } from "tensorlake";
 
 const TensorlakeApiKeyEnv = "TENSORLAKE_API_KEY";
 
 export type RegisterTensorlakeSandboxBaseImageInput = {
   readonly apiKey: string;
-  readonly contextPath: string;
-  readonly source: Omit<SandboxSdkImageBaseImageSource, "contextPath" | "kind">;
+  readonly source: {
+    readonly baseImageRef: string;
+    readonly imageId: string;
+  };
 };
 
 export async function registerTensorlakeSandboxBaseImage(
   input: RegisterTensorlakeSandboxBaseImageInput,
 ): Promise<void> {
   await withTensorlakeApiKey(input.apiKey, async () => {
-    const buildLogs = createTensorlakeBuildLogCollector();
+    const importLogs = createTensorlakeImageImportLogCollector();
 
     try {
-      await createSandboxImage(
-        createTensorlakeSandboxBaseImage({
-          baseImageRef: input.source.baseImageRef,
-          name: input.source.imageId,
-          ...(input.source.sandboxd === undefined ? {} : { sandboxd: input.source.sandboxd }),
-        }),
+      await importSandboxImage(
+        input.source.baseImageRef,
         {
           registeredName: input.source.imageId,
-          contextDir: input.contextPath,
           dockerCompat: true,
         },
-        { emit: buildLogs.emit },
+        { emit: importLogs.emit },
       );
     } catch (error) {
-      throw formatTensorlakeBuildFailure(error, buildLogs.entries());
+      throw formatTensorlakeImageImportFailure(error, importLogs.entries());
     }
   });
 }
 
-type TensorlakeBuildLogEntry = {
+type TensorlakeImageImportLogEntry = {
   readonly label: string;
   readonly message: string;
 };
 
-type TensorlakeBuildLogCollector = {
+type TensorlakeImageImportLogCollector = {
   readonly emit: (event: Record<string, unknown>) => void;
-  readonly entries: () => readonly TensorlakeBuildLogEntry[];
+  readonly entries: () => readonly TensorlakeImageImportLogEntry[];
 };
 
-function createTensorlakeBuildLogCollector(): TensorlakeBuildLogCollector {
-  const entries: TensorlakeBuildLogEntry[] = [];
+function createTensorlakeImageImportLogCollector(): TensorlakeImageImportLogCollector {
+  const entries: TensorlakeImageImportLogEntry[] = [];
 
   return {
     emit: (event) => {
-      const entry = parseTensorlakeBuildLogEntry(event);
+      const entry = parseTensorlakeImageImportLogEntry(event);
       if (entry === null) {
         return;
       }
@@ -64,9 +58,9 @@ function createTensorlakeBuildLogCollector(): TensorlakeBuildLogCollector {
   };
 }
 
-function parseTensorlakeBuildLogEntry(
+function parseTensorlakeImageImportLogEntry(
   event: Record<string, unknown>,
-): TensorlakeBuildLogEntry | null {
+): TensorlakeImageImportLogEntry | null {
   if (typeof event.message !== "string") {
     return null;
   }
@@ -81,30 +75,32 @@ function parseTensorlakeBuildLogEntry(
       ? event.stream
       : typeof event.type === "string" && event.type.length > 0
         ? event.type
-        : "build";
+        : "import";
 
   return { label, message };
 }
 
-export function formatTensorlakeBuildFailure(
+export function formatTensorlakeImageImportFailure(
   error: unknown,
-  entries: readonly TensorlakeBuildLogEntry[],
+  entries: readonly TensorlakeImageImportLogEntry[],
 ): Error {
   const baseMessage =
     error instanceof Error
       ? error.message
-      : `Tensorlake sandbox image build failed: ${String(error)}`;
+      : `Tensorlake sandbox image import failed: ${String(error)}`;
 
-  const logMessage = formatTensorlakeBuildLogs(entries);
+  const logMessage = formatTensorlakeImageImportLogs(entries);
   const message =
     logMessage.length === 0
       ? baseMessage
-      : `${baseMessage}\n\nTensorlake sandbox image build output:\n${logMessage}`;
+      : `${baseMessage}\n\nTensorlake sandbox image import output:\n${logMessage}`;
 
   return new Error(message, { cause: error });
 }
 
-function formatTensorlakeBuildLogs(entries: readonly TensorlakeBuildLogEntry[]): string {
+function formatTensorlakeImageImportLogs(
+  entries: readonly TensorlakeImageImportLogEntry[],
+): string {
   return entries.map((entry) => `${entry.label}:\n${entry.message}`).join("\n");
 }
 
