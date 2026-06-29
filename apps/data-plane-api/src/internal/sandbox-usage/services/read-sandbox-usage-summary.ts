@@ -10,19 +10,13 @@ import type {
   SandboxUsageSummaryInput,
   SandboxUsageSummaryResponse,
 } from "../../sandbox/sandbox-usage/summary/schema.js";
+import { SandboxUsageActivities } from "../../sandbox/sandbox-usage/summary/schema.js";
 import {
   aggregateSandboxUsage,
   type SandboxUsageInstanceMetadata,
 } from "./sandbox-usage-aggregation.js";
 
-const UsageActivities: readonly SandboxUsageActivity[] = [
-  "user_sessions",
-  "designer_sessions",
-  "trigger_runs",
-  "setup_assistants",
-  "setup_script_checks",
-  "snapshot_maintenance",
-];
+const UsageActivities: readonly SandboxUsageActivity[] = SandboxUsageActivities;
 
 type ReadSandboxUsageSummaryContext = {
   db: DataPlaneDatabase;

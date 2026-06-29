@@ -1,13 +1,9 @@
-import type { OrganizationUsageSettingsPageViewProps } from "./organization-usage-settings-page-view.js";
+import type { OrganizationUsageSettingsPageViewProps } from "../features/pages/organization-usage-settings-page-view.js";
 
 export function createOrganizationUsagePrototypeProps(): OrganizationUsageSettingsPageViewProps {
   return {
     period: {
       range: "Jun 1-30, 2026",
-    },
-    measurement: {
-      measuredFrom: "2026-06-01T00:00:00.000Z",
-      complete: true,
     },
     summaryMetrics: [
       {
@@ -154,24 +150,10 @@ export function createOrganizationUsagePrototypeProps(): OrganizationUsageSettin
   };
 }
 
-export function createOrganizationUsagePartialMeasurementProps(): OrganizationUsageSettingsPageViewProps {
-  return {
-    ...createOrganizationUsagePrototypeProps(),
-    measurement: {
-      measuredFrom: "2026-06-12T14:30:00.000Z",
-      complete: false,
-    },
-  };
-}
-
 export function createOrganizationUsageEmptyMeasuredProps(): OrganizationUsageSettingsPageViewProps {
   return {
     period: {
       range: "Jun 1-30, 2026",
-    },
-    measurement: {
-      measuredFrom: null,
-      complete: false,
     },
     summaryMetrics: [
       {

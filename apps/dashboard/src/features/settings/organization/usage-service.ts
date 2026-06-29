@@ -85,8 +85,9 @@ export async function getOrganizationUsage(input: {
 }): Promise<OrganizationUsageResponse> {
   const response = await requestControlPlane({
     operation: "getOrganizationUsage",
-    pathname: `/v1/organization/usage?month=${encodeURIComponent(input.month)}`,
+    pathname: "/v1/organization/usage",
     method: "GET",
+    query: { month: input.month },
     fallbackMessage: "Could not load usage information.",
   });
 

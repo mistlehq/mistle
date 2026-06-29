@@ -5,19 +5,13 @@ import {
 } from "@mistle/db/data-plane";
 import { describe, expect, it } from "vitest";
 
+import { SandboxUsageActivities } from "../../sandbox/sandbox-usage/summary/schema.js";
 import { aggregateSandboxUsage, type SandboxUsageEventRow } from "./sandbox-usage-aggregation.js";
 
 const PeriodStart = "2026-06-01T00:00:00.000Z";
 const PeriodEnd = "2026-07-01T00:00:00.000Z";
 const RequestedAt = "2026-06-29T12:00:00.000Z";
-const ActivityRows = [
-  "user_sessions",
-  "designer_sessions",
-  "trigger_runs",
-  "setup_assistants",
-  "setup_script_checks",
-  "snapshot_maintenance",
-] as const;
+const ActivityRows = SandboxUsageActivities;
 
 describe("aggregateSandboxUsage", () => {
   it("clips runtime intervals to the requested usage period", () => {
@@ -92,6 +86,61 @@ describe("aggregateSandboxUsage", () => {
     });
 
     expect(result.summary.sandboxHours).toBe(30);
+  });
+
+  it("counts resumed runtime intervals for the same compute generation", () => {
+    const result = aggregateSandboxUsage({
+      activityRows: ActivityRows,
+      periodStart: PeriodStart,
+      periodEnd: PeriodEnd,
+      requestedAt: RequestedAt,
+      events: [
+        usageEvent({
+          sandboxInstanceId: "sandbox-1",
+          eventType: SandboxUsageEventTypes.SANDBOX_ALLOCATED,
+          occurredAt: "2026-06-01T00:00:00.000Z",
+        }),
+        usageEvent({
+          sandboxInstanceId: "sandbox-1",
+          eventType: SandboxUsageEventTypes.SANDBOX_STOPPED,
+          occurredAt: "2026-06-01T02:00:00.000Z",
+        }),
+        usageEvent({
+          sandboxInstanceId: "sandbox-1",
+          eventType: SandboxUsageEventTypes.SANDBOX_RESUMED,
+          occurredAt: "2026-06-01T05:00:00.000Z",
+        }),
+        usageEvent({
+          sandboxInstanceId: "sandbox-1",
+          eventType: SandboxUsageEventTypes.SANDBOX_STOPPED,
+          occurredAt: "2026-06-01T08:00:00.000Z",
+        }),
+      ],
+      instancesById: new Map([
+        [
+          "sandbox-1",
+          {
+            sandboxProfileId: "profile-1",
+            purpose: SandboxInstancePurposes.SESSION,
+            source: SandboxInstanceSources.DASHBOARD,
+          },
+        ],
+      ]),
+      runs: [],
+    });
+
+    expect(result.summary).toEqual({
+      sandboxHours: 5,
+      sandboxRuns: 0,
+      vcpuHours: 10,
+      memoryGbHours: 20,
+      storageGbHours: 50,
+    });
+    expect(result.dailyUsage[0]).toEqual({
+      day: "2026-06-01",
+      sandboxHours: 5,
+      runCount: 0,
+    });
   });
 
   it("counts runs only when the sandbox lifecycle started in the period", () => {

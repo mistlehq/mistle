@@ -550,7 +550,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           failedAttributes: {
             timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
           },
-          failedMessage: "Resumed sandbox runtime readiness timed out.",
+          failedMessage: "Resumed sandbox runtime readiness wait timed out.",
           phase: "ready",
           startedMessage: "Resumed sandbox runtime readiness wait started.",
         },

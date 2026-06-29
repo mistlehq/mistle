@@ -10,8 +10,6 @@ import {
 
 import { FormPageHeader, FormPageSection, FormPageStack } from "../shared/form-page.js";
 
-export type OrganizationUsagePeriodKind = "calendar_month" | "subscription_period";
-
 export type OrganizationUsageSummaryMetric = {
   id: string;
   label: string;
@@ -39,10 +37,6 @@ export type OrganizationUsageBreakdownRow = {
 export type OrganizationUsageSettingsPageViewProps = {
   period: {
     range: string;
-  };
-  measurement?: {
-    measuredFrom: string | null;
-    complete: boolean;
   };
   summaryMetrics: readonly OrganizationUsageSummaryMetric[];
   dailyUsage: readonly OrganizationUsageDailyPoint[];

@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { createTriggerParameterResourceQueryKey } from "../triggers/webhook-trigger-resource-query-keys.js";
 import {
   StorySlackConnection,
   StorySlackTarget,
@@ -25,7 +26,10 @@ describe("SandboxProfileBindingResourcesAndToolsCell", () => {
   it("passes the Slack row connection id into associated resource channel filters", async () => {
     const queryClient = createTestQueryClient();
     queryClient.setQueryData(
-      ["trigger-trigger-parameters", StorySlackConnection.id, "channel"],
+      createTriggerParameterResourceQueryKey({
+        connectionId: StorySlackConnection.id,
+        resourceKind: "channel",
+      }),
       createSlackChannelResources(),
     );
 

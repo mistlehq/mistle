@@ -60,6 +60,15 @@ export type SandboxUsageAggregateResult = {
   })[];
 };
 
+type ResolvedRuntimeInterval = {
+  sandboxInstanceId: string;
+  startMs: number;
+  endMs: number | null;
+  vcpuCount: number | null;
+  memoryMb: number | null;
+  diskMb: number | null;
+};
+
 const StartEventTypes = new Set<SandboxUsageEventType>([
   SandboxUsageEventTypes.SANDBOX_ALLOCATED,
   SandboxUsageEventTypes.SANDBOX_RESUMED,
@@ -87,37 +96,34 @@ export function aggregateSandboxUsage(
 
   const eventsByIntervalKey = groupEventsByIntervalKey(input.events);
   for (const events of eventsByIntervalKey.values()) {
-    const interval = resolveRuntimeInterval(events);
-    if (interval === null) {
-      continue;
-    }
+    for (const interval of resolveRuntimeIntervals(events)) {
+      const instance = input.instancesById.get(interval.sandboxInstanceId);
+      if (instance === undefined) {
+        continue;
+      }
 
-    const instance = input.instancesById.get(interval.sandboxInstanceId);
-    if (instance === undefined) {
-      continue;
-    }
+      const clippedStartMs = Math.max(interval.startMs, periodStartMs);
+      const clippedEndMs = Math.min(interval.endMs ?? effectiveOpenEndMs, periodEndMs);
+      if (clippedEndMs <= clippedStartMs) {
+        continue;
+      }
 
-    const clippedStartMs = Math.max(interval.startMs, periodStartMs);
-    const clippedEndMs = Math.min(interval.endMs ?? effectiveOpenEndMs, periodEndMs);
-    if (clippedEndMs <= clippedStartMs) {
-      continue;
+      const hours = (clippedEndMs - clippedStartMs) / MillisecondsPerHour;
+      const totals = createIntervalTotals({
+        hours,
+        vcpuCount: interval.vcpuCount,
+        memoryMb: interval.memoryMb,
+        diskMb: interval.diskMb,
+      });
+      addTotals(summary, totals);
+      addTotals(getOrCreateTotals(profileTotals, instance.sandboxProfileId), totals);
+      addTotals(getOrCreateTotals(activityTotals, resolveSandboxUsageActivity(instance)), totals);
+      addDailyHours({
+        dailyTotals,
+        startMs: clippedStartMs,
+        endMs: clippedEndMs,
+      });
     }
-
-    const hours = (clippedEndMs - clippedStartMs) / MillisecondsPerHour;
-    const totals = createIntervalTotals({
-      hours,
-      vcpuCount: interval.vcpuCount,
-      memoryMb: interval.memoryMb,
-      diskMb: interval.diskMb,
-    });
-    addTotals(summary, totals);
-    addTotals(getOrCreateTotals(profileTotals, instance.sandboxProfileId), totals);
-    addTotals(getOrCreateTotals(activityTotals, resolveSandboxUsageActivity(instance)), totals);
-    addDailyHours({
-      dailyTotals,
-      startMs: clippedStartMs,
-      endMs: clippedEndMs,
-    });
   }
 
   for (const run of input.runs) {
@@ -181,32 +187,44 @@ function groupEventsByIntervalKey(
   return grouped;
 }
 
-function resolveRuntimeInterval(events: readonly SandboxUsageEventRow[]): {
-  sandboxInstanceId: string;
-  startMs: number;
-  endMs: number | null;
-  vcpuCount: number | null;
-  memoryMb: number | null;
-  diskMb: number | null;
-} | null {
-  const start = events.find((event) => StartEventTypes.has(event.eventType));
-  if (start === undefined) {
-    return null;
+function resolveRuntimeIntervals(
+  events: readonly SandboxUsageEventRow[],
+): ResolvedRuntimeInterval[] {
+  const intervals: ResolvedRuntimeInterval[] = [];
+  let openStart: SandboxUsageEventRow | undefined;
+
+  for (const event of events) {
+    if (StartEventTypes.has(event.eventType)) {
+      openStart = event;
+      continue;
+    }
+
+    if (openStart === undefined || !TerminalEventTypes.has(event.eventType)) {
+      continue;
+    }
+
+    intervals.push(createRuntimeInterval({ start: openStart, end: event }));
+    openStart = undefined;
   }
 
-  const startMs = parseTimestamp(start.occurredAt);
-  const terminal = events.find(
-    (event) =>
-      TerminalEventTypes.has(event.eventType) && parseTimestamp(event.occurredAt) >= startMs,
-  );
+  if (openStart !== undefined) {
+    intervals.push(createRuntimeInterval({ start: openStart, end: null }));
+  }
 
+  return intervals;
+}
+
+function createRuntimeInterval(input: {
+  start: SandboxUsageEventRow;
+  end: SandboxUsageEventRow | null;
+}): ResolvedRuntimeInterval {
   return {
-    sandboxInstanceId: start.sandboxInstanceId,
-    startMs,
-    endMs: terminal === undefined ? null : parseTimestamp(terminal.occurredAt),
-    vcpuCount: start.vcpuCount,
-    memoryMb: start.memoryMb,
-    diskMb: start.diskMb,
+    sandboxInstanceId: input.start.sandboxInstanceId,
+    startMs: parseTimestamp(input.start.occurredAt),
+    endMs: input.end === null ? null : parseTimestamp(input.end.occurredAt),
+    vcpuCount: input.start.vcpuCount,
+    memoryMb: input.start.memoryMb,
+    diskMb: input.start.diskMb,
   };
 }
 

@@ -1,6 +1,5 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { inArray } from "drizzle-orm";
 
 import { DESIGNER_RUNTIME_PROFILE_ID } from "../../designer/constants.js";
 import type { OrganizationUsageResponse } from "./organization-usage-contract.js";
@@ -110,7 +109,7 @@ async function resolveProfileNames(
       id: true,
       displayName: true,
     },
-    where: (table, { and, eq }) =>
+    where: (table, { and, eq, inArray }) =>
       and(eq(table.organizationId, input.organizationId), inArray(table.id, profileIds)),
   });
 

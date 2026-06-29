@@ -100,7 +100,6 @@ function toUsageViewProps(
     period: {
       range: formatPeriodRange(response.period),
     },
-    measurement: response.measurement,
     summaryMetrics: [
       {
         id: "sandbox-hours",

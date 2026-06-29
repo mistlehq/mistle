@@ -1,13 +1,15 @@
 import { z } from "@hono/zod-openapi";
 
-export const SandboxUsageActivitySchema = z.enum([
+export const SandboxUsageActivities = [
   "user_sessions",
   "designer_sessions",
   "trigger_runs",
   "setup_assistants",
   "setup_script_checks",
   "snapshot_maintenance",
-]);
+] as const;
+
+export const SandboxUsageActivitySchema = z.enum(SandboxUsageActivities);
 
 export const SandboxUsageSummaryInputSchema = z
   .object({

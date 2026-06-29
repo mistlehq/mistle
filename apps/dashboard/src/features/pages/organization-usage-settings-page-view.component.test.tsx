@@ -3,8 +3,8 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { createOrganizationUsagePrototypeProps } from "../../test-support/organization-usage-page-fixtures.js";
 import { OrganizationUsageSettingsPageView } from "./organization-usage-settings-page-view.js";
-import { createOrganizationUsagePrototypeProps } from "./organization-usage-settings-page-view.story-fixtures.js";
 
 describe("OrganizationUsageSettingsPageView", () => {
   it("labels breakdown tables by their row category instead of a generic segment column", () => {
