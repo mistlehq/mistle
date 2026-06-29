@@ -46,6 +46,10 @@ function createUserEntryId(): string {
   return `user:${crypto.randomUUID()}`;
 }
 
+function createUserInputResponseEntryId(): string {
+  return `user-input-response:${crypto.randomUUID()}`;
+}
+
 type QueuedSteerRequest = {
   entryId: string;
   threadId: string;
@@ -583,6 +587,17 @@ export function useCodexChatController(input: {
         });
       },
       [flushPendingChatNotifications, syncPendingSteerCount],
+    ),
+    addUserInputResponseToTranscript: useCallback(
+      (responseInput: { responseText: string; turnId: string }): void => {
+        dispatchChatAction({
+          type: "user_input_response_submitted",
+          entryId: createUserInputResponseEntryId(),
+          turnId: responseInput.turnId,
+          responseText: responseInput.responseText,
+        });
+      },
+      [],
     ),
     steerTurn: useCallback(
       async (turnInput: {

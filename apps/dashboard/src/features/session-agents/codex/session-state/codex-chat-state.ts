@@ -169,6 +169,12 @@ export type CodexChatAction =
       attachments?: readonly ChatAttachment[];
     }
   | {
+      type: "user_input_response_submitted";
+      entryId: string;
+      turnId: string;
+      responseText: string;
+    }
+  | {
       type: "steer_turn_processed";
       entryId: string;
       turnId: string;
@@ -1765,6 +1771,30 @@ export function reduceCodexChatState(
                 },
               ),
               requestState: "queued",
+              anchor: getCurrentTurnSteerAnchor(turn),
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  if (action.type === "user_input_response_submitted") {
+    const ensured = ensureTurn(state.turnsById, state.turnOrder, action.turnId);
+    const turn = ensured.turnsById[action.turnId] ?? createTurnState(action.turnId);
+
+    return buildState({
+      pendingTurnId: state.pendingTurnId,
+      turnOrder: ensured.turnOrder,
+      turnsById: {
+        ...ensured.turnsById,
+        [action.turnId]: {
+          ...turn,
+          clientSteerEntries: [
+            ...turn.clientSteerEntries,
+            {
+              entry: buildUserEntry(action.turnId, action.responseText, [], action.entryId),
+              requestState: "accepted",
               anchor: getCurrentTurnSteerAnchor(turn),
             },
           ],

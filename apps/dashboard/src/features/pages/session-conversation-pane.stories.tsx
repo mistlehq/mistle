@@ -143,6 +143,68 @@ const UserInputCustomResponseComposerStateInput: React.ComponentProps<
 
 const LongTranscriptStreamingTurnId = "long-transcript-streaming-turn";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readCustomResponseText(result: unknown): string | null {
+  if (!isRecord(result) || !isRecord(result["customResponse"])) {
+    return null;
+  }
+
+  const text = result["customResponse"]["text"];
+  return typeof text === "string" && text.length > 0 ? text : null;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function readStructuredAnswerResponseText(result: unknown): string | null {
+  if (!isRecord(result) || !Array.isArray(result["answers"])) {
+    return null;
+  }
+
+  const answerTexts = result["answers"].flatMap((answer) => {
+    if (!isRecord(answer)) {
+      return [];
+    }
+
+    const value = answer["value"];
+    if (typeof value === "string") {
+      return value.length === 0 ? [] : [value];
+    }
+
+    return isStringArray(value) ? value.filter((item) => item.length > 0) : [];
+  });
+
+  return answerTexts.length === 0 ? null : answerTexts.join("\n");
+}
+
+function readUserInputResponseText(result: unknown): string | null {
+  return readCustomResponseText(result) ?? readStructuredAnswerResponseText(result);
+}
+
+function createUserInputCustomResponseInitialEntries(): readonly ChatEntry[] {
+  return [
+    {
+      id: "user-input-custom-response-user-1",
+      turnId: "user-input-custom-response-turn",
+      kind: "user-message",
+      status: "completed",
+      text: "Set up the first outbound email workflow.",
+    },
+    {
+      id: "user-input-custom-response-assistant-1",
+      turnId: "user-input-custom-response-turn",
+      kind: "assistant-message",
+      phase: null,
+      status: "completed",
+      text: "I need one provider decision before I can continue configuring the workflow.",
+    },
+  ];
+}
+
 function createLongTranscriptAssistantText(input: {
   paragraphCount: number;
   turnNumber: number;
@@ -268,7 +330,10 @@ function UserInputCustomResponseHarness(): React.JSX.Element {
   const [composerDraft, setComposerDraft] = useState(() =>
     createComposerDraft("Actually use Postmark for this setup."),
   );
-  const [lastResponseText, setLastResponseText] = useState<string | null>(null);
+  const [chatEntries, setChatEntries] = useState(createUserInputCustomResponseInitialEntries);
+  const [serverRequestPanelEntries, setServerRequestPanelEntries] = useState(
+    UserInputCustomResponseRequestEntries,
+  );
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const handleComposerDraftChange = useCallback(
     (nextComposerDraft: React.SetStateAction<typeof composerDraft>): void => {
@@ -287,29 +352,24 @@ function UserInputCustomResponseHarness(): React.JSX.Element {
     }),
     [composerDraft, handleComposerDraftChange],
   );
-  const chatEntries = useMemo(
-    (): readonly ChatEntry[] => [
-      {
-        id: "user-input-custom-response-user-1",
-        turnId: "user-input-custom-response-turn",
-        kind: "user-message",
-        status: "completed",
-        text: "Set up the first outbound email workflow.",
-      },
-      {
-        id: "user-input-custom-response-assistant-1",
-        turnId: "user-input-custom-response-turn",
-        kind: "assistant-message",
-        phase: null,
-        status: "completed",
-        text: "I need one provider decision before I can continue configuring the workflow.",
-      },
-    ],
-    [],
-  );
   const handleRespondToServerRequest = useCallback(
-    (requestId: string | number, result: unknown) => {
-      setLastResponseText(JSON.stringify({ requestId, result }, null, 2));
+    (_requestId: string | number, result: unknown) => {
+      const responseText = readUserInputResponseText(result);
+      if (responseText === null) {
+        return;
+      }
+
+      setChatEntries((currentEntries) => [
+        ...currentEntries,
+        {
+          id: `user-input-custom-response-response-${String(currentEntries.length)}`,
+          turnId: "user-input-custom-response-turn",
+          kind: "user-message",
+          status: "completed",
+          text: responseText,
+        },
+      ]);
+      setServerRequestPanelEntries([]);
     },
     [],
   );
@@ -324,26 +384,20 @@ function UserInputCustomResponseHarness(): React.JSX.Element {
         onRespondToServerRequest={handleRespondToServerRequest}
         pendingTurnId={null}
         scrollContainerRef={scrollContainerRef}
-        serverRequestPanelEntries={UserInputCustomResponseRequestEntries}
+        serverRequestPanelEntries={serverRequestPanelEntries}
       />
     ),
     mainContentScrollContainerRef: scrollContainerRef,
     primaryBottomPanel: (
-      <div className="space-y-3">
-        <SessionConversationBottomPanelController
-          composerStateInput={UserInputCustomResponseComposerStateInput}
-          draftState={draftState}
-          isRespondingToServerRequest={false}
-          onRespondToServerRequest={handleRespondToServerRequest}
-          serverRequestPanelEntries={UserInputCustomResponseRequestEntries}
-          supportsUserInputRequestCustomResponse
-        />
-        {lastResponseText === null ? null : (
-          <pre className="max-h-32 overflow-auto rounded border bg-muted/40 p-3 text-xs text-muted-foreground">
-            {lastResponseText}
-          </pre>
-        )}
-      </div>
+      <SessionConversationBottomPanelController
+        chatEntries={chatEntries}
+        composerStateInput={UserInputCustomResponseComposerStateInput}
+        draftState={draftState}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={handleRespondToServerRequest}
+        serverRequestPanelEntries={serverRequestPanelEntries}
+        supportsUserInputRequestCustomResponse
+      />
     ),
   });
 }

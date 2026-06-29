@@ -203,6 +203,35 @@ function isUserInputAnswerResult(result: unknown): result is UserInputAnswerResu
   return Array.isArray(result["answers"]) && result["answers"].every(isUserInputAnswer);
 }
 
+function readUserInputCustomResponseText(result: unknown): string | null {
+  if (!isRecord(result) || !isRecord(result["customResponse"])) {
+    return null;
+  }
+
+  const text = result["customResponse"]["text"];
+  return typeof text === "string" && text.trim().length > 0 ? text : null;
+}
+
+function readUserInputAnswerResponseText(result: unknown): string | null {
+  if (!isUserInputAnswerResult(result)) {
+    return null;
+  }
+
+  const answerTexts = result.answers.flatMap((answer) => {
+    if (typeof answer.value === "string") {
+      return answer.value.trim().length === 0 ? [] : [answer.value];
+    }
+
+    return answer.value.filter((value) => value.trim().length > 0);
+  });
+
+  return answerTexts.length === 0 ? null : answerTexts.join("\n");
+}
+
+function readUserInputResponseTranscriptText(result: unknown): string | null {
+  return readUserInputCustomResponseText(result) ?? readUserInputAnswerResponseText(result);
+}
+
 function serializeIntegrationBindingForDraft(binding: SandboxProfileVersionIntegrationBinding): {
   id: string;
   connectionId: string;
@@ -641,6 +670,7 @@ export function useCodexSessionState(input: {
     reloadChat,
     interruptTurn,
     dismissUserMessageAction,
+    addUserInputResponseToTranscript,
     steerTurn,
   } = useCodexChatController({
     rpcClientRef: input.rpcClientRef,
@@ -1054,6 +1084,12 @@ export function useCodexSessionState(input: {
         const requestId = String(responseInput.requestId);
         const isDashboardControlUserInputRequest =
           dashboardControlUserInputRequestIdsRef.current.has(requestId);
+        const responseTranscriptText = readUserInputResponseTranscriptText(responseInput.result);
+        const responseTranscriptTurnId =
+          responseTranscriptText === null ? null : chatState.activeTurnId;
+        if (responseTranscriptText !== null && responseTranscriptTurnId === null) {
+          throw new Error("No active turn is available for the user input response.");
+        }
         const result = isDashboardControlUserInputRequest
           ? createDashboardControlUserInputResponse({
               result: await maybeApplyDashboardUserInputSubmitBehavior({
@@ -1070,6 +1106,12 @@ export function useCodexSessionState(input: {
               result: responseInput.result,
             });
         await rpcClient.respond(responseInput.requestId, result);
+        if (responseTranscriptText !== null && responseTranscriptTurnId !== null) {
+          addUserInputResponseToTranscript({
+            responseText: responseTranscriptText,
+            turnId: responseTranscriptTurnId,
+          });
+        }
         if (isDashboardControlUserInputRequest) {
           dashboardControlUserInputRequestIdsRef.current.delete(requestId);
           dispatchServerRequestsAction({
