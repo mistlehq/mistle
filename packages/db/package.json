@@ -62,6 +62,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
+    "@mistle/integrations-definitions": "workspace:*",
     "@mistle/sandbox-lifecycle": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.20.0",

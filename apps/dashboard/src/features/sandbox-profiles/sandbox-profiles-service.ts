@@ -1,4 +1,5 @@
 import { SlackThreadMessageModes } from "@mistle/integrations-core";
+import { AgentRuntimeIds } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { z } from "zod";
 
 import { getControlPlaneApiClient } from "../../lib/control-plane-api/client.js";
@@ -38,7 +39,7 @@ import type {
   UpdateSandboxProfileInput,
 } from "./sandbox-profiles-types.js";
 
-const AgentRuntimeIdSchema = z.enum(["claude-code", "codex", "opencode", "pi"]);
+const AgentRuntimeIdSchema = z.enum(AgentRuntimeIds);
 const AssociatedResourceEventRoutingResourceRuleSchema = z
   .object({
     resourceKind: z.string().min(1),

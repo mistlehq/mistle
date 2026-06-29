@@ -1,9 +1,9 @@
-import type { SandboxProfileVersionAgentRuntimeId } from "@mistle/db/control-plane";
 import {
   SandboxInstancePurposes,
   type SandboxInstanceSource,
   type SandboxInstanceStarterKind,
 } from "@mistle/db/data-plane";
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 
 import type { SandboxProfileVersionResources } from "./profile-version-runtime-config.js";
 import { resolveMaintenanceSnapshotImageId } from "./resolve-maintenance-snapshot-image.js";
@@ -15,7 +15,7 @@ type StartProfileMaintenanceScriptTestRunInput = {
   profileId: string;
   profileVersion: number;
   maintenanceScript: string;
-  agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+  agentRuntimeId?: AgentRuntimeId;
   sandboxRuntimeConfig?: {
     sandboxProvider: string;
     sandboxConnectionId: string | null;

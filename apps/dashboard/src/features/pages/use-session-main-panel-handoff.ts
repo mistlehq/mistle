@@ -1,3 +1,4 @@
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { useCallback, useEffect, useReducer, useRef, type RefObject } from "react";
 
@@ -13,7 +14,7 @@ import {
   type MainPanelTransitionState,
 } from "./session-main-panel-handoff-state.js";
 
-type SessionMainPanelRuntimeId = "claude-code" | "codex" | "opencode" | "pi";
+type SessionMainPanelRuntimeId = AgentRuntimeId;
 type ChatRestoreConnectionInput =
   | {
       initialCwd?: string | null;

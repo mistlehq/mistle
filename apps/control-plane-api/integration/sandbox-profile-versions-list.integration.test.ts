@@ -3,11 +3,11 @@
  */
 
 import {
-  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import { AgentRuntimeIdCatalog } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
@@ -24,7 +24,7 @@ const it = createIntegrationTest({
 });
 
 const EmptySandboxRuntimeConfig = {
-  agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
+  agentRuntimeId: AgentRuntimeIdCatalog.CODEX,
   associatedResourceEventRoutingConfig: {},
   gitCommitSigningIntegrationConnectionId: null,
   mistleMcpEnabled: false,

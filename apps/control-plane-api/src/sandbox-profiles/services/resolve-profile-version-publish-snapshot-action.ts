@@ -1,9 +1,6 @@
-import type {
-  ControlPlaneDatabase,
-  ControlPlaneTransaction,
-  SandboxProfileVersionAgentRuntimeId,
-} from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase, ControlPlaneTransaction } from "@mistle/db/control-plane";
 import type { CompiledRuntimePlan, ResolvedSandboxImage } from "@mistle/integrations-core";
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 
 import { compileProfileVersionRuntimePlan } from "../compile-profile-version-runtime-plan.js";
 import type { SandboxProfileVersionSkillsConfig } from "./profile-version-skills-config.js";
@@ -22,7 +19,7 @@ type PublishSnapshotAction =
 type ProfileVersionSnapshotDecisionFields = {
   version: number;
   setupScript: string | null;
-  agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+  agentRuntimeId: AgentRuntimeId;
   sandboxProvider: string | null;
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;

@@ -4,11 +4,11 @@
 
 import {
   TriggerKinds,
-  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import { AgentRuntimeIdCatalog } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
@@ -32,7 +32,7 @@ const DockerSandboxRuntimeColumns = {
 } as const;
 
 const DockerSandboxRuntimeConfig = {
-  agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
+  agentRuntimeId: AgentRuntimeIdCatalog.CODEX,
   associatedResourceEventRoutingConfig: {},
   mistleMcpApiKeyId: null,
   mistleMcpEnabled: false,

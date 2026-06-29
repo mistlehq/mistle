@@ -5,13 +5,13 @@
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
 } from "@mistle/integrations-core";
+import { AgentRuntimeIdCatalog } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { SandboxProvider } from "@mistle/sandbox";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
@@ -65,7 +65,7 @@ describe.concurrent("sandbox profile version publishability get integration", ()
         sandboxProfileId: "sbp_publishability_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
-        agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
+        agentRuntimeId: AgentRuntimeIdCatalog.CODEX,
         sandboxProvider: SandboxProvider.DOCKER,
       }),
     );

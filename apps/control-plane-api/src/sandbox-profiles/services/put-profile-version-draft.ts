@@ -5,10 +5,10 @@ import {
   OrganizationIdentityLinkProviderConfigStatus,
   type IntegrationBindingKind,
   type ControlPlaneTransaction,
-  type SandboxProfileVersionAgentRuntimeId,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import type { SandboxProfileAssociatedResourceEventRoutingConfig as SandboxProfileAssociatedResourceEventRoutingConfigInput } from "@mistle/integrations-core";
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { and, eq, inArray } from "drizzle-orm";
 
 import { GitHubProviderFamily } from "../../identity-linking/github-signing.js";
@@ -46,7 +46,7 @@ type PutProfileVersionDraftInput = {
   profileId: string;
   profileVersion: number;
   setupScript?: string | null;
-  agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+  agentRuntimeId?: AgentRuntimeId;
   gitCommitSigningIntegrationConnectionId?: string | null;
   mistleMcpEnabled?: boolean;
   mistleMcpApiKeyId?: string | null;
@@ -70,7 +70,7 @@ type PutProfileVersionDraftOutput = {
   sandboxProfileId: string;
   version: number;
   setupScript: string | null;
-  agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+  agentRuntimeId: AgentRuntimeId;
   gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
   mistleMcpApiKeyId: string | null;

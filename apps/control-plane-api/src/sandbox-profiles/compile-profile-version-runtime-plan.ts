@@ -1,10 +1,10 @@
-import type { SandboxProfileVersionAgentRuntimeId } from "@mistle/db/control-plane";
 import type { ControlPlaneDatabase, ControlPlaneTransaction } from "@mistle/db/control-plane";
 import type {
   CompiledRuntimePlan,
   EgressCredentialResolverRef,
   ResolvedSandboxImage,
 } from "@mistle/integrations-core";
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
 
 import { resolveIntegrationTargetSecrets } from "../lib/integration-target-secrets.js";
@@ -26,7 +26,7 @@ type CompileProfileVersionRuntimePlanInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
-  agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+  agentRuntimeId?: AgentRuntimeId;
   snapshotPreparationScriptKind?: "setup" | "maintenance";
   mistleMcpCredentialResolver?: EgressCredentialResolverRef;
   mergeRuntimeSetupFiles?: boolean;

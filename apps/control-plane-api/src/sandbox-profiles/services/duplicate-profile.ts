@@ -6,7 +6,6 @@ import {
   type ControlPlaneTransaction,
   type SandboxProfile,
   type SandboxProfileAssociatedResourceEventRoutingConfig,
-  type SandboxProfileVersionAgentRuntimeId,
   SandboxProfileStatuses,
   type SandboxProfileVersionState,
   SandboxProfileVersionStates,
@@ -15,6 +14,7 @@ import {
   TriggerKinds,
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { findNextScheduleOccurrence } from "@mistle/time";
 import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
 
@@ -66,7 +66,7 @@ type SourceProfileVersion = {
   sandboxVcpuCount: number | null;
   sandboxMemoryMb: number | null;
   sandboxDiskMb: number | null;
-  agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+  agentRuntimeId: AgentRuntimeId;
   gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
   mistleMcpApiKeyId: string | null;

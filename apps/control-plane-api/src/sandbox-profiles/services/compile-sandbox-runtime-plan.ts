@@ -2,9 +2,7 @@ import type {
   ControlPlaneDatabase,
   ControlPlaneTransaction,
   SandboxProfileVersionSkillsConfig,
-  SandboxProfileVersionAgentRuntimeId,
 } from "@mistle/db/control-plane";
-import { SandboxProfileVersionAgentRuntimeIds } from "@mistle/db/control-plane";
 import {
   CompilerErrorCodes,
   DefaultSandboxWorkspaceDir,
@@ -24,6 +22,10 @@ import {
   type ResolvedIntegrationMcpServer,
   type ResolvedSandboxImage,
 } from "@mistle/integrations-core";
+import {
+  AgentRuntimeIdCatalog,
+  type AgentRuntimeId,
+} from "@mistle/integrations-definitions/agent-runtimes/catalog";
 
 import { canonicalizePublicGitHubSkillsSourceOriginUrl } from "./profile-version-skills-config.js";
 
@@ -105,7 +107,7 @@ export type CompileSandboxRuntimePlanInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
-  agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+  agentRuntimeId?: AgentRuntimeId;
   snapshotPreparationScriptKind?: "setup" | "maintenance";
   mistleMcpCredentialResolver?: EgressCredentialResolverRef;
   mergeRuntimeSetupFiles?: boolean;
@@ -227,7 +229,7 @@ async function resolveAssociatedResourceEventRouting(input: {
   rawConfig: unknown;
   integrationDefinitions: IntegrationDefinitionsBundle;
   agentRuntimeRegistry: AgentRuntimeReader;
-  agentRuntimeId: SandboxProfileVersionAgentRuntimeId | undefined;
+  agentRuntimeId: AgentRuntimeId | undefined;
   compileBindings: Awaited<ReturnType<typeof resolveCompileBindingsForVersion>>;
 }): Promise<AssociatedResourceEventRouting> {
   const config = SandboxProfileAssociatedResourceEventRoutingConfigSchema.parse(input.rawConfig);
@@ -602,10 +604,7 @@ function resolveRuntimePlanWithClaudeCodeSkills(input: {
 
   const claudeCodeRuntimeClientIds = new Set(
     input.runtimePlan.agentRuntimes
-      .filter(
-        (agentRuntime) =>
-          agentRuntime.runtimeId === SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE,
-      )
+      .filter((agentRuntime) => agentRuntime.runtimeId === AgentRuntimeIdCatalog.CLAUDE_CODE)
       .map((agentRuntime) => agentRuntime.clientId),
   );
 

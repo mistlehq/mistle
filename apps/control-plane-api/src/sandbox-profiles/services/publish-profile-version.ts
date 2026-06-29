@@ -3,11 +3,11 @@ import {
   type ControlPlaneTransaction,
   ScheduleKinds,
   ScheduleTargetTypes,
-  type SandboxProfileVersionAgentRuntimeId,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { findNextScheduleOccurrence } from "@mistle/time";
 import { and, eq, sql } from "drizzle-orm";
 import { typeid } from "typeid-js";
@@ -56,7 +56,7 @@ type PublishProfileVersionOutput = {
     version: number;
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     publishedAt: string | null;
-    agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+    agentRuntimeId: AgentRuntimeId;
     gitCommitSigningIntegrationConnectionId: string | null;
     mistleMcpEnabled: boolean;
     mistleMcpApiKeyId: string | null;

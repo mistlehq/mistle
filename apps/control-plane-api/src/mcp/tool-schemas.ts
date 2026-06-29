@@ -1,8 +1,5 @@
-import {
-  IntegrationBindingKinds,
-  SandboxProfileVersionAgentRuntimeIds,
-  TriggerKinds,
-} from "@mistle/db/control-plane";
+import { IntegrationBindingKinds, TriggerKinds } from "@mistle/db/control-plane";
+import { AgentRuntimeIds } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { MistleSupportedCapabilityKinds } from "@mistle/integrations-definitions/server";
 import { z } from "zod";
 
@@ -208,14 +205,7 @@ const mcpSandboxProfileVersionIntegrationBindingsWriteSchema = z
 export const mcpSandboxProfileDraftUpdateInputSchema = mcpSandboxProfileVersionParamsSchema
   .extend({
     setupScript: z.string().min(1).nullable().optional(),
-    agentRuntimeId: z
-      .enum([
-        SandboxProfileVersionAgentRuntimeIds.CLAUDE_CODE,
-        SandboxProfileVersionAgentRuntimeIds.CODEX,
-        SandboxProfileVersionAgentRuntimeIds.OPENCODE,
-        SandboxProfileVersionAgentRuntimeIds.PI,
-      ])
-      .optional(),
+    agentRuntimeId: z.enum(AgentRuntimeIds).optional(),
     gitCommitSigningIntegrationConnectionId: z.string().min(1).nullable().optional(),
     mistleMcpEnabled: z.boolean().optional(),
     mistleMcpApiKeyId: z.string().min(1).nullable().optional(),
@@ -230,13 +220,7 @@ export const mcpSandboxProfileDraftUpdateInputSchema = mcpSandboxProfileVersionP
 
 const mcpSandboxRuntimeOverrideInputSchema = z
   .object({
-    agentRuntimeId: z
-      .enum([
-        SandboxProfileVersionAgentRuntimeIds.CODEX,
-        SandboxProfileVersionAgentRuntimeIds.OPENCODE,
-        SandboxProfileVersionAgentRuntimeIds.PI,
-      ])
-      .optional(),
+    agentRuntimeId: z.enum(AgentRuntimeIds).optional(),
     sandboxProvider: z.string().min(1).optional(),
     sandboxConnectionId: z.string().min(1).nullable().optional(),
     sandboxResources: mcpSandboxProfileVersionResourcesSchema.nullable().optional(),

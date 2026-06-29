@@ -180,6 +180,7 @@ export function createBrowserDefinitionsBundle(): IntegrationDefinitionsBundle<A
 
 export * from "./agentmail/browser.js";
 export * from "./anthropic/index.js";
+export * from "./agent-runtimes/catalog.js";
 export * from "./agent-runtimes/provider-selection.js";
 export * from "./autumn/browser.js";
 export * from "./bugsnag/browser.js";

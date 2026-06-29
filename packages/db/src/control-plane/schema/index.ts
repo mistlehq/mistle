@@ -308,11 +308,7 @@ export {
   type SkillsSourceRepo,
   type SkillsSourceRepoSkill,
 } from "./skills-source-repos.js";
-export {
-  sandboxProfileVersions,
-  SandboxProfileVersionAgentRuntimeIds,
-  SandboxProfileVersionStates,
-} from "./sandbox-profile-versions.js";
+export { sandboxProfileVersions, SandboxProfileVersionStates } from "./sandbox-profile-versions.js";
 export type {
   InsertSandboxProfileVersion,
   SandboxProfileAssociatedResourceEventRoutingConfig,

@@ -6,10 +6,10 @@ import {
   TriggerKinds,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionStates,
   ScheduleTargetTypes,
 } from "@mistle/db/control-plane";
+import { AgentRuntimeIdCatalog } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -172,7 +172,7 @@ describe.concurrent("sandbox profile version draft trigger impact get integratio
         sandboxProfileId: "sbp_draft_impact_ok_001",
         version: 2,
         state: SandboxProfileVersionStates.DRAFT,
-        agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+        agentRuntimeId: AgentRuntimeIdCatalog.OPENCODE,
       }),
     );
     await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values([
@@ -533,7 +533,7 @@ describe.concurrent("sandbox profile version draft trigger impact get integratio
         sandboxProfileId: "sbp_draft_impact_primary_001",
         version: 2,
         state: SandboxProfileVersionStates.DRAFT,
-        agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+        agentRuntimeId: AgentRuntimeIdCatalog.OPENCODE,
       }),
     );
     await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(

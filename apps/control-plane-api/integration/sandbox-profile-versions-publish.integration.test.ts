@@ -6,7 +6,6 @@ import {
   ApiKeyActorKinds,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -16,6 +15,7 @@ import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
 } from "@mistle/integrations-core";
+import { AgentRuntimeIdCatalog } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { SandboxProvider } from "@mistle/sandbox";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
@@ -39,7 +39,7 @@ const it = createIntegrationTest({
 });
 
 const EmptySandboxRuntimeConfig = {
-  agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
+  agentRuntimeId: AgentRuntimeIdCatalog.CODEX,
   associatedResourceEventRoutingConfig: {},
   mistleMcpEnabled: false,
   mistleMcpApiKeyId: null,

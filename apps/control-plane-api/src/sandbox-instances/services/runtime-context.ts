@@ -1,6 +1,10 @@
 import type { CompiledRuntimePlan } from "@mistle/integrations-core";
+import {
+  isAgentRuntimeId,
+  type AgentRuntimeId,
+} from "@mistle/integrations-definitions/agent-runtimes/catalog";
 
-export type SandboxInstanceAgentRuntimeId = "claude-code" | "codex" | "opencode" | "pi";
+export type SandboxInstanceAgentRuntimeId = AgentRuntimeId;
 
 function normalizePath(path: string): string {
   return path.replace(/\/+$/, "");
@@ -53,12 +57,7 @@ function resolveAgentRuntimeId(
   if (agentRuntime === undefined) {
     return null;
   }
-  if (
-    agentRuntime.runtimeId !== "claude-code" &&
-    agentRuntime.runtimeId !== "codex" &&
-    agentRuntime.runtimeId !== "opencode" &&
-    agentRuntime.runtimeId !== "pi"
-  ) {
+  if (!isAgentRuntimeId(agentRuntime.runtimeId)) {
     throw new Error(`Unsupported sandbox instance agent runtime '${agentRuntime.runtimeId}'.`);
   }
   return agentRuntime.runtimeId;
