@@ -331,7 +331,6 @@ function UserInputCustomResponseHarness(): React.JSX.Element {
     primaryBottomPanel: (
       <div className="space-y-3">
         <SessionConversationBottomPanelController
-          chatEntries={chatEntries}
           composerStateInput={UserInputCustomResponseComposerStateInput}
           draftState={draftState}
           isRespondingToServerRequest={false}

@@ -12,10 +12,7 @@ import {
   createGitHubAppDetailViewStoryProps,
   createSlackDetailViewStoryProps,
 } from "../integrations/integration-story-harness.js";
-import {
-  CodexFixtureSessionEntriesWithExploringGroup,
-  SessionComposerFixtureProps,
-} from "../session-agents/codex/fixtures/session-fixtures.js";
+import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/session-fixtures.js";
 import {
   ExistingScheduledTriggerValues,
   ScheduledTriggerFormStoryHarness,
@@ -269,7 +266,6 @@ function DocsSessionConversationBottomPanel(input?: {
 
   return (
     <SessionConversationBottomPanel
-      chatEntries={CodexFixtureSessionEntriesWithExploringGroup}
       composerViewModel={{
         ...SessionComposerFixtureProps,
         composerDraft: createComposerDraft(
