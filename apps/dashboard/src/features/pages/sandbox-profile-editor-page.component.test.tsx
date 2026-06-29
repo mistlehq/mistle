@@ -3588,7 +3588,7 @@ describe("SandboxProfileEditorPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
 
-    expect(screen.getByText("Publish and close Setup Assistant?")).toBeTruthy();
+    expect(await screen.findByText("Publish and close Setup Assistant?")).toBeTruthy();
     expect(
       screen.getByText(
         "Publishing closes the Setup Assistant and stops its temporary sandbox. Any assistant work that has not been saved back to the draft will be lost.",
@@ -3603,7 +3603,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(router.state.location.pathname).toBe("/sandbox-profiles/sbp_test/sandbox-profile/draft");
 
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
-    fireEvent.click(screen.getByRole("button", { name: "Publish and close" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Publish and close" }));
 
     await waitFor(() => {
       expect(screen.queryByText("Publish and close Setup Assistant?")).toBeNull();
