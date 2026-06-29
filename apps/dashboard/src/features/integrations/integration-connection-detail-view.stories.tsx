@@ -16,7 +16,7 @@ import {
 } from "./integration-story-harness.js";
 
 const meta = {
-  title: "Dashboard/Integrations/Connection Detail",
+  title: "Dashboard/Integrations/ConnectionDetail/StateExamples",
   component: IntegrationConnectionDetailView,
   decorators: [withDashboardCenteredStory],
   args: {
@@ -29,9 +29,9 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
-type StoryArgs = NonNullable<Story["args"]>;
+type DetailViewStoryProps = React.ComponentProps<typeof IntegrationConnectionDetailView>;
 
-function createAutoSyncAfterConnectionStoryProps(): StoryArgs {
+function createAutoSyncAfterConnectionStoryProps(): DetailViewStoryProps {
   const props = createGitHubNotSyncedDetailViewStoryProps();
 
   return {
@@ -58,13 +58,39 @@ const WebhookSyncErrorMessages = {
   SLACK_MANIFEST_EXPORT_FAILED: "Slack app manifest export failed: invalid_auth.",
   SLACK_REQUEST_URL_MISMATCH:
     "Slack Events API Request URL must be 'https://control-plane.example.com/p/integration/webhooks/slack-default/ep_slack_engineering' before webhook events can be synced. Current Slack Request URL is 'https://control-plane.example.com/p/integration/webhooks/slack-default/ep_slack_other'.",
-} as const;
+};
+
+const WebhookSyncScenarios: {
+  readonly GITHUB_INSTALLATION_UNAVAILABLE: "github-installation-unavailable";
+  readonly GITHUB_URL_MISMATCH: "github-url-mismatch";
+  readonly GITHUB_CONTENT_TYPE_MISMATCH: "github-content-type-mismatch";
+  readonly GITHUB_MISSING_PRIVATE_KEY: "github-missing-private-key";
+  readonly GITHUB_SYNCING: "github-syncing";
+  readonly SLACK_REQUEST_URL_MISMATCH: "slack-request-url-mismatch";
+  readonly SLACK_MANIFEST_EXPORT_FAILED: "slack-manifest-export-failed";
+  readonly SLACK_SYNCING: "slack-syncing";
+} = {
+  GITHUB_INSTALLATION_UNAVAILABLE: "github-installation-unavailable",
+  GITHUB_URL_MISMATCH: "github-url-mismatch",
+  GITHUB_CONTENT_TYPE_MISMATCH: "github-content-type-mismatch",
+  GITHUB_MISSING_PRIVATE_KEY: "github-missing-private-key",
+  GITHUB_SYNCING: "github-syncing",
+  SLACK_REQUEST_URL_MISMATCH: "slack-request-url-mismatch",
+  SLACK_MANIFEST_EXPORT_FAILED: "slack-manifest-export-failed",
+  SLACK_SYNCING: "slack-syncing",
+};
+
+type WebhookSyncScenario = (typeof WebhookSyncScenarios)[keyof typeof WebhookSyncScenarios];
+
+type WebhookSyncStatesStoryArgs = {
+  scenario: WebhookSyncScenario;
+};
 
 function createWebhookSyncStateStoryProps(input: {
-  baseProps: StoryArgs;
+  baseProps: DetailViewStoryProps;
   isSyncing?: boolean;
   syncErrorMessage?: string;
-}): StoryArgs {
+}): DetailViewStoryProps {
   const props = input.baseProps;
   const connections = props.connections ?? [];
   const selectedConnection = connections[0];
@@ -99,6 +125,64 @@ function createWebhookSyncStateStoryProps(input: {
   };
 }
 
+function createWebhookSyncScenarioStoryProps(input: {
+  scenario: WebhookSyncScenario;
+}): DetailViewStoryProps {
+  if (input.scenario === WebhookSyncScenarios.GITHUB_URL_MISMATCH) {
+    return createWebhookSyncStateStoryProps({
+      baseProps: createGitHubAppDetailViewStoryProps(),
+      syncErrorMessage: WebhookSyncErrorMessages.GITHUB_WEBHOOK_URL_MISMATCH,
+    });
+  }
+
+  if (input.scenario === WebhookSyncScenarios.GITHUB_CONTENT_TYPE_MISMATCH) {
+    return createWebhookSyncStateStoryProps({
+      baseProps: createGitHubAppDetailViewStoryProps(),
+      syncErrorMessage: WebhookSyncErrorMessages.GITHUB_WEBHOOK_CONTENT_TYPE,
+    });
+  }
+
+  if (input.scenario === WebhookSyncScenarios.GITHUB_MISSING_PRIVATE_KEY) {
+    return createWebhookSyncStateStoryProps({
+      baseProps: createGitHubAppDetailViewStoryProps(),
+      syncErrorMessage: WebhookSyncErrorMessages.GITHUB_MISSING_PRIVATE_KEY,
+    });
+  }
+
+  if (input.scenario === WebhookSyncScenarios.GITHUB_SYNCING) {
+    return createWebhookSyncStateStoryProps({
+      baseProps: createGitHubAppDetailViewStoryProps(),
+      isSyncing: true,
+    });
+  }
+
+  if (input.scenario === WebhookSyncScenarios.SLACK_REQUEST_URL_MISMATCH) {
+    return createWebhookSyncStateStoryProps({
+      baseProps: createSlackDetailViewStoryProps(),
+      syncErrorMessage: WebhookSyncErrorMessages.SLACK_REQUEST_URL_MISMATCH,
+    });
+  }
+
+  if (input.scenario === WebhookSyncScenarios.SLACK_MANIFEST_EXPORT_FAILED) {
+    return createWebhookSyncStateStoryProps({
+      baseProps: createSlackDetailViewStoryProps(),
+      syncErrorMessage: WebhookSyncErrorMessages.SLACK_MANIFEST_EXPORT_FAILED,
+    });
+  }
+
+  if (input.scenario === WebhookSyncScenarios.SLACK_SYNCING) {
+    return createWebhookSyncStateStoryProps({
+      baseProps: createSlackDetailViewStoryProps(),
+      isSyncing: true,
+    });
+  }
+
+  return createWebhookSyncStateStoryProps({
+    baseProps: createGitHubAppDetailViewStoryProps(),
+    syncErrorMessage: WebhookSyncErrorMessages.GITHUB_INSTALLATION_UNAVAILABLE,
+  });
+}
+
 export const StackedConnections: Story = {};
 
 export const ApiKeyConnectionWithSyncError: Story = {
@@ -116,68 +200,36 @@ export const AutoSyncAfterConnection: Story = {
   args: createAutoSyncAfterConnectionStoryProps(),
 };
 
-export const GitHubWebhookSyncError: Story = {
-  name: "GitHub webhook sync error - installation unavailable",
-  args: createWebhookSyncStateStoryProps({
-    baseProps: createGitHubAppDetailViewStoryProps(),
-    syncErrorMessage: WebhookSyncErrorMessages.GITHUB_INSTALLATION_UNAVAILABLE,
-  }),
-};
-
-export const GitHubWebhookUrlMismatch: Story = {
-  name: "GitHub webhook sync error - URL mismatch",
-  args: createWebhookSyncStateStoryProps({
-    baseProps: createGitHubAppDetailViewStoryProps(),
-    syncErrorMessage: WebhookSyncErrorMessages.GITHUB_WEBHOOK_URL_MISMATCH,
-  }),
-};
-
-export const GitHubWebhookContentTypeMismatch: Story = {
-  name: "GitHub webhook sync error - content type mismatch",
-  args: createWebhookSyncStateStoryProps({
-    baseProps: createGitHubAppDetailViewStoryProps(),
-    syncErrorMessage: WebhookSyncErrorMessages.GITHUB_WEBHOOK_CONTENT_TYPE,
-  }),
-};
-
-export const GitHubWebhookMissingPrivateKey: Story = {
-  name: "GitHub webhook sync error - missing private key",
-  args: createWebhookSyncStateStoryProps({
-    baseProps: createGitHubAppDetailViewStoryProps(),
-    syncErrorMessage: WebhookSyncErrorMessages.GITHUB_MISSING_PRIVATE_KEY,
-  }),
-};
-
-export const GitHubWebhookSyncing: Story = {
-  name: "GitHub webhook sync - syncing",
-  args: createWebhookSyncStateStoryProps({
-    baseProps: createGitHubAppDetailViewStoryProps(),
-    isSyncing: true,
-  }),
-};
-
-export const SlackWebhookRequestUrlMismatch: Story = {
-  name: "Slack webhook sync error - request URL mismatch",
-  args: createWebhookSyncStateStoryProps({
-    baseProps: createSlackDetailViewStoryProps(),
-    syncErrorMessage: WebhookSyncErrorMessages.SLACK_REQUEST_URL_MISMATCH,
-  }),
-};
-
-export const SlackWebhookManifestExportFailed: Story = {
-  name: "Slack webhook sync error - manifest export failed",
-  args: createWebhookSyncStateStoryProps({
-    baseProps: createSlackDetailViewStoryProps(),
-    syncErrorMessage: WebhookSyncErrorMessages.SLACK_MANIFEST_EXPORT_FAILED,
-  }),
-};
-
-export const SlackWebhookSyncing: Story = {
-  name: "Slack webhook sync - syncing",
-  args: createWebhookSyncStateStoryProps({
-    baseProps: createSlackDetailViewStoryProps(),
-    isSyncing: true,
-  }),
+export const WebhookSyncStates: StoryObj<WebhookSyncStatesStoryArgs> = {
+  args: {
+    scenario: WebhookSyncScenarios.GITHUB_INSTALLATION_UNAVAILABLE,
+  },
+  argTypes: {
+    scenario: {
+      control: "select",
+      options: [
+        WebhookSyncScenarios.GITHUB_INSTALLATION_UNAVAILABLE,
+        WebhookSyncScenarios.GITHUB_URL_MISMATCH,
+        WebhookSyncScenarios.GITHUB_CONTENT_TYPE_MISMATCH,
+        WebhookSyncScenarios.GITHUB_MISSING_PRIVATE_KEY,
+        WebhookSyncScenarios.GITHUB_SYNCING,
+        WebhookSyncScenarios.SLACK_REQUEST_URL_MISMATCH,
+        WebhookSyncScenarios.SLACK_MANIFEST_EXPORT_FAILED,
+        WebhookSyncScenarios.SLACK_SYNCING,
+      ],
+    },
+  },
+  render: function RenderStory(input) {
+    return (
+      <IntegrationConnectionDetailView
+        {...createWebhookSyncScenarioStoryProps({
+          scenario: input.scenario,
+        })}
+        onEditAuthentication={(_connectionId: string) => {}}
+        onRefreshResource={(_payload: { connectionId: string; kind: string }) => {}}
+      />
+    );
+  },
 };
 
 export const Empty: Story = {

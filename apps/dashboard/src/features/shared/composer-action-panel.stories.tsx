@@ -67,7 +67,7 @@ function ComposerActionPanelStory(): React.JSX.Element {
 }
 
 const meta = {
-  title: "Dashboard/Shared/Composer Action Panel",
+  title: "Dashboard/Shared/ComposerActionPanel",
   component: ComposerActionPanelStory,
   decorators: [withDashboardCenteredStory],
   parameters: {

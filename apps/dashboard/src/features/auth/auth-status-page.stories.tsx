@@ -4,7 +4,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { AuthStatusPage } from "./auth-status-page.js";
 
 const meta = {
-  title: "Dashboard/Auth/StatusPage",
+  title: "Dashboard/Auth/Status/Page",
   component: AuthStatusPage,
   parameters: {
     layout: "fullscreen",

@@ -2,7 +2,7 @@ import type { SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
-import { buildSandboxInstanceListItemFixture } from "./sessions-page.story-fixtures.js";
+import { buildSandboxInstanceListItemFixture } from "../../test-support/sessions-page-fixtures.js";
 import { SessionsStoryHarness } from "./sessions-story-harness.js";
 
 type SessionWorkbenchPageStoryArgs = {
@@ -13,7 +13,7 @@ type SessionWorkbenchPageStoryArgs = {
 };
 
 const meta = {
-  title: "Dashboard/Sessions/SessionWorkbench/RoutedPage",
+  title: "Dashboard/Sessions/SessionWorkbench/Page",
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",

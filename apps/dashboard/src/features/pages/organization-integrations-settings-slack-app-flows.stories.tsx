@@ -4,15 +4,8 @@ import {
 } from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { QueryClient, QueryClientProvider, useMutation } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import {
-  createMemoryRouter,
-  createRoutesFromElements,
-  Outlet,
-  Route,
-  RouterProvider,
-} from "react-router";
+import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
 import { z } from "zod";
 
 import { getDashboardStoryControlPlaneApiOrigin } from "../../storybook/dashboard-story-config.js";
@@ -25,17 +18,20 @@ import {
 import { useIntegrationWebhookSourceActions } from "../integrations/integration-webhook-source-actions.js";
 import type {
   IntegrationConnection,
-  IntegrationTarget,
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
 import { refreshIntegrationWebhookTriggerCapabilities } from "../integrations/integrations-service.js";
-import { ROUTE_HANDLES } from "../navigation/route-handles.js";
-import { SESSION_QUERY_KEY } from "../shell/session-query.js";
-import { IntegrationConnectionCreatePage } from "./integration-connection-create-page.js";
-import { IntegrationConnectionSetupPage } from "./integration-connection-setup-page.js";
-import { IntegrationsPage } from "./integrations-page.js";
-import { createStoryConnectionMethods } from "./organization-integrations-settings-page-story-support.js";
-import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
+import {
+  createIntegrationStoryQueryClient,
+  createIntegrationStoryTarget,
+  createJsonStoryResponse,
+  getIntegrationStoryWebhookSources,
+  IntegrationSetupRouteStory,
+  IntegrationStoryControlPlaneProvider,
+  type IntegrationStoryControlPlaneHandler,
+  setIntegrationStoryDirectoryData,
+  setIntegrationStoryWebhookSources,
+} from "./integration-setup-flow-story-support.js";
 
 const IntegrationRegistry = createBrowserIntegrationRegistry();
 const ActiveConnectionStatus: IntegrationConnection["status"] = "active";
@@ -67,62 +63,22 @@ function getSlackDefinitionOrThrow(): AnyIntegrationDefinition {
 }
 
 const SlackDefinition = getSlackDefinitionOrThrow();
+const SlackTarget = createIntegrationStoryTarget({
+  definition: SlackDefinition,
+  config: {
+    api_base_url: "https://slack.com/api",
+  },
+});
 
 function createStoryQueryClient(input: {
   connections?: readonly IntegrationConnection[];
   webhookSources?: readonly IntegrationWebhookSource[];
-}): QueryClient {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        gcTime: Infinity,
-        refetchOnMount: false,
-        refetchOnReconnect: false,
-        refetchOnWindowFocus: false,
-        retry: false,
-        staleTime: Infinity,
-      },
-    },
+}) {
+  return createIntegrationStoryQueryClient({
+    targets: [SlackTarget],
+    ...(input.connections === undefined ? {} : { connections: input.connections }),
+    ...(input.webhookSources === undefined ? {} : { webhookSources: input.webhookSources }),
   });
-
-  queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
-    targets: [createSlackTargetFixture()],
-    connections: [...(input.connections ?? [])],
-  });
-  queryClient.setQueryData(SESSION_QUERY_KEY, {
-    session: {
-      activeOrganizationId: "org_mistle",
-    },
-  });
-
-  for (const source of input.webhookSources ?? []) {
-    queryClient.setQueryData(
-      ["integration-webhook-sources", source.integrationConnectionId],
-      [source],
-    );
-  }
-
-  return queryClient;
-}
-
-function createSlackTargetFixture(): IntegrationTarget {
-  return {
-    targetKey: "slack-default",
-    familyId: SlackDefinition.familyId,
-    variantId: SlackDefinition.variantId,
-    kind: SlackDefinition.kind,
-    enabled: true,
-    config: {
-      api_base_url: "https://slack.com/api",
-    },
-    displayName: SlackDefinition.displayName,
-    description: SlackDefinition.description ?? "",
-    ...(SlackDefinition.logoKey === undefined ? {} : { logoKey: SlackDefinition.logoKey }),
-    connectionMethods: createStoryConnectionMethods(SlackDefinition),
-    targetHealth: {
-      configStatus: "valid",
-    },
-  };
 }
 
 export function createDraftSlackConnection(input?: {
@@ -184,29 +140,6 @@ function createWebhookSourceFixture(): IntegrationWebhookSource {
   };
 }
 
-function createJsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "content-type": "application/json",
-    },
-  });
-}
-
-function createPageResponse<T>(items: readonly T[]): {
-  items: readonly T[];
-  totalResults: number;
-  nextPage: null;
-  previousPage: null;
-} {
-  return {
-    items,
-    totalResults: items.length,
-    nextPage: null,
-    previousPage: null,
-  };
-}
-
 const StoryFormUpdateRequestBodySchema = z.object({
   displayName: z.string(),
   config: z.record(z.string(), z.unknown()),
@@ -237,263 +170,190 @@ function createSlackSourceTruthProviderMetadata(): Record<string, unknown> {
   };
 }
 
-function useSlackStoryControlPlane(input: { queryClient: QueryClient }): void {
-  useEffect(() => {
-    const originalFetch = globalThis.fetch;
-
-    globalThis.fetch = async (
-      resource: RequestInfo | URL,
-      init?: RequestInit,
-    ): Promise<Response> => {
-      const request = resource instanceof Request ? resource : new Request(resource, init);
-      const url = new URL(request.url);
-      const storyControlPlaneApiOrigin = getDashboardStoryControlPlaneApiOrigin();
-
-      if (url.origin !== storyControlPlaneApiOrigin) {
-        return originalFetch(resource, init);
-      }
-
-      const method = request.method.toUpperCase();
-      const path = url.pathname;
-      const directoryData = input.queryClient.getQueryData<{
-        targets: readonly IntegrationTarget[];
-        connections: readonly IntegrationConnection[];
-      }>(SETTINGS_INTEGRATIONS_QUERY_KEY) ?? { targets: [], connections: [] };
-
-      if (method === "GET" && path === "/v1/integration/targets") {
-        return createJsonResponse(createPageResponse(directoryData.targets));
-      }
-
-      if (method === "GET" && path === "/v1/integration/connections") {
-        return createJsonResponse(createPageResponse(directoryData.connections));
-      }
-
-      const webhookSourcesMatch = path.match(
-        /^\/v1\/integration\/connections\/([^/]+)\/webhook-sources$/,
-      );
-      if (method === "GET" && webhookSourcesMatch !== null) {
-        const connectionId = decodeURIComponent(webhookSourcesMatch[1] ?? "");
-        const webhookSources =
-          input.queryClient.getQueryData<readonly IntegrationWebhookSource[]>([
-            "integration-webhook-sources",
-            connectionId,
-          ]) ?? [];
-        return createJsonResponse(webhookSources);
-      }
-
-      const refreshCapabilitiesMatch = path.match(
-        /^\/v1\/integration\/connections\/([^/]+)\/webhook-sources\/trigger-capabilities\/refresh$/,
-      );
-      if (method === "POST" && refreshCapabilitiesMatch !== null) {
-        const connectionId = decodeURIComponent(refreshCapabilitiesMatch[1] ?? "");
-        const requestBody: unknown = await request.json();
-        StoryRefreshSlackTriggerCapabilitiesRequestBodySchema.parse(requestBody);
-        const currentWebhookSources =
-          input.queryClient.getQueryData<readonly IntegrationWebhookSource[]>([
-            "integration-webhook-sources",
-            connectionId,
-          ]) ?? [];
-        const currentSource = currentWebhookSources[0];
-        if (currentSource === undefined) {
-          return createJsonResponse(
-            { code: "WEBHOOK_SOURCE_NOT_FOUND", message: "Webhook source not found." },
-            404,
-          );
-        }
-
-        const updatedSource: IntegrationWebhookSource = {
-          ...currentSource,
-          providerMetadata: {
-            ...currentSource.providerMetadata,
-            ...createSlackSourceTruthProviderMetadata(),
-          },
-          updatedAt: "2026-04-26T00:45:00.000Z",
-        };
-
-        input.queryClient.setQueryData(
-          ["integration-webhook-sources", connectionId],
-          [updatedSource],
+function createSlackStoryControlPlaneHandler(): IntegrationStoryControlPlaneHandler {
+  return async ({
+    directoryData,
+    method,
+    path,
+    queryClient,
+    request,
+    storyControlPlaneApiOrigin,
+  }) => {
+    const refreshCapabilitiesMatch = path.match(
+      /^\/v1\/integration\/connections\/([^/]+)\/webhook-sources\/trigger-capabilities\/refresh$/,
+    );
+    if (method === "POST" && refreshCapabilitiesMatch !== null) {
+      const connectionId = decodeURIComponent(refreshCapabilitiesMatch[1] ?? "");
+      const requestBody: unknown = await request.json();
+      StoryRefreshSlackTriggerCapabilitiesRequestBodySchema.parse(requestBody);
+      const currentWebhookSources = getIntegrationStoryWebhookSources({
+        connectionId,
+        queryClient,
+      });
+      const currentSource = currentWebhookSources[0];
+      if (currentSource === undefined) {
+        return createJsonStoryResponse(
+          { code: "WEBHOOK_SOURCE_NOT_FOUND", message: "Webhook source not found." },
+          404,
         );
-
-        return createJsonResponse(updatedSource);
       }
 
-      const updateFormMatch = path.match(/^\/v1\/integration\/connections\/([^/]+)\/form$/);
-      if (method === "PUT" && updateFormMatch !== null) {
-        const connectionId = decodeURIComponent(updateFormMatch[1] ?? "");
-        const requestBody: unknown = await request.json();
-        const body = StoryFormUpdateRequestBodySchema.parse(requestBody);
-        const currentConnection =
-          directoryData.connections.find((connection) => connection.id === connectionId) ?? null;
-        if (currentConnection === null) {
-          return createJsonResponse(
-            { code: "CONNECTION_NOT_FOUND", message: "Connection not found." },
-            404,
-          );
-        }
+      const updatedSource: IntegrationWebhookSource = {
+        ...currentSource,
+        providerMetadata: {
+          ...currentSource.providerMetadata,
+          ...createSlackSourceTruthProviderMetadata(),
+        },
+        updatedAt: "2026-04-26T00:45:00.000Z",
+      };
 
-        const nextConfiguredSecretNames = new Set(currentConnection.configuredSecretNames ?? []);
-        for (const secretName of Object.keys(body.secrets ?? {})) {
-          nextConfiguredSecretNames.add(secretName);
-        }
+      setIntegrationStoryWebhookSources({
+        connectionId,
+        queryClient,
+        webhookSources: [updatedSource],
+      });
 
-        const updatedConnection: IntegrationConnection = {
-          ...currentConnection,
-          displayName: body.displayName,
-          config: body.config,
-          configuredSecretNames:
-            nextConfiguredSecretNames.size === 0
-              ? undefined
-              : [...nextConfiguredSecretNames].sort(),
-          updatedAt: "2026-04-26T00:30:00.000Z",
-        };
+      return createJsonStoryResponse(updatedSource);
+    }
 
-        input.queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
-          targets: directoryData.targets,
-          connections: directoryData.connections.map((connection) =>
-            connection.id === connectionId ? updatedConnection : connection,
-          ),
-        });
-
-        return createJsonResponse(updatedConnection);
-      }
-
-      const repairConnectionMatch = path.match(/^\/v1\/integration\/connections\/([^/]+)\/repair$/);
-      if (method === "POST" && repairConnectionMatch !== null) {
-        const connectionId = decodeURIComponent(repairConnectionMatch[1] ?? "");
-        const currentConnection =
-          directoryData.connections.find((connection) => connection.id === connectionId) ?? null;
-        if (currentConnection === null) {
-          return createJsonResponse(
-            { code: "CONNECTION_NOT_FOUND", message: "Connection not found." },
-            404,
-          );
-        }
-
-        const { repairAction, ...connectionWithoutRepairAction } = currentConnection;
-        void repairAction;
-        const updatedConnection: IntegrationConnection = {
-          ...connectionWithoutRepairAction,
-          config: {
-            ...(currentConnection.config ?? {}),
-            bot_user_id: "U0123456789",
-          },
-          updatedAt: "2026-04-26T00:45:00.000Z",
-        };
-
-        input.queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
-          targets: directoryData.targets,
-          connections: directoryData.connections.map((connection) =>
-            connection.id === connectionId ? updatedConnection : connection,
-          ),
-        });
-
-        return createJsonResponse(updatedConnection);
-      }
-
-      const createDraftMatch = path.match(
-        /^\/v1\/integration\/connections\/([^/]+)\/slack-bot-token\/draft$/,
-      );
-      if (method === "POST" && createDraftMatch !== null) {
-        const targetKey = decodeURIComponent(createDraftMatch[1] ?? "");
-        const requestBody: unknown = await request.json();
-        const body = StoryDraftConnectionRequestBodySchema.parse(requestBody);
-        const createdConnection: IntegrationConnection = {
-          id: "icn_slack_story_created",
-          targetKey,
-          displayName: body.displayName,
-          status: "active",
-          connectionMethodId: "slack-bot-token",
-          connectionMethodLabel: "Slack app",
-          config: {
-            connection_method: "slack-bot-token",
-          },
-          createdAt: "2026-04-26T00:30:00.000Z",
-          updatedAt: "2026-04-26T00:30:00.000Z",
-        };
-
-        input.queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
-          targets: directoryData.targets,
-          connections: [...directoryData.connections, createdConnection],
-        });
-        input.queryClient.setQueryData(
-          ["integration-webhook-sources", createdConnection.id],
-          [
-            {
-              ...createWebhookSourceFixture(),
-              integrationConnectionId: createdConnection.id,
-            },
-          ],
+    const updateFormMatch = path.match(/^\/v1\/integration\/connections\/([^/]+)\/form$/);
+    if (method === "PUT" && updateFormMatch !== null) {
+      const connectionId = decodeURIComponent(updateFormMatch[1] ?? "");
+      const requestBody: unknown = await request.json();
+      const body = StoryFormUpdateRequestBodySchema.parse(requestBody);
+      const currentConnection =
+        directoryData.connections.find((connection) => connection.id === connectionId) ?? null;
+      if (currentConnection === null) {
+        return createJsonStoryResponse(
+          { code: "CONNECTION_NOT_FOUND", message: "Connection not found." },
+          404,
         );
-
-        return createJsonResponse(createdConnection, 201);
       }
 
-      const startManifestMatch = path.match(
-        /^\/v1\/integration\/connections\/([^/]+)\/setup\/slack-app\/start$/,
-      );
-      if (method === "POST" && startManifestMatch !== null) {
-        const requestBody: unknown = await request.json();
-        StorySlackManifestStartRequestBodySchema.parse(requestBody);
-        return createJsonResponse({
-          kind: "redirect",
-          authorizationUrl: `${storyControlPlaneApiOrigin}/storybook/slack-app-install`,
-        });
+      const nextConfiguredSecretNames = new Set(currentConnection.configuredSecretNames ?? []);
+      for (const secretName of Object.keys(body.secrets ?? {})) {
+        nextConfiguredSecretNames.add(secretName);
       }
 
-      return createJsonResponse(
-        { code: "STORYBOOK_UNHANDLED", message: `${method} ${path} is not handled in Storybook.` },
-        500,
-      );
-    };
+      const updatedConnection: IntegrationConnection = {
+        ...currentConnection,
+        displayName: body.displayName,
+        config: body.config,
+        configuredSecretNames:
+          nextConfiguredSecretNames.size === 0 ? undefined : [...nextConfiguredSecretNames].sort(),
+        updatedAt: "2026-04-26T00:30:00.000Z",
+      };
 
-    return () => {
-      globalThis.fetch = originalFetch;
-    };
-  }, [input.queryClient]);
+      setIntegrationStoryDirectoryData(queryClient, {
+        targets: directoryData.targets,
+        connections: directoryData.connections.map((connection) =>
+          connection.id === connectionId ? updatedConnection : connection,
+        ),
+      });
+
+      return createJsonStoryResponse(updatedConnection);
+    }
+
+    const repairConnectionMatch = path.match(/^\/v1\/integration\/connections\/([^/]+)\/repair$/);
+    if (method === "POST" && repairConnectionMatch !== null) {
+      const connectionId = decodeURIComponent(repairConnectionMatch[1] ?? "");
+      const currentConnection =
+        directoryData.connections.find((connection) => connection.id === connectionId) ?? null;
+      if (currentConnection === null) {
+        return createJsonStoryResponse(
+          { code: "CONNECTION_NOT_FOUND", message: "Connection not found." },
+          404,
+        );
+      }
+
+      const { repairAction, ...connectionWithoutRepairAction } = currentConnection;
+      void repairAction;
+      const updatedConnection: IntegrationConnection = {
+        ...connectionWithoutRepairAction,
+        config: {
+          ...(currentConnection.config ?? {}),
+          bot_user_id: "U0123456789",
+        },
+        updatedAt: "2026-04-26T00:45:00.000Z",
+      };
+
+      setIntegrationStoryDirectoryData(queryClient, {
+        targets: directoryData.targets,
+        connections: directoryData.connections.map((connection) =>
+          connection.id === connectionId ? updatedConnection : connection,
+        ),
+      });
+
+      return createJsonStoryResponse(updatedConnection);
+    }
+
+    const createDraftMatch = path.match(
+      /^\/v1\/integration\/connections\/([^/]+)\/slack-bot-token\/draft$/,
+    );
+    if (method === "POST" && createDraftMatch !== null) {
+      const targetKey = decodeURIComponent(createDraftMatch[1] ?? "");
+      const requestBody: unknown = await request.json();
+      const body = StoryDraftConnectionRequestBodySchema.parse(requestBody);
+      const createdConnection: IntegrationConnection = {
+        id: "icn_slack_story_created",
+        targetKey,
+        displayName: body.displayName,
+        status: "active",
+        connectionMethodId: "slack-bot-token",
+        connectionMethodLabel: "Slack app",
+        config: {
+          connection_method: "slack-bot-token",
+        },
+        createdAt: "2026-04-26T00:30:00.000Z",
+        updatedAt: "2026-04-26T00:30:00.000Z",
+      };
+
+      setIntegrationStoryDirectoryData(queryClient, {
+        targets: directoryData.targets,
+        connections: [...directoryData.connections, createdConnection],
+      });
+      setIntegrationStoryWebhookSources({
+        connectionId: createdConnection.id,
+        queryClient,
+        webhookSources: [
+          {
+            ...createWebhookSourceFixture(),
+            integrationConnectionId: createdConnection.id,
+          },
+        ],
+      });
+
+      return createJsonStoryResponse(createdConnection, 201);
+    }
+
+    const startManifestMatch = path.match(
+      /^\/v1\/integration\/connections\/([^/]+)\/setup\/slack-app\/start$/,
+    );
+    if (method === "POST" && startManifestMatch !== null) {
+      const requestBody: unknown = await request.json();
+      StorySlackManifestStartRequestBodySchema.parse(requestBody);
+      return createJsonStoryResponse({
+        kind: "redirect",
+        authorizationUrl: `${storyControlPlaneApiOrigin}/storybook/slack-app-install`,
+      });
+    }
+
+    return null;
+  };
 }
 
-function StoryQueryClientProvider(input: {
-  queryClient: QueryClient;
-  children: React.ReactNode;
-}): React.JSX.Element {
-  useSlackStoryControlPlane({ queryClient: input.queryClient });
-
-  return <QueryClientProvider client={input.queryClient}>{input.children}</QueryClientProvider>;
-}
+const SlackStoryControlPlaneHandlers = [createSlackStoryControlPlaneHandler()];
 
 function SlackCreatePageStory(): React.JSX.Element {
   const [queryClient] = useState(() => createStoryQueryClient({}));
-  const [router] = useState(() =>
-    createMemoryRouter(
-      createRoutesFromElements(
-        <Route element={<Outlet />}>
-          <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="/integrations">
-            <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
-              <Route
-                element={<IntegrationConnectionCreatePage />}
-                handle={ROUTE_HANDLES.integrationCreate}
-                path="add"
-              />
-              <Route
-                element={<IntegrationConnectionSetupPage />}
-                handle={ROUTE_HANDLES.integrationSetup}
-                path=":connectionId/:setupRouteSegment/setup"
-              />
-            </Route>
-          </Route>
-        </Route>,
-      ),
-      {
-        initialEntries: ["/integrations/slack-default/add"],
-      },
-    ),
-  );
 
   return (
-    <StoryQueryClientProvider queryClient={queryClient}>
-      <RouterProvider router={router} />
-    </StoryQueryClientProvider>
+    <IntegrationSetupRouteStory
+      handlers={SlackStoryControlPlaneHandlers}
+      initialEntries={["/integrations/slack-default/add"]}
+      queryClient={queryClient}
+      routeKind="create-and-setup"
+    />
   );
 }
 
@@ -508,33 +368,16 @@ export function SlackAppSetupPageStory(input: {
       webhookSources: [input.webhookSource ?? createWebhookSourceFixture()],
     }),
   );
-  const [router] = useState(() =>
-    createMemoryRouter(
-      createRoutesFromElements(
-        <Route element={<Outlet />}>
-          <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="/integrations">
-            <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
-              <Route
-                element={<IntegrationConnectionSetupPage />}
-                handle={ROUTE_HANDLES.integrationSetup}
-                path=":connectionId/:setupRouteSegment/setup"
-              />
-            </Route>
-          </Route>
-        </Route>,
-      ),
-      {
-        initialEntries: [
-          input.initialEntry ?? "/integrations/slack-default/icn_slack_story_draft/slack-app/setup",
-        ],
-      },
-    ),
-  );
 
   return (
-    <StoryQueryClientProvider queryClient={queryClient}>
-      <RouterProvider router={router} />
-    </StoryQueryClientProvider>
+    <IntegrationSetupRouteStory
+      handlers={SlackStoryControlPlaneHandlers}
+      initialEntries={[
+        input.initialEntry ?? "/integrations/slack-default/icn_slack_story_draft/slack-app/setup",
+      ]}
+      queryClient={queryClient}
+      routeKind="setup"
+    />
   );
 }
 
@@ -543,6 +386,29 @@ function SlackConnectedWebhookVerifiedRefreshStory({
 }: {
   includeAppId?: boolean;
 } = {}): React.JSX.Element {
+  const model = createSlackConnectedWebhookVerifiedRefreshStoryModel({ includeAppId });
+  const [queryClient] = useState(() =>
+    createStoryQueryClient({
+      connections: model.storyConnections,
+      webhookSources: model.initialWebhookSources,
+    }),
+  );
+
+  return (
+    <IntegrationStoryControlPlaneProvider
+      handlers={SlackStoryControlPlaneHandlers}
+      queryClient={queryClient}
+    >
+      <SlackConnectedWebhookVerifiedRefreshStoryContent model={model} queryClient={queryClient} />
+    </IntegrationStoryControlPlaneProvider>
+  );
+}
+
+type SlackConnectedWebhookVerifiedRefreshStoryModel = ReturnType<
+  typeof createSlackConnectedWebhookVerifiedRefreshStoryModel
+>;
+
+function createSlackConnectedWebhookVerifiedRefreshStoryModel(input: { includeAppId: boolean }) {
   const storyProps = createSlackDetailViewStoryProps();
   const selectedConnection = storyProps.connections[0];
   if (selectedConnection === undefined) {
@@ -557,9 +423,6 @@ function SlackConnectedWebhookVerifiedRefreshStory({
     ...source,
     providerMetadata: {},
   }));
-  const [webhookSources, setWebhookSources] = useState<readonly IntegrationWebhookSource[]>(
-    () => initialWebhookSources,
-  );
   const storyConnections = storyProps.connections.map((connection) => ({
     id: connection.id,
     targetKey: "slack-default",
@@ -570,14 +433,14 @@ function SlackConnectedWebhookVerifiedRefreshStory({
     config: {
       connection_method: "slack-bot-token",
       client_id: "3555487893074.10993991013813",
-      ...(includeAppId ? { app_id: "A0123456789" } : {}),
+      ...(input.includeAppId ? { app_id: "A0123456789" } : {}),
     },
     configuredSecretNames: ["botToken", "clientSecret", "signingSecret"],
     supportsWebhookSources: true,
     webhookTriggerCapabilitiesRefreshAction: {
       actionLabel: "Sync webhook events",
       pendingLabel: "Syncing...",
-      ...(includeAppId
+      ...(input.includeAppId
         ? {}
         : { disabledMessage: "Add the Slack App ID before syncing webhook events." }),
       bodyForm: {
@@ -616,11 +479,23 @@ function SlackConnectedWebhookVerifiedRefreshStory({
       ...storyConnection,
     };
   });
-  const [queryClient] = useState(() =>
-    createStoryQueryClient({
-      connections: storyConnections,
-      webhookSources,
-    }),
+
+  return {
+    initialWebhookSourceState,
+    initialWebhookSources,
+    selectedConnection,
+    storyConnections,
+    storyDetailConnections,
+    storyProps,
+  };
+}
+
+function SlackConnectedWebhookVerifiedRefreshStoryContent(input: {
+  model: SlackConnectedWebhookVerifiedRefreshStoryModel;
+  queryClient: ReturnType<typeof createStoryQueryClient>;
+}): React.JSX.Element {
+  const [webhookSources, setWebhookSources] = useState<readonly IntegrationWebhookSource[]>(
+    () => input.model.initialWebhookSources,
   );
   const refreshMutation = useMutation({
     mutationFn: (payload: { body: Readonly<Record<string, unknown>>; connectionId: string }) =>
@@ -631,28 +506,31 @@ function SlackConnectedWebhookVerifiedRefreshStory({
           currentSource.id === source.id ? source : currentSource,
         ),
       );
-      queryClient.setQueryData(
+      input.queryClient.setQueryData(
         ["integration-webhook-sources", source.integrationConnectionId],
         [source],
       );
-      void queryClient.invalidateQueries({
+      void input.queryClient.invalidateQueries({
         queryKey: ["integration-webhook-sources", source.integrationConnectionId],
       });
     },
   });
-  const webhookSourceStateByConnectionId = new Map(storyProps.webhookSourceStateByConnectionId);
-  webhookSourceStateByConnectionId.set(selectedConnection.id, {
-    ...initialWebhookSourceState,
+  const webhookSourceStateByConnectionId = new Map(
+    input.model.storyProps.webhookSourceStateByConnectionId,
+  );
+  webhookSourceStateByConnectionId.set(input.model.selectedConnection.id, {
+    ...input.model.initialWebhookSourceState,
     items: webhookSources,
     syncErrorMessage:
-      refreshMutation.isError && refreshMutation.variables?.connectionId === selectedConnection.id
+      refreshMutation.isError &&
+      refreshMutation.variables?.connectionId === input.model.selectedConnection.id
         ? refreshMutation.error instanceof Error
           ? refreshMutation.error.message
           : "Could not sync webhook events."
         : null,
   });
   const webhookSourceActions = useIntegrationWebhookSourceActions({
-    connections: storyConnections,
+    connections: input.model.storyConnections,
     refreshTriggerCapabilities: (payload, options) => {
       refreshMutation.mutate(payload, {
         onSuccess: () => {
@@ -667,17 +545,15 @@ function SlackConnectedWebhookVerifiedRefreshStory({
   });
 
   return (
-    <StoryQueryClientProvider queryClient={queryClient}>
-      <div className="flex flex-col gap-6">
-        <IntegrationConnectionDetailView
-          {...storyProps}
-          connections={storyDetailConnections}
-          renderWebhookSourceActions={webhookSourceActions.renderWebhookSourceActions}
-          webhookSourceStateByConnectionId={webhookSourceStateByConnectionId}
-        />
-        {webhookSourceActions.dialog}
-      </div>
-    </StoryQueryClientProvider>
+    <div className="flex flex-col gap-6">
+      <IntegrationConnectionDetailView
+        {...input.model.storyProps}
+        connections={input.model.storyDetailConnections}
+        renderWebhookSourceActions={webhookSourceActions.renderWebhookSourceActions}
+        webhookSourceStateByConnectionId={webhookSourceStateByConnectionId}
+      />
+      {webhookSourceActions.dialog}
+    </div>
   );
 }
 
@@ -698,31 +574,16 @@ function SlackInstalledDetailPageStory(): React.JSX.Element {
       webhookSources: [createWebhookSourceFixture()],
     }),
   );
-  const [router] = useState(() =>
-    createMemoryRouter(
-      createRoutesFromElements(
-        <Route element={<Outlet />}>
-          <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="/integrations">
-            <Route
-              element={<IntegrationsPage />}
-              handle={ROUTE_HANDLES.integrationDetail}
-              path=":targetKey"
-            />
-          </Route>
-        </Route>,
-      ),
-      {
-        initialEntries: [
-          "/integrations/slack-default?connectionId=icn_slack_story_draft&connectionNotice=installed",
-        ],
-      },
-    ),
-  );
 
   return (
-    <StoryQueryClientProvider queryClient={queryClient}>
-      <RouterProvider router={router} />
-    </StoryQueryClientProvider>
+    <IntegrationSetupRouteStory
+      handlers={SlackStoryControlPlaneHandlers}
+      initialEntries={[
+        "/integrations/slack-default?connectionId=icn_slack_story_draft&connectionNotice=installed",
+      ]}
+      queryClient={queryClient}
+      routeKind="detail"
+    />
   );
 }
 
@@ -743,29 +604,14 @@ function SlackMissingBotIdentityRepairStory(): React.JSX.Element {
       webhookSources: [createWebhookSourceFixture()],
     }),
   );
-  const [router] = useState(() =>
-    createMemoryRouter(
-      createRoutesFromElements(
-        <Route element={<Outlet />}>
-          <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="/integrations">
-            <Route
-              element={<IntegrationsPage />}
-              handle={ROUTE_HANDLES.integrationDetail}
-              path=":targetKey"
-            />
-          </Route>
-        </Route>,
-      ),
-      {
-        initialEntries: ["/integrations/slack-default?connectionId=icn_slack_story_draft"],
-      },
-    ),
-  );
 
   return (
-    <StoryQueryClientProvider queryClient={queryClient}>
-      <RouterProvider router={router} />
-    </StoryQueryClientProvider>
+    <IntegrationSetupRouteStory
+      handlers={SlackStoryControlPlaneHandlers}
+      initialEntries={["/integrations/slack-default?connectionId=icn_slack_story_draft"]}
+      queryClient={queryClient}
+      routeKind="detail"
+    />
   );
 }
 

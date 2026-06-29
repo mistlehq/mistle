@@ -18,7 +18,7 @@ const LongSetupScript = [
 ].join("\n");
 
 const meta = {
-  title: "Dashboard/SandboxProfiles/Editor/Setup Script",
+  title: "Dashboard/SandboxProfiles/Editor/SetupScript",
   component: SandboxProfileEditorPageStory,
   decorators: [withDashboardPageStory],
   parameters: {

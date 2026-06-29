@@ -1,15 +1,7 @@
 import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import {
-  createMemoryRouter,
-  createRoutesFromElements,
-  Outlet,
-  Route,
-  RouterProvider,
-} from "react-router";
+import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
 import { z } from "zod";
 
@@ -22,18 +14,19 @@ import {
 } from "../integrations/integration-story-harness.js";
 import type {
   IntegrationConnection,
-  IntegrationTarget,
   IntegrationWebhookSource,
   StartedProviderAppSetup,
 } from "../integrations/integrations-service.js";
-import { ROUTE_HANDLES } from "../navigation/route-handles.js";
-import { SESSION_QUERY_KEY } from "../shell/session-query.js";
-import { IntegrationConnectionCreatePage } from "./integration-connection-create-page.js";
 import { GitHubInstallationSelectionPanel } from "./integration-connection-provider-app-setup-pane.js";
-import { IntegrationConnectionSetupPage } from "./integration-connection-setup-page.js";
-import { IntegrationsPage } from "./integrations-page.js";
-import { createStoryConnectionMethods } from "./organization-integrations-settings-page-story-support.js";
-import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
+import {
+  createIntegrationStoryQueryClient,
+  createIntegrationStoryTarget,
+  createJsonStoryResponse,
+  IntegrationSetupRouteStory,
+  type IntegrationStoryControlPlaneHandler,
+  setIntegrationStoryDirectoryData,
+  setIntegrationStoryWebhookSources,
+} from "./integration-setup-flow-story-support.js";
 
 const IntegrationRegistry = createBrowserIntegrationRegistry();
 function getGitHubDefinitionOrThrow(): AnyIntegrationDefinition {
@@ -50,63 +43,23 @@ function getGitHubDefinitionOrThrow(): AnyIntegrationDefinition {
 }
 
 const GitHubDefinition = getGitHubDefinitionOrThrow();
+const GitHubTarget = createIntegrationStoryTarget({
+  definition: GitHubDefinition,
+  config: {
+    api_base_url: "https://api.github.com",
+    web_base_url: "https://github.com",
+  },
+});
 
 function createStoryQueryClient(input: {
   connections?: readonly IntegrationConnection[];
   webhookSources?: readonly IntegrationWebhookSource[];
-}): QueryClient {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        gcTime: Infinity,
-        refetchOnMount: false,
-        refetchOnReconnect: false,
-        refetchOnWindowFocus: false,
-        retry: false,
-        staleTime: Infinity,
-      },
-    },
+}) {
+  return createIntegrationStoryQueryClient({
+    targets: [GitHubTarget],
+    ...(input.connections === undefined ? {} : { connections: input.connections }),
+    ...(input.webhookSources === undefined ? {} : { webhookSources: input.webhookSources }),
   });
-
-  queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
-    targets: [createGitHubTargetFixture()],
-    connections: [...(input.connections ?? [])],
-  });
-  queryClient.setQueryData(SESSION_QUERY_KEY, {
-    session: {
-      activeOrganizationId: "org_mistle",
-    },
-  });
-
-  for (const source of input.webhookSources ?? []) {
-    queryClient.setQueryData(
-      ["integration-webhook-sources", source.integrationConnectionId],
-      [source],
-    );
-  }
-
-  return queryClient;
-}
-
-function createGitHubTargetFixture(): IntegrationTarget {
-  return {
-    targetKey: "github-cloud",
-    familyId: GitHubDefinition.familyId,
-    variantId: GitHubDefinition.variantId,
-    kind: GitHubDefinition.kind,
-    enabled: true,
-    config: {
-      api_base_url: "https://api.github.com",
-      web_base_url: "https://github.com",
-    },
-    displayName: GitHubDefinition.displayName,
-    description: GitHubDefinition.description ?? "",
-    ...(GitHubDefinition.logoKey === undefined ? {} : { logoKey: GitHubDefinition.logoKey }),
-    connectionMethods: createStoryConnectionMethods(GitHubDefinition),
-    targetHealth: {
-      configStatus: "valid",
-    },
-  };
 }
 
 export function createDraftGitHubConnection(input?: {
@@ -159,29 +112,6 @@ function createWebhookSourceFixture(): IntegrationWebhookSource {
   };
 }
 
-function createJsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "content-type": "application/json",
-    },
-  });
-}
-
-function createPageResponse<T>(items: readonly T[]): {
-  items: readonly T[];
-  totalResults: number;
-  nextPage: null;
-  previousPage: null;
-} {
-  return {
-    items,
-    totalResults: items.length,
-    nextPage: null,
-    previousPage: null,
-  };
-}
-
 const StoryFormUpdateRequestBodySchema = z.object({
   displayName: z.string(),
   config: z.record(z.string(), z.unknown()),
@@ -226,254 +156,186 @@ const StoryGitHubInstallationSelectionOptions: Extract<
   },
 ];
 
-function useGitHubStoryControlPlane(input: { queryClient: QueryClient }): void {
-  useEffect(() => {
-    const originalFetch = globalThis.fetch;
-
-    globalThis.fetch = async (
-      resource: RequestInfo | URL,
-      init?: RequestInit,
-    ): Promise<Response> => {
-      const request = resource instanceof Request ? resource : new Request(resource, init);
-      const url = new URL(request.url);
-      const storyControlPlaneApiOrigin = getDashboardStoryControlPlaneApiOrigin();
-
-      if (url.origin !== storyControlPlaneApiOrigin) {
-        return originalFetch(resource, init);
-      }
-
-      const method = request.method.toUpperCase();
-      const path = url.pathname;
-      const directoryData = input.queryClient.getQueryData<{
-        targets: readonly IntegrationTarget[];
-        connections: readonly IntegrationConnection[];
-      }>(SETTINGS_INTEGRATIONS_QUERY_KEY) ?? { targets: [], connections: [] };
-
-      if (method === "GET" && path === "/v1/integration/targets") {
-        return createJsonResponse(createPageResponse(directoryData.targets));
-      }
-
-      if (method === "GET" && path === "/v1/integration/connections") {
-        return createJsonResponse(createPageResponse(directoryData.connections));
-      }
-
-      const webhookSourcesMatch = path.match(
-        /^\/v1\/integration\/connections\/([^/]+)\/webhook-sources$/,
-      );
-      if (method === "GET" && webhookSourcesMatch !== null) {
-        const connectionId = decodeURIComponent(webhookSourcesMatch[1] ?? "");
-        const webhookSources =
-          input.queryClient.getQueryData<readonly IntegrationWebhookSource[]>([
-            "integration-webhook-sources",
-            connectionId,
-          ]) ?? [];
-        return createJsonResponse(webhookSources);
-      }
-
-      const updateFormMatch = path.match(/^\/v1\/integration\/connections\/([^/]+)\/form$/);
-      if (method === "PUT" && updateFormMatch !== null) {
-        const connectionId = decodeURIComponent(updateFormMatch[1] ?? "");
-        const requestBody: unknown = await request.json();
-        const body = StoryFormUpdateRequestBodySchema.parse(requestBody);
-        const currentConnection =
-          directoryData.connections.find((connection) => connection.id === connectionId) ?? null;
-        if (currentConnection === null) {
-          return createJsonResponse(
-            { code: "CONNECTION_NOT_FOUND", message: "Connection not found." },
-            404,
-          );
-        }
-
-        const nextConfiguredSecretNames = new Set(currentConnection.configuredSecretNames ?? []);
-        for (const secretName of Object.keys(body.secrets ?? {})) {
-          nextConfiguredSecretNames.add(secretName);
-        }
-
-        const updatedConnection: IntegrationConnection = {
-          ...currentConnection,
-          displayName: body.displayName,
-          config: body.config,
-          configuredSecretNames:
-            nextConfiguredSecretNames.size === 0
-              ? undefined
-              : [...nextConfiguredSecretNames].sort(),
-          updatedAt: "2026-04-24T00:00:00.000Z",
-        };
-
-        input.queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
-          targets: directoryData.targets,
-          connections: directoryData.connections.map((connection) =>
-            connection.id === connectionId ? updatedConnection : connection,
-          ),
-        });
-
-        return createJsonResponse(updatedConnection);
-      }
-
-      const startInstallMatch = path.match(
-        /^\/v1\/integration\/connections\/([^/]+)\/setup\/github-app-installation\/start$/,
-      );
-      if (method === "POST" && startInstallMatch !== null) {
-        const connectionId = decodeURIComponent(startInstallMatch[1] ?? "");
-        if (connectionId === "icn_github_story_selection") {
-          return createJsonResponse({
-            kind: "installation-selection",
-            options: StoryGitHubInstallationSelectionOptions,
-          });
-        }
-
-        return createJsonResponse({
-          kind: "redirect",
-          authorizationUrl: `${storyControlPlaneApiOrigin}/storybook/github-app-install`,
-        });
-      }
-
-      const selectInstallMatch = path.match(
-        /^\/v1\/integration\/connections\/([^/]+)\/setup\/github-app-installation\/select-installation$/,
-      );
-      if (method === "POST" && selectInstallMatch !== null) {
-        const connectionId = decodeURIComponent(selectInstallMatch[1] ?? "");
-        const requestBody: unknown = await request.json();
-        const body = StorySelectInstallationRequestBodySchema.parse(requestBody);
-        const currentConnection =
-          directoryData.connections.find((connection) => connection.id === connectionId) ?? null;
-        if (currentConnection === null) {
-          return createJsonResponse(
-            { code: "CONNECTION_NOT_FOUND", message: "Connection not found." },
-            404,
-          );
-        }
-
-        const updatedConnection: IntegrationConnection = {
-          ...currentConnection,
-          config: {
-            ...currentConnection.config,
-            installation_id: body.installationId,
-          },
-          externalSubjectId: body.installationId,
-          updatedAt: "2026-04-24T00:00:00.000Z",
-        };
-
-        input.queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
-          targets: directoryData.targets,
-          connections: directoryData.connections.map((connection) =>
-            connection.id === connectionId ? updatedConnection : connection,
-          ),
-        });
-
-        return createJsonResponse({
-          connectionId,
-          targetKey: currentConnection.targetKey,
-          completionRedirect: {
-            kind: "connection-detail",
-            notice: "installed",
-          },
-        });
-      }
-
-      const startManifestMatch = path.match(
-        /^\/v1\/integration\/connections\/([^/]+)\/setup\/github-app\/start$/,
-      );
-      if (method === "POST" && startManifestMatch !== null) {
-        const requestBody: unknown = await request.json();
-        StoryGitHubManifestStartRequestBodySchema.parse(requestBody);
-        return createJsonResponse({
-          kind: "form-post",
-          submissionUrl: "https://github.com/settings/apps/new",
-          fields: {
-            manifest: JSON.stringify({
-              name: "Mistle GitHub App",
-            }),
-          },
-        });
-      }
-
-      const createDraftMatch = path.match(
-        /^\/v1\/integration\/connections\/([^/]+)\/github-app-installation\/draft$/,
-      );
-      if (method === "POST" && createDraftMatch !== null) {
-        const targetKey = decodeURIComponent(createDraftMatch[1] ?? "");
-        const requestBody: unknown = await request.json();
-        const body = StoryDraftConnectionRequestBodySchema.parse(requestBody);
-        const createdConnection: IntegrationConnection = {
-          id: "icn_github_story_created",
-          targetKey,
-          displayName: body.displayName,
-          status: "active",
-          connectionMethodId: "github-app-installation",
-          connectionMethodLabel: "GitHub App installation",
-          config: {
-            connection_method: "github-app-installation",
-          },
-          createdAt: "2026-04-24T00:00:00.000Z",
-          updatedAt: "2026-04-24T00:00:00.000Z",
-        };
-
-        input.queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
-          targets: directoryData.targets,
-          connections: [...directoryData.connections, createdConnection],
-        });
-        input.queryClient.setQueryData(
-          ["integration-webhook-sources", createdConnection.id],
-          [
-            {
-              ...createWebhookSourceFixture(),
-              integrationConnectionId: createdConnection.id,
-            },
-          ],
+function createGitHubStoryControlPlaneHandler(): IntegrationStoryControlPlaneHandler {
+  return async ({
+    directoryData,
+    method,
+    path,
+    queryClient,
+    request,
+    storyControlPlaneApiOrigin,
+  }) => {
+    const updateFormMatch = path.match(/^\/v1\/integration\/connections\/([^/]+)\/form$/);
+    if (method === "PUT" && updateFormMatch !== null) {
+      const connectionId = decodeURIComponent(updateFormMatch[1] ?? "");
+      const requestBody: unknown = await request.json();
+      const body = StoryFormUpdateRequestBodySchema.parse(requestBody);
+      const currentConnection =
+        directoryData.connections.find((connection) => connection.id === connectionId) ?? null;
+      if (currentConnection === null) {
+        return createJsonStoryResponse(
+          { code: "CONNECTION_NOT_FOUND", message: "Connection not found." },
+          404,
         );
-
-        return createJsonResponse(createdConnection, 201);
       }
 
-      return createJsonResponse(
-        { code: "STORYBOOK_UNHANDLED", message: `${method} ${path} is not handled in Storybook.` },
-        500,
-      );
-    };
+      const nextConfiguredSecretNames = new Set(currentConnection.configuredSecretNames ?? []);
+      for (const secretName of Object.keys(body.secrets ?? {})) {
+        nextConfiguredSecretNames.add(secretName);
+      }
 
-    return () => {
-      globalThis.fetch = originalFetch;
-    };
-  }, [input.queryClient]);
+      const updatedConnection: IntegrationConnection = {
+        ...currentConnection,
+        displayName: body.displayName,
+        config: body.config,
+        configuredSecretNames:
+          nextConfiguredSecretNames.size === 0 ? undefined : [...nextConfiguredSecretNames].sort(),
+        updatedAt: "2026-04-24T00:00:00.000Z",
+      };
+
+      setIntegrationStoryDirectoryData(queryClient, {
+        targets: directoryData.targets,
+        connections: directoryData.connections.map((connection) =>
+          connection.id === connectionId ? updatedConnection : connection,
+        ),
+      });
+
+      return createJsonStoryResponse(updatedConnection);
+    }
+
+    const startInstallMatch = path.match(
+      /^\/v1\/integration\/connections\/([^/]+)\/setup\/github-app-installation\/start$/,
+    );
+    if (method === "POST" && startInstallMatch !== null) {
+      const connectionId = decodeURIComponent(startInstallMatch[1] ?? "");
+      if (connectionId === "icn_github_story_selection") {
+        return createJsonStoryResponse({
+          kind: "installation-selection",
+          options: StoryGitHubInstallationSelectionOptions,
+        });
+      }
+
+      return createJsonStoryResponse({
+        kind: "redirect",
+        authorizationUrl: `${storyControlPlaneApiOrigin}/storybook/github-app-install`,
+      });
+    }
+
+    const selectInstallMatch = path.match(
+      /^\/v1\/integration\/connections\/([^/]+)\/setup\/github-app-installation\/select-installation$/,
+    );
+    if (method === "POST" && selectInstallMatch !== null) {
+      const connectionId = decodeURIComponent(selectInstallMatch[1] ?? "");
+      const requestBody: unknown = await request.json();
+      const body = StorySelectInstallationRequestBodySchema.parse(requestBody);
+      const currentConnection =
+        directoryData.connections.find((connection) => connection.id === connectionId) ?? null;
+      if (currentConnection === null) {
+        return createJsonStoryResponse(
+          { code: "CONNECTION_NOT_FOUND", message: "Connection not found." },
+          404,
+        );
+      }
+
+      const updatedConnection: IntegrationConnection = {
+        ...currentConnection,
+        config: {
+          ...currentConnection.config,
+          installation_id: body.installationId,
+        },
+        externalSubjectId: body.installationId,
+        updatedAt: "2026-04-24T00:00:00.000Z",
+      };
+
+      setIntegrationStoryDirectoryData(queryClient, {
+        targets: directoryData.targets,
+        connections: directoryData.connections.map((connection) =>
+          connection.id === connectionId ? updatedConnection : connection,
+        ),
+      });
+
+      return createJsonStoryResponse({
+        connectionId,
+        targetKey: currentConnection.targetKey,
+        completionRedirect: {
+          kind: "connection-detail",
+          notice: "installed",
+        },
+      });
+    }
+
+    const startManifestMatch = path.match(
+      /^\/v1\/integration\/connections\/([^/]+)\/setup\/github-app\/start$/,
+    );
+    if (method === "POST" && startManifestMatch !== null) {
+      const requestBody: unknown = await request.json();
+      StoryGitHubManifestStartRequestBodySchema.parse(requestBody);
+      return createJsonStoryResponse({
+        kind: "form-post",
+        submissionUrl: "https://github.com/settings/apps/new",
+        fields: {
+          manifest: JSON.stringify({
+            name: "Mistle GitHub App",
+          }),
+        },
+      });
+    }
+
+    const createDraftMatch = path.match(
+      /^\/v1\/integration\/connections\/([^/]+)\/github-app-installation\/draft$/,
+    );
+    if (method === "POST" && createDraftMatch !== null) {
+      const targetKey = decodeURIComponent(createDraftMatch[1] ?? "");
+      const requestBody: unknown = await request.json();
+      const body = StoryDraftConnectionRequestBodySchema.parse(requestBody);
+      const createdConnection: IntegrationConnection = {
+        id: "icn_github_story_created",
+        targetKey,
+        displayName: body.displayName,
+        status: "active",
+        connectionMethodId: "github-app-installation",
+        connectionMethodLabel: "GitHub App installation",
+        config: {
+          connection_method: "github-app-installation",
+        },
+        createdAt: "2026-04-24T00:00:00.000Z",
+        updatedAt: "2026-04-24T00:00:00.000Z",
+      };
+
+      setIntegrationStoryDirectoryData(queryClient, {
+        targets: directoryData.targets,
+        connections: [...directoryData.connections, createdConnection],
+      });
+      setIntegrationStoryWebhookSources({
+        connectionId: createdConnection.id,
+        queryClient,
+        webhookSources: [
+          {
+            ...createWebhookSourceFixture(),
+            integrationConnectionId: createdConnection.id,
+          },
+        ],
+      });
+
+      return createJsonStoryResponse(createdConnection, 201);
+    }
+
+    return null;
+  };
 }
 
-function StoryQueryClientProvider(input: {
-  queryClient: QueryClient;
-  children: React.ReactNode;
-}): React.JSX.Element {
-  useGitHubStoryControlPlane({ queryClient: input.queryClient });
-
-  return <QueryClientProvider client={input.queryClient}>{input.children}</QueryClientProvider>;
-}
+const GitHubStoryControlPlaneHandlers = [createGitHubStoryControlPlaneHandler()];
 
 function GitHubCreatePageStory(): React.JSX.Element {
   const [queryClient] = useState(() => createStoryQueryClient({}));
-  const [router] = useState(() =>
-    createMemoryRouter(
-      createRoutesFromElements(
-        <Route element={<Outlet />}>
-          <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="/integrations">
-            <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
-              <Route
-                element={<IntegrationConnectionCreatePage />}
-                handle={ROUTE_HANDLES.integrationCreate}
-                path="add"
-              />
-            </Route>
-          </Route>
-        </Route>,
-      ),
-      {
-        initialEntries: ["/integrations/github-cloud/add"],
-      },
-    ),
-  );
 
   return (
-    <StoryQueryClientProvider queryClient={queryClient}>
-      <RouterProvider router={router} />
-    </StoryQueryClientProvider>
+    <IntegrationSetupRouteStory
+      handlers={GitHubStoryControlPlaneHandlers}
+      initialEntries={["/integrations/github-cloud/add"]}
+      queryClient={queryClient}
+      routeKind="create-and-setup"
+    />
   );
 }
 
@@ -487,34 +349,16 @@ export function GitHubAppSetupPageStory(input: {
       webhookSources: [createWebhookSourceFixture()],
     }),
   );
-  const [router] = useState(() =>
-    createMemoryRouter(
-      createRoutesFromElements(
-        <Route element={<Outlet />}>
-          <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="/integrations">
-            <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
-              <Route
-                element={<IntegrationConnectionSetupPage />}
-                handle={ROUTE_HANDLES.integrationSetup}
-                path=":connectionId/:setupRouteSegment/setup"
-              />
-            </Route>
-          </Route>
-        </Route>,
-      ),
-      {
-        initialEntries: [
-          input.initialEntry ??
-            "/integrations/github-cloud/icn_github_story_draft/github-app/setup",
-        ],
-      },
-    ),
-  );
 
   return (
-    <StoryQueryClientProvider queryClient={queryClient}>
-      <RouterProvider router={router} />
-    </StoryQueryClientProvider>
+    <IntegrationSetupRouteStory
+      handlers={GitHubStoryControlPlaneHandlers}
+      initialEntries={[
+        input.initialEntry ?? "/integrations/github-cloud/icn_github_story_draft/github-app/setup",
+      ]}
+      queryClient={queryClient}
+      routeKind="setup"
+    />
   );
 }
 
@@ -536,31 +380,16 @@ function GitHubInstalledDetailPageStory(): React.JSX.Element {
       webhookSources: [createWebhookSourceFixture()],
     }),
   );
-  const [router] = useState(() =>
-    createMemoryRouter(
-      createRoutesFromElements(
-        <Route element={<Outlet />}>
-          <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="/integrations">
-            <Route
-              element={<IntegrationsPage />}
-              handle={ROUTE_HANDLES.integrationDetail}
-              path=":targetKey"
-            />
-          </Route>
-        </Route>,
-      ),
-      {
-        initialEntries: [
-          "/integrations/github-cloud?connectionId=icn_github_story_draft&connectionNotice=installed",
-        ],
-      },
-    ),
-  );
 
   return (
-    <StoryQueryClientProvider queryClient={queryClient}>
-      <RouterProvider router={router} />
-    </StoryQueryClientProvider>
+    <IntegrationSetupRouteStory
+      handlers={GitHubStoryControlPlaneHandlers}
+      initialEntries={[
+        "/integrations/github-cloud?connectionId=icn_github_story_draft&connectionNotice=installed",
+      ]}
+      queryClient={queryClient}
+      routeKind="detail"
+    />
   );
 }
 

@@ -294,7 +294,7 @@ function SectionHeading(input: { children: React.ReactNode }): React.JSX.Element
 }
 
 const meta = {
-  title: "Dashboard/Shared/PageFrame Shell Patterns",
+  title: "Dashboard/Shared/PageFrameShellPatterns",
   component: PageFrameShellPatternsStory,
   parameters: {
     layout: "fullscreen",

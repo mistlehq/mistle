@@ -7,10 +7,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import { buildLaunchableSandboxProfileFixture } from "../../test-support/sessions-page-fixtures.js";
 import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { NewSessionPage, shouldClearSelectedProfile } from "./new-session-page.js";
-import { buildStoryLaunchableSandboxProfile } from "./sessions-page.story-fixtures.js";
 
 function createNewSessionPageQueryClient(input?: {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
@@ -23,11 +23,11 @@ function createNewSessionPageQueryClient(input?: {
   seedAuthenticatedSession(queryClient);
   queryClient.setQueryData(launchableSandboxProfilesQueryKey(), {
     items: input?.launchableProfiles ?? [
-      buildStoryLaunchableSandboxProfile({
+      buildLaunchableSandboxProfileFixture({
         id: "sbp_profile_alpha",
         displayName: "Alpha Profile",
       }),
-      buildStoryLaunchableSandboxProfile({
+      buildLaunchableSandboxProfileFixture({
         id: "sbp_profile_beta",
         displayName: "Beta Profile",
         latestVersion: 7,
@@ -116,7 +116,7 @@ describe("NewSessionPage", () => {
     const rendered = renderNewSessionPage({
       initialSelectedProfileId: "sbp_profile_alpha",
       launchableProfiles: [
-        buildStoryLaunchableSandboxProfile({
+        buildLaunchableSandboxProfileFixture({
           id: "sbp_profile_alpha",
           repositoryOptions: [
             {
@@ -163,7 +163,7 @@ describe("NewSessionPage", () => {
     renderNewSessionPage({
       initialSelectedProfileId: "sbp_profile_alpha",
       launchableProfiles: [
-        buildStoryLaunchableSandboxProfile({
+        buildLaunchableSandboxProfileFixture({
           id: "sbp_profile_alpha",
           repositoryOptions: [
             {
@@ -191,7 +191,7 @@ describe("NewSessionPage", () => {
     renderNewSessionPage({
       initialSelectedProfileId: "sbp_profile_alpha",
       launchableProfiles: [
-        buildStoryLaunchableSandboxProfile({
+        buildLaunchableSandboxProfileFixture({
           id: "sbp_profile_alpha",
           repositoryOptions: [],
         }),
@@ -215,7 +215,7 @@ describe("NewSessionPage", () => {
     const rendered = renderNewSessionPage({
       initialSelectedProfileId: "sbp_profile_alpha",
       launchableProfiles: [
-        buildStoryLaunchableSandboxProfile({
+        buildLaunchableSandboxProfileFixture({
           id: "sbp_profile_alpha",
           repositoryOptions: [
             {
@@ -258,7 +258,7 @@ describe("NewSessionPage", () => {
   it("clears a stale selected profile after launchable profiles finish refetching without it", () => {
     expect(
       shouldClearSelectedProfile({
-        selectedProfile: buildStoryLaunchableSandboxProfile({
+        selectedProfile: buildLaunchableSandboxProfileFixture({
           id: "sbp_profile_alpha",
         }),
         selectableProfiles: [],
@@ -270,7 +270,7 @@ describe("NewSessionPage", () => {
   it("keeps the current selection while launchable profiles are still loading", () => {
     expect(
       shouldClearSelectedProfile({
-        selectedProfile: buildStoryLaunchableSandboxProfile({
+        selectedProfile: buildLaunchableSandboxProfileFixture({
           id: "sbp_profile_alpha",
         }),
         selectableProfiles: [],
@@ -282,11 +282,11 @@ describe("NewSessionPage", () => {
   it("keeps the current selection when the selected profile is still launchable", () => {
     expect(
       shouldClearSelectedProfile({
-        selectedProfile: buildStoryLaunchableSandboxProfile({
+        selectedProfile: buildLaunchableSandboxProfileFixture({
           id: "sbp_profile_alpha",
         }),
         selectableProfiles: [
-          buildStoryLaunchableSandboxProfile({
+          buildLaunchableSandboxProfileFixture({
             id: "sbp_profile_alpha",
           }),
         ],

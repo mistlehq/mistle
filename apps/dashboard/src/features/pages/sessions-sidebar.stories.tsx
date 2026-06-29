@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
-import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
-import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import {
   buildSandboxInstanceListItemFixture,
-  buildStoryLaunchableSandboxProfile,
-} from "./sessions-page.story-fixtures.js";
+  buildLaunchableSandboxProfileFixture,
+} from "../../test-support/sessions-page-fixtures.js";
+import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import { SessionsStoryHarness } from "./sessions-story-harness.js";
 
 type SessionsSidebarStoryArgs = {
@@ -116,11 +116,11 @@ const meta = {
     initialEntries: ["/sessions/new"],
     showSessionsSidebar: true,
     launchableProfiles: [
-      buildStoryLaunchableSandboxProfile({
+      buildLaunchableSandboxProfileFixture({
         id: "sbp_profile_alpha",
         displayName: "Alpha Profile",
       }),
-      buildStoryLaunchableSandboxProfile({
+      buildLaunchableSandboxProfileFixture({
         id: "sbp_profile_beta",
         displayName: "Beta Profile",
         latestVersion: 7,

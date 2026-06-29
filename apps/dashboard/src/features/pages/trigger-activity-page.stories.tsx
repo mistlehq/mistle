@@ -179,7 +179,7 @@ function TriggerActivityPageStoryHarness(input: {
 }
 
 const meta = {
-  title: "Dashboard/Triggers/ActivityPage",
+  title: "Dashboard/Triggers/Activity/Page",
   component: TriggerActivityPageStoryHarness,
   decorators: [withDashboardPageStory],
   parameters: {

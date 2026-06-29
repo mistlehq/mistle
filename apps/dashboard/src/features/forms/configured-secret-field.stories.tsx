@@ -80,7 +80,7 @@ function ConfiguredSecretFieldStory(input: {
 }
 
 const meta = {
-  title: "Dashboard/Forms/Configured Secret Field",
+  title: "Dashboard/Forms/ConfiguredSecretField",
   decorators: [withDashboardCenteredStory],
 } satisfies Meta;
 

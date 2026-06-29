@@ -3,12 +3,10 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { buildLaunchableSandboxProfileFixture } from "../../test-support/sessions-page-fixtures.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { NewSessionPage } from "./new-session-page.js";
-import {
-  buildStoryLaunchableSandboxProfile,
-  createSessionsPageStoryQueryClient,
-} from "./sessions-page.story-fixtures.js";
+import { createSessionsPageStoryQueryClient } from "./sessions-page.story-fixtures.js";
 
 type NewSessionPageStoryArgs = {
   launchableProfiles: LaunchableSandboxProfilesResult["items"];
@@ -35,7 +33,7 @@ export function NewSessionPageStory(input: NewSessionPageStoryArgs): React.JSX.E
 }
 
 const meta = {
-  title: "Dashboard/Sessions/New Session Page",
+  title: "Dashboard/Sessions/New/Page",
   component: NewSessionPageStory,
   tags: ["autodocs"],
   excludeStories: ["NewSessionPageStory"],
@@ -45,7 +43,7 @@ const meta = {
   decorators: [withDashboardPageStory],
   args: {
     launchableProfiles: [
-      buildStoryLaunchableSandboxProfile({
+      buildLaunchableSandboxProfileFixture({
         id: "sbp_profile_multi_repo",
         displayName: "Engineering Sandbox",
         repositoryOptions: [
@@ -61,7 +59,7 @@ const meta = {
           },
         ],
       }),
-      buildStoryLaunchableSandboxProfile({
+      buildLaunchableSandboxProfileFixture({
         id: "sbp_profile_single_repo",
         displayName: "Docs Sandbox",
         latestVersion: 7,
@@ -73,7 +71,7 @@ const meta = {
           },
         ],
       }),
-      buildStoryLaunchableSandboxProfile({
+      buildLaunchableSandboxProfileFixture({
         id: "sbp_profile_no_repo",
         displayName: "General Sandbox",
         latestVersion: 2,

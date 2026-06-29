@@ -4,7 +4,7 @@ import { withDashboardPageStory } from "../../storybook/decorators.js";
 import { OrganizationApiKeyCreatePageView } from "./organization-api-key-create-page-view.js";
 
 const meta = {
-  title: "Dashboard/Settings/OrganizationApiKeys/CreatePageView",
+  title: "Dashboard/Settings/OrganizationApiKeys/Create/PageView",
   component: OrganizationApiKeyCreatePageView,
   decorators: [withDashboardPageStory],
   args: {

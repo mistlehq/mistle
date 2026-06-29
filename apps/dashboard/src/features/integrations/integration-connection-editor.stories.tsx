@@ -349,7 +349,7 @@ function ChatGptDeviceReauthorizationPendingStory(): React.JSX.Element {
 }
 
 const meta = {
-  title: "Dashboard/Integrations/Connection Editor",
+  title: "Dashboard/Integrations/ConnectionEditor",
   component: IntegrationConnectionEditorStory,
   decorators: [withDashboardCenteredStory],
   parameters: {

@@ -4,9 +4,9 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { buildSandboxInstanceListItemFixture } from "../../test-support/sessions-page-fixtures.js";
 import { HomePageStoryModels } from "./home-page-view-model.js";
 import { HomePageView } from "./home-page-view.js";
-import { buildSandboxInstanceListItemFixture } from "./sessions-page.story-fixtures.js";
 
 describe("HomePageView", () => {
   it("renders the current step status mark in desktop and mobile title positions", () => {

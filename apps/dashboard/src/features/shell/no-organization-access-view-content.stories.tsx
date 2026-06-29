@@ -5,7 +5,7 @@ import { AuthPageShell, AuthPageWidths } from "../auth/auth-page-shell.js";
 import { NoOrganizationAccessViewContent } from "./no-organization-access-view-content.js";
 
 const meta = {
-  title: "Dashboard/Onboarding/NoOrganizationAccessView",
+  title: "Dashboard/Onboarding/NoOrganizationAccess/PageView",
   component: NoOrganizationAccessViewContent,
   parameters: {
     layout: "fullscreen",

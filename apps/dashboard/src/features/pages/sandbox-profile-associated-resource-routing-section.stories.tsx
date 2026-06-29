@@ -42,7 +42,7 @@ type AssociatedResourceRoutingStoryArgs = {
  * profile integration card. The full editor story shows the surrounding Sandbox Profile context.
  */
 const meta = {
-  title: "Dashboard/SandboxProfiles/Editor/Associated Resource Routing",
+  title: "Dashboard/SandboxProfiles/Editor/AssociatedResourceRouting",
   component: SandboxProfileAssociatedResourceRoutingFieldGroup,
   decorators: [withDashboardCenteredStory],
   render: function RenderStory(args): React.JSX.Element {

@@ -105,7 +105,7 @@ function MultiSelectStoryHarness(input: {
 }
 
 const meta = {
-  title: "Dashboard/Forms/String Combobox Fields",
+  title: "Dashboard/Forms/StringSelectComboboxFields",
   decorators: [withDashboardCenteredStory],
   parameters: {
     layout: "fullscreen",

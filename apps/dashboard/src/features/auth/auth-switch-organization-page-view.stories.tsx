@@ -4,7 +4,7 @@ import { withDashboardMemoryRouter, withDashboardPageStory } from "../../storybo
 import { AuthSwitchOrganizationPageView } from "./auth-switch-organization-page-view.js";
 
 const meta = {
-  title: "Dashboard/Auth/SwitchOrganizationPageView",
+  title: "Dashboard/Auth/SwitchOrganization/PageView",
   component: AuthSwitchOrganizationPageView,
   decorators: [withDashboardPageStory, withDashboardMemoryRouter],
   parameters: {

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { buildLaunchableSandboxProfileFixture } from "../../test-support/sessions-page-fixtures.js";
 import { noopRespondToServerRequest } from "../chat/components/chat-story-support.js";
 import {
   IntegrationConnectionDetailView,
@@ -77,7 +78,6 @@ import {
   renderSessionWorkbenchStoryWithChrome,
 } from "./session-story-support.js";
 import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
-import { buildStoryLaunchableSandboxProfile } from "./sessions-page.story-fixtures.js";
 import type { SessionPortAccessState } from "./use-session-port-access.js";
 
 const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [
@@ -575,7 +575,7 @@ function NewSessionCreationStory(): React.JSX.Element {
     <NewSessionPageStory
       initialSelectedProfileId="sbp_profile_multi_repo"
       launchableProfiles={[
-        buildStoryLaunchableSandboxProfile({
+        buildLaunchableSandboxProfileFixture({
           id: "sbp_profile_multi_repo",
           displayName: "Engineering Sandbox",
           repositoryOptions: [
@@ -591,7 +591,7 @@ function NewSessionCreationStory(): React.JSX.Element {
             },
           ],
         }),
-        buildStoryLaunchableSandboxProfile({
+        buildLaunchableSandboxProfileFixture({
           id: "sbp_profile_general",
           displayName: "General Sandbox",
           latestVersion: 4,

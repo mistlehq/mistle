@@ -16,6 +16,10 @@ import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import {
+  buildSandboxInstanceListItemFixture,
+  buildLaunchableSandboxProfileFixture,
+} from "../../test-support/sessions-page-fixtures.js";
 import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
@@ -31,10 +35,6 @@ import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
 import type { TriggerListItem, TriggersListResult } from "../triggers/triggers-types.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionsPage } from "./sessions-page.js";
-import {
-  buildSandboxInstanceListItemFixture,
-  buildStoryLaunchableSandboxProfile,
-} from "./sessions-page.story-fixtures.js";
 
 function createSessionsPageQueryClient(
   input?: Parameters<typeof createTestQueryClient>[0],
@@ -298,7 +298,7 @@ describe("SessionsPage", () => {
     });
     seedLaunchableSandboxProfiles({
       queryClient,
-      items: [buildStoryLaunchableSandboxProfile({ id: "sbp_launchable" })],
+      items: [buildLaunchableSandboxProfileFixture({ id: "sbp_launchable" })],
     });
 
     renderSessionsPage({

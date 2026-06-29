@@ -4,7 +4,7 @@ import { withDashboardMemoryRouter, withDashboardPageStory } from "../../storybo
 import { AuthLoginCallbackPageView } from "./auth-login-callback-page-view.js";
 
 const meta = {
-  title: "Dashboard/Auth/LoginCallbackPageView",
+  title: "Dashboard/Auth/LoginCallback/PageView",
   component: AuthLoginCallbackPageView,
   decorators: [withDashboardPageStory, withDashboardMemoryRouter],
   parameters: {

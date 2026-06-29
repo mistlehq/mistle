@@ -1,20 +1,18 @@
 import { QueryClient } from "@tanstack/react-query";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
+import {
+  buildLaunchableSandboxProfileFixture,
+  type SessionsPageListFilters,
+} from "../../test-support/sessions-page-fixtures.js";
 import { organizationLogoQueryKey } from "../organizations/organization-logo-query.js";
 import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import type {
-  LaunchableSandboxProfile,
-  LaunchableSandboxProfilesResult,
-} from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
   sandboxInstanceStatusQueryKey,
   sandboxInstancesListQueryKey,
 } from "../sessions/sessions-query-keys.js";
-import type {
-  SandboxInstanceListItem,
-  SandboxInstancesListResult,
-} from "../sessions/sessions-types.js";
+import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
 import type { TriggerListItem, TriggersListResult } from "../triggers/triggers-types.js";
 
@@ -30,94 +28,16 @@ type SessionsSidebarQueryState =
       kind: "error";
     };
 
-export type SessionsPageStoryListFilters = {
-  search: string;
-  owner: "anyone" | "me";
-  startedFrom: "any" | "manual" | "trigger" | "event" | "schedule";
-  triggerId: string | null;
-};
-
 function storyOrganizationSummaryQueryKey(
   organizationId: string | null,
 ): readonly ["shell", "organization-summary", string | null] {
   return ["shell", "organization-summary", organizationId];
 }
 
-export function buildStoryLaunchableSandboxProfile(
-  overrides: Partial<LaunchableSandboxProfile> & Pick<LaunchableSandboxProfile, "id">,
-): LaunchableSandboxProfile {
-  const { id, ...restOverrides } = overrides;
-
-  return {
-    id,
-    activeVersion: 3,
-    displayName: "Alpha Profile",
-    status: "active",
-    latestVersion: 3,
-    repositoryOptions: [],
-    createdAt: "2026-03-10T00:00:00.000Z",
-    updatedAt: "2026-03-10T00:00:00.000Z",
-    organizationId: "org_123",
-    ...restOverrides,
-  };
-}
-
-export function buildSandboxInstanceListItemFixture(
-  overrides: Partial<SandboxInstanceListItem> & Pick<SandboxInstanceListItem, "id">,
-): SandboxInstanceListItem {
-  const { id, ...restOverrides } = overrides;
-
-  return {
-    id,
-    title: null,
-    sandboxProfileId: "sbp_profile_alpha",
-    sandboxProfileDisplayName: "Alpha Profile",
-    sandboxProfileVersion: 3,
-    status: "running",
-    startedBy: {
-      kind: "user",
-      id: "user-id",
-      name: "Mistle User",
-    },
-    source: "dashboard",
-    createdAt: "2026-03-10T00:00:00.000Z",
-    updatedAt: "2026-03-10T00:00:00.000Z",
-    failureCode: null,
-    failureMessage: null,
-    ...restOverrides,
-  };
-}
-
-export function buildStoryTriggerListItem(
-  overrides: Partial<TriggerListItem> & Pick<TriggerListItem, "id" | "name">,
-): TriggerListItem {
-  const { id, name, ...restOverrides } = overrides;
-
-  return {
-    id,
-    kind: "webhook",
-    name,
-    enabled: true,
-    target: {
-      sandboxProfileId: "sbp_profile_alpha",
-      sandboxProfileName: "Alpha Profile",
-      sandboxProfileVersion: 3,
-      primaryRepositoryId: null,
-      primaryRepositoryName: null,
-    },
-    source: {
-      kind: "webhook",
-      events: [{ label: "app_mention" }],
-    },
-    updatedAt: "2026-03-10T00:00:00.000Z",
-    ...restOverrides,
-  };
-}
-
 export function createSessionsPageStoryQueryClient(input?: {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
   sandboxInstancesList?: SandboxInstancesListResult;
-  sandboxInstancesListFilters?: SessionsPageStoryListFilters;
+  sandboxInstancesListFilters?: SessionsPageListFilters;
   sandboxInstanceStatus?: {
     id: string;
     title: string | null;
@@ -154,7 +74,7 @@ export function createSessionsPageStoryQueryClient(input?: {
   queryClient.setQueryData(organizationLogoQueryKey("org_123"), null);
   queryClient.setQueryData(launchableSandboxProfilesQueryKey(), {
     items: input?.launchableProfiles ?? [
-      buildStoryLaunchableSandboxProfile({ id: "sbp_profile_alpha" }),
+      buildLaunchableSandboxProfileFixture({ id: "sbp_profile_alpha" }),
     ],
   } satisfies LaunchableSandboxProfilesResult);
   queryClient.setQueryData(
