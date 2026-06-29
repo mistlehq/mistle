@@ -1,7 +1,7 @@
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ChatEntry } from "../chat/chat-types.js";
 import {
@@ -78,6 +78,13 @@ const LongTranscriptServerRequestPanelEntries: React.ComponentProps<
 const LongTranscriptPendingDiffComments: React.ComponentProps<
   typeof SessionConversationBottomPanelDraftController
 >["pendingDiffComments"] = [];
+const LongTranscriptPendingBlueprintComments: React.ComponentProps<
+  typeof SessionConversationBottomPanelDraftController
+>["pendingBlueprintComments"] = [];
+
+function clearLongTranscriptPendingBlueprintComments(): void {}
+
+function clearLongTranscriptPendingDiffComments(): void {}
 
 const LongTranscriptComposerStateInput: React.ComponentProps<
   typeof SessionConversationBottomPanelDraftController
@@ -383,16 +390,15 @@ function LongTranscriptTypingHarness(): React.JSX.Element {
           <RenderCounter label="isolated-composer-owner" />
         </div>
         <SessionConversationBottomPanelDraftController
-          chatEntries={entries}
-          clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
-          clearPendingDiffComments={function clearPendingDiffComments() {}}
+          clearPendingBlueprintComments={clearLongTranscriptPendingBlueprintComments}
+          clearPendingDiffComments={clearLongTranscriptPendingDiffComments}
           composerStateInput={LongTranscriptComposerStateInput}
           draftResetKey="long-transcript-typing"
           isRespondingToServerRequest={false}
           onRespondToServerRequest={
             SessionConversationPanePlaygroundBaseArgs.onRespondToServerRequest
           }
-          pendingBlueprintComments={[]}
+          pendingBlueprintComments={LongTranscriptPendingBlueprintComments}
           pendingDiffComments={LongTranscriptPendingDiffComments}
           serverRequestPanelEntries={LongTranscriptServerRequestPanelEntries}
         />
@@ -422,7 +428,9 @@ function LongTranscriptStreamingHarness(): React.JSX.Element {
     [completedEntries, streamingChunkCount],
   );
   const appendStreamingChunk = useCallback((): void => {
-    setStreamingChunkCount((currentChunkCount) => currentChunkCount + 1);
+    startTransition(() => {
+      setStreamingChunkCount((currentChunkCount) => currentChunkCount + 1);
+    });
   }, []);
   const resetStreamingChunks = useCallback((): void => {
     setStreaming(false);
@@ -446,7 +454,9 @@ function LongTranscriptStreamingHarness(): React.JSX.Element {
           return;
         }
 
-        setStreamingChunkCount((currentChunkCount) => currentChunkCount + 1);
+        startTransition(() => {
+          setStreamingChunkCount((currentChunkCount) => currentChunkCount + 1);
+        });
         scheduleNextChunk();
       }, 80);
     }
@@ -518,16 +528,15 @@ function LongTranscriptStreamingHarness(): React.JSX.Element {
           <RenderCounter label="streaming-composer-owner" />
         </div>
         <SessionConversationBottomPanelDraftController
-          chatEntries={entries}
-          clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
-          clearPendingDiffComments={function clearPendingDiffComments() {}}
+          clearPendingBlueprintComments={clearLongTranscriptPendingBlueprintComments}
+          clearPendingDiffComments={clearLongTranscriptPendingDiffComments}
           composerStateInput={LongTranscriptComposerStateInput}
           draftResetKey="long-transcript-streaming"
           isRespondingToServerRequest={false}
           onRespondToServerRequest={
             SessionConversationPanePlaygroundBaseArgs.onRespondToServerRequest
           }
-          pendingBlueprintComments={[]}
+          pendingBlueprintComments={LongTranscriptPendingBlueprintComments}
           pendingDiffComments={LongTranscriptPendingDiffComments}
           serverRequestPanelEntries={LongTranscriptServerRequestPanelEntries}
           showWorkingIndicator

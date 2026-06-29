@@ -1009,7 +1009,6 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
         primaryBottomPanel={
           workbench.primaryPanelState.showsChatComposer && entryPreparationState === null ? (
             <SessionConversationBottomPanelDraftController
-              chatEntries={conversationPane.chatState.entries}
               clearPendingBlueprintComments={handleClearPendingBlueprintComments}
               clearPendingDiffComments={handleClearPendingDiffComments}
               composerStateInput={conversationPane.composerStateInput}

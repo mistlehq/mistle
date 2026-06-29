@@ -14,7 +14,15 @@ import {
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { useMutation } from "@tanstack/react-query";
-import { useCallback, useEffect, useReducer, useRef, useState, type RefObject } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 
 import type { ChatAttachment } from "../../../chat/chat-types.js";
 import {
@@ -204,12 +212,14 @@ export function useCodexChatController(input: {
     }
 
     pendingChatNotificationsRef.current = [];
-    for (const notification of coalesceCodexChatNotifications(pendingNotifications)) {
-      dispatchChatAction({
-        type: "notification_received",
-        notification,
-      });
-    }
+    startTransition(() => {
+      for (const notification of coalesceCodexChatNotifications(pendingNotifications)) {
+        dispatchChatAction({
+          type: "notification_received",
+          notification,
+        });
+      }
+    });
   }, [cancelPendingChatNotificationFlush]);
 
   const clearPendingChatNotifications = useCallback((): void => {

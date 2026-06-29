@@ -30,6 +30,14 @@ type ChatThreadProps = {
   pendingServerRequests: readonly ServerRequestEntry[];
 };
 
+type ChatThreadTurnGroupProps = {
+  group: ReturnType<typeof buildChatTurnGroups>[number];
+  isRespondingToServerRequest: boolean;
+  onRespondToServerRequest: RespondToServerRequest;
+  onUserMessageAction?: (actionId: string) => void;
+  pendingServerRequests: readonly ServerRequestEntry[];
+};
+
 function getAssistantBlockSpacingClass(input: {
   block: ChatEntry;
   previousBlock: ChatEntry | null;
@@ -101,15 +109,63 @@ function mapGenericItemToSemanticGroup(block: ChatGenericItemEntry): ChatSemanti
   };
 }
 
-function ChatThreadView({
-  entries,
+function areChatTurnContentSegmentsEqual(
+  leftSegments: readonly ChatTurnContentSegment[],
+  rightSegments: readonly ChatTurnContentSegment[],
+): boolean {
+  if (leftSegments.length !== rightSegments.length) {
+    return false;
+  }
+
+  return leftSegments.every((leftSegment, index) => {
+    const rightSegment = rightSegments[index];
+    if (rightSegment === undefined || leftSegment.kind !== rightSegment.kind) {
+      return false;
+    }
+
+    if (leftSegment.kind === "user-message") {
+      return rightSegment.kind === "user-message" && leftSegment.entry === rightSegment.entry;
+    }
+
+    if (rightSegment.kind !== "assistant-blocks") {
+      return false;
+    }
+
+    if (leftSegment.blocks.length !== rightSegment.blocks.length) {
+      return false;
+    }
+
+    return leftSegment.blocks.every((leftBlock, blockIndex) => {
+      return leftBlock === rightSegment.blocks[blockIndex];
+    });
+  });
+}
+
+function areChatTurnGroupPropsEqual(
+  previousProps: ChatThreadTurnGroupProps,
+  nextProps: ChatThreadTurnGroupProps,
+): boolean {
+  return (
+    previousProps.group.turnId === nextProps.group.turnId &&
+    previousProps.group.userEntry === nextProps.group.userEntry &&
+    previousProps.isRespondingToServerRequest === nextProps.isRespondingToServerRequest &&
+    previousProps.onRespondToServerRequest === nextProps.onRespondToServerRequest &&
+    previousProps.onUserMessageAction === nextProps.onUserMessageAction &&
+    previousProps.pendingServerRequests === nextProps.pendingServerRequests &&
+    areChatTurnContentSegmentsEqual(
+      previousProps.group.contentSegments,
+      nextProps.group.contentSegments,
+    )
+  );
+}
+
+function ChatThreadTurnGroupView({
+  group,
   isRespondingToServerRequest,
   onRespondToServerRequest,
   onUserMessageAction,
   pendingServerRequests,
-}: ChatThreadProps): React.JSX.Element {
-  const chatTurnGroups = buildChatTurnGroups(entries);
-
+}: ChatThreadTurnGroupProps): React.JSX.Element {
   function renderUserMessage(
     entry: Extract<ChatEntry, { kind: "user-message" }>,
   ): React.JSX.Element {
@@ -253,6 +309,33 @@ function ChatThreadView({
 
   return (
     <div
+      className="flex flex-col"
+      data-chat-turn-group
+      data-turn-id={group.turnId}
+      style={{
+        gap: "var(--chat-thread-turn-content-gap, 1rem)",
+      }}
+    >
+      {group.userEntry === null ? null : renderUserMessage(group.userEntry)}
+      {group.contentSegments.map((segment) => renderContentSegment(segment))}
+    </div>
+  );
+}
+
+const ChatThreadTurnGroup = memo(ChatThreadTurnGroupView, areChatTurnGroupPropsEqual);
+ChatThreadTurnGroup.displayName = "ChatThreadTurnGroup";
+
+function ChatThreadView({
+  entries,
+  isRespondingToServerRequest,
+  onRespondToServerRequest,
+  onUserMessageAction,
+  pendingServerRequests,
+}: ChatThreadProps): React.JSX.Element {
+  const chatTurnGroups = buildChatTurnGroups(entries);
+
+  return (
+    <div
       className="flex flex-col pt-2"
       data-chat-thread
       style={{
@@ -261,18 +344,14 @@ function ChatThreadView({
       }}
     >
       {chatTurnGroups.map((group) => (
-        <div
-          className="flex flex-col"
-          data-chat-turn-group
-          data-turn-id={group.turnId}
+        <ChatThreadTurnGroup
+          group={group}
+          isRespondingToServerRequest={isRespondingToServerRequest}
           key={group.turnId}
-          style={{
-            gap: "var(--chat-thread-turn-content-gap, 1rem)",
-          }}
-        >
-          {group.userEntry === null ? null : renderUserMessage(group.userEntry)}
-          {group.contentSegments.map((segment) => renderContentSegment(segment))}
-        </div>
+          onRespondToServerRequest={onRespondToServerRequest}
+          pendingServerRequests={pendingServerRequests}
+          {...(onUserMessageAction === undefined ? {} : { onUserMessageAction })}
+        />
       ))}
     </div>
   );

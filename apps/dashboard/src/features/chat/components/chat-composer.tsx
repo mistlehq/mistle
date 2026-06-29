@@ -1860,10 +1860,18 @@ export function ChatComposer({
                 });
               }
               updateComposerSelectionFromView(viewUpdate.view);
-              setActiveSlashCommandIndex(0);
-              setActiveSkillMentionIndex(0);
-              setActiveContextMentionIndex(0);
-              setDismissedContextMentionKey(null);
+              if (viewUpdate.docChanged) {
+                setActiveSlashCommandIndex((currentIndex) =>
+                  currentIndex === 0 ? currentIndex : 0,
+                );
+                setActiveSkillMentionIndex((currentIndex) =>
+                  currentIndex === 0 ? currentIndex : 0,
+                );
+                setActiveContextMentionIndex((currentIndex) =>
+                  currentIndex === 0 ? currentIndex : 0,
+                );
+                setDismissedContextMentionKey(null);
+              }
             }}
             onCreateEditor={(view: EditorView) => {
               editorViewRef.current = view;

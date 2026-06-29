@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, startTransition, useCallback, useMemo, useState } from "react";
 import type React from "react";
 
 import type { ChatEntry } from "../chat/chat-types.js";
@@ -48,7 +48,7 @@ type SessionConversationMainContentProps = {
 };
 
 type SessionConversationSharedPanelProps = {
-  chatEntries: readonly ChatEntry[];
+  chatEntries?: readonly ChatEntry[];
   serverRequestPanelEntries: readonly ServerRequestEntry[];
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: RespondToServerRequest;
@@ -280,7 +280,7 @@ export function SessionConversationBottomPanelController({
   );
 }
 
-export function SessionConversationBottomPanelDraftController({
+function SessionConversationBottomPanelDraftControllerView({
   clearPendingBlueprintComments,
   clearPendingDiffComments,
   draftResetKey,
@@ -300,6 +300,12 @@ export function SessionConversationBottomPanelDraftController({
   );
 }
 
+export const SessionConversationBottomPanelDraftController = memo(
+  SessionConversationBottomPanelDraftControllerView,
+);
+SessionConversationBottomPanelDraftController.displayName =
+  "SessionConversationBottomPanelDraftController";
+
 function SessionConversationBottomPanelDraftOwner({
   clearPendingBlueprintComments,
   clearPendingDiffComments,
@@ -316,11 +322,13 @@ function SessionConversationBottomPanelDraftOwner({
   const [composerDraft, setComposerDraft] = useState(() => createComposerDraft(""));
 
   const handleComposerDraftChange = useCallback((nextComposerDraft: ComposerDraft): void => {
-    setComposerDraft((currentComposerDraft) =>
-      areComposerDraftsEqual(currentComposerDraft, nextComposerDraft)
-        ? currentComposerDraft
-        : nextComposerDraft,
-    );
+    startTransition(() => {
+      setComposerDraft((currentComposerDraft) =>
+        areComposerDraftsEqual(currentComposerDraft, nextComposerDraft)
+          ? currentComposerDraft
+          : nextComposerDraft,
+      );
+    });
   }, []);
 
   const draftState = useMemo(
