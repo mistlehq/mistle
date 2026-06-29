@@ -184,6 +184,38 @@ describe("ChatMarkdownMessage", () => {
       ),
     ).toBe(false);
   });
+
+  it("keeps reference-style streaming markdown in one parser context", () => {
+    const stablePrefix = Array.from(
+      { length: 90 },
+      (_, index) =>
+        `Reference paragraph ${String(index).padStart(2, "0")} keeps enough length before [the linked label][target].`,
+    ).join("\n\n");
+
+    const { container } = render(
+      <ChatMarkdownMessage
+        isStreaming
+        text={`${stablePrefix}\n\n[target]: https://example.com/docs`}
+      />,
+    );
+
+    expect(container.querySelectorAll(".chat-markdown-content")).toHaveLength(1);
+    expect(container.textContent).toContain("Reference paragraph 00");
+  });
+
+  it("does not split loose lists across streaming markdown segments", () => {
+    const listText = Array.from(
+      { length: 90 },
+      (_, index) =>
+        `${String(index + 1)}. Loose list item ${String(index).padStart(2, "0")}\n\n   continuation paragraph`,
+    ).join("\n\n");
+
+    const { container } = render(<ChatMarkdownMessage isStreaming text={listText} />);
+
+    expect(container.querySelectorAll(".chat-markdown-content")).toHaveLength(1);
+    expect(container.textContent).toContain("Loose list item 00");
+    expect(container.textContent).toContain("continuation paragraph");
+  });
 });
 
 function getAnimationChunk(container: HTMLElement, text: string): Element {

@@ -87,6 +87,7 @@ const SerializedStreamingAnimationStaggerMs = 40;
 const StreamingMarkdownSplitThresholdCharacters = 4_000;
 const StreamingMarkdownStaticSegmentTargetCharacters = 2_000;
 const StreamingMarkdownLiveTailMinimumCharacters = 1_000;
+const MarkdownListItemPattern = /^\s{0,3}(?:[-+*]|\d+[.)])\s+/;
 const FirstMarkdownBlockIndex = 0;
 let nextSerializedStreamingAnimationPluginId = 0;
 
@@ -351,7 +352,10 @@ function getEarlierDelay(leftDelayMs: number | null, rightDelayMs: number | null
 }
 
 function splitStreamingMarkdownSegments(text: string): readonly StreamingMarkdownSegment[] {
-  if (text.length <= StreamingMarkdownSplitThresholdCharacters) {
+  if (
+    text.length <= StreamingMarkdownSplitThresholdCharacters ||
+    !canSegmentStreamingMarkdownText(text)
+  ) {
     return [{ isLive: true, key: "live", text }];
   }
 
@@ -382,6 +386,10 @@ function splitStreamingMarkdownSegments(text: string): readonly StreamingMarkdow
     const canFreezeSegment =
       fencedBlockMarker === null &&
       trimmedLine.length === 0 &&
+      canSegmentStreamingMarkdownAtBoundary(text, {
+        lineStartIndex,
+        lineEndIndex,
+      }) &&
       lineEndIndex - segmentStartIndex >= StreamingMarkdownStaticSegmentTargetCharacters &&
       remainingCharacters >= StreamingMarkdownLiveTailMinimumCharacters;
 
@@ -404,6 +412,66 @@ function splitStreamingMarkdownSegments(text: string): readonly StreamingMarkdow
   });
 
   return segments;
+}
+
+function canSegmentStreamingMarkdownText(text: string): boolean {
+  return !text.includes("[");
+}
+
+function canSegmentStreamingMarkdownAtBoundary(
+  text: string,
+  input: {
+    lineEndIndex: number;
+    lineStartIndex: number;
+  },
+): boolean {
+  const previousNonBlankLine = findPreviousNonBlankMarkdownLine(text, input.lineStartIndex);
+  const nextNonBlankLine = findNextNonBlankMarkdownLine(text, input.lineEndIndex);
+  if (previousNonBlankLine === null || nextNonBlankLine === null) {
+    return false;
+  }
+
+  return (
+    !lineCanContinueMarkdownAcrossBlankLine(previousNonBlankLine) &&
+    !lineCanContinueMarkdownAcrossBlankLine(nextNonBlankLine)
+  );
+}
+
+function findPreviousNonBlankMarkdownLine(text: string, beforeIndex: number): string | null {
+  let lineEndIndex = beforeIndex;
+  while (lineEndIndex > 0) {
+    const previousNewlineIndex = text.lastIndexOf("\n", lineEndIndex - 1);
+    const lineStartIndex = previousNewlineIndex === -1 ? 0 : previousNewlineIndex + 1;
+    const line = text.slice(lineStartIndex, lineEndIndex);
+    if (line.trim().length > 0) {
+      return line;
+    }
+
+    lineEndIndex = previousNewlineIndex;
+  }
+
+  return null;
+}
+
+function findNextNonBlankMarkdownLine(text: string, afterIndex: number): string | null {
+  let lineStartIndex = afterIndex;
+  while (lineStartIndex < text.length) {
+    const nextNewlineIndex = text.indexOf("\n", lineStartIndex);
+    const lineEndIndex = nextNewlineIndex === -1 ? text.length : nextNewlineIndex;
+    const line = text.slice(lineStartIndex, lineEndIndex);
+    if (line.trim().length > 0) {
+      return line;
+    }
+
+    lineStartIndex = nextNewlineIndex === -1 ? text.length : nextNewlineIndex + 1;
+  }
+
+  return null;
+}
+
+function lineCanContinueMarkdownAcrossBlankLine(line: string): boolean {
+  const trimmedLine = line.trimStart();
+  return MarkdownListItemPattern.test(line) || trimmedLine.startsWith(">");
 }
 
 export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Element {
