@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   AgentInstructionTokenGroups,
+  buildAgentInstructionsResourceReferences,
   buildAgentInstructionTokenCatalog,
+  resolveTriggerInstructionResourceKinds,
 } from "./agent-instructions-token-catalog.js";
 import { createGitHubEventOption } from "./webhook-trigger-test-fixtures.js";
 
@@ -103,5 +105,82 @@ describe("buildAgentInstructionTokenCatalog", () => {
 
     expect(webhookEventIndex).toBeGreaterThanOrEqual(0);
     expect(firstPayloadIndex).toBeGreaterThan(webhookEventIndex);
+  });
+});
+
+describe("buildAgentInstructionsResourceReferences", () => {
+  it("builds plain text references only for resources with provider external ids", () => {
+    const references = buildAgentInstructionsResourceReferences({
+      providerLabel: "Slack",
+      resources: [
+        {
+          id: "rsc_slack_user",
+          displayName: "Jonathan",
+          handle: "jonathan",
+          externalId: "U12039",
+          kind: "user",
+        },
+        {
+          id: "rsc_missing_external_id",
+          displayName: "Someone",
+          handle: "someone",
+          kind: "user",
+        },
+      ],
+    });
+
+    expect(references).toEqual([
+      {
+        id: "rsc_slack_user",
+        displayName: "Jonathan",
+        handle: "jonathan",
+        externalId: "U12039",
+        resourceKind: "user",
+        providerLabel: "Slack",
+        insertText: "@Jonathan (Slack user ID: U12039)",
+      },
+    ]);
+  });
+});
+
+describe("resolveTriggerInstructionResourceKinds", () => {
+  it("uses resource-backed parameters and actor resource definitions from selected events", () => {
+    const resourceKinds = resolveTriggerInstructionResourceKinds({
+      selectedEventOptions: [
+        createGitHubEventOption({
+          eventType: "github.issue_comment.created",
+          overrides: {
+            parameters: [
+              {
+                id: "repository",
+                label: "Repository",
+                kind: "resource-select",
+                resourceKind: "repository",
+                payloadPath: ["repository", "full_name"],
+              },
+            ],
+            actor: {
+              resourceReferences: [
+                {
+                  resourceKind: "user",
+                  handlePayloadPath: ["sender", "login"],
+                },
+              ],
+            },
+            resourceDefinitions: [
+              {
+                kind: "team",
+                selectionMode: "multi",
+                bindingField: "reviewTeams",
+                displayNameSingular: "team",
+                displayNamePlural: "teams",
+              },
+            ],
+          },
+        }),
+      ],
+    });
+
+    expect(resourceKinds).toEqual(["repository", "team", "user"]);
   });
 });

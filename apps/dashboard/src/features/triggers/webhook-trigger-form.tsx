@@ -11,11 +11,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@mistle/ui";
-import type { ReactNode } from "react";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useMemo, type ReactNode } from "react";
 
-import type { IntegrationConnection } from "../integrations/integrations-service.js";
+import {
+  listIntegrationConnectionResources,
+  type IntegrationConnection,
+  type IntegrationConnectionResource,
+  type IntegrationConnectionResources,
+} from "../integrations/integrations-service.js";
 import { FormPageSection } from "../shared/form-page.js";
-import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
+import {
+  AgentInstructionsEditor,
+  type AgentInstructionsResourceReferenceLoader,
+} from "./agent-instructions-editor.js";
+import { buildAgentInstructionsResourceReferences } from "./agent-instructions-token-catalog.js";
 import {
   TriggerFormFieldError,
   TriggerFormShell,
@@ -42,6 +52,7 @@ import {
   type WebhookTriggerFormValues,
 } from "./webhook-trigger-form-types.js";
 import { DefaultWebhookTriggerMessageTemplate } from "./webhook-trigger-input-template.js";
+import { createTriggerParameterResourceQueryKey } from "./webhook-trigger-resource-query-keys.js";
 export type {
   WebhookTriggerFormFieldErrors,
   WebhookTriggerFormOption,
@@ -81,6 +92,7 @@ type WebhookTriggerInstructionsSectionProps = {
   instructionsLabelId: string;
   value: string;
   disabled: boolean;
+  loadResourceReferences?: AgentInstructionsResourceReferenceLoader;
   onValueChange: (value: string) => void;
 };
 
@@ -262,6 +274,9 @@ export function WebhookTriggerInstructionsSection(
               ariaLabelledBy={input.instructionsLabelId}
               disabled={input.disabled}
               invalid={false}
+              {...(input.loadResourceReferences === undefined
+                ? {}
+                : { loadResourceReferences: input.loadResourceReferences })}
               onChange={input.onValueChange}
               tokens={[]}
               value={input.value}
@@ -270,6 +285,87 @@ export function WebhookTriggerInstructionsSection(
         </Field>
       </div>
     </FormPageSection>
+  );
+}
+
+export function useWebhookTriggerResourceReferenceLoader(input: {
+  selectedConnectionId: string;
+  selectedConnectionLabel: string;
+  resourceKinds: readonly string[];
+}): AgentInstructionsResourceReferenceLoader {
+  const queryClient = useQueryClient();
+
+  return useMemo(
+    () => async (loaderInput) => {
+      if (input.selectedConnectionId.trim().length === 0 || input.resourceKinds.length === 0) {
+        return [];
+      }
+
+      const resources = await Promise.all(
+        input.resourceKinds.map((resourceKind) =>
+          loadTriggerInstructionResourceReferenceResources({
+            connectionId: input.selectedConnectionId,
+            query: loaderInput.query,
+            queryClient,
+            resourceKind,
+            signal: loaderInput.signal,
+          }),
+        ),
+      );
+
+      return buildAgentInstructionsResourceReferences({
+        providerLabel: input.selectedConnectionLabel,
+        resources: resources.flat(),
+      });
+    },
+    [input.resourceKinds, input.selectedConnectionId, input.selectedConnectionLabel, queryClient],
+  );
+}
+
+async function loadTriggerInstructionResourceReferenceResources(input: {
+  connectionId: string;
+  query: string;
+  queryClient: QueryClient;
+  resourceKind: string;
+  signal: AbortSignal;
+}): Promise<readonly IntegrationConnectionResource[]> {
+  const cachedResources = input.queryClient.getQueryData<IntegrationConnectionResources>(
+    createTriggerParameterResourceQueryKey({
+      connectionId: input.connectionId,
+      resourceKind: input.resourceKind,
+    }),
+  );
+  if (cachedResources !== undefined) {
+    return filterTriggerInstructionResourceReferenceResources({
+      query: input.query,
+      resources: cachedResources.items,
+    });
+  }
+
+  if (input.query.length === 0) {
+    return [];
+  }
+
+  const loadedResources = await listIntegrationConnectionResources({
+    connectionId: input.connectionId,
+    kind: input.resourceKind,
+    search: input.query,
+    signal: input.signal,
+  });
+
+  return loadedResources.items;
+}
+
+function filterTriggerInstructionResourceReferenceResources(input: {
+  query: string;
+  resources: readonly IntegrationConnectionResource[];
+}): readonly IntegrationConnectionResource[] {
+  const normalizedQuery = input.query.toLowerCase();
+
+  return input.resources.filter((resource) =>
+    [resource.displayName, resource.handle, resource.externalId].some((searchValue) =>
+      (searchValue ?? "").toLowerCase().includes(normalizedQuery),
+    ),
   );
 }
 
@@ -289,6 +385,11 @@ export function WebhookTriggerForm(input: WebhookTriggerFormProps): React.JSX.El
     eventIdsError: input.fieldErrors.eventIds,
   });
   const disabled = input.isDeleting || input.isSaving || input.isDuplicating;
+  const resourceReferenceLoader = useWebhookTriggerResourceReferenceLoader({
+    selectedConnectionId: formState.selectedConnectionId,
+    selectedConnectionLabel: formState.selectedTriggerConnectionLabel,
+    resourceKinds: formState.triggerInstructionResourceKinds,
+  });
 
   return (
     <TriggerFormShell
@@ -318,6 +419,7 @@ export function WebhookTriggerForm(input: WebhookTriggerFormProps): React.JSX.El
       }
       inputTemplateLabelId={inputTemplateLabelId}
       inputTemplatePlaceholderText={DefaultWebhookTriggerMessageTemplate}
+      inputTemplateResourceReferenceLoader={resourceReferenceLoader}
       inputTemplateTokens={formState.agentInstructionTokens}
       isDeleting={input.isDeleting}
       isDuplicating={input.isDuplicating}
@@ -369,6 +471,7 @@ export function WebhookTriggerForm(input: WebhookTriggerFormProps): React.JSX.El
           onValueChange={(value) => {
             input.onValueChange("instructions", value);
           }}
+          loadResourceReferences={resourceReferenceLoader}
           value={input.values.instructions}
         />
       }

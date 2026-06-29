@@ -23,7 +23,10 @@ import type { ReactNode } from "react";
 
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
 import { FormPageFooter, FormPageSection, FormPageStack } from "../shared/form-page.js";
-import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
+import {
+  AgentInstructionsEditor,
+  type AgentInstructionsResourceReferenceLoader,
+} from "./agent-instructions-editor.js";
 import type { AgentInstructionsEditorToken } from "./agent-instructions-token-catalog.js";
 import { WebhookTriggerTitleEditor } from "./webhook-trigger-title-editor.js";
 
@@ -66,6 +69,7 @@ type TriggerFormShellProps = {
   inputTemplateDescription: ReactNode;
   inputTemplatePlaceholderText?: string;
   inputTemplateTokens: readonly AgentInstructionsEditorToken[];
+  inputTemplateResourceReferenceLoader?: AgentInstructionsResourceReferenceLoader;
   submitLabel: string;
   shouldShowTriggerEnabledField: boolean;
   shouldShowCreateNameField: boolean;
@@ -415,6 +419,9 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
                   {...(input.inputTemplatePlaceholderText === undefined
                     ? {}
                     : { placeholderText: input.inputTemplatePlaceholderText })}
+                  {...(input.inputTemplateResourceReferenceLoader === undefined
+                    ? {}
+                    : { loadResourceReferences: input.inputTemplateResourceReferenceLoader })}
                   tokens={input.inputTemplateTokens}
                   value={input.inputTemplate}
                 />

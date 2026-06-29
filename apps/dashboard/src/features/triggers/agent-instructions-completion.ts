@@ -6,7 +6,10 @@ import {
 } from "@codemirror/autocomplete";
 import type { EditorView } from "@codemirror/view";
 
-import type { AgentInstructionsEditorToken } from "./agent-instructions-token-catalog.js";
+import type {
+  AgentInstructionsEditorToken,
+  AgentInstructionsResourceReference,
+} from "./agent-instructions-token-catalog.js";
 
 type ActiveTemplateTokenContext = {
   from: number;
@@ -14,8 +17,23 @@ type ActiveTemplateTokenContext = {
   query: string;
 };
 
+type ActiveResourceReferenceContext = {
+  from: number;
+  to: number;
+  query: string;
+};
+
+export type AgentInstructionsResourceReferenceLoader = (input: {
+  query: string;
+  signal: AbortSignal;
+}) => Promise<readonly AgentInstructionsResourceReference[]>;
+
 function isTemplatePathCharacter(character: string): boolean {
   return /^[A-Za-z0-9_.]$/.test(character);
+}
+
+function isResourceReferenceQueryCharacter(character: string): boolean {
+  return /^[^\s@{}()[\]]$/.test(character);
 }
 
 export function resolveTemplateTokenContext(input: {
@@ -78,6 +96,37 @@ export function applyAgentInstructionCompletion(
   view.dispatch(insertTransaction);
 }
 
+export function resolveResourceReferenceContext(input: {
+  documentText: string;
+  cursorOffset: number;
+}): ActiveResourceReferenceContext | null {
+  const prefixText = input.documentText.slice(0, input.cursorOffset);
+  const match = /(^|\s)@([^\s@{}()[\]]*)$/.exec(prefixText);
+  if (match === null) {
+    return null;
+  }
+
+  const matchedText = match[0];
+  const query = match[2] ?? "";
+  const atOffset = input.cursorOffset - matchedText.length + (matchedText.startsWith("@") ? 0 : 1);
+
+  let replaceEnd = input.cursorOffset;
+  while (replaceEnd < input.documentText.length) {
+    const currentCharacter = input.documentText[replaceEnd] ?? "";
+    if (!isResourceReferenceQueryCharacter(currentCharacter)) {
+      break;
+    }
+
+    replaceEnd += 1;
+  }
+
+  return {
+    from: atOffset,
+    to: replaceEnd,
+    query,
+  };
+}
+
 function compareMatchingTokens(
   left: AgentInstructionsEditorToken,
   right: AgentInstructionsEditorToken,
@@ -112,6 +161,55 @@ export function findMatchingAgentInstructionTokens(input: {
   return input.tokens.filter((token) =>
     token.replacePath.toLowerCase().startsWith(normalizedQuery),
   );
+}
+
+export function findMatchingAgentInstructionResourceReferences(input: {
+  query: string;
+  resourceReferences: readonly AgentInstructionsResourceReference[];
+}): readonly AgentInstructionsResourceReference[] {
+  const normalizedQuery = input.query.toLowerCase();
+
+  return input.resourceReferences.filter((resourceReference) =>
+    [resourceReference.displayName, resourceReference.handle, resourceReference.externalId].some(
+      (searchValue) => searchValue.toLowerCase().includes(normalizedQuery),
+    ),
+  );
+}
+
+function buildAgentInstructionResourceReferenceCompletionResult(input: {
+  resolvedContext: ActiveResourceReferenceContext;
+  resourceReferences: readonly AgentInstructionsResourceReference[];
+}): CompletionResult | null {
+  const options = findMatchingAgentInstructionResourceReferences({
+    query: input.resolvedContext.query,
+    resourceReferences: input.resourceReferences,
+  }).map(
+    (resourceReference): Completion => ({
+      label: resourceReference.displayName,
+      detail: `${resourceReference.providerLabel} ${resourceReference.resourceKind} ID: ${resourceReference.externalId}`,
+      type: "variable",
+      apply: (view, _completion, from, to) => {
+        const insertTransaction = insertCompletionText(
+          view.state,
+          resourceReference.insertText,
+          from,
+          to,
+        );
+        view.dispatch(insertTransaction);
+      },
+    }),
+  );
+
+  if (options.length === 0) {
+    return null;
+  }
+
+  return {
+    from: input.resolvedContext.from,
+    to: input.resolvedContext.to,
+    filter: false,
+    options,
+  };
 }
 
 export function completeAgentInstructionToken(
@@ -154,4 +252,60 @@ export function completeAgentInstructionToken(
     options,
     validFor: /^[A-Za-z0-9_.]*$/,
   };
+}
+
+export function completeAgentInstructionResourceReference(
+  context: CompletionContext,
+  input: {
+    resourceReferences: readonly AgentInstructionsResourceReference[];
+  },
+): CompletionResult | null {
+  const resolvedContext = resolveResourceReferenceContext({
+    documentText: context.state.doc.toString(),
+    cursorOffset: context.pos,
+  });
+  if (resolvedContext === null) {
+    return null;
+  }
+
+  return buildAgentInstructionResourceReferenceCompletionResult({
+    resolvedContext,
+    resourceReferences: input.resourceReferences,
+  });
+}
+
+export async function completeAgentInstructionResourceReferenceFromLoader(
+  context: CompletionContext,
+  input: {
+    loadResourceReferences: AgentInstructionsResourceReferenceLoader;
+  },
+): Promise<CompletionResult | null> {
+  const resolvedContext = resolveResourceReferenceContext({
+    documentText: context.state.doc.toString(),
+    cursorOffset: context.pos,
+  });
+  if (resolvedContext === null) {
+    return null;
+  }
+
+  const abortController = new AbortController();
+  context.addEventListener(
+    "abort",
+    () => {
+      abortController.abort();
+    },
+    { onDocChange: true },
+  );
+  const resourceReferences = await input.loadResourceReferences({
+    query: resolvedContext.query,
+    signal: abortController.signal,
+  });
+  if (context.aborted) {
+    return null;
+  }
+
+  return buildAgentInstructionResourceReferenceCompletionResult({
+    resolvedContext,
+    resourceReferences,
+  });
 }

@@ -31,17 +31,28 @@ import {
   getCodeMirrorDrawSelectionExtensions,
 } from "../shared/code-mirror-theme.js";
 import {
+  completeAgentInstructionResourceReference,
+  completeAgentInstructionResourceReferenceFromLoader,
   completeAgentInstructionToken,
+  type AgentInstructionsResourceReferenceLoader,
   rankAgentInstructionTokensForMatching,
+  resolveResourceReferenceContext,
   resolveTemplateTokenContext,
 } from "./agent-instructions-completion.js";
-import type { AgentInstructionsEditorToken } from "./agent-instructions-token-catalog.js";
+import type {
+  AgentInstructionsEditorToken,
+  AgentInstructionsResourceReference,
+} from "./agent-instructions-token-catalog.js";
+
+export type { AgentInstructionsResourceReferenceLoader } from "./agent-instructions-completion.js";
 
 type AgentInstructionsEditorProps = {
   value: string;
   disabled: boolean;
   invalid: boolean;
   tokens: readonly AgentInstructionsEditorToken[];
+  resourceReferences?: readonly AgentInstructionsResourceReference[];
+  loadResourceReferences?: AgentInstructionsResourceReferenceLoader;
   ariaLabelledBy: string;
   onChange: (value: string) => void;
   placeholderText?: string;
@@ -252,6 +263,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
     () => rankAgentInstructionTokensForMatching(input.tokens),
     [input.tokens],
   );
+  const resourceReferences = input.resourceReferences ?? [];
   const placeholderText = input.placeholderText;
 
   const extensions = useMemo(
@@ -282,7 +294,15 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
           (context) =>
             completeAgentInstructionToken(context, {
               tokens: rankedTokens,
-            }),
+            }) ??
+            completeAgentInstructionResourceReference(context, {
+              resourceReferences,
+            }) ??
+            (input.loadResourceReferences === undefined
+              ? null
+              : completeAgentInstructionResourceReferenceFromLoader(context, {
+                  loadResourceReferences: input.loadResourceReferences,
+                })),
         ],
       }),
       Prec.highest(
@@ -319,9 +339,13 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
           documentText: update.state.doc.toString(),
           cursorOffset: mainSelection.head,
         });
+        const resourceReferenceQuery = resolveResourceReferenceContext({
+          documentText: update.state.doc.toString(),
+          cursorOffset: mainSelection.head,
+        });
         const status = completionStatus(update.state);
 
-        if (templateQuery === null) {
+        if (templateQuery === null && resourceReferenceQuery === null) {
           if (status !== null) {
             closeCompletion(update.view);
           }
@@ -342,7 +366,15 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
       }),
       createAgentInstructionsEditorTheme(),
     ],
-    [input.ariaLabelledBy, input.disabled, input.invalid, placeholderText, rankedTokens],
+    [
+      input.ariaLabelledBy,
+      input.disabled,
+      input.invalid,
+      input.loadResourceReferences,
+      placeholderText,
+      rankedTokens,
+      resourceReferences,
+    ],
   );
 
   return (

@@ -1,4 +1,7 @@
-import { buildAgentInstructionTokenCatalog } from "./agent-instructions-token-catalog.js";
+import {
+  buildAgentInstructionTokenCatalog,
+  resolveTriggerInstructionResourceKinds,
+} from "./agent-instructions-token-catalog.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-trigger-conversation-key-field.js";
 import { isWebhookTriggerEventOptionUnavailable } from "./webhook-trigger-event-option-availability.js";
 import { resolveSelectedWebhookTriggerEventOptions } from "./webhook-trigger-event-picker-state.js";
@@ -57,14 +60,18 @@ export function resolveWebhookTriggerFormState(input: {
   conversationKeySelectionState: ReturnType<typeof resolveConversationKeyFieldOptions>;
   selectedConversationGroupingLabel: string | undefined;
   agentInstructionTokens: ReturnType<typeof buildAgentInstructionTokenCatalog>;
+  selectedTriggerConnectionLabel: string;
+  triggerInstructionResourceKinds: ReturnType<typeof resolveTriggerInstructionResourceKinds>;
 } {
   const selectedTriggerOptions = resolveSelectedWebhookTriggerEventOptions({
     eventOptions: input.webhookEventOptions,
     selectedEventIds: input.selectedEventIds,
   });
+  const selectedAvailableTriggerOptions = selectedTriggerOptions.filter(
+    (option) => !isWebhookTriggerEventOptionUnavailable(option),
+  );
   const selectedConnectionIds = new Set(
-    selectedTriggerOptions
-      .filter((option) => !isWebhookTriggerEventOptionUnavailable(option))
+    selectedAvailableTriggerOptions
       .map((option) => option.connectionId)
       .filter((connectionId) => connectionId.trim().length > 0),
   );
@@ -90,12 +97,21 @@ export function resolveWebhookTriggerFormState(input: {
   return {
     selectedTriggerOptions,
     selectedConnectionId,
+    selectedTriggerConnectionLabel:
+      selectedConnectionIds.size === 1
+        ? (selectedAvailableTriggerOptions.find(
+            (option) => option.connectionId === selectedConnectionId,
+          )?.connectionLabel ?? "")
+        : "",
     triggerHeaderMessage,
     hasSelectedTrigger: input.selectedEventIds.length > 0,
     conversationKeySelectionState,
     selectedConversationGroupingLabel,
     agentInstructionTokens: buildAgentInstructionTokenCatalog({
       selectedEventOptions: selectedTriggerOptions,
+    }),
+    triggerInstructionResourceKinds: resolveTriggerInstructionResourceKinds({
+      selectedEventOptions: selectedAvailableTriggerOptions,
     }),
   };
 }

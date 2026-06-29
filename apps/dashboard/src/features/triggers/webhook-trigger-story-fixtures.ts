@@ -12,6 +12,7 @@ import {
 import type { WebhookTriggerEventOption } from "./webhook-trigger-event-types.js";
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import { createWebhookTriggerEventId } from "./webhook-trigger-option-builders.js";
+import { createTriggerParameterResourceQueryKey } from "./webhook-trigger-resource-query-keys.js";
 import { createGitHubEventOption } from "./webhook-trigger-test-fixtures.js";
 
 export const StoryGitHubConnectionId = "conn_github_prod";
@@ -778,35 +779,59 @@ export function createWebhookTriggerStoryQueryClient(input?: {
   });
 
   queryClient.setQueryData(
-    ["trigger-trigger-parameters", StoryGitHubConnectionId, "repository"],
+    createTriggerParameterResourceQueryKey({
+      connectionId: StoryGitHubConnectionId,
+      resourceKind: "repository",
+    }),
     StoryGitHubRepositoryResources,
   );
   queryClient.setQueryData(
-    ["trigger-trigger-parameters", StoryGitHubConnectionId, "branch"],
+    createTriggerParameterResourceQueryKey({
+      connectionId: StoryGitHubConnectionId,
+      resourceKind: "branch",
+    }),
     StoryGitHubBranchResources,
   );
   queryClient.setQueryData(
-    ["trigger-trigger-parameters", StoryGitHubConnectionId, "user"],
+    createTriggerParameterResourceQueryKey({
+      connectionId: StoryGitHubConnectionId,
+      resourceKind: "user",
+    }),
     StoryGitHubUserResources,
   );
   queryClient.setQueryData(
-    ["trigger-trigger-parameters", StoryGitHubConnectionId, "team"],
+    createTriggerParameterResourceQueryKey({
+      connectionId: StoryGitHubConnectionId,
+      resourceKind: "team",
+    }),
     input?.githubTeamResources ?? StoryGitHubTeamResources,
   );
   queryClient.setQueryData(
-    ["trigger-trigger-parameters", StoryGitHubConnectionId, "bot"],
+    createTriggerParameterResourceQueryKey({
+      connectionId: StoryGitHubConnectionId,
+      resourceKind: "bot",
+    }),
     StoryGitHubBotResources,
   );
   queryClient.setQueryData(
-    ["trigger-trigger-parameters", StorySlackConnectionId, "channel"],
+    createTriggerParameterResourceQueryKey({
+      connectionId: StorySlackConnectionId,
+      resourceKind: "channel",
+    }),
     input?.slackChannelResources ?? StorySlackChannelResources,
   );
   queryClient.setQueryData(
-    ["trigger-trigger-parameters", StorySlackConnectionId, "user"],
+    createTriggerParameterResourceQueryKey({
+      connectionId: StorySlackConnectionId,
+      resourceKind: "user",
+    }),
     input?.slackUserResources ?? StorySlackUserResources,
   );
   queryClient.setQueryData(
-    ["trigger-trigger-parameters", StorySlackConnectionId, "user_group"],
+    createTriggerParameterResourceQueryKey({
+      connectionId: StorySlackConnectionId,
+      resourceKind: "user_group",
+    }),
     input?.slackUserGroupResources ?? StorySlackUserGroupResources,
   );
 

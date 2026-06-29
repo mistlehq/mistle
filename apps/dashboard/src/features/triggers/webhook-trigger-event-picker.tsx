@@ -57,6 +57,10 @@ import type {
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import type { WebhookTriggerEventParameterFieldError } from "./webhook-trigger-form-types.js";
 import { createWebhookTriggerEventConditionId } from "./webhook-trigger-option-builders.js";
+import {
+  createTriggerParameterResourceQueryKey,
+  type TriggerParameterResourceQueryKey,
+} from "./webhook-trigger-resource-query-keys.js";
 
 const EventParameterRowClassName = "flex w-full items-center gap-4";
 const EventParameterLabelClassName = "text-muted-foreground shrink-0 text-sm whitespace-nowrap";
@@ -87,13 +91,6 @@ type ResourceParameterOption = {
   handle: string;
   displayName: string;
 };
-
-function createTriggerParameterResourceQueryKey(input: {
-  connectionId: string;
-  resourceKind: string;
-}): readonly ["trigger-trigger-parameters", string, string] {
-  return ["trigger-trigger-parameters", input.connectionId, input.resourceKind];
-}
 
 export function WebhookTriggerEventPicker(input: {
   hasConnectedIntegrations: boolean;
@@ -1154,7 +1151,7 @@ function ResourceMultiSelectParameterField(input: {
     displayName: string;
   }>;
   resourceErrorMessage: string | null;
-  resourceQueryKey: readonly ["trigger-trigger-parameters", string, string];
+  resourceQueryKey: TriggerParameterResourceQueryKey;
   resourceQueryIsError: boolean;
   resourceQueryIsPending: boolean;
   syncState: string | undefined;
@@ -1427,7 +1424,7 @@ function ResourceRefreshFooter(input: {
   disabled: boolean;
   parameterLabel: string;
   resourceKind: string;
-  resourceQueryKey: readonly ["trigger-trigger-parameters", string, string];
+  resourceQueryKey: TriggerParameterResourceQueryKey;
   syncState: string | undefined;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
@@ -1496,7 +1493,7 @@ function ResourceSelectParameterCombobox(input: {
   parameterLabel: string;
   placeholder: string;
   resourceKind: string;
-  resourceQueryKey: readonly ["trigger-trigger-parameters", string, string];
+  resourceQueryKey: TriggerParameterResourceQueryKey;
   syncState: string | undefined;
   value: string | undefined;
 }): React.JSX.Element {
@@ -1614,7 +1611,7 @@ function ResourceSelectParameterField(input: {
   rule: WebhookTriggerEventParameterRule | undefined;
   placeholder: string;
   resourceOptions: ResourceParameterOption[];
-  resourceQueryKey: readonly ["trigger-trigger-parameters", string, string];
+  resourceQueryKey: TriggerParameterResourceQueryKey;
   syncState: string | undefined;
   onRuleChange: (rule: WebhookTriggerEventParameterRule) => void;
 }): React.JSX.Element {

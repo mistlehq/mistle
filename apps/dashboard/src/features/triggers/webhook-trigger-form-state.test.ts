@@ -14,7 +14,9 @@ import {
 import {
   createGithubIssueCommentCreatedEventOption,
   createGithubPullRequestOpenedEventOption,
+  createGithubPullRequestReviewRequestedEventOption,
   GitHubConnectionId,
+  GitHubConnectionLabel,
   GitHubWebhookSourceId,
 } from "./webhook-trigger-test-fixtures.js";
 
@@ -145,6 +147,24 @@ describe("resolveWebhookTriggerFormState", () => {
 
     expect(state.selectedConnectionId).toBe(GitHubConnectionId);
     expect(state.hasSelectedTrigger).toBe(true);
+  });
+
+  it("derives the selected connection label from available selected triggers", () => {
+    const unavailableTrigger = createGithubPullRequestReviewRequestedEventOption({
+      availability: "wrong_profile",
+    });
+    const availableTrigger = createGithubIssueCommentCreatedEventOption();
+
+    const state = resolveWebhookTriggerFormState({
+      webhookEventOptions: [unavailableTrigger, availableTrigger],
+      selectedEventIds: [unavailableTrigger.id, availableTrigger.id],
+      conversationKeyTemplate: "",
+      eventIdsError: undefined,
+    });
+
+    expect(state.selectedConnectionId).toBe(GitHubConnectionId);
+    expect(state.selectedTriggerConnectionLabel).toBe(GitHubConnectionLabel);
+    expect(state.triggerInstructionResourceKinds).not.toContain("reviewer");
   });
 
   it("suppresses the special unavailable-trigger message from the header", () => {

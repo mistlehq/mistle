@@ -297,6 +297,22 @@ _Avoid_: Filter field
 A **Trigger event parameter** whose selectable values come from synced **Integration connection resources**.
 _Avoid_: Trigger resource, resource for trigger
 
+**Trigger user message**:
+The event-specific message body a **Trigger** sends to the agent when the trigger runs.
+_Avoid_: Agent instructions, developer message, trigger instructions
+
+**Trigger developer instructions**:
+The behavior-shaping instructions a **Trigger** appends to the agent's developer message when the trigger runs.
+_Avoid_: User message, trigger input, payload template
+
+**Trigger event field reference**:
+A **Trigger user message** template reference that inserts a value from the matched **Trigger event** or its normalized trigger-run context.
+_Avoid_: Resource reference, context mention, developer instruction variable
+
+**Trigger text resource reference**:
+A plain-text **Integration connection resource** mention inserted into **Trigger configuration** text to make the referenced provider resource unambiguous to the agent.
+_Avoid_: Context mention, Trigger event field reference, structured trigger resource reference, resource attachment
+
 **Trigger event parameter group**:
 A provider-defined set of related **Trigger event parameters** that should be configured as one logical trigger-matching choice.
 _Avoid_: Parameter layout, control group
@@ -883,6 +899,9 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Trigger event condition** without a match expression matches every provider event of its **Trigger event** type.
 - A **Trigger event condition** may use an advanced match expression that is not fully represented by visible trigger-builder controls.
 - A **Trigger event condition** decides whether a provider event matches; conversation grouping, **Rendered trigger input**, and agent instructions belong to the **Trigger**.
+- A **Trigger user message** may include **Trigger event field references** and **Trigger text resource references**.
+- **Trigger developer instructions** may include **Trigger text resource references** but do not use **Trigger event field references**.
+- A **Trigger event field reference** resolves event data, while a **Trigger text resource reference** names a synced **Integration connection resource**.
 - A migrated **Trigger event condition** preserves the matching behavior of the selected **Trigger event** and event-scoped match expression it replaces.
 - A provider event that matches multiple **Trigger event conditions** for the same **Trigger** produces at most one **Trigger** run.
 - A **Trigger** may contain redundant **Trigger event conditions**; redundancy does not create extra **Trigger** runs.

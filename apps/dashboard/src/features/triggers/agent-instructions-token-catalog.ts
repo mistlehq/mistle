@@ -22,6 +22,16 @@ export type AgentInstructionsEditorToken = {
 export const AgentInstructionsNoTriggerHelpText =
   "Select a trigger to unlock event-specific payload fields.";
 
+export type AgentInstructionsResourceReference = {
+  id: string;
+  displayName: string;
+  handle: string;
+  externalId: string;
+  resourceKind: string;
+  providerLabel: string;
+  insertText: string;
+};
+
 const SharedAgentInstructionTokens: readonly AgentInstructionsEditorToken[] = [
   createSharedToken({
     path: "webhookEvent.eventType",
@@ -161,4 +171,87 @@ export function buildAgentInstructionTokenCatalog(input: {
 
     return left.path.localeCompare(right.path);
   });
+}
+
+export function formatAgentInstructionsResourceReferenceText(input: {
+  displayName: string;
+  externalId: string;
+  providerLabel: string;
+  resourceKind: string;
+}): string {
+  return `@${input.displayName} (${input.providerLabel} ${formatResourceKindLabel(input.resourceKind)} ID: ${input.externalId})`;
+}
+
+function formatResourceKindLabel(resourceKind: string): string {
+  return resourceKind.replaceAll("_", " ");
+}
+
+export function buildAgentInstructionsResourceReferences(input: {
+  providerLabel: string;
+  resources: readonly {
+    id: string;
+    displayName: string;
+    handle: string;
+    externalId?: string | undefined;
+    kind: string;
+  }[];
+}): readonly AgentInstructionsResourceReference[] {
+  return input.resources
+    .flatMap((resource) => {
+      if (resource.externalId === undefined) {
+        return [];
+      }
+
+      return {
+        id: resource.id,
+        displayName: resource.displayName,
+        handle: resource.handle,
+        externalId: resource.externalId,
+        resourceKind: resource.kind,
+        providerLabel: input.providerLabel,
+        insertText: formatAgentInstructionsResourceReferenceText({
+          displayName: resource.displayName,
+          externalId: resource.externalId,
+          providerLabel: input.providerLabel,
+          resourceKind: resource.kind,
+        }),
+      };
+    })
+    .sort((left, right) => {
+      const displayNameComparison = left.displayName.localeCompare(right.displayName);
+      if (displayNameComparison !== 0) {
+        return displayNameComparison;
+      }
+
+      const kindComparison = left.resourceKind.localeCompare(right.resourceKind);
+      if (kindComparison !== 0) {
+        return kindComparison;
+      }
+
+      return left.externalId.localeCompare(right.externalId);
+    });
+}
+
+export function resolveTriggerInstructionResourceKinds(input: {
+  selectedEventOptions: readonly WebhookTriggerEventOption[];
+}): readonly string[] {
+  const resourceKinds = new Set<string>();
+
+  for (const eventOption of input.selectedEventOptions) {
+    for (const parameter of eventOption.parameters ?? []) {
+      if (parameter.kind === "resource-select") {
+        resourceKinds.add(parameter.resourceKind);
+      }
+    }
+
+    for (const resourceReference of eventOption.actor?.resourceReferences ?? []) {
+      resourceKinds.add(resourceReference.resourceKind);
+    }
+
+    for (const resourceDefinition of eventOption.resourceDefinitions ?? []) {
+      resourceKinds.add(resourceDefinition.kind);
+    }
+  }
+
+  return [...resourceKinds].sort();
 }

@@ -49,6 +49,7 @@ import {
   type WebhookTriggerFormValues,
 } from "./webhook-trigger-form-types.js";
 import {
+  useWebhookTriggerResourceReferenceLoader,
   WebhookTriggerInstructionsSection,
   WebhookTriggerTypeSpecificSection,
 } from "./webhook-trigger-form.js";
@@ -957,6 +958,12 @@ export function CreateTriggerEditor(input: CreateTriggerEditorProps): React.JSX.
     eventParameterRules: state.formValues.eventParameterRules,
     eventIdsError: state.fieldErrors.eventIds,
   });
+  const resourceReferenceLoader = useWebhookTriggerResourceReferenceLoader({
+    selectedConnectionId: state.kind === "trigger" ? formState.selectedConnectionId : "",
+    selectedConnectionLabel:
+      state.kind === "trigger" ? formState.selectedTriggerConnectionLabel : "",
+    resourceKinds: state.kind === "trigger" ? formState.triggerInstructionResourceKinds : [],
+  });
 
   if (state.isPending) {
     return null;
@@ -989,6 +996,9 @@ export function CreateTriggerEditor(input: CreateTriggerEditorProps): React.JSX.
       {...(state.kind === "trigger"
         ? { inputTemplatePlaceholderText: DefaultWebhookTriggerMessageTemplate }
         : {})}
+      {...(state.kind === "trigger"
+        ? { inputTemplateResourceReferenceLoader: resourceReferenceLoader }
+        : {})}
       inputTemplateTokens={state.kind === "trigger" ? formState.agentInstructionTokens : []}
       isDeleting={false}
       isDuplicating={false}
@@ -1020,6 +1030,7 @@ export function CreateTriggerEditor(input: CreateTriggerEditorProps): React.JSX.
           <WebhookTriggerInstructionsSection
             disabled={state.isSaving}
             instructionsLabelId="trigger-instructions-label"
+            loadResourceReferences={resourceReferenceLoader}
             onValueChange={state.onWebhookInstructionsChange}
             value={state.formValues.instructions}
           />
