@@ -3,7 +3,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { ChatMarkdownMessage } from "./chat-markdown-message.js";
+import { ChatMarkdownMessage, splitStreamingMarkdownSegments } from "./chat-markdown-message.js";
 
 describe("ChatMarkdownMessage", () => {
   it("renders assistant markdown as structured content", () => {
@@ -238,6 +238,49 @@ describe("ChatMarkdownMessage", () => {
 
     expect(container.querySelectorAll(".chat-markdown-content")).toHaveLength(1);
     expect(container.textContent).toContain("After the fence.");
+  });
+
+  it("does not close a streaming code fence on a same-character content line with text", () => {
+    const codeLines = Array.from(
+      { length: 170 },
+      (_, index) => `const line${String(index).padStart(3, "0")} = "inside a long fence";`,
+    ).join("\n");
+    const text = [
+      "```",
+      "The next same-character fence is still code content because it has trailing text.",
+      "``` aaa",
+      "",
+      codeLines,
+      "",
+      "```",
+      "",
+      "After the fence.",
+    ].join("\n");
+
+    const { container } = render(<ChatMarkdownMessage isStreaming text={text} />);
+
+    expect(container.querySelectorAll(".chat-markdown-content")).toHaveLength(1);
+    expect(container.textContent).toContain("``` aaa");
+    expect(container.textContent).toContain("After the fence.");
+  });
+
+  it("splits streaming markdown with many blank lines without quadratic boundary scans", () => {
+    const blankLines = "\n".repeat(10_000);
+    const text = [
+      "Stable prefix paragraph starts the stream.",
+      blankLines,
+      "Next non-blank paragraph allows a safe boundary.",
+      "",
+      "Live tail keeps enough remaining text after the blank run.",
+      "Live tail ".repeat(520),
+    ].join("\n");
+    const startedAtMs = performance.now();
+
+    const segments = splitStreamingMarkdownSegments(text);
+
+    expect(performance.now() - startedAtMs).toBeLessThan(250);
+    expect(segments.length).toBeGreaterThan(1);
+    expect(segments.at(-1)?.isLive).toBe(true);
   });
 });
 

@@ -348,7 +348,7 @@ function getEarlierDelay(leftDelayMs: number | null, rightDelayMs: number | null
   return Math.min(leftDelayMs, rightDelayMs);
 }
 
-function splitStreamingMarkdownSegments(text: string): readonly StreamingMarkdownSegment[] {
+export function splitStreamingMarkdownSegments(text: string): readonly StreamingMarkdownSegment[] {
   if (
     text.length <= StreamingMarkdownSplitThresholdCharacters ||
     !canSegmentStreamingMarkdownText(text)
@@ -360,6 +360,8 @@ function splitStreamingMarkdownSegments(text: string): readonly StreamingMarkdow
   let segmentStartIndex = 0;
   let lineStartIndex = 0;
   let fenceState: MarkdownFenceState | null = null;
+  let previousNonBlankLine: string | null = null;
+  let pendingBlankBoundary: MarkdownSegmentBoundary | null = null;
 
   while (lineStartIndex < text.length) {
     const nextNewlineIndex = text.indexOf("\n", lineStartIndex);
@@ -370,23 +372,39 @@ function splitStreamingMarkdownSegments(text: string): readonly StreamingMarkdow
     fenceState = updateMarkdownFenceState(fenceState, trimmedLine);
 
     const remainingCharacters = text.length - lineEndIndex;
-    const canFreezeSegment =
+    if (
       fenceState === null &&
       trimmedLine.length === 0 &&
-      canSegmentStreamingMarkdownAtBoundary(text, {
-        lineStartIndex,
-        lineEndIndex,
-      }) &&
       lineEndIndex - segmentStartIndex >= StreamingMarkdownStaticSegmentTargetCharacters &&
-      remainingCharacters >= StreamingMarkdownLiveTailMinimumCharacters;
+      remainingCharacters >= StreamingMarkdownLiveTailMinimumCharacters
+    ) {
+      pendingBlankBoundary = {
+        lineEndIndex,
+      };
+    }
 
-    if (canFreezeSegment) {
+    if (
+      fenceState === null &&
+      trimmedLine.length > 0 &&
+      pendingBlankBoundary !== null &&
+      previousNonBlankLine !== null &&
+      canSegmentStreamingMarkdownAtBoundary({
+        nextNonBlankLine: line,
+        previousNonBlankLine,
+      })
+    ) {
       segments.push({
         isLive: false,
-        key: `static:${String(segmentStartIndex)}:${String(lineEndIndex)}`,
-        text: text.slice(segmentStartIndex, lineEndIndex),
+        key: `static:${String(segmentStartIndex)}:${String(pendingBlankBoundary.lineEndIndex)}`,
+        text: text.slice(segmentStartIndex, pendingBlankBoundary.lineEndIndex),
       });
-      segmentStartIndex = lineEndIndex;
+      segmentStartIndex = pendingBlankBoundary.lineEndIndex;
+      pendingBlankBoundary = null;
+    }
+
+    if (trimmedLine.length > 0) {
+      previousNonBlankLine = line;
+      pendingBlankBoundary = null;
     }
 
     lineStartIndex = lineEndIndex;
@@ -401,20 +419,19 @@ function splitStreamingMarkdownSegments(text: string): readonly StreamingMarkdow
   return segments;
 }
 
+type MarkdownSegmentBoundary = {
+  lineEndIndex: number;
+};
+
 function updateMarkdownFenceState(
   currentFenceState: MarkdownFenceState | null,
   trimmedLine: string,
 ): MarkdownFenceState | null {
-  const fence = readOpeningMarkdownFence(trimmedLine);
-  if (fence === null) {
-    return currentFenceState;
-  }
-
   if (currentFenceState === null) {
-    return fence;
+    return readOpeningMarkdownFence(trimmedLine);
   }
 
-  if (fence.character !== currentFenceState.character || fence.length < currentFenceState.length) {
+  if (!isClosingMarkdownFence(trimmedLine, currentFenceState)) {
     return currentFenceState;
   }
 
@@ -446,59 +463,42 @@ function readOpeningMarkdownFence(trimmedLine: string): MarkdownFenceState | nul
   };
 }
 
+function isClosingMarkdownFence(
+  trimmedLine: string,
+  currentFenceState: MarkdownFenceState,
+): boolean {
+  if (trimmedLine.at(0) !== currentFenceState.character) {
+    return false;
+  }
+
+  let fenceLength = 0;
+  for (const character of trimmedLine) {
+    if (character !== currentFenceState.character) {
+      break;
+    }
+
+    fenceLength += 1;
+  }
+
+  if (fenceLength < currentFenceState.length) {
+    return false;
+  }
+
+  return trimmedLine.slice(fenceLength).trim().length === 0;
+}
+
 function canSegmentStreamingMarkdownText(text: string): boolean {
   return !text.includes("[");
 }
 
-function canSegmentStreamingMarkdownAtBoundary(
-  text: string,
-  input: {
-    lineEndIndex: number;
-    lineStartIndex: number;
-  },
-): boolean {
-  const previousNonBlankLine = findPreviousNonBlankMarkdownLine(text, input.lineStartIndex);
-  const nextNonBlankLine = findNextNonBlankMarkdownLine(text, input.lineEndIndex);
-  if (previousNonBlankLine === null || nextNonBlankLine === null) {
-    return false;
-  }
-
+function canSegmentStreamingMarkdownAtBoundary(input: {
+  nextNonBlankLine: string;
+  previousNonBlankLine: string;
+}): boolean {
   return (
-    !lineCanContinueMarkdownAcrossBlankLine(previousNonBlankLine) &&
-    !lineCanContinueMarkdownAcrossBlankLine(nextNonBlankLine)
+    !lineCanContinueMarkdownAcrossBlankLine(input.previousNonBlankLine) &&
+    !lineCanContinueMarkdownAcrossBlankLine(input.nextNonBlankLine)
   );
-}
-
-function findPreviousNonBlankMarkdownLine(text: string, beforeIndex: number): string | null {
-  let lineEndIndex = beforeIndex;
-  while (lineEndIndex > 0) {
-    const previousNewlineIndex = text.lastIndexOf("\n", lineEndIndex - 1);
-    const lineStartIndex = previousNewlineIndex === -1 ? 0 : previousNewlineIndex + 1;
-    const line = text.slice(lineStartIndex, lineEndIndex);
-    if (line.trim().length > 0) {
-      return line;
-    }
-
-    lineEndIndex = previousNewlineIndex;
-  }
-
-  return null;
-}
-
-function findNextNonBlankMarkdownLine(text: string, afterIndex: number): string | null {
-  let lineStartIndex = afterIndex;
-  while (lineStartIndex < text.length) {
-    const nextNewlineIndex = text.indexOf("\n", lineStartIndex);
-    const lineEndIndex = nextNewlineIndex === -1 ? text.length : nextNewlineIndex;
-    const line = text.slice(lineStartIndex, lineEndIndex);
-    if (line.trim().length > 0) {
-      return line;
-    }
-
-    lineStartIndex = nextNewlineIndex === -1 ? text.length : nextNewlineIndex + 1;
-  }
-
-  return null;
 }
 
 function lineCanContinueMarkdownAcrossBlankLine(line: string): boolean {

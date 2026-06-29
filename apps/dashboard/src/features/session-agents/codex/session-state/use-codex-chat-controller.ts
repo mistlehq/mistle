@@ -241,6 +241,7 @@ export function useCodexChatController(input: {
 
   useEffect(
     () => () => {
+      // Synchronizes controller unmount with the scheduler-owned delayed transcript flush.
       clearPendingChatNotifications();
     },
     [clearPendingChatNotifications],

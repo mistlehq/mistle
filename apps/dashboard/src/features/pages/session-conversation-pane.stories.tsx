@@ -441,6 +441,8 @@ function LongTranscriptStreamingHarness(): React.JSX.Element {
   }, []);
 
   useEffect(() => {
+    // Synchronizes the Storybook streaming harness with the shared scheduler timer;
+    // render logic/event handlers only cover manual chunks, and this loop needs cleanup.
     if (!isStreaming) {
       return;
     }
