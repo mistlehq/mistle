@@ -63,6 +63,7 @@ export type AppShellFrame = Pick<
 
 export function resolveAppShellFrame(input: {
   handleBackToApp: () => void;
+  handleCreateNewOrganization: () => void;
   handleNavigateToSettings: () => void;
   handleSignOut: () => void;
   handleSwitchOrganization: (organizationId: string) => void;
@@ -136,6 +137,7 @@ export function resolveAppShellFrame(input: {
         activeOrganizationId={input.activeOrganizationId}
         isSigningOut={input.isSigningOut}
         isSwitchingOrganization={input.isSwitchingOrganization}
+        onCreateNewOrganization={input.handleCreateNewOrganization}
         onNavigateToSettings={input.handleNavigateToSettings}
         onSignOut={input.handleSignOut}
         onSwitchOrganization={input.handleSwitchOrganization}

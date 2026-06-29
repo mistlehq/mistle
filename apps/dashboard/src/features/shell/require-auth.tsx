@@ -3,12 +3,12 @@ import { Navigate, Outlet, useLocation } from "react-router";
 import { AuthenticatedAnalytics } from "../../lib/analytics/authenticated.js";
 import { AppearanceProvider, SystemAppearanceProvider } from "../appearance/appearance-provider.js";
 import { readUserAppearanceFromSession } from "../appearance/appearance.js";
+import { AUTH_CREATE_ORGANIZATION_PATH } from "../auth/auth-create-organization-page.js";
 import type { SessionData } from "../auth/types.js";
 import {
   MISSING_ACTIVE_ORGANIZATION_ERROR_MESSAGE,
   resolveActiveOrganizationIdFromSession,
 } from "./active-organization.js";
-import { NoOrganizationAccessView } from "./no-organization-access-view.js";
 import { PendingSessionShell } from "./pending-session-shell.js";
 import { requireAuthenticatedSession } from "./session-context.js";
 import { useSessionQuery } from "./session-query.js";
@@ -59,7 +59,7 @@ export function RequireAuth(): React.JSX.Element {
   if (activeOrganizationId === null) {
     return (
       <AppearanceProvider appearance={appearance}>
-        <NoOrganizationAccessView />
+        <Navigate replace state={{ from: location }} to={AUTH_CREATE_ORGANIZATION_PATH} />
       </AppearanceProvider>
     );
   }

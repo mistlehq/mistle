@@ -38,15 +38,13 @@ export function OrganizationMenuTrigger(input: {
   isSwitchOrganizationSubmenuOpen?: boolean;
   onSwitchOrganizationSubmenuOpenChange?: (open: boolean) => void;
   onNavigateToSettings: () => void;
-  onSwitchOrganization?: (organizationId: string) => void;
+  onCreateNewOrganization: () => void;
+  onSwitchOrganization: (organizationId: string) => void;
   onSignOut: () => void;
 }): React.JSX.Element {
   const organizationName = input.organizationName ?? "";
   const organizations = input.organizations ?? [];
   const showOrganizationSwitcherError = input.organizationSwitcherErrorMessage !== null;
-  const showOrganizationSwitcher =
-    (organizations.length > 0 || showOrganizationSwitcherError) &&
-    typeof input.onSwitchOrganization === "function";
 
   return (
     <DropdownMenu onOpenChange={input.onMenuOpenChange} open={input.isMenuOpen}>
@@ -103,44 +101,49 @@ export function OrganizationMenuTrigger(input: {
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          {showOrganizationSwitcher ? (
-            <DropdownMenuSub
-              onOpenChange={input.onSwitchOrganizationSubmenuOpenChange}
-              open={input.isSwitchOrganizationSubmenuOpen}
-            >
-              <DropdownMenuSubTrigger disabled={input.isSwitchingOrganization}>
-                Switch organization
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="min-w-48">
-                {organizations.length > 0 ? (
-                  <DropdownMenuRadioGroup
-                    onValueChange={(organizationId) => {
-                      input.onSwitchOrganization?.(organizationId);
-                    }}
-                    value={input.activeOrganizationId ?? undefined}
-                  >
-                    {organizations.map((organization) => (
-                      <DropdownMenuRadioItem
-                        disabled={input.isSwitchingOrganization}
-                        key={organization.id}
-                        value={organization.id}
-                      >
-                        {organization.name}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
-                ) : null}
-                {showOrganizationSwitcherError ? (
-                  <>
-                    {organizations.length > 0 ? <DropdownMenuSeparator /> : null}
-                    <DropdownMenuItem disabled>
-                      {input.organizationSwitcherErrorMessage}
-                    </DropdownMenuItem>
-                  </>
-                ) : null}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          ) : null}
+          <DropdownMenuSub
+            onOpenChange={input.onSwitchOrganizationSubmenuOpenChange}
+            open={input.isSwitchOrganizationSubmenuOpen}
+          >
+            <DropdownMenuSubTrigger disabled={input.isSwitchingOrganization}>
+              Switch organization
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="min-w-48">
+              {organizations.length > 0 ? (
+                <DropdownMenuRadioGroup
+                  onValueChange={(organizationId) => {
+                    input.onSwitchOrganization(organizationId);
+                  }}
+                  value={input.activeOrganizationId ?? undefined}
+                >
+                  {organizations.map((organization) => (
+                    <DropdownMenuRadioItem
+                      disabled={input.isSwitchingOrganization}
+                      key={organization.id}
+                      value={organization.id}
+                    >
+                      {organization.name}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              ) : null}
+              {showOrganizationSwitcherError ? (
+                <>
+                  {organizations.length > 0 ? <DropdownMenuSeparator /> : null}
+                  <DropdownMenuItem disabled>
+                    {input.organizationSwitcherErrorMessage}
+                  </DropdownMenuItem>
+                </>
+              ) : null}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={input.isSwitchingOrganization}
+                onClick={input.onCreateNewOrganization}
+              >
+                Create new organization
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
           <DropdownMenuItem
             disabled={input.isSigningOut}
             onClick={input.onSignOut}

@@ -248,6 +248,7 @@ const meta = {
       <AppSidebarHeader
         activeOrganizationId="org_mistle"
         isSigningOut={false}
+        onCreateNewOrganization={function onCreateNewOrganization() {}}
         onSwitchOrganization={function onSwitchOrganization() {}}
         onNavigateToSettings={function onNavigateToSettings() {}}
         onSignOut={function onSignOut() {}}

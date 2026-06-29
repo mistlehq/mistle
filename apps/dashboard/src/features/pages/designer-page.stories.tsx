@@ -442,8 +442,10 @@ function DesignerSessionCanvasFirstOpenStory(): React.JSX.Element {
     throw new Error("Designer blueprint story tab is missing.");
   }
 
+  const availableBlueprintTab = blueprintTab;
+
   function openBlueprint(): void {
-    setTabs([blueprintTab]);
+    setTabs([availableBlueprintTab]);
     setActiveTabHref(DesignerBlueprintCurrentTabHref);
   }
 

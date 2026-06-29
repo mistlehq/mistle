@@ -15,40 +15,65 @@ const CurrentDashboardBuildDriftStatus = {
   serverReleaseVersion: "0.18.1",
 } as const;
 
+type ResolveAppShellFrameInput = Parameters<typeof resolveAppShellFrame>[0];
+
+function createFrameInput(
+  overrides: Partial<ResolveAppShellFrameInput> = {},
+): ResolveAppShellFrameInput {
+  const locationPathname = overrides.locationPathname ?? "/";
+  const routeState = resolveAppShellRouteState(locationPathname);
+
+  return {
+    handleBackToApp: () => {},
+    handleCreateNewOrganization: () => {},
+    handleNavigateToSettings: () => {},
+    handleSignOut: () => {},
+    handleSwitchOrganization: () => {},
+    inSessions: routeState.inSessions,
+    inSettings: routeState.inSettings,
+    isSigningOut: false,
+    isSwitchingOrganization: false,
+    locationPathname,
+    organizationOptions: [],
+    organizationSummaryErrorMessage: null,
+    organizationSwitcherErrorMessage: null,
+    organizationImageUrl: null,
+    activeOrganizationId: "org_123",
+    dashboardBuildDriftStatus: CurrentDashboardBuildDriftStatus,
+    organizationName: "Acme",
+    pageMeta: {
+      appShellInsetOwner: "app-shell",
+      appShellViewportMode: "document",
+      sidebarEntryState: null,
+      sidebarTriggerOwner: "workspace",
+      title: "Home",
+      headerIcon: null,
+      supportingText: null,
+    },
+    signOutError: null,
+    showSessionsSidebar: false,
+    onShowSessionsSidebarChange: () => {},
+    ...overrides,
+  };
+}
+
 describe("resolveAppShellFrame", () => {
   it("uses the dedicated sessions sidebar only when the toggle is enabled on sessions routes", () => {
-    const locationPathname = "/sessions/sbi_123";
-    const routeState = resolveAppShellRouteState(locationPathname);
-    const frame = resolveAppShellFrame({
-      handleBackToApp: () => {},
-      handleNavigateToSettings: () => {},
-      handleSignOut: () => {},
-      handleSwitchOrganization: () => {},
-      inSessions: routeState.inSessions,
-      inSettings: routeState.inSettings,
-      isSigningOut: false,
-      isSwitchingOrganization: false,
-      locationPathname,
-      organizationOptions: [],
-      organizationSummaryErrorMessage: null,
-      organizationSwitcherErrorMessage: null,
-      organizationImageUrl: null,
-      activeOrganizationId: "org_123",
-      dashboardBuildDriftStatus: CurrentDashboardBuildDriftStatus,
-      organizationName: "Acme",
-      pageMeta: {
-        appShellInsetOwner: "app-shell",
-        appShellViewportMode: "document",
-        sidebarEntryState: null,
-        sidebarTriggerOwner: "workspace",
-        title: "Sessions",
-        headerIcon: null,
-        supportingText: null,
-      },
-      signOutError: null,
-      showSessionsSidebar: true,
-      onShowSessionsSidebarChange: () => {},
-    });
+    const frame = resolveAppShellFrame(
+      createFrameInput({
+        locationPathname: "/sessions/sbi_123",
+        pageMeta: {
+          appShellInsetOwner: "app-shell",
+          appShellViewportMode: "document",
+          sidebarEntryState: null,
+          sidebarTriggerOwner: "workspace",
+          title: "Sessions",
+          headerIcon: null,
+          supportingText: null,
+        },
+        showSessionsSidebar: true,
+      }),
+    );
 
     expect(isValidElement<{ children: ReactNode[]; className: string }>(frame.sidebarContent)).toBe(
       true,
@@ -70,38 +95,20 @@ describe("resolveAppShellFrame", () => {
   });
 
   it("keeps the normal app sidebar when the sessions toggle is disabled", () => {
-    const locationPathname = "/sessions/sbi_123";
-    const routeState = resolveAppShellRouteState(locationPathname);
-    const frame = resolveAppShellFrame({
-      handleBackToApp: () => {},
-      handleNavigateToSettings: () => {},
-      handleSignOut: () => {},
-      handleSwitchOrganization: () => {},
-      inSessions: routeState.inSessions,
-      inSettings: routeState.inSettings,
-      isSigningOut: false,
-      isSwitchingOrganization: false,
-      locationPathname,
-      organizationOptions: [],
-      organizationSummaryErrorMessage: null,
-      organizationSwitcherErrorMessage: null,
-      organizationImageUrl: null,
-      activeOrganizationId: "org_123",
-      dashboardBuildDriftStatus: CurrentDashboardBuildDriftStatus,
-      organizationName: "Acme",
-      pageMeta: {
-        appShellInsetOwner: "app-shell",
-        appShellViewportMode: "document",
-        sidebarEntryState: null,
-        sidebarTriggerOwner: "workspace",
-        title: "Sessions",
-        headerIcon: null,
-        supportingText: null,
-      },
-      signOutError: null,
-      showSessionsSidebar: false,
-      onShowSessionsSidebarChange: () => {},
-    });
+    const frame = resolveAppShellFrame(
+      createFrameInput({
+        locationPathname: "/sessions/sbi_123",
+        pageMeta: {
+          appShellInsetOwner: "app-shell",
+          appShellViewportMode: "document",
+          sidebarEntryState: null,
+          sidebarTriggerOwner: "workspace",
+          title: "Sessions",
+          headerIcon: null,
+          supportingText: null,
+        },
+      }),
+    );
 
     expect(isValidElement(frame.sidebarContent)).toBe(true);
     if (!isValidElement(frame.sidebarContent)) {
@@ -117,38 +124,20 @@ describe("resolveAppShellFrame", () => {
   });
 
   it("hides Designer from the main app sidebar", () => {
-    const locationPathname = "/";
-    const routeState = resolveAppShellRouteState(locationPathname);
-    const frame = resolveAppShellFrame({
-      handleBackToApp: () => {},
-      handleNavigateToSettings: () => {},
-      handleSignOut: () => {},
-      handleSwitchOrganization: () => {},
-      inSessions: routeState.inSessions,
-      inSettings: routeState.inSettings,
-      isSigningOut: false,
-      isSwitchingOrganization: false,
-      locationPathname,
-      organizationOptions: [],
-      organizationSummaryErrorMessage: null,
-      organizationSwitcherErrorMessage: null,
-      organizationImageUrl: null,
-      activeOrganizationId: "org_123",
-      dashboardBuildDriftStatus: CurrentDashboardBuildDriftStatus,
-      organizationName: "Acme",
-      pageMeta: {
-        appShellInsetOwner: "app-shell",
-        appShellViewportMode: "document",
-        sidebarEntryState: null,
-        sidebarTriggerOwner: "page-frame",
-        title: "Home",
-        headerIcon: null,
-        supportingText: null,
-      },
-      signOutError: null,
-      showSessionsSidebar: false,
-      onShowSessionsSidebarChange: () => {},
-    });
+    const frame = resolveAppShellFrame(
+      createFrameInput({
+        locationPathname: "/",
+        pageMeta: {
+          appShellInsetOwner: "app-shell",
+          appShellViewportMode: "document",
+          sidebarEntryState: null,
+          sidebarTriggerOwner: "page-frame",
+          title: "Home",
+          headerIcon: null,
+          supportingText: null,
+        },
+      }),
+    );
 
     const sidebarMarkup = renderToStaticMarkup(
       <MemoryRouter>
@@ -161,75 +150,39 @@ describe("resolveAppShellFrame", () => {
   });
 
   it("keeps the sidebar trigger available for non-session-detail pages", () => {
-    const locationPathname = "/integrations";
-    const routeState = resolveAppShellRouteState(locationPathname);
-    const frame = resolveAppShellFrame({
-      handleBackToApp: () => {},
-      handleNavigateToSettings: () => {},
-      handleSignOut: () => {},
-      handleSwitchOrganization: () => {},
-      inSessions: routeState.inSessions,
-      inSettings: routeState.inSettings,
-      isSigningOut: false,
-      isSwitchingOrganization: false,
-      locationPathname,
-      organizationOptions: [],
-      organizationSummaryErrorMessage: null,
-      organizationSwitcherErrorMessage: null,
-      organizationImageUrl: null,
-      activeOrganizationId: "org_123",
-      dashboardBuildDriftStatus: CurrentDashboardBuildDriftStatus,
-      organizationName: "Acme",
-      pageMeta: {
-        appShellInsetOwner: "child",
-        appShellViewportMode: "document",
-        sidebarEntryState: null,
-        sidebarTriggerOwner: "page-frame",
-        title: "Integrations",
-        headerIcon: null,
-        supportingText: "",
-      },
-      signOutError: null,
-      showSessionsSidebar: false,
-      onShowSessionsSidebarChange: () => {},
-    });
+    const frame = resolveAppShellFrame(
+      createFrameInput({
+        locationPathname: "/integrations",
+        pageMeta: {
+          appShellInsetOwner: "child",
+          appShellViewportMode: "document",
+          sidebarEntryState: null,
+          sidebarTriggerOwner: "page-frame",
+          title: "Integrations",
+          headerIcon: null,
+          supportingText: "",
+        },
+      }),
+    );
 
     expect(frame.renderSidebarTrigger).toBe(true);
   });
 
   it("passes explicit route sidebar entry state into the shell view frame", () => {
-    const locationPathname = "/designer/dsn_123";
-    const routeState = resolveAppShellRouteState(locationPathname);
-    const frame = resolveAppShellFrame({
-      handleBackToApp: () => {},
-      handleNavigateToSettings: () => {},
-      handleSignOut: () => {},
-      handleSwitchOrganization: () => {},
-      inSessions: routeState.inSessions,
-      inSettings: routeState.inSettings,
-      isSigningOut: false,
-      isSwitchingOrganization: false,
-      locationPathname,
-      organizationOptions: [],
-      organizationSummaryErrorMessage: null,
-      organizationSwitcherErrorMessage: null,
-      organizationImageUrl: null,
-      activeOrganizationId: "org_123",
-      dashboardBuildDriftStatus: CurrentDashboardBuildDriftStatus,
-      organizationName: "Acme",
-      pageMeta: {
-        appShellInsetOwner: "app-shell",
-        appShellViewportMode: "workspace",
-        sidebarEntryState: "collapsed",
-        sidebarTriggerOwner: "workspace",
-        title: "Designer",
-        headerIcon: null,
-        supportingText: "",
-      },
-      signOutError: null,
-      showSessionsSidebar: false,
-      onShowSessionsSidebarChange: () => {},
-    });
+    const frame = resolveAppShellFrame(
+      createFrameInput({
+        locationPathname: "/designer/dsn_123",
+        pageMeta: {
+          appShellInsetOwner: "app-shell",
+          appShellViewportMode: "workspace",
+          sidebarEntryState: "collapsed",
+          sidebarTriggerOwner: "workspace",
+          title: "Designer",
+          headerIcon: null,
+          supportingText: "",
+        },
+      }),
+    );
 
     expect(frame.sidebarEntryKey).toBe("/designer/dsn_123");
     expect(frame.sidebarEntryState).toBe("collapsed");

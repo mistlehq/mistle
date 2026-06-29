@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 
 import { authClient } from "../../lib/auth/client.js";
+import { AUTH_CREATE_ORGANIZATION_PATH } from "../auth/auth-create-organization-page.js";
 import { AUTH_SWITCH_ORGANIZATION_PATH } from "../auth/auth-switch-organization-page.js";
 import { resolveErrorMessage } from "../auth/messages.js";
 import { useDashboardBuildDriftMonitor } from "../dashboard/use-dashboard-build-drift-monitor.js";
@@ -122,6 +123,14 @@ export function AppShell(): React.JSX.Element {
     await navigate(SETTINGS_DEFAULT_PATH);
   }
 
+  async function handleCreateNewOrganization(): Promise<void> {
+    await navigate(AUTH_CREATE_ORGANIZATION_PATH, {
+      state: {
+        from: location,
+      },
+    });
+  }
+
   async function handleSwitchOrganization(organizationId: string): Promise<void> {
     if (organizationId === organizationSummary.activeOrganizationId) {
       return;
@@ -191,6 +200,9 @@ export function AppShell(): React.JSX.Element {
   const appShellFrame = resolveAppShellFrame({
     handleBackToApp: () => {
       void handleBackToApp();
+    },
+    handleCreateNewOrganization: () => {
+      void handleCreateNewOrganization();
     },
     handleNavigateToSettings: () => {
       void handleNavigateToSettings();

@@ -235,6 +235,7 @@ function RuntimeConversationNavigationAppShellStory(input?: {
           <AppSidebarHeader
             activeOrganizationId="org_mistle"
             isSigningOut={false}
+            onCreateNewOrganization={function onCreateNewOrganization() {}}
             onNavigateToSettings={function onNavigateToSettings() {}}
             onSignOut={function onSignOut() {}}
             onSwitchOrganization={function onSwitchOrganization() {}}
