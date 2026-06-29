@@ -24,6 +24,7 @@ import {
   createWebhookTriggerEventConditionId,
   createWebhookTriggerEventId,
 } from "./webhook-trigger-option-builders.js";
+import { createTriggerParameterResourceQueryKey } from "./webhook-trigger-resource-query-keys.js";
 import {
   createGithubIssueCommentCreatedEventOption,
   createGithubPullRequestOpenedEventOption,
@@ -153,90 +154,111 @@ function renderTriggerPicker(input: {
   teamResources?: IntegrationConnectionResources;
   useStatefulSelection?: boolean;
 }): ReturnType<typeof render> {
-  TestQueryClient.setQueryData(["trigger-trigger-parameters", input.selectedConnectionId, "user"], {
-    connectionId: input.selectedConnectionId,
-    familyId: "github",
-    kind: "user",
-    syncState: "ready",
-    items: [
-      {
-        id: "icr_github_user_1",
-        familyId: "github",
-        kind: "user",
-        externalId: "1001",
-        handle: "octocat",
-        displayName: "octocat",
-        status: "accessible",
-        metadata: {},
-      },
-    ],
-    page: {
-      totalResults: 1,
-      nextCursor: null,
-      previousCursor: null,
-    },
-  });
-  TestQueryClient.setQueryData(["trigger-trigger-parameters", input.selectedConnectionId, "team"], {
-    connectionId: input.selectedConnectionId,
-    familyId: "github",
-    kind: "team",
-    syncState: "ready",
-    items: [
-      {
-        id: "icr_github_team_1",
-        familyId: "github",
-        kind: "team",
-        externalId: "2001",
-        handle: "platform",
-        displayName: "Platform (mistle)",
-        status: "accessible",
-        metadata: {
-          organizationLogins: ["mistle"],
-        },
-      },
-    ],
-    page: {
-      totalResults: 1,
-      nextCursor: null,
-      previousCursor: null,
-    },
-    ...(input.teamResources ?? {}),
-  });
-  TestQueryClient.setQueryData(["trigger-trigger-parameters", input.selectedConnectionId, "bot"], {
-    connectionId: input.selectedConnectionId,
-    familyId: "github",
-    kind: "bot",
-    syncState: "ready",
-    items: [
-      {
-        id: "icr_github_bot_1",
-        familyId: "github",
-        kind: "bot",
-        externalId: "3001",
-        handle: "dependabot[bot]",
-        displayName: "dependabot[bot]",
-        status: "accessible",
-        metadata: {},
-      },
-      {
-        id: "icr_github_bot_2",
-        familyId: "github",
-        kind: "bot",
-        externalId: "3002",
-        handle: "mistle-agent[bot]",
-        displayName: "mistle-agent[bot]",
-        status: "accessible",
-        metadata: {},
-      },
-    ],
-    page: {
-      totalResults: 2,
-      nextCursor: null,
-      previousCursor: null,
-    },
-  });
   TestQueryClient.setQueryData(
-    ["trigger-trigger-parameters", input.selectedConnectionId, "branch"],
+    createTriggerParameterResourceQueryKey({
+      connectionId: input.selectedConnectionId,
+      resourceKind: "user",
+    }),
+    {
+      connectionId: input.selectedConnectionId,
+      familyId: "github",
+      kind: "user",
+      syncState: "ready",
+      items: [
+        {
+          id: "icr_github_user_1",
+          familyId: "github",
+          kind: "user",
+          externalId: "1001",
+          handle: "octocat",
+          displayName: "octocat",
+          status: "accessible",
+          metadata: {},
+        },
+      ],
+      page: {
+        totalResults: 1,
+        nextCursor: null,
+        previousCursor: null,
+      },
+    },
+  );
+  TestQueryClient.setQueryData(
+    createTriggerParameterResourceQueryKey({
+      connectionId: input.selectedConnectionId,
+      resourceKind: "team",
+    }),
+    {
+      connectionId: input.selectedConnectionId,
+      familyId: "github",
+      kind: "team",
+      syncState: "ready",
+      items: [
+        {
+          id: "icr_github_team_1",
+          familyId: "github",
+          kind: "team",
+          externalId: "2001",
+          handle: "platform",
+          displayName: "Platform (mistle)",
+          status: "accessible",
+          metadata: {
+            organizationLogins: ["mistle"],
+          },
+        },
+      ],
+      page: {
+        totalResults: 1,
+        nextCursor: null,
+        previousCursor: null,
+      },
+      ...(input.teamResources ?? {}),
+    },
+  );
+  TestQueryClient.setQueryData(
+    createTriggerParameterResourceQueryKey({
+      connectionId: input.selectedConnectionId,
+      resourceKind: "bot",
+    }),
+    {
+      connectionId: input.selectedConnectionId,
+      familyId: "github",
+      kind: "bot",
+      syncState: "ready",
+      items: [
+        {
+          id: "icr_github_bot_1",
+          familyId: "github",
+          kind: "bot",
+          externalId: "3001",
+          handle: "dependabot[bot]",
+          displayName: "dependabot[bot]",
+          status: "accessible",
+          metadata: {},
+        },
+        {
+          id: "icr_github_bot_2",
+          familyId: "github",
+          kind: "bot",
+          externalId: "3002",
+          handle: "mistle-agent[bot]",
+          displayName: "mistle-agent[bot]",
+          status: "accessible",
+          metadata: {},
+        },
+      ],
+      page: {
+        totalResults: 2,
+        nextCursor: null,
+        previousCursor: null,
+      },
+    },
+  );
+  TestQueryClient.setQueryData(
+    createTriggerParameterResourceQueryKey({
+      connectionId: input.selectedConnectionId,
+      resourceKind: "branch",
+    }),
     {
       connectionId: input.selectedConnectionId,
       familyId: "github",
@@ -326,7 +348,10 @@ function createSlackChannelResources(): IntegrationConnectionResources {
 
 function renderSlackChannelTriggerPicker(): ReturnType<typeof render> {
   TestQueryClient.setQueryData(
-    ["trigger-trigger-parameters", SlackConnectionId, "channel"],
+    createTriggerParameterResourceQueryKey({
+      connectionId: SlackConnectionId,
+      resourceKind: "channel",
+    }),
     createSlackChannelResources(),
   );
 
@@ -994,39 +1019,45 @@ describe("WebhookTriggerEventPicker", () => {
   });
 
   it("preserves exclusion operators when editing multi-value resources", async () => {
-    TestQueryClient.setQueryData(["trigger-trigger-parameters", GitHubConnectionId, "user"], {
-      connectionId: GitHubConnectionId,
-      familyId: "github",
-      kind: "user",
-      syncState: "ready",
-      items: [
-        {
-          id: "icr_github_user_1",
-          familyId: "github",
-          kind: "user",
-          externalId: "1001",
-          handle: "octocat",
-          displayName: "octocat",
-          status: "accessible",
-          metadata: {},
+    TestQueryClient.setQueryData(
+      createTriggerParameterResourceQueryKey({
+        connectionId: GitHubConnectionId,
+        resourceKind: "user",
+      }),
+      {
+        connectionId: GitHubConnectionId,
+        familyId: "github",
+        kind: "user",
+        syncState: "ready",
+        items: [
+          {
+            id: "icr_github_user_1",
+            familyId: "github",
+            kind: "user",
+            externalId: "1001",
+            handle: "octocat",
+            displayName: "octocat",
+            status: "accessible",
+            metadata: {},
+          },
+          {
+            id: "icr_github_user_2",
+            familyId: "github",
+            kind: "user",
+            externalId: "1002",
+            handle: "hubot",
+            displayName: "hubot",
+            status: "accessible",
+            metadata: {},
+          },
+        ],
+        page: {
+          totalResults: 2,
+          nextCursor: null,
+          previousCursor: null,
         },
-        {
-          id: "icr_github_user_2",
-          familyId: "github",
-          kind: "user",
-          externalId: "1002",
-          handle: "hubot",
-          displayName: "hubot",
-          status: "accessible",
-          metadata: {},
-        },
-      ],
-      page: {
-        totalResults: 2,
-        nextCursor: null,
-        previousCursor: null,
       },
-    });
+    );
 
     function StatefulMultiValueResourceSelection(): React.JSX.Element {
       const eventOptionId = createWebhookTriggerEventId({
@@ -1296,7 +1327,10 @@ describe("WebhookTriggerEventPicker", () => {
 
   it("resets unsaved resource query text when the selected value changes", () => {
     TestQueryClient.setQueryData(
-      ["trigger-trigger-parameters", "icn_01kkk1g84mfetvga8a4b853k27", "user"],
+      createTriggerParameterResourceQueryKey({
+        connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+        resourceKind: "user",
+      }),
       {
         connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
         familyId: "github",

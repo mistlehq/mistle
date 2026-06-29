@@ -17,6 +17,7 @@ import { PageFrame } from "../shared/page-frame.js";
 import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
 import {
   AgentInstructionsNoTriggerHelpText,
+  buildAgentInstructionsResourceReferences,
   buildAgentInstructionTokenCatalog,
 } from "./agent-instructions-token-catalog.js";
 import {
@@ -32,8 +33,44 @@ type StoryHarnessProps = {
   withSelectedTriggers?: boolean;
 };
 
+const StoryResourceReferences = buildAgentInstructionsResourceReferences({
+  providerLabel: "Slack",
+  resources: [
+    {
+      id: "rsc_story_slack_jonathan",
+      displayName: "Jonathan",
+      handle: "jonathan",
+      externalId: "U12039",
+      kind: "user",
+    },
+    {
+      id: "rsc_story_slack_charmaine",
+      displayName: "Charmaine",
+      handle: "charmaine",
+      externalId: "U45012",
+      kind: "user",
+    },
+    {
+      id: "rsc_story_slack_alerts",
+      displayName: "alerts",
+      handle: "alerts",
+      externalId: "C_ALERTS_001",
+      kind: "channel",
+    },
+    {
+      id: "rsc_story_slack_engineering",
+      displayName: "engineering",
+      handle: "eng",
+      externalId: "C_ENG_001",
+      kind: "channel",
+    },
+  ],
+});
+
 function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
   const [value, setValue] = useState(input.value);
+  const isUserMessage = input.withSelectedTriggers === true;
+  const fieldLabel = isUserMessage ? "User message" : "Agent Instructions for Trigger";
   const tokens = buildAgentInstructionTokenCatalog({
     selectedEventOptions: input.withSelectedTriggers
       ? [createGithubIssueCommentCreatedEventOption(), createGithubPullRequestOpenedEventOption()]
@@ -52,16 +89,28 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
             <Field>
               <FieldHeader>
                 <div className="space-y-1">
-                  <FieldLabel id="story-agent-instructions-label">User message</FieldLabel>
+                  <FieldLabel id="story-agent-instructions-label">{fieldLabel}</FieldLabel>
                   <FieldDescription>
-                    <span className="block">
-                      These are the instructions the agent will receive.
-                    </span>
-                    <span className="block">
-                      Use Liquid syntax with{" "}
-                      <InlineCode variant="muted">{"{{webhookEvent.eventType}}"}</InlineCode> and{" "}
-                      <InlineCode variant="muted">{"{{payload}}"}</InlineCode>.
-                    </span>
+                    {isUserMessage ? (
+                      <>
+                        <span className="block">
+                          Sent to the agent each time this trigger runs.
+                        </span>
+                        <span className="block">
+                          Use <InlineCode variant="muted">{"{{ ... }}"}</InlineCode> to insert event
+                          fields, or <InlineCode variant="muted">@</InlineCode> to insert resources.
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="block">
+                          Appended to the developer message when this trigger runs.
+                        </span>
+                        <span className="block">
+                          Use <InlineCode variant="muted">@</InlineCode> to insert resources.
+                        </span>
+                      </>
+                    )}
                   </FieldDescription>
                 </div>
               </FieldHeader>
@@ -71,6 +120,7 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
                   disabled={input.disabled ?? false}
                   invalid={input.invalid ?? false}
                   onChange={setValue}
+                  resourceReferences={StoryResourceReferences}
                   tokens={tokens}
                   value={value}
                 />
@@ -80,7 +130,7 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
                   </p>
                 ) : null}
                 {input.invalid ? (
-                  <p className="text-destructive text-sm">User message is required.</p>
+                  <p className="text-destructive text-sm">{fieldLabel} is required.</p>
                 ) : null}
               </FieldContent>
             </Field>
@@ -167,11 +217,12 @@ function PlaygroundHarness(): React.JSX.Element {
                   <FieldLabel id="playground-agent-instructions-label">User message</FieldLabel>
                   <FieldDescription>
                     <span className="block">
-                      Type inside the editor as if this were the real form.
+                      Type inside the user message editor as if this were the real form.
                     </span>
                     <span className="block">
-                      Start with <InlineCode variant="muted">{"{{"}</InlineCode> to inspect
-                      completions.
+                      Start with <InlineCode variant="muted">{"{{"}</InlineCode> to inspect event
+                      field completions, or <InlineCode variant="muted">@</InlineCode> to insert
+                      resources.
                     </span>
                   </FieldDescription>
                 </div>
@@ -182,6 +233,7 @@ function PlaygroundHarness(): React.JSX.Element {
                   disabled={disabled}
                   invalid={invalid}
                   onChange={setValue}
+                  resourceReferences={StoryResourceReferences}
                   tokens={tokens}
                   value={value}
                 />
@@ -252,5 +304,15 @@ export const Highlighting: Story = {
       "{{webhookEvent.notARealField}}",
     ].join("\n"),
     withSelectedTriggers: true,
+  },
+};
+
+export const ResourceReferences: Story = {
+  args: {
+    value: [
+      "When this fires, ask @",
+      "",
+      "Try typing after the @ sign. Suggestions search display name, handle, and provider ID.",
+    ].join("\n"),
   },
 };

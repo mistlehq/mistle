@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 
+import { EditorView } from "@codemirror/view";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
+import { resolveTriggerInstructionResourceKinds } from "./agent-instructions-token-catalog.js";
 import type { TriggerFormShellStatusMessage } from "./trigger-form-shell.js";
 import type { WebhookTriggerEventPickerDisabledState } from "./webhook-trigger-event-picker-state.js";
 import {
@@ -23,6 +25,7 @@ import {
   createWebhookTriggerEventConditionId,
   createWebhookTriggerEventId,
 } from "./webhook-trigger-option-builders.js";
+import { createTriggerParameterResourceQueryKey } from "./webhook-trigger-resource-query-keys.js";
 import {
   createGithubIssueCommentCreatedEventOption,
   createGithubPullRequestOpenedEventOption,
@@ -222,6 +225,16 @@ describe("WebhookTriggerForm", () => {
 
   function renderFormWithOptions(input: RenderFormOptions): ReturnType<typeof render> {
     return render(createFormElement(input));
+  }
+
+  function getEditorViewByName(name: string): EditorView {
+    const textbox = screen.getByRole("textbox", { name });
+    const editorView = EditorView.findFromDOM(textbox);
+    if (editorView === null) {
+      throw new Error(`Expected '${name}' to be a CodeMirror editor.`);
+    }
+
+    return editorView;
   }
 
   it("shows selected option labels in the select triggers instead of raw ids", () => {
@@ -1015,6 +1028,90 @@ describe("WebhookTriggerForm", () => {
       container.textContent?.indexOf("User message") ?? Number.POSITIVE_INFINITY,
     );
   });
+
+  it.each(["Agent Instructions for Trigger", "User message"])(
+    "opens resource reference completions in the %s editor",
+    async (editorName) => {
+      const resourceBackedEventOption = createGithubIssueCommentCreatedEventOption({
+        parameters: [
+          {
+            id: "sender",
+            label: "sender",
+            kind: "resource-select",
+            resourceKind: "user",
+            payloadPath: ["sender", "login"],
+          },
+        ],
+      });
+      for (const resourceKind of resolveTriggerInstructionResourceKinds({
+        selectedEventOptions: [resourceBackedEventOption],
+      })) {
+        TestQueryClient.setQueryData(
+          createTriggerParameterResourceQueryKey({
+            connectionId: GitHubConnectionId,
+            resourceKind,
+          }),
+          {
+            connectionId: GitHubConnectionId,
+            familyId: "github",
+            kind: resourceKind,
+            syncState: "syncing",
+            items:
+              resourceKind === "user"
+                ? [
+                    {
+                      id: "rsc_github_jonathan",
+                      familyId: "github",
+                      kind: "user",
+                      externalId: "991203",
+                      handle: "jon-low",
+                      displayName: "Jonathan Low",
+                      status: "accessible",
+                      metadata: {},
+                    },
+                  ]
+                : [],
+          },
+        );
+      }
+      renderFormWithOptions({
+        mode: "edit",
+        values: buildFormValues({
+          eventIds: [resourceBackedEventOption.id],
+        }),
+        webhookEventOptions: [resourceBackedEventOption],
+      });
+
+      const editorView = getEditorViewByName(editorName);
+      editorView.focus();
+      editorView.dispatch({
+        changes: {
+          from: 0,
+          to: editorView.state.doc.length,
+          insert: "Ask @",
+        },
+        selection: {
+          anchor: "Ask @".length,
+        },
+      });
+
+      let option: HTMLElement | null = null;
+      await waitFor(() => {
+        option = screen.getByText("Jonathan Low").closest('[role="option"]');
+        expect(option).toBeTruthy();
+      });
+
+      if (option === null) {
+        throw new Error("Expected Jonathan Low resource completion option.");
+      }
+
+      fireEvent.mouseDown(option);
+      fireEvent.click(option);
+      expect(editorView.state.doc.toString()).toBe(
+        "Ask @Jonathan Low (GitHub Engineering user ID: 991203)",
+      );
+    },
+  );
 
   it("renders the trigger name field without an inline edit-name control on create", () => {
     const { container } = renderFormWithOptions({
