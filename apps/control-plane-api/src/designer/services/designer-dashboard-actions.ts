@@ -1,5 +1,6 @@
 import {
   type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   type IntegrationBindingKind,
@@ -153,49 +154,11 @@ export async function saveDesignerSelectedProviderResources(
 
   const bindingKind: IntegrationBindingKind = definition.kind;
   const selectedHandles = dedupeStrings(input.body.selectedHandles);
-  const currentBindings = await db.query.sandboxProfileVersionIntegrationBindings.findMany({
-    where: (table, { and, eq }) =>
-      and(
-        eq(table.sandboxProfileId, input.body.targetDraft.profileId),
-        eq(table.sandboxProfileVersion, input.body.targetDraft.version),
-      ),
-    orderBy: (table, { asc }) => [asc(table.id)],
-  });
-  const targetBinding = await findProviderResourceTargetBinding(
-    { db, integrationRegistry },
-    {
-      organizationId: input.organizationId,
-      bindings: currentBindings,
-      bindingKind,
-      familyId: selectedTarget.familyId,
-      selectedConnectionId: connection.id,
-    },
-  );
-  const createdBinding = targetBinding === undefined;
   const nextFieldValue = createBindingFieldValue({
     selectionMode: resourceDefinition.selectionMode,
     selectedHandles,
   });
-  const nextTargetBinding = {
-    ...(targetBinding === undefined ? {} : { id: targetBinding.id }),
-    connectionId: connection.id,
-    kind: bindingKind,
-    config: {
-      ...targetBinding?.config,
-      [resourceDefinition.bindingField]: nextFieldValue,
-    },
-  };
-  const nextBindings = [
-    ...currentBindings
-      .filter((binding) => binding.id !== targetBinding?.id)
-      .map((binding) => ({
-        id: binding.id,
-        connectionId: binding.connectionId,
-        kind: binding.kind,
-        config: binding.config,
-      })),
-    nextTargetBinding,
-  ];
+  let createdBinding: boolean | undefined;
 
   const savedDraft = await putProfileVersionDraft(
     { db, integrationRegistry, sandboxConfig },
@@ -204,10 +167,46 @@ export async function saveDesignerSelectedProviderResources(
       profileId: input.body.targetDraft.profileId,
       profileVersion: input.body.targetDraft.version,
       integrationBindings: {
-        bindings: nextBindings,
+        mergeCurrentBindings: async ({ db: tx, currentBindings }) => {
+          const targetBinding = await findProviderResourceTargetBinding(
+            { db: tx, integrationRegistry },
+            {
+              organizationId: input.organizationId,
+              bindings: currentBindings,
+              bindingKind,
+              familyId: selectedTarget.familyId,
+              selectedConnectionId: connection.id,
+            },
+          );
+          createdBinding = targetBinding === undefined;
+          const nextTargetBinding = {
+            ...(targetBinding === undefined ? {} : { id: targetBinding.id }),
+            connectionId: connection.id,
+            kind: bindingKind,
+            config: {
+              ...targetBinding?.config,
+              [resourceDefinition.bindingField]: nextFieldValue,
+            },
+          };
+
+          return [
+            ...currentBindings
+              .filter((binding) => binding.id !== targetBinding?.id)
+              .map((binding) => ({
+                id: binding.id,
+                connectionId: binding.connectionId,
+                kind: binding.kind,
+                config: binding.config,
+              })),
+            nextTargetBinding,
+          ];
+        },
       },
     },
   );
+  if (createdBinding === undefined) {
+    throw new Error("Expected provider resource binding merge to run.");
+  }
   const savedBinding = savedDraft.integrationBindings.bindings.find(
     (binding) => binding.connectionId === connection.id && binding.kind === bindingKind,
   );
@@ -244,7 +243,13 @@ function dedupeStrings(values: readonly string[]): string[] {
 }
 
 async function findProviderResourceTargetBinding(
-  { db, integrationRegistry }: Pick<DesignerDashboardActionsContext, "db" | "integrationRegistry">,
+  {
+    db,
+    integrationRegistry,
+  }: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+    integrationRegistry: IntegrationRegistry;
+  },
   input: {
     organizationId: string;
     bindings: readonly SandboxProfileVersionIntegrationBinding[];

@@ -45,7 +45,7 @@
     "lint:rust": "pnpm --filter @mistle/sandboxd lint && pnpm --filter @mistle/commit-sign lint && pnpm --filter @mistle/mstl-core lint && pnpm --filter @mistle/mstl-cli lint",
     "lint:spelling": "typos .",
     "lint:sql": "pnpm --filter @mistle/db lint:sql",
-    "lint:ts": "pnpm lint:dashboard-preflight && pnpm lint:package-exports && pnpm lint:oxlint && pnpm lint:openapi && pnpm lint:docs",
+    "lint:ts": "pnpm lint:dashboard-preflight && pnpm lint:package-exports && pnpm lint:designer-integration-catalog && pnpm lint:oxlint && pnpm lint:openapi && pnpm lint:docs",
     "prepare": "node -e \"const cp = require('child_process'); if (!(process.env.CI || process.env.LEFTHOOK === '0')) { try { cp.execSync('git rev-parse --is-inside-work-tree', { stdio: 'ignore' }); cp.execSync('lefthook install', { stdio: 'inherit' }); } catch {} }\"",
     "release:create-tag": "tsx ./scripts/release/create-tag.ts",
     "release:notes": "tsx ./scripts/release/notes.ts",
