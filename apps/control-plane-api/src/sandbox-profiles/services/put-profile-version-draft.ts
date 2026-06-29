@@ -78,6 +78,10 @@ type PutProfileVersionDraftIntegrationBindingsInput =
       }) => Promise<PutProfileVersionDraftIntegrationBindingInput[]>;
     };
 
+type ValidatedProfileVersionIntegrationBindings = Awaited<
+  ReturnType<typeof validateProfileVersionIntegrationBindings>
+>;
+
 type PutProfileVersionDraftOutput = {
   sandboxProfileId: string;
   version: number;
@@ -120,6 +124,18 @@ export async function putProfileVersionDraft(
     );
   }
 
+  const validatedReplacementBindings =
+    input.integrationBindings !== undefined && "bindings" in input.integrationBindings
+      ? await validateProfileVersionIntegrationBindings(
+          { db },
+          {
+            organizationId: input.organizationId,
+            profileId: input.profileId,
+            profileVersion: input.profileVersion,
+            bindings: input.integrationBindings.bindings,
+          },
+        )
+      : undefined;
   const nextSkillsConfig =
     input.skillsConfig === undefined
       ? undefined
@@ -209,6 +225,7 @@ export async function putProfileVersionDraft(
             organizationId: input.organizationId,
             profileId: input.profileId,
             profileVersion: input.profileVersion,
+            validatedReplacementBindings,
           });
 
     await validateGitCommitSigningDraftConfig(tx, {
@@ -386,22 +403,31 @@ async function createIntegrationBindingWriteInput(
     profileId: string;
     profileVersion: number;
     integrationBindings: PutProfileVersionDraftIntegrationBindingsInput;
+    validatedReplacementBindings: ValidatedProfileVersionIntegrationBindings | undefined;
   },
 ) {
-  const bindings =
-    "bindings" in input.integrationBindings
-      ? input.integrationBindings.bindings
-      : await input.integrationBindings.mergeCurrentBindings({
-          db,
-          currentBindings: await db.query.sandboxProfileVersionIntegrationBindings.findMany({
-            where: (table, { and: whereAnd, eq: whereEq }) =>
-              whereAnd(
-                whereEq(table.sandboxProfileId, input.profileId),
-                whereEq(table.sandboxProfileVersion, input.profileVersion),
-              ),
-            orderBy: (table, { asc }) => [asc(table.id)],
-          }),
-        });
+  if ("bindings" in input.integrationBindings) {
+    if (input.validatedReplacementBindings === undefined) {
+      throw new Error("Expected replacement integration bindings to be prevalidated.");
+    }
+
+    return {
+      bindings: input.integrationBindings.bindings,
+      validatedBindings: input.validatedReplacementBindings,
+    };
+  }
+
+  const bindings = await input.integrationBindings.mergeCurrentBindings({
+    db,
+    currentBindings: await db.query.sandboxProfileVersionIntegrationBindings.findMany({
+      where: (table, { and: whereAnd, eq: whereEq }) =>
+        whereAnd(
+          whereEq(table.sandboxProfileId, input.profileId),
+          whereEq(table.sandboxProfileVersion, input.profileVersion),
+        ),
+      orderBy: (table, { asc }) => [asc(table.id)],
+    }),
+  });
 
   return {
     bindings,
