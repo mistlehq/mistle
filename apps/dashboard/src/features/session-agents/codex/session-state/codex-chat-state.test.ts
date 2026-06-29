@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  coalesceCodexChatNotifications,
   createInitialCodexChatState,
+  isCoalescibleCodexChatNotification,
   reduceCodexChatState,
   type CodexChatState,
 } from "./codex-chat-state.js";
@@ -68,6 +70,113 @@ function receiveUserMessage(
     },
   });
 }
+
+describe("coalesceCodexChatNotifications", () => {
+  it("combines pending deltas for the same runtime item into one notification", () => {
+    expect(
+      coalesceCodexChatNotifications([
+        {
+          method: "item/agentMessage/delta",
+          params: {
+            turnId: "turn_123",
+            itemId: "item_assistant",
+            delta: "first ",
+          },
+        },
+        {
+          method: "item/agentMessage/delta",
+          params: {
+            turnId: "turn_123",
+            itemId: "item_assistant",
+            delta: "second",
+          },
+        },
+      ]),
+    ).toEqual([
+      {
+        method: "item/agentMessage/delta",
+        params: {
+          turnId: "turn_123",
+          itemId: "item_assistant",
+          delta: "first second",
+        },
+      },
+    ]);
+  });
+
+  it("keeps separate runtime items as separate coalesced notifications", () => {
+    expect(
+      coalesceCodexChatNotifications([
+        {
+          method: "item/commandExecution/outputDelta",
+          params: {
+            turnId: "turn_123",
+            itemId: "item_command",
+            delta: "stdout",
+          },
+        },
+        {
+          method: "item/fileChange/outputDelta",
+          params: {
+            turnId: "turn_123",
+            itemId: "item_file",
+            delta: "diff",
+          },
+        },
+      ]),
+    ).toEqual([
+      {
+        method: "item/commandExecution/outputDelta",
+        params: {
+          turnId: "turn_123",
+          itemId: "item_command",
+          delta: "stdout",
+        },
+      },
+      {
+        method: "item/fileChange/outputDelta",
+        params: {
+          turnId: "turn_123",
+          itemId: "item_file",
+          delta: "diff",
+        },
+      },
+    ]);
+  });
+
+  it("only treats item deltas with turn and item ids as coalescible", () => {
+    expect(
+      isCoalescibleCodexChatNotification({
+        method: "item/reasoning/textDelta",
+        params: {
+          turnId: "turn_123",
+          itemId: "item_reasoning",
+          delta: "thinking",
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isCoalescibleCodexChatNotification({
+        method: "item/reasoning/textDelta",
+        params: {
+          turnId: "turn_123",
+          delta: "missing item id",
+        },
+      }),
+    ).toBe(false);
+    expect(
+      isCoalescibleCodexChatNotification({
+        method: "turn/completed",
+        params: {
+          turn: {
+            id: "turn_123",
+            status: "completed",
+          },
+        },
+      }),
+    ).toBe(false);
+  });
+});
 
 describe("reduceCodexChatState", () => {
   it("appends a user message when a turn is accepted by the runtime", () => {

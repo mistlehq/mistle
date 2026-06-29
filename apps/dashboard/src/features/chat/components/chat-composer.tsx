@@ -217,6 +217,26 @@ function buildSelectedSkillMentionDecorations(
   );
 }
 
+function areSelectedSkillMentionsEqual(
+  leftMentions: readonly SelectedSkillMention[],
+  rightMentions: readonly SelectedSkillMention[],
+): boolean {
+  if (leftMentions.length !== rightMentions.length) {
+    return false;
+  }
+
+  return leftMentions.every((leftMention, index) => {
+    const rightMention = rightMentions[index];
+    return (
+      rightMention !== undefined &&
+      leftMention.name === rightMention.name &&
+      leftMention.sourcePath === rightMention.sourcePath &&
+      leftMention.range.start === rightMention.range.start &&
+      leftMention.range.end === rightMention.range.end
+    );
+  });
+}
+
 function insertComposerLineBreak(view: EditorView): boolean {
   view.dispatch(view.state.replaceSelection("\n"));
 
@@ -1827,10 +1847,18 @@ export function ChatComposer({
                   })
                 : composerDraft.selectedSkillMentions;
 
-              onComposerDraftChange({
-                text: nextText,
-                selectedSkillMentions,
-              });
+              if (
+                nextText !== composerDraft.text ||
+                !areSelectedSkillMentionsEqual(
+                  selectedSkillMentions,
+                  composerDraft.selectedSkillMentions,
+                )
+              ) {
+                onComposerDraftChange({
+                  text: nextText,
+                  selectedSkillMentions,
+                });
+              }
               updateComposerSelectionFromView(viewUpdate.view);
               setActiveSlashCommandIndex(0);
               setActiveSkillMentionIndex(0);

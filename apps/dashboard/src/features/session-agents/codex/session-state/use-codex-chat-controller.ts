@@ -5,22 +5,28 @@ import {
   normalizeCodexLocalImageAttachment,
   startCodexTurn,
   steerCodexTurn,
+  type CodexJsonRpcNotification,
   type CodexTurnCollaborationModeKind,
   type CodexTurnCollaborationModeSettings,
   type CodexTurnInputLocalImageItem,
   type CodexJsonRpcClient,
   type CodexThreadReadTurn,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { useMutation } from "@tanstack/react-query";
-import { useCallback, useReducer, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState, type RefObject } from "react";
 
 import type { ChatAttachment } from "../../../chat/chat-types.js";
 import {
+  coalesceCodexChatNotifications,
   createInitialCodexChatState,
+  isCoalescibleCodexChatNotification,
   reduceCodexChatState,
   type CodexChatState,
 } from "./codex-chat-state.js";
 import { readCodexThreadState } from "./codex-thread-read-state.js";
+
+const CodexChatDeltaFlushDelayMs = 80;
 
 function createSteerEntryId(): string {
   return `steer:${crypto.randomUUID()}`;
@@ -170,6 +176,8 @@ export function useCodexChatController(input: {
   const cachedThreadTurnsRef = useRef(new Map<string, readonly CodexThreadReadTurn[]>());
   const queuedSteerRequestsRef = useRef<QueuedSteerRequest[]>([]);
   const isProcessingSteerQueueRef = useRef(false);
+  const pendingChatNotificationsRef = useRef<CodexJsonRpcNotification[]>([]);
+  const pendingChatNotificationFlushHandleRef = useRef<TimerHandle | null>(null);
   const [pendingSteerCount, setPendingSteerCount] = useState(0);
   activeTurnIdRef.current = chatState.activeTurnId;
   chatStatusRef.current = chatState.status;
@@ -178,21 +186,72 @@ export function useCodexChatController(input: {
     setPendingSteerCount(queuedSteerRequestsRef.current.length);
   }, []);
 
+  const cancelPendingChatNotificationFlush = useCallback((): void => {
+    const flushHandle = pendingChatNotificationFlushHandleRef.current;
+    if (flushHandle === null) {
+      return;
+    }
+
+    systemScheduler.cancel(flushHandle);
+    pendingChatNotificationFlushHandleRef.current = null;
+  }, []);
+
+  const flushPendingChatNotifications = useCallback((): void => {
+    cancelPendingChatNotificationFlush();
+    const pendingNotifications = pendingChatNotificationsRef.current;
+    if (pendingNotifications.length === 0) {
+      return;
+    }
+
+    pendingChatNotificationsRef.current = [];
+    for (const notification of coalesceCodexChatNotifications(pendingNotifications)) {
+      dispatchChatAction({
+        type: "notification_received",
+        notification,
+      });
+    }
+  }, [cancelPendingChatNotificationFlush]);
+
+  const clearPendingChatNotifications = useCallback((): void => {
+    cancelPendingChatNotificationFlush();
+    pendingChatNotificationsRef.current = [];
+  }, [cancelPendingChatNotificationFlush]);
+
+  useEffect(
+    () => () => {
+      clearPendingChatNotifications();
+    },
+    [clearPendingChatNotifications],
+  );
+
   const resetChat = useCallback((): void => {
+    clearPendingChatNotifications();
     queuedSteerRequestsRef.current = [];
     isProcessingSteerQueueRef.current = false;
     syncPendingSteerCount();
     dispatchChatAction({ type: "reset" });
-  }, [syncPendingSteerCount]);
+  }, [clearPendingChatNotifications, syncPendingSteerCount]);
 
   const handleNotificationReceived = useCallback(
-    (notification: { method: string; params?: unknown }): void => {
+    (notification: CodexJsonRpcNotification): void => {
+      if (isCoalescibleCodexChatNotification(notification)) {
+        pendingChatNotificationsRef.current.push(notification);
+        if (pendingChatNotificationFlushHandleRef.current === null) {
+          pendingChatNotificationFlushHandleRef.current = systemScheduler.schedule(
+            flushPendingChatNotifications,
+            CodexChatDeltaFlushDelayMs,
+          );
+        }
+        return;
+      }
+
+      flushPendingChatNotifications();
       dispatchChatAction({
         type: "notification_received",
         notification,
       });
     },
-    [],
+    [flushPendingChatNotifications],
   );
 
   const hydrateThreadStateFromRead = useCallback(
@@ -202,6 +261,7 @@ export function useCodexChatController(input: {
       generation?: number;
       ensureCurrentGeneration?: (generation: number) => void;
     }): Promise<"empty" | "hydrated"> => {
+      flushPendingChatNotifications();
       const rpcClient = hydrateInput?.rpcClient ?? input.rpcClientRef.current;
       const threadId = hydrateInput?.threadId ?? input.threadIdRef.current;
 
@@ -242,7 +302,12 @@ export function useCodexChatController(input: {
       });
       return "hydrated";
     },
-    [input.rpcClientRef, input.setSessionErrorMessage, input.threadIdRef],
+    [
+      flushPendingChatNotifications,
+      input.rpcClientRef,
+      input.setSessionErrorMessage,
+      input.threadIdRef,
+    ],
   );
 
   const hydrateInitialThread = useCallback(
@@ -292,6 +357,7 @@ export function useCodexChatController(input: {
           ? {}
           : { collaborationMode: turnRequest.collaborationMode }),
       });
+      flushPendingChatNotifications();
       dispatchChatAction({
         type: "turn_started",
         turnId: startedTurn.turnId,
@@ -487,13 +553,14 @@ export function useCodexChatController(input: {
           (request) => request.entryId !== actionId,
         );
         syncPendingSteerCount();
+        flushPendingChatNotifications();
         dispatchChatAction({
           type: "dismiss_client_user_entry",
           entryId: actionId,
           turnId,
         });
       },
-      [syncPendingSteerCount],
+      [flushPendingChatNotifications, syncPendingSteerCount],
     ),
     steerTurn: useCallback(
       async (turnInput: {
@@ -513,6 +580,7 @@ export function useCodexChatController(input: {
         const turnRequest = buildTextOnlyTurnRequest(turnInput);
         const steerEntryId = createSteerEntryId();
 
+        flushPendingChatNotifications();
         dispatchChatAction({
           type: "steer_turn_requested",
           entryId: steerEntryId,
@@ -533,7 +601,13 @@ export function useCodexChatController(input: {
         syncPendingSteerCount();
         processSteerQueue();
       },
-      [input.rpcClientRef, input.threadIdRef, processSteerQueue, syncPendingSteerCount],
+      [
+        flushPendingChatNotifications,
+        input.rpcClientRef,
+        input.threadIdRef,
+        processSteerQueue,
+        syncPendingSteerCount,
+      ],
     ),
   };
 }

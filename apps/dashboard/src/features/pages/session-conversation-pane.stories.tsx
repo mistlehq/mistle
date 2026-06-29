@@ -1,3 +1,4 @@
+import { systemScheduler, type TimerHandle } from "@mistle/time";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -436,12 +437,27 @@ function LongTranscriptStreamingHarness(): React.JSX.Element {
       return;
     }
 
-    const intervalId = window.setInterval(() => {
-      setStreamingChunkCount((currentChunkCount) => currentChunkCount + 1);
-    }, 80);
+    let isCancelled = false;
+    let scheduledHandle: TimerHandle | null = null;
+
+    function scheduleNextChunk(): void {
+      scheduledHandle = systemScheduler.schedule(() => {
+        if (isCancelled) {
+          return;
+        }
+
+        setStreamingChunkCount((currentChunkCount) => currentChunkCount + 1);
+        scheduleNextChunk();
+      }, 80);
+    }
+
+    scheduleNextChunk();
 
     return () => {
-      window.clearInterval(intervalId);
+      isCancelled = true;
+      if (scheduledHandle !== null) {
+        systemScheduler.cancel(scheduledHandle);
+      }
     };
   }, [isStreaming]);
 

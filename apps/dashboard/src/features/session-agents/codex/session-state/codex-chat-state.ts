@@ -64,6 +64,15 @@ const ItemDeltaNotificationSchema = z.object({
   }),
 });
 
+const CoalescibleItemDeltaMethods = new Set([
+  "item/agentMessage/delta",
+  "item/plan/delta",
+  "item/reasoning/summaryTextDelta",
+  "item/reasoning/textDelta",
+  "item/commandExecution/outputDelta",
+  "item/fileChange/outputDelta",
+]);
+
 const ItemLifecycleNotificationSchema = z.object({
   method: z.enum(["item/started", "item/completed"]),
   params: z.looseObject({
@@ -195,6 +204,116 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function readOptionalString(record: Record<string, unknown>, key: string): string | null {
   const value = record[key];
   return typeof value === "string" ? value : null;
+}
+
+type CoalescibleCodexItemDeltaNotification = {
+  delta: string;
+  itemId: string;
+  method: string;
+  params: Record<string, unknown>;
+  turnId: string;
+};
+
+function parseCoalescibleCodexItemDeltaNotification(
+  notification: CodexJsonRpcNotification,
+): CoalescibleCodexItemDeltaNotification | null {
+  if (!CoalescibleItemDeltaMethods.has(notification.method)) {
+    return null;
+  }
+
+  if (!isRecord(notification.params)) {
+    return null;
+  }
+
+  const turnId = readOptionalString(notification.params, "turnId");
+  const itemId = readOptionalString(notification.params, "itemId");
+  if (turnId === null || itemId === null) {
+    return null;
+  }
+
+  const delta = readOptionalString(notification.params, "delta") ?? "";
+
+  return {
+    delta,
+    itemId,
+    method: notification.method,
+    params: notification.params,
+    turnId,
+  };
+}
+
+export function isCoalescibleCodexChatNotification(
+  notification: CodexJsonRpcNotification,
+): boolean {
+  return parseCoalescibleCodexItemDeltaNotification(notification) !== null;
+}
+
+export function coalesceCodexChatNotifications(
+  notifications: readonly CodexJsonRpcNotification[],
+): readonly CodexJsonRpcNotification[] {
+  const coalescedNotifications: CodexJsonRpcNotification[] = [];
+  let orderedCoalescedNotifications: {
+    delta: string;
+    method: string;
+    params: Record<string, unknown>;
+  }[] = [];
+  let coalescedNotificationByKey = new Map<
+    string,
+    {
+      delta: string;
+      method: string;
+      params: Record<string, unknown>;
+    }
+  >();
+
+  function flushCoalescedNotifications(): void {
+    if (orderedCoalescedNotifications.length === 0) {
+      return;
+    }
+
+    coalescedNotifications.push(
+      ...orderedCoalescedNotifications.map((notification) => ({
+        method: notification.method,
+        params: {
+          ...notification.params,
+          delta: notification.delta,
+        },
+      })),
+    );
+    orderedCoalescedNotifications = [];
+    coalescedNotificationByKey = new Map();
+  }
+
+  for (const notification of notifications) {
+    const parsedNotification = parseCoalescibleCodexItemDeltaNotification(notification);
+    if (parsedNotification === null) {
+      flushCoalescedNotifications();
+      coalescedNotifications.push(notification);
+      continue;
+    }
+
+    const key = [
+      parsedNotification.method,
+      parsedNotification.turnId,
+      parsedNotification.itemId,
+    ].join("\u0000");
+    const existingNotification = coalescedNotificationByKey.get(key);
+    if (existingNotification !== undefined) {
+      existingNotification.delta += parsedNotification.delta;
+      continue;
+    }
+
+    const coalescedNotification = {
+      delta: parsedNotification.delta,
+      method: parsedNotification.method,
+      params: parsedNotification.params,
+    };
+    coalescedNotificationByKey.set(key, coalescedNotification);
+    orderedCoalescedNotifications.push(coalescedNotification);
+  }
+
+  flushCoalescedNotifications();
+  return coalescedNotifications;
 }
 
 function createTurnState(turnId: string): CodexRawTurnState {
