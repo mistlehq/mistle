@@ -1,5 +1,6 @@
 import {
   CreditCardIcon,
+  ChartBarIcon,
   KeyIcon,
   LinkSimpleIcon,
   SlidersHorizontalIcon,
@@ -48,6 +49,17 @@ export function resolveSettingsNavGroups(input: {
                 to: "/settings/organization/identity-linking",
                 label: "Identity Linking",
                 icon: IdentityLinkingNavIcon,
+              },
+            ]
+          : []),
+        ...(canViewOrganizationUsageSettings({
+          organizationRole: input.organizationRole,
+        })
+          ? [
+              {
+                to: "/settings/organization/usage",
+                label: "Usage",
+                icon: UsageNavIcon,
               },
             ]
           : []),
@@ -117,6 +129,10 @@ function BillingNavIcon(props: { className?: string; "aria-hidden"?: boolean }):
   return createElement(CreditCardIcon, props);
 }
 
+function UsageNavIcon(props: { className?: string; "aria-hidden"?: boolean }): React.JSX.Element {
+  return createElement(ChartBarIcon, props);
+}
+
 function ApiKeysNavIcon(props: { className?: string; "aria-hidden"?: boolean }): React.JSX.Element {
   return createElement(KeyIcon, props);
 }
@@ -135,6 +151,12 @@ export function canViewOrganizationBillingSettings(input: {
     input.stripeBillingEnabled &&
     (input.organizationRole === "owner" || input.organizationRole === "admin")
   );
+}
+
+export function canViewOrganizationUsageSettings(input: {
+  organizationRole: OrganizationRole | null;
+}): boolean {
+  return input.organizationRole === "owner" || input.organizationRole === "admin";
 }
 
 export function canViewApiKeySettings(input: {

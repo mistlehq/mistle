@@ -1,4 +1,12 @@
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mistle/ui";
+import {
+  OverflowTooltipText,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@mistle/ui";
 
 import { FormPageHeader, FormPageSection, FormPageStack } from "../shared/form-page.js";
 
@@ -31,6 +39,10 @@ export type OrganizationUsageBreakdownRow = {
 export type OrganizationUsageSettingsPageViewProps = {
   period: {
     range: string;
+  };
+  measurement?: {
+    measuredFrom: string | null;
+    complete: boolean;
   };
   summaryMetrics: readonly OrganizationUsageSummaryMetric[];
   dailyUsage: readonly OrganizationUsageDailyPoint[];
@@ -68,9 +80,17 @@ export function OrganizationUsageSettingsPageView(
         </div>
       </FormPageSection>
 
-      <section className="grid gap-5 xl:grid-cols-2">
-        <UsageBreakdownTable rows={props.profileBreakdown} title="By sandbox profile" />
-        <UsageBreakdownTable rows={props.activityBreakdown} title="By activity" />
+      <section className="grid gap-5">
+        <UsageBreakdownTable
+          labelColumnHeader="Sandbox profile"
+          rows={props.profileBreakdown}
+          title="By sandbox profile"
+        />
+        <UsageBreakdownTable
+          labelColumnHeader="Activity"
+          rows={props.activityBreakdown}
+          title="By activity"
+        />
       </section>
     </FormPageStack>
   );
@@ -98,72 +118,91 @@ function SummaryMetricCard(input: { metric: OrganizationUsageSummaryMetric }): R
 function DailyUsageChart(input: {
   points: readonly OrganizationUsageDailyPoint[];
 }): React.JSX.Element {
-  const maxSandboxHours = Math.max(...input.points.map((point) => point.sandboxHours), 1);
+  const visiblePoints = input.points.filter((point) => point.sandboxHours > 0);
+  const maxSandboxHours = Math.max(...visiblePoints.map((point) => point.sandboxHours), 1);
   const axisMax = Math.ceil(maxSandboxHours / 10) * 10;
   const axisTicks = [axisMax, axisMax * 0.75, axisMax * 0.5, axisMax * 0.25, 0];
+  const chartColumnWidthPx = 44;
+  const chartMinContentWidthPx = Math.max(visiblePoints.length * chartColumnWidthPx, 720);
+  const chartGridStyle = {
+    gridTemplateColumns: `repeat(${String(visiblePoints.length)}, ${String(chartColumnWidthPx)}px)`,
+  };
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <span className="size-2 rounded-full bg-primary" />
-        Sandbox hours
-      </div>
-      <div className="grid h-72 grid-cols-[3rem_minmax(0,1fr)] gap-3">
-        <div className="relative h-full text-right text-[11px] text-muted-foreground tabular-nums">
-          {axisTicks.map((tick) => (
-            <span
-              className="absolute right-0 -translate-y-1/2"
-              key={tick}
-              style={{ top: `${100 - (tick / axisMax) * 100}%` }}
-            >
-              {tick.toFixed(0)}
-            </span>
-          ))}
-        </div>
-        <div className="relative min-w-0 border-b border-l">
-          {axisTicks.slice(0, -1).map((tick) => (
-            <div
-              className="absolute left-0 right-0 border-t border-dashed border-border"
-              key={tick}
-              style={{ top: `${100 - (tick / axisMax) * 100}%` }}
-            />
-          ))}
-          <div className="relative z-10 grid h-full grid-cols-10 items-end gap-2 px-2 pt-4">
-            {input.points.map((point) => {
-              const heightPercent = Math.max((point.sandboxHours / axisMax) * 100, 3);
-
-              return (
-                <div
-                  className="group relative flex h-full min-w-0 items-end justify-center"
-                  key={point.day}
-                >
-                  <div
-                    aria-label={`${point.day}: ${formatHours(point.sandboxHours)}, ${point.runCount} runs`}
-                    className="relative w-full max-w-8 rounded-t bg-primary transition-colors group-hover:bg-primary/80"
-                    style={{ height: `${heightPercent}%` }}
-                  >
-                    <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden min-w-36 -translate-x-1/2 rounded border bg-popover px-3 py-2 text-left text-xs shadow-md group-hover:block">
-                      <div className="font-medium text-popover-foreground">{point.day}</div>
-                      <div className="mt-1 text-muted-foreground">
-                        {formatHours(point.sandboxHours)} sandbox hours
-                      </div>
-                      <div className="text-muted-foreground">{point.runCount} runs</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+      <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-3">
+        <div className="flex h-80 flex-col gap-2">
+          <div className="text-right text-xs text-muted-foreground">Hours</div>
+          <div className="relative h-full">
+            {axisTicks.map((tick) => (
+              <span
+                className="absolute right-0 -translate-y-1/2 text-right text-[11px] text-muted-foreground tabular-nums"
+                key={tick}
+                style={{ top: `${100 - (tick / axisMax) * 100}%` }}
+              >
+                {tick.toFixed(0)}
+              </span>
+            ))}
           </div>
         </div>
-      </div>
-      <div className="grid grid-cols-[3rem_minmax(0,1fr)] gap-3">
-        <div />
-        <div className="grid grid-cols-10 gap-2 px-2 text-center text-[11px] text-muted-foreground">
-          {input.points.map((point) => (
-            <span className="truncate" key={point.day}>
-              {point.day}
-            </span>
-          ))}
+        <div className="overflow-x-auto">
+          <div
+            className="relative h-80"
+            style={{ minWidth: `${String(chartMinContentWidthPx)}px`, width: "100%" }}
+          >
+            <div className="relative h-full border-b border-l">
+              {axisTicks.slice(0, -1).map((tick) => (
+                <div
+                  className="absolute left-0 right-0 border-t border-dashed border-border"
+                  key={tick}
+                  style={{ top: `${100 - (tick / axisMax) * 100}%` }}
+                />
+              ))}
+              <div className="relative z-10 grid h-full items-end gap-2" style={chartGridStyle}>
+                {visiblePoints.map((point, index) => {
+                  const heightPercent = Math.max((point.sandboxHours / axisMax) * 100, 3);
+
+                  return (
+                    <div
+                      className="group relative flex h-full min-w-0 items-end justify-center"
+                      key={point.day}
+                    >
+                      <div
+                        aria-label={`${point.day}: ${formatHours(point.sandboxHours)}, ${point.runCount} runs`}
+                        className="relative w-full max-w-8 rounded-t bg-primary transition-colors group-hover:bg-primary/80"
+                        style={{ height: `${heightPercent}%` }}
+                      />
+                      <div className={getChartTooltipClassName(index, visiblePoints.length)}>
+                        <div className="font-medium text-popover-foreground">{point.day}</div>
+                        <div className="mt-1 text-muted-foreground">
+                          {formatHours(point.sandboxHours)} sandbox hours
+                        </div>
+                        <div className="text-muted-foreground">{point.runCount} runs</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <div
+            className="grid gap-2 pt-2 text-center text-[11px] text-muted-foreground"
+            style={{
+              ...chartGridStyle,
+              minWidth: `${String(chartMinContentWidthPx)}px`,
+              width: "100%",
+            }}
+          >
+            {visiblePoints.map((point) => (
+              <span key={point.day}>{formatXAxisDay(point.day)}</span>
+            ))}
+          </div>
+          <div
+            className="pt-1 text-center text-xs text-muted-foreground"
+            style={{ minWidth: `${String(chartMinContentWidthPx)}px`, width: "100%" }}
+          >
+            Day of month
+          </div>
         </div>
       </div>
     </div>
@@ -184,6 +223,7 @@ function SectionHeading(input: { title: string; detail: string }): React.JSX.Ele
 }
 
 function UsageBreakdownTable(input: {
+  labelColumnHeader: string;
   rows: readonly OrganizationUsageBreakdownRow[];
   title: string;
   detail?: string;
@@ -194,25 +234,25 @@ function UsageBreakdownTable(input: {
         <Table className="min-w-[54rem] table-fixed">
           <TableHeader className="bg-muted/60">
             <TableRow className="h-9 border-b">
-              <TableHead className="w-[31%] py-2 text-[11px] font-semibold tracking-wide text-foreground uppercase">
-                Segment
+              <TableHead className="w-[22%] py-2 text-[11px] font-semibold tracking-wide text-foreground uppercase">
+                {input.labelColumnHeader}
               </TableHead>
-              <TableHead className="w-[13%] py-2 text-right text-[11px] font-semibold tracking-wide text-foreground uppercase">
+              <TableHead className="w-[14%] py-2 text-right text-[11px] font-semibold tracking-wide text-foreground uppercase">
                 Sandbox
               </TableHead>
-              <TableHead className="w-[13%] py-2 text-right text-[11px] font-semibold tracking-wide text-foreground uppercase">
+              <TableHead className="w-[14%] py-2 text-right text-[11px] font-semibold tracking-wide text-foreground uppercase">
                 vCPU
               </TableHead>
-              <TableHead className="w-[15%] py-2 text-right text-[11px] font-semibold tracking-wide text-foreground uppercase">
+              <TableHead className="w-[16%] py-2 text-right text-[11px] font-semibold tracking-wide text-foreground uppercase">
                 Memory
               </TableHead>
-              <TableHead className="w-[15%] py-2 text-right text-[11px] font-semibold tracking-wide text-foreground uppercase">
+              <TableHead className="w-[16%] py-2 text-right text-[11px] font-semibold tracking-wide text-foreground uppercase">
                 Storage
               </TableHead>
-              <TableHead className="w-[8%] py-2 text-right text-[11px] font-semibold tracking-wide text-foreground uppercase">
+              <TableHead className="w-[9%] py-2 text-right text-[11px] font-semibold tracking-wide text-foreground uppercase">
                 Runs
               </TableHead>
-              <TableHead className="w-[5%] py-2 text-right text-[11px] font-semibold tracking-wide text-foreground uppercase">
+              <TableHead className="w-[9%] py-2 text-right text-[11px] font-semibold tracking-wide text-foreground uppercase">
                 Share
               </TableHead>
             </TableRow>
@@ -222,27 +262,35 @@ function UsageBreakdownTable(input: {
               <TableRow key={row.id}>
                 <TableCell className="max-w-0 align-top">
                   <div className="flex min-w-0 flex-col gap-1">
-                    <span className="truncate font-medium">{row.label}</span>
-                    <span className="truncate text-sm text-muted-foreground">{row.detail}</span>
+                    <OverflowTooltipText
+                      className="font-medium"
+                      text={row.label}
+                      tooltipSide="right"
+                    />
+                    {row.detail.length === 0 ? null : (
+                      <OverflowTooltipText
+                        className="text-sm text-muted-foreground"
+                        text={row.detail}
+                        tooltipSide="right"
+                      />
+                    )}
                   </div>
                 </TableCell>
-                <TableCell className="align-top text-right font-mono text-sm tabular-nums">
+                <TableCell className="align-top text-right text-sm">
                   {formatHours(row.sandboxHours)}
                 </TableCell>
-                <TableCell className="align-top text-right font-mono text-sm tabular-nums">
+                <TableCell className="align-top text-right text-sm">
                   {formatResourceHours(row.vcpuHours)}
                 </TableCell>
-                <TableCell className="align-top text-right font-mono text-sm tabular-nums">
+                <TableCell className="align-top text-right text-sm">
                   {formatResourceHours(row.memoryGbHours)}
                 </TableCell>
-                <TableCell className="align-top text-right font-mono text-sm tabular-nums">
+                <TableCell className="align-top text-right text-sm">
                   {formatResourceHours(row.storageGbHours)}
                 </TableCell>
-                <TableCell className="align-top text-right text-sm tabular-nums">
-                  {row.runCount}
-                </TableCell>
-                <TableCell className="align-top text-right text-sm tabular-nums">
-                  {row.sharePercent}%
+                <TableCell className="align-top text-right text-sm">{row.runCount}</TableCell>
+                <TableCell className="align-top text-right text-sm">
+                  {row.sandboxHours === 0 ? null : `${String(row.sharePercent)}%`}
                 </TableCell>
               </TableRow>
             ))}
@@ -259,4 +307,24 @@ function formatHours(value: number): string {
 
 function formatResourceHours(value: number): string {
   return value.toFixed(1);
+}
+
+function formatXAxisDay(value: string): string {
+  const day = value.trim().split(" ").at(-1);
+  return day === undefined || day.length === 0 ? value : day;
+}
+
+function getChartTooltipClassName(index: number, pointCount: number): string {
+  const baseClassName =
+    "pointer-events-none absolute top-2 z-20 hidden min-w-36 rounded border bg-popover px-3 py-2 text-left text-xs shadow-md group-hover:block";
+
+  if (index === 0) {
+    return `${baseClassName} left-0`;
+  }
+
+  if (index === pointCount - 1) {
+    return `${baseClassName} right-0`;
+  }
+
+  return `${baseClassName} left-1/2 -translate-x-1/2`;
 }

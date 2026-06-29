@@ -295,6 +295,10 @@ export type ListSandboxInstancesInput =
   paths["/internal/sandbox/instances"]["get"]["parameters"]["query"];
 export type ListSandboxInstancesResponse =
   paths["/internal/sandbox/instances"]["get"]["responses"]["200"]["content"]["application/json"];
+export type ReadSandboxUsageSummaryInput =
+  paths["/internal/sandbox/usage/summary"]["post"]["requestBody"]["content"]["application/json"];
+export type ReadSandboxUsageSummaryResponse =
+  paths["/internal/sandbox/usage/summary"]["post"]["responses"]["200"]["content"]["application/json"];
 export type ListSandboxOperationEventsInput = {
   sandboxInstanceId: string;
   organizationId: string;
@@ -368,6 +372,9 @@ export type DataPlaneSandboxInstancesClient = {
   ) => Promise<SandboxInstanceMetadataResponse>;
   getSandboxInstance: (input: GetSandboxInstanceInput) => Promise<GetSandboxInstanceResponse>;
   listSandboxInstances: (input: ListSandboxInstancesInput) => Promise<ListSandboxInstancesResponse>;
+  readSandboxUsageSummary: (
+    input: ReadSandboxUsageSummaryInput,
+  ) => Promise<ReadSandboxUsageSummaryResponse>;
   listSandboxOperationEvents: (
     input: ListSandboxOperationEventsInput,
   ) => Promise<ListSandboxOperationEventsResponse>;
@@ -415,6 +422,7 @@ function createClientError(input: {
     | "patch"
     | "read"
     | "list"
+    | "readUsageSummary"
     | "listOperationEvents"
     | "invalidateCredentialCache";
 }): DataPlaneSandboxInstancesClientError {
@@ -431,6 +439,7 @@ function createClientError(input: {
     patch: "patch",
     read: "read",
     list: "list",
+    readUsageSummary: "read usage summary",
     listOperationEvents: "list operation events",
     invalidateCredentialCache: "invalidate credential cache",
   };
@@ -1092,6 +1101,25 @@ export function createDataPlaneSandboxInstancesClient(
         status: result.response.status,
         error: result.error,
         operation: "list",
+      });
+    },
+
+    async readSandboxUsageSummary(
+      readInput: ReadSandboxUsageSummaryInput,
+    ): Promise<ReadSandboxUsageSummaryResponse> {
+      const result = await internalClient.client.POST("/internal/sandbox/usage/summary", {
+        body: readInput,
+        signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+      });
+
+      if (result.response.status === 200 && result.data !== undefined) {
+        return result.data;
+      }
+
+      throw createClientError({
+        status: result.response.status,
+        error: result.error,
+        operation: "readUsageSummary",
       });
     },
 

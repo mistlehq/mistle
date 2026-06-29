@@ -5727,6 +5727,292 @@
         }
       }
     },
+    "/internal/sandbox/usage/summary": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "periodStart": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "periodEnd": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "requestedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": ["organizationId", "periodStart", "periodEnd", "requestedAt"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sandbox usage summary for an organization and bounded period.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "period": {
+                      "type": "object",
+                      "properties": {
+                        "start": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "end": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": ["start", "end"],
+                      "additionalProperties": false
+                    },
+                    "measurement": {
+                      "type": "object",
+                      "properties": {
+                        "measuredFrom": {
+                          "type": ["string", "null"],
+                          "format": "date-time"
+                        },
+                        "complete": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["measuredFrom", "complete"],
+                      "additionalProperties": false
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "sandboxHours": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "sandboxRuns": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "vcpuHours": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "memoryGbHours": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "storageGbHours": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "sandboxHours",
+                        "sandboxRuns",
+                        "vcpuHours",
+                        "memoryGbHours",
+                        "storageGbHours"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "dailyUsage": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "day": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sandboxHours": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "runCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": ["day", "sandboxHours", "runCount"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "profileBreakdown": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sandboxHours": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "sandboxRuns": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "vcpuHours": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "memoryGbHours": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "storageGbHours": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "sandboxProfileId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "sandboxHours",
+                          "sandboxRuns",
+                          "vcpuHours",
+                          "memoryGbHours",
+                          "storageGbHours",
+                          "sandboxProfileId"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "activityBreakdown": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sandboxHours": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "sandboxRuns": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "vcpuHours": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "memoryGbHours": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "storageGbHours": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "activity": {
+                            "type": "string",
+                            "enum": [
+                              "user_sessions",
+                              "designer_sessions",
+                              "trigger_runs",
+                              "setup_assistants",
+                              "setup_script_checks",
+                              "snapshot_maintenance"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "sandboxHours",
+                          "sandboxRuns",
+                          "vcpuHours",
+                          "memoryGbHours",
+                          "storageGbHours",
+                          "activity"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "period",
+                    "measurement",
+                    "summary",
+                    "dailyUsage",
+                    "profileBreakdown",
+                    "activityBreakdown"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/integration-connections/:connectionId/credential-cache/invalidate": {
       "post": {
         "tags": ["Internal"],

@@ -10024,6 +10024,140 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/organization/usage": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query: {
+          month: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Sandbox usage for the active organization. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              activityBreakdown: {
+                /** @enum {string} */
+                activity:
+                  | "user_sessions"
+                  | "designer_sessions"
+                  | "trigger_runs"
+                  | "setup_assistants"
+                  | "setup_script_checks"
+                  | "snapshot_maintenance";
+                label: string;
+                memoryGbHours: number;
+                sandboxHours: number;
+                sandboxRuns: number;
+                storageGbHours: number;
+                vcpuHours: number;
+              }[];
+              dailyUsage: {
+                day: string;
+                runCount: number;
+                sandboxHours: number;
+              }[];
+              measurement: {
+                complete: boolean;
+                /** Format: date-time */
+                measuredFrom: string | null;
+              };
+              period: {
+                /** Format: date-time */
+                end: string;
+                /** Format: date-time */
+                start: string;
+              };
+              profileBreakdown: {
+                label: string;
+                memoryGbHours: number;
+                sandboxHours: number;
+                sandboxProfileId: string;
+                sandboxRuns: number;
+                storageGbHours: number;
+                vcpuHours: number;
+              }[];
+              summary: {
+                memoryGbHours: number;
+                sandboxHours: number;
+                sandboxRuns: number;
+                storageGbHours: number;
+                vcpuHours: number;
+              };
+            };
+          };
+        };
+        /** @description Invalid request query. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Forbidden request. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/sandbox/instances": {
     parameters: {
       query?: never;

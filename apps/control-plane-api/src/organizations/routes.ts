@@ -13,6 +13,7 @@ import * as getIdentityLinkProviderGitCommitSigningImpact from "./get-identity-l
 import * as getLogoContent from "./get-logo-content/index.js";
 import * as getLogo from "./get-logo/index.js";
 import * as getMembershipCapabilities from "./get-membership-capabilities/index.js";
+import * as getUsage from "./get-usage/index.js";
 import * as listIdentityLinkProviderConfigLinks from "./list-identity-link-provider-config-links/index.js";
 import * as listIdentityLinkProviderLinks from "./list-identity-link-provider-links/index.js";
 import * as listIdentityLinkProviders from "./list-identity-link-providers/index.js";
@@ -34,6 +35,7 @@ export function createOrganizationRoutes(): AppRoutes<typeof ORGANIZATION_ROUTE_
   routes.openapi(putLogo.route, putLogo.handler);
   routes.openapi(deleteLogo.route, deleteLogo.handler);
   routes.openapi(getBilling.route, getBilling.handler);
+  routes.openapi(getUsage.route, getUsage.handler);
   routes.openapi(ensureBillingCustomer.route, ensureBillingCustomer.handler);
   routes.openapi(getMembershipCapabilities.route, getMembershipCapabilities.handler);
   routes.openapi(listIdentityLinkProviders.route, listIdentityLinkProviders.handler);
