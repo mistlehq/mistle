@@ -10,6 +10,7 @@ const baseProps = {
   activeOrganizationId: null,
   isSigningOut: false,
   isSwitchingOrganization: false,
+  onCreateNewOrganization: () => {},
   onNavigateToSettings: () => {},
   onSignOut: () => {},
   onSwitchOrganization: () => {},
@@ -102,6 +103,26 @@ describe("OrganizationMenuTrigger", () => {
     fireEvent.click(screen.getByRole("button", { name: "Organization menu" }));
 
     expect(screen.getByText("Switch organization")).toBeTruthy();
+  });
+
+  it("renders create new organization as the switcher footer action", () => {
+    let createNewOrganizationSelected = false;
+
+    renderOrganizationMenuTrigger({
+      onCreateNewOrganization: () => {
+        createNewOrganizationSelected = true;
+      },
+      organizations: [
+        { id: "org_1", name: "Acme Corp" },
+        { id: "org_2", name: "Mistle Labs" },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Organization menu" }));
+    fireEvent.click(screen.getByText("Switch organization"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Create new organization" }));
+
+    expect(createNewOrganizationSelected).toBe(true);
   });
 
   it("renders summary errors in the top-level menu without blocking the switcher", () => {

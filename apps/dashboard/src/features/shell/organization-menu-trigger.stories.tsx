@@ -14,6 +14,7 @@ const baseArgs = {
   isSwitchOrganizationSubmenuOpen: false,
   organizations: [{ id: "org_mistle", name: "Mistle Labs" }],
   isSigningOut: false,
+  onCreateNewOrganization: function onCreateNewOrganization() {},
   onNavigateToSettings: function onNavigateToSettings() {},
   onSignOut: function onSignOut() {},
   onSwitchOrganization: function onSwitchOrganization() {},

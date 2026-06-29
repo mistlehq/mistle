@@ -146,6 +146,7 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
   const pageMeta = useAppPageMeta();
   const appShellFrame = resolveAppShellFrame({
     handleBackToApp: () => {},
+    handleCreateNewOrganization: () => {},
     handleNavigateToSettings: () => {},
     handleSignOut: () => {},
     handleSwitchOrganization: () => {},

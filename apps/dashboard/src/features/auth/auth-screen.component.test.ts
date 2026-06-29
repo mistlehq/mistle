@@ -99,6 +99,12 @@ describe("resolveSerializedPostLoginPath", () => {
     );
   });
 
+  it("allows the authenticated organization creation route after login", () => {
+    expect(resolveSerializedPostLoginPath("/auth/create-organization")).toBe(
+      "/auth/create-organization",
+    );
+  });
+
   it("allows serialized external redirects to the configured control-plane origin", () => {
     expect(
       resolveSerializedPostLoginPath("http://localhost:5100/oauth/authorize?client_id=mistle-cli", {

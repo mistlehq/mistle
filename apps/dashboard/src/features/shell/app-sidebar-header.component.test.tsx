@@ -11,6 +11,7 @@ const baseProps = {
   activeOrganizationId: "org_mistle",
   isSigningOut: false,
   isSwitchingOrganization: false,
+  onCreateNewOrganization: () => {},
   onNavigateToSettings: () => {},
   onSignOut: () => {},
   onSwitchOrganization: () => {},

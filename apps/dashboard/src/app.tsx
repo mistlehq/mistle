@@ -8,6 +8,10 @@ import {
 } from "react-router";
 
 import { SystemAppearanceProvider } from "./features/appearance/appearance-provider.js";
+import {
+  AUTH_CREATE_ORGANIZATION_PATH,
+  AuthCreateOrganizationPage,
+} from "./features/auth/auth-create-organization-page.js";
 import { AuthLoginCallbackPage } from "./features/auth/auth-login-callback-page.js";
 import { AuthScreen } from "./features/auth/auth-screen.js";
 import {
@@ -58,6 +62,7 @@ export const APP_ROUTES = createRoutesFromElements(
   <>
     <Route element={<SystemAppearanceRoute />} errorElement={<RouteErrorBoundary />}>
       <Route element={<AuthScreen />} path="/auth/login" />
+      <Route element={<AuthCreateOrganizationPage />} path={AUTH_CREATE_ORGANIZATION_PATH} />
       <Route element={<AuthLoginCallbackPage />} path="/auth/login/callback" />
       <Route element={<AuthSwitchOrganizationPage />} path={AUTH_SWITCH_ORGANIZATION_PATH} />
       <Route element={<InvitationAcceptPage />} path="/invitations/accept" />

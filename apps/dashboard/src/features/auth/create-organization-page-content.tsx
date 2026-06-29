@@ -1,6 +1,6 @@
 import { Field, FieldContent, Input, Notice, ScreenActionButton } from "@mistle/ui";
 
-type NoOrganizationAccessViewContentProps = {
+type CreateOrganizationPageContentProps = {
   organizationName: string;
   organizationNameError: string | null;
   createOrganizationError: string | null;
@@ -8,11 +8,12 @@ type NoOrganizationAccessViewContentProps = {
   isSigningOut: boolean;
   onOrganizationNameChange: (value: string) => void;
   onCreateOrganization: (event: React.SyntheticEvent<HTMLFormElement>) => void;
-  onSignOut: () => void;
+  onCancel: (() => void) | null;
+  onSignOut: (() => void) | null;
 };
 
-export function NoOrganizationAccessViewContent(
-  props: NoOrganizationAccessViewContentProps,
+export function CreateOrganizationPageContent(
+  props: CreateOrganizationPageContentProps,
 ): React.JSX.Element {
   return (
     <>
@@ -32,7 +33,7 @@ export function NoOrganizationAccessViewContent(
               aria-invalid={props.organizationNameError === null ? undefined : true}
               autoFocus
               className="h-12"
-              id="onboarding-organization-name"
+              id="create-organization-name"
               onChange={(event) => props.onOrganizationNameChange(event.currentTarget.value)}
               placeholder="Organization name"
               value={props.organizationName}
@@ -44,26 +45,41 @@ export function NoOrganizationAccessViewContent(
           {props.isCreatingOrganization ? "Creating organization..." : "Create organization"}
         </ScreenActionButton>
 
-        <ScreenActionButton
-          disabled={props.isSigningOut || props.isCreatingOrganization}
-          onClick={props.onSignOut}
-          type="button"
-          variant="outline"
-        >
-          {props.isSigningOut ? "Signing out..." : "Sign Out"}
-        </ScreenActionButton>
+        {props.onCancel === null ? null : (
+          <ScreenActionButton
+            disabled={props.isCreatingOrganization}
+            onClick={props.onCancel}
+            type="button"
+            variant="outline"
+          >
+            Cancel
+          </ScreenActionButton>
+        )}
+
+        {props.onSignOut === null ? null : (
+          <ScreenActionButton
+            disabled={props.isSigningOut || props.isCreatingOrganization}
+            onClick={props.onSignOut}
+            type="button"
+            variant="outline"
+          >
+            {props.isSigningOut ? "Signing out..." : "Sign Out"}
+          </ScreenActionButton>
+        )}
       </form>
 
-      <div className="mt-6 grid gap-3">
-        <div className="text-muted-foreground flex items-center gap-4">
-          <div className="bg-border h-px flex-1" />
-          <p className="text-xs font-medium tracking-[0.2em] uppercase">Have an existing org?</p>
-          <div className="bg-border h-px flex-1" />
+      {props.onSignOut === null ? null : (
+        <div className="mt-6 grid gap-3">
+          <div className="text-muted-foreground flex items-center gap-4">
+            <div className="bg-border h-px flex-1" />
+            <p className="text-xs font-medium tracking-[0.2em] uppercase">Have an existing org?</p>
+            <div className="bg-border h-px flex-1" />
+          </div>
+          <div className="grid gap-2 text-center">
+            <p className="text-muted-foreground text-sm">Ask your administrator for an invite.</p>
+          </div>
         </div>
-        <div className="grid gap-2 text-center">
-          <p className="text-muted-foreground text-sm">Ask your administrator for an invite.</p>
-        </div>
-      </div>
+      )}
     </>
   );
 }

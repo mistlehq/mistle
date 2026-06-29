@@ -40,6 +40,7 @@ function UnavailableResourceInShellStory({
           <AppSidebarHeader
             activeOrganizationId="org_mistle"
             isSigningOut={false}
+            onCreateNewOrganization={() => {}}
             onNavigateToSettings={() => {}}
             onSignOut={() => {}}
             onSwitchOrganization={() => {}}

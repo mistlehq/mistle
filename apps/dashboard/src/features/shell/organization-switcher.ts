@@ -5,6 +5,10 @@ export type OrganizationSwitcherOption = {
   name: string;
 };
 
+export type CreatedOrganization = {
+  id: string;
+};
+
 export const ORGANIZATION_SWITCHER_QUERY_KEY = ["auth", "organizations"] as const;
 
 const organizationSwitcherNameCollator = new Intl.Collator("en", {
@@ -37,6 +41,21 @@ function parseOrganizationSwitcherOption(value: unknown): OrganizationSwitcherOp
   };
 }
 
+function parseCreatedOrganization(value: unknown): CreatedOrganization | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const id = value.id;
+  if (typeof id !== "string" || id.length === 0) {
+    return null;
+  }
+
+  return {
+    id,
+  };
+}
+
 function resolveOrganizationSwitcherErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message;
@@ -52,6 +71,35 @@ function resolveOrganizationSwitcherErrorMessage(error: unknown, fallback: strin
   }
 
   return fallback;
+}
+
+export async function createOrganization(input: {
+  name: string;
+  slug: string;
+}): Promise<CreatedOrganization> {
+  let response: unknown;
+
+  try {
+    response = await authClient.$fetch("/organization/create", {
+      method: "POST",
+      throw: true,
+      body: {
+        name: input.name,
+        slug: input.slug,
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      resolveOrganizationSwitcherErrorMessage(error, "Unable to create organization."),
+    );
+  }
+
+  const organization = parseCreatedOrganization(response);
+  if (organization === null) {
+    throw new Error("Organization create response must include an organization id.");
+  }
+
+  return organization;
 }
 
 export function sortOrganizationSwitcherOptions(
