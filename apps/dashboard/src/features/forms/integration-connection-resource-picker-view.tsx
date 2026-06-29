@@ -141,6 +141,7 @@ function ComboboxLayout(input: {
   const unavailableSelectedValueSet = new Set(input.props.unavailableSelectedValues);
   const chipsClassName = density === "compact" ? "min-h-10 w-full gap-1 px-2 py-1" : "w-full";
   const chipClassName = density === "compact" ? "h-6 max-w-full" : "max-w-full";
+  const inputClassName = density === "compact" ? "min-w-20 flex-1" : "min-w-28";
   const contentClassName = density === "compact" ? "w-[min(30rem,calc(100vw-2rem))] p-0" : "p-0";
   const listWrapperClassName =
     density === "compact" ? "max-h-64 overflow-y-auto p-2" : "max-h-72 overflow-y-auto p-2";
@@ -233,7 +234,7 @@ function ComboboxLayout(input: {
             <ComboboxChipsInput
               aria-invalid={hasAlertMessages ? true : undefined}
               aria-label={input.props.label}
-              className="min-w-28"
+              className={inputClassName}
               disabled={input.props.disabled === true}
               id={input.props.id}
               onFocus={input.props.onFocus}

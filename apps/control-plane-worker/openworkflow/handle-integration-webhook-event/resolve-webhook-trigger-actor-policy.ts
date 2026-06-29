@@ -15,7 +15,6 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import {
   ActorPolicyQueryResultStates,
-  queryActorPolicyResourceAttribute,
   queryActorPolicyResourceRelationship,
   type ActorPolicyQueryResult,
   type ActorPolicyResourceReference,
@@ -65,6 +64,10 @@ export async function resolveWebhookTriggerActorPolicy(input: {
     return { status: "matched" };
   }
 
+  if (input.actorPolicy.anyOf === undefined && input.actorPolicy.noneOf === undefined) {
+    throw new Error("Webhook trigger actor policy must include at least one rule list.");
+  }
+
   const actor = resolveWebhookEventActor({
     actorDefinition: input.actorDefinition,
     payload: input.payload,
@@ -77,20 +80,36 @@ export async function resolveWebhookTriggerActorPolicy(input: {
     };
   }
 
-  const result = await evaluateActorPolicyRules({
+  if (input.actorPolicy.anyOf !== undefined) {
+    const result = await evaluateActorPolicyRules({
+      db: input.db,
+      connectionId: input.connectionId,
+      actor,
+      rules: input.actorPolicy.anyOf,
+    });
+    if (result.state !== ActorPolicyQueryResultStates.MATCHED) {
+      return {
+        status: "skipped",
+        reason: mapActorPolicyQueryResultToSkipReason(result),
+        detail: result.reason ?? result.state,
+      };
+    }
+  }
+
+  const exclusionResult = await evaluateActorPolicyExclusionRules({
     db: input.db,
     connectionId: input.connectionId,
     actor,
-    rules: input.actorPolicy.anyOf,
+    rules: input.actorPolicy.noneOf ?? [],
   });
-  if (result.state === ActorPolicyQueryResultStates.MATCHED) {
+  if (exclusionResult.state === ActorPolicyQueryResultStates.NOT_MATCHED) {
     return { status: "matched" };
   }
 
   return {
     status: "skipped",
-    reason: mapActorPolicyQueryResultToSkipReason(result),
-    detail: result.reason ?? result.state,
+    reason: mapActorPolicyQueryResultToSkipReason(exclusionResult),
+    detail: exclusionResult.reason ?? exclusionResult.state,
   };
 }
 
@@ -206,6 +225,10 @@ async function evaluateActorPolicyRules(input: {
   actor: ResolvedWebhookEventActor;
   rules: readonly WebhookTriggerActorPolicyRule[];
 }): Promise<ActorPolicyQueryResult> {
+  if (input.rules.length === 0) {
+    return matched();
+  }
+
   let unavailableResult: ActorPolicyQueryResult | undefined;
   for (const rule of input.rules) {
     const result = await evaluateActorPolicyRule({
@@ -230,6 +253,27 @@ async function evaluateActorPolicyRules(input: {
   return unavailableResult ?? notMatched();
 }
 
+async function evaluateActorPolicyExclusionRules(input: {
+  db: ControlPlaneDatabase;
+  connectionId: string;
+  actor: ResolvedWebhookEventActor;
+  rules: readonly WebhookTriggerActorPolicyRule[];
+}): Promise<ActorPolicyQueryResult> {
+  if (input.rules.length === 0) {
+    return notMatched();
+  }
+
+  const result = await evaluateActorPolicyRules(input);
+  if (result.state === ActorPolicyQueryResultStates.MATCHED) {
+    return {
+      state: ActorPolicyQueryResultStates.MATCHED,
+      reason: "actor_policy_excluded",
+    };
+  }
+
+  return result;
+}
+
 async function evaluateActorPolicyRule(input: {
   db: ControlPlaneDatabase;
   connectionId: string;
@@ -242,17 +286,6 @@ async function evaluateActorPolicyRule(input: {
       connectionId: input.connectionId,
       eventActor: input.actor,
       policyActor: input.rule.actor,
-    });
-  }
-
-  if (input.rule.kind === "attribute") {
-    return await queryActorPolicyResourceAttribute({
-      db: input.db,
-      connectionId: input.connectionId,
-      actor: createEventActorResourceReference(input.actor),
-      attributeKey: input.rule.attributeKey,
-      attributeValue: input.rule.attributeValue,
-      valueType: input.rule.valueType,
     });
   }
 
@@ -409,7 +442,10 @@ function dataUnavailable(reason: string): ActorPolicyQueryResult {
 function mapActorPolicyQueryResultToSkipReason(
   result: ActorPolicyQueryResult,
 ): WebhookTriggerActorPolicySkipReason {
-  if (result.state === ActorPolicyQueryResultStates.NOT_MATCHED) {
+  if (
+    result.state === ActorPolicyQueryResultStates.NOT_MATCHED ||
+    result.reason === "actor_policy_excluded"
+  ) {
     return WebhookTriggerActorPolicySkipReasons.ACTOR_POLICY_NOT_MATCHED;
   }
 

@@ -25,13 +25,6 @@ export type WebhookTriggerActorPolicyResourceReference =
       handle: string;
     };
 
-export type WebhookTriggerActorPolicyAttributeRule = {
-  kind: "attribute";
-  attributeKey: string;
-  attributeValue: string;
-  valueType: "boolean" | "number" | "string";
-};
-
 export type WebhookTriggerActorPolicyRelationshipRule = {
   kind: "relationship";
   actorSet: WebhookTriggerActorPolicyResourceReference;
@@ -45,13 +38,23 @@ export type WebhookTriggerActorPolicySpecificActorRule = {
 };
 
 export type WebhookTriggerActorPolicyRule =
-  | WebhookTriggerActorPolicyAttributeRule
   | WebhookTriggerActorPolicyRelationshipRule
   | WebhookTriggerActorPolicySpecificActorRule;
 
-export type WebhookTriggerActorPolicy = {
-  anyOf: WebhookTriggerActorPolicyRule[];
-};
+export type WebhookTriggerActorPolicyRuleList = [
+  WebhookTriggerActorPolicyRule,
+  ...WebhookTriggerActorPolicyRule[],
+];
+
+export type WebhookTriggerActorPolicy =
+  | {
+      anyOf: WebhookTriggerActorPolicyRuleList;
+      noneOf?: WebhookTriggerActorPolicyRuleList | undefined;
+    }
+  | {
+      anyOf?: WebhookTriggerActorPolicyRuleList | undefined;
+      noneOf: WebhookTriggerActorPolicyRuleList;
+    };
 
 export function defineWebhookTriggers(schema: PgSchema) {
   return schema.table(

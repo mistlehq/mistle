@@ -9,7 +9,10 @@ import {
   createSlackUserResource,
   createSlackUserResources,
 } from "../integrations/slack-channel-resource-story-support.js";
-import type { WebhookTriggerEventOption } from "./webhook-trigger-event-types.js";
+import type {
+  WebhookTriggerActorResourceDefinition,
+  WebhookTriggerEventOption,
+} from "./webhook-trigger-event-types.js";
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import { createWebhookTriggerEventId } from "./webhook-trigger-option-builders.js";
 import { createTriggerParameterResourceQueryKey } from "./webhook-trigger-resource-query-keys.js";
@@ -282,6 +285,50 @@ const StoryGitHubBotResources: IntegrationConnectionResources = {
         appSlug: "mistle-reviewer",
       },
     },
+    {
+      id: "icr_github_bot_3",
+      familyId: "github",
+      kind: "bot",
+      externalId: "3003",
+      handle: "hacktron-ai[bot]",
+      displayName: "hacktron-ai[bot]",
+      status: "accessible",
+      metadata: {
+        appSlug: "hacktron-ai",
+      },
+    },
+    {
+      id: "icr_github_bot_4",
+      familyId: "github",
+      kind: "bot",
+      externalId: "3004",
+      handle: "superagent-sh[bot]",
+      displayName: "superagent-sh[bot]",
+      status: "accessible",
+      metadata: {
+        appSlug: "superagent-sh",
+      },
+    },
+  ],
+};
+
+const StoryGitHubOrgResources: IntegrationConnectionResources = {
+  connectionId: StoryGitHubConnectionId,
+  familyId: "github",
+  kind: "org",
+  syncState: "ready",
+  lastSyncedAt: "2026-03-17T00:00:00.000Z",
+  items: [
+    {
+      id: "icr_github_org_1",
+      familyId: "github",
+      kind: "org",
+      externalId: "2001",
+      handle: "mistlehq",
+      displayName: "mistlehq",
+      status: "accessible",
+      metadata: {},
+    },
   ],
 };
 
@@ -358,15 +405,95 @@ export const StorySlackChannelResourcesSyncing: IntegrationConnectionResources =
   syncState: "syncing",
 };
 
+function withStoryActorPolicyCapabilities(
+  eventOption: WebhookTriggerEventOption,
+): WebhookTriggerEventOption {
+  const storyResourceDefinitions: readonly WebhookTriggerActorResourceDefinition[] = [
+    ...(eventOption.resourceDefinitions ?? []),
+    {
+      kind: "user",
+      selectionMode: "multi",
+      bindingField: "users",
+      displayNameSingular: "GitHub user",
+      displayNamePlural: "GitHub users",
+      description:
+        "Human GitHub users with collaborator access to repositories on this connection.",
+    },
+    {
+      kind: "bot",
+      selectionMode: "multi",
+      bindingField: "bots",
+      displayNameSingular: "GitHub App bot",
+      displayNamePlural: "GitHub App bots",
+      description:
+        "GitHub App bots discovered from app installations in organizations with accessible repositories.",
+    },
+    {
+      kind: "org",
+      selectionMode: "multi",
+      bindingField: "organizations",
+      displayNameSingular: "GitHub organization",
+      displayNamePlural: "GitHub organizations",
+      description: "GitHub organizations that own repositories accessible to this connection.",
+    },
+    {
+      kind: "team",
+      selectionMode: "multi",
+      bindingField: "teams",
+      displayNameSingular: "GitHub team",
+      displayNamePlural: "GitHub teams",
+      description: "GitHub teams discovered from organizations with accessible repositories.",
+    },
+  ];
+
+  return {
+    ...eventOption,
+    resourceRelationshipDefinitions: [
+      ...(eventOption.resourceRelationshipDefinitions ?? []),
+      {
+        relationshipKind: "belongs_to",
+        subjectResourceKind: "user",
+        objectResourceKind: "org",
+        displayName: "Organization members",
+        description: "GitHub users that belong to a GitHub organization.",
+        scopeDefinitions: [
+          {
+            scopeKind: "org",
+            displayName: "Organization",
+            description: "The GitHub organization whose user membership snapshot is synced.",
+          },
+        ],
+      },
+      {
+        relationshipKind: "belongs_to",
+        subjectResourceKind: "user",
+        objectResourceKind: "team",
+        displayName: "Team members",
+        description: "GitHub users that belong to a GitHub team.",
+        scopeDefinitions: [
+          {
+            scopeKind: "team",
+            displayName: "Team",
+            description: "The GitHub team whose user membership snapshot is synced.",
+          },
+        ],
+      },
+    ],
+    resourceDefinitions: storyResourceDefinitions,
+  };
+}
+
 export const StoryGitHubEventOptions: readonly WebhookTriggerEventOption[] = [
-  createGitHubEventOption({
-    eventType: "github.issue_comment.created",
-    connectionId: StoryGitHubConnectionId,
-    webhookSourceId: StoryGitHubWebhookSourceId,
-    connectionLabel: "GitHub Engineering",
-    categoryPrefix: "GitHub Engineering",
-    overrides: { id: StoryIssueCommentCreatedTriggerId },
-  }),
+  withStoryActorPolicyCapabilities(
+    createGitHubEventOption({
+      eventType: "github.issue_comment.created",
+      connectionId: StoryGitHubConnectionId,
+      webhookSourceId: StoryGitHubWebhookSourceId,
+      connectionLabel: "GitHub Engineering",
+      categoryPrefix: "GitHub Engineering",
+      overrides: { id: StoryIssueCommentCreatedTriggerId },
+    }),
+  ),
   createGitHubEventOption({
     eventType: "github.issues.opened",
     connectionId: StoryGitHubConnectionId,
@@ -812,6 +939,22 @@ export function createWebhookTriggerStoryQueryClient(input?: {
       resourceKind: "bot",
     }),
     StoryGitHubBotResources,
+  );
+  queryClient.setQueryData(
+    ["trigger-actor-policy-resources", StoryGitHubConnectionId, "user"],
+    StoryGitHubUserResources,
+  );
+  queryClient.setQueryData(
+    ["trigger-actor-policy-resources", StoryGitHubConnectionId, "team"],
+    input?.githubTeamResources ?? StoryGitHubTeamResources,
+  );
+  queryClient.setQueryData(
+    ["trigger-actor-policy-resources", StoryGitHubConnectionId, "bot"],
+    StoryGitHubBotResources,
+  );
+  queryClient.setQueryData(
+    ["trigger-actor-policy-resources", StoryGitHubConnectionId, "org"],
+    StoryGitHubOrgResources,
   );
   queryClient.setQueryData(
     createTriggerParameterResourceQueryKey({

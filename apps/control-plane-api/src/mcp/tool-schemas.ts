@@ -332,41 +332,6 @@ const mcpTriggerActorPolicyResourceReferenceSchema = z.union([
     .strict(),
 ]);
 
-const mcpTriggerActorPolicyAttributeRuleSchema = z
-  .object({
-    kind: z.literal("attribute"),
-    attributeKey: z.string().min(1),
-    attributeValue: z.string().min(1),
-    valueType: z.enum(["boolean", "number", "string"]),
-  })
-  .strict()
-  .superRefine((rule, ctx) => {
-    if (
-      rule.valueType === "boolean" &&
-      rule.attributeValue !== "true" &&
-      rule.attributeValue !== "false"
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Boolean actor policy attribute values must be exactly 'true' or 'false'.",
-        path: ["attributeValue"],
-      });
-      return;
-    }
-
-    if (rule.valueType === "number") {
-      const numericValue = Number(rule.attributeValue);
-      if (!Number.isFinite(numericValue) || String(numericValue) !== rule.attributeValue) {
-        ctx.addIssue({
-          code: "custom",
-          message:
-            "Number actor policy attribute values must be canonical finite JavaScript numbers.",
-          path: ["attributeValue"],
-        });
-      }
-    }
-  });
-
 const mcpTriggerActorPolicyRuleSchema = z.discriminatedUnion("kind", [
   z
     .object({
@@ -374,7 +339,6 @@ const mcpTriggerActorPolicyRuleSchema = z.discriminatedUnion("kind", [
       actor: mcpTriggerActorPolicyResourceReferenceSchema,
     })
     .strict(),
-  mcpTriggerActorPolicyAttributeRuleSchema,
   z
     .object({
       kind: z.literal("relationship"),
@@ -385,11 +349,22 @@ const mcpTriggerActorPolicyRuleSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 
-const mcpTriggerActorPolicyInputSchema = z
-  .object({
-    anyOf: z.array(mcpTriggerActorPolicyRuleSchema).min(1),
-  })
-  .strict();
+const mcpTriggerActorPolicyRuleListSchema = z.array(mcpTriggerActorPolicyRuleSchema).min(1);
+
+const mcpTriggerActorPolicyInputSchema = z.union([
+  z
+    .object({
+      anyOf: mcpTriggerActorPolicyRuleListSchema,
+      noneOf: mcpTriggerActorPolicyRuleListSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      anyOf: mcpTriggerActorPolicyRuleListSchema.optional(),
+      noneOf: mcpTriggerActorPolicyRuleListSchema,
+    })
+    .strict(),
+]);
 
 const mcpTriggerEventConditionInputSchema = z
   .object({

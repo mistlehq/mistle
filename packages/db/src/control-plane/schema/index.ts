@@ -259,10 +259,10 @@ export {
 export {
   webhookTriggers,
   type WebhookTriggerActorPolicy,
-  type WebhookTriggerActorPolicyAttributeRule,
   type WebhookTriggerActorPolicyRelationshipRule,
   type WebhookTriggerActorPolicyResourceReference,
   type WebhookTriggerActorPolicyRule,
+  type WebhookTriggerActorPolicyRuleList,
   type WebhookTriggerActorPolicySpecificActorRule,
   type WebhookTriggerEventCondition,
   type InsertWebhookTrigger,

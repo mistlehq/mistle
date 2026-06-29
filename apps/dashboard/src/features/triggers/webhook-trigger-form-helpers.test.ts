@@ -484,6 +484,41 @@ describe("toWebhookTriggerFormValues", () => {
     ]);
   });
 
+  it("serializes actor exclusion policies without positive rules", () => {
+    const actorPolicy: WebhookTriggerActorPolicy = {
+      noneOf: [
+        {
+          kind: "resource",
+          actor: {
+            resourceKind: "user",
+            handle: "octocat",
+          },
+        },
+      ],
+    };
+
+    const formValues = {
+      ...toWebhookTriggerFormValues(null),
+      name: "Issue comments",
+      sandboxProfileId: "sbp_123",
+      primaryRepositoryId: "mistlehq/mistle",
+      eventIds: [IssueCommentConditionId0],
+      eventActorPolicies: {
+        [IssueCommentConditionId0]: actorPolicy,
+      },
+      eventParameterRules: {
+        [IssueCommentConditionId0]: {},
+      },
+    };
+
+    expect(toUpdateWebhookTriggerPayload(formValues, GitHubEventOptions).eventConditions).toEqual([
+      {
+        eventType: "github.issue_comment.created",
+        actorPolicy,
+      },
+    ]);
+  });
+
   it("accepts custom stored templates", () => {
     expect(
       toWebhookTriggerFormValues({

@@ -31,6 +31,61 @@ export function createGitHubEventOption(input: {
   return {
     ...createWebhookTriggerEventOption({
       eventDefinition,
+      resourceDefinitions:
+        GitHubCloudBrowserDefinition.resourceDefinitions === undefined
+          ? undefined
+          : GitHubCloudBrowserDefinition.resourceDefinitions.map((definition) => ({
+              kind: definition.kind,
+              selectionMode: definition.selectionMode,
+              bindingField: definition.bindingField,
+              displayNameSingular: definition.displayNameSingular,
+              displayNamePlural: definition.displayNamePlural,
+              ...(definition.description === undefined
+                ? {}
+                : { description: definition.description }),
+              ...(definition.attributeDefinitions === undefined
+                ? {}
+                : {
+                    attributeDefinitions: definition.attributeDefinitions.map(
+                      (attributeDefinition) => ({
+                        key: attributeDefinition.key,
+                        valueType: attributeDefinition.valueType,
+                        ...(attributeDefinition.displayName === undefined
+                          ? {}
+                          : { displayName: attributeDefinition.displayName }),
+                        ...(attributeDefinition.description === undefined
+                          ? {}
+                          : { description: attributeDefinition.description }),
+                        ...(attributeDefinition.actorPolicyEligible === undefined
+                          ? {}
+                          : { actorPolicyEligible: attributeDefinition.actorPolicyEligible }),
+                      }),
+                    ),
+                  }),
+            })),
+      resourceRelationshipDefinitions:
+        GitHubCloudBrowserDefinition.resourceRelationshipDefinitions === undefined
+          ? undefined
+          : GitHubCloudBrowserDefinition.resourceRelationshipDefinitions.map((definition) => ({
+              relationshipKind: definition.relationshipKind,
+              subjectResourceKind: definition.subjectResourceKind,
+              objectResourceKind: definition.objectResourceKind,
+              ...(definition.displayName === undefined
+                ? {}
+                : { displayName: definition.displayName }),
+              ...(definition.description === undefined
+                ? {}
+                : { description: definition.description }),
+              scopeDefinitions: definition.scopeDefinitions.map((scopeDefinition) => ({
+                scopeKind: scopeDefinition.scopeKind,
+                ...(scopeDefinition.displayName === undefined
+                  ? {}
+                  : { displayName: scopeDefinition.displayName }),
+                ...(scopeDefinition.description === undefined
+                  ? {}
+                  : { description: scopeDefinition.description }),
+              })),
+            })),
       webhookSourceId: input.webhookSourceId ?? GitHubWebhookSourceId,
       connectionId: input.connectionId ?? GitHubConnectionId,
       connectionLabel: input.connectionLabel ?? GitHubConnectionLabel,

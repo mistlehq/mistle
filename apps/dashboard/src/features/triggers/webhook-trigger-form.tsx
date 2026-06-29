@@ -65,10 +65,9 @@ export type { WebhookTriggerEventOptionAvailability } from "./webhook-trigger-ev
 type WebhookTriggerTypeSpecificSectionProps = {
   values: Pick<
     WebhookTriggerFormValues,
-    "conversationKeyTemplate" | "eventActorPolicies" | "eventIds" | "eventParameterRules"
+    "conversationKeyTemplate" | "eventIds" | "eventParameterRules"
   >;
   connectionOptions: readonly WebhookTriggerFormOption[];
-  connections: readonly IntegrationConnection[];
   webhookEventOptions: readonly WebhookTriggerEventOption[];
   triggerPickerDisabledState: WebhookTriggerEventPickerDisabledState | null;
   disabled: boolean;
@@ -191,17 +190,6 @@ export function WebhookTriggerTypeSpecificSection(
           eventParameterRules={input.values.eventParameterRules}
         />
       </div>
-
-      <WebhookTriggerActorPolicyFields
-        connections={input.connections}
-        disabled={input.disabled}
-        eventActorPolicies={input.values.eventActorPolicies}
-        onActorPoliciesChange={(policies) => {
-          input.onValueChange("eventActorPolicies", policies);
-        }}
-        selectedEventIds={input.values.eventIds}
-        webhookEventOptions={input.webhookEventOptions}
-      />
 
       {input.values.eventIds.length === 0 ? null : (
         <div className="p-4">
@@ -452,7 +440,6 @@ export function WebhookTriggerForm(input: WebhookTriggerFormProps): React.JSX.El
       typeSpecificSection={
         <WebhookTriggerTypeSpecificSection
           connectionOptions={input.connectionOptions}
-          connections={input.connections}
           disabled={disabled}
           fieldErrors={input.fieldErrors}
           formState={formState}
@@ -465,15 +452,27 @@ export function WebhookTriggerForm(input: WebhookTriggerFormProps): React.JSX.El
         />
       }
       extraSectionsBeforeMessage={
-        <WebhookTriggerInstructionsSection
-          disabled={disabled}
-          instructionsLabelId={instructionsLabelId}
-          onValueChange={(value) => {
-            input.onValueChange("instructions", value);
-          }}
-          loadResourceReferences={resourceReferenceLoader}
-          value={input.values.instructions}
-        />
+        <>
+          <WebhookTriggerActorPolicyFields
+            connections={input.connections}
+            disabled={disabled}
+            eventActorPolicies={input.values.eventActorPolicies}
+            onActorPoliciesChange={(policies) => {
+              input.onValueChange("eventActorPolicies", policies);
+            }}
+            selectedEventIds={input.values.eventIds}
+            webhookEventOptions={input.webhookEventOptions}
+          />
+          <WebhookTriggerInstructionsSection
+            disabled={disabled}
+            instructionsLabelId={instructionsLabelId}
+            onValueChange={(value) => {
+              input.onValueChange("instructions", value);
+            }}
+            loadResourceReferences={resourceReferenceLoader}
+            value={input.values.instructions}
+          />
+        </>
       }
     />
   );
