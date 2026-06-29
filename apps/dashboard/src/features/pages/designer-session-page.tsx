@@ -32,6 +32,7 @@ import {
   removeDesignerCanvasTabFromLatestTabs,
 } from "./designer-canvas-tabs.js";
 import { DesignerCanvasWorkspace } from "./designer-session-page-view.js";
+import { SessionStartupStatus } from "./session-startup-status.js";
 import { SessionWorkbenchFullPage } from "./session-workbench-full-page.js";
 
 function useDesignerSessionId(): string {
@@ -259,7 +260,7 @@ export function DesignerSessionPage(): React.JSX.Element | null {
   });
 
   if (designerSessionQuery.isPending) {
-    return null;
+    return <DesignerSessionLoadingPage />;
   }
 
   if (designerSessionQuery.isError) {
@@ -290,6 +291,16 @@ export function DesignerSessionPage(): React.JSX.Element | null {
       searchParams={searchParams}
       setSearchParams={setSearchParams}
     />
+  );
+}
+
+export function DesignerSessionLoadingPage(): React.JSX.Element {
+  return (
+    <ConversationWorkspaceFrame title="Designer" leadingControl={<DesignerSessionSidebarTrigger />}>
+      <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center px-4 py-6">
+        <SessionStartupStatus state="preparing_conversation" />
+      </div>
+    </ConversationWorkspaceFrame>
   );
 }
 

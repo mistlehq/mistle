@@ -39,6 +39,7 @@ describe("resolveAppShellFrame", () => {
       pageMeta: {
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
+        sidebarEntryState: null,
         sidebarDefaultOpen: null,
         sidebarTriggerOwner: "workspace",
         title: "Sessions",
@@ -92,6 +93,7 @@ describe("resolveAppShellFrame", () => {
       pageMeta: {
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
+        sidebarEntryState: null,
         sidebarDefaultOpen: null,
         sidebarTriggerOwner: "workspace",
         title: "Sessions",
@@ -139,6 +141,7 @@ describe("resolveAppShellFrame", () => {
       pageMeta: {
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
+        sidebarEntryState: null,
         sidebarDefaultOpen: null,
         sidebarTriggerOwner: "page-frame",
         title: "Home",
@@ -183,6 +186,7 @@ describe("resolveAppShellFrame", () => {
       pageMeta: {
         appShellInsetOwner: "child",
         appShellViewportMode: "document",
+        sidebarEntryState: null,
         sidebarDefaultOpen: null,
         sidebarTriggerOwner: "page-frame",
         title: "Integrations",
@@ -197,7 +201,7 @@ describe("resolveAppShellFrame", () => {
     expect(frame.renderSidebarTrigger).toBe(true);
   });
 
-  it("passes explicit route sidebar defaults into the shell view frame", () => {
+  it("passes explicit route sidebar entry state into the shell view frame", () => {
     const locationPathname = "/designer/dsn_123";
     const routeState = resolveAppShellRouteState(locationPathname);
     const frame = resolveAppShellFrame({
@@ -220,7 +224,8 @@ describe("resolveAppShellFrame", () => {
       pageMeta: {
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "workspace",
-        sidebarDefaultOpen: false,
+        sidebarEntryState: "collapsed",
+        sidebarDefaultOpen: null,
         sidebarTriggerOwner: "workspace",
         title: "Designer",
         headerIcon: null,
@@ -231,6 +236,8 @@ describe("resolveAppShellFrame", () => {
       onShowSessionsSidebarChange: () => {},
     });
 
-    expect(frame.sidebarDefaultOpen).toBe(false);
+    expect(frame.sidebarEntryKey).toBe("/designer/dsn_123");
+    expect(frame.sidebarEntryState).toBe("collapsed");
+    expect(frame.sidebarDefaultOpen).toBeUndefined();
   });
 });

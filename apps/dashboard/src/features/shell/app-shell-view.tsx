@@ -9,6 +9,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@mistle/ui";
+import { useEffect, useRef, useState } from "react";
 
 import { PageHeaderSidebarTriggerProvider } from "../shared/page-header-sidebar-trigger-context.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
@@ -27,6 +28,8 @@ export interface AppShellViewProps {
   contentInsetOwner: "app-shell" | "child";
   mainContent: React.ReactNode;
   renderSidebarTrigger: boolean;
+  sidebarEntryKey?: string;
+  sidebarEntryState?: "collapsed" | null;
   topLoadingBar: React.ReactNode;
   viewportMode: "document" | "workspace";
 }
@@ -36,13 +39,31 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
     contentInsetOwner: input.contentInsetOwner,
     viewportMode: input.viewportMode,
   });
-  const sidebarProviderKey =
-    input.sidebarDefaultOpen === false ? "default-collapsed" : "default-expanded";
+  const sidebarEntryState = input.sidebarEntryState ?? null;
+  const sidebarEntryKey = input.sidebarEntryKey ?? "";
+  const [sidebarOpen, setSidebarOpen] = useState(input.sidebarDefaultOpen ?? true);
+  const appliedSidebarEntryKeyRef = useRef<string | null>(null);
+
+  // Synchronizes sidebar posture with router entry because location changes can come from links,
+  // history navigation, or redirects outside this shell's event handlers.
+  useEffect(() => {
+    if (sidebarEntryState !== "collapsed") {
+      return;
+    }
+
+    if (appliedSidebarEntryKeyRef.current === sidebarEntryKey) {
+      return;
+    }
+
+    appliedSidebarEntryKeyRef.current = sidebarEntryKey;
+    setSidebarOpen(false);
+  }, [sidebarEntryKey, sidebarEntryState]);
 
   return (
     <SidebarProvider
       defaultOpen={input.sidebarDefaultOpen ?? true}
-      key={sidebarProviderKey}
+      onOpenChange={setSidebarOpen}
+      open={sidebarOpen}
       style={SidebarWidthStyle}
     >
       <Sidebar>
