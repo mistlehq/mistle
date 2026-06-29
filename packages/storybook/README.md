@@ -50,6 +50,11 @@ This package hosts the single Storybook for the Mistle monorepo.
 - Reserve `*.story-fixtures.ts` or `*.story-fixtures.tsx` for Storybook-only composition.
 - Do not import story fixtures from dashboard tests.
 
+## Development Notes
+
+- The `pnpm storybook` script uses polling watcher settings to avoid macOS file descriptor limits in this monorepo.
+- `.storybook/main.ts` also routes Storybook's generated story-registry imports through fresh dev-only virtual modules during HMR. Without that, Storybook can detect a changed `*.stories.tsx` file and emit a Vite HMR update while the browser re-imports the unchanged story URL and keeps stale story exports.
+
 Agent-specific working preferences live in `packages/storybook/AGENTS.md`.
 
 ## Commands
