@@ -14,15 +14,12 @@ export const AgentRuntimeIds: readonly ["claude-code", "codex", "opencode", "pi"
 
 export type AgentRuntimeId = (typeof AgentRuntimeIds)[number];
 
-export const AgentRuntimeIdCatalog: Record<
-  "CLAUDE_CODE" | "CODEX" | "OPENCODE" | "PI",
-  AgentRuntimeId
-> = {
-  CLAUDE_CODE: "claude-code",
-  CODEX: "codex",
-  OPENCODE: "opencode",
-  PI: "pi",
-};
+export const AgentRuntimeIdCatalog = {
+  CLAUDE_CODE: AgentRuntimeIds[0],
+  CODEX: AgentRuntimeIds[1],
+  OPENCODE: AgentRuntimeIds[2],
+  PI: AgentRuntimeIds[3],
+} satisfies Record<"CLAUDE_CODE" | "CODEX" | "OPENCODE" | "PI", AgentRuntimeId>;
 
 export const AgentRuntimeMetadataCatalog: ReadonlyArray<AnyAgentRuntimeMetadata> = [
   CodexRuntimeMetadata,

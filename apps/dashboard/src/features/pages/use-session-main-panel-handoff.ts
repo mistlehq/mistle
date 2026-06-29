@@ -14,7 +14,6 @@ import {
   type MainPanelTransitionState,
 } from "./session-main-panel-handoff-state.js";
 
-type SessionMainPanelRuntimeId = AgentRuntimeId;
 type ChatRestoreConnectionInput =
   | {
       initialCwd?: string | null;
@@ -58,9 +57,9 @@ type SessionMainPanelHandoffRuntime = {
 };
 
 type UseSessionMainPanelHandoffInput = {
-  activeRuntimeIdRef: RefObject<SessionMainPanelRuntimeId>;
+  activeRuntimeIdRef: RefObject<AgentRuntimeId>;
   cliPtyState: ReturnType<typeof useSandboxPtyState>;
-  runtimes: Record<SessionMainPanelRuntimeId, SessionMainPanelHandoffRuntime>;
+  runtimes: Record<AgentRuntimeId, SessionMainPanelHandoffRuntime>;
   selectedRepositoryPathRef: RefObject<string | null>;
   sandboxInstanceId: string | null;
 };
@@ -154,7 +153,6 @@ export type {
   ChatRestoreConnectionInput,
   SessionMainPanelHandoffLifecycle,
   SessionMainPanelHandoffRuntime,
-  SessionMainPanelRuntimeId,
   SessionMainPanelHandoffResult,
   SessionCliLaunchTarget,
   UseSessionMainPanelHandoffInput,

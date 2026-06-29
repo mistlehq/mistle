@@ -1,3 +1,4 @@
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { useCallback, useMemo, type RefObject } from "react";
 
 import type { UseClaudeCodeSessionStateResult } from "../session-agents/claude-code/session-state/index.js";
@@ -21,10 +22,7 @@ import {
   resolveSessionLifecycleForWorkbench,
 } from "../session-agents/session-workbench-handoff-runtimes.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
-import {
-  useSessionMainPanelHandoff,
-  type SessionMainPanelRuntimeId,
-} from "./use-session-main-panel-handoff.js";
+import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
 import type { SessionLifecycleForWorkbench } from "./use-session-workbench-lifecycle-state.js";
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
 
@@ -40,7 +38,7 @@ type SessionWorkbenchHandoffControlState = {
 };
 
 export function useSessionWorkbenchHandoffControl(input: {
-  activeHandoffRuntimeIdRef: RefObject<SessionMainPanelRuntimeId>;
+  activeHandoffRuntimeIdRef: RefObject<AgentRuntimeId>;
   claudeCodeSessionState: UseClaudeCodeSessionStateResult;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   openCodeSessionState: UseOpenCodeSessionStateResult;

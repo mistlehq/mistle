@@ -313,7 +313,6 @@ export type {
   InsertSandboxProfileVersion,
   SandboxProfileAssociatedResourceEventRoutingConfig,
   SandboxProfileVersion,
-  SandboxProfileVersionAgentRuntimeId,
   SandboxProfileVersionSkillsConfig,
   SandboxProfileVersionState,
 } from "./sandbox-profile-versions.js";
