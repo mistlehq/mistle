@@ -126,49 +126,7 @@ export async function listIntegrationTargets(
 
     return {
       ...result,
-      items: result.items.map((target) => {
-        const resolvedMetadata = resolveTargetMetadataFromPersistedTarget(target);
-        const projectedTargetUi = projectTargetUi({
-          familyId: target.familyId,
-          variantId: target.variantId,
-          config: target.config,
-        });
-
-        return {
-          targetKey: target.targetKey,
-          familyId: target.familyId,
-          variantId: target.variantId,
-          kind: resolvedMetadata.kind,
-          enabled: target.enabled,
-          config: target.config,
-          displayName: resolvedMetadata.displayName,
-          description: resolvedMetadata.description,
-          ...(resolvedMetadata.logoKey === undefined ? {} : { logoKey: resolvedMetadata.logoKey }),
-          ...(resolvedMetadata.connectionMethods === undefined ||
-          resolvedMetadata.connectionMethods.length === 0
-            ? {}
-            : { connectionMethods: resolvedMetadata.connectionMethods }),
-          ...(resolvedMetadata.webhookSource === undefined
-            ? {}
-            : { webhookSource: resolvedMetadata.webhookSource }),
-          ...(resolvedMetadata.supportedWebhookEvents === undefined
-            ? {}
-            : { supportedWebhookEvents: resolvedMetadata.supportedWebhookEvents }),
-          ...(resolvedMetadata.supportedAssociatedResourceEvents === undefined
-            ? {}
-            : {
-                supportedAssociatedResourceEvents:
-                  resolvedMetadata.supportedAssociatedResourceEvents,
-              }),
-          targetHealth: projectedTargetUi.targetHealth,
-          ...(target.displayNameOverride === null
-            ? {}
-            : { displayNameOverride: target.displayNameOverride }),
-          ...(target.descriptionOverride === null
-            ? {}
-            : { descriptionOverride: target.descriptionOverride }),
-        };
-      }),
+      items: result.items.map(projectIntegrationTargetListItem),
     };
   } catch (error) {
     if (
@@ -183,4 +141,55 @@ export async function listIntegrationTargets(
 
     throw error;
   }
+}
+
+export function projectIntegrationTargetListItem(
+  target: IntegrationTarget,
+): IntegrationTargetListItem {
+  const resolvedMetadata = resolveTargetMetadataFromPersistedTarget(target);
+  const projectedTargetUi = projectTargetUi({
+    familyId: target.familyId,
+    variantId: target.variantId,
+    config: target.config,
+  });
+
+  return IntegrationTargetSchema.parse({
+    targetKey: target.targetKey,
+    familyId: target.familyId,
+    variantId: target.variantId,
+    kind: resolvedMetadata.kind,
+    enabled: target.enabled,
+    config: target.config,
+    displayName: resolvedMetadata.displayName,
+    description: resolvedMetadata.description,
+    ...(resolvedMetadata.logoKey === undefined ? {} : { logoKey: resolvedMetadata.logoKey }),
+    ...(resolvedMetadata.connectionMethods === undefined ||
+    resolvedMetadata.connectionMethods.length === 0
+      ? {}
+      : { connectionMethods: resolvedMetadata.connectionMethods }),
+    ...(resolvedMetadata.webhookSource === undefined
+      ? {}
+      : { webhookSource: resolvedMetadata.webhookSource }),
+    ...(resolvedMetadata.resourceDefinitions === undefined
+      ? {}
+      : { resourceDefinitions: resolvedMetadata.resourceDefinitions }),
+    ...(resolvedMetadata.resourceRelationshipDefinitions === undefined
+      ? {}
+      : { resourceRelationshipDefinitions: resolvedMetadata.resourceRelationshipDefinitions }),
+    ...(resolvedMetadata.supportedWebhookEvents === undefined
+      ? {}
+      : { supportedWebhookEvents: resolvedMetadata.supportedWebhookEvents }),
+    ...(resolvedMetadata.supportedAssociatedResourceEvents === undefined
+      ? {}
+      : {
+          supportedAssociatedResourceEvents: resolvedMetadata.supportedAssociatedResourceEvents,
+        }),
+    targetHealth: projectedTargetUi.targetHealth,
+    ...(target.displayNameOverride === null
+      ? {}
+      : { displayNameOverride: target.displayNameOverride }),
+    ...(target.descriptionOverride === null
+      ? {}
+      : { descriptionOverride: target.descriptionOverride }),
+  });
 }
