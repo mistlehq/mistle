@@ -1,4 +1,8 @@
-import { IntegrationBindingKinds, TriggerKinds } from "@mistle/db/control-plane";
+import {
+  IntegrationConnectionStatuses,
+  IntegrationBindingKinds,
+  TriggerKinds,
+} from "@mistle/db/control-plane";
 import { AgentRuntimeIds } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { MistleSupportedCapabilityKinds } from "@mistle/integrations-definitions/server";
 import { z } from "zod";
@@ -61,9 +65,19 @@ export const mcpListIntegrationTargetsInputSchema = z
 
 export const mcpListIntegrationConnectionsInputSchema = z
   .object({
+    targetKey: z.string().min(1).optional(),
+    providerFamilyId: z.string().min(1).optional(),
+    status: z.enum(IntegrationConnectionStatuses).optional(),
     limit: z.number().int().min(1).max(100).optional(),
     after: z.string().min(1).optional(),
     before: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const mcpIntegrationSetupStatusGetInputSchema = z
+  .object({
+    targetKey: z.string().min(1).optional(),
+    providerFamilyId: z.string().min(1).optional(),
   })
   .strict();
 

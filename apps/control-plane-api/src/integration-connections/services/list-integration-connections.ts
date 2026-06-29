@@ -2,6 +2,7 @@ import {
   OrganizationIdentityLinkProviderConfigStatus,
   type ControlPlaneDatabase,
   type IntegrationConnection,
+  type IntegrationConnectionStatus,
   type IntegrationConnectionResourceState,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
@@ -49,6 +50,9 @@ export type ListIntegrationConnectionsInput = {
   limit?: number;
   after?: string | undefined;
   before?: string | undefined;
+  status?: IntegrationConnectionStatus | undefined;
+  targetKey?: string | undefined;
+  targetKeys?: readonly string[] | undefined;
 };
 
 type IntegrationConnectionListItem = z.output<typeof IntegrationConnectionSchema>;
@@ -120,18 +124,18 @@ export async function listIntegrationConnections(
         }),
         fetchPage: async ({ direction, cursor, limitPlusOne }) =>
           db.query.integrationConnections.findMany({
-            where: (table, { and, eq, gt, lt }) => {
-              const organizationScope = eq(table.organizationId, input.organizationId);
+            where: (table, { and, gt, lt }) => {
+              const scope = buildIntegrationConnectionsListScope(table, input);
 
               if (cursor === undefined) {
-                return organizationScope;
+                return scope;
               }
 
               if (direction === KeysetPaginationDirections.FORWARD) {
-                return and(organizationScope, gt(table.id, cursor.id));
+                return and(scope, gt(table.id, cursor.id));
               }
 
-              return and(organizationScope, lt(table.id, cursor.id));
+              return and(scope, lt(table.id, cursor.id));
             },
             orderBy:
               direction === KeysetPaginationDirections.BACKWARD
@@ -156,7 +160,7 @@ export async function listIntegrationConnections(
               totalResults: sql<number>`count(*)::int`,
             })
             .from(tables.integrationConnections)
-            .where(eq(tables.integrationConnections.organizationId, input.organizationId));
+            .where(buildIntegrationConnectionsListScope(tables.integrationConnections, input));
 
           return result?.totalResults ?? 0;
         },
@@ -264,6 +268,30 @@ export async function listIntegrationConnections(
 
     throw error;
   }
+}
+
+type IntegrationConnectionsScopeTable = Pick<
+  ReturnType<typeof getControlPlaneDatabaseSchema>["integrationConnections"],
+  "organizationId" | "status" | "targetKey"
+>;
+
+function buildIntegrationConnectionsListScope(
+  table: IntegrationConnectionsScopeTable,
+  input: Pick<
+    ListIntegrationConnectionsInput,
+    "organizationId" | "status" | "targetKey" | "targetKeys"
+  >,
+) {
+  if (input.targetKeys !== undefined && input.targetKeys.length === 0) {
+    return sql`false`;
+  }
+
+  return and(
+    eq(table.organizationId, input.organizationId),
+    ...(input.targetKey === undefined ? [] : [eq(table.targetKey, input.targetKey)]),
+    ...(input.targetKeys === undefined ? [] : [inArray(table.targetKey, [...input.targetKeys])]),
+    ...(input.status === undefined ? [] : [eq(table.status, input.status)]),
+  );
 }
 
 async function listIdentityLinkedConnectionIds(input: {

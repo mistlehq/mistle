@@ -63,6 +63,55 @@ const FormSetupDescriptorSchema = z
   })
   .strict();
 
+const SetupStatusSchema = z
+  .object({
+    items: z.array(
+      z
+        .object({
+          target: z
+            .object({
+              targetKey: z.string().min(1),
+              providerFamilyId: z.string().min(1),
+              variantId: z.string().min(1),
+              displayName: z.string().min(1),
+            })
+            .strict(),
+          setup: z
+            .object({
+              setupSupported: z.boolean(),
+              requiresSetup: z.boolean(),
+              availableMethods: z.array(
+                z
+                  .object({
+                    methodId: z.string().min(1),
+                    kind: z.enum(["device-authorization", "form", "redirect"]),
+                    label: z.string().min(1),
+                    secretFieldNames: z.array(z.string().min(1)).optional(),
+                  })
+                  .strict(),
+              ),
+            })
+            .strict(),
+          connections: z.array(
+            z
+              .object({
+                connectionId: z.string().min(1),
+                displayName: z.string().min(1),
+                status: z.enum(IntegrationConnectionStatuses),
+                setupComplete: z.boolean(),
+                methodId: z.string().min(1).optional(),
+                configuredSecretNames: z.array(z.string().min(1)),
+                createdAt: z.string().min(1),
+                updatedAt: z.string().min(1),
+              })
+              .strict(),
+          ),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
 describe.concurrent("MCP integration tools", () => {
   it("exposes integration setup input schemas without agent-supplied OAuth config", async ({
     env,
@@ -338,6 +387,153 @@ describe.concurrent("MCP integration tools", () => {
     expect(webhookSourcesResult.structuredContent).toEqual({
       items: [],
     });
+  });
+
+  it("scopes connection listing by target and provider family", async ({ env }) => {
+    await seedOpenAiTarget(env);
+    await seedGitHubTarget(env);
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-integration-connection-scope@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP integration scoped connection reader",
+      permissions: [OrganizationPermissions.INTEGRATION_CONNECTION_READ],
+    });
+
+    const openAiResponse = await createFormConnection({
+      env,
+      targetKey: "openai-default",
+      cookie: session.cookie,
+      body: CreateFormConnectionBodySchema.parse({
+        displayName: "OpenAI scoped key",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+        secrets: {
+          apiKey: "sk-test-mcp-scoped-openai",
+        },
+      }),
+    });
+    expect(openAiResponse.status).toBe(201);
+    const openAiConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await openAiResponse.json(),
+    );
+    const githubResponse = await createFormConnection({
+      env,
+      targetKey: "github-cloud",
+      cookie: session.cookie,
+      body: CreateFormConnectionBodySchema.parse({
+        displayName: "GitHub scoped key",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+        secrets: {
+          apiKey: "github-token-mcp-scoped",
+        },
+      }),
+    });
+    expect(githubResponse.status).toBe(201);
+    const githubConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await githubResponse.json(),
+    );
+
+    const targetScopedResult = await callMcpTool({
+      env,
+      token,
+      name: "integration_connections_list",
+      arguments: {
+        targetKey: "openai-default",
+        limit: 10,
+      },
+    });
+    expect(targetScopedResult.isError).toBeUndefined();
+    const targetScopedConnections = ListIntegrationConnectionsResponseSchema.parse(
+      targetScopedResult.structuredContent,
+    );
+    expect(targetScopedConnections.items.map((connection) => connection.id)).toEqual([
+      openAiConnection.id,
+    ]);
+
+    const providerScopedResult = await callMcpTool({
+      env,
+      token,
+      name: "integration_connections_list",
+      arguments: {
+        providerFamilyId: "github",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        limit: 10,
+      },
+    });
+    expect(providerScopedResult.isError).toBeUndefined();
+    const providerScopedConnections = ListIntegrationConnectionsResponseSchema.parse(
+      providerScopedResult.structuredContent,
+    );
+    expect(providerScopedConnections.items.map((connection) => connection.id)).toEqual([
+      githubConnection.id,
+    ]);
+  });
+
+  it("returns compact setup status for a catalog-resolved target before setup", async ({ env }) => {
+    await seedIntegrationTarget(env, {
+      targetKey: "linear-default",
+      familyId: "linear",
+      variantId: "linear-default",
+      config: {},
+    });
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-integration-setup-status@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP integration setup status reader",
+      permissions: [OrganizationPermissions.INTEGRATION_CONNECTION_READ],
+    });
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "integration_setup_status_get",
+      arguments: {
+        targetKey: "linear-default",
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const status = SetupStatusSchema.parse(result.structuredContent);
+    expect(status.items).toEqual([
+      {
+        target: {
+          targetKey: "linear-default",
+          providerFamilyId: "linear",
+          variantId: "linear-default",
+          displayName: "Linear",
+        },
+        setup: {
+          setupSupported: true,
+          requiresSetup: true,
+          availableMethods: [
+            {
+              methodId: IntegrationConnectionMethodIds.API_KEY,
+              kind: "form",
+              label: "API key",
+              secretFieldNames: ["apiKey"],
+            },
+            {
+              methodId: "linear-oauth-app",
+              kind: "form",
+              label: "Linear OAuth app",
+              secretFieldNames: ["clientSecret"],
+            },
+          ],
+        },
+        connections: [],
+      },
+    ]);
   });
 
   it("strips declared secret field names from MCP connection config projections", async ({

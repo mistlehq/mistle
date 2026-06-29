@@ -6,7 +6,7 @@
 ## Managed Instruction Context
 
 - Keep stable Designer session-agent vocabulary in the `mistle-designer-context` managed instruction block, separate from the `mistle-designer-behavior` block.
-- Keep Designer managed instruction content in the dedicated TypeScript modules under `services/`. Do not move it to Markdown unless runtime packaging explicitly includes and loads that Markdown file.
+- Keep Designer managed instruction content in the canonical Markdown files under `instructions/`. The TypeScript modules under `services/` load those files and the production build copies them into `dist`.
 - The context block is the Designer session agent's operating vocabulary. It may repeat product terms from `CONTEXT.md` when those terms matter at runtime, but `CONTEXT.md` remains authoritative for codebase product/domain terms.
 - For any Designer terminology, instruction, or context change, route settled terms by authority: update root `CONTEXT.md` only for product/domain concepts that should guide the codebase, and update `mistle-designer-context` only for Designer session-agent wording, user-facing aliases, `_Avoid_` guidance, and `_Maps to_` anchors.
 - If a decision affects both product meaning and Designer chat wording, update both surfaces in the same change and keep the `mistle-designer-context` entry mapped back to the `CONTEXT.md` term.

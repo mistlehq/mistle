@@ -1,4 +1,7 @@
-import { type IntegrationConnection } from "@mistle/db/control-plane";
+import {
+  type IntegrationConnection,
+  IntegrationConnectionStatuses,
+} from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
   IntegrationConnectionMethodIds,
@@ -32,6 +35,7 @@ import {
   mcpIntegrationConnectionOAuthStartInputSchema,
   mcpIntegrationConnectionResourcesListInputSchema,
   mcpIntegrationConnectionResourcesRefreshInputSchema,
+  mcpIntegrationSetupStatusGetInputSchema,
   mcpListIntegrationConnectionsInputSchema,
   mcpListIntegrationTargetsInputSchema,
 } from "../tool-schemas.js";
@@ -140,6 +144,11 @@ export function registerIntegrationTools(server: McpServer, context: MistleMcpSe
           ...(input.after === undefined ? {} : { after: input.after }),
           ...(input.before === undefined ? {} : { before: input.before }),
           ...(input.limit === undefined ? {} : { limit: input.limit }),
+          ...(input.providerFamilyId === undefined
+            ? {}
+            : { providerFamilyId: input.providerFamilyId }),
+          ...(input.status === undefined ? {} : { status: input.status }),
+          ...(input.targetKey === undefined ? {} : { targetKey: input.targetKey }),
         }),
       );
     },
@@ -164,6 +173,28 @@ export function registerIntegrationTools(server: McpServer, context: MistleMcpSe
       );
 
       return structuredResult(await getIntegrationConnectionForMcp(context, { connectionId }));
+    },
+  );
+
+  server.registerTool(
+    "integration_setup_status_get",
+    {
+      title: "Get integration setup status",
+      description:
+        "Get compact setup status for a target or provider family in the current Mistle organization. Use after resolving a provider name from the Designer integration catalog to decide whether an App is already connected or an App setup step is needed.",
+      inputSchema: mcpIntegrationSetupStatusGetInputSchema,
+      annotations: {
+        ...ReadOnlyToolAnnotations,
+        title: "Get integration setup status",
+      },
+    },
+    async (input) => {
+      requireMcpToolPermission(
+        context.organizationActor,
+        OrganizationPermissions.INTEGRATION_CONNECTION_READ,
+      );
+
+      return structuredResult(await getIntegrationSetupStatusForMcp(context, input));
     },
   );
 
@@ -487,8 +518,18 @@ async function listIntegrationConnectionsForMcp(
     limit?: number;
     after?: string | undefined;
     before?: string | undefined;
+    providerFamilyId?: string | undefined;
+    status?: IntegrationConnection["status"] | undefined;
+    targetKey?: string | undefined;
   },
 ): Promise<IntegrationConnectionsListResult> {
+  const resolvedTargetKeys =
+    input.providerFamilyId === undefined
+      ? undefined
+      : await listEnabledTargetKeysByProviderFamily(context, {
+          providerFamilyId: input.providerFamilyId,
+        });
+
   const result = await listIntegrationConnections(
     {
       db: context.db,
@@ -499,6 +540,9 @@ async function listIntegrationConnectionsForMcp(
       ...(input.after === undefined ? {} : { after: input.after }),
       ...(input.before === undefined ? {} : { before: input.before }),
       ...(input.limit === undefined ? {} : { limit: input.limit }),
+      ...(input.status === undefined ? {} : { status: input.status }),
+      ...(input.targetKey === undefined ? {} : { targetKey: input.targetKey }),
+      ...(resolvedTargetKeys === undefined ? {} : { targetKeys: resolvedTargetKeys }),
     },
   );
   const targetKeys = [...new Set(result.items.map((connection) => connection.targetKey))];
@@ -528,6 +572,162 @@ async function listIntegrationConnectionsForMcp(
       });
     }),
   };
+}
+
+async function getIntegrationSetupStatusForMcp(
+  context: MistleMcpServerContext,
+  input: {
+    providerFamilyId?: string | undefined;
+    targetKey?: string | undefined;
+  },
+): Promise<Record<string, unknown>> {
+  const targets = await listSetupStatusTargets(context, input);
+  const targetKeys = targets.map((target) => target.targetKey);
+  const connections =
+    targetKeys.length === 0
+      ? []
+      : await context.db.query.integrationConnections.findMany({
+          where: (table, { and, eq, inArray }) =>
+            and(
+              eq(table.organizationId, context.organizationActor.organizationId),
+              inArray(table.targetKey, targetKeys),
+            ),
+          orderBy: (table, { asc }) => [asc(table.targetKey), asc(table.id)],
+          with: {
+            target: {
+              columns: {
+                familyId: true,
+                variantId: true,
+              },
+            },
+          },
+        });
+  const configuredSecretNamesByConnectionId = await listConfiguredSecretNamesByConnectionId({
+    connections,
+    db: context.db,
+    integrationRegistry: context.integrationRegistry,
+  });
+  const connectionsByTargetKey = new Map<string, typeof connections>();
+  for (const connection of connections) {
+    const targetConnections = connectionsByTargetKey.get(connection.targetKey) ?? [];
+    targetConnections.push(connection);
+    connectionsByTargetKey.set(connection.targetKey, targetConnections);
+  }
+
+  return {
+    items: targets.map((target) => {
+      const definition = getDefinitionOrThrow({
+        integrationRegistry: context.integrationRegistry,
+        target,
+      });
+      const targetConnections = connectionsByTargetKey.get(target.targetKey) ?? [];
+      const activeConnectionCount = targetConnections.filter(
+        (connection) => connection.status === IntegrationConnectionStatuses.ACTIVE,
+      ).length;
+
+      return {
+        target: {
+          targetKey: target.targetKey,
+          providerFamilyId: target.familyId,
+          variantId: target.variantId,
+          displayName: definition.displayName,
+        },
+        setup: {
+          setupSupported: definition.connectionMethods.length > 0,
+          requiresSetup: activeConnectionCount === 0,
+          availableMethods: definition.connectionMethods.map((method) => ({
+            methodId: method.id,
+            kind: method.kind,
+            label: method.label,
+            ...(method.kind === "form"
+              ? { secretFieldNames: method.secretFields.map((field) => field.name) }
+              : {}),
+          })),
+        },
+        connections: targetConnections.map((connection) => {
+          const config = readConnectionConfig(connection);
+          const connectionMethod = config["connection_method"];
+
+          return {
+            connectionId: connection.id,
+            displayName: connection.displayName,
+            status: connection.status,
+            setupComplete: connection.status === IntegrationConnectionStatuses.ACTIVE,
+            ...(typeof connectionMethod === "string" && connectionMethod.length > 0
+              ? { methodId: connectionMethod }
+              : {}),
+            configuredSecretNames: configuredSecretNamesByConnectionId.get(connection.id) ?? [],
+            createdAt: normalizeDateString(connection.createdAt),
+            updatedAt: normalizeDateString(connection.updatedAt),
+          };
+        }),
+      };
+    }),
+  };
+}
+
+async function listSetupStatusTargets(
+  context: MistleMcpServerContext,
+  input: {
+    providerFamilyId?: string | undefined;
+    targetKey?: string | undefined;
+  },
+): Promise<PersistedIntegrationTarget[]> {
+  if (input.targetKey === undefined && input.providerFamilyId === undefined) {
+    throw new BadRequestError(
+      "INVALID_INTEGRATION_SETUP_STATUS_INPUT",
+      "Either `targetKey` or `providerFamilyId` must be provided.",
+    );
+  }
+
+  const targets =
+    input.targetKey !== undefined
+      ? [
+          await getTargetOrThrow(context, {
+            targetKey: input.targetKey,
+          }),
+        ]
+      : await context.db.query.integrationTargets.findMany({
+          where: (table, { and, eq }) =>
+            and(eq(table.enabled, true), eq(table.familyId, input.providerFamilyId ?? "")),
+          orderBy: (table, { asc }) => [asc(table.targetKey)],
+        });
+
+  if (input.providerFamilyId !== undefined) {
+    const mismatchedTarget = targets.find((target) => target.familyId !== input.providerFamilyId);
+    if (mismatchedTarget !== undefined) {
+      throw new BadRequestError(
+        "INVALID_INTEGRATION_SETUP_STATUS_INPUT",
+        `Integration target '${mismatchedTarget.targetKey}' does not belong to provider family '${input.providerFamilyId}'.`,
+      );
+    }
+  }
+
+  if (targets.length === 0) {
+    throw new NotFoundError(
+      "TARGET_NOT_FOUND",
+      `No enabled integration target was found for provider family '${input.providerFamilyId ?? ""}'.`,
+    );
+  }
+
+  return targets;
+}
+
+async function listEnabledTargetKeysByProviderFamily(
+  context: MistleMcpServerContext,
+  input: {
+    providerFamilyId: string;
+  },
+): Promise<string[]> {
+  const targets = await context.db.query.integrationTargets.findMany({
+    columns: {
+      targetKey: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.enabled, true), eq(table.familyId, input.providerFamilyId)),
+  });
+
+  return targets.map((target) => target.targetKey);
 }
 
 async function prepareFormIntegrationSetup(
@@ -896,6 +1096,10 @@ function readConnectionConfig(
   }
 
   return readRecord(connection.config, "Integration connection config");
+}
+
+function normalizeDateString(value: string | Date): string {
+  return new Date(value).toISOString();
 }
 
 function readRecord(value: unknown, label: string): Record<string, unknown> {

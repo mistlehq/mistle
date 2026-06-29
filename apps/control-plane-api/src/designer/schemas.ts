@@ -349,6 +349,40 @@ export const putDesignerSessionCanvasTabsBodySchema = z
   })
   .strict();
 
+export const saveDesignerSelectedProviderResourcesBodySchema = z
+  .object({
+    targetDraft: z
+      .object({
+        profileId: z
+          .string()
+          .min(1)
+          .regex(/^sbp_[a-zA-Z0-9_-]+$/, {
+            message: "`profileId` must be a sandbox profile id.",
+          }),
+        version: z.number().int().min(1),
+      })
+      .strict(),
+    connectionId: z.string().min(1),
+    resourceKind: z.string().min(1),
+    selectedHandles: z.array(z.string().min(1).max(500)).max(500),
+    bindingIntent: z.string().min(1).max(160),
+  })
+  .strict();
+
+export const saveDesignerSelectedProviderResourcesResponseSchema = z
+  .object({
+    kind: z.literal("sandbox-profile-draft-provider-resources-saved"),
+    profileId: z.string().min(1),
+    version: z.number().int().min(1),
+    connectionId: z.string().min(1),
+    resourceKind: z.string().min(1),
+    bindingIntent: z.string().min(1),
+    bindingId: z.string().min(1),
+    selectedHandles: z.array(z.string().min(1)),
+    createdBinding: z.boolean(),
+  })
+  .strict();
+
 export const designerSessionSchema = z
   .object({
     id: z.string().min(1),
@@ -390,4 +424,10 @@ export type DesignerSessionListItemResponse = z.infer<typeof designerSessionList
 export type CreateDesignerSessionBody = z.infer<typeof createDesignerSessionBodySchema>;
 export type PutDesignerSessionCanvasTabsBody = z.infer<
   typeof putDesignerSessionCanvasTabsBodySchema
+>;
+export type SaveDesignerSelectedProviderResourcesBody = z.infer<
+  typeof saveDesignerSelectedProviderResourcesBodySchema
+>;
+export type SaveDesignerSelectedProviderResourcesResponse = z.infer<
+  typeof saveDesignerSelectedProviderResourcesResponseSchema
 >;

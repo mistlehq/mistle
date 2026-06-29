@@ -5,6 +5,7 @@ import {
   OrganizationIdentityLinkProviderConfigStatus,
   type IntegrationBindingKind,
   type ControlPlaneTransaction,
+  type SandboxProfileVersionIntegrationBinding,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import type { SandboxProfileAssociatedResourceEventRoutingConfig as SandboxProfileAssociatedResourceEventRoutingConfigInput } from "@mistle/integrations-core";
@@ -55,16 +56,31 @@ type PutProfileVersionDraftInput = {
   sandboxResources?: SandboxProfileVersionResources | null;
   skillsConfig?: SandboxProfileVersionSkillsConfig | null;
   associatedResourceEventRoutingConfig?: SandboxProfileAssociatedResourceEventRoutingConfigInput;
-  integrationBindings?: {
-    bindings: Array<{
-      id?: string;
-      clientRef?: string;
-      connectionId: string;
-      kind: IntegrationBindingKind;
-      config: Record<string, unknown>;
-    }>;
-  };
+  integrationBindings?: PutProfileVersionDraftIntegrationBindingsInput;
 };
+
+type PutProfileVersionDraftIntegrationBindingInput = {
+  id?: string;
+  clientRef?: string;
+  connectionId: string;
+  kind: IntegrationBindingKind;
+  config: Record<string, unknown>;
+};
+
+type PutProfileVersionDraftIntegrationBindingsInput =
+  | {
+      bindings: PutProfileVersionDraftIntegrationBindingInput[];
+    }
+  | {
+      mergeCurrentBindings: (input: {
+        db: ControlPlaneTransaction;
+        currentBindings: readonly SandboxProfileVersionIntegrationBinding[];
+      }) => Promise<PutProfileVersionDraftIntegrationBindingInput[]>;
+    };
+
+type ValidatedProfileVersionIntegrationBindings = Awaited<
+  ReturnType<typeof validateProfileVersionIntegrationBindings>
+>;
 
 type PutProfileVersionDraftOutput = {
   sandboxProfileId: string;
@@ -108,10 +124,9 @@ export async function putProfileVersionDraft(
     );
   }
 
-  const validatedBindings =
-    input.integrationBindings === undefined
-      ? null
-      : await validateProfileVersionIntegrationBindings(
+  const validatedReplacementBindings =
+    input.integrationBindings !== undefined && "bindings" in input.integrationBindings
+      ? await validateProfileVersionIntegrationBindings(
           { db },
           {
             organizationId: input.organizationId,
@@ -119,7 +134,8 @@ export async function putProfileVersionDraft(
             profileVersion: input.profileVersion,
             bindings: input.integrationBindings.bindings,
           },
-        );
+        )
+      : undefined;
   const nextSkillsConfig =
     input.skillsConfig === undefined
       ? undefined
@@ -201,9 +217,20 @@ export async function putProfileVersionDraft(
       input.gitCommitSigningIntegrationConnectionId === undefined
         ? lockedVersion.gitCommitSigningIntegrationConnectionId
         : input.gitCommitSigningIntegrationConnectionId;
+    const integrationBindingWrite =
+      input.integrationBindings === undefined
+        ? undefined
+        : await createIntegrationBindingWriteInput(tx, {
+            integrationBindings: input.integrationBindings,
+            organizationId: input.organizationId,
+            profileId: input.profileId,
+            profileVersion: input.profileVersion,
+            validatedReplacementBindings,
+          });
+
     await validateGitCommitSigningDraftConfig(tx, {
       bindings:
-        validatedBindings ??
+        integrationBindingWrite?.validatedBindings ??
         (await tx.query.sandboxProfileVersionIntegrationBindings.findMany({
           columns: {
             connectionId: true,
@@ -301,7 +328,7 @@ export async function putProfileVersionDraft(
     }
 
     const integrationBindings =
-      input.integrationBindings === undefined
+      integrationBindingWrite === undefined
         ? {
             bindings: await tx.query.sandboxProfileVersionIntegrationBindings.findMany({
               where: (table, { and: whereAnd, eq: whereEq }) =>
@@ -315,8 +342,8 @@ export async function putProfileVersionDraft(
         : await replaceProfileVersionIntegrationBindings(tx, {
             profileId: input.profileId,
             profileVersion: input.profileVersion,
-            bindings: input.integrationBindings.bindings,
-            validatedBindings: validatedBindings ?? [],
+            bindings: integrationBindingWrite.bindings,
+            validatedBindings: integrationBindingWrite.validatedBindings,
           });
 
     const persistedVersion = await tx.query.sandboxProfileVersions.findFirst({
@@ -367,6 +394,53 @@ export async function putProfileVersionDraft(
       integrationBindings,
     };
   });
+}
+
+async function createIntegrationBindingWriteInput(
+  db: ControlPlaneTransaction,
+  input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
+    integrationBindings: PutProfileVersionDraftIntegrationBindingsInput;
+    validatedReplacementBindings: ValidatedProfileVersionIntegrationBindings | undefined;
+  },
+) {
+  if ("bindings" in input.integrationBindings) {
+    if (input.validatedReplacementBindings === undefined) {
+      throw new Error("Expected replacement integration bindings to be prevalidated.");
+    }
+
+    return {
+      bindings: input.integrationBindings.bindings,
+      validatedBindings: input.validatedReplacementBindings,
+    };
+  }
+
+  const bindings = await input.integrationBindings.mergeCurrentBindings({
+    db,
+    currentBindings: await db.query.sandboxProfileVersionIntegrationBindings.findMany({
+      where: (table, { and: whereAnd, eq: whereEq }) =>
+        whereAnd(
+          whereEq(table.sandboxProfileId, input.profileId),
+          whereEq(table.sandboxProfileVersion, input.profileVersion),
+        ),
+      orderBy: (table, { asc }) => [asc(table.id)],
+    }),
+  });
+
+  return {
+    bindings,
+    validatedBindings: await validateProfileVersionIntegrationBindings(
+      { db },
+      {
+        organizationId: input.organizationId,
+        profileId: input.profileId,
+        profileVersion: input.profileVersion,
+        bindings,
+      },
+    ),
+  };
 }
 
 async function validateGitCommitSigningDraftConfig(

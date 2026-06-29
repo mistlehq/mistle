@@ -357,6 +357,33 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
+  it("shows a custom user input response in the transcript", () => {
+    const activeTurn = startTurn();
+    const state = reduceCodexChatState(activeTurn, {
+      type: "user_input_response_submitted",
+      entryId: "user-input-response_1",
+      turnId: "turn_123",
+      responseText: "Use the production Slack workspace.",
+    });
+
+    expect(state.entries).toEqual([
+      {
+        id: "user:turn_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Test prompt",
+        status: "completed",
+      },
+      {
+        id: "user-input-response_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Use the production Slack workspace.",
+        status: "completed",
+      },
+    ]);
+  });
+
   it("removes the steer delete action once the request is sending", () => {
     const activeTurn = startTurn();
     const queued = reduceCodexChatState(activeTurn, {

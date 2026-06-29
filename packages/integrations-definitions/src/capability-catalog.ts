@@ -35,6 +35,7 @@ export type MistleSupportedIntegrationCapability = {
       connectionMethods?: MistleSupportedConnectionMethod[] | undefined;
     };
     providerResources: {
+      bindingIntents?: MistleSupportedProviderResourceBindingIntent[] | undefined;
       resourceKindCount: number;
       resources?: MistleSupportedProviderResource[] | undefined;
       syncTriggers?: MistleSupportedResourceSyncTrigger[] | undefined;
@@ -91,6 +92,18 @@ export type MistleSupportedProviderResource = {
   displayNameSingular: string;
   kind: string;
   selectionMode: string;
+};
+
+export type MistleSupportedProviderResourceBindingIntent = {
+  id: string;
+  bindingKind: string;
+  bindingField: string;
+  emptyMessage: string;
+  label: string;
+  minSelectedResources: number;
+  resourceKind: string;
+  resourceLabelPlural: string;
+  searchPlaceholder: string;
 };
 
 export type MistleSupportedResourceSyncTrigger = {
@@ -295,6 +308,20 @@ function buildSupportedIntegrationCapability(
         resourceKindCount: resourceDefinitions.length,
         ...(input.includeDetails
           ? {
+              bindingIntents: resourceDefinitions.map((resource) => ({
+                id: createProviderResourceBindingIntentId({
+                  bindingKind: definition.kind,
+                  bindingField: resource.bindingField,
+                }),
+                bindingKind: definition.kind,
+                bindingField: resource.bindingField,
+                resourceKind: resource.kind,
+                label: `${definition.displayName} ${resource.displayNamePlural}`,
+                resourceLabelPlural: resource.displayNamePlural,
+                searchPlaceholder: `Search ${resource.displayNamePlural}`,
+                emptyMessage: `No ${resource.displayNamePlural} available for this connection.`,
+                minSelectedResources: 0,
+              })),
               resources: resourceDefinitions.map((resource) => ({
                 kind: resource.kind,
                 selectionMode: resource.selectionMode,
@@ -327,6 +354,13 @@ function buildSupportedIntegrationCapability(
       setup,
     },
   };
+}
+
+export function createProviderResourceBindingIntentId(input: {
+  bindingKind: string;
+  bindingField: string;
+}): string {
+  return `${input.bindingKind}-${input.bindingField}`;
 }
 
 function buildSetupSummary(definition: AnyIntegrationDefinition): {

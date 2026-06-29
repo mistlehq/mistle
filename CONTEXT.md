@@ -77,6 +77,14 @@ _Code name_: designer
 Mistle-owned instructions that guide **Mistle Designer** behavior inside a **Mistle Designer session**.
 _Avoid_: Repo guidance, contributor instructions, Designer instructions when the source of authority is ambiguous
 
+**Designer runtime reference**:
+A generated, read-only reference artifact made available inside a **Mistle Designer session** for runtime lookup without becoming part of **Designer managed instructions**.
+_Avoid_: Designer managed instructions, hand-authored runtime docs
+
+**Designer integration catalog**:
+A **Designer runtime reference** that lists static integration metadata such as provider aliases, integration target identities, setup methods, supported resource kinds, and known provider caveats.
+_Avoid_: Integration connection state, organization integration status, hand-authored provider docs
+
 **Designer recommendation**:
 A structured setup recommendation produced by **Mistle Designer** for integrations, triggers, provider configuration resources, or sandbox profile configuration.
 _Avoid_: Chat suggestion when the recommendation has selectable product state
@@ -149,8 +157,8 @@ A user-authored response submitted through the composer for a pending **User inp
 _Avoid_: Steer message, turn interruption, cancellation
 
 **Dashboard control action**:
-A runtime-requested action handled by the dashboard client to control browser-owned workspace state.
-_Avoid_: MCP tool when the action is handled by the browser rather than Mistle resource access
+A runtime-requested action handled by the dashboard client to control dashboard-owned workspace state or execute an explicitly supported dashboard-mediated product action.
+_Avoid_: MCP tool when the action is handled by the browser; browser-only action when the action intentionally mutates product state
 
 **Designer canvas**:
 The route-backed workspace surface displayed beside **Mistle Designer** chat.
@@ -803,6 +811,25 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Dashboard control action** that opens a **Designer canvas tab** is not responsible for whether the tab is persisted as **Mistle Designer session** workspace state.
 - A **Dashboard control action** is handled only by the currently active dashboard surface that supports it.
 - A **Dashboard control action** may open only dashboard-internal routes in **Designer canvas tabs**.
+- A dashboard-mediated **Dashboard control action** may target a Designer-selected draft **Sandbox profile version** when the product mutation is validated against the **Mistle Designer session** before it is saved.
+- A dashboard-mediated **Dashboard control action** that saves selected provider resources must validate the target draft **Sandbox profile version**, the selected **Integration connection**, the targeted **Integration binding**, and the selected provider resources before changing saved configuration.
+- A dashboard-mediated **Dashboard control action** should express a typed product action rather than a generic patch to arbitrary **Sandbox profile version configuration**.
+- A dashboard-mediated **Dashboard control action** that saves selected provider resources may create or update the intended **Integration binding** on the target draft **Sandbox profile version** when the binding is part of the typed product action.
+- A dashboard-mediated **Dashboard control action** that saves selected provider resources should update only the resolved binding field for the typed action while preserving unrelated **Integration bindings** and unrelated binding configuration.
+- A dashboard-mediated **Dashboard control action** that saves selected provider resources should treat server-side provider resource validation as authoritative over the dashboard's currently loaded resource list.
+- A dashboard-mediated provider-resource selection action should use binding-intent-specific cardinality rules for empty or minimum selected resources.
+- A dashboard-mediated **Dashboard control action** should identify an **Integration binding** by typed binding intent rather than requiring a preexisting binding row id.
+- A dashboard-mediated provider-resource selection action may support multiple provider/resource combinations through a server-side binding-intent registry rather than one-off action names or arbitrary draft patches.
+- A dashboard-mediated provider-resource selection action should be generic across supported providers and resource kinds rather than hard-coded to GitHub repositories.
+- A dashboard-mediated provider-resource selection action should expose binding intent to **Mistle Designer** rather than low-level **Integration binding** fields such as binding kind or config field.
+- A dashboard-mediated provider-resource selection action should carry an explicit binding intent even when product capability discovery can recommend a default intent for a provider/resource combination.
+- A dashboard-mediated provider-resource selection action should be submitted as part of the corresponding **User input request** so the product action is tied to the user's submitted answer.
+- The active dashboard surface should attach the trusted **Mistle Designer session** identity to a dashboard-mediated provider-resource selection action rather than requiring **Mistle Designer** to provide that identity.
+- Designer-owned routes should execute dashboard-mediated provider-resource selection saves because the action authority is validated through a **Mistle Designer session**.
+- Available binding intents for dashboard-mediated provider-resource selection should be discoverable from product capability state rather than guessed from dashboard-control schemas.
+- Dashboard-mediated provider-resource selection discovery may include non-authoritative UI hints for the corresponding **User input request** while the server remains authoritative for save validation.
+- A dashboard-mediated **Dashboard control action** that changes saved configuration should return the user's submitted answer together with a server-issued receipt describing the product resource that changed.
+- A dashboard-mediated provider-resource selection receipt should identify the target draft **Sandbox profile version**, **Integration connection**, provider resource kind, binding intent, resolved **Integration binding**, selected handles, and whether the binding was created.
 - A **Designer canvas tab** may accept a dashboard-internal route before that route has a supported embedded rendering surface.
 - A **Designer page** is the top-level dashboard entry point for **Mistle Designer sessions**.
 - The **Designer page** presents a composer for starting a new **Mistle Designer session** before the list of past **Mistle Designer sessions**.

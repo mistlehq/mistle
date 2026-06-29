@@ -333,12 +333,13 @@ describe("dashboard control actions", () => {
           emptyMessage: "No repositories available for this connection.",
           initialSelectedHandles: ["mistlehq/mistle"],
         },
-        submitBehavior: {
-          kind: "saveSandboxProfileDraftBinding",
-          profileId: "sbp_designer",
-          version: 2,
-          bindingId: "spib_github",
-          configField: "repositories",
+        submitAction: {
+          kind: "saveSelectedProviderResourcesToSandboxProfileDraft",
+          targetDraft: {
+            profileId: "sbp_designer",
+            version: 2,
+          },
+          bindingIntent: "git-repositories",
         },
       },
     });
@@ -357,18 +358,19 @@ describe("dashboard control actions", () => {
           emptyMessage: "No repositories available for this connection.",
           initialSelectedHandles: ["mistlehq/mistle"],
         },
-        submitBehavior: {
-          kind: "saveSandboxProfileDraftBinding",
-          profileId: "sbp_designer",
-          version: 2,
-          bindingId: "spib_github",
-          configField: "repositories",
+        submitAction: {
+          kind: "saveSelectedProviderResourcesToSandboxProfileDraft",
+          targetDraft: {
+            profileId: "sbp_designer",
+            version: 2,
+          },
+          bindingIntent: "git-repositories",
         },
       },
     });
   });
 
-  it("rejects save draft submit behavior on text user input calls", () => {
+  it("rejects save selected resources submit actions on text user input calls", () => {
     const parsed = parseDashboardControlDynamicToolCall({
       namespace: DashboardControlDynamicToolNamespace,
       tool: DesignerUserInputRequestDynamicToolName,
@@ -380,12 +382,13 @@ describe("dashboard control actions", () => {
             label: "mistlehq/mistle",
           },
         ],
-        submitBehavior: {
-          kind: "saveSandboxProfileDraftBinding",
-          profileId: "sbp_designer",
-          version: 2,
-          bindingId: "spib_github",
-          configField: "repositories",
+        submitAction: {
+          kind: "saveSelectedProviderResourcesToSandboxProfileDraft",
+          targetDraft: {
+            profileId: "sbp_designer",
+            version: 2,
+          },
+          bindingIntent: "git-repositories",
         },
       },
     });
@@ -586,9 +589,15 @@ describe("dashboard control actions", () => {
             id: "github-review-repositories",
             value: ["mistlehq/mistle-desktop", "mistlehq/mistle"],
             sideEffect: {
-              kind: "sandbox-profile-draft-updated",
+              kind: "sandbox-profile-draft-provider-resources-saved",
               profileId: "sbp_designer",
               version: 2,
+              connectionId: "icn_github",
+              resourceKind: "repository",
+              bindingIntent: "git-repositories",
+              bindingId: "ibd_github",
+              selectedHandles: ["mistlehq/mistle-desktop", "mistlehq/mistle"],
+              createdBinding: false,
             },
           },
         ],
@@ -605,9 +614,15 @@ describe("dashboard control actions", () => {
                 id: "github-review-repositories",
                 value: ["mistlehq/mistle-desktop", "mistlehq/mistle"],
                 sideEffect: {
-                  kind: "sandbox-profile-draft-updated",
+                  kind: "sandbox-profile-draft-provider-resources-saved",
                   profileId: "sbp_designer",
                   version: 2,
+                  connectionId: "icn_github",
+                  resourceKind: "repository",
+                  bindingIntent: "git-repositories",
+                  bindingId: "ibd_github",
+                  selectedHandles: ["mistlehq/mistle-desktop", "mistlehq/mistle"],
+                  createdBinding: false,
                 },
               },
             ],
