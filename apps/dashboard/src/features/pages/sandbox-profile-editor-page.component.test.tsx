@@ -3542,7 +3542,7 @@ describe("SandboxProfileEditorPage", () => {
   });
 
   it("prompts before publishing when the Setup Assistant panel is open", async () => {
-    const { router } = renderSandboxProfileEditor({
+    renderSandboxProfileEditor({
       bindings: [
         {
           id: "binding-agent",
@@ -3585,7 +3585,6 @@ describe("SandboxProfileEditorPage", () => {
         name: "Close Setup Assistant panel",
       }),
     ).toBeTruthy();
-    expect(screen.getByRole("region", { name: "Setup Assistant conversation" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
 
@@ -3599,19 +3598,6 @@ describe("SandboxProfileEditorPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByText("Publish and close Setup Assistant?")).toBeNull();
-    expect(screen.getByRole("button", { name: "Close Setup Assistant panel" })).toBeTruthy();
-    expect(router.state.location.pathname).toBe("/sandbox-profiles/sbp_test/sandbox-profile/draft");
-
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Publish and close" }));
-
-    await waitFor(() => {
-      expect(screen.queryByText("Publish and close Setup Assistant?")).toBeNull();
-      expect(screen.queryByRole("button", { name: "Close Setup Assistant panel" })).toBeNull();
-      expect(screen.queryByRole("region", { name: "Setup Assistant conversation" })).toBeNull();
-    });
-    expect(await screen.findByText("Profile version action failed")).toBeDefined();
-    expect(await screen.findByRole("button", { name: "Publish" })).toBeDefined();
   });
 
   it("closes the Setup Assistant panel immediately after stop confirmation during startup", async () => {

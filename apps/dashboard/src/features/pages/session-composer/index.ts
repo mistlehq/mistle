@@ -7,6 +7,7 @@ export {
   type SessionComposerSharedInput,
   type SessionComposerStateInput,
   type SessionComposerUiState,
+  type SessionStartTurnAcceptedCallback,
   type SessionTurnControl,
 } from "./use-session-composer-state.js";
 export {

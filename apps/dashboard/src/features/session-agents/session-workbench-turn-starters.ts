@@ -3,6 +3,7 @@ import type { QueryClient } from "@tanstack/react-query";
 
 import type {
   SessionComposerConfigControl,
+  SessionStartTurnAcceptedCallback,
   SessionTurnControl,
 } from "../pages/session-composer/index.js";
 import { resolvePrimaryRepositoryTurnStartCwd } from "../pages/session-primary-repository-policy.js";
@@ -36,14 +37,23 @@ type OpenCodeTurnStarterModelSelection = Pick<
   "hasExplicitModelSelection" | "selectedModel" | "selectedReasoningEffort"
 >;
 
-type OpenCodeTurnInput = Parameters<SessionTurnControl["startTurn"]>[0];
+type RuntimePromptPresentationInput = {
+  submittedPrompt: string;
+  transcriptPrompt?: string;
+  uploadedAttachments?: Parameters<SessionTurnControl["startTurn"]>[0]["uploadedAttachments"];
+};
+
+type OpenCodeTurnPromptInput = RuntimePromptPresentationInput & {
+  onAccepted?: SessionStartTurnAcceptedCallback;
+};
 
 async function sendOpenCodeTurnPrompt(input: {
   chat: Pick<UseOpenCodeSessionStateResult["chat"], "sendPrompt">;
   modelSelection: OpenCodeTurnStarterModelSelection;
   selectedRepositoryPath: string | null;
-  turnInput: OpenCodeTurnInput;
+  turnInput: OpenCodeTurnPromptInput;
 }): Promise<void> {
+  const { onAccepted, ...turnInput } = input.turnInput;
   const selectedOpenCodeModel = resolveOpenCodePromptModelOverride(
     input.modelSelection.hasExplicitModelSelection,
     input.modelSelection.selectedModel,
@@ -51,14 +61,15 @@ async function sendOpenCodeTurnPrompt(input: {
   const selectedOpenCodeVariant = resolveOpenCodePromptVariantOverride(
     input.modelSelection.selectedReasoningEffort,
   );
-  const attachmentParts = buildOpenCodeAttachmentParts(input.turnInput.uploadedAttachments ?? []);
+  const attachmentParts = buildOpenCodeAttachmentParts(turnInput.uploadedAttachments ?? []);
 
   await input.chat.sendPrompt({
     ...(input.selectedRepositoryPath === null ? {} : { directory: input.selectedRepositoryPath }),
     ...(selectedOpenCodeModel === undefined ? {} : { model: selectedOpenCodeModel }),
     ...(selectedOpenCodeVariant === undefined ? {} : { variant: selectedOpenCodeVariant }),
+    ...(onAccepted === undefined ? {} : { onAccepted }),
     submittedAttachments: attachmentParts,
-    submittedPrompt: input.turnInput.transcriptPrompt ?? input.turnInput.submittedPrompt,
+    submittedPrompt: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
   });
 }
 
@@ -91,10 +102,12 @@ export function buildCodexTurnStarter(input: {
       messageCount: input.chat.chatState.turnOrder.length,
     });
 
+    const { onAccepted, ...codexTurnInput } = turnInput;
     await input.chat.startTurn({
-      ...turnInput,
+      ...codexTurnInput,
       cwd: resolvePrimaryRepositoryTurnStartCwd(input.selectedRepositoryPath),
     });
+    onAccepted?.();
 
     if (!shouldGenerateSessionTitle || sandboxInstanceId === null) {
       return;
@@ -163,6 +176,7 @@ export function buildClaudeCodeTurnStarter(input: {
 }): SessionTurnControl["startTurn"] {
   return async (turnInput): Promise<void> => {
     await input.chat.sendPrompt({
+      ...(turnInput.onAccepted === undefined ? {} : { onAccepted: turnInput.onAccepted }),
       submittedPrompt: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
     });
   };
@@ -212,6 +226,7 @@ export function buildPiTurnStarter(input: {
     });
 
     await input.chat.sendPrompt({
+      ...(turnInput.onAccepted === undefined ? {} : { onAccepted: turnInput.onAccepted }),
       submittedPrompt: buildPiSubmittedPrompt(turnInput),
     });
 
@@ -252,7 +267,7 @@ export function buildPiTurnQueuer(input: {
   };
 }
 
-function buildPiSubmittedPrompt(turnInput: Parameters<SessionTurnControl["startTurn"]>[0]): string {
+function buildPiSubmittedPrompt(turnInput: RuntimePromptPresentationInput): string {
   const messagePayload = turnInput.transcriptPrompt ?? turnInput.submittedPrompt;
   return buildPiSourceReferencePrompt({
     prompt: messagePayload,

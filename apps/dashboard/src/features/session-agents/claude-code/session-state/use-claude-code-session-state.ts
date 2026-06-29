@@ -9,6 +9,7 @@ import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { systemSleeper } from "@mistle/time";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
+import type { SessionStartTurnAcceptedCallback } from "../../../pages/session-composer/index.js";
 import type { SessionComposerBootstrapResult } from "../../../pages/session-composer/session-composer-runtime-contracts.js";
 import {
   createInitialClaudeCodeChatState,
@@ -93,7 +94,10 @@ export type UseClaudeCodeSessionStateResult = {
       message?: string;
       requestId: string;
     }) => Promise<void>;
-    sendPrompt: (input: { submittedPrompt: string }) => Promise<void>;
+    sendPrompt: (input: {
+      onAccepted?: SessionStartTurnAcceptedCallback;
+      submittedPrompt: string;
+    }) => Promise<void>;
     steerTurn: (input: { submittedPrompt: string }) => Promise<void>;
   };
   lifecycle: ClaudeCodeSessionLifecycleState;
@@ -567,7 +571,10 @@ export function useClaudeCodeSessionState(input: {
   );
 
   const sendPrompt = useCallback(
-    async (promptInput: { submittedPrompt: string }): Promise<void> => {
+    async (promptInput: {
+      onAccepted?: SessionStartTurnAcceptedCallback;
+      submittedPrompt: string;
+    }): Promise<void> => {
       const client = clientRef.current;
       const sessionId = sessionSnapshot?.activeSessionId ?? null;
       if (client === null || sessionId === null) {
@@ -590,6 +597,7 @@ export function useClaudeCodeSessionState(input: {
           sessionId,
           submittedPrompt: prompt,
         });
+        promptInput.onAccepted?.();
         setSessionErrorMessage(null);
         await pollSessionUntilIdle({
           client,

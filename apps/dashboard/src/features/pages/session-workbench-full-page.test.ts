@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ChatEntry } from "../chat/chat-types.js";
 import {
   resolveSessionEntryPreparationState,
+  shouldFulfillExplicitStartTurnScrollRequest,
   shouldAutoStartWorkbenchTurn,
   shouldShowSessionWorkbenchSecondaryPanel,
 } from "./session-workbench-full-page.js";
@@ -231,6 +232,53 @@ describe("resolveSessionEntryPreparationState", () => {
         }),
       ),
     ).toBeNull();
+  });
+});
+
+describe("shouldFulfillExplicitStartTurnScrollRequest", () => {
+  it("waits until a new chat entry is committed after explicit start acceptance", () => {
+    const scrollRequest = {
+      activeConversationId: "thread_current",
+      initialEntryCount: 2,
+    };
+
+    expect(
+      shouldFulfillExplicitStartTurnScrollRequest({
+        activeConversationId: "thread_current",
+        entryCount: 2,
+        scrollRequest,
+      }),
+    ).toBe(false);
+    expect(
+      shouldFulfillExplicitStartTurnScrollRequest({
+        activeConversationId: "thread_current",
+        entryCount: 3,
+        scrollRequest,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not fulfill when no explicit start scroll request is pending", () => {
+    expect(
+      shouldFulfillExplicitStartTurnScrollRequest({
+        activeConversationId: "thread_current",
+        entryCount: 3,
+        scrollRequest: null,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not fulfill a request created for another conversation", () => {
+    expect(
+      shouldFulfillExplicitStartTurnScrollRequest({
+        activeConversationId: "thread_next",
+        entryCount: 3,
+        scrollRequest: {
+          activeConversationId: "thread_previous",
+          initialEntryCount: 2,
+        },
+      }),
+    ).toBe(false);
   });
 });
 

@@ -152,6 +152,8 @@ export type QueuedComposerPromptViewModel = {
   isRemovable: boolean;
 };
 
+export type SessionStartTurnAcceptedCallback = () => void;
+
 export type SessionTurnControl = {
   activeTurnState: "idle" | "running";
   canSteer: boolean;
@@ -169,6 +171,7 @@ export type SessionTurnControl = {
     displayAttachments?: readonly ChatAttachment[];
     collaborationMode?: SessionComposerCollaborationModeSettings["mode"] | undefined;
     collaborationModeSettings?: SessionComposerCollaborationModeSettings | undefined;
+    onAccepted?: SessionStartTurnAcceptedCallback;
     resolveSkillMentions?: boolean;
   }) => Promise<void>;
   steerTurn: (input: {
@@ -253,6 +256,7 @@ export type SessionComposerUiState = {
 export function useSessionComposerState(input: {
   composerStateInput: SessionComposerStateInput;
   draftState: SessionComposerDraftState;
+  onExplicitStartTurnAccepted?: () => void;
 }): SessionComposerUiState {
   const { composerStateInput, draftState } = input;
   const { clearSessionErrorMessage, sessionErrorMessage } = composerStateInput;
@@ -760,6 +764,9 @@ export function useSessionComposerState(input: {
           selectedSkillMentions,
           transcriptPrompt: submittedPrompt,
           collaborationMode: "plan",
+          ...(input.onExplicitStartTurnAccepted === undefined
+            ? {}
+            : { onAccepted: input.onExplicitStartTurnAccepted }),
           collaborationModeSettings: {
             mode: "plan",
             model: activeComposerModel.model,
@@ -786,6 +793,7 @@ export function useSessionComposerState(input: {
       composerStateInput.turnControl,
       composerDraft,
       draftState,
+      input.onExplicitStartTurnAccepted,
       prepareComposerTurnSubmission,
     ],
   );
@@ -950,6 +958,9 @@ export function useSessionComposerState(input: {
             ...(turnCollaborationModeSettings === undefined
               ? {}
               : { collaborationModeSettings: turnCollaborationModeSettings }),
+            ...(input.onExplicitStartTurnAccepted === undefined
+              ? {}
+              : { onAccepted: input.onExplicitStartTurnAccepted }),
           });
         }
       } catch (error) {
@@ -976,6 +987,7 @@ export function useSessionComposerState(input: {
     draftState,
     pendingComposerAttachments,
     prepareComposerTurnSubmission,
+    input.onExplicitStartTurnAccepted,
     submitAction,
     submitPlanTypedRuntimeCommand,
     turnCollaborationModeSettings,
