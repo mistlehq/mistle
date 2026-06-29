@@ -12,11 +12,9 @@ import {
 } from "../settings/api-keys/api-keys-service.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
+import { OrganizationApiKeysCreateActionLink } from "./organization-api-keys-settings-page-actions.js";
 import { resolveRevokingApiKeyId } from "./organization-api-keys-settings-page-state.js";
-import {
-  OrganizationApiKeysCreateActionLink,
-  OrganizationApiKeysSettingsPageView,
-} from "./organization-api-keys-settings-page-view.js";
+import { OrganizationApiKeysSettingsPageView } from "./organization-api-keys-settings-page-view.js";
 
 type CreatedApiKeyNotice = {
   name: string;

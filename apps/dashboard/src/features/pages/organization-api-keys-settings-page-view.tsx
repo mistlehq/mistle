@@ -23,13 +23,12 @@ import {
   TableHeader,
   TableRow,
 } from "@mistle/ui";
-import { KeyIcon, PlusIcon, ProhibitIcon } from "@phosphor-icons/react";
+import { KeyIcon, ProhibitIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import { ApiKeyMistleResourceAccessSummary } from "../settings/api-keys/api-key-permissions-summary.js";
 import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
 import { formatDateTime } from "../shared/date-formatters.js";
-import { RoutedButtonLink } from "../shared/routed-button-link.js";
 
 export type OrganizationApiKeysSettingsPageViewProps = {
   apiKeys: readonly ApiKey[];
@@ -140,6 +139,7 @@ export function OrganizationApiKeysSettingsPageView(
                   <TableCell className="align-middle whitespace-nowrap">
                     <ApiKeyMistleResourceAccessSummary
                       apiKey={apiKey}
+                      className="px-0 hover:bg-transparent"
                       description={
                         <>
                           {apiKey.name} can access these Mistle resources. Access is limited by this
@@ -208,15 +208,6 @@ export function OrganizationApiKeysSettingsPageView(
         )}
       </AlertDialog>
     </div>
-  );
-}
-
-export function OrganizationApiKeysCreateActionLink(): React.JSX.Element {
-  return (
-    <RoutedButtonLink to="/settings/organization/api-keys/new">
-      <PlusIcon aria-hidden className="size-4" />
-      Create API key
-    </RoutedButtonLink>
   );
 }
 

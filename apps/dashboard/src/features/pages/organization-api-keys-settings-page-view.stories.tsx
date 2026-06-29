@@ -7,10 +7,8 @@ import {
 } from "../../storybook/decorators.js";
 import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
 import { PageFrame } from "../shared/page-frame.js";
-import {
-  OrganizationApiKeysCreateActionLink,
-  OrganizationApiKeysSettingsPageView,
-} from "./organization-api-keys-settings-page-view.js";
+import { OrganizationApiKeysCreateActionLink } from "./organization-api-keys-settings-page-actions.js";
+import { OrganizationApiKeysSettingsPageView } from "./organization-api-keys-settings-page-view.js";
 
 const ProductionApiKeyId = "apk_story_prod";
 
@@ -34,7 +32,7 @@ const StoryApiKeys = [
   {
     id: "apk_story_ci",
     name: "CI runner",
-    secretPrefix: "A9fZg2qP8xQmN7rT6wLs",
+    secretPrefix: "A9fZg2qP8xQmN7rT6wLs7K",
     permissions: ["sandboxProfile:read", "sandboxSession:create"],
     expiresAt: null,
     lastUsedAt: "2026-05-19T10:30:00.000Z",

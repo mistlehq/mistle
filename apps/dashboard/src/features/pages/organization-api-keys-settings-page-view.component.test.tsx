@@ -7,13 +7,11 @@ import { describe, expect, it } from "vitest";
 
 import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
 import { OrganizationApiKeyCreatePageView } from "./organization-api-key-create-page-view.js";
-import {
-  OrganizationApiKeysCreateActionLink,
-  OrganizationApiKeysSettingsPageView,
-} from "./organization-api-keys-settings-page-view.js";
+import { OrganizationApiKeysCreateActionLink } from "./organization-api-keys-settings-page-actions.js";
+import { OrganizationApiKeysSettingsPageView } from "./organization-api-keys-settings-page-view.js";
 
 describe("OrganizationApiKeysSettingsPageView", () => {
-  it("renders existing API keys with masked keys and grouped permission details", () => {
+  it("renders existing API keys with comparable key prefixes and grouped permission details", () => {
     renderPage({
       apiKeys: [
         buildApiKey({
@@ -266,7 +264,7 @@ function buildApiKey(overrides: Partial<ApiKey> & Pick<ApiKey, "id" | "name">): 
   return {
     id,
     name,
-    secretPrefix: "mst_test",
+    secretPrefix: "B7kLm4nP9qRs2TuV5wXyZ1",
     permissions: ["sandboxProfile:read"],
     expiresAt: null,
     lastUsedAt: null,

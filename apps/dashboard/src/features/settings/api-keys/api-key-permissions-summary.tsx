@@ -1,5 +1,6 @@
 import {
   Button,
+  cn,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -17,6 +18,7 @@ import type { ApiKey } from "./api-keys-service.js";
 
 export function ApiKeyMistleResourceAccessSummary(input: {
   apiKey: ApiKey;
+  className?: string;
   description: ReactNode;
 }): React.JSX.Element {
   const [detailsAreOpen, setDetailsAreOpen] = useState(false);
@@ -36,7 +38,7 @@ export function ApiKeyMistleResourceAccessSummary(input: {
     <>
       <Button
         aria-label={`View allowed Mistle resources: ${summaryLabel}`}
-        className="text-muted-foreground px-0 hover:bg-transparent"
+        className={cn("text-muted-foreground", input.className)}
         onClick={() => {
           setDetailsAreOpen(true);
         }}
