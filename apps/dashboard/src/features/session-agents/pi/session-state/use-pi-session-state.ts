@@ -24,6 +24,7 @@ import {
   type Dispatch,
 } from "react";
 
+import type { SessionStartTurnAcceptedCallback } from "../../../pages/session-composer/index.js";
 import type { SessionComposerBootstrapResult } from "../../../pages/session-composer/session-composer-runtime-contracts.js";
 import type { SessionCliLaunchTarget } from "../../session-runtime-cli-launch.js";
 import { createInitialPiChatState, reducePiChatState, type PiChatState } from "./pi-chat-state.js";
@@ -115,7 +116,10 @@ export type UsePiSessionStateResult = {
     followUpTurn: (input: { submittedPrompt: string }) => Promise<void>;
     pendingExtensionUIRequests: readonly ExposedPiExtensionUIRequest[];
     respondToExtensionUIRequest: (input: PiExtensionUIResponseInput) => Promise<void>;
-    sendPrompt: (input: { submittedPrompt: string }) => Promise<void>;
+    sendPrompt: (input: {
+      onAccepted?: SessionStartTurnAcceptedCallback;
+      submittedPrompt: string;
+    }) => Promise<void>;
     steerTurn: (input: { submittedPrompt: string }) => Promise<void>;
   };
   modelControl: {
@@ -742,7 +746,10 @@ export function usePiSessionState(input: {
   );
 
   const sendPrompt = useCallback(
-    async (promptInput: { submittedPrompt: string }): Promise<void> => {
+    async (promptInput: {
+      onAccepted?: SessionStartTurnAcceptedCallback;
+      submittedPrompt: string;
+    }): Promise<void> => {
       const client = clientRef.current;
       const sessionFile = sessionSnapshot?.activeSessionFile ?? null;
       if (client === null || sessionFile === null) {
@@ -763,6 +770,7 @@ export function usePiSessionState(input: {
           sessionFile,
           message: prompt,
         });
+        promptInput.onAccepted?.();
         setSessionErrorMessage(null);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Could not send Pi prompt.";

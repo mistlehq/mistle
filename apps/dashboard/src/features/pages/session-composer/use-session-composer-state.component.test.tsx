@@ -129,6 +129,7 @@ function SessionComposerStateHarness(input: {
   const [collaborationModeSettings, setCollaborationModeSettings] =
     useState<SessionComposerCollaborationModeSettings | null>(null);
   const [collaborationMode, setCollaborationMode] = useState<"default" | "plan" | null>(null);
+  const [explicitStartTurnAcceptedCount, setExplicitStartTurnAcceptedCount] = useState(0);
   const [resolveSubmit, setResolveSubmit] = useState<(() => void) | null>(null);
   const [resolveNativeQueue, setResolveNativeQueue] = useState<(() => void) | null>(null);
 
@@ -213,6 +214,7 @@ function SessionComposerStateHarness(input: {
           transcriptPrompt,
           collaborationMode,
           collaborationModeSettings,
+          onAccepted,
           resolveSkillMentions,
         }) => {
           if (input.shouldFailSubmit) {
@@ -225,6 +227,7 @@ function SessionComposerStateHarness(input: {
           setResolveSkillMentions(resolveSkillMentions ?? null);
           setCollaborationMode(collaborationMode ?? null);
           setCollaborationModeSettings(collaborationModeSettings ?? null);
+          onAccepted?.();
           if (input.deferSubmit) {
             await new Promise<void>((resolve) => {
               setResolveSubmit(() => resolve);
@@ -293,6 +296,9 @@ function SessionComposerStateHarness(input: {
       },
       setComposerDraft,
     },
+    onExplicitStartTurnAccepted: () => {
+      setExplicitStartTurnAcceptedCount((currentCount) => currentCount + 1);
+    },
   });
 
   return (
@@ -358,6 +364,9 @@ function SessionComposerStateHarness(input: {
         {serverRequestResponse === null ? "" : JSON.stringify(serverRequestResponse)}
       </div>
       <div data-testid="native-queue-submission-count">{String(nativeQueueSubmissionCount)}</div>
+      <div data-testid="explicit-start-turn-accepted-count">
+        {String(explicitStartTurnAcceptedCount)}
+      </div>
       <div data-testid="transcript-prompt">{transcriptPrompt ?? ""}</div>
       <div data-testid="resolve-skill-mentions">
         {resolveSkillMentions === null ? "" : String(resolveSkillMentions)}
@@ -916,6 +925,7 @@ describe("useSessionComposerState", () => {
         developerInstructions: null,
       }),
     );
+    expect(screen.getByTestId("explicit-start-turn-accepted-count").textContent).toBe("1");
     expect(screen.getByTestId("composer-text").textContent).toBe("");
   });
 
@@ -1086,6 +1096,17 @@ describe("useSessionComposerState", () => {
     expect(submittedRuntimeCommands).toEqual([]);
   });
 
+  it("records explicit start-turn acceptance after primary submit succeeds", async () => {
+    render(<SessionComposerStateHarness composerText="Start this task" pendingDiffComments={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("submitted-prompt").textContent).toBe("Start this task");
+    });
+    expect(screen.getByTestId("explicit-start-turn-accepted-count").textContent).toBe("1");
+  });
+
   it("blocks local queued prompts with selected skill mentions during an active turn", () => {
     render(
       <SessionComposerStateHarness
@@ -1148,6 +1169,26 @@ describe("useSessionComposerState", () => {
     );
     expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
     expect(screen.getByTestId("composer-text").textContent).toBe("$duplicate");
+  });
+
+  it("does not record explicit start-turn acceptance after a steer succeeds", async () => {
+    render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        canSteer
+        composerText="Narrow the current approach"
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("submitted-prompt").textContent).toBe(
+        "Narrow the current approach",
+      );
+    });
+    expect(screen.getByTestId("explicit-start-turn-accepted-count").textContent).toBe("0");
   });
 
   it("offsets selected skill mention ranges when pending diff comments are prepended", async () => {
@@ -1304,6 +1345,7 @@ describe("useSessionComposerState", () => {
       "Submit this with review comments",
     );
     expect(screen.getByTestId("pending-diff-comments").textContent).toBe("2");
+    expect(screen.getByTestId("explicit-start-turn-accepted-count").textContent).toBe("0");
   });
 
   it("submits runtime-native queued turns immediately and clears the draft on success", async () => {
@@ -1324,6 +1366,7 @@ describe("useSessionComposerState", () => {
     expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
     expect(screen.getByTestId("composer-text").textContent).toBe("");
     expect(screen.getByTestId("queued-prompt-count").textContent).toBe("0");
+    expect(screen.getByTestId("explicit-start-turn-accepted-count").textContent).toBe("0");
   });
 
   it("guards runtime-native queued turns while queue submission is pending", async () => {
@@ -1451,6 +1494,7 @@ describe("useSessionComposerState", () => {
       expect(screen.getByTestId("submitted-prompt").textContent).toBe("Queue after current task");
     });
     expect(screen.getByTestId("queued-prompt-count").textContent).toBe("0");
+    expect(screen.getByTestId("explicit-start-turn-accepted-count").textContent).toBe("0");
   });
 
   it("drains local queued prompts as text-only starts", async () => {

@@ -27,6 +27,7 @@ import {
   type Dispatch,
 } from "react";
 
+import type { SessionStartTurnAcceptedCallback } from "../../../pages/session-composer/index.js";
 import type {
   SessionComposerBootstrapPhase,
   SessionComposerBootstrapResult,
@@ -126,6 +127,7 @@ export type UseOpenCodeSessionStateResult = {
     sendPrompt: (input: {
       directory?: string;
       model?: OpenCodePromptModelSelection;
+      onAccepted?: SessionStartTurnAcceptedCallback;
       submittedAttachments?: readonly OpenCodePromptPartInput[];
       submittedPrompt: string;
       variant?: string;
@@ -867,6 +869,7 @@ export function useOpenCodeSessionState(input: {
     async (promptInput: {
       directory?: string;
       model?: OpenCodePromptModelSelection;
+      onAccepted?: SessionStartTurnAcceptedCallback;
       submittedAttachments?: readonly OpenCodePromptPartInput[];
       submittedPrompt: string;
       variant?: string;
@@ -899,6 +902,7 @@ export function useOpenCodeSessionState(input: {
           parts: [...submittedAttachments, ...textParts],
           ...(promptInput.variant === undefined ? {} : { variant: promptInput.variant }),
         });
+        promptInput.onAccepted?.();
         setSessionErrorMessage(null);
       } catch (error) {
         setSessionErrorMessage(

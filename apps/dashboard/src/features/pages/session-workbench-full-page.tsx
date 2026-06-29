@@ -1,5 +1,5 @@
 import { CssBreakpointVariables, useIsBelowBreakpoint } from "@mistle/ui";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { useSearchParams } from "react-router";
 
 import { isUnavailableResourceError } from "../api/http-api-error.js";
@@ -107,6 +107,30 @@ export type SessionWorkbenchFullPageProps = {
 type SessionWorkbenchActiveTurnState = ReturnType<
   typeof useSessionWorkbenchController
 >["conversationPane"]["composerStateInput"]["turnControl"]["activeTurnState"];
+
+function scrollContainerToBottom(scrollContainerElement: HTMLDivElement): void {
+  scrollContainerElement.scrollTop = Math.max(
+    0,
+    scrollContainerElement.scrollHeight - scrollContainerElement.clientHeight,
+  );
+}
+
+type ExplicitStartTurnScrollRequest = {
+  activeConversationId: string | null;
+  initialEntryCount: number;
+};
+
+export function shouldFulfillExplicitStartTurnScrollRequest(input: {
+  activeConversationId: string | null;
+  entryCount: number;
+  scrollRequest: ExplicitStartTurnScrollRequest | null;
+}): boolean {
+  return (
+    input.scrollRequest !== null &&
+    input.scrollRequest.activeConversationId === input.activeConversationId &&
+    input.entryCount > input.scrollRequest.initialEntryCount
+  );
+}
 
 type SessionWorkbenchPrimaryPanelTransitionState = ReturnType<
   typeof useSessionWorkbenchController
@@ -346,8 +370,11 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
   });
   const [hasEnteredReadyConversation, setHasEnteredReadyConversation] = useState(false);
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const activeConversationIdRef = useRef<string | null>(null);
   const previousActiveConversationIdRef = useRef<string | null>(null);
   const [isMobileConversationNavigatorOpen, setMobileConversationNavigatorOpen] = useState(false);
+  const [explicitStartTurnScrollRequest, setExplicitStartTurnScrollRequest] =
+    useState<ExplicitStartTurnScrollRequest | null>(null);
   const isMobileSecondaryPanelLayout = useIsBelowBreakpoint(CssBreakpointVariables.SM);
   const [autoStartedTurnKeys, setAutoStartedTurnKeys] = useState<ReadonlySet<string>>(new Set());
   const autoStartedTurnKeysRef = useRef(new Set<string>());
@@ -778,6 +805,7 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
     }
 
     previousActiveConversationIdRef.current = conversationPane.activeConversationId;
+    setExplicitStartTurnScrollRequest(null);
     setPendingBlueprintComments([]);
     setPendingDiffComments([]);
   }, [conversationPane.activeConversationId]);
@@ -828,8 +856,60 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
         : null;
 
   const activeConversationId = conversationPane.activeConversationId;
+  activeConversationIdRef.current = activeConversationId;
   const turnControl = conversationPane.composerStateInput.turnControl;
   const isConversationTurnRunning = turnControl.activeTurnState === "running";
+  const handleExplicitStartTurnAccepted = useCallback(() => {
+    setExplicitStartTurnScrollRequest({
+      activeConversationId,
+      initialEntryCount: conversationPane.chatState.entries.length,
+    });
+  }, [activeConversationId, conversationPane.chatState.entries.length]);
+
+  useLayoutEffect(() => {
+    const scrollRequest = explicitStartTurnScrollRequest;
+    if (scrollRequest === null) {
+      return;
+    }
+
+    if (scrollRequest.activeConversationId !== activeConversationId) {
+      setExplicitStartTurnScrollRequest(null);
+      return;
+    }
+
+    if (
+      !shouldFulfillExplicitStartTurnScrollRequest({
+        activeConversationId,
+        entryCount: conversationPane.chatState.entries.length,
+        scrollRequest,
+      })
+    ) {
+      return;
+    }
+
+    const scrollContainerElement = conversationScrollContainerRef.current;
+    if (scrollContainerElement === null) {
+      return;
+    }
+
+    scrollContainerToBottom(scrollContainerElement);
+    const scrollRequestConversationId = scrollRequest.activeConversationId;
+    requestAnimationFrame(() => {
+      if (
+        activeConversationIdRef.current !== scrollRequestConversationId ||
+        conversationScrollContainerRef.current !== scrollContainerElement
+      ) {
+        return;
+      }
+
+      scrollContainerToBottom(scrollContainerElement);
+    });
+    setExplicitStartTurnScrollRequest(null);
+  }, [
+    activeConversationId,
+    conversationPane.chatState.entries.length,
+    explicitStartTurnScrollRequest,
+  ]);
   const initialConnectionStartupState =
     !hasEnteredReadyConversation && alert === null ? workbench.initialEntryStartupState : null;
   const entryPreparationState = resolveSessionEntryPreparationState({
@@ -1022,6 +1102,7 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
               isRespondingToServerRequest={
                 conversationPane.serverRequestsState.isRespondingToServerRequest
               }
+              onExplicitStartTurnAccepted={handleExplicitStartTurnAccepted}
               onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
               key={input.sandboxInstanceId ?? "missing-session"}
               pendingBlueprintComments={pendingBlueprintComments}

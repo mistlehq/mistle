@@ -64,6 +64,7 @@ type SessionConversationBottomPanelProps = SessionConversationSharedPanelProps &
 type SessionConversationBottomPanelControllerProps = SessionConversationSharedPanelProps & {
   draftState: SessionComposerDraftState;
   composerStateInput: SessionComposerStateInput;
+  onExplicitStartTurnAccepted?: () => void;
   showWorkingIndicator?: boolean;
   supportsUserInputRequestCustomResponse?: boolean;
 };
@@ -264,6 +265,7 @@ export function SessionConversationBottomPanel({
 export function SessionConversationBottomPanelController({
   draftState,
   composerStateInput,
+  onExplicitStartTurnAccepted,
   showWorkingIndicator,
   supportsUserInputRequestCustomResponse,
   ...bottomPanelProps
@@ -297,6 +299,7 @@ export function SessionConversationBottomPanelController({
       userInputRequestCustomResponseTarget,
     },
     draftState,
+    ...(onExplicitStartTurnAccepted === undefined ? {} : { onExplicitStartTurnAccepted }),
   });
 
   return (
