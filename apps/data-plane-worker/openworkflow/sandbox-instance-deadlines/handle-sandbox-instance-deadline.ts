@@ -128,6 +128,14 @@ export async function handleSandboxInstanceDeadline(
     kind: input.kind,
     ownerLeaseId: deadline.ownerLeaseId,
   });
+  if (input.kind === "disconnect" && "diagnostics" in actionResult) {
+    await recordDisconnectReconciliationDiagnostics(ctx.operationEvents, {
+      actionOutcome: actionResult.outcome,
+      diagnostics: actionResult.diagnostics,
+      executed: actionResult.executed,
+      ownerLeaseId: deadline.ownerLeaseId,
+    });
+  }
 
   return {
     sandboxInstanceId: input.sandboxInstanceId,
@@ -189,4 +197,32 @@ async function executeDeadlineAction(
         },
       );
   }
+}
+
+async function recordDisconnectReconciliationDiagnostics(
+  operationEvents: WorkerSandboxLifecycleEventRecorder | undefined,
+  input: {
+    actionOutcome: ReconcileSandboxInstanceResult["outcome"];
+    diagnostics: ReconcileSandboxInstanceResult["diagnostics"] | undefined;
+    executed: boolean;
+    ownerLeaseId: string;
+  },
+): Promise<void> {
+  if (operationEvents === undefined || input.diagnostics === undefined) {
+    return;
+  }
+
+  await operationEvents.record({
+    attributes: {
+      actionOutcome: input.actionOutcome,
+      disconnectDiagnostics: input.diagnostics,
+      executed: input.executed,
+      ownerLeaseId: input.ownerLeaseId,
+      timelineKey: "disconnect_reconciliation",
+      timelineLabel: "Reconciling disconnected sandbox",
+    },
+    message: "Sandbox disconnect reconciliation diagnostics captured.",
+    phase: "deadline",
+    status: input.actionOutcome === "failed" ? "failed" : "warning",
+  });
 }

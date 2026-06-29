@@ -2,6 +2,7 @@
  * The test cases use an extended Vitest fixture created by the test harness.
  */
 
+import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   SandboxInstanceDeadlineKinds,
   SandboxInstancePurposes,
@@ -27,8 +28,13 @@ import { HandleSandboxInstanceDeadlineWorkflowSpec } from "@mistle/workflow-regi
 import { describe, expect } from "vitest";
 
 import { logger as dataPlaneWorkerLogger } from "../logger.js";
+import {
+  createDataPlaneWorkerRuntimeConfig,
+  type DataPlaneWorkerConfig,
+} from "../openworkflow/core/config.js";
 import { markSandboxInstanceFailed as markSandboxInstanceFailedDuringReconcile } from "../openworkflow/reconcile-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceStopped as markSandboxInstanceStoppedDuringReconcile } from "../openworkflow/reconcile-sandbox-instance/mark-sandbox-instance-stopped.js";
+import { handleSandboxInstanceDeadline } from "../openworkflow/sandbox-instance-deadlines/handle-sandbox-instance-deadline.js";
 import { applySandboxLifecycleEvent } from "../openworkflow/shared/apply-sandbox-lifecycle-event.js";
 import { createWorkerSandboxLifecycleEventRecorder } from "../openworkflow/shared/sandbox-operation-events.js";
 import { markSandboxInstanceFailed as markSandboxInstanceFailedDuringStart } from "../openworkflow/start-sandbox-instance/mark-sandbox-instance-failed.js";
@@ -45,6 +51,7 @@ const it = createIntegrationTest({
 
 const MatchingDeadlineDueAt = "2026-04-14T12:00:00.000Z";
 const AlternateDeadlineDueAt = "2026-04-14T12:05:00.000Z";
+const InternalServiceToken = "integration-new-internal-service-token";
 
 type DeadlineWorkflowInput = {
   sandboxInstanceId: string;
@@ -461,6 +468,113 @@ describe.concurrent("data-plane worker sandbox instance deadlines", () => {
     await expectDeadlinesCleared(env, sandboxInstanceId);
   });
 
+  it("persists disconnect reconciliation diagnostics when provider inspection fails the sandbox", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = "sbi_integration_deadline_disconnect_diagnostics";
+    const ownerLeaseId = "owner-integration-deadline-disconnect-diagnostics";
+    const providerSandboxId = "provider-integration-deadline-disconnect-diagnostics";
+    await insertSandboxInstance(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.RUNNING,
+      providerSandboxId,
+    });
+    await insertDeadline(env, {
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.DISCONNECT,
+      ownerLeaseId,
+      dueAt: MatchingDeadlineDueAt,
+    });
+
+    const operationEvents = createWorkerSandboxLifecycleEventRecorder({
+      clock: DeterministicIntegrationClock,
+      db: env.dataPlaneDb,
+      logger: dataPlaneWorkerLogger,
+      operationId: "deadline-disconnect-diagnostics-operation",
+      operationKind: "deadline",
+      sandboxInstanceId,
+    });
+    const result = await handleSandboxInstanceDeadline(
+      {
+        config: createDataPlaneWorkerRuntimeConfig({
+          app: createWorkerConfig(),
+        }),
+        db: env.dataPlaneDb,
+        tables: env.dataPlaneTables,
+        controlPlaneInternalClient: createControlPlaneInternalClient(),
+        sandboxRuntimeProviderResolver: TerminalStoppedRuntimeProviderResolver,
+        runtimeStateReader: createDetachedRuntimeStateReader({
+          sandboxInstanceId,
+          ownerLeaseId,
+        }),
+        clock: DeterministicIntegrationClock,
+        operationEvents,
+      },
+      {
+        sandboxInstanceId,
+        kind: SandboxInstanceDeadlineKinds.DISCONNECT,
+        ownerLeaseId,
+        dueAt: MatchingDeadlineDueAt,
+        generation: 1,
+      },
+    );
+
+    expect(result).toEqual({
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.DISCONNECT,
+      executed: true,
+      outcome: "executed",
+    });
+    await expectSandboxStatus(env, sandboxInstanceId, SandboxInstanceStatuses.FAILED);
+
+    const persistedOperationEvents = await env.dataPlaneDb.query.sandboxOperationEvents.findMany({
+      columns: {
+        phase: true,
+        status: true,
+        message: true,
+        attributes: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxInstanceId, sandboxInstanceId), eq(table.operationKind, "deadline")),
+      orderBy: (table, { asc }) => [asc(table.sequence)],
+    });
+
+    expect(persistedOperationEvents).toMatchObject([
+      {
+        phase: "deadline",
+        status: "failed",
+        message: "Sandbox disconnect reconciliation diagnostics captured.",
+        attributes: {
+          actionOutcome: "failed",
+          disconnectDiagnostics: {
+            failureCode: "provider_runtime_terminal",
+            providerState: SandboxInspectDispositions.TERMINAL_STOPPED,
+            providerStatus: "exited",
+            sandboxStatus: SandboxInstanceStatuses.RUNNING,
+            runtimeProvider: SandboxProvider.DOCKER,
+            providerSandboxId,
+            expectedOwnerLeaseId: ownerLeaseId,
+            initialRuntimeState: {
+              ownerLeaseId,
+              attachmentOwnerLeaseId: null,
+              attachmentSessionId: null,
+              attachmentNodeId: null,
+              presenceActiveCount: 0,
+              keepaliveActive: false,
+              runtimeReady: true,
+            },
+            startupFailureEvidence: null,
+            latestStartupEvent: null,
+          },
+          executed: true,
+          ownerLeaseId,
+          timelineKey: "disconnect_reconciliation",
+          timelineLabel: "Reconciling disconnected sandbox",
+        },
+      },
+    ]);
+  });
+
   it("can stop and finalize a starting sandbox during disconnect reconciliation", async ({
     env,
   }) => {
@@ -795,6 +909,31 @@ const ResumableStoppedRuntimeProviderResolver = {
   },
 };
 
+const TerminalStoppedSandboxAdapter: SandboxAdapter = {
+  ...ResumableStoppedSandboxAdapter,
+  inspect: async (request) => ({
+    provider: SandboxProvider.DOCKER,
+    id: request.id,
+    state: SandboxInspectStates.STOPPED,
+    disposition: SandboxInspectDispositions.TERMINAL_STOPPED,
+    createdAt: "2026-05-16T00:00:00.000Z",
+    startedAt: "2026-05-16T00:00:00.000Z",
+    endedAt: "2026-05-16T00:00:00.000Z",
+    raw: { status: "exited" },
+  }),
+};
+
+const TerminalStoppedRuntimeProviderResolver = {
+  resolve: async () => ({
+    provider: SandboxProvider.DOCKER,
+    sandboxAdapter: TerminalStoppedSandboxAdapter,
+    sandboxRuntimeControl: UnusedSandboxRuntimeControl,
+  }),
+  resolveForImagePreparation: async () => {
+    throw new Error("This test does not prepare images.");
+  },
+};
+
 function createChangingRuntimeStateReader(input: {
   sandboxInstanceId: string;
   permittedOwnerLeaseId: string;
@@ -808,6 +947,64 @@ function createChangingRuntimeStateReader(input: {
         sandboxInstanceId: input.sandboxInstanceId,
         ownerLeaseId: readCount < 4 ? input.permittedOwnerLeaseId : input.rejectedOwnerLeaseId,
       });
+    },
+  };
+}
+
+function createDetachedRuntimeStateReader(input: {
+  sandboxInstanceId: string;
+  ownerLeaseId: string;
+}): SandboxRuntimeStateReader {
+  return {
+    readSnapshot: async () => ({
+      ...createRuntimeStateSnapshot({
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: input.ownerLeaseId,
+      }),
+      attachment: null,
+    }),
+  };
+}
+
+function createControlPlaneInternalClient(): ControlPlaneInternalClient {
+  return new ControlPlaneInternalClient({
+    baseUrl: "http://127.0.0.1:5100",
+    internalAuthServiceToken: InternalServiceToken,
+  });
+}
+
+function createWorkerConfig(): DataPlaneWorkerConfig {
+  return {
+    database: {
+      url: "postgresql://unused",
+    },
+    workflow: {
+      databaseUrl: "postgresql://unused",
+      namespaceId: "integration-new-worker-deadline",
+      runMigrations: false,
+      concurrency: 1,
+      databasePoolMax: 2,
+    },
+    runtimeState: {
+      gatewayBaseUrl: "http://127.0.0.1:5202",
+    },
+    controlPlaneApi: {
+      baseUrl: "http://127.0.0.1:5100",
+    },
+    sandbox: {
+      internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      bootstrap: {
+        tokenSecret: "integration-new-bootstrap-token-secret",
+        tokenIssuer: "integration-new-data-plane-worker",
+        tokenAudience: "integration-new-data-plane-gateway",
+      },
+    },
+    internalAuth: {
+      serviceToken: InternalServiceToken,
+    },
+    telemetry: {
+      enabled: false,
+      debug: false,
     },
   };
 }
