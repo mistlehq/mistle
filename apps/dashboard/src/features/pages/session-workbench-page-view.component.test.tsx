@@ -1,10 +1,144 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { useState } from "react";
+import { EditorView } from "@codemirror/view";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useMemo, useRef, useState } from "react";
 import { beforeAll, describe, expect, it } from "vitest";
 
+import type { ChatEntry } from "../chat/chat-types.js";
+import { createReadySessionComposerStateInput } from "../session-agents/codex/fixtures/session-fixtures.js";
+import {
+  SessionConversationBottomPanelDraftController,
+  SessionConversationMainContent,
+} from "./session-conversation-pane.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
+
+function getComposerEditor(): HTMLElement {
+  const textbox = screen.getByRole("textbox");
+  if (!(textbox instanceof HTMLElement)) {
+    throw new Error("Expected composer textbox to be an element.");
+  }
+
+  return textbox;
+}
+
+function getComposerEditorView(): EditorView {
+  const editorView = EditorView.findFromDOM(getComposerEditor());
+  if (editorView === null) {
+    throw new Error("Expected composer CodeMirror editor view.");
+  }
+
+  return editorView;
+}
+
+function readComposerText(): string {
+  return getComposerEditorView().state.doc.toString();
+}
+
+function replaceComposerText(nextText: string): void {
+  const editorView = getComposerEditorView();
+  act(() => {
+    editorView.dispatch({
+      changes: {
+        from: 0,
+        to: editorView.state.doc.length,
+        insert: nextText,
+      },
+      selection: {
+        anchor: nextText.length,
+      },
+    });
+  });
+}
+
+function createLongTranscriptEntries(): readonly ChatEntry[] {
+  return Array.from({ length: 80 }, (_, index): ChatEntry[] => {
+    const turnNumber = String(index + 1).padStart(3, "0");
+    const turnId = `workbench-long-turn-${turnNumber}`;
+
+    return [
+      {
+        id: `${turnId}:user`,
+        turnId,
+        kind: "user-message",
+        status: "completed",
+        text: `Long workbench prompt ${turnNumber}`,
+      },
+      {
+        id: `${turnId}:assistant`,
+        turnId,
+        kind: "assistant-message",
+        phase: null,
+        status: "completed",
+        text: [
+          `Long workbench assistant response ${turnNumber}.`,
+          "This stable response text keeps the transcript large enough to protect composer typing at the workbench boundary.",
+        ].join(" "),
+      },
+    ];
+  }).flat();
+}
+
+function RenderCountedLongTranscript(input: {
+  chatEntries: readonly ChatEntry[];
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+}): React.JSX.Element {
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+
+  return (
+    <>
+      <div data-testid="long-transcript-render-count">{renderCountRef.current}</div>
+      <SessionConversationMainContent
+        activeTurnId={null}
+        chatEntries={input.chatEntries}
+        isRespondingToServerRequest={false}
+        isTurnInProgress={false}
+        onRespondToServerRequest={function onRespondToServerRequest() {}}
+        pendingTurnId={null}
+        scrollBehavior="none"
+        scrollContainerRef={input.scrollContainerRef}
+        serverRequestPanelEntries={[]}
+      />
+    </>
+  );
+}
+
+function WorkbenchLongTranscriptTypingHarness(): React.JSX.Element {
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const chatEntries = useMemo(() => createLongTranscriptEntries(), []);
+
+  return (
+    <SessionWorkbenchPageView
+      alert={null}
+      bottomPanel={<div>Terminal workspace</div>}
+      isBottomPanelVisible={false}
+      isSecondaryPanelVisible={false}
+      mainContent={
+        <RenderCountedLongTranscript
+          chatEntries={chatEntries}
+          scrollContainerRef={scrollContainerRef}
+        />
+      }
+      mainContentScrollContainerRef={scrollContainerRef}
+      primaryBottomPanel={
+        <SessionConversationBottomPanelDraftController
+          clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
+          clearPendingDiffComments={function clearPendingDiffComments() {}}
+          composerStateInput={createReadySessionComposerStateInput()}
+          draftResetKey="workbench-long-transcript"
+          isRespondingToServerRequest={false}
+          onRespondToServerRequest={function onRespondToServerRequest() {}}
+          pendingBlueprintComments={[]}
+          pendingDiffComments={[]}
+          serverRequestPanelEntries={[]}
+        />
+      }
+      sandboxInstanceId="sbi_test"
+      secondaryPanel={<div>Secondary</div>}
+    />
+  );
+}
 
 describe("SessionWorkbenchPageView", () => {
   beforeAll(() => {
@@ -123,6 +257,23 @@ describe("SessionWorkbenchPageView", () => {
     const visibleComposer = screen.getByText("Composer mount 1");
     expect(visibleComposer).toBeTruthy();
     expect(visibleComposer.closest(".hidden")).toBeNull();
+  });
+
+  it("keeps long transcript main content stable while typing in the primary bottom composer", () => {
+    render(<WorkbenchLongTranscriptTypingHarness />);
+
+    expect(screen.getByText("Long workbench prompt 001")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Long workbench assistant response 080. This stable response text keeps the transcript large enough to protect composer typing at the workbench boundary.",
+      ),
+    ).toBeTruthy();
+    const initialRenderCount = screen.getByTestId("long-transcript-render-count").textContent;
+
+    replaceComposerText("Typing in the dock should not re-render the long transcript.");
+
+    expect(readComposerText()).toBe("Typing in the dock should not re-render the long transcript.");
+    expect(screen.getByTestId("long-transcript-render-count").textContent).toBe(initialRenderCount);
   });
 
   it("opens the terminal panel with a pixel-based default height", () => {

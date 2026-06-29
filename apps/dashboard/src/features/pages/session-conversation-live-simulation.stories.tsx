@@ -500,7 +500,6 @@ function SessionConversationWorkbenchHarness(input: {
           ) : null}
 
           <SessionConversationBottomPanel
-            chatEntries={entries}
             composerViewModel={{
               ...SessionComposerFixtureProps,
               composerDraft,

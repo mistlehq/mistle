@@ -65,6 +65,8 @@ import {
   type ContextMentionSearchResult,
 } from "./context-mention-search-menu.js";
 
+const ComposerTokenWhitespacePattern = /\s/;
+
 function formatSlashCommandOptionLabel(command: ComposerCommandDescriptor): string {
   if (command.description === undefined) {
     return `/${command.name}`;
@@ -154,6 +156,21 @@ function createComposerPlaceholder(view: EditorView, placeholderText: string): H
   });
 }
 
+function composerTokenCanStartActiveTrigger(view: EditorView, cursorIndex: number): boolean {
+  let tokenStart = cursorIndex;
+  while (tokenStart > 0) {
+    const previousCharacter = view.state.sliceDoc(tokenStart - 1, tokenStart);
+    if (ComposerTokenWhitespacePattern.test(previousCharacter)) {
+      break;
+    }
+
+    tokenStart -= 1;
+  }
+
+  const tokenTrigger = view.state.sliceDoc(tokenStart, Math.min(tokenStart + 1, cursorIndex));
+  return tokenTrigger === "/" || tokenTrigger === "@" || tokenTrigger === "$";
+}
+
 function createComposerEditorTheme(): ReturnType<typeof EditorView.theme> {
   return createCodeMirrorTheme({
     root: {
@@ -215,6 +232,26 @@ function buildSelectedSkillMentionDecorations(
       )
       .sort((left, right) => left.from - right.from),
   );
+}
+
+function areSelectedSkillMentionsEqual(
+  leftMentions: readonly SelectedSkillMention[],
+  rightMentions: readonly SelectedSkillMention[],
+): boolean {
+  if (leftMentions.length !== rightMentions.length) {
+    return false;
+  }
+
+  return leftMentions.every((leftMention, index) => {
+    const rightMention = rightMentions[index];
+    return (
+      rightMention !== undefined &&
+      leftMention.name === rightMention.name &&
+      leftMention.sourcePath === rightMention.sourcePath &&
+      leftMention.range.start === rightMention.range.start &&
+      leftMention.range.end === rightMention.range.end
+    );
+  });
 }
 
 function insertComposerLineBreak(view: EditorView): boolean {
@@ -599,6 +636,7 @@ export function ChatComposer({
     start: composerDraft.text.length,
     end: composerDraft.text.length,
   });
+  const composerSelectionRef = useRef(composerSelection);
   const [activeSlashCommandIndex, setActiveSlashCommandIndex] = useState(0);
   const [activeSkillMentionIndex, setActiveSkillMentionIndex] = useState(0);
   const [activeContextMentionIndex, setActiveContextMentionIndex] = useState(0);
@@ -831,18 +869,47 @@ export function ChatComposer({
     onPendingFilesAdded(files);
   }
 
-  function updateComposerSelectionFromView(view: EditorView): void {
-    const selection = view.state.selection.main;
+  function commitComposerSelection(nextSelection: { start: number; end: number }): void {
+    composerSelectionRef.current = nextSelection;
     setComposerSelection((currentSelection) => {
-      if (currentSelection.start === selection.from && currentSelection.end === selection.to) {
+      if (
+        currentSelection.start === nextSelection.start &&
+        currentSelection.end === nextSelection.end
+      ) {
         return currentSelection;
       }
 
-      return {
-        start: selection.from,
-        end: selection.to,
-      };
+      return nextSelection;
     });
+  }
+
+  function updateComposerSelectionFromView(view: EditorView): void {
+    const selection = view.state.selection.main;
+    const nextSelection = {
+      start: selection.from,
+      end: selection.to,
+    };
+    composerSelectionRef.current = nextSelection;
+
+    if (
+      activeComposerTrigger === null &&
+      selection.from === selection.to &&
+      !composerTokenCanStartActiveTrigger(view, selection.from)
+    ) {
+      return;
+    }
+
+    const nextActiveComposerTrigger = detectActiveComposerTrigger({
+      composerCapabilities,
+      composerText: view.state.doc.toString(),
+      selectionStart: nextSelection.start,
+      selectionEnd: nextSelection.end,
+    });
+    if (activeComposerTrigger === null && nextActiveComposerTrigger === null) {
+      return;
+    }
+
+    commitComposerSelection(nextSelection);
   }
 
   function readLiveComposerState(): {
@@ -852,10 +919,11 @@ export function ChatComposer({
   } {
     const editorView = editorViewRef.current;
     if (editorView === null) {
+      const composerSelectionSnapshot = composerSelectionRef.current;
       return {
         text: composerDraft.text,
-        selectionStart: composerSelection.start,
-        selectionEnd: composerSelection.end,
+        selectionStart: composerSelectionSnapshot.start,
+        selectionEnd: composerSelectionSnapshot.end,
       };
     }
 
@@ -935,7 +1003,7 @@ export function ChatComposer({
       text: nextComposerText,
       selectedSkillMentions,
     });
-    setComposerSelection({
+    commitComposerSelection({
       start: nextCursorIndex,
       end: nextCursorIndex,
     });
@@ -1008,7 +1076,7 @@ export function ChatComposer({
       text: nextComposerText,
       selectedSkillMentions,
     });
-    setComposerSelection({
+    commitComposerSelection({
       start: nextCursorIndex,
       end: nextCursorIndex,
     });
@@ -1055,7 +1123,7 @@ export function ChatComposer({
         text: nextComposerText,
       }),
     });
-    setComposerSelection({
+    commitComposerSelection({
       start: nextCursorIndex,
       end: nextCursorIndex,
     });
@@ -1827,15 +1895,31 @@ export function ChatComposer({
                   })
                 : composerDraft.selectedSkillMentions;
 
-              onComposerDraftChange({
-                text: nextText,
-                selectedSkillMentions,
-              });
+              if (
+                nextText !== composerDraft.text ||
+                !areSelectedSkillMentionsEqual(
+                  selectedSkillMentions,
+                  composerDraft.selectedSkillMentions,
+                )
+              ) {
+                onComposerDraftChange({
+                  text: nextText,
+                  selectedSkillMentions,
+                });
+              }
               updateComposerSelectionFromView(viewUpdate.view);
-              setActiveSlashCommandIndex(0);
-              setActiveSkillMentionIndex(0);
-              setActiveContextMentionIndex(0);
-              setDismissedContextMentionKey(null);
+              if (viewUpdate.docChanged) {
+                setActiveSlashCommandIndex((currentIndex) =>
+                  currentIndex === 0 ? currentIndex : 0,
+                );
+                setActiveSkillMentionIndex((currentIndex) =>
+                  currentIndex === 0 ? currentIndex : 0,
+                );
+                setActiveContextMentionIndex((currentIndex) =>
+                  currentIndex === 0 ? currentIndex : 0,
+                );
+                setDismissedContextMentionKey(null);
+              }
             }}
             onCreateEditor={(view: EditorView) => {
               editorViewRef.current = view;

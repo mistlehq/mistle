@@ -3,7 +3,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { ChatMarkdownMessage } from "./chat-markdown-message.js";
+import { ChatMarkdownMessage, splitStreamingMarkdownSegments } from "./chat-markdown-message.js";
 
 describe("ChatMarkdownMessage", () => {
   it("renders assistant markdown as structured content", () => {
@@ -158,6 +158,130 @@ describe("ChatMarkdownMessage", () => {
     expect(getAnimationChunk(container, "paragraph.")).toBe(intermediateParagraphChunk);
     expect(secondBulletDelayMs).toBeGreaterThan(firstBulletDelayMs);
   });
+
+  it("renders long streaming markdown with stable static prefix segments", () => {
+    const stablePrefix = Array.from(
+      { length: 140 },
+      (_, index) =>
+        `${
+          index === 0 ? "FrozenAlphaZero " : ""
+        }Stable prefix paragraph ${String(index).padStart(2, "0")} keeps previously streamed content out of the live markdown tail.`,
+    ).join("\n\n");
+    const liveTail =
+      "Live tail paragraph remains animated while streaming continues.\n\n- live bullet one\n- live bullet two";
+
+    const { container } = render(
+      <ChatMarkdownMessage isStreaming text={`${stablePrefix}\n\n${liveTail}`} />,
+    );
+
+    expect(container.querySelectorAll(".chat-markdown-content").length).toBeGreaterThan(1);
+    expect(screen.getByText(/Stable prefix paragraph 00/)).toBeDefined();
+    expect(container.textContent).toContain("live bullet two");
+    expect(getAnimationChunk(container, "Live")).toBeDefined();
+    expect(
+      Array.from(container.querySelectorAll("[data-sd-animate]")).some(
+        (chunk) => chunk.textContent === "FrozenAlphaZero",
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps reference-style streaming markdown in one parser context", () => {
+    const stablePrefix = Array.from(
+      { length: 90 },
+      (_, index) =>
+        `Reference paragraph ${String(index).padStart(2, "0")} keeps enough length before [the linked label][target].`,
+    ).join("\n\n");
+
+    const { container } = render(
+      <ChatMarkdownMessage
+        isStreaming
+        text={`${stablePrefix}\n\n[target]: https://example.com/docs`}
+      />,
+    );
+
+    expect(container.querySelectorAll(".chat-markdown-content")).toHaveLength(1);
+    expect(container.textContent).toContain("Reference paragraph 00");
+  });
+
+  it("does not split loose lists across streaming markdown segments", () => {
+    const listText = Array.from(
+      { length: 90 },
+      (_, index) =>
+        `${String(index + 1)}. Loose list item ${String(index).padStart(2, "0")}\n\n   continuation paragraph`,
+    ).join("\n\n");
+
+    const { container } = render(<ChatMarkdownMessage isStreaming text={listText} />);
+
+    expect(container.querySelectorAll(".chat-markdown-content")).toHaveLength(1);
+    expect(container.textContent).toContain("Loose list item 00");
+    expect(container.textContent).toContain("continuation paragraph");
+  });
+
+  it("does not split inside longer fenced code blocks", () => {
+    const codeLines = Array.from(
+      { length: 170 },
+      (_, index) => `const line${String(index).padStart(3, "0")} = "inside a long fence";`,
+    ).join("\n");
+    const text = [
+      "````md",
+      "A literal nested fence follows:",
+      "```",
+      "",
+      codeLines,
+      "",
+      "````",
+      "",
+      "After the fence.",
+    ].join("\n");
+
+    const { container } = render(<ChatMarkdownMessage isStreaming text={text} />);
+
+    expect(container.querySelectorAll(".chat-markdown-content")).toHaveLength(1);
+    expect(container.textContent).toContain("After the fence.");
+  });
+
+  it("does not close a streaming code fence on a same-character content line with text", () => {
+    const codeLines = Array.from(
+      { length: 170 },
+      (_, index) => `const line${String(index).padStart(3, "0")} = "inside a long fence";`,
+    ).join("\n");
+    const text = [
+      "```",
+      "The next same-character fence is still code content because it has trailing text.",
+      "``` aaa",
+      "",
+      codeLines,
+      "",
+      "```",
+      "",
+      "After the fence.",
+    ].join("\n");
+
+    const { container } = render(<ChatMarkdownMessage isStreaming text={text} />);
+
+    expect(container.querySelectorAll(".chat-markdown-content")).toHaveLength(1);
+    expect(container.textContent).toContain("``` aaa");
+    expect(container.textContent).toContain("After the fence.");
+  });
+
+  it("splits streaming markdown with many blank lines without quadratic boundary scans", () => {
+    const blankLines = "\n".repeat(10_000);
+    const text = [
+      "Stable prefix paragraph starts the stream.",
+      blankLines,
+      "Next non-blank paragraph allows a safe boundary.",
+      "",
+      "Live tail keeps enough remaining text after the blank run.",
+      "Live tail ".repeat(520),
+    ].join("\n");
+    const startedAtMs = performance.now();
+
+    const segments = splitStreamingMarkdownSegments(text);
+
+    expect(performance.now() - startedAtMs).toBeLessThan(250);
+    expect(segments.length).toBeGreaterThan(1);
+    expect(segments.at(-1)?.isLive).toBe(true);
+  });
 });
 
 function getAnimationChunk(container: HTMLElement, text: string): Element {
@@ -213,17 +337,17 @@ function getAnimationValueFromStyleMs(element: Element, property: string): numbe
     throw new Error("Expected animated chunk to include an inline animation style.");
   }
 
-  const delayDeclaration = style
+  const matchingDeclaration = style
     .split(";")
     .find((declaration) => declaration.trim().startsWith(property));
-  if (delayDeclaration === undefined) {
+  if (matchingDeclaration === undefined) {
     throw new Error(`Expected animation style to include ${property} ${style}`);
   }
 
-  const delayMsText = delayDeclaration.split(":").at(1)?.trim();
-  if (delayMsText === undefined || !delayMsText.endsWith("ms")) {
+  const propertyValueText = matchingDeclaration.split(":").at(1)?.trim();
+  if (propertyValueText === undefined || !propertyValueText.endsWith("ms")) {
     throw new Error(`Expected animation delay in milliseconds: ${style}`);
   }
 
-  return Number(delayMsText.slice(0, -2));
+  return Number(propertyValueText.slice(0, -2));
 }

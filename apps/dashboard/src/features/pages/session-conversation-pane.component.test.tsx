@@ -26,6 +26,7 @@ import {
   SessionConversationBottomPanelController,
   SessionConversationBottomPanelDraftController,
   SessionConversationMainContent,
+  createSessionConversationComposerDraftStore,
 } from "./session-conversation-pane.js";
 
 const UploadedImageFixture: UploadedSandboxFile = {
@@ -141,7 +142,6 @@ function RenderedComposerPaneHarness(input: {
 
   return (
     <SessionConversationBottomPanelController
-      chatEntries={[]}
       composerStateInput={{
         ...createReadySessionComposerStateInput(),
         clearSessionErrorMessage: () => {
@@ -189,7 +189,6 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
       </button>
       <div data-testid="started-prompts">{startedPrompts.join(" | ")}</div>
       <SessionConversationBottomPanelController
-        chatEntries={[]}
         composerStateInput={{
           ...readyComposerStateInput,
           turnControl: {
@@ -296,7 +295,6 @@ function LongTranscriptComposerHarness(): React.JSX.Element {
         serverRequestPanelEntries={[]}
       />
       <SessionConversationBottomPanel
-        chatEntries={chatEntries}
         composerViewModel={{
           ...SessionComposerFixtureProps,
           composerDraft,
@@ -326,7 +324,6 @@ function DraftOwnedComposerHarness(): React.JSX.Element {
         Switch conversation
       </button>
       <SessionConversationBottomPanelDraftController
-        chatEntries={[]}
         clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
         clearPendingDiffComments={function clearPendingDiffComments() {}}
         composerStateInput={createReadySessionComposerStateInput()}
@@ -337,6 +334,38 @@ function DraftOwnedComposerHarness(): React.JSX.Element {
         pendingDiffComments={[]}
         serverRequestPanelEntries={[]}
       />
+    </div>
+  );
+}
+
+function StoreBackedDraftOwnedComposerHarness(): React.JSX.Element {
+  const [isComposerMounted, setComposerMounted] = useState(true);
+  const draftStore = useMemo(() => createSessionConversationComposerDraftStore(), []);
+
+  return (
+    <div>
+      <button
+        onClick={() => {
+          setComposerMounted((currentIsComposerMounted) => !currentIsComposerMounted);
+        }}
+        type="button"
+      >
+        Toggle composer
+      </button>
+      {isComposerMounted ? (
+        <SessionConversationBottomPanelDraftController
+          clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
+          clearPendingDiffComments={function clearPendingDiffComments() {}}
+          composerStateInput={createReadySessionComposerStateInput()}
+          draftResetKey="thread-1"
+          draftStore={draftStore}
+          isRespondingToServerRequest={false}
+          onRespondToServerRequest={function onRespondToServerRequest() {}}
+          pendingBlueprintComments={[]}
+          pendingDiffComments={[]}
+          serverRequestPanelEntries={[]}
+        />
+      ) : null}
     </div>
   );
 }
@@ -480,6 +509,22 @@ describe("SessionConversationBottomPanel", () => {
     });
   });
 
+  it("preserves a store-backed composer draft across composer unmounts", async () => {
+    render(<StoreBackedDraftOwnedComposerHarness />);
+
+    replaceComposerText("draft survives panel transitions");
+    expect(readComposerText()).toBe("draft survives panel transitions");
+
+    fireEvent.click(screen.getByRole("button", { name: "Toggle composer" }));
+    expect(screen.queryByRole("textbox")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Toggle composer" }));
+
+    await waitFor(() => {
+      expect(readComposerText()).toBe("draft survives panel transitions");
+    });
+  });
+
   it("keeps a long transcript and scroll position stable while typing in the composer", () => {
     render(<LongTranscriptComposerHarness />);
 
@@ -517,7 +562,6 @@ describe("SessionConversationBottomPanel", () => {
   it("renders the session status message above the composer", () => {
     render(
       <SessionConversationBottomPanel
-        chatEntries={[]}
         composerViewModel={{
           ...SessionComposerFixtureProps,
         }}
@@ -543,7 +587,6 @@ describe("SessionConversationBottomPanel", () => {
   it("renders a working indicator directly above the composer when a turn is active", () => {
     render(
       <SessionConversationBottomPanel
-        chatEntries={[]}
         composerViewModel={{
           ...SessionComposerFixtureProps,
         }}
@@ -562,7 +605,6 @@ describe("SessionConversationBottomPanel", () => {
   it("hides the working indicator while a pending server request is shown", () => {
     render(
       <SessionConversationBottomPanel
-        chatEntries={[]}
         composerViewModel={{
           ...SessionComposerFixtureProps,
         }}

@@ -22,11 +22,11 @@ import type {
   PendingSessionBlueprintCommentInput,
 } from "./session-blueprint-comment.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
-import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import type { SessionComposerBootstrapPhase } from "./session-composer/session-composer-runtime-contracts.js";
 import {
-  SessionConversationBottomPanelController,
+  SessionConversationBottomPanelDraftController,
   SessionConversationMainContent,
+  createSessionConversationComposerDraftStore,
 } from "./session-conversation-pane.js";
 import type {
   PendingSessionDiffComment,
@@ -347,7 +347,6 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
   const [hasEnteredReadyConversation, setHasEnteredReadyConversation] = useState(false);
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const previousActiveConversationIdRef = useRef<string | null>(null);
-  const [composerDraft, setComposerDraft] = useState(createComposerDraft(""));
   const [isMobileConversationNavigatorOpen, setMobileConversationNavigatorOpen] = useState(false);
   const isMobileSecondaryPanelLayout = useIsBelowBreakpoint(CssBreakpointVariables.SM);
   const [autoStartedTurnKeys, setAutoStartedTurnKeys] = useState<ReadonlySet<string>>(new Set());
@@ -731,10 +730,17 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
       workbench.terminalPanelState.openPanel,
     ],
   );
-  const unmatchedServerRequests = filterUnmatchedSessionServerRequests({
-    chatEntries: conversationPane.chatState.entries,
-    pendingServerRequests: conversationPane.serverRequestsState.pendingServerRequests,
-  });
+  const unmatchedServerRequests = useMemo(
+    () =>
+      filterUnmatchedSessionServerRequests({
+        chatEntries: conversationPane.chatState.entries,
+        pendingServerRequests: conversationPane.serverRequestsState.pendingServerRequests,
+      }),
+    [
+      conversationPane.chatState.entries,
+      conversationPane.serverRequestsState.pendingServerRequests,
+    ],
+  );
   const terminalPanelKey = input.sandboxInstanceId ?? "missing-session";
   const diffPanelErrorNotice: React.ComponentProps<typeof SessionDiffPanel>["errorNotice"] =
     !workbench.connectionReadiness.canConnect
@@ -753,6 +759,16 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
     workbench.sandboxStatusQuery.data === undefined
       ? input.documentTitleFallback
       : resolveSessionTitleLabel(workbench.sandboxStatusQuery.data.title);
+  const conversationScopedComposerRenderKey = resolveConversationScopedComposerRenderKey({
+    activeConversationId: conversationPane.activeConversationId,
+    requestedRuntimeConversationId: input.requestedRuntimeConversationId,
+    sandboxInstanceId: input.sandboxInstanceId,
+    triggerConversation: workbench.sandboxStatusQuery.data?.triggerConversation ?? null,
+  });
+  const conversationComposerDraftStore = useMemo(
+    () => createSessionConversationComposerDraftStore(),
+    [conversationScopedComposerRenderKey],
+  );
 
   useDocumentTitle(sessionDocumentTitle);
 
@@ -762,7 +778,6 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
     }
 
     previousActiveConversationIdRef.current = conversationPane.activeConversationId;
-    setComposerDraft(createComposerDraft(""));
     setPendingBlueprintComments([]);
     setPendingDiffComments([]);
   }, [conversationPane.activeConversationId]);
@@ -972,12 +987,7 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
             isTurnInProgress: isConversationTurnRunning,
             pendingTurnId: conversationPane.chatState.pendingTurnId,
             autoScrollToBottomOnInitialLoad: true,
-            initialBottomScrollResetKey: resolveConversationScopedComposerRenderKey({
-              activeConversationId: conversationPane.activeConversationId,
-              requestedRuntimeConversationId: input.requestedRuntimeConversationId,
-              sandboxInstanceId: input.sandboxInstanceId,
-              triggerConversation: workbench.sandboxStatusQuery.data?.triggerConversation ?? null,
-            }),
+            initialBottomScrollResetKey: conversationScopedComposerRenderKey,
             scrollBehavior: "follow-streaming-at-bottom",
             chatEntries: conversationPane.chatState.entries,
             onUserMessageAction: conversationPane.dismissUserMessageAction,
@@ -1003,22 +1013,19 @@ export function SessionWorkbenchFullPage(input: SessionWorkbenchFullPageProps): 
         mainContentScrollContainerRef={conversationScrollContainerRef}
         primaryBottomPanel={
           workbench.primaryPanelState.showsChatComposer && entryPreparationState === null ? (
-            <SessionConversationBottomPanelController
-              chatEntries={conversationPane.chatState.entries}
+            <SessionConversationBottomPanelDraftController
+              clearPendingBlueprintComments={handleClearPendingBlueprintComments}
+              clearPendingDiffComments={handleClearPendingDiffComments}
               composerStateInput={conversationPane.composerStateInput}
-              draftState={{
-                composerDraft,
-                pendingBlueprintComments,
-                clearPendingBlueprintComments: handleClearPendingBlueprintComments,
-                pendingDiffComments,
-                clearPendingDiffComments: handleClearPendingDiffComments,
-                setComposerDraft,
-              }}
+              draftStore={conversationComposerDraftStore}
+              draftResetKey={conversationScopedComposerRenderKey}
               isRespondingToServerRequest={
                 conversationPane.serverRequestsState.isRespondingToServerRequest
               }
               onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
               key={input.sandboxInstanceId ?? "missing-session"}
+              pendingBlueprintComments={pendingBlueprintComments}
+              pendingDiffComments={pendingDiffComments}
               serverRequestPanelEntries={unmatchedServerRequests}
               showWorkingIndicator={isConversationTurnRunning}
               supportsUserInputRequestCustomResponse={

@@ -400,7 +400,6 @@ function DesignerSessionWithCanvasStory(input?: {
         ),
         primaryBottomPanel: (
           <SessionConversationBottomPanelDraftController
-            chatEntries={StoryDesignerSessionConversationEntries}
             clearPendingBlueprintComments={blueprintCommentState.clearBlueprintComments}
             clearPendingDiffComments={function clearPendingDiffComments() {}}
             composerStateInput={StoryDesignerSessionComposerStateInput}
@@ -486,7 +485,6 @@ function DesignerSessionCanvasFirstOpenStory(): React.JSX.Element {
           mainContentLayout={{ scroll: "contained", width: "full" }}
           primaryBottomPanel={
             <SessionConversationBottomPanelDraftController
-              chatEntries={StoryDesignerSessionConversationEntries}
               clearPendingBlueprintComments={function clearPendingBlueprintComments() {}}
               clearPendingDiffComments={function clearPendingDiffComments() {}}
               composerStateInput={StoryDesignerSessionComposerStateInput}
