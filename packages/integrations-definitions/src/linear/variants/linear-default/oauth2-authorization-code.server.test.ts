@@ -1,18 +1,11 @@
-import {
-  IntegrationConnectionMethodIds,
-  IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications,
-} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import {
   buildLinearAuthorizationCodeExchangeRequestBody,
   buildLinearAuthorizationUrl,
   buildLinearRefreshRequestBody,
-  buildLinearRevocationRequestBody,
-  classifyLinearRefreshFailure,
   resolveLinearAuthorizationCodeOrThrow,
-  resolveLinearCompleteGrantResult,
-  resolveLinearRefreshResult,
+  resolveLinearAccessTokenExpiresAt,
 } from "./oauth2-authorization-code.server.js";
 
 describe("Linear OAuth authorization code helpers", () => {
@@ -64,29 +57,6 @@ describe("Linear OAuth authorization code helpers", () => {
     );
   });
 
-  it("builds authenticated token revocation request bodies using the current Linear token field", () => {
-    expect(
-      buildLinearRevocationRequestBody({
-        token: "access_123",
-        clientId: "linear_client_123",
-        clientSecret: "linear_secret_456",
-        tokenTypeHint: "access_token",
-      }).toString(),
-    ).toBe(
-      "token=access_123&client_id=linear_client_123&client_secret=linear_secret_456&token_type_hint=access_token",
-    );
-    expect(
-      buildLinearRevocationRequestBody({
-        token: "refresh_123",
-        clientId: "linear_client_123",
-        clientSecret: "linear_secret_456",
-        tokenTypeHint: "refresh_token",
-      }).toString(),
-    ).toBe(
-      "token=refresh_123&client_id=linear_client_123&client_secret=linear_secret_456&token_type_hint=refresh_token",
-    );
-  });
-
   it("resolves callback authorization codes and reports provider errors", () => {
     expect(resolveLinearAuthorizationCodeOrThrow(new URLSearchParams("code=code_123"))).toBe(
       "code_123",
@@ -103,104 +73,12 @@ describe("Linear OAuth authorization code helpers", () => {
     );
   });
 
-  it("maps token responses into persisted connection credentials", () => {
+  it("resolves access token expiry timestamps from Linear expires_in values", () => {
     expect(
-      resolveLinearCompleteGrantResult({
-        providerState: {
-          clientId: "linear_client_123",
-          clientSecret: "linear_secret_456",
-        },
-        response: {
-          access_token: "access_123",
-          expires_in: 3600,
-          refresh_token: "refresh_123",
-          scope: "read write",
-          token_type: "Bearer",
-        },
+      resolveLinearAccessTokenExpiresAt({
         issuedAt: new Date("2026-06-27T00:00:00.000Z"),
+        expiresIn: "7200",
       }),
-    ).toEqual({
-      connectionConfig: {
-        connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
-        client_id: "linear_client_123",
-      },
-      accessToken: "access_123",
-      accessTokenExpiresAt: "2026-06-27T01:00:00.000Z",
-      refreshSchedulingResponse: {
-        access_token: "access_123",
-        expires_in: 3600,
-        refresh_token: "refresh_123",
-        scope: "read write",
-        token_type: "Bearer",
-      },
-      refreshToken: "refresh_123",
-      clientSecret: "linear_secret_456",
-      credentialMetadata: {
-        scope: "read write",
-      },
-    });
-
-    expect(() =>
-      resolveLinearCompleteGrantResult({
-        providerState: {
-          clientId: "linear_client_123",
-          clientSecret: "linear_secret_456",
-        },
-        response: {
-          access_token: "access_123",
-        },
-        issuedAt: new Date("2026-06-27T00:00:00.000Z"),
-      }),
-    ).toThrow("Linear OAuth authorization did not return a refresh token.");
-  });
-
-  it("maps refresh token responses and refresh failures", () => {
-    expect(
-      resolveLinearRefreshResult({
-        response: {
-          access_token: "access_456",
-          expires_in: "7200",
-          refresh_token: "refresh_456",
-          scope: ["read", "write"],
-        },
-        issuedAt: new Date("2026-06-27T00:00:00.000Z"),
-      }),
-    ).toEqual({
-      accessToken: "access_456",
-      accessTokenExpiresAt: "2026-06-27T02:00:00.000Z",
-      refreshSchedulingResponse: {
-        access_token: "access_456",
-        expires_in: "7200",
-        refresh_token: "refresh_456",
-        scope: ["read", "write"],
-      },
-      refreshToken: "refresh_456",
-      credentialMetadata: {
-        scope: "read write",
-      },
-    });
-
-    expect(
-      classifyLinearRefreshFailure({
-        status: 401,
-        body: '{"error":"invalid_grant","error_description":"Refresh token expired"}',
-      }),
-    ).toEqual({
-      classification:
-        IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications.PERMANENT,
-      code: "invalid_grant",
-      message: "Refresh token expired",
-    });
-
-    expect(
-      classifyLinearRefreshFailure({
-        status: 503,
-        body: "",
-      }),
-    ).toEqual({
-      classification:
-        IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications.TEMPORARY,
-      message: "Linear access token refresh failed with status 503.",
-    });
+    ).toBe("2026-06-27T02:00:00.000Z");
   });
 });

@@ -2,11 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 
 import { describe, expect, it } from "vitest";
 
-import {
-  LinearConnectionMethodIds,
-  LinearCredentialSlotKeys,
-  LinearOAuth2CredentialSlotKeys,
-} from "./auth.js";
+import { LinearConnectionMethodIds, LinearCredentialSlotKeys } from "./auth.js";
 import {
   completeLinearLinkedAccountAuthorization,
   LinearIdentityLinkingAuthorizationError,
@@ -99,7 +95,9 @@ describe("Linear identity linking", () => {
             client_id: "linear_client_123",
           },
         },
-        availableConnectionSecretSlotKeys: new Set([LinearOAuth2CredentialSlotKeys.clientSecret]),
+        availableConnectionSecretSlotKeys: new Set([
+          "linear.linear-default.oauth2-authorization-code.client-secret",
+        ]),
       }),
     ).toBe(false);
   });

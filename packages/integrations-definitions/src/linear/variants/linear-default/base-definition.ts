@@ -9,8 +9,6 @@ import { z } from "zod";
 import {
   type LinearConnectionConfig,
   LinearApiKeyConnectionConfigSchema,
-  LinearOAuth2ConnectionConfigSchema,
-  LinearOAuth2ConnectionStartConfigSchema,
   LinearOAuthAppConnectionConfigSchema,
   LinearConnectionMethodIds,
   LinearCredentialSecretTypes,
@@ -85,7 +83,7 @@ export const LinearBaseDefinition: LinearBaseIntegrationDefinition = {
         {
           name: "clientSecret",
           label: "OAuth client secret",
-          placeholder: "Linear OAuth app client secret",
+          placeholder: "Enter client secret",
           inputType: "password",
           secretType: LinearCredentialSecretTypes.OAUTH2_CLIENT_SECRET,
           slotKey: LinearCredentialSlotKeys.OAUTH_APP_CLIENT_SECRET,
@@ -96,49 +94,7 @@ export const LinearBaseDefinition: LinearBaseIntegrationDefinition = {
       ui: {
         create: {
           submitLabel: "Save Linear OAuth app",
-          helperText: "Stores the Linear OAuth app client used for organization identity linking.",
-        },
-      },
-    },
-    {
-      id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
-      label: "Linear OAuth",
-      kind: "redirect",
-      configSchema: LinearOAuth2ConnectionConfigSchema,
-      startConfigSchema: LinearOAuth2ConnectionStartConfigSchema,
-      startConfigForm: () => ({
-        schema: {
-          type: "object",
-          properties: {
-            client_id: {
-              type: "string",
-              title: "OAuth client ID",
-            },
-            client_secret: {
-              type: "string",
-              title: "OAuth client secret",
-            },
-          },
-          required: ["client_id", "client_secret"],
-        },
-        uiSchema: {
-          client_id: {
-            "ui:placeholder": "Linear OAuth client ID",
-          },
-          client_secret: {
-            "ui:widget": "password",
-          },
-        },
-      }),
-      ui: {
-        create: {
-          submitLabel: "Connect Linear",
-          helperText: "Authorize Linear access with your Linear OAuth application.",
-          showCallbackUrl: true,
-        },
-        reauthorize: {
-          actionLabel: "Re-authorize",
-          pendingLabel: "Starting...",
+          helperText: "Stores Linear OAuth app credentials for organization identity linking.",
         },
       },
     },
