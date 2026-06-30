@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync } from "node:fs";
+import { cpSync, mkdirSync, readdirSync } from "node:fs";
 
 cpSync(
   new URL("../src/designer/instructions", import.meta.url),
@@ -8,9 +8,18 @@ cpSync(
   },
 );
 
-const runtimeReferencesDistDir = new URL("../dist/designer/runtime-references", import.meta.url);
+const runtimeReferencesDistDir = new URL("../dist/designer/runtime-references/", import.meta.url);
 mkdirSync(runtimeReferencesDistDir, { recursive: true });
-cpSync(
-  new URL("../src/designer/runtime-references/integration-catalog.md", import.meta.url),
-  new URL("integration-catalog.md", runtimeReferencesDistDir),
-);
+
+for (const fileName of readdirSync(
+  new URL("../src/designer/runtime-references", import.meta.url),
+)) {
+  if (!fileName.endsWith(".md")) {
+    continue;
+  }
+
+  cpSync(
+    new URL(`../src/designer/runtime-references/${fileName}`, import.meta.url),
+    new URL(fileName, runtimeReferencesDistDir),
+  );
+}

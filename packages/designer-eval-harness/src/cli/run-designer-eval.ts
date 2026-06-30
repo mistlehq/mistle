@@ -76,7 +76,7 @@ async function main(): Promise<void> {
     });
     const designerSessionId = state.designerSession.id;
     const runtimePlan = compileEvalDesignerRuntime({
-      availableProviderResources: state.productState.availableProviderResources,
+      availableProviderResources: state.availableProviderResources,
       config: evalConfig,
       designerSessionId,
       initialPrompt: evalCase.prompt,

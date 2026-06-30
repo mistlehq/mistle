@@ -22,7 +22,7 @@ async function main(): Promise<void> {
     runKey: "runtime_materialization",
   });
   const runtimePlan = compileEvalDesignerRuntime({
-    availableProviderResources: state.productState.availableProviderResources,
+    availableProviderResources: state.availableProviderResources,
     config: evalConfig,
     designerSessionId: options.designerSessionId,
     initialPrompt: options.prompt,

@@ -2,7 +2,7 @@
 
 # Designer Integration Catalog
 
-Static integration metadata for Mistle Designer runtime lookup. Use this file to resolve user-facing provider names to provider family ids, integration target keys, setup method ids, and supported resource kinds before broad integration MCP discovery.
+Static integration metadata for Mistle Designer runtime lookup. Use this file to resolve user-facing provider names to provider family ids, integration target keys, setup method ids, binding tool ids, and supported resource kinds before broad integration MCP discovery.
 
 ## AgentMail
 

@@ -10,6 +10,21 @@ import { startDesignerEvalControlPlane } from "./eval-control-plane.ts";
 import { createDesignerEvalSessionState } from "./in-memory-state.ts";
 
 describe("Designer eval control plane", () => {
+  it("uses the eval case target draft id when seeding in-memory state", () => {
+    const evalCase = getDesignerEvalCase("ai-software-factory-linear-github");
+    const state = createDesignerEvalSessionState({
+      evalCase,
+      runKey: "run_key_does_not_match_case_id",
+    });
+
+    expect(state.seededState.targetDraft.profileId).toBe(evalCase.seed.targetDraft.profileId);
+    expect(state.seededState.targetDraft.version).toBe(evalCase.seed.targetDraft.version);
+    expect(state.designerSession.sandboxProfileId).toBe(evalCase.seed.targetDraft.profileId);
+    expect(state.designerSession.sandboxProfileVersion).toBe(evalCase.seed.targetDraft.version);
+    expect(state.productState.targetDraft.profileId).toBe(evalCase.seed.targetDraft.profileId);
+    expect(state.productState.targetDraft.version).toBe(evalCase.seed.targetDraft.version);
+  });
+
   it("persists canvas tabs in run-local memory through the Designer canvas-tabs route", async () => {
     const evalCase = getDesignerEvalCase("github-pr-review-basic");
     const state = createDesignerEvalSessionState({
@@ -148,6 +163,99 @@ describe("Designer eval control plane", () => {
           },
         },
       ]);
+    } finally {
+      await controlPlane.close();
+    }
+  });
+
+  it("rejects selected provider resource saves for a different target draft", async () => {
+    const evalCase = getDesignerEvalCase("github-pr-review-basic");
+    const state = createDesignerEvalSessionState({
+      evalCase,
+      runKey: "github_pr_review_basic",
+    });
+    const githubConnectionId = readSeededGithubConnectionId(state.seededState.providerConnections);
+    const originalBindings = structuredClone(state.productState.targetDraft.integrationBindings);
+    const controlPlane = await startDesignerEvalControlPlane({ state });
+
+    try {
+      const response = await fetch(
+        new URL(
+          `/v1/designer/sessions/${state.designerSession.id}/dashboard-actions/save-selected-provider-resources`,
+          controlPlane.baseUrl,
+        ),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            targetDraft: {
+              profileId: "sbp_eval_different",
+              version: state.seededState.targetDraft.version,
+            },
+            connectionId: githubConnectionId,
+            resourceKind: "repository",
+            selectedHandles: ["mistlehq/mistle"],
+            bindingIntent: "git-repositories",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({
+        error: `Designer eval can only mutate seeded draft ${state.seededState.targetDraft.profileId}@${String(state.seededState.targetDraft.version)}.`,
+      });
+      expect(state.productState.targetDraft.integrationBindings).toEqual(originalBindings);
+    } finally {
+      await controlPlane.close();
+    }
+  });
+
+  it("rejects selected provider resource saves when an existing binding config is malformed", async () => {
+    const evalCase = getDesignerEvalCase("github-pr-review-basic");
+    const state = createDesignerEvalSessionState({
+      evalCase,
+      runKey: "github_pr_review_basic",
+    });
+    const githubConnectionId = readSeededGithubConnectionId(state.seededState.providerConnections);
+    state.productState.targetDraft.integrationBindings = [
+      {
+        id: "ibd_eval_malformed_github",
+        connectionId: githubConnectionId,
+        kind: "git",
+        config: "malformed",
+      },
+    ];
+    const originalBindings = structuredClone(state.productState.targetDraft.integrationBindings);
+    const controlPlane = await startDesignerEvalControlPlane({ state });
+
+    try {
+      const response = await fetch(
+        new URL(
+          `/v1/designer/sessions/${state.designerSession.id}/dashboard-actions/save-selected-provider-resources`,
+          controlPlane.baseUrl,
+        ),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            targetDraft: state.seededState.targetDraft,
+            connectionId: githubConnectionId,
+            resourceKind: "repository",
+            selectedHandles: ["mistlehq/mistle"],
+            bindingIntent: "git-repositories",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({
+        error: "Designer eval binding 'ibd_eval_malformed_github' config must be an object.",
+      });
+      expect(state.productState.targetDraft.integrationBindings).toEqual(originalBindings);
     } finally {
       await controlPlane.close();
     }

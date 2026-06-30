@@ -148,7 +148,7 @@ function saveSelectedProviderResourcesToMemory(input: {
     connectionId: input.body.connectionId,
     kind: "git",
     config: {
-      ...readObjectConfig(matchingBinding?.config),
+      ...readExistingBindingConfig(matchingBinding),
       repositories: selectedHandles,
     },
   };
@@ -173,9 +173,16 @@ function saveSelectedProviderResourcesToMemory(input: {
   });
 }
 
-function readObjectConfig(config: unknown): Record<string, unknown> {
-  if (typeof config !== "object" || config === null || Array.isArray(config)) {
+function readExistingBindingConfig(
+  binding: DesignerEvalProductStateIntegrationBinding | undefined,
+): Record<string, unknown> {
+  if (binding === undefined) {
     return {};
+  }
+
+  const config = binding.config;
+  if (typeof config !== "object" || config === null || Array.isArray(config)) {
+    throw new Error(`Designer eval binding '${binding.id}' config must be an object.`);
   }
 
   return Object.fromEntries(Object.entries(config));

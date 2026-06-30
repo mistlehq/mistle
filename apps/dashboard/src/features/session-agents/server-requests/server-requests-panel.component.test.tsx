@@ -278,12 +278,6 @@ describe("ServerRequestsPanel", () => {
                 header: "Goal",
                 id: "goal",
                 question: "What should the agent optimize for?",
-                options: [
-                  {
-                    label: "Describe the outcome",
-                    isOther: true,
-                  },
-                ],
               },
             ],
             status: "pending",
@@ -368,6 +362,53 @@ describe("ServerRequestsPanel", () => {
     ]);
   });
 
+  it("lets runtimes without composer custom responses cancel auto-submit user input choices", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: "triage-source-choice-request-1",
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [
+              {
+                header: "Intake source",
+                id: "triage-source-choice",
+                question: "What should the triaging agent watch first?",
+                options: [
+                  {
+                    label: "GitHub issues/PRs",
+                    isOther: false,
+                  },
+                  {
+                    label: "Slack messages",
+                    isOther: false,
+                  },
+                ],
+              },
+            ],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(submittedResults).toEqual([
+      {
+        decision: "cancel",
+      },
+    ]);
+  });
+
   it("renders short selectable user input options as numbered rows", () => {
     const submittedResults: unknown[] = [];
 
@@ -417,7 +458,7 @@ describe("ServerRequestsPanel", () => {
     expect(screen.getByText("1").textContent).toBe("1");
     expect(screen.getByText("2").textContent).toBe("2");
     expect(screen.getByText("3").textContent).toBe("3");
-    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Cancel" }).textContent).toBe("Cancel");
 
     fireEvent.click(screen.getByRole("button", { name: /Slack messages/u }));
 

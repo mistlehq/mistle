@@ -94,11 +94,11 @@ Mistle-owned instructions that guide **Mistle Designer** behavior inside a **Mis
 _Avoid_: Repo guidance, contributor instructions, Designer instructions when the source of authority is ambiguous
 
 **Designer runtime reference**:
-A generated, read-only reference artifact made available inside a **Mistle Designer session** for runtime lookup without becoming part of **Designer managed instructions**.
-_Avoid_: Designer managed instructions, hand-authored runtime docs
+A Mistle-owned reference artifact made available inside a **Mistle Designer session** for runtime lookup without becoming part of **Designer managed instructions**. A runtime reference may be generated from typed product metadata or curated by Mistle for stable product concepts.
+_Avoid_: Designer managed instructions, user project docs, ad hoc runtime notes
 
 **Designer integration catalog**:
-A **Designer runtime reference** that lists static integration metadata such as provider aliases, integration target identities, setup methods, supported resource kinds, and known provider caveats.
+A generated **Designer runtime reference** that lists static integration metadata such as provider aliases, integration target identities, setup methods, supported resource kinds, binding tools, and known provider caveats.
 _Avoid_: Integration connection state, organization integration status, hand-authored provider docs
 
 **Designer recommendation**:
@@ -873,7 +873,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Mistle Designer session** setup changes do not automatically change the target **Sandbox profile version configuration**.
 - A **Designer eval case** may require a reversible saved change to a draft **Sandbox profile version** as evidence that **Mistle Designer** produced actionable product progress.
 - A **Designer eval client** should submit dashboard-mediated product actions through the same validated **Dashboard control action** path as the dashboard client.
-- First-pass **Designer eval client** implementation may live as a root developer script until eval-case and artifact boundaries justify a reusable package.
+- The **Designer eval client** lives in `packages/designer-eval-harness`; eval runs may remain local/manual developer workflows before becoming CI gates.
 - A **Designer eval seed** may create prerequisite product state directly, but the product change being evaluated should be produced through the same validated product path used by a dashboard-mediated **Dashboard control action**.
 - First-pass **Designer eval artifacts** should preserve the transcript, raw runtime events, dashboard-control trace, product-state snapshots, and evaluation result; provider MCP call traces may wait until they are available from existing runtime events without special runtime changes.
 - First-pass **Designer eval cases** may run as local/manual developer workflows before becoming CI gates.

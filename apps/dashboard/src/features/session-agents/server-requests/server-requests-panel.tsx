@@ -68,6 +68,13 @@ type ResourceSelectionRefetchQuery = {
     error: unknown;
   };
 };
+type ToolUserInputPanelMode = {
+  renderOtherOptionInputs: boolean;
+  showFooterCancel: boolean;
+  showFooterSubmit: boolean;
+  submitOnOptionSelect: boolean;
+  useComposerCustomResponseOnly: boolean;
+};
 
 const ResourceSearchDebounceMs = 300;
 const ResourceSyncRefetchIntervalMs = 3_000;
@@ -154,6 +161,22 @@ function shouldUseComposerCustomResponseOnly(input: {
       question.inputKind !== "integrationConnectionResourceMultiSelect" &&
       readSelectableUserInputOptions(question).length === 0,
   );
+}
+
+function resolveToolUserInputPanelMode(input: {
+  entry: Extract<ServerRequestEntry, { kind: "tool-user-input" }>;
+  supportsUserInputRequestCustomResponse: boolean;
+}): ToolUserInputPanelMode {
+  const submitOnOptionSelect = canSubmitUserInputOnOptionSelect(input);
+  const useComposerCustomResponseOnly = shouldUseComposerCustomResponseOnly(input);
+
+  return {
+    renderOtherOptionInputs: !input.supportsUserInputRequestCustomResponse,
+    showFooterCancel: !input.supportsUserInputRequestCustomResponse,
+    showFooterSubmit: !submitOnOptionSelect && !useComposerCustomResponseOnly,
+    submitOnOptionSelect,
+    useComposerCustomResponseOnly,
+  };
 }
 
 function createUserInputResponse(input: {
@@ -585,15 +608,10 @@ function ToolUserInputRequestPanelContent(input: {
     });
   }
 
-  const submitOnOptionSelect = canSubmitUserInputOnOptionSelect({
+  const panelMode = resolveToolUserInputPanelMode({
     entry: input.entry,
     supportsUserInputRequestCustomResponse: input.supportsUserInputRequestCustomResponse,
   });
-  const useComposerCustomResponseOnly = shouldUseComposerCustomResponseOnly({
-    entry: input.entry,
-    supportsUserInputRequestCustomResponse: input.supportsUserInputRequestCustomResponse,
-  });
-  const showFooterSubmit = !submitOnOptionSelect && !useComposerCustomResponseOnly;
   const isSubmitDisabled =
     input.isRespondingToServerRequest ||
     input.entry.questions.some((question) => {
@@ -611,37 +629,53 @@ function ToolUserInputRequestPanelContent(input: {
         }).trim().length === 0
       );
     });
+  const footerActions =
+    panelMode.showFooterSubmit || panelMode.showFooterCancel ? (
+      <div className="flex w-full items-center justify-end gap-2">
+        {panelMode.showFooterCancel ? (
+          <Button
+            disabled={input.isRespondingToServerRequest}
+            onClick={() => {
+              submitResponse({
+                decision: "cancel",
+              });
+            }}
+            type="button"
+            variant="outline"
+          >
+            Cancel
+          </Button>
+        ) : null}
+        {panelMode.showFooterSubmit ? (
+          <Button
+            disabled={isSubmitDisabled}
+            onClick={() => {
+              submitResponse(
+                createUserInputResponse({
+                  entry: input.entry,
+                  requestKey: input.requestKey,
+                  userInputAnswers: input.userInputAnswers,
+                }),
+              );
+            }}
+            type="button"
+          >
+            Submit
+          </Button>
+        ) : null}
+      </div>
+    ) : null;
 
   return (
     <ComposerActionPanel
-      actions={
-        !showFooterSubmit ? null : (
-          <div className="flex w-full items-center justify-end gap-2">
-            <Button
-              disabled={isSubmitDisabled}
-              onClick={() => {
-                submitResponse(
-                  createUserInputResponse({
-                    entry: input.entry,
-                    requestKey: input.requestKey,
-                    userInputAnswers: input.userInputAnswers,
-                  }),
-                );
-              }}
-              type="button"
-            >
-              Submit
-            </Button>
-          </div>
-        )
-      }
+      actions={footerActions}
       details={
         <div className="space-y-3">
           {input.entry.questions.map((question) => {
             const answerKey = `${input.requestKey}:${question.id}`;
-            const otherOption = input.supportsUserInputRequestCustomResponse
-              ? undefined
-              : question.options?.find((option) => option.isOther);
+            const otherOption = panelMode.renderOtherOptionInputs
+              ? question.options?.find((option) => option.isOther)
+              : undefined;
             const selectedAnswer = readUserInputAnswer({
               answerKey,
               otherOption,
@@ -673,7 +707,7 @@ function ToolUserInputRequestPanelContent(input: {
                     answerKey={answerKey}
                     disabled={input.isRespondingToServerRequest}
                     onSelectOption={(option) => {
-                      if (!submitOnOptionSelect) {
+                      if (!panelMode.submitOnOptionSelect) {
                         return;
                       }
 
@@ -745,7 +779,7 @@ function ToolUserInputRequestPanelContent(input: {
       key={input.requestKey}
       padding="flush-x"
       title={null}
-      {...(useComposerCustomResponseOnly ? { verticalPadding: "balanced" } : {})}
+      {...(panelMode.useComposerCustomResponseOnly ? { verticalPadding: "balanced" } : {})}
     />
   );
 }

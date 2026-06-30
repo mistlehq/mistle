@@ -178,7 +178,7 @@ async function runAgentAssistedEval(input: {
     });
     const designerSessionId = state.designerSession.id;
     const runtimePlan = compileEvalDesignerRuntime({
-      availableProviderResources: state.productState.availableProviderResources,
+      availableProviderResources: state.availableProviderResources,
       config: evalConfig,
       designerSessionId,
       initialPrompt: prompt,

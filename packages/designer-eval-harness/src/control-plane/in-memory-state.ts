@@ -27,11 +27,12 @@ export function createDesignerEvalSessionState(input: {
     runKey: input.runKey,
     seed: input.evalCase.seed,
   });
+  const availableProviderResources = createSeededProviderResources(input.evalCase.seed);
   const now = new Date().toISOString();
 
   return {
     seededState,
-    availableProviderResources: createSeededProviderResources(input.evalCase.seed),
+    availableProviderResources,
     designerSession: {
       id: designerSessionId,
       organizationId,
@@ -56,7 +57,7 @@ export function createDesignerEvalSessionState(input: {
     },
     productState: {
       providerConnections: seededState.providerConnections,
-      availableProviderResources: createSeededProviderResources(input.evalCase.seed),
+      availableProviderResources,
       targetDraft: {
         profileId: seededState.targetDraft.profileId,
         version: seededState.targetDraft.version,
@@ -94,7 +95,7 @@ function createSeededState(input: {
   return {
     providerConnections,
     targetDraft: {
-      profileId: `sbp_eval_${input.runKey}`,
+      profileId: input.seed.targetDraft.profileId,
       version: input.seed.targetDraft.version,
     },
   };
