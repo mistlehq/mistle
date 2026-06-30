@@ -25,6 +25,8 @@ const StorybookStoryImportPattern = /import\("([^"]+\.stories\.(?:ts|tsx))"\)/g;
 const StorybookFreshStoryModuleId = "virtual:mistle-storybook-fresh-story/";
 const StorybookFreshStoryResolvedModuleId = `\0${StorybookFreshStoryModuleId}`;
 const StorybookFreshStoryModuleSuffix = "/module.js";
+const ViteHotContextPreamblePattern =
+  /^import \{ createHotContext as __vite__createHotContext \} from "\/@vite\/client";import\.meta\.hot = __vite__createHotContext\("[^"]+"\);/;
 
 const config: StorybookConfig = {
   framework: {
@@ -104,7 +106,7 @@ function storybookStoryImportCacheBustPlugin(): Plugin {
       }
 
       return {
-        code: transformedStory.code,
+        code: stripViteHotContextPreamble(transformedStory.code),
         map: transformedStory.map,
       };
     },
@@ -147,6 +149,10 @@ function getStorybookFreshStoryPath(id: string): string {
   }
 
   return decodeURIComponent(encodedStoryPath);
+}
+
+export function stripViteHotContextPreamble(code: string): string {
+  return code.replace(ViteHotContextPreamblePattern, "");
 }
 
 export default config;

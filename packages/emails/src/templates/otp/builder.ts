@@ -38,6 +38,9 @@ function getTitleForOTPType(type: OTPVerificationType): string {
 
 function buildTemplateProps(options: BuildEmailOTPTemplateOptions): EmailOTPTemplateProps {
   return {
+    ...(options.type === "sign-in"
+      ? { bodyMessage: "If you do not see the email, please check the spam folder." }
+      : {}),
     otp: options.otp,
     expiresInSeconds: options.expiresInSeconds,
     title: getTitleForOTPType(options.type),
