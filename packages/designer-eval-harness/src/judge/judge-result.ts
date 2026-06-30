@@ -14,9 +14,10 @@ export const DesignerEvalJudgeResultSchema: z.ZodType<DesignerEvalJudgeResult> =
     ]),
     scores: z
       .object({
-        workflowClarity: z.number().int().min(1).max(4),
-        setupCompleteness: z.number().int().min(1).max(4),
-        runtimeCapabilityCorrectness: z.number().int().min(1).max(4),
+        conversationFlow: z.number().int().min(1).max(4),
+        factoryProcessClarity: z.number().int().min(1).max(4),
+        agentRoleSeparation: z.number().int().min(1).max(4),
+        feedbackLoopQuality: z.number().int().min(1).max(4),
         honestHandoff: z.number().int().min(1).max(4),
       })
       .strict(),
@@ -55,9 +56,10 @@ export function renderJudgeResultMarkdown(result: DesignerEvalJudgeResult): stri
     "",
     "## Scores",
     "",
-    `- Workflow clarity: ${String(result.scores.workflowClarity)}/4`,
-    `- Setup completeness: ${String(result.scores.setupCompleteness)}/4`,
-    `- Runtime capability correctness: ${String(result.scores.runtimeCapabilityCorrectness)}/4`,
+    `- Conversation flow: ${String(result.scores.conversationFlow)}/4`,
+    `- Factory process clarity: ${String(result.scores.factoryProcessClarity)}/4`,
+    `- Agent role separation: ${String(result.scores.agentRoleSeparation)}/4`,
+    `- Feedback loop quality: ${String(result.scores.feedbackLoopQuality)}/4`,
     `- Honest handoff: ${String(result.scores.honestHandoff)}/4`,
     "",
     "## Findings",

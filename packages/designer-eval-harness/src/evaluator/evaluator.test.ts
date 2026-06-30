@@ -148,7 +148,7 @@ describe("Designer eval evaluator", () => {
         },
         {
           kind: "blueprint-has-provider-lifecycle",
-          requiredConcepts: ["linear", "github", "review"],
+          requiredConcepts: ["linear", "github", "ready", "review", "feedback", "status"],
         },
         {
           kind: "blueprint-excludes-setup-nodes",
@@ -181,7 +181,7 @@ describe("Designer eval evaluator", () => {
                 {
                   id: "linear-intake",
                   kind: "trigger",
-                  label: "Linear intake",
+                  label: "Linear ready issue intake",
                   state: "proposed",
                 },
                 {
@@ -193,7 +193,7 @@ describe("Designer eval evaluator", () => {
                 {
                   id: "review-loop",
                   kind: "agent_step",
-                  label: "Route review feedback",
+                  label: "Route review feedback and update Linear status",
                   state: "proposed",
                 },
               ],
@@ -228,7 +228,8 @@ describe("Designer eval evaluator", () => {
           ],
         },
       },
-      transcriptMarkdown: "Linear setup remains incomplete and must be completed manually.",
+      transcriptMarkdown:
+        "Linear setup remains incomplete. Configure labels and statuses before calling the factory ready.",
     });
 
     expect(result.passed).toBe(true);

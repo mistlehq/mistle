@@ -162,9 +162,10 @@ export type DesignerEvalJudgeResult = {
     | "product_capability_gap"
     | "ambiguous_case";
   scores: {
-    workflowClarity: number;
-    setupCompleteness: number;
-    runtimeCapabilityCorrectness: number;
+    conversationFlow: number;
+    factoryProcessClarity: number;
+    agentRoleSeparation: number;
+    feedbackLoopQuality: number;
     honestHandoff: number;
   };
   findings: readonly {

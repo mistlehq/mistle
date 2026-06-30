@@ -8,6 +8,7 @@ import {
 } from "../runtime-references/designer-integration-catalog.js";
 
 const DesignerRuntimeReferenceFileNames = {
+  AI_SOFTWARE_FACTORY: "ai-software-factory.md",
   INTEGRATION_CATALOG: "integration-catalog.md",
 };
 
@@ -38,4 +39,23 @@ export function createDesignerIntegrationCatalogSetupFile(): RuntimeClientSetupF
       DesignerRuntimeReferenceFileNames.INTEGRATION_CATALOG,
     )}\n`,
   };
+}
+
+export function createDesignerAiSoftwareFactoryReferenceSetupFile(): RuntimeClientSetupFile {
+  return {
+    fileId: "designer_ai_software_factory_reference",
+    path: "/root/.mistle/designer/references/workflow-patterns/ai-software-factory.md",
+    mode: 420,
+    writeMode: "overwrite",
+    content: `${loadDesignerRuntimeReferenceContent(
+      DesignerRuntimeReferenceFileNames.AI_SOFTWARE_FACTORY,
+    )}\n`,
+  };
+}
+
+export function createDesignerRuntimeReferenceSetupFiles(): readonly RuntimeClientSetupFile[] {
+  return [
+    createDesignerIntegrationCatalogSetupFile(),
+    createDesignerAiSoftwareFactoryReferenceSetupFile(),
+  ];
 }

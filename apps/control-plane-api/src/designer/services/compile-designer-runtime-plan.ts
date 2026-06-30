@@ -17,7 +17,7 @@ import {
 import { DESIGNER_RUNTIME_PROFILE_ID, DESIGNER_RUNTIME_PROFILE_VERSION } from "../constants.js";
 import { createDesignerBehaviorInstructionBlock } from "./designer-behavior-instructions.js";
 import { createDesignerContextInstructionBlock } from "./designer-context-instructions.js";
-import { createDesignerIntegrationCatalogSetupFile } from "./designer-runtime-reference-files.js";
+import { createDesignerRuntimeReferenceSetupFiles } from "./designer-runtime-reference-files.js";
 
 const DesignerRuntimeId = "codex";
 const DesignerDocsMcpServerUrl = "https://docs.mistle.dev/mcp";
@@ -135,7 +135,7 @@ export function createDesignerRuntimePlan(input: {
           ...runtimeClient,
           setup: {
             ...runtimeClient.setup,
-            files: [...runtimeClient.setup.files, createDesignerIntegrationCatalogSetupFile()],
+            files: [...runtimeClient.setup.files, ...createDesignerRuntimeReferenceSetupFiles()],
           },
         }
       : runtimeClient,

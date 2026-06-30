@@ -1,4 +1,27 @@
-import type { DesignerEvalCase } from "../types.ts";
+import type { DesignerEvalCase, DesignerEvalInputResponse } from "../types.ts";
+
+type ScriptedAnswerValue = string | readonly string[];
+
+function scriptedAnswerAliases(
+  ids: readonly string[],
+  value: ScriptedAnswerValue,
+): Record<string, DesignerEvalInputResponse> {
+  const responses: Record<string, DesignerEvalInputResponse> = {};
+
+  for (const id of ids) {
+    responses[id] = {
+      kind: "answers",
+      answers: [
+        {
+          id,
+          value,
+        },
+      ],
+    };
+  }
+
+  return responses;
+}
 
 const GithubPrReviewBasicCase: DesignerEvalCase = {
   id: "github-pr-review-basic",
@@ -140,42 +163,79 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     },
   },
   scriptedInputs: {
-    select_github_repositories: {
-      kind: "answers",
-      answers: [
-        {
-          id: "select_github_repositories",
-          value: ["mistlehq/mistle"],
-        },
+    ...scriptedAnswerAliases(
+      [
+        "select_github_repositories",
+        "select_github_repository",
+        "select_github_repo",
+        "github_repository_selection",
+        "github_repository",
+        "github_repo",
+        "repository_selection",
+        "select_repository",
       ],
-    },
-    select_repository: {
-      kind: "answers",
-      answers: [
-        {
-          id: "select_repository",
-          value: ["mistlehq/mistle"],
-        },
+      ["mistlehq/mistle"],
+    ),
+    ...scriptedAnswerAliases(
+      [
+        "confirm_operating_model",
+        "confirm_ai_factory_model",
+        "ai_factory_operating_model",
+        "ai_software_factory_operating_model",
+        "software_factory_operating_model",
+        "confirm_factory_model",
+        "factory_operating_model",
       ],
-    },
-    workflow_approval_boundary: {
-      kind: "answers",
-      answers: [
-        {
-          id: "workflow_approval_boundary",
-          value: "Ask before creating pull requests or posting Linear updates",
-        },
+      "Add review agent",
+    ),
+    ...scriptedAnswerAliases(
+      [
+        "workflow_approval_boundary",
+        "approval_boundary",
+        "pr_approval_boundary",
+        "pr_handoff_boundary",
+        "handoff_boundary",
+        "human_review_boundary",
       ],
-    },
-    approval_boundary: {
-      kind: "answers",
-      answers: [
-        {
-          id: "approval_boundary",
-          value: "Ask before creating pull requests or posting Linear updates",
-        },
+      "Ask before creating pull requests or posting Linear updates",
+    ),
+    ...scriptedAnswerAliases(["linear_start_boundary"], "Ready for AI"),
+    ...scriptedAnswerAliases(["linear_trigger_scope"], "Ready state"),
+    ...scriptedAnswerAliases(
+      [
+        "linear_intake_rule",
+        "linear_ready_signal",
+        "linear_ready_state",
+        "linear_ready_scope",
+        "linear_readiness_rule",
+        "linear_pickup_rule",
+        "readiness_rule",
       ],
-    },
+      "Ready status",
+    ),
+    ...scriptedAnswerAliases(
+      [
+        "next_action",
+        "next_factory_step",
+        "next_setup_action",
+        "next_setup_step",
+        "profile_config_next_step",
+        "profile_configuration_next_step",
+        "next_profile_action",
+      ],
+      "Stop here",
+    ),
+    ...scriptedAnswerAliases(
+      [
+        "pull_request_mode",
+        "pr_mode",
+        "pr_creation_mode",
+        "pr_review_mode",
+        "pull_request_review_mode",
+        "review_mode",
+      ],
+      "Draft PRs",
+    ),
   },
   assertions: [
     {
@@ -187,7 +247,7 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     },
     {
       kind: "blueprint-has-provider-lifecycle",
-      requiredConcepts: ["linear", "github", "review", "status"],
+      requiredConcepts: ["linear", "github", "ready", "review", "feedback", "status"],
     },
     {
       kind: "blueprint-excludes-setup-nodes",
@@ -205,7 +265,7 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     },
     {
       kind: "setup-incompleteness-disclosed",
-      requiredPhrases: ["linear", "setup"],
+      requiredPhrases: ["linear", "setup", "labels", "statuses"],
     },
   ],
 };

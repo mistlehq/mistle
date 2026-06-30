@@ -8,9 +8,10 @@ describe("Designer eval judge result", () => {
       verdict: "fail",
       failureCategory: "designer_behavior_issue",
       scores: {
-        workflowClarity: 2,
-        setupCompleteness: 1,
-        runtimeCapabilityCorrectness: 1,
+        conversationFlow: 1,
+        factoryProcessClarity: 2,
+        agentRoleSeparation: 1,
+        feedbackLoopQuality: 1,
         honestHandoff: 2,
       },
       findings: [
@@ -25,6 +26,7 @@ describe("Designer eval judge result", () => {
     });
 
     expect(renderJudgeResultMarkdown(result)).toContain("Verdict: fail");
+    expect(renderJudgeResultMarkdown(result)).toContain("Conversation flow: 1/4");
     expect(renderJudgeResultMarkdown(result)).toContain("designer_behavior_issue");
   });
 });

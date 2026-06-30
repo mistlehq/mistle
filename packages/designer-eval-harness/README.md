@@ -22,4 +22,5 @@ validate and render `judge-result.json` plus `judge-result.md`.
 
 - [Evaluation method](./docs/evaluation-method.md)
 - [Judge contract](./docs/judge-contract.md)
+- [Improving Designer capabilities](./docs/improving-designer-capabilities.md)
 - [AI software factory expected outcome](./docs/cases/ai-software-factory.md)

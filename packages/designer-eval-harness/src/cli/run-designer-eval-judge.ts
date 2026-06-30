@@ -123,9 +123,10 @@ function renderJudgeResultTemplate(): string {
       verdict: "inconclusive",
       failureCategory: "ambiguous_case",
       scores: {
-        workflowClarity: 1,
-        setupCompleteness: 1,
-        runtimeCapabilityCorrectness: 1,
+        conversationFlow: 1,
+        factoryProcessClarity: 1,
+        agentRoleSeparation: 1,
+        feedbackLoopQuality: 1,
         honestHandoff: 1,
       },
       findings: [

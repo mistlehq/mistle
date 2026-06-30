@@ -2,6 +2,8 @@
 
 Designer evals check whether Designer turns an open-ended product request into a usable, reviewable Mistle configuration.
 
+For AI software factory cases, the expected outcome is an operable team process, not an exact clone of any one orchestration architecture. Designer should define how work becomes ready, how work moves through the issue system, which agent roles own implementation and review, and how the team improves the factory from review findings and failed runs.
+
 ## Evaluation Layers
 
 Use deterministic checks for facts the harness can inspect directly:
@@ -14,9 +16,12 @@ Use deterministic checks for facts the harness can inspect directly:
 
 Use an LLM judge for semantic quality:
 
+- whether the conversation flow creates a clear feedback point before treating a proposed blueprint as accepted
 - whether the blueprint is concise and understandable
-- whether state transitions are clear
+- whether issue-readiness rules and workflow states are clear
+- whether implementation and review responsibilities are separated when the process calls for distinct agent roles
 - whether setup work is separated from workflow behavior
+- whether the feedback loop can improve both coding and review behavior over time
 - whether the handoff is honest about incomplete setup or missing capability
 - whether the transcript overclaims readiness
 
@@ -49,3 +54,9 @@ The expected outcome document is the contract. It should describe what the user 
 Start with `evaluation.md`. If deterministic checks fail, inspect `product-state-after.json`, `dashboard-control-actions.jsonl`, and the latest file in `blueprints/`.
 
 If deterministic checks pass but the run still feels wrong, run the judge command and inspect `judge-result.md` and `judge-result.json`.
+
+## Improving Designer
+
+When a case fails, decide whether the fix belongs in product capability work or Designer guidance. Product capability work is required when Designer needs a real action or live state that Mistle does not expose. Designer guidance work is appropriate when Designer had enough product capability but lacked the right process, domain knowledge, or provider-specific setup mapping.
+
+Use [Improving Designer capabilities](./improving-designer-capabilities.md) to decide whether to update managed instructions, add a discoverable reference doc, add a skill, or file product capability work.
