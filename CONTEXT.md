@@ -156,6 +156,10 @@ _Avoid_: Runtime approval decline, turn interruption
 A user-authored response submitted through the composer for a pending **User input request**, either to provide an unlisted answer or redirect the conversation.
 _Avoid_: Steer message, turn interruption, cancellation
 
+**User input request custom answer**:
+An inline answer field scoped to one question in a **User input request**. A **User input request custom answer** is submitted as a structured answer for that question rather than as a **User input request custom response**.
+_Avoid_: Free-form response, composer custom response, turn interruption
+
 **Dashboard control action**:
 A runtime-requested action handled by the dashboard client to control dashboard-owned workspace state or execute an explicitly supported dashboard-mediated product action.
 _Avoid_: MCP tool when the action is handled by the browser; browser-only action when the action intentionally mutates product state
@@ -908,7 +912,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Future **Mistle Designer** work may read and refresh scoped **Provider configuration resources** needed for the current setup path.
 - Future **Mistle Designer** work may make **Provider configuration changes** only after explicit user approval.
 - **Runtime approval requests** are the generic mechanism for surfacing side-effecting runtime tool calls to the user; product or provider writes still require an explicit supported operation path after approval.
-- A **User input request** may be resolved by a structured answer, a **User input request custom response**, or **User input request cancellation**.
+- A **User input request** may be resolved by a structured answer, a **User input request custom response**, or **User input request cancellation**. A **User input request custom answer** is an inline way to produce a structured answer for a specific question.
 - First-pass **Mistle Designer sessions** do not require detailed durable activity history for **Provider configuration changes**.
 - Publishing the first **Sandbox profile version** is publish-worthy when no **Source sandbox profile version** exists.
 - Publishing the first **Sandbox profile version** does not require a **Source sandbox profile version**.

@@ -693,7 +693,7 @@ function ToolUserInputRequestPanelContent(input: {
                           [answerKey]: event.target.value,
                         }));
                       }}
-                      placeholder={otherOption.label}
+                      placeholder={otherOption.placeholder ?? otherOption.label}
                       value={selectedAnswer}
                     />
                   </div>
@@ -707,7 +707,7 @@ function ToolUserInputRequestPanelContent(input: {
                           [answerKey]: event.target.value,
                         }));
                       }}
-                      placeholder={otherOption.label}
+                      placeholder={otherOption.placeholder ?? otherOption.label}
                       value={selectedAnswer}
                     />
                   </div>

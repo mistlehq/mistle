@@ -154,8 +154,14 @@ describe("dashboard control actions", () => {
               "Selectable options. Include the recommended option first when there is a recommendation. Keep option labels short and clear.",
             maxItems: 6,
           },
-          freeForm: {
+          customAnswer: {
             properties: {
+              placeholder: {
+                description: "Placeholder text for the inline custom answer field.",
+                maxLength: 240,
+                minLength: 1,
+                type: "string",
+              },
               inputKind: {
                 enum: ["input", "textarea"],
               },
@@ -317,6 +323,47 @@ describe("dashboard control actions", () => {
     });
   });
 
+  it("parses Designer user input dynamic tool calls with custom answers", () => {
+    const parsed = parseDashboardControlDynamicToolCall({
+      namespace: DashboardControlDynamicToolNamespace,
+      tool: DesignerUserInputRequestDynamicToolName,
+      arguments: {
+        header: "Sandbox profile",
+        id: "profile-choice",
+        question: "Which sandbox profile should run the triaging agent?",
+        options: [
+          {
+            label: "Create new",
+          },
+        ],
+        customAnswer: {
+          label: "Use another profile",
+          placeholder: "Paste a sandbox profile ID",
+          inputKind: "input",
+        },
+      },
+    });
+
+    expect(parsed).toEqual({
+      action: DesignerUserInputRequestAction,
+      input: {
+        header: "Sandbox profile",
+        id: "profile-choice",
+        question: "Which sandbox profile should run the triaging agent?",
+        options: [
+          {
+            label: "Create new",
+          },
+        ],
+        customAnswer: {
+          label: "Use another profile",
+          placeholder: "Paste a sandbox profile ID",
+          inputKind: "input",
+        },
+      },
+    });
+  });
+
   it("parses Designer integration connection resource selection user input calls", () => {
     const parsed = parseDashboardControlDynamicToolCall({
       namespace: DashboardControlDynamicToolNamespace,
@@ -432,6 +479,45 @@ describe("dashboard control actions", () => {
         },
       ],
       success: false,
+    });
+  });
+
+  it("maps Designer custom answers to server request other options", () => {
+    const serverRequest = createDashboardControlUserInputServerRequest({
+      requestId: "request-1",
+      userInput: {
+        header: "Sandbox profile",
+        id: "profile-choice",
+        question: "Which sandbox profile should run the triaging agent?",
+        options: [
+          {
+            label: "Create new",
+          },
+        ],
+        customAnswer: {
+          label: "Use another profile",
+          placeholder: "Paste a sandbox profile ID",
+          inputKind: "input",
+        },
+      },
+    });
+
+    expect(serverRequest).toMatchObject({
+      questions: [
+        {
+          options: [
+            {
+              label: "Create new",
+              isOther: false,
+            },
+            {
+              label: "Use another profile",
+              isOther: true,
+              placeholder: "Paste a sandbox profile ID",
+            },
+          ],
+        },
+      ],
     });
   });
 
