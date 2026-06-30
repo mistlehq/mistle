@@ -233,24 +233,6 @@ function readUserInputResponseTranscriptText(result: unknown): string | null {
   return readUserInputCustomResponseText(result) ?? readUserInputAnswerResponseText(result);
 }
 
-export function assertDesignerSubmitActionTargetsSupportedDraft(input: {
-  submitActionTargetDraft: {
-    profileId: string;
-    version: number;
-  };
-  supportedTargetDraft: {
-    profileId: string;
-    version: number;
-  };
-}): void {
-  if (
-    input.submitActionTargetDraft.profileId !== input.supportedTargetDraft.profileId ||
-    input.submitActionTargetDraft.version !== input.supportedTargetDraft.version
-  ) {
-    throw new Error("Sandbox profile draft provider resource save target is not allowed.");
-  }
-}
-
 async function maybeApplyDashboardUserInputSubmitAction(input: {
   entries: readonly CodexApprovalRequestEntry[];
   queryClient: QueryClient;
@@ -286,11 +268,6 @@ async function maybeApplyDashboardUserInputSubmitAction(input: {
     if (input.submitActionSupport === undefined) {
       throw new Error("Saving selected provider resources is not supported in this session.");
     }
-
-    assertDesignerSubmitActionTargetsSupportedDraft({
-      submitActionTargetDraft: submitAction.targetDraft,
-      supportedTargetDraft: input.submitActionSupport.targetDraft,
-    });
 
     const answerIndex = answers.findIndex((answer) => answer.id === question.id);
     const answer = answers[answerIndex];

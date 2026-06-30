@@ -221,10 +221,6 @@ export type DashboardControlActionSupport = {
   handleAction: DashboardControlActionHandler;
   userInputSubmitAction?: {
     designerSessionId: string;
-    targetDraft: {
-      profileId: string;
-      version: number;
-    };
   };
 };
 

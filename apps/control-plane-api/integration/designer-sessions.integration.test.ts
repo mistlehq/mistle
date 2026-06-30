@@ -284,6 +284,97 @@ describe.concurrent("designer sessions integration", () => {
     );
   });
 
+  it("rejects saving selected provider resources to a published sandbox profile version", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-designer-dashboard-resource-save-published@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.designerSessions).values({
+      id: "dsn_dashboard_resource_save_published",
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_dashboard_resource_save_published",
+      canvasTabs: [],
+      initialPrompt: "Build a Linear coding workflow.",
+      createdAt: "2026-06-30T00:00:00.000Z",
+      updatedAt: "2026-06-30T00:00:00.000Z",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "github-designer-dashboard-resource-save-published",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_designer_dashboard_resource_save_published",
+        organizationId: session.organizationId,
+        targetKey: "github-designer-dashboard-resource-save-published",
+        displayName: "GitHub Dashboard Resource Save Published",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          app_id: "123",
+          app_slug: "mistle-test",
+          client_id: "Iv1.test",
+          installation_id: "456",
+        },
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_designer_dashboard_resource_save_published",
+        organizationId: session.organizationId,
+        displayName: "Designer Dashboard Resource Save Published",
+        activeVersion: 1,
+        createdAt: "2026-06-30T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_designer_dashboard_resource_save_published",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: "2026-06-30T00:00:00.000Z",
+        ...DockerSandboxRuntimeColumns,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/designer/sessions/dsn_dashboard_resource_save_published/dashboard-actions/save-selected-provider-resources",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          targetDraft: {
+            profileId: "sbp_designer_dashboard_resource_save_published",
+            version: 1,
+          },
+          connectionId: "icn_designer_dashboard_resource_save_published",
+          resourceKind: "repository",
+          selectedHandles: ["mistlehq/mistle"],
+          bindingIntent: "git-repositories",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      code: "DESIGNER_DASHBOARD_ACTION_INVALID_INPUT",
+      message: "Target sandbox profile version is not an editable draft.",
+    });
+  });
+
   it("creates, lists, reads, and updates a Designer session in the authenticated organization", async ({
     env,
   }) => {

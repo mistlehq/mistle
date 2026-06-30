@@ -222,18 +222,9 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
       handleAction: handleDashboardControlAction,
       userInputSubmitAction: {
         designerSessionId: designerSession.id,
-        targetDraft: {
-          profileId: designerSession.sandboxProfileId,
-          version: designerSession.sandboxProfileVersion,
-        },
       },
     }),
-    [
-      designerSession.id,
-      designerSession.sandboxProfileId,
-      designerSession.sandboxProfileVersion,
-      handleDashboardControlAction,
-    ],
+    [designerSession.id, handleDashboardControlAction],
   );
 
   return {
