@@ -145,6 +145,16 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain("conversation.lastError = undefined;");
   });
 
+  it("ignores stale Claude Code query failures after a newer query starts", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain("latestSubmittedQueryId: null");
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "conversation.latestSubmittedQueryId = queryId;",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "if (conversation.latestSubmittedQueryId === queryId)",
+    );
+  });
+
   it("reports failed idle Claude Code sessions as error sessions", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain("function resolveConversationStatus");
     expect(ClaudeCodeRuntimeServerBundle).toContain('return "active";');

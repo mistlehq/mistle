@@ -224,6 +224,7 @@ function createConversationState(input) {
     providerConversationId: input.providerConversationId,
     cwd: input.cwd,
     activeQueryId: null,
+    latestSubmittedQueryId: null,
     queries: [],
     lastError: undefined,
     sdkSessionId: input.sdkSessionId,
@@ -945,9 +946,12 @@ function appendSubmittedUserQuery(conversation, queryId, inputText) {
 function startQuery(conversation, inputText) {
   const queryId = randomUUID();
   conversation.lastError = undefined;
+  conversation.latestSubmittedQueryId = queryId;
   appendSubmittedUserQuery(conversation, queryId, inputText);
   void runClaudeQuery(conversation, queryId, inputText).catch((error) => {
-    conversation.lastError = error instanceof Error ? error.message : String(error);
+    if (conversation.latestSubmittedQueryId === queryId) {
+      conversation.lastError = error instanceof Error ? error.message : String(error);
+    }
   });
   return queryId;
 }
