@@ -1438,6 +1438,77 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(screen.queryByText("Save failed")).toBeNull();
   });
 
+  it("keeps connector binding save errors visible when every connection is filtered out", () => {
+    const linearTarget: IntegrationTargetSummary = {
+      targetKey: "target-linear",
+      displayName: "Linear",
+      logoKey: "linear",
+      familyId: "linear",
+      variantId: "linear-default",
+      config: {},
+      connectionMethods: [
+        {
+          id: "linear-oauth-app",
+          label: "Linear OAuth app",
+          kind: "form",
+          sandboxProfileBinding: {
+            supported: false,
+            reason:
+              "Linear OAuth app connections configure identity linking and cannot be used in sandbox profile bindings.",
+          },
+          secretFields: [
+            {
+              name: "clientSecret",
+              label: "OAuth client secret",
+              inputType: "password",
+            },
+          ],
+        },
+      ],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [
+            {
+              id: "linear-oauth-app",
+              displayName: "Linear OAuth app",
+              targetKey: linearTarget.targetKey,
+              status: "active",
+              config: {
+                connection_method: "linear-oauth-app",
+              },
+            },
+          ],
+          availableTargets: [linearTarget],
+          integrationRows: [
+            {
+              clientId: "linear-row",
+              connectionId: "linear-oauth-app",
+              kind: "connector",
+              config: {},
+            },
+          ],
+          integrationRowErrorsByClientId: {
+            "linear-row":
+              "Linear OAuth app connections are setup-only for identity linking and cannot be used in Linear connector bindings.",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("No connections available.")).toBeDefined();
+    expect(
+      screen.getByText(
+        "Linear OAuth app connections are setup-only for identity linking and cannot be used in Linear connector bindings.",
+      ),
+    ).toBeDefined();
+  });
+
   it("hides connections whose method does not support sandbox profile bindings", () => {
     const linearTarget: IntegrationTargetSummary = {
       targetKey: "target-linear",

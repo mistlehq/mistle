@@ -352,8 +352,13 @@ function ConnectionSelectionCell(input: {
   );
   if (input.availableConnections.length === 0) {
     return (
-      <div className={SandboxProfileIntegrationCellContentClassName}>
+      <div className="grid gap-1.5">
         <p className="text-muted-foreground text-sm">No connections available.</p>
+        {input.invalid === true &&
+        input.errorMessage !== null &&
+        input.errorMessage !== undefined ? (
+          <p className="text-destructive text-xs">{input.errorMessage}</p>
+        ) : null}
       </div>
     );
   }
