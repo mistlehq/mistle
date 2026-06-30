@@ -163,7 +163,7 @@
 - GH CLI is available; you can open a PR with it when needed.
 - If creating or updating a GitHub PR, use the `github-pr-authoring` skill.
 - Before opening a PR, ensure your branch is rebased onto the latest `main` (for example: `git fetch origin main && git rebase origin/main`).
-- If you open a PR, you must monitor its CI and address issues until the PR is green, unless the failure requires human intervention (e.g. missing GitHub secrets). Do not hack or workaround CI failures.
+- For post-ready PR follow-through, including CI, reviewer comments, `pr-review`, or merge-ready iteration, use the `pr-review-followthrough` skill. Do not bypass or hide CI failures.
 
 ## Language Guidance
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Review Followthrough"
+  short_description: "Watch PR CI and reviewer feedback"
+  default_prompt: "Use $pr-review-followthrough to watch this PR, handle reviewer feedback, and iterate until it is merge-ready."
