@@ -55,6 +55,7 @@ describe("Designer eval control plane", () => {
       evalCase,
       runKey: "github_pr_review_basic",
     });
+    const githubConnectionId = readSeededGithubConnectionId(state.seededState.providerConnections);
     const controlPlane = await startDesignerEvalControlPlane({ state });
 
     try {
@@ -66,7 +67,7 @@ describe("Designer eval control plane", () => {
           `/v1/designer/sessions/${state.designerSession.id}/dashboard-actions/save-selected-provider-resources`,
           {
             targetDraft: state.seededState.targetDraft,
-            connectionId: state.seededState.githubConnectionId,
+            connectionId: githubConnectionId,
             resourceKind: "repository",
             selectedHandles: ["mistlehq/mistle", "mistlehq/mistle"],
             bindingIntent: "git-repositories",
@@ -78,16 +79,16 @@ describe("Designer eval control plane", () => {
         kind: "sandbox-profile-draft-provider-resources-saved",
         profileId: state.seededState.targetDraft.profileId,
         version: state.seededState.targetDraft.version,
-        connectionId: state.seededState.githubConnectionId,
+        connectionId: githubConnectionId,
         resourceKind: "repository",
         bindingIntent: "git-repositories",
-        bindingId: `ibd_${state.seededState.githubConnectionId}_git`,
+        bindingId: `ibd_${githubConnectionId}_git`,
         selectedHandles: ["mistlehq/mistle"],
         createdBinding: true,
       });
       expect(state.productState.targetDraft.integrationBindings).toContainEqual({
         id: response.bindingId,
-        connectionId: state.seededState.githubConnectionId,
+        connectionId: githubConnectionId,
         kind: "git",
         config: {
           repositories: ["mistlehq/mistle"],
@@ -104,6 +105,7 @@ describe("Designer eval control plane", () => {
       evalCase,
       runKey: "github_pr_review_basic",
     });
+    const githubConnectionId = readSeededGithubConnectionId(state.seededState.providerConnections);
     const controlPlane = await startDesignerEvalControlPlane({ state });
 
     try {
@@ -119,7 +121,7 @@ describe("Designer eval control plane", () => {
           },
           body: JSON.stringify({
             targetDraft: state.seededState.targetDraft,
-            connectionId: state.seededState.githubConnectionId,
+            connectionId: githubConnectionId,
             resourceKind: "repository",
             selectedHandles: ["mistlehq/not-seeded"],
             bindingIntent: "git-repositories",
@@ -137,3 +139,14 @@ describe("Designer eval control plane", () => {
     }
   });
 });
+
+function readSeededGithubConnectionId(
+  connections: readonly { id: string; providerFamilyId: string }[],
+): string {
+  const connection = connections.find((candidate) => candidate.providerFamilyId === "github");
+  if (connection === undefined) {
+    throw new Error("Expected seeded GitHub connection.");
+  }
+
+  return connection.id;
+}

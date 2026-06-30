@@ -41,6 +41,10 @@ Setup methods:
 
 - `api-key` (form): Secret key
 
+Binding tools:
+
+- `autumn`: Autumn MCP (default)
+
 ## AWS
 
 Provider family ID: `aws`
@@ -82,6 +86,10 @@ Description: Enable Cloudflare API MCP Code Mode access.
 Setup methods:
 
 - `api-key` (form): API token
+
+Binding tools:
+
+- `cloudflare_api`: Cloudflare API MCP (default)
 
 ## Datadog
 
@@ -183,6 +191,10 @@ Description: Enable Expo hosted MCP access for Expo docs, EAS builds, workflows,
 Setup methods:
 
 - `oauth2-authorization-code` (redirect): Expo MCP OAuth
+
+Binding tools:
+
+- `expo`: Expo MCP (default)
 
 ## Fireworks AI
 
@@ -340,6 +352,14 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Google OAuth
 
+Binding tools:
+
+- `cloud_logging`: Cloud Logging
+- `cloud_run`: Cloud Run
+- `cloud_storage`: Cloud Storage
+- `cloud_resource_manager`: Cloud Resource Manager
+- `gke`: Google Kubernetes Engine
+
 ## Google Search Console
 
 Provider family ID: `google-search-console`
@@ -367,6 +387,17 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Google OAuth
 - `google-workspace-service-account` (form): Service account
+
+Binding tools:
+
+- `gmail`: Gmail (default)
+- `drive`: Google Drive (default)
+- `sheets`: Google Sheets (default)
+- `docs`: Google Docs (default)
+- `slides`: Google Slides (default)
+- `calendar`: Google Calendar (default)
+- `chat`: Google Chat (default)
+- `people`: People API (default)
 
 ## Inception Labs
 

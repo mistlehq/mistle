@@ -30,6 +30,14 @@ describe("Designer eval evaluator", () => {
       },
     ];
     const productStateAfter: DesignerEvalProductState = {
+      providerConnections: [
+        {
+          id: "icn_eval_github_pr_review_basic_repo",
+          label: "GitHub",
+          providerFamilyId: "github",
+          targetKey: "github-cloud",
+        },
+      ],
       availableProviderResources: [
         {
           connectionId: "icn_eval_github_pr_review_basic_repo",
@@ -75,6 +83,7 @@ describe("Designer eval evaluator", () => {
       ],
       dashboardControlActions: actions,
       productStateAfter,
+      transcriptMarkdown: "GitHub repository setup is complete.",
     });
 
     expect(result.passed).toBe(true);
@@ -114,6 +123,14 @@ describe("Designer eval evaluator", () => {
         },
       ],
       productStateAfter: {
+        providerConnections: [
+          {
+            id: "icn_eval_github_pr_review_basic_repo",
+            label: "GitHub",
+            providerFamilyId: "github",
+            targetKey: "github-cloud",
+          },
+        ],
         availableProviderResources: [
           {
             connectionId: "icn_eval_github_pr_review_basic_repo",
@@ -149,6 +166,14 @@ describe("Designer eval evaluator", () => {
       ],
       dashboardControlActions: [],
       productStateAfter: {
+        providerConnections: [
+          {
+            id: "icn_eval_github_pr_review_basic_repo",
+            label: "GitHub",
+            providerFamilyId: "github",
+            targetKey: "github-cloud",
+          },
+        ],
         availableProviderResources: [
           {
             connectionId: "icn_eval_github_pr_review_basic_repo",
@@ -174,5 +199,101 @@ describe("Designer eval evaluator", () => {
     });
 
     expect(result.passed).toBe(false);
+  });
+
+  it("checks blueprint shape, required binding tools, and setup disclosure", () => {
+    const result = evaluateDesignerEvalRun({
+      caseId: "ai-software-factory-linear-github",
+      assertions: [
+        {
+          kind: "blueprint-core-node-count-at-most",
+          maxItems: 5,
+        },
+        {
+          kind: "blueprint-has-provider-lifecycle",
+          requiredConcepts: ["linear", "github", "review"],
+        },
+        {
+          kind: "blueprint-excludes-setup-nodes",
+          disallowedConcepts: ["publish", "repository selection"],
+        },
+        {
+          kind: "required-binding-tools-present",
+          connectionId: "icn_github",
+          tools: ["github-cli"],
+        },
+        {
+          kind: "setup-incompleteness-disclosed",
+          requiredPhrases: ["linear", "setup"],
+        },
+      ],
+      dashboardControlActions: [
+        {
+          sequence: 1,
+          kind: "show_designer_canvas_tab",
+          tabKind: "blueprint",
+          input: {
+            kind: "blueprint",
+            title: "AI software factory",
+            blueprint: {
+              version: 1,
+              outcome: {
+                label: "Move Linear work through GitHub implementation and review",
+              },
+              items: [
+                {
+                  id: "linear-intake",
+                  kind: "trigger",
+                  label: "Linear intake",
+                  state: "proposed",
+                },
+                {
+                  id: "github-work",
+                  kind: "agent_step",
+                  label: "Create GitHub implementation branch and PR",
+                  state: "proposed",
+                },
+                {
+                  id: "review-loop",
+                  kind: "agent_step",
+                  label: "Route review feedback",
+                  state: "proposed",
+                },
+              ],
+            },
+          },
+          response: {},
+        },
+      ],
+      productStateAfter: {
+        providerConnections: [
+          {
+            id: "icn_github",
+            label: "GitHub",
+            providerFamilyId: "github",
+            targetKey: "github-cloud",
+          },
+        ],
+        availableProviderResources: [],
+        targetDraft: {
+          profileId: "sbp_eval",
+          version: 1,
+          integrationBindings: [
+            {
+              id: "ibd_github",
+              connectionId: "icn_github",
+              kind: "git",
+              config: {
+                repositories: ["mistlehq/mistle"],
+                tools: ["github-cli"],
+              },
+            },
+          ],
+        },
+      },
+      transcriptMarkdown: "Linear setup remains incomplete and must be completed manually.",
+    });
+
+    expect(result.passed).toBe(true);
   });
 });

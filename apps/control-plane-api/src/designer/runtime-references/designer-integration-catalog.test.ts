@@ -34,6 +34,19 @@ describe("Designer integration catalog", () => {
     expect(markdown).toContain("- `github-cli`: GitHub CLI (default)");
   });
 
+  it("renders Google Workspace MCP server choices as binding tools", () => {
+    const markdown = renderDesignerIntegrationCatalogMarkdown(
+      createIntegrationRegistry().listDefinitions(),
+    );
+
+    const googleWorkspaceSection = readCatalogSection(markdown, "Google Workspace");
+
+    expect(googleWorkspaceSection).toContain("Binding tools:");
+    expect(googleWorkspaceSection).toContain("- `gmail`: Gmail (default)");
+    expect(googleWorkspaceSection).toContain("- `drive`: Google Drive (default)");
+    expect(googleWorkspaceSection).toContain("- `sheets`: Google Sheets (default)");
+  });
+
   it("omits optional catalog sections when the integration has no values", () => {
     const markdown = renderDesignerIntegrationCatalogMarkdown(
       createIntegrationRegistry().listDefinitions(),

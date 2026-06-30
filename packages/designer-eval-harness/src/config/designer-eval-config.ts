@@ -16,9 +16,6 @@ const DesignerEvalMcpConfigSchema = z.discriminatedUnion("mode", [
     mode: z.literal("disabled"),
   }),
   z.object({
-    mode: z.literal("eval-control-plane"),
-  }),
-  z.object({
     mode: z.literal("external"),
     url: z.url(),
   }),

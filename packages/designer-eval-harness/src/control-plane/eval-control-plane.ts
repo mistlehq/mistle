@@ -184,15 +184,22 @@ function validateProviderResourceSave(input: {
       `Designer eval can only mutate seeded draft ${input.state.seededState.targetDraft.profileId}@${String(input.state.seededState.targetDraft.version)}.`,
     );
   }
-  if (input.body.connectionId !== input.state.seededState.githubConnectionId) {
-    throw new Error(
-      `Designer eval can only save resources for seeded connection '${input.state.seededState.githubConnectionId}'.`,
-    );
-  }
   if (input.body.resourceKind !== "repository" || input.body.bindingIntent !== "git-repositories") {
     throw new Error(
       "Designer eval currently supports only GitHub repository selections with git-repositories binding intent.",
     );
+  }
+
+  const connection = input.state.productState.providerConnections.find(
+    (candidate) => candidate.id === input.body.connectionId,
+  );
+  if (connection === undefined) {
+    throw new Error(
+      `Designer eval can only save resources for seeded connections; '${input.body.connectionId}' was not seeded.`,
+    );
+  }
+  if (connection.providerFamilyId !== "github") {
+    throw new Error("Designer eval currently supports resource saves only for GitHub.");
   }
 
   const availableHandles = new Set(

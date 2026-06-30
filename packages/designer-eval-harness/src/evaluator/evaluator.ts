@@ -11,12 +11,14 @@ export function evaluateDesignerEvalRun(input: {
   assertions: readonly DesignerEvalAssertion[];
   dashboardControlActions: readonly DesignerEvalDashboardControlAction[];
   productStateAfter: DesignerEvalProductState;
+  transcriptMarkdown?: string | undefined;
 }): DesignerEvalResult {
   const checks = input.assertions.map((assertion) =>
     evaluateAssertion({
       assertion,
       dashboardControlActions: input.dashboardControlActions,
       productStateAfter: input.productStateAfter,
+      transcriptMarkdown: input.transcriptMarkdown,
     }),
   );
 
@@ -43,10 +45,36 @@ function evaluateAssertion(input: {
   assertion: DesignerEvalAssertion;
   dashboardControlActions: readonly DesignerEvalDashboardControlAction[];
   productStateAfter: DesignerEvalProductState;
+  transcriptMarkdown?: string | undefined;
 }): DesignerEvalCheckResult {
   switch (input.assertion.kind) {
     case "blueprint-before-product-mutation":
       return evaluateBlueprintBeforeProductMutation(input.dashboardControlActions);
+    case "blueprint-core-node-count-at-most":
+      return evaluateBlueprintCoreNodeCountAtMost({
+        actions: input.dashboardControlActions,
+        maxItems: input.assertion.maxItems,
+      });
+    case "blueprint-has-provider-lifecycle":
+      return evaluateBlueprintHasProviderLifecycle({
+        actions: input.dashboardControlActions,
+        requiredConcepts: input.assertion.requiredConcepts,
+      });
+    case "blueprint-excludes-setup-nodes":
+      return evaluateBlueprintExcludesSetupNodes({
+        actions: input.dashboardControlActions,
+        disallowedConcepts: input.assertion.disallowedConcepts,
+      });
+    case "required-binding-tools-present":
+      return evaluateRequiredBindingToolsPresent({
+        assertion: input.assertion,
+        productStateAfter: input.productStateAfter,
+      });
+    case "setup-incompleteness-disclosed":
+      return evaluateSetupIncompletenessDisclosed({
+        requiredPhrases: input.assertion.requiredPhrases,
+        transcriptMarkdown: input.transcriptMarkdown,
+      });
     case "saved-selected-provider-resources":
       return evaluateSavedSelectedProviderResources({
         assertion: input.assertion,
@@ -58,6 +86,152 @@ function evaluateAssertion(input: {
         dashboardControlActions: input.dashboardControlActions,
       });
   }
+}
+
+function evaluateBlueprintCoreNodeCountAtMost(input: {
+  actions: readonly DesignerEvalDashboardControlAction[];
+  maxItems: number;
+}): DesignerEvalCheckResult {
+  const latestBlueprint = readLatestBlueprint(input.actions);
+  if (latestBlueprint === undefined) {
+    return {
+      passed: false,
+      label: "Blueprint core node count",
+      detail: "Designer did not show a blueprint.",
+    };
+  }
+
+  const items = readBlueprintItems(latestBlueprint);
+  if (items === undefined) {
+    return {
+      passed: false,
+      label: "Blueprint core node count",
+      detail: "Latest blueprint did not contain an items array.",
+    };
+  }
+
+  return {
+    passed: items.length <= input.maxItems,
+    label: "Blueprint core node count",
+    detail:
+      items.length <= input.maxItems
+        ? `Latest blueprint contains ${String(items.length)} item(s), at or below limit ${String(input.maxItems)}.`
+        : `Latest blueprint contains ${String(items.length)} item(s), above limit ${String(input.maxItems)}.`,
+  };
+}
+
+function evaluateBlueprintHasProviderLifecycle(input: {
+  actions: readonly DesignerEvalDashboardControlAction[];
+  requiredConcepts: readonly string[];
+}): DesignerEvalCheckResult {
+  const latestBlueprint = readLatestBlueprint(input.actions);
+  const searchableText =
+    latestBlueprint === undefined ? "" : collectBlueprintSearchText(latestBlueprint);
+  const missingConcepts = input.requiredConcepts.filter(
+    (concept) => !searchableText.includes(concept.toLowerCase()),
+  );
+
+  return {
+    passed: latestBlueprint !== undefined && missingConcepts.length === 0,
+    label: "Blueprint provider lifecycle",
+    detail:
+      latestBlueprint === undefined
+        ? "Designer did not show a blueprint."
+        : missingConcepts.length === 0
+          ? `Latest blueprint includes required concepts: ${input.requiredConcepts.join(", ")}.`
+          : `Latest blueprint is missing required concepts: ${missingConcepts.join(", ")}.`,
+  };
+}
+
+function evaluateBlueprintExcludesSetupNodes(input: {
+  actions: readonly DesignerEvalDashboardControlAction[];
+  disallowedConcepts: readonly string[];
+}): DesignerEvalCheckResult {
+  const latestBlueprint = readLatestBlueprint(input.actions);
+  if (latestBlueprint === undefined) {
+    return {
+      passed: false,
+      label: "Blueprint excludes setup nodes",
+      detail: "Designer did not show a blueprint.",
+    };
+  }
+
+  const items = readBlueprintItems(latestBlueprint);
+  if (items === undefined) {
+    return {
+      passed: false,
+      label: "Blueprint excludes setup nodes",
+      detail: "Latest blueprint did not contain an items array.",
+    };
+  }
+
+  const disallowedMatches = items.flatMap((item) => {
+    const itemText = collectObjectStringValues(item).join(" ").toLowerCase();
+    return input.disallowedConcepts
+      .filter((concept) => itemText.includes(concept.toLowerCase()))
+      .map((concept) => concept);
+  });
+
+  return {
+    passed: disallowedMatches.length === 0,
+    label: "Blueprint excludes setup nodes",
+    detail:
+      disallowedMatches.length === 0
+        ? "Latest blueprint does not use disallowed setup concepts as workflow nodes."
+        : `Latest blueprint item text includes disallowed setup concepts: ${[
+            ...new Set(disallowedMatches),
+          ].join(", ")}.`,
+  };
+}
+
+function evaluateRequiredBindingToolsPresent(input: {
+  assertion: Extract<DesignerEvalAssertion, { kind: "required-binding-tools-present" }>;
+  productStateAfter: DesignerEvalProductState;
+}): DesignerEvalCheckResult {
+  const matchingBinding = input.productStateAfter.targetDraft.integrationBindings.find(
+    (binding) => binding.connectionId === input.assertion.connectionId,
+  );
+  const configuredTools =
+    matchingBinding === undefined ? [] : readStringArrayProperty(matchingBinding.config, "tools");
+  const missingTools = input.assertion.tools.filter((tool) => !configuredTools.includes(tool));
+
+  return {
+    passed: matchingBinding !== undefined && missingTools.length === 0,
+    label: `Required binding tools for ${input.assertion.connectionId}`,
+    detail:
+      matchingBinding === undefined
+        ? `No binding found for connection ${input.assertion.connectionId}.`
+        : missingTools.length === 0
+          ? `Binding ${matchingBinding.id} includes required tools: ${input.assertion.tools.join(", ")}.`
+          : `Binding ${matchingBinding.id} is missing required tools: ${missingTools.join(", ")}.`,
+  };
+}
+
+function evaluateSetupIncompletenessDisclosed(input: {
+  requiredPhrases: readonly string[];
+  transcriptMarkdown?: string | undefined;
+}): DesignerEvalCheckResult {
+  if (input.transcriptMarkdown === undefined) {
+    return {
+      passed: false,
+      label: "Setup incompleteness disclosed",
+      detail: "Transcript markdown was not supplied to the evaluator.",
+    };
+  }
+
+  const transcriptText = input.transcriptMarkdown.toLowerCase();
+  const missingPhrases = input.requiredPhrases.filter(
+    (phrase) => !transcriptText.includes(phrase.toLowerCase()),
+  );
+
+  return {
+    passed: missingPhrases.length === 0,
+    label: "Setup incompleteness disclosed",
+    detail:
+      missingPhrases.length === 0
+        ? `Transcript includes required disclosure phrases: ${input.requiredPhrases.join(", ")}.`
+        : `Transcript is missing disclosure phrases: ${missingPhrases.join(", ")}.`,
+  };
 }
 
 function evaluateBlueprintBeforeProductMutation(
@@ -173,4 +347,62 @@ function configHasRepositories(config: unknown, expectedRepositories: readonly s
     repositories.length === expectedRepositories.length &&
     expectedRepositories.every((repository) => repositories.includes(repository))
   );
+}
+
+function readLatestBlueprint(actions: readonly DesignerEvalDashboardControlAction[]): unknown {
+  const blueprintActions = actions.filter(
+    (action) => action.kind === "show_designer_canvas_tab" && action.tabKind === "blueprint",
+  );
+  const latestAction = blueprintActions.at(-1);
+  if (latestAction === undefined) {
+    return undefined;
+  }
+
+  if (typeof latestAction.input !== "object" || latestAction.input === null) {
+    return undefined;
+  }
+
+  return Reflect.get(latestAction.input, "blueprint");
+}
+
+function readBlueprintItems(blueprint: unknown): readonly unknown[] | undefined {
+  if (typeof blueprint !== "object" || blueprint === null) {
+    return undefined;
+  }
+
+  const items = Reflect.get(blueprint, "items");
+  return Array.isArray(items) ? items : undefined;
+}
+
+function collectBlueprintSearchText(blueprint: unknown): string {
+  return collectObjectStringValues(blueprint).join(" ").toLowerCase();
+}
+
+function collectObjectStringValues(value: unknown): readonly string[] {
+  if (typeof value === "string") {
+    return [value];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => collectObjectStringValues(entry));
+  }
+
+  if (typeof value !== "object" || value === null) {
+    return [];
+  }
+
+  return Object.values(value).flatMap((entry) => collectObjectStringValues(entry));
+}
+
+function readStringArrayProperty(value: unknown, property: string): readonly string[] {
+  if (typeof value !== "object" || value === null) {
+    return [];
+  }
+
+  const propertyValue = Reflect.get(value, property);
+  if (!Array.isArray(propertyValue)) {
+    return [];
+  }
+
+  return propertyValue.filter((entry) => typeof entry === "string");
 }

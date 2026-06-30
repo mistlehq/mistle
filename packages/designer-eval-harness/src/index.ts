@@ -11,6 +11,7 @@ export {
   startDesignerEvalContainer,
 } from "./docker/designer-eval-container.js";
 export { evaluateDesignerEvalRun, renderEvaluationMarkdown } from "./evaluator/evaluator.js";
+export { DesignerEvalJudgeResultSchema, renderJudgeResultMarkdown } from "./judge/judge-result.js";
 export { compileEvalDesignerRuntime } from "./runtime/compile-eval-designer-runtime.js";
 export { connectDirectCodexJsonRpcClient } from "./runtime/direct-codex-json-rpc-client.js";
 export { materializeDesignerRuntimeFiles } from "./runtime/materialize-runtime-files.js";

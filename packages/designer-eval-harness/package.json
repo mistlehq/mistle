@@ -14,6 +14,7 @@
   "scripts": {
     "artifacts:clean": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx ./src/cli/clean-designer-eval-artifacts.ts",
     "eval:agent": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx ./src/cli/run-designer-eval-agent.ts",
+    "eval:judge": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx ./src/cli/run-designer-eval-judge.ts",
     "eval": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx ./src/cli/run-designer-eval.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",

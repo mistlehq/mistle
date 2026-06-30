@@ -80,10 +80,9 @@ async function main(): Promise<void> {
     });
     const designerSessionId = state.designerSession.id;
     const runtimePlan = compileEvalDesignerRuntime({
-      availableRepositoryHandles: evalCase.seed.githubRepositoryHandles,
+      availableProviderResources: state.productState.availableProviderResources,
       config: evalConfig,
       designerSessionId,
-      evalControlPlaneBaseUrl: controlPlane.baseUrl,
       initialPrompt: evalCase.prompt,
       openAiProviderMode: "local_subscription",
       organizationId: state.designerSession.organizationId,
@@ -118,6 +117,7 @@ async function main(): Promise<void> {
       connectTimeoutMs: options.connectTimeoutMs,
     });
     const dashboardActions: DesignerEvalDashboardControlAction[] = [];
+    let transcriptMarkdown = "";
     let rejectServerRequestFailure: (error: Error) => void = () => {};
     const serverRequestFailure = new Promise<never>((_resolve, reject) => {
       rejectServerRequestFailure = reject;
@@ -195,12 +195,13 @@ async function main(): Promise<void> {
         rpcClient,
         threadId: completedTurn.threadId,
       });
+      transcriptMarkdown = renderTranscriptMarkdown({
+        caseId: evalCase.id,
+        threadId: threadRead.threadId,
+        turns: threadRead.turns,
+      });
       await artifacts.writeTranscript({
-        markdown: renderTranscriptMarkdown({
-          caseId: evalCase.id,
-          threadId: threadRead.threadId,
-          turns: threadRead.turns,
-        }),
+        markdown: transcriptMarkdown,
         rawThread: threadRead.response,
       });
     } finally {
@@ -222,6 +223,7 @@ async function main(): Promise<void> {
       }),
       dashboardControlActions: dashboardActions,
       productStateAfter,
+      transcriptMarkdown,
     });
     await artifacts.writeEvaluation(result);
 
@@ -278,7 +280,6 @@ function resolveSeededAssertions(input: {
       ...assertion,
       profileId: input.seededState.targetDraft.profileId,
       version: input.seededState.targetDraft.version,
-      connectionId: input.seededState.githubConnectionId,
     };
   });
 }

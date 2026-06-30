@@ -180,10 +180,9 @@ async function runAgentAssistedEval(input: {
     });
     const designerSessionId = state.designerSession.id;
     const runtimePlan = compileEvalDesignerRuntime({
-      availableRepositoryHandles: evalCase.seed.githubRepositoryHandles,
+      availableProviderResources: state.productState.availableProviderResources,
       config: evalConfig,
       designerSessionId,
-      evalControlPlaneBaseUrl: controlPlane.baseUrl,
       initialPrompt: prompt,
       openAiProviderMode: "local_subscription",
       organizationId: state.designerSession.organizationId,
@@ -222,6 +221,7 @@ async function runAgentAssistedEval(input: {
         : { connectTimeoutMs: input.params.connectTimeoutMs }),
     });
     const dashboardActions: DesignerEvalDashboardControlAction[] = [];
+    let transcriptMarkdown = "";
     let rejectServerRequestFailure: (error: Error) => void = () => {};
     const serverRequestFailure = new Promise<never>((_resolve, reject) => {
       rejectServerRequestFailure = reject;
@@ -313,12 +313,13 @@ async function runAgentAssistedEval(input: {
         rpcClient,
         threadId: completedTurn.threadId,
       });
+      transcriptMarkdown = renderTranscriptMarkdown({
+        caseId: evalCase.id,
+        threadId: threadRead.threadId,
+        turns: threadRead.turns,
+      });
       await artifacts.writeTranscript({
-        markdown: renderTranscriptMarkdown({
-          caseId: evalCase.id,
-          threadId: threadRead.threadId,
-          turns: threadRead.turns,
-        }),
+        markdown: transcriptMarkdown,
         rawThread: threadRead.response,
       });
     } finally {
@@ -338,6 +339,7 @@ async function runAgentAssistedEval(input: {
       }),
       dashboardControlActions: dashboardActions,
       productStateAfter,
+      transcriptMarkdown,
     });
     await artifacts.writeEvaluation(result);
     input.peer.notify("designerEval/completed", {
@@ -417,7 +419,6 @@ function resolveSeededAssertions(input: {
       ...assertion,
       profileId: input.seededState.targetDraft.profileId,
       version: input.seededState.targetDraft.version,
-      connectionId: input.seededState.githubConnectionId,
     };
   });
 }

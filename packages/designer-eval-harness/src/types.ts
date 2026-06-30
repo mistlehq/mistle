@@ -1,5 +1,6 @@
 export type DesignerEvalCase = {
   id: string;
+  expectedOutcomePath: string;
   prompt: string;
   seed: DesignerEvalSeed;
   scriptedInputs: Record<string, DesignerEvalInputResponse>;
@@ -7,15 +8,30 @@ export type DesignerEvalCase = {
 };
 
 export type DesignerEvalSeed = {
-  githubRepositoryHandles: readonly string[];
+  providerConnections?: readonly DesignerEvalSeedProviderConnection[] | undefined;
+  providerResources?: readonly DesignerEvalSeedProviderResource[] | undefined;
   targetDraft: {
+    initialIntegrationBindings?: readonly DesignerEvalProductStateIntegrationBinding[] | undefined;
     profileId: string;
     version: number;
   };
 };
 
+export type DesignerEvalSeedProviderConnection = {
+  id: string;
+  label: string;
+  providerFamilyId: string;
+  targetKey: string;
+};
+
+export type DesignerEvalSeedProviderResource = {
+  connectionId: string;
+  handle: string;
+  kind: string;
+};
+
 export type DesignerEvalSeededState = {
-  githubConnectionId: string;
+  providerConnections: readonly DesignerEvalSeedProviderConnection[];
   targetDraft: {
     profileId: string;
     version: number;
@@ -43,6 +59,27 @@ export type DesignerEvalAnswer = {
 export type DesignerEvalAssertion =
   | {
       kind: "blueprint-before-product-mutation";
+    }
+  | {
+      kind: "blueprint-core-node-count-at-most";
+      maxItems: number;
+    }
+  | {
+      kind: "blueprint-has-provider-lifecycle";
+      requiredConcepts: readonly string[];
+    }
+  | {
+      kind: "blueprint-excludes-setup-nodes";
+      disallowedConcepts: readonly string[];
+    }
+  | {
+      kind: "required-binding-tools-present";
+      connectionId: string;
+      tools: readonly string[];
+    }
+  | {
+      kind: "setup-incompleteness-disclosed";
+      requiredPhrases: readonly string[];
     }
   | {
       kind: "saved-selected-provider-resources";
@@ -82,6 +119,7 @@ export type DesignerEvalDashboardControlAction =
     };
 
 export type DesignerEvalProductState = {
+  providerConnections: readonly DesignerEvalSeedProviderConnection[];
   availableProviderResources: readonly {
     connectionId: string;
     kind: string;
@@ -111,4 +149,32 @@ export type DesignerEvalCheckResult = {
   passed: boolean;
   label: string;
   detail: string;
+};
+
+export type DesignerEvalJudgeFindingCategory =
+  | "harness_issue"
+  | "designer_behavior_issue"
+  | "product_capability_gap"
+  | "ambiguous_case";
+
+export type DesignerEvalJudgeResult = {
+  verdict: "pass" | "fail" | "inconclusive";
+  failureCategory:
+    | "none"
+    | "harness_issue"
+    | "designer_behavior_issue"
+    | "product_capability_gap"
+    | "ambiguous_case";
+  scores: {
+    workflowClarity: number;
+    setupCompleteness: number;
+    runtimeCapabilityCorrectness: number;
+    honestHandoff: number;
+  };
+  findings: readonly {
+    severity: "low" | "medium" | "high";
+    category: DesignerEvalJudgeFindingCategory;
+    evidence: string;
+    suggestedFix: string;
+  }[];
 };

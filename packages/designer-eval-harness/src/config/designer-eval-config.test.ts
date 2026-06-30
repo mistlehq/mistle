@@ -63,4 +63,21 @@ url = "http://127.0.0.1:5100/mcp"
       },
     });
   });
+
+  it("rejects eval-control-plane MCP mode until the eval control plane implements MCP", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "designer-eval-config-"));
+    const configPath = join(directory, "designer-eval.toml");
+    await writeFile(
+      configPath,
+      `
+[runtime]
+image_ref = "registry.example.com/designer:eval"
+
+[mcp]
+mode = "eval-control-plane"
+`.trim(),
+    );
+
+    expect(() => loadDesignerEvalConfig({ configPath })).toThrow("Invalid discriminator value");
+  });
 });

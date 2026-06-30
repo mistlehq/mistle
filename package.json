@@ -29,6 +29,7 @@
     "designer:eval:agent": "pnpm --filter @mistle/designer-eval-harness eval:agent",
     "designer:eval:clean": "pnpm --filter @mistle/designer-eval-harness artifacts:clean",
     "designer:eval:docker-runtime": "pnpm --filter @mistle/designer-eval-harness runtime:docker",
+    "designer:eval:judge": "pnpm --filter @mistle/designer-eval-harness eval:judge",
     "designer:eval:runtime-files": "pnpm --filter @mistle/designer-eval-harness runtime:materialize",
     "docs:dev": "nix develop .#docs -c pnpm --filter @mistle/docs dev",
     "emails:preview": "pnpm --filter @mistle/emails preview",

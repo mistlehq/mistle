@@ -163,12 +163,29 @@ function readBindingToolReferences(input: {
   schema?: Record<string, unknown> | undefined;
   uiSchema?: Record<string, unknown> | undefined;
 }): readonly BindingToolReference[] {
+  return [
+    ...readBindingToolReferencesForProperty({
+      ...input,
+      propertyName: "tools",
+    }),
+    ...readBindingToolReferencesForProperty({
+      ...input,
+      propertyName: "mcpServers",
+    }),
+  ];
+}
+
+function readBindingToolReferencesForProperty(input: {
+  propertyName: string;
+  schema?: Record<string, unknown> | undefined;
+  uiSchema?: Record<string, unknown> | undefined;
+}): readonly BindingToolReference[] {
   const properties = readJsonObject(input.schema?.properties);
-  const toolsSchema = readJsonObject(properties?.tools);
+  const toolsSchema = readJsonObject(properties?.[input.propertyName]);
   const itemsSchema = readJsonObject(toolsSchema?.items);
   const toolIds = readStringArray(itemsSchema?.enum);
   const defaultToolIds = new Set(readStringArray(toolsSchema?.default));
-  const toolsUiSchema = readJsonObject(input.uiSchema?.tools);
+  const toolsUiSchema = readJsonObject(input.uiSchema?.[input.propertyName]);
   const toolLabels = readStringArray(toolsUiSchema?.["ui:enumNames"]);
 
   return toolIds.map((toolId, index) => ({
