@@ -1,6 +1,6 @@
 ---
 name: github-pr-authoring
-description: Draft or update GitHub pull requests for this repository in the required format. Use when creating a PR, marking a PR ready for review, revising a PR description, preparing reviewer guidance, documenting checks and tests performed, or using `gh pr create` / `gh pr edit` for repo-compliant GitHub PR authoring.
+description: Draft or update GitHub pull requests for this repository in the required format. Use when creating a PR, marking a PR ready for review by default, revising a PR description, preparing reviewer guidance, documenting checks and tests performed, or using `gh pr create` / `gh pr edit` for repo-compliant GitHub PR authoring.
 ---
 
 # Github Pr Authoring
@@ -18,7 +18,7 @@ description: Draft or update GitHub pull requests for this repository in the req
 
 ## Publication Handoff
 
-- Mark the PR ready for review when the user asks to publish a ready PR instead of a draft.
+- Create and publish PRs as ready for review by default. Use draft state only when the user explicitly asks for a draft PR.
 - Use `pr-review-followthrough` for CI, reviewer comments, `pr-review`, and merge-ready iteration after the PR is ready.
 
 ## Section Expectations
