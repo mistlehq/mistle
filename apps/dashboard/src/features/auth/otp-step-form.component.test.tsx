@@ -48,6 +48,21 @@ describe("OtpStepForm", () => {
     expect(markup).toContain('autoComplete="one-time-code"');
   });
 
+  it("asks users to check the spam folder when the code email is missing", () => {
+    const markup = renderToStaticMarkup(
+      <OtpStepForm
+        email="user@example.com"
+        isVerifyingOtp={false}
+        onOtpChange={() => {}}
+        onSubmit={async () => {}}
+        onUseDifferentEmail={() => {}}
+        otp=""
+      />,
+    );
+
+    expect(markup).toContain("If you do not see the email, please check the spam folder.");
+  });
+
   it("keeps the OTP input visible to pointer interaction", () => {
     const markup = renderToStaticMarkup(
       <OtpStepForm

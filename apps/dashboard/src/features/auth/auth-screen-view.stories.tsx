@@ -111,6 +111,11 @@ export const OtpEntry: Story = {
   play: async ({ canvasElement }): Promise<void> => {
     const canvas = within(canvasElement);
     await expect(canvas.getByLabelText("One-time code")).toHaveFocus();
+    await expect(
+      canvas.getByText("If you do not see the email, please check the spam folder.", {
+        exact: false,
+      }),
+    ).toBeVisible();
   },
 };
 

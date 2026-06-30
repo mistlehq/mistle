@@ -30,7 +30,8 @@ export function OtpStepForm(props: OtpStepFormProps): React.JSX.Element {
       <div className="gap-2 flex flex-col">
         <p className="text-muted-foreground text-sm leading-relaxed">
           We sent a one-time code to{" "}
-          <span className="font-medium text-foreground">{props.email}</span>.
+          <span className="font-medium text-foreground">{props.email}</span>. If you do not see the
+          email, please check the spam folder.
         </p>
         <Label className="sr-only" htmlFor="otp">
           One-time code

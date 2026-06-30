@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildEmailOTPTemplate } from "./builder.js";
 
 describe("emails otp", () => {
-  it("builds an OTP email template", async () => {
+  it("builds sign-in OTP emails with spam-folder guidance", async () => {
     const template = await buildEmailOTPTemplate({
       otp: "123456",
       type: "sign-in",
@@ -18,6 +18,7 @@ describe("emails otp", () => {
     expect(template.html).toContain("123456");
     expect(template.text).toContain("123456");
     expect(template.text).toContain("5 minutes");
+    expect(template.text).toContain("If you do not see the email, please check the spam folder.");
   });
 
   it("builds email verification OTP emails", async () => {
@@ -32,6 +33,8 @@ describe("emails otp", () => {
       templateName: "OTP",
     });
     expect(template.html).toContain("654321");
+    expect(template.html).not.toContain("spam folder");
+    expect(template.text).not.toContain("spam folder");
   });
 
   it("builds password reset OTP emails", async () => {
@@ -46,6 +49,8 @@ describe("emails otp", () => {
       templateName: "OTP",
     });
     expect(template.html).toContain("654321");
+    expect(template.html).not.toContain("spam folder");
+    expect(template.text).not.toContain("spam folder");
   });
 
   it("matches snapshot for a stable OTP template output", async () => {

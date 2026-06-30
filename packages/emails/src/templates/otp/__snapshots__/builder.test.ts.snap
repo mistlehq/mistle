@@ -36,6 +36,7 @@ exports[`emails otp > matches snapshot for a stable OTP template output 1`] = `
                           </tbody>
                         </table>
                         <p style="font-size:24px;line-height:32px;margin:0 0 18px;color:#1f2937;font-weight:700;text-align:center">Your sign-in code</p>
+                        <p style="font-size:15px;line-height:22px;margin:0 0 16px;color:#4b5563;text-align:center">If you do not see the email, please check the spam folder.</p>
                         <table align="center" width="100%" style="background-color:#f5f1e8;border:1px solid #ded8cc;border-radius:10px;margin:12px 0 18px;padding:16px" border="0" cellpadding="0" cellspacing="0" role="presentation">
                           <tbody>
                             <tr>
@@ -67,6 +68,8 @@ exports[`emails otp > matches snapshot for a stable OTP template output 1`] = `
   },
   "subject": "Your Mistle sign-in code",
   "text": "Your sign-in code
+
+If you do not see the email, please check the spam folder.
 
 123456
 
