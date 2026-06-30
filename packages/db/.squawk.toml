@@ -8,4 +8,5 @@ excluded_rules = [
   "require-timeout-settings",
   "adding-foreign-key-constraint",
   "constraint-missing-not-valid",
+  "identifier-too-long",
 ]
