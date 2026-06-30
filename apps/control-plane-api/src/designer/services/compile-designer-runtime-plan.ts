@@ -19,7 +19,6 @@ import { createDesignerBehaviorInstructionBlock } from "./designer-behavior-inst
 import { createDesignerContextInstructionBlock } from "./designer-context-instructions.js";
 import { createDesignerRuntimeReferenceSetupFiles } from "./designer-runtime-reference-files.js";
 
-const DesignerRuntimeId = "codex";
 const DesignerDocsMcpServerUrl = "https://docs.mistle.dev/mcp";
 
 function createDesignerInitialPromptInstructionBlock(input: { initialPrompt: string }) {
