@@ -129,7 +129,15 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
           connectionId: "icn_eval_ai_factory_linear",
           kind: "connector",
           config: {
-            tools: [],
+            tools: ["linear-mcp"],
+          },
+        },
+        {
+          id: "ibd_eval_ai_factory_github",
+          connectionId: "icn_eval_ai_factory_github",
+          kind: "git",
+          config: {
+            tools: ["github-cli"],
           },
         },
       ],
