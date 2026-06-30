@@ -6,6 +6,7 @@ import { useState, type JSX } from "react";
 import { describe, expect, it } from "vitest";
 
 import {
+  SandboxProfileSnapshotPanelView,
   SandboxProfileSnapshotRefreshScheduleForm,
   type SnapshotRefreshSchedule,
   type SnapshotRefreshScheduleInput,
@@ -21,6 +22,42 @@ const ExistingSnapshotRefreshSchedule = {
 } satisfies NonNullable<SnapshotRefreshSchedule>;
 
 describe("SandboxProfileSnapshotRefreshScheduleForm", () => {
+  it("shows the persisted publish snapshot failure message when snapshot creation fails", () => {
+    render(
+      <SandboxProfileSnapshotPanelView
+        canRunMaintenanceRefresh={false}
+        isActionPending={false}
+        onMaintenanceRefreshSnapshot={() => {}}
+        onPublishSuccessMessageDismiss={() => {}}
+        onRefreshSnapshot={() => {}}
+        onRetryPublishSnapshot={() => {}}
+        publishSuccessMessage={false}
+        publishSuccessMessageKey="idle"
+        refreshScheduleSection={null}
+        showMaintenanceRefreshAction={false}
+        state={{
+          kind: "publish-snapshot-error",
+          message:
+            "Snapshot creation failed because Linear is configured with the wrong type. Update the Linear binding, then retry snapshot creation.\n\nCause: Binding 'ibd_story_linear' has kind 'agent' but definition 'linear::linear-default' has kind 'connector'.",
+          operationId: null,
+          publishedVersion: 4,
+          runnableVersion: 3,
+          sandboxInstanceId: null,
+        }}
+        version={4}
+      />,
+    );
+
+    expect(
+      screen.getByText("Snapshot failed: Linear is configured with the wrong type"),
+    ).toBeDefined();
+    expect(
+      screen.getByText("Update the Linear binding, then retry snapshot creation."),
+    ).toBeDefined();
+    expect(screen.queryByText("Snapshot creation failed")).toBeNull();
+    expect(screen.queryByText(/Binding 'ibd_story_linear' has kind 'agent'/u)).toBeNull();
+  });
+
   it("returns to the automatic snapshot refresh summary after saving maintenance script edits", () => {
     render(<RefreshScheduleSaveHarness />);
 

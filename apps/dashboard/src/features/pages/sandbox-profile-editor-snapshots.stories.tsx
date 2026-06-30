@@ -203,6 +203,110 @@ export const PublishSnapshotFailed: Story = {
   },
 };
 
+export const PublishSnapshotFailedInvalidBindingConnectionReference: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "snapshot-failed-invalid-binding-connection-reference",
+  },
+};
+
+export const PublishSnapshotFailedInvalidConnectionTargetReference: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "snapshot-failed-invalid-connection-target-reference",
+  },
+};
+
+export const PublishSnapshotFailedConnectionMismatch: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "snapshot-failed-connection-mismatch",
+  },
+};
+
+export const PublishSnapshotFailedTargetDisabled: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "snapshot-failed-target-disabled",
+  },
+};
+
+export const PublishSnapshotFailedConnectionNotActive: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "snapshot-failed-connection-not-active",
+  },
+};
+
+export const PublishSnapshotFailedKindMismatch: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "snapshot-failed-kind-mismatch",
+  },
+};
+
+export const PublishSnapshotFailedInvalidTargetConfig: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "snapshot-failed-invalid-target-config",
+  },
+};
+
+export const PublishSnapshotFailedInvalidTargetSecrets: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "snapshot-failed-invalid-target-secrets",
+  },
+};
+
+export const PublishSnapshotFailedInvalidBindingConfig: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "snapshot-failed-invalid-binding-config",
+  },
+};
+
+export const PublishSnapshotFailedRouteConflict: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "snapshot-failed-route-conflict",
+  },
+};
+
+export const PublishSnapshotFailedArtifactConflict: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "snapshot-failed-artifact-conflict",
+  },
+};
+
+export const PublishSnapshotFailedRuntimeClientSetupConflict: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "snapshot-failed-runtime-client-setup-conflict",
+  },
+};
+
+export const PublishSnapshotFailedRuntimeClientSetupInvalidRef: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "snapshot-failed-runtime-client-setup-invalid-ref",
+  },
+};
+
 export const RefreshFailed: Story = {
   args: {
     initialSectionId: "snapshot",
