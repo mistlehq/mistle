@@ -216,7 +216,7 @@
       "config": {}
     },
     {
-      "targetKey": "sentry-mcp",
+      "targetKey": "sentry-default",
       "enabled": true,
       "config": {}
     },
