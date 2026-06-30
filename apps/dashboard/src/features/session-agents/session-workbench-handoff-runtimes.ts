@@ -17,10 +17,7 @@ import {
   type UseOpenCodeSessionStateResult,
 } from "./opencode/session-state/index.js";
 import { buildPiCliPtyOpenInput, type UsePiSessionStateResult } from "./pi/session-state/index.js";
-import {
-  resolveSessionWorkbenchRuntimeId,
-  SessionRuntimeWorkbenchCapabilities,
-} from "./session-runtime-workbench-capabilities.js";
+import { SessionRuntimeWorkbenchCapabilities } from "./session-runtime-workbench-capabilities.js";
 
 type RuntimeConversationConnectInput =
   | InitialSessionConnectInput
@@ -316,29 +313,6 @@ export function buildPiLifecycleForWorkbench(
             sandboxInstanceId: lifecycle.sessionSnapshot.sandboxInstanceId,
           },
   };
-}
-
-export function resolveSessionLifecycleForWorkbench(input: {
-  agentRuntimeId: string | null;
-  claudeCodeLifecycle: SessionLifecycleForWorkbench;
-  codexLifecycle: SessionLifecycleForWorkbench;
-  openCodeLifecycle: SessionLifecycleForWorkbench;
-  piLifecycle: SessionLifecycleForWorkbench;
-}): SessionLifecycleForWorkbench {
-  const activeRuntimeId = resolveSessionWorkbenchRuntimeId({
-    runtimeAgentRuntimeId: input.agentRuntimeId,
-  });
-
-  if (activeRuntimeId === SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE.runtimeId) {
-    return input.claudeCodeLifecycle;
-  }
-  if (activeRuntimeId === SessionRuntimeWorkbenchCapabilities.OPENCODE.runtimeId) {
-    return input.openCodeLifecycle;
-  }
-  if (activeRuntimeId === SessionRuntimeWorkbenchCapabilities.PI.runtimeId) {
-    return input.piLifecycle;
-  }
-  return input.codexLifecycle;
 }
 
 export function buildCodexHandoffRuntime(input: {

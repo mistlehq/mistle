@@ -5,7 +5,10 @@ import type { UseClaudeCodeSessionStateResult } from "../session-agents/claude-c
 import type { UseCodexSessionStateResult } from "../session-agents/codex/session-state/index.js";
 import type { UseOpenCodeSessionStateResult } from "../session-agents/opencode/session-state/index.js";
 import type { UsePiSessionStateResult } from "../session-agents/pi/session-state/index.js";
-import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-runtime-workbench-capabilities.js";
+import {
+  resolveSessionWorkbenchRuntimeId,
+  SessionRuntimeWorkbenchCapabilities,
+} from "../session-agents/session-runtime-workbench-capabilities.js";
 import {
   buildCodexHandoffRuntime,
   buildCodexLifecycleForHandoff,
@@ -19,7 +22,6 @@ import {
   buildPiHandoffRuntime,
   buildPiLifecycleForHandoff,
   buildPiLifecycleForWorkbench,
-  resolveSessionLifecycleForWorkbench,
 } from "../session-agents/session-workbench-handoff-runtimes.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
@@ -155,21 +157,28 @@ export function useSessionWorkbenchHandoffControl(input: {
       piLifecycle.sessionSnapshot,
     ],
   );
-  const resolveLifecycleForWorkbench = useCallback(
-    (agentRuntimeId: string | null) =>
-      resolveSessionLifecycleForWorkbench({
-        agentRuntimeId,
-        claudeCodeLifecycle: claudeCodeLifecycleForWorkbench,
-        codexLifecycle: codexLifecycleForWorkbench,
-        openCodeLifecycle: openCodeLifecycleForWorkbench,
-        piLifecycle: piLifecycleForWorkbench,
-      }),
+  const lifecyclesForWorkbenchByRuntimeId = useMemo(
+    (): Record<AgentRuntimeId, SessionLifecycleForWorkbench> => ({
+      [ClaudeCodeWorkbenchCapabilities.runtimeId]: claudeCodeLifecycleForWorkbench,
+      [CodexWorkbenchCapabilities.runtimeId]: codexLifecycleForWorkbench,
+      [OpenCodeWorkbenchCapabilities.runtimeId]: openCodeLifecycleForWorkbench,
+      [PiWorkbenchCapabilities.runtimeId]: piLifecycleForWorkbench,
+    }),
     [
       claudeCodeLifecycleForWorkbench,
       codexLifecycleForWorkbench,
       openCodeLifecycleForWorkbench,
       piLifecycleForWorkbench,
     ],
+  );
+  const resolveLifecycleForWorkbench = useCallback(
+    (agentRuntimeId: string | null) =>
+      lifecyclesForWorkbenchByRuntimeId[
+        resolveSessionWorkbenchRuntimeId({
+          runtimeAgentRuntimeId: agentRuntimeId,
+        })
+      ],
+    [lifecyclesForWorkbenchByRuntimeId],
   );
   const cliPtyState = useSandboxPtyState({
     ensureTransportConnected: input.ensureTransportConnected,
