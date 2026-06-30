@@ -1,76 +1,120 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  getSessionRuntimeWorkbenchCapabilities,
+  getSessionWorkbenchRuntimeModule,
   resolveSessionWorkbenchRuntimeId,
-  SessionRuntimeWorkbenchCapabilities,
+  SessionWorkbenchRuntimeModules,
 } from "./session-workbench-runtime-registry.js";
 
 describe("session workbench runtime registry", () => {
   it("describes the Codex workbench contract", () => {
-    expect(SessionRuntimeWorkbenchCapabilities.CODEX).toEqual({
+    expect(SessionWorkbenchRuntimeModules.CODEX).toEqual({
       runtimeId: "codex",
-      displayName: "Codex",
-      cliTerminalContentInset: "default",
-      composerModelSelection: {
-        required: true,
-        showControls: true,
+      capabilities: {
+        runtimeId: "codex",
+        displayName: "Codex",
+        cliTerminalContentInset: "default",
+        composerModelSelection: {
+          required: true,
+          showControls: true,
+        },
+        supportsSteering: true,
+        preservesCliLaunchContext: false,
       },
-      supportsSteering: true,
-      preservesCliLaunchContext: false,
+      conversationPolicy: {
+        enablesOpenCodeComposerState: false,
+        usesCodexActiveRuntimeConversationId: true,
+      },
+      repositoryPolicy: {
+        blocksPrimaryRepositorySwitchWhileCliActive: true,
+        usesCodexActiveThreadCwd: true,
+      },
     });
   });
 
   it("describes the Claude Code workbench contract", () => {
-    expect(SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE).toEqual({
+    expect(SessionWorkbenchRuntimeModules.CLAUDE_CODE).toEqual({
       runtimeId: "claude-code",
-      displayName: "Claude Code",
-      cliTerminalContentInset: "none",
-      composerModelSelection: {
-        required: false,
-        showControls: true,
+      capabilities: {
+        runtimeId: "claude-code",
+        displayName: "Claude Code",
+        cliTerminalContentInset: "none",
+        composerModelSelection: {
+          required: false,
+          showControls: true,
+        },
+        supportsSteering: true,
+        preservesCliLaunchContext: false,
       },
-      supportsSteering: true,
-      preservesCliLaunchContext: false,
+      conversationPolicy: {
+        enablesOpenCodeComposerState: false,
+        usesCodexActiveRuntimeConversationId: false,
+      },
+      repositoryPolicy: {
+        blocksPrimaryRepositorySwitchWhileCliActive: false,
+        usesCodexActiveThreadCwd: false,
+      },
     });
   });
 
   it("describes the OpenCode workbench contract", () => {
-    expect(SessionRuntimeWorkbenchCapabilities.OPENCODE).toEqual({
+    expect(SessionWorkbenchRuntimeModules.OPENCODE).toEqual({
       runtimeId: "opencode",
-      displayName: "OpenCode",
-      cliTerminalContentInset: "none",
-      composerModelSelection: {
-        required: false,
-        showControls: true,
+      capabilities: {
+        runtimeId: "opencode",
+        displayName: "OpenCode",
+        cliTerminalContentInset: "none",
+        composerModelSelection: {
+          required: false,
+          showControls: true,
+        },
+        supportsSteering: true,
+        preservesCliLaunchContext: true,
       },
-      supportsSteering: true,
-      preservesCliLaunchContext: true,
+      conversationPolicy: {
+        enablesOpenCodeComposerState: true,
+        usesCodexActiveRuntimeConversationId: false,
+      },
+      repositoryPolicy: {
+        blocksPrimaryRepositorySwitchWhileCliActive: false,
+        usesCodexActiveThreadCwd: false,
+      },
     });
   });
 
   it("describes the Pi workbench contract", () => {
-    expect(SessionRuntimeWorkbenchCapabilities.PI).toEqual({
+    expect(SessionWorkbenchRuntimeModules.PI).toEqual({
       runtimeId: "pi",
-      displayName: "Pi",
-      cliTerminalContentInset: "none",
-      composerModelSelection: {
-        required: false,
-        showControls: true,
+      capabilities: {
+        runtimeId: "pi",
+        displayName: "Pi",
+        cliTerminalContentInset: "none",
+        composerModelSelection: {
+          required: false,
+          showControls: true,
+        },
+        supportsSteering: true,
+        preservesCliLaunchContext: false,
       },
-      supportsSteering: true,
-      preservesCliLaunchContext: false,
+      conversationPolicy: {
+        enablesOpenCodeComposerState: false,
+        usesCodexActiveRuntimeConversationId: false,
+      },
+      repositoryPolicy: {
+        blocksPrimaryRepositorySwitchWhileCliActive: false,
+        usesCodexActiveThreadCwd: false,
+      },
     });
   });
 
   it("resolves known runtime ids through the workbench registry", () => {
     expect(
-      getSessionRuntimeWorkbenchCapabilities({
+      getSessionWorkbenchRuntimeModule({
         runtimeId: resolveSessionWorkbenchRuntimeId({
           runtimeAgentRuntimeId: "opencode",
         }),
       }),
-    ).toBe(SessionRuntimeWorkbenchCapabilities.OPENCODE);
+    ).toBe(SessionWorkbenchRuntimeModules.OPENCODE);
   });
 
   it("uses Codex while the runtime id is not loaded", () => {

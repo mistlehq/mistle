@@ -2,9 +2,8 @@ import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runt
 import { useCallback, type RefObject } from "react";
 
 import {
-  getSessionRuntimeWorkbenchCapabilities,
+  getSessionWorkbenchRuntimeModule,
   resolveSessionWorkbenchRuntimeId,
-  SessionRuntimeWorkbenchCapabilities,
 } from "../session-agents/session-workbench-runtime-registry.js";
 import {
   resolveInitialSelectedRepositoryPath,
@@ -15,8 +14,6 @@ import {
   type SessionPrimaryRepositoryState,
 } from "./use-session-primary-repository-state.js";
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
-
-const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
 
 type SessionWorkbenchRepositoryControlState = {
   activeRuntimeId: AgentRuntimeId;
@@ -44,13 +41,14 @@ export function useSessionWorkbenchRepositoryControl(input: {
   const activeRuntimeId = resolveSessionWorkbenchRuntimeId({
     runtimeAgentRuntimeId: input.runtimeAgentRuntimeId,
   });
-  const activeRuntimeCapabilities = getSessionRuntimeWorkbenchCapabilities({
+  const activeRuntimeModule = getSessionWorkbenchRuntimeModule({
     runtimeId: activeRuntimeId,
   });
-  input.activeHandoffRuntimeIdRef.current = activeRuntimeCapabilities.runtimeId;
+  input.activeHandoffRuntimeIdRef.current = activeRuntimeModule.runtimeId;
 
-  const activeThreadCwd =
-    activeRuntimeId === CodexWorkbenchCapabilities.runtimeId ? input.codexActiveThreadCwd : null;
+  const activeThreadCwd = activeRuntimeModule.repositoryPolicy.usesCodexActiveThreadCwd
+    ? input.codexActiveThreadCwd
+    : null;
   const initialSelectedRepositoryPath = resolveInitialSelectedRepositoryPath({
     activeThreadCwd: activeThreadCwd ?? undefined,
     runtimePrimaryRepositoryRoot: input.runtimePrimaryRepositoryRoot,
@@ -59,7 +57,7 @@ export function useSessionWorkbenchRepositoryControl(input: {
     enabled: input.canConnect,
     ensureTransportConnected: input.ensureTransportConnected,
     initialSelectedRepositoryPath,
-    runtimeDisplayName: activeRuntimeCapabilities.displayName,
+    runtimeDisplayName: activeRuntimeModule.capabilities.displayName,
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const selectedRepositoryPath = primaryRepositoryState.selectedRepositoryPath;
@@ -75,13 +73,13 @@ export function useSessionWorkbenchRepositoryControl(input: {
         return;
       }
 
-      if (activeRuntimeId === CodexWorkbenchCapabilities.runtimeId) {
+      if (activeRuntimeModule.repositoryPolicy.usesCodexActiveThreadCwd) {
         await input.ensureCanSwitchPrimaryRepository();
       }
       primaryRepositoryState.setSelectedRepositoryPath(nextSelectedRepositoryPath);
     },
     [
-      activeRuntimeId,
+      activeRuntimeModule.repositoryPolicy.usesCodexActiveThreadCwd,
       input.ensureCanSwitchPrimaryRepository,
       primaryRepositoryState.setSelectedRepositoryPath,
       selectedRepositoryPath,
@@ -92,7 +90,7 @@ export function useSessionWorkbenchRepositoryControl(input: {
     activeRuntimeId,
     primaryRepositoryControlState: {
       disabledReason:
-        activeRuntimeId === CodexWorkbenchCapabilities.runtimeId &&
+        activeRuntimeModule.repositoryPolicy.blocksPrimaryRepositorySwitchWhileCliActive &&
         isPrimaryRepositorySwitchBlockedByCli
           ? "Exit Codex TUI before switching the primary repository."
           : null,

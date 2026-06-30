@@ -16,59 +16,120 @@ export type SessionRuntimeWorkbenchCapability = {
   preservesCliLaunchContext: boolean;
 };
 
-export const SessionRuntimeWorkbenchCapabilities = {
+type SessionWorkbenchRuntimeRepositoryPolicy = {
+  blocksPrimaryRepositorySwitchWhileCliActive: boolean;
+  usesCodexActiveThreadCwd: boolean;
+};
+
+type SessionWorkbenchRuntimeConversationPolicy = {
+  enablesOpenCodeComposerState: boolean;
+  usesCodexActiveRuntimeConversationId: boolean;
+};
+
+export type SessionWorkbenchRuntimeModule = {
+  runtimeId: AgentRuntimeId;
+  capabilities: SessionRuntimeWorkbenchCapability;
+  conversationPolicy: SessionWorkbenchRuntimeConversationPolicy;
+  repositoryPolicy: SessionWorkbenchRuntimeRepositoryPolicy;
+};
+
+export const SessionWorkbenchRuntimeModules = {
   CODEX: {
     runtimeId: AgentRuntimeIdCatalog.CODEX,
-    displayName: "Codex",
-    cliTerminalContentInset: "default",
-    composerModelSelection: {
-      required: true,
-      showControls: true,
+    capabilities: {
+      runtimeId: AgentRuntimeIdCatalog.CODEX,
+      displayName: "Codex",
+      cliTerminalContentInset: "default",
+      composerModelSelection: {
+        required: true,
+        showControls: true,
+      },
+      supportsSteering: true,
+      preservesCliLaunchContext: false,
     },
-    supportsSteering: true,
-    preservesCliLaunchContext: false,
+    conversationPolicy: {
+      enablesOpenCodeComposerState: false,
+      usesCodexActiveRuntimeConversationId: true,
+    },
+    repositoryPolicy: {
+      blocksPrimaryRepositorySwitchWhileCliActive: true,
+      usesCodexActiveThreadCwd: true,
+    },
   },
   CLAUDE_CODE: {
     runtimeId: AgentRuntimeIdCatalog.CLAUDE_CODE,
-    displayName: "Claude Code",
-    cliTerminalContentInset: "none",
-    composerModelSelection: {
-      required: false,
-      showControls: true,
+    capabilities: {
+      runtimeId: AgentRuntimeIdCatalog.CLAUDE_CODE,
+      displayName: "Claude Code",
+      cliTerminalContentInset: "none",
+      composerModelSelection: {
+        required: false,
+        showControls: true,
+      },
+      supportsSteering: true,
+      preservesCliLaunchContext: false,
     },
-    supportsSteering: true,
-    preservesCliLaunchContext: false,
+    conversationPolicy: {
+      enablesOpenCodeComposerState: false,
+      usesCodexActiveRuntimeConversationId: false,
+    },
+    repositoryPolicy: {
+      blocksPrimaryRepositorySwitchWhileCliActive: false,
+      usesCodexActiveThreadCwd: false,
+    },
   },
   OPENCODE: {
     runtimeId: AgentRuntimeIdCatalog.OPENCODE,
-    displayName: "OpenCode",
-    cliTerminalContentInset: "none",
-    composerModelSelection: {
-      required: false,
-      showControls: true,
+    capabilities: {
+      runtimeId: AgentRuntimeIdCatalog.OPENCODE,
+      displayName: "OpenCode",
+      cliTerminalContentInset: "none",
+      composerModelSelection: {
+        required: false,
+        showControls: true,
+      },
+      supportsSteering: true,
+      preservesCliLaunchContext: true,
     },
-    supportsSteering: true,
-    preservesCliLaunchContext: true,
+    conversationPolicy: {
+      enablesOpenCodeComposerState: true,
+      usesCodexActiveRuntimeConversationId: false,
+    },
+    repositoryPolicy: {
+      blocksPrimaryRepositorySwitchWhileCliActive: false,
+      usesCodexActiveThreadCwd: false,
+    },
   },
   PI: {
     runtimeId: AgentRuntimeIdCatalog.PI,
-    displayName: "Pi",
-    cliTerminalContentInset: "none",
-    composerModelSelection: {
-      required: false,
-      showControls: true,
+    capabilities: {
+      runtimeId: AgentRuntimeIdCatalog.PI,
+      displayName: "Pi",
+      cliTerminalContentInset: "none",
+      composerModelSelection: {
+        required: false,
+        showControls: true,
+      },
+      supportsSteering: true,
+      preservesCliLaunchContext: false,
     },
-    supportsSteering: true,
-    preservesCliLaunchContext: false,
+    conversationPolicy: {
+      enablesOpenCodeComposerState: false,
+      usesCodexActiveRuntimeConversationId: false,
+    },
+    repositoryPolicy: {
+      blocksPrimaryRepositorySwitchWhileCliActive: false,
+      usesCodexActiveThreadCwd: false,
+    },
   },
-} satisfies Record<string, SessionRuntimeWorkbenchCapability>;
+} satisfies Record<string, SessionWorkbenchRuntimeModule>;
 
-export const SessionRuntimeWorkbenchCapabilitiesByRuntimeId = {
-  [AgentRuntimeIdCatalog.CLAUDE_CODE]: SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE,
-  [AgentRuntimeIdCatalog.CODEX]: SessionRuntimeWorkbenchCapabilities.CODEX,
-  [AgentRuntimeIdCatalog.OPENCODE]: SessionRuntimeWorkbenchCapabilities.OPENCODE,
-  [AgentRuntimeIdCatalog.PI]: SessionRuntimeWorkbenchCapabilities.PI,
-} satisfies Record<AgentRuntimeId, SessionRuntimeWorkbenchCapability>;
+export const SessionWorkbenchRuntimeModulesByRuntimeId = {
+  [AgentRuntimeIdCatalog.CLAUDE_CODE]: SessionWorkbenchRuntimeModules.CLAUDE_CODE,
+  [AgentRuntimeIdCatalog.CODEX]: SessionWorkbenchRuntimeModules.CODEX,
+  [AgentRuntimeIdCatalog.OPENCODE]: SessionWorkbenchRuntimeModules.OPENCODE,
+  [AgentRuntimeIdCatalog.PI]: SessionWorkbenchRuntimeModules.PI,
+} satisfies Record<AgentRuntimeId, SessionWorkbenchRuntimeModule>;
 
 export function resolveSessionWorkbenchRuntimeId(input: {
   runtimeAgentRuntimeId: string | null | undefined;
@@ -87,8 +148,15 @@ export function resolveSessionWorkbenchRuntimeId(input: {
   return input.runtimeAgentRuntimeId;
 }
 
-export function getSessionRuntimeWorkbenchCapabilities(input: {
+export function getSessionWorkbenchRuntimeModule(input: {
   runtimeId: AgentRuntimeId;
-}): SessionRuntimeWorkbenchCapability {
-  return SessionRuntimeWorkbenchCapabilitiesByRuntimeId[input.runtimeId];
+}): SessionWorkbenchRuntimeModule {
+  return SessionWorkbenchRuntimeModulesByRuntimeId[input.runtimeId];
+}
+
+export function selectSessionWorkbenchRuntimeValue<TValue>(input: {
+  runtimeId: AgentRuntimeId;
+  valuesByRuntimeId: Record<AgentRuntimeId, TValue>;
+}): TValue {
+  return input.valuesByRuntimeId[input.runtimeId];
 }

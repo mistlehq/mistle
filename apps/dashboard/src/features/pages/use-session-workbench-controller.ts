@@ -12,7 +12,7 @@ import { useCodexSessionState } from "../session-agents/codex/session-state/inde
 import type { DashboardControlActionSupport } from "../session-agents/dashboard-control-actions.js";
 import { useOpenCodeSessionState } from "../session-agents/opencode/session-state/index.js";
 import { usePiSessionState } from "../session-agents/pi/session-state/index.js";
-import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-workbench-runtime-registry.js";
+import { SessionWorkbenchRuntimeModules } from "../session-agents/session-workbench-runtime-registry.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import type { SessionStartupState } from "./session-startup-status.js";
@@ -87,7 +87,7 @@ type SessionWorkbenchState = {
   portAccessState: SessionWorkbenchChromeState["portAccessState"];
 };
 
-const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
+const CodexWorkbenchRuntimeModule = SessionWorkbenchRuntimeModules.CODEX;
 
 type UseSessionWorkbenchControllerResult = {
   workbench: SessionWorkbenchState;
@@ -131,7 +131,7 @@ export function useSessionWorkbenchController(input: {
   const sessionClientRef = useRef<AgentStreamClient | null>(null);
   const rpcClientRef = useRef<CodexJsonRpcClient | null>(null);
   const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
-  const activeHandoffRuntimeIdRef = useRef<AgentRuntimeId>(CodexWorkbenchCapabilities.runtimeId);
+  const activeHandoffRuntimeIdRef = useRef<AgentRuntimeId>(CodexWorkbenchRuntimeModule.runtimeId);
   const selectedRepositoryPathRef = useRef<string | null>(null);
   const sessionState = useCodexSessionState({
     ensureTransportConnected: transportManager.ensureTransportConnected,

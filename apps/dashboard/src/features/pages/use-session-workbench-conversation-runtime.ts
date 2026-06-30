@@ -32,6 +32,10 @@ import {
   type SessionWorkbenchRuntimeAdapter,
 } from "../session-agents/session-workbench-conversation-runtimes.js";
 import {
+  getSessionWorkbenchRuntimeModule,
+  selectSessionWorkbenchRuntimeValue,
+} from "../session-agents/session-workbench-runtime-registry.js";
+import {
   buildCodexTurnStarter,
   buildClaudeCodeTurnStarter,
   buildClaudeCodeTurnSteerer,
@@ -383,12 +387,15 @@ export function useSessionWorkbenchConversationRuntime(input: {
   sessionState: UseCodexSessionStateResult;
 }): SessionWorkbenchConversationRuntimeState {
   const { sessionState, openCodeSessionState } = input;
+  const activeRuntimeModule = getSessionWorkbenchRuntimeModule({
+    runtimeId: input.activeRuntimeId,
+  });
   const chat = sessionState.chat;
   const serverRequests = sessionState.serverRequests;
   const sessionMessage = sessionState.sessionMessage;
   const { bootstrap: openCodeComposerBootstrap, configControl: openCodeConfigControl } =
     useOpenCodeWorkbenchComposerState({
-      enabled: input.activeRuntimeId === AgentRuntimeIdCatalog.OPENCODE,
+      enabled: activeRuntimeModule.conversationPolicy.enablesOpenCodeComposerState,
       sandboxInstanceId: input.sandboxInstanceId,
       selectedRepositoryPath: input.selectedRepositoryPath,
       sessionState: openCodeSessionState,
@@ -404,10 +411,10 @@ export function useSessionWorkbenchConversationRuntime(input: {
     useClaudeCodeWorkbenchComposerState({
       sessionState: input.claudeCodeSessionState,
     });
-  const activeRuntimeConversationId =
-    input.activeRuntimeId === AgentRuntimeIdCatalog.CODEX
-      ? (input.sessionSnapshot?.activeRuntimeConversationId ?? null)
-      : null;
+  const activeRuntimeConversationId = activeRuntimeModule.conversationPolicy
+    .usesCodexActiveRuntimeConversationId
+    ? (input.sessionSnapshot?.activeRuntimeConversationId ?? null)
+    : null;
   const contextUsage =
     sessionState.threadTokenUsageSnapshot?.threadId ===
     sessionState.lifecycle.sessionSnapshot?.activeThreadId
@@ -747,8 +754,14 @@ export function useSessionWorkbenchConversationRuntime(input: {
         piSessionState: input.piSessionState,
       }),
   };
-  const activeRuntime = runtimesByRuntimeId[input.activeRuntimeId];
-  const runtimeConversationNavigator = navigatorBuildersByRuntimeId[input.activeRuntimeId]();
+  const activeRuntime = selectSessionWorkbenchRuntimeValue({
+    runtimeId: input.activeRuntimeId,
+    valuesByRuntimeId: runtimesByRuntimeId,
+  });
+  const runtimeConversationNavigator = selectSessionWorkbenchRuntimeValue({
+    runtimeId: input.activeRuntimeId,
+    valuesByRuntimeId: navigatorBuildersByRuntimeId,
+  })();
   const attachmentTargetId = activeRuntime.conversation.attachmentTargetId;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:

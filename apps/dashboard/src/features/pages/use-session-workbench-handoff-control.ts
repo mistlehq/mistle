@@ -21,17 +21,18 @@ import {
 } from "../session-agents/session-workbench-handoff-runtimes.js";
 import {
   resolveSessionWorkbenchRuntimeId,
-  SessionRuntimeWorkbenchCapabilities,
+  selectSessionWorkbenchRuntimeValue,
+  SessionWorkbenchRuntimeModules,
 } from "../session-agents/session-workbench-runtime-registry.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
 import type { SessionLifecycleForWorkbench } from "./use-session-workbench-lifecycle-state.js";
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
 
-const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
-const ClaudeCodeWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE;
-const OpenCodeWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.OPENCODE;
-const PiWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.PI;
+const CodexWorkbenchRuntimeModule = SessionWorkbenchRuntimeModules.CODEX;
+const ClaudeCodeWorkbenchRuntimeModule = SessionWorkbenchRuntimeModules.CLAUDE_CODE;
+const OpenCodeWorkbenchRuntimeModule = SessionWorkbenchRuntimeModules.OPENCODE;
+const PiWorkbenchRuntimeModule = SessionWorkbenchRuntimeModules.PI;
 
 type SessionWorkbenchHandoffControlState = {
   cliPtyState: ReturnType<typeof useSandboxPtyState>;
@@ -159,10 +160,10 @@ export function useSessionWorkbenchHandoffControl(input: {
   );
   const lifecyclesForWorkbenchByRuntimeId = useMemo(
     (): Record<AgentRuntimeId, SessionLifecycleForWorkbench> => ({
-      [ClaudeCodeWorkbenchCapabilities.runtimeId]: claudeCodeLifecycleForWorkbench,
-      [CodexWorkbenchCapabilities.runtimeId]: codexLifecycleForWorkbench,
-      [OpenCodeWorkbenchCapabilities.runtimeId]: openCodeLifecycleForWorkbench,
-      [PiWorkbenchCapabilities.runtimeId]: piLifecycleForWorkbench,
+      [ClaudeCodeWorkbenchRuntimeModule.runtimeId]: claudeCodeLifecycleForWorkbench,
+      [CodexWorkbenchRuntimeModule.runtimeId]: codexLifecycleForWorkbench,
+      [OpenCodeWorkbenchRuntimeModule.runtimeId]: openCodeLifecycleForWorkbench,
+      [PiWorkbenchRuntimeModule.runtimeId]: piLifecycleForWorkbench,
     }),
     [
       claudeCodeLifecycleForWorkbench,
@@ -173,11 +174,12 @@ export function useSessionWorkbenchHandoffControl(input: {
   );
   const resolveLifecycleForWorkbench = useCallback(
     (agentRuntimeId: string | null) =>
-      lifecyclesForWorkbenchByRuntimeId[
-        resolveSessionWorkbenchRuntimeId({
+      selectSessionWorkbenchRuntimeValue({
+        runtimeId: resolveSessionWorkbenchRuntimeId({
           runtimeAgentRuntimeId: agentRuntimeId,
-        })
-      ],
+        }),
+        valuesByRuntimeId: lifecyclesForWorkbenchByRuntimeId,
+      }),
     [lifecyclesForWorkbenchByRuntimeId],
   );
   const cliPtyState = useSandboxPtyState({
@@ -243,10 +245,10 @@ export function useSessionWorkbenchHandoffControl(input: {
   );
   const handoffRuntimes = useMemo(
     () => ({
-      [ClaudeCodeWorkbenchCapabilities.runtimeId]: claudeCodeHandoffRuntime,
-      [CodexWorkbenchCapabilities.runtimeId]: codexHandoffRuntime,
-      [OpenCodeWorkbenchCapabilities.runtimeId]: openCodeHandoffRuntime,
-      [PiWorkbenchCapabilities.runtimeId]: piHandoffRuntime,
+      [ClaudeCodeWorkbenchRuntimeModule.runtimeId]: claudeCodeHandoffRuntime,
+      [CodexWorkbenchRuntimeModule.runtimeId]: codexHandoffRuntime,
+      [OpenCodeWorkbenchRuntimeModule.runtimeId]: openCodeHandoffRuntime,
+      [PiWorkbenchRuntimeModule.runtimeId]: piHandoffRuntime,
     }),
     [claudeCodeHandoffRuntime, codexHandoffRuntime, openCodeHandoffRuntime, piHandoffRuntime],
   );
