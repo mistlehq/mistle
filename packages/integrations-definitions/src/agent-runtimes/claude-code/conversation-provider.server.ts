@@ -1,4 +1,5 @@
 import type {
+  AgentConversationCollaborationModeSettings,
   AgentConversationConnection,
   AgentConversationInspectResult,
   AgentConversationProvider,
@@ -81,6 +82,24 @@ function extractGeneratedTitle(result: unknown): string {
   return title;
 }
 
+export function buildClaudeCodeCreateSessionParams(input: {
+  cwd?: string | undefined;
+  options?: Readonly<Record<string, unknown>> | undefined;
+}): Record<string, unknown> {
+  return input.cwd === undefined ? {} : { cwd: input.cwd };
+}
+
+export function buildClaudeCodeStartQueryParams(input: {
+  collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
+  inputText: string;
+  providerConversationId: string;
+}): Record<string, unknown> {
+  return {
+    sessionId: input.providerConversationId,
+    inputText: input.inputText,
+  };
+}
+
 async function connectClaudeCodeConversationProvider(input: {
   connectionUrl: string;
   connectTimeoutMs?: number;
@@ -129,10 +148,10 @@ export function createClaudeCodeConversationProvider(): AgentConversationProvide
       const claudeCodeClient = getClaudeCodeClient(input.connection);
       const result = await claudeCodeClient.call(
         "session/create",
-        {
-          ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
-          ...(input.options === undefined ? {} : { options: input.options }),
-        },
+        buildClaudeCodeCreateSessionParams({
+          cwd: input.cwd,
+          options: input.options,
+        }),
         {
           idempotency: input.idempotency,
         },
@@ -179,13 +198,11 @@ export function createClaudeCodeConversationProvider(): AgentConversationProvide
       const claudeCodeClient = getClaudeCodeClient(input.connection);
       const result = await claudeCodeClient.call(
         "query/start",
-        {
-          sessionId: input.providerConversationId,
+        buildClaudeCodeStartQueryParams({
+          collaborationModeSettings: input.collaborationModeSettings,
+          providerConversationId: input.providerConversationId,
           inputText: input.inputText,
-          ...(input.collaborationModeSettings === undefined
-            ? {}
-            : { collaborationModeSettings: input.collaborationModeSettings }),
-        },
+        }),
         {
           idempotency: input.idempotency,
         },
@@ -215,10 +232,10 @@ export function createClaudeCodeConversationProvider(): AgentConversationProvide
       const claudeCodeClient = getClaudeCodeClient(input.connection);
       const result = await claudeCodeClient.call(
         "query/start",
-        {
-          sessionId: input.providerConversationId,
+        buildClaudeCodeStartQueryParams({
+          providerConversationId: input.providerConversationId,
           inputText: input.inputText,
-        },
+        }),
         {
           idempotency: input.idempotency,
         },
