@@ -950,6 +950,13 @@ function startQuery(conversation, inputText) {
   return queryId;
 }
 
+function resolveConversationStatus(conversation) {
+  if (conversation.activeQueryId !== null) {
+    return "active";
+  }
+  return conversation.lastError === undefined ? "idle" : "error";
+}
+
 async function handleRequest(request) {
   switch (request.method) {
     case "initialize":
@@ -1055,7 +1062,7 @@ async function handleRequest(request) {
           id: conversation.providerConversationId,
           cwd: conversation.cwd,
           status: {
-            type: conversation.activeQueryId === null ? "idle" : "active",
+            type: resolveConversationStatus(conversation),
           },
           activeQueryId: conversation.activeQueryId,
           queries,

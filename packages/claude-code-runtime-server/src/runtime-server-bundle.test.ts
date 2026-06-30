@@ -140,6 +140,17 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain("conversation.queries = queries;");
   });
 
+  it("reports failed idle Claude Code sessions as error sessions", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain("function resolveConversationStatus");
+    expect(ClaudeCodeRuntimeServerBundle).toContain('return "active";');
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      'return conversation.lastError === undefined ? "idle" : "error";',
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "type: resolveConversationStatus(conversation)",
+    );
+  });
+
   it("exposes Claude Code sessions and queries instead of Codex thread and turn RPCs", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain('case "session/create"');
     expect(ClaudeCodeRuntimeServerBundle).toContain('case "session/list"');
