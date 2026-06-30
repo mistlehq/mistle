@@ -15,15 +15,13 @@ Leave the PR acceptable for merge: checks are complete, no actionable reviewer f
 
 Work from live GitHub state for the current head SHA, including checks, review decisions, reviews, comments, and review threads.
 
-Wait for checks. If a check fails, inspect the logs, fix the real issue, validate locally, commit, and push. Do not bypass hooks or hide CI failures.
+Wait for checks. If a check fails, inspect the logs, fix the real issue, commit, and push.
 
 Handle reviewer findings by judgment:
 
-- Accept real, in-scope findings and push the smallest validated fix.
+- Accept real, in-scope findings and push the smallest fix.
 - Reject incorrect, speculative, behavior-changing, or out-of-scope findings with concise code-backed evidence.
 - Ask a concrete clarification question when a finding is too ambiguous to fix safely.
-
-Before pushing fixes, run focused validation and `pnpm validate:changed --base origin/main --head HEAD`.
 
 Do not post `pr-review` after pushing; pushes trigger reviewer agents. Post `pr-review` only when no push occurred and the reviewer needs to respond, such as after CI passes with no current-head review response or after you reject/clarify a finding.
 
@@ -31,4 +29,4 @@ Continue until CI is green, skipped, or neutral as expected; review threads have
 
 ## Report
 
-Report the PR URL, current head SHA, CI result, reviewer result, accepted fixes pushed, rejected findings with reasons, validation run, and any human-only blocker.
+Report the PR URL, current head SHA, CI result, reviewer result, accepted fixes pushed, rejected findings with reasons, and any human-only blocker.
