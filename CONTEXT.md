@@ -160,6 +160,10 @@ _Avoid_: Steer message, turn interruption, cancellation
 An inline answer field scoped to one question in a **User input request**. A **User input request custom answer** is submitted as a structured answer for that question rather than as a **User input request custom response**.
 _Avoid_: Free-form response, composer custom response, turn interruption
 
+**App setup completion signal**:
+A user's indication that they have completed a user-owned **App setup step** in the dashboard. An **App setup completion signal** unblocks **Mistle Designer** to verify product state, but it is not proof that the resulting **Integration connection** is usable.
+_Avoid_: Connected app, verified setup, setup completed
+
 **Dashboard control action**:
 A runtime-requested action handled by the dashboard client to control dashboard-owned workspace state or execute an explicitly supported dashboard-mediated product action.
 _Avoid_: MCP tool when the action is handled by the browser; browser-only action when the action intentionally mutates product state
@@ -849,6 +853,8 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Future **Mistle Designer session** access to newly selected **Integration connections** may change without changing the **Runtime plan**.
 - **Mistle Designer session** setup changes do not automatically change the target **Sandbox profile version configuration**.
 - **Mistle Designer** may route a user to an existing integration setup flow rather than creating an **Integration connection** directly.
+- An **App setup completion signal** should be collected through a **User input request** when **Mistle Designer** is waiting on an **App setup step**.
+- An **App setup completion signal** must be followed by live product-state verification before **Mistle Designer** selects provider resources or updates **Sandbox profile version configuration**.
 - Future **Mistle Designer** work should treat **Integration connection** setup as complete when the relevant control-plane resource state exists.
 - A **Designer blueprint** may show the intended workflow that future triggers and sandbox profile behavior will implement, but it does not itself save **Sandbox profile version configuration**.
 - First-pass **Mistle Designer sessions** have at most one current **Designer blueprint**.
