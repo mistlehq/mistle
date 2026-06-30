@@ -703,7 +703,7 @@ export const DesignerUserInputRequestDynamicToolSpec = {
   namespace: DashboardControlDynamicToolNamespace,
   name: DesignerUserInputRequestDynamicToolName,
   description:
-    "Ask the user exactly one setup question in the dashboard. Use this for Designer decisions that need a selectable choice, short free-form response, or integration connection resource selection.",
+    "Ask the user for exactly one actionable decision in the dashboard and wait for the response. Use this when Designer needs the user to choose a next action, confirm setup completion, answer a configuration question, provide an inline custom answer, or select integration resources.",
   inputSchema: {
     type: "object",
     additionalProperties: false,
