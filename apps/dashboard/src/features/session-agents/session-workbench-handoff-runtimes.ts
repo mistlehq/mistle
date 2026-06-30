@@ -17,7 +17,7 @@ import {
   type UseOpenCodeSessionStateResult,
 } from "./opencode/session-state/index.js";
 import { buildPiCliPtyOpenInput, type UsePiSessionStateResult } from "./pi/session-state/index.js";
-import { SessionRuntimeWorkbenchCapabilities } from "./session-runtime-workbench-capabilities.js";
+import { SessionWorkbenchRuntimeModules } from "./session-workbench-runtime-registry.js";
 
 type RuntimeConversationConnectInput =
   | InitialSessionConnectInput
@@ -315,25 +315,6 @@ export function buildPiLifecycleForWorkbench(
   };
 }
 
-export function resolveSessionLifecycleForWorkbench(input: {
-  agentRuntimeId: string | null;
-  claudeCodeLifecycle: SessionLifecycleForWorkbench;
-  codexLifecycle: SessionLifecycleForWorkbench;
-  openCodeLifecycle: SessionLifecycleForWorkbench;
-  piLifecycle: SessionLifecycleForWorkbench;
-}): SessionLifecycleForWorkbench {
-  if (input.agentRuntimeId === SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE.runtimeId) {
-    return input.claudeCodeLifecycle;
-  }
-  if (input.agentRuntimeId === SessionRuntimeWorkbenchCapabilities.OPENCODE.runtimeId) {
-    return input.openCodeLifecycle;
-  }
-  if (input.agentRuntimeId === SessionRuntimeWorkbenchCapabilities.PI.runtimeId) {
-    return input.piLifecycle;
-  }
-  return input.codexLifecycle;
-}
-
 export function buildCodexHandoffRuntime(input: {
   chat: UseCodexSessionStateResult["chat"];
   lifecycle: SessionMainPanelHandoffLifecycle;
@@ -343,11 +324,11 @@ export function buildCodexHandoffRuntime(input: {
   return {
     buildCliPtyOpenInput: buildCodexCliPtyOpenInput,
     clearActiveThreadIdAfterCliLaunch: input.threadAuthority.clearActiveThreadIdAfterCliLaunch,
-    displayName: SessionRuntimeWorkbenchCapabilities.CODEX.displayName,
+    displayName: SessionWorkbenchRuntimeModules.CODEX.capabilities.displayName,
     hydrateChatFromConversation: input.chat.hydrateChatFromThread,
     lifecycle: input.lifecycle,
     preserveCliLaunchForRestore:
-      SessionRuntimeWorkbenchCapabilities.CODEX.preservesCliLaunchContext,
+      SessionWorkbenchRuntimeModules.CODEX.capabilities.preservesCliLaunchContext,
     resetServerRequests: input.serverRequests.resetServerRequests,
     restoreConversationId: input.threadAuthority.providerThreadId,
     restoreProviderConversationId: input.threadAuthority.providerThreadId,
@@ -363,11 +344,11 @@ export function buildOpenCodeHandoffRuntime(input: {
   return {
     buildCliPtyOpenInput: buildOpenCodeCliPtyOpenInput,
     clearActiveThreadIdAfterCliLaunch: () => {},
-    displayName: SessionRuntimeWorkbenchCapabilities.OPENCODE.displayName,
+    displayName: SessionWorkbenchRuntimeModules.OPENCODE.capabilities.displayName,
     hydrateChatFromConversation: input.chat.hydrateChatFromSessionOrThrow,
     lifecycle: input.lifecycle,
     preserveCliLaunchForRestore:
-      SessionRuntimeWorkbenchCapabilities.OPENCODE.preservesCliLaunchContext,
+      SessionWorkbenchRuntimeModules.OPENCODE.capabilities.preservesCliLaunchContext,
     resetServerRequests: () => {},
     restoreConversationId: input.sessionSnapshot?.activeSessionId ?? null,
     restoreProviderConversationId: input.sessionSnapshot?.providerSessionId ?? null,
@@ -397,11 +378,11 @@ export function buildClaudeCodeHandoffRuntime(input: {
   return {
     buildCliPtyOpenInput: buildClaudeCodeCliPtyOpenInput,
     clearActiveThreadIdAfterCliLaunch: () => {},
-    displayName: SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE.displayName,
+    displayName: SessionWorkbenchRuntimeModules.CLAUDE_CODE.capabilities.displayName,
     hydrateChatFromConversation: input.chat.hydrateChatFromSessionOrThrow,
     lifecycle: input.lifecycle,
     preserveCliLaunchForRestore:
-      SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE.preservesCliLaunchContext,
+      SessionWorkbenchRuntimeModules.CLAUDE_CODE.capabilities.preservesCliLaunchContext,
     resetServerRequests: () => {},
     restoreConversationId: input.sessionSnapshot?.activeSessionId ?? null,
     restoreProviderConversationId: input.sessionSnapshot?.providerSessionId ?? null,
@@ -432,10 +413,11 @@ export function buildPiHandoffRuntime(input: {
   return {
     buildCliPtyOpenInput: buildPiCliPtyOpenInput,
     clearActiveThreadIdAfterCliLaunch: () => {},
-    displayName: SessionRuntimeWorkbenchCapabilities.PI.displayName,
+    displayName: SessionWorkbenchRuntimeModules.PI.capabilities.displayName,
     hydrateChatFromConversation: input.chat.confirmChatRestoredAfterReconnect,
     lifecycle: input.lifecycle,
-    preserveCliLaunchForRestore: SessionRuntimeWorkbenchCapabilities.PI.preservesCliLaunchContext,
+    preserveCliLaunchForRestore:
+      SessionWorkbenchRuntimeModules.PI.capabilities.preservesCliLaunchContext,
     resetServerRequests: () => {},
     restoreConversationId: input.sessionSnapshot?.activeConversationId ?? null,
     restoreProviderConversationId: input.sessionSnapshot?.providerConversationId ?? null,

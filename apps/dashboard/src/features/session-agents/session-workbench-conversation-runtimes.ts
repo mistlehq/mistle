@@ -32,7 +32,7 @@ import {
   type UsePiSessionStateResult,
 } from "./pi/session-state/index.js";
 import type { RespondToServerRequest, ServerRequestEntry } from "./server-requests/index.js";
-import { SessionRuntimeWorkbenchCapabilities } from "./session-runtime-workbench-capabilities.js";
+import { SessionWorkbenchRuntimeModules } from "./session-workbench-runtime-registry.js";
 
 type SessionConversationChatState = Pick<
   ChatState,
@@ -127,7 +127,7 @@ export function buildCodexConversationRuntime(input: {
   plans: UseCodexSessionStateResult["plans"];
   reviews: UseCodexSessionStateResult["reviews"];
 }): SessionWorkbenchRuntimeAdapter {
-  const capabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
+  const capabilities = SessionWorkbenchRuntimeModules.CODEX.capabilities;
 
   return {
     displayName: capabilities.displayName,
@@ -289,7 +289,7 @@ export function buildOpenCodeConversationRuntime(input: {
   startTurn: SessionTurnControl["startTurn"];
   steerTurn: SessionTurnControl["steerTurn"];
 }): SessionWorkbenchRuntimeAdapter {
-  const capabilities = SessionRuntimeWorkbenchCapabilities.OPENCODE;
+  const capabilities = SessionWorkbenchRuntimeModules.OPENCODE.capabilities;
   const isTurnRunning = input.chat.chatState.status === "busy";
   const respondToServerRequest = (requestId: string | number, result: unknown): void => {
     let response: ReturnType<typeof resolveOpenCodePermissionResponse>;
@@ -384,7 +384,7 @@ export function buildClaudeCodeConversationRuntime(input: {
   startTurn: SessionTurnControl["startTurn"];
   steerTurn: SessionTurnControl["steerTurn"];
 }): SessionWorkbenchRuntimeAdapter {
-  const capabilities = SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE;
+  const capabilities = SessionWorkbenchRuntimeModules.CLAUDE_CODE.capabilities;
   const isTurnRunning = input.chat.chatState.status === "busy";
   const activeSessionId = input.sessionSnapshot?.activeSessionId ?? null;
   const pendingPermissionRequests =
@@ -494,7 +494,7 @@ export function buildPiConversationRuntime(input: {
   startTurn: SessionTurnControl["startTurn"];
   steerTurn: SessionTurnControl["steerTurn"];
 }): SessionWorkbenchRuntimeAdapter {
-  const capabilities = SessionRuntimeWorkbenchCapabilities.PI;
+  const capabilities = SessionWorkbenchRuntimeModules.PI.capabilities;
   const isTurnRunning = input.chat.chatState.status === "busy";
   const respondToServerRequest = (requestId: string | number, result: unknown): void => {
     const request = input.chat.pendingExtensionUIRequests.find(

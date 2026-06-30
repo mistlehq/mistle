@@ -1,7 +1,10 @@
 import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import { useCallback, type RefObject } from "react";
 
-import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-runtime-workbench-capabilities.js";
+import {
+  getSessionWorkbenchRuntimeModule,
+  resolveSessionWorkbenchRuntimeId,
+} from "../session-agents/session-workbench-runtime-registry.js";
 import {
   resolveInitialSelectedRepositoryPath,
   resolveSessionTerminalCwd,
@@ -12,15 +15,8 @@ import {
 } from "./use-session-primary-repository-state.js";
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
 
-const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
-const ClaudeCodeWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE;
-const OpenCodeWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.OPENCODE;
-const PiWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.PI;
-
 type SessionWorkbenchRepositoryControlState = {
-  isClaudeCodeRuntime: boolean;
-  isOpenCodeRuntime: boolean;
-  isPiRuntime: boolean;
+  activeRuntimeId: AgentRuntimeId;
   primaryRepositoryControlState: {
     disabledReason: string | null;
     switchPrimaryRepository: (nextSelectedRepositoryPath: string | null) => Promise<void>;
@@ -42,21 +38,17 @@ export function useSessionWorkbenchRepositoryControl(input: {
   sandboxInstanceId: string | null;
   selectedRepositoryPathRef: RefObject<string | null>;
 }): SessionWorkbenchRepositoryControlState {
-  const isClaudeCodeRuntime =
-    input.runtimeAgentRuntimeId === ClaudeCodeWorkbenchCapabilities.runtimeId;
-  const isOpenCodeRuntime = input.runtimeAgentRuntimeId === OpenCodeWorkbenchCapabilities.runtimeId;
-  const isPiRuntime = input.runtimeAgentRuntimeId === PiWorkbenchCapabilities.runtimeId;
-  const activeRuntimeCapabilities = isClaudeCodeRuntime
-    ? ClaudeCodeWorkbenchCapabilities
-    : isOpenCodeRuntime
-      ? OpenCodeWorkbenchCapabilities
-      : isPiRuntime
-        ? PiWorkbenchCapabilities
-        : CodexWorkbenchCapabilities;
-  input.activeHandoffRuntimeIdRef.current = activeRuntimeCapabilities.runtimeId;
+  const activeRuntimeId = resolveSessionWorkbenchRuntimeId({
+    runtimeAgentRuntimeId: input.runtimeAgentRuntimeId,
+  });
+  const activeRuntimeModule = getSessionWorkbenchRuntimeModule({
+    runtimeId: activeRuntimeId,
+  });
+  input.activeHandoffRuntimeIdRef.current = activeRuntimeModule.runtimeId;
 
-  const activeThreadCwd =
-    isClaudeCodeRuntime || isOpenCodeRuntime || isPiRuntime ? null : input.codexActiveThreadCwd;
+  const activeThreadCwd = activeRuntimeModule.repositoryPolicy.usesCodexActiveThreadCwd
+    ? input.codexActiveThreadCwd
+    : null;
   const initialSelectedRepositoryPath = resolveInitialSelectedRepositoryPath({
     activeThreadCwd: activeThreadCwd ?? undefined,
     runtimePrimaryRepositoryRoot: input.runtimePrimaryRepositoryRoot,
@@ -65,7 +57,7 @@ export function useSessionWorkbenchRepositoryControl(input: {
     enabled: input.canConnect,
     ensureTransportConnected: input.ensureTransportConnected,
     initialSelectedRepositoryPath,
-    runtimeDisplayName: activeRuntimeCapabilities.displayName,
+    runtimeDisplayName: activeRuntimeModule.capabilities.displayName,
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const selectedRepositoryPath = primaryRepositoryState.selectedRepositoryPath;
@@ -81,30 +73,24 @@ export function useSessionWorkbenchRepositoryControl(input: {
         return;
       }
 
-      if (!isClaudeCodeRuntime && !isOpenCodeRuntime && !isPiRuntime) {
+      if (activeRuntimeModule.repositoryPolicy.usesCodexActiveThreadCwd) {
         await input.ensureCanSwitchPrimaryRepository();
       }
       primaryRepositoryState.setSelectedRepositoryPath(nextSelectedRepositoryPath);
     },
     [
+      activeRuntimeModule.repositoryPolicy.usesCodexActiveThreadCwd,
       input.ensureCanSwitchPrimaryRepository,
-      isClaudeCodeRuntime,
-      isOpenCodeRuntime,
-      isPiRuntime,
       primaryRepositoryState.setSelectedRepositoryPath,
       selectedRepositoryPath,
     ],
   );
 
   return {
-    isClaudeCodeRuntime,
-    isOpenCodeRuntime,
-    isPiRuntime,
+    activeRuntimeId,
     primaryRepositoryControlState: {
       disabledReason:
-        !isClaudeCodeRuntime &&
-        !isOpenCodeRuntime &&
-        !isPiRuntime &&
+        activeRuntimeModule.repositoryPolicy.blocksPrimaryRepositorySwitchWhileCliActive &&
         isPrimaryRepositorySwitchBlockedByCli
           ? "Exit Codex TUI before switching the primary repository."
           : null,

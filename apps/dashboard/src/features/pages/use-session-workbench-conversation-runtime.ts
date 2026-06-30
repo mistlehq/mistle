@@ -1,3 +1,4 @@
+import type { AgentRuntimeId } from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import type { QueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
@@ -27,6 +28,10 @@ import {
   buildPiConversationRuntime,
   type SessionWorkbenchRuntimeAdapter,
 } from "../session-agents/session-workbench-conversation-runtimes.js";
+import {
+  getSessionWorkbenchRuntimeModule,
+  SessionWorkbenchRuntimeModules,
+} from "../session-agents/session-workbench-runtime-registry.js";
 import {
   buildCodexTurnStarter,
   buildClaudeCodeTurnStarter,
@@ -365,11 +370,9 @@ function buildPiRuntimeConversationNavigatorState(input: {
 }
 
 export function useSessionWorkbenchConversationRuntime(input: {
+  activeRuntimeId: AgentRuntimeId;
   claudeCodeSessionState: UseClaudeCodeSessionStateResult;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
-  isClaudeCodeRuntime: boolean;
-  isOpenCodeRuntime: boolean;
-  isPiRuntime: boolean;
   openCodeSessionState: UseOpenCodeSessionStateResult;
   piSessionState: UsePiSessionStateResult;
   queryClient: QueryClient;
@@ -381,12 +384,15 @@ export function useSessionWorkbenchConversationRuntime(input: {
   sessionState: UseCodexSessionStateResult;
 }): SessionWorkbenchConversationRuntimeState {
   const { sessionState, openCodeSessionState } = input;
+  const activeRuntimeModule = getSessionWorkbenchRuntimeModule({
+    runtimeId: input.activeRuntimeId,
+  });
   const chat = sessionState.chat;
   const serverRequests = sessionState.serverRequests;
   const sessionMessage = sessionState.sessionMessage;
   const { bootstrap: openCodeComposerBootstrap, configControl: openCodeConfigControl } =
     useOpenCodeWorkbenchComposerState({
-      enabled: input.isOpenCodeRuntime,
+      enabled: activeRuntimeModule.conversationPolicy.enablesOpenCodeComposerState,
       sandboxInstanceId: input.sandboxInstanceId,
       selectedRepositoryPath: input.selectedRepositoryPath,
       sessionState: openCodeSessionState,
@@ -402,10 +408,10 @@ export function useSessionWorkbenchConversationRuntime(input: {
     useClaudeCodeWorkbenchComposerState({
       sessionState: input.claudeCodeSessionState,
     });
-  const activeRuntimeConversationId =
-    input.isClaudeCodeRuntime || input.isOpenCodeRuntime || input.isPiRuntime
-      ? null
-      : (input.sessionSnapshot?.activeRuntimeConversationId ?? null);
+  const activeRuntimeConversationId = activeRuntimeModule.conversationPolicy
+    .usesCodexActiveRuntimeConversationId
+    ? (input.sessionSnapshot?.activeRuntimeConversationId ?? null)
+    : null;
   const contextUsage =
     sessionState.threadTokenUsageSnapshot?.threadId ===
     sessionState.lifecycle.sessionSnapshot?.activeThreadId
@@ -718,28 +724,35 @@ export function useSessionWorkbenchConversationRuntime(input: {
       steerPiTurn,
     ],
   );
-  const activeRuntime = input.isClaudeCodeRuntime
-    ? claudeCodeRuntime
-    : input.isPiRuntime
-      ? piRuntime
-      : input.isOpenCodeRuntime
-        ? openCodeRuntime
-        : codexRuntime;
-  const runtimeConversationNavigator = input.isClaudeCodeRuntime
-    ? buildClaudeCodeRuntimeConversationNavigatorState({
+  const runtimesByRuntimeId: Record<AgentRuntimeId, SessionWorkbenchRuntimeAdapter> = {
+    [SessionWorkbenchRuntimeModules.CLAUDE_CODE.runtimeId]: claudeCodeRuntime,
+    [SessionWorkbenchRuntimeModules.CODEX.runtimeId]: codexRuntime,
+    [SessionWorkbenchRuntimeModules.OPENCODE.runtimeId]: openCodeRuntime,
+    [SessionWorkbenchRuntimeModules.PI.runtimeId]: piRuntime,
+  };
+  const navigatorBuildersByRuntimeId: Record<
+    AgentRuntimeId,
+    () => RuntimeConversationNavigatorState
+  > = {
+    [SessionWorkbenchRuntimeModules.CLAUDE_CODE.runtimeId]: () =>
+      buildClaudeCodeRuntimeConversationNavigatorState({
         claudeCodeSessionState: input.claudeCodeSessionState,
-      })
-    : input.isPiRuntime
-      ? buildPiRuntimeConversationNavigatorState({
-          piSessionState: input.piSessionState,
-        })
-      : input.isOpenCodeRuntime
-        ? buildOpenCodeRuntimeConversationNavigatorState({
-            openCodeSessionState,
-          })
-        : buildCodexRuntimeConversationNavigatorState({
-            sessionState,
-          });
+      }),
+    [SessionWorkbenchRuntimeModules.CODEX.runtimeId]: () =>
+      buildCodexRuntimeConversationNavigatorState({
+        sessionState,
+      }),
+    [SessionWorkbenchRuntimeModules.OPENCODE.runtimeId]: () =>
+      buildOpenCodeRuntimeConversationNavigatorState({
+        openCodeSessionState,
+      }),
+    [SessionWorkbenchRuntimeModules.PI.runtimeId]: () =>
+      buildPiRuntimeConversationNavigatorState({
+        piSessionState: input.piSessionState,
+      }),
+  };
+  const activeRuntime = runtimesByRuntimeId[input.activeRuntimeId];
+  const runtimeConversationNavigator = navigatorBuildersByRuntimeId[input.activeRuntimeId]();
   const attachmentTargetId = activeRuntime.conversation.attachmentTargetId;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:
