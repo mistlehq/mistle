@@ -373,6 +373,15 @@ describe("browser definitions", () => {
 
   it("keeps sentry browser definitions free of server-only OAuth handlers", () => {
     expect(SentryBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(SentryBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(SentryBrowserDefinition.webhookSource).toBeUndefined();
+    expect(SentryBrowserDefinition.supportedWebhookEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: "sentry.issue.created",
+        }),
+      ]),
+    );
   });
 
   it("keeps notion browser definitions free of server-only OAuth handlers", () => {

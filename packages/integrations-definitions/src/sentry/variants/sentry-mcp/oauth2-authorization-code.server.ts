@@ -12,7 +12,7 @@ import {
 import { z } from "zod";
 
 import {
-  SentryConnectionConfigSchema,
+  SentryMcpOAuthConnectionConfigSchema,
   SentryMcpIssuerUrl,
   SentryMcpOAuthScopes,
   SentryMcpUrl,
@@ -331,7 +331,7 @@ export function createSentryRefreshTransportFailure(input: {
 export const SentryMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2AuthorizationCodeCapability<
   Record<string, unknown>,
   Record<string, string>,
-  z.output<typeof SentryConnectionConfigSchema>
+  z.output<typeof SentryMcpOAuthConnectionConfigSchema>
 > = {
   async startAuthorization(input) {
     const pkceChallenge = input.pkce?.challenge;
@@ -402,7 +402,7 @@ export const SentryMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Author
   },
 
   async refreshAccessToken(input) {
-    const connectionConfig = SentryConnectionConfigSchema.parse(input.connection.config);
+    const connectionConfig = SentryMcpOAuthConnectionConfigSchema.parse(input.connection.config);
 
     let tokenResponse: Response;
     try {

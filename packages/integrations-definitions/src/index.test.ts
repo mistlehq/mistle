@@ -982,9 +982,32 @@ describe("integrations-definitions index", () => {
             },
           },
         },
+        {
+          id: "sentry-internal-integration",
+          label: "Sentry Internal Integration",
+          kind: "form",
+          secretFields: [
+            {
+              name: "clientSecret",
+              label: "Client secret",
+              inputType: "password",
+              slotKey: "sentry.sentry-mcp.sentry-internal-integration.client-secret",
+            },
+          ],
+        },
       ],
     });
     expect(sentryDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(sentryDefinition?.webhookHandler).toBeUndefined();
+    expect(sentryDefinition?.webhookSource).toBeUndefined();
+    expect(sentryDefinition?.supportedWebhookEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: "sentry.issue.created",
+          providerEventType: "issue.created",
+        }),
+      ]),
+    );
     expect(signozDefinition).toMatchObject({
       familyId: "signoz",
       variantId: "signoz-mcp",

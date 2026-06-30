@@ -830,6 +830,7 @@ Description: Enable Sentry hosted MCP access for issues, traces, releases, and p
 Setup methods:
 
 - `oauth2-authorization-code` (redirect): Sentry MCP OAuth
+- `sentry-internal-integration` (form): Sentry Internal Integration
 
 Resource kinds:
 
@@ -837,7 +838,11 @@ Resource kinds:
 
 Trigger events:
 
-- None
+- `sentry.issue.created`: Issue created
+- `sentry.issue.resolved`: Issue resolved
+- `sentry.issue.assigned`: Issue assigned
+- `sentry.issue.archived`: Issue archived
+- `sentry.issue.unresolved`: Issue unresolved
 
 ## Shopify
 
