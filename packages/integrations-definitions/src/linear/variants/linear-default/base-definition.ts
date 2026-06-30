@@ -79,6 +79,11 @@ export const LinearBaseDefinition: LinearBaseIntegrationDefinition = {
       id: LinearConnectionMethodIds.OAUTH_APP,
       label: "Linear OAuth app",
       kind: "form",
+      sandboxProfileBinding: {
+        supported: false,
+        reason:
+          "Linear OAuth app connections configure identity linking and cannot be used in sandbox profile bindings.",
+      },
       secretFields: [
         {
           name: "clientSecret",

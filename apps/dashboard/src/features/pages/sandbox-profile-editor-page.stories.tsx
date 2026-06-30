@@ -190,7 +190,7 @@ pnpm install
 pnpm dev:bootstrap
 pnpm lint`,
     draftSaveErrorMessage:
-      "Saving draft failed. Fix the highlighted profile settings below and try again.",
+      "Saving draft failed. Review the profile setting messages below and try again.",
   },
 };
 
@@ -198,7 +198,7 @@ export const DraftSaveMissingAgentRuntimeConnection: Story = {
   args: {
     agentRuntimeConnectionErrorMessage: "Select an agent runtime connection.",
     draftSaveErrorMessage:
-      "Saving draft failed. Fix the highlighted profile settings below and try again.",
+      "Saving draft failed. Review the profile setting messages below and try again.",
     initialBindings: [],
   },
 };

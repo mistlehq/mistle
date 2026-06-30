@@ -4,6 +4,7 @@ import type {
   IntegrationConnectionMethodDetailFieldSource,
   IntegrationConnectionMethodDetailFieldSourceLeaf,
   IntegrationConnectionMethodDetailMetadata,
+  IntegrationConnectionMethodSandboxProfileBindingMetadata,
   IntegrationConnectionMethodDefinition,
   IntegrationFormConnectionMethodPostCreateMetadata,
   IntegrationFormConnectionMethodSetupCompletionRequirement,
@@ -153,6 +154,7 @@ export type ResolvedIntegrationTargetMetadata = {
         label: string;
         kind: "form";
         connectionDetail?: IntegrationConnectionMethodDetailMetadata;
+        sandboxProfileBinding?: IntegrationConnectionMethodSandboxProfileBindingMetadata;
         createBehavior?: "single-step" | "draft-then-setup";
         postCreate?: IntegrationFormConnectionMethodPostCreateMetadata;
         setupFlow?: {
@@ -185,6 +187,7 @@ export type ResolvedIntegrationTargetMetadata = {
         label: string;
         kind: "redirect";
         connectionDetail?: IntegrationConnectionMethodDetailMetadata;
+        sandboxProfileBinding?: IntegrationConnectionMethodSandboxProfileBindingMetadata;
         ui: {
           create: {
             submitLabel: string;
@@ -202,6 +205,7 @@ export type ResolvedIntegrationTargetMetadata = {
         label: string;
         kind: "device-authorization";
         connectionDetail?: IntegrationConnectionMethodDetailMetadata;
+        sandboxProfileBinding?: IntegrationConnectionMethodSandboxProfileBindingMetadata;
         ui: {
           create: {
             submitLabel: string;
@@ -255,6 +259,25 @@ type ResolvedSetupCompletionRequirement =
       kind: "all-of";
     };
 
+function cloneSandboxProfileBindingMetadata(
+  metadata: IntegrationConnectionMethodSandboxProfileBindingMetadata,
+): IntegrationConnectionMethodSandboxProfileBindingMetadata {
+  if (metadata.supported === false) {
+    return {
+      supported: false,
+      ...(metadata.reason === undefined ? {} : { reason: metadata.reason }),
+    };
+  }
+
+  if (metadata.supported === undefined) {
+    return {};
+  }
+
+  return {
+    supported: true,
+  };
+}
+
 function resolveConnectionMethod(
   method: IntegrationConnectionMethodDefinition,
 ): NonNullable<ResolvedIntegrationTargetMetadata["connectionMethods"]>[number] {
@@ -266,6 +289,11 @@ function resolveConnectionMethod(
       ...(method.connectionDetail === undefined
         ? {}
         : { connectionDetail: cloneConnectionMethodDetailMetadata(method.connectionDetail) }),
+      ...(method.sandboxProfileBinding === undefined
+        ? {}
+        : {
+            sandboxProfileBinding: cloneSandboxProfileBindingMetadata(method.sandboxProfileBinding),
+          }),
       ...(method.createBehavior === undefined ? {} : { createBehavior: method.createBehavior }),
       ...(method.postCreate === undefined
         ? {}
@@ -333,6 +361,11 @@ function resolveConnectionMethod(
       ...(method.connectionDetail === undefined
         ? {}
         : { connectionDetail: cloneConnectionMethodDetailMetadata(method.connectionDetail) }),
+      ...(method.sandboxProfileBinding === undefined
+        ? {}
+        : {
+            sandboxProfileBinding: cloneSandboxProfileBindingMetadata(method.sandboxProfileBinding),
+          }),
       ui: method.ui,
     };
   }
@@ -344,6 +377,11 @@ function resolveConnectionMethod(
     ...(method.connectionDetail === undefined
       ? {}
       : { connectionDetail: cloneConnectionMethodDetailMetadata(method.connectionDetail) }),
+    ...(method.sandboxProfileBinding === undefined
+      ? {}
+      : {
+          sandboxProfileBinding: cloneSandboxProfileBindingMetadata(method.sandboxProfileBinding),
+        }),
     ui: {
       create: method.ui.create,
       ...(method.ui.reauthorize === undefined

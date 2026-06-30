@@ -459,12 +459,13 @@ const SetupAssistantAgentRuntimeRequiredMessage =
   "Select and save an agent runtime connection before using Setup Assistant.";
 const SaveDraftAgentRuntimeConnectionRequiredMessage = "Select an agent runtime connection.";
 const DraftSaveWorkflowErrorMessage =
-  "Saving draft failed. Fix the highlighted profile settings below and try again.";
+  "Saving draft failed. Review the profile setting messages below and try again.";
 
 const IntegrationDraftSaveErrorCodes = new Set([
   "CONNECTION_MISMATCH",
   "CONNECTION_NOT_ACTIVE",
   "INVALID_BINDING_CONFIG",
+  "INVALID_BINDING_CONFIG_REFERENCE",
   "INVALID_BINDING_CONNECTION_REFERENCE",
   "INVALID_CONNECTION_TARGET_REFERENCE",
   "INVALID_TARGET_CONFIG",
@@ -4350,6 +4351,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
         }}
         integrationDirectoryQuery={input.integrationDirectoryQuery}
         integrationRows={integrationsState.integrationRows}
+        integrationRowErrorsByClientId={integrationsState.integrationRowErrorsByClientId}
         integrationSaveError={integrationsState.integrationSaveError}
         gitCommitSigningIntegrationConnectionId={input.gitCommitSigningIntegrationConnectionId}
         identityLinkedGitConnectionIds={identityLinkedGitConnectionIds}

@@ -1,6 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import {
   IntegrationConnectionMethodDetailMetadataSchema,
+  IntegrationConnectionMethodSandboxProfileBindingMetadataSchema,
   IntegrationFormConnectionMethodPostCreateMetadataSchema,
   IntegrationFormConnectionMethodSetupFlowMetadataSchema,
 } from "@mistle/integrations-core";
@@ -53,6 +54,8 @@ const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
       label: z.string().min(1),
       kind: z.literal("form"),
       connectionDetail: IntegrationConnectionMethodDetailMetadataSchema.optional(),
+      sandboxProfileBinding:
+        IntegrationConnectionMethodSandboxProfileBindingMetadataSchema.optional(),
       createBehavior: z.enum(["single-step", "draft-then-setup"]).optional(),
       postCreate: IntegrationFormConnectionMethodPostCreateMetadataSchema.optional(),
       setupFlow: IntegrationFormConnectionMethodSetupFlowMetadataSchema.optional(),
@@ -71,6 +74,8 @@ const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
       label: z.string().min(1),
       kind: z.literal("redirect"),
       connectionDetail: IntegrationConnectionMethodDetailMetadataSchema.optional(),
+      sandboxProfileBinding:
+        IntegrationConnectionMethodSandboxProfileBindingMetadataSchema.optional(),
       ui: z
         .object({
           create: IntegrationConnectionMethodCreateUiSchema,
@@ -85,6 +90,8 @@ const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
       label: z.string().min(1),
       kind: z.literal("device-authorization"),
       connectionDetail: IntegrationConnectionMethodDetailMetadataSchema.optional(),
+      sandboxProfileBinding:
+        IntegrationConnectionMethodSandboxProfileBindingMetadataSchema.optional(),
       ui: z
         .object({
           create: IntegrationDeviceAuthorizationConnectionMethodCreateUiSchema,
