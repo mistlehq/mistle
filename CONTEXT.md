@@ -796,6 +796,13 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Mistle Designer resource access** is distinct from **Mistle resource access** configured on a target **Sandbox profile version**.
 - **Mistle Designer resource access** defines technical access authority; approval behavior for mutating actions is a separate **Mistle Designer** interaction policy.
 - **Mistle Designer resource access** is scoped to a **Mistle Designer session** and organization rather than one target **Sandbox profile version**.
+- A **Mistle Designer session** may make ordinary reversible draft saves to draft **Sandbox profile versions** in the session's organization through supported typed product actions.
+- High-impact actions, such as publishing, discarding, starting a **Sandbox session**, provider-side mutations, or trigger enablement, still require separate action-specific approval.
+- A **Mistle Designer session** must not treat its designer sandbox instance's runtime profile as the target **Sandbox profile version** for authored product mutations.
+- A dashboard-mediated product mutation may carry a requested target draft **Sandbox profile version**, but that requested target is not the source of authority.
+- A dashboard-mediated product mutation must validate that its requested target draft **Sandbox profile version** belongs to the **Mistle Designer session**'s organization and is still a draft.
+- The dashboard client should preserve the typed product action shape for **Mistle Designer** draft saves, but the control-plane API owns target draft authorization and validation.
+- The control-plane API should explicitly validate draft editability for **Mistle Designer** draft saves before applying the requested product mutation.
 - A **Secret-bearing integration setup** is completed through a **User-action integration setup**, even when the same setup also includes non-secret fields.
 - Provider consent and provider installation setup steps are completed through **User-action integration setup**.
 - A **User-action integration setup descriptor** describes exactly one **User-action integration setup**.
@@ -838,7 +845,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Dashboard-mediated provider-resource selection discovery may include non-authoritative UI hints for the corresponding **User input request** while the server remains authoritative for save validation.
 - A dashboard-mediated **Dashboard control action** that changes saved configuration should return the user's submitted answer together with a server-issued receipt describing the product resource that changed.
 - A dashboard-mediated provider-resource selection receipt should identify the target draft **Sandbox profile version**, **Integration connection**, provider resource kind, binding intent, resolved **Integration binding**, selected handles, and whether the binding was created.
-- A **Designer canvas tab** should only accept a dashboard-internal route when the **Designer canvas** has a supported embedded rendering surface for that route.
+- A **Designer canvas tab** may accept a dashboard-internal route before that route has a fully supported embedded rendering surface; unsupported embedded routes should fail visibly in the **Designer canvas**.
 - A **Designer page** is the top-level dashboard entry point for **Mistle Designer sessions**.
 - The **Designer page** presents a composer for starting a new **Mistle Designer session** before the list of past **Mistle Designer sessions**.
 - Submitting the **Designer page** composer creates a **Mistle Designer session**, opens that session's designer workspace, and seeds the first Designer chat turn from the submitted prompt.
@@ -891,6 +898,8 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - User alignment on a **Designer blueprint** may authorize **Mistle Designer** to create or update the matching saved draft **Sandbox profile version** without a separate per-field confirmation.
 - **Mistle Designer** applies aligned **Sandbox profile version configuration** as one draft update, preserving unrelated saved draft configuration on existing drafts.
 - When **Mistle Designer** changes **Integration bindings** on a saved draft **Sandbox profile version**, the resulting saved configuration should include the complete intended binding set, including unrelated bindings that remain part of the draft.
+- When **Mistle Designer** changes an existing target draft's provider resource scope, it should verify the current scoped binding state before changing it.
+- A provider resource selection save replaces the targeted binding field with the selected resource set while preserving unrelated **Integration bindings**.
 - After **Designer blueprint** alignment, **Mistle Designer** may publish a saved draft **Sandbox profile version** when the aligned outcome requires a published version.
 - Publishing a **Sandbox profile version** through **Mistle Designer** does not imply starting a **Sandbox session**.
 - **Mistle Designer** may discard a saved draft **Sandbox profile version** when discarding that draft is the aligned outcome.

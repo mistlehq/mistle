@@ -3,6 +3,7 @@ import {
   type ControlPlaneTransaction,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  SandboxProfileVersionStates,
   type IntegrationBindingKind,
   type SandboxProfileVersionIntegrationBinding,
 } from "@mistle/db/control-plane";
@@ -94,6 +95,28 @@ export async function saveDesignerSelectedProviderResources(
     throw new DesignerBadRequestError(
       DesignerBadRequestCodes.DESIGNER_DASHBOARD_ACTION_INVALID_INPUT,
       "Target sandbox profile draft was not found.",
+    );
+  }
+  const targetVersion = await db.query.sandboxProfileVersions.findFirst({
+    columns: {
+      state: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.sandboxProfileId, input.body.targetDraft.profileId),
+        eq(table.version, input.body.targetDraft.version),
+      ),
+  });
+  if (targetVersion === undefined) {
+    throw new DesignerBadRequestError(
+      DesignerBadRequestCodes.DESIGNER_DASHBOARD_ACTION_INVALID_INPUT,
+      "Target sandbox profile draft was not found.",
+    );
+  }
+  if (targetVersion.state !== SandboxProfileVersionStates.DRAFT) {
+    throw new DesignerBadRequestError(
+      DesignerBadRequestCodes.DESIGNER_DASHBOARD_ACTION_INVALID_INPUT,
+      "Target sandbox profile version is not an editable draft.",
     );
   }
 
