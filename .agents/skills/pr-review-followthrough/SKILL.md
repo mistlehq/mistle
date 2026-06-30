@@ -5,38 +5,29 @@ description: Shepherd an existing ready GitHub PR through CI and reviewer feedba
 
 # Pr Review Followthrough
 
-Use this only after a PR exists and is ready for review. If the PR does not exist or is still draft, use `github-pr-authoring` first.
+Use this after a PR exists and is ready for review. If the PR does not exist or is still draft, use `github-pr-authoring` first.
 
-## Resolve State
+## Outcome
 
-1. Resolve the PR from the current branch or user-provided PR number/URL.
-2. Record the current head SHA, merge state, review decision, comments, reviews, and checks from live GitHub state.
-3. Use thread-aware review data for inline comments and resolution state. Do not rely on flat PR comments alone when review threads matter.
+Leave the PR acceptable for merge: checks are complete, no actionable reviewer findings remain, and any remaining blocker needs human approval or merge policy rather than code changes.
 
-## Main Loop
+## Follow Through
 
-Repeat until the stop conditions are met:
+Work from live GitHub state for the current head SHA, including checks, review decisions, reviews, comments, and review threads.
 
-1. Watch checks for the current head with `gh pr checks <number> --watch`.
-2. If a check fails, inspect logs, fix the real issue, validate locally, commit, push, then continue the loop. Do not bypass hooks or hide CI failures.
-3. After checks pass, refresh thread-aware review state. If there is no reviewer response for the current head, post `pr-review` once and wait.
-4. Classify each current-head reviewer finding:
-   - Accept when the finding is real, in scope, and fixable without changing intended behavior.
-   - Reject when the finding is incorrect, speculative, broad, behavior-changing, or outside the PR scope.
-   - Clarify when the finding is too ambiguous to fix safely.
-5. For accepted findings, make the smallest fix, run focused validation, then run `pnpm validate:changed --base origin/main --head HEAD` before pushing.
-6. Commit and push accepted fixes after validation passes. Do not post `pr-review` after a push; the push triggers reviewer agents.
-7. For rejected findings, reply with concise code-backed evidence, post `pr-review` because no push occurred, then continue the loop.
-8. For clarification findings, ask the minimum concrete question and post `pr-review` only when the reviewer must reconsider without a push.
+Wait for checks. If a check fails, inspect the logs, fix the real issue, validate locally, commit, and push. Do not bypass hooks or hide CI failures.
 
-## Stop Conditions
+Handle reviewer findings by judgment:
 
-Stop only when all are true:
+- Accept real, in-scope findings and push the smallest validated fix.
+- Reject incorrect, speculative, behavior-changing, or out-of-scope findings with concise code-backed evidence.
+- Ask a concrete clarification question when a finding is too ambiguous to fix safely.
 
-- CI is green, skipped, or neutral as expected for the current head.
-- There are no unresolved, non-outdated actionable review threads.
-- The latest reviewer response for the current head says no blocking findings, acceptable for merge, or equivalent.
-- The PR merge state is clean or blocked only by human approval/merge policy.
+Before pushing fixes, run focused validation and `pnpm validate:changed --base origin/main --head HEAD`.
+
+Do not post `pr-review` after pushing; pushes trigger reviewer agents. Post `pr-review` only when no push occurred and the reviewer needs to respond, such as after CI passes with no current-head review response or after you reject/clarify a finding.
+
+Continue until CI is green, skipped, or neutral as expected; review threads have no unresolved actionable findings; the latest reviewer response says the PR has no blocking findings or is acceptable for merge; and the merge state has no code-change blocker.
 
 ## Report
 
