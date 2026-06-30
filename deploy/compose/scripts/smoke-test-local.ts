@@ -547,8 +547,8 @@ async function authenticateThroughMailpit(): Promise<AuthSession> {
   };
 }
 
-async function assertAuthenticatedHome(cookie: string): Promise<void> {
-  const response = await requestApi("/v1/home", {
+async function assertAuthenticatedSessionsList(cookie: string): Promise<void> {
+  const response = await requestApi("/v1/sandbox/instances?limit=1", {
     headers: {
       cookie,
     },
@@ -556,7 +556,7 @@ async function assertAuthenticatedHome(cookie: string): Promise<void> {
   if (response.status !== 200) {
     const bodyText = await response.text().catch(() => "");
     throw new Error(
-      `Expected authenticated /v1/home status 200, got ${String(response.status)}. Response body: ${bodyText}`,
+      `Expected authenticated /v1/sandbox/instances status 200, got ${String(response.status)}. Response body: ${bodyText}`,
     );
   }
 }
@@ -923,7 +923,7 @@ async function run(): Promise<void> {
 
   console.log("Authenticating through Mailpit-backed OTP...");
   const session = await authenticateThroughMailpit();
-  await assertAuthenticatedHome(session.cookie);
+  await assertAuthenticatedSessionsList(session.cookie);
 
   console.log("Configuring baseline integration and sandbox profile...");
   const sandboxProfileId = await configureBaselineIntegrationAndProfile(session.cookie);
@@ -939,7 +939,7 @@ async function run(): Promise<void> {
     console.log("Restarting Docker Compose stack to verify persisted state...");
     await restartLocalComposeStack(config.envFilePath);
     await waitForCoreServicesAfterRestart(config.envFilePath);
-    await assertAuthenticatedHome(session.cookie);
+    await assertAuthenticatedSessionsList(session.cookie);
 
     console.log("Starting a second sandbox instance after restart...");
     const restartedSandboxInstanceId = await startSandboxInstance(session.cookie, sandboxProfileId);

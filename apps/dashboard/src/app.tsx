@@ -22,7 +22,6 @@ import { OAuthConsentPage } from "./features/auth/oauth-consent/oauth-consent-pa
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
 import { DesignerPage } from "./features/pages/designer-page.js";
 import { DesignerSessionPage } from "./features/pages/designer-session-page.js";
-import { HomePage } from "./features/pages/home-page.js";
 import { IntegrationConnectionCreatePage } from "./features/pages/integration-connection-create-page.js";
 import { IntegrationConnectionEditPage } from "./features/pages/integration-connection-edit-page.js";
 import { IntegrationConnectionSetupPage } from "./features/pages/integration-connection-setup-page.js";
@@ -72,7 +71,7 @@ export const APP_ROUTES = createRoutesFromElements(
       <Route element={<OAuthConsentPage />} path="/auth/oauth/consent/:requestId" />
       <Route element={<PortAccessRedirectPage />} path="/p/ports/:slug" />
       <Route element={<AppShell />} errorElement={<RouteErrorBoundary />}>
-        <Route element={<HomePage />} handle={ROUTE_HANDLES.dashboard} index />
+        <Route element={<SessionsPage />} handle={ROUTE_HANDLES.sessions} index />
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.designer} path="designer">
           <Route element={<DesignerPage />} index />
           <Route
