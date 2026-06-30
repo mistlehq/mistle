@@ -87,6 +87,21 @@ export {
   StorySlackTarget,
 };
 
+type SnapshotCompileErrorStoryStatus =
+  | "snapshot-failed-invalid-binding-connection-reference"
+  | "snapshot-failed-invalid-connection-target-reference"
+  | "snapshot-failed-connection-mismatch"
+  | "snapshot-failed-target-disabled"
+  | "snapshot-failed-connection-not-active"
+  | "snapshot-failed-kind-mismatch"
+  | "snapshot-failed-invalid-target-config"
+  | "snapshot-failed-invalid-target-secrets"
+  | "snapshot-failed-invalid-binding-config"
+  | "snapshot-failed-route-conflict"
+  | "snapshot-failed-artifact-conflict"
+  | "snapshot-failed-runtime-client-setup-conflict"
+  | "snapshot-failed-runtime-client-setup-invalid-ref";
+
 export const DefaultSandboxProfileEditorStoryArgs = {
   displayName: "Customer Support Sandbox",
   setupScript: `#!/usr/bin/env bash
@@ -112,6 +127,7 @@ export type SandboxProfileEditorPageStoryArgs = {
     | "creating-snapshot"
     | "snapshot-ready"
     | "snapshot-failed"
+    | SnapshotCompileErrorStoryStatus
     | "refresh-failed";
   snapshotRefreshScheduleState?:
     | "none"
@@ -659,6 +675,7 @@ function createSnapshotPanelState(status: SnapshotStoryStatus): SnapshotPanelSta
   if (status === "snapshot-unavailable-no-previous") {
     return {
       kind: "publish-snapshot-error",
+      message: null,
       operationId: null,
       publishedVersion: 1,
       runnableVersion: null,
@@ -689,10 +706,22 @@ function createSnapshotPanelState(status: SnapshotStoryStatus): SnapshotPanelSta
   if (status === "snapshot-failed") {
     return {
       kind: "publish-snapshot-error",
+      message: "Snapshot materialization failed.",
       operationId: "ssj_story_failed_snapshot",
       publishedVersion: 4,
       runnableVersion: 3,
       sandboxInstanceId: "sbi_story_failed_snapshot",
+    };
+  }
+
+  if (isSnapshotCompileErrorStoryStatus(status)) {
+    return {
+      kind: "publish-snapshot-error",
+      message: createSnapshotCompileErrorMessage(status),
+      operationId: StorySnapshotOperationId,
+      publishedVersion: 4,
+      runnableVersion: 3,
+      sandboxInstanceId: StorySnapshotSandboxInstanceId,
     };
   }
 
@@ -1032,7 +1061,45 @@ const SnapshotCreationOperationEvents = [
   }),
 ] satisfies readonly SandboxOperationEvent[];
 
+const SnapshotCompileFailureOperationEvents = [
+  sandboxOperationLifecycleEvent({
+    attributes: {
+      snapshotJobId: StorySnapshotOperationId,
+      timelineKey: "compile",
+      timelineLabel: "Compiling runtime plan",
+    },
+    id: "soe_story_snapshot_compile_started",
+    message: "Snapshot runtime plan compile started.",
+    operationId: StorySnapshotOperationId,
+    operationKind: "snapshot",
+    phase: "runtime_plan",
+    sandboxInstanceId: StorySnapshotSandboxInstanceId,
+    sequence: 1,
+    source: "worker",
+    status: "started",
+  }),
+  sandboxOperationLifecycleEvent({
+    attributes: {
+      error:
+        "Control-plane internal runtime plan compile failed with status 400: Binding 'ibd_story_linear' has kind 'agent' but definition 'linear::linear-default' has kind 'connector'.",
+      snapshotJobId: StorySnapshotOperationId,
+      timelineKey: "compile",
+      timelineLabel: "Compiling runtime plan",
+    },
+    id: "soe_story_snapshot_compile_failed",
+    message: "Snapshot runtime plan compile failed.",
+    operationId: StorySnapshotOperationId,
+    operationKind: "snapshot",
+    phase: "runtime_plan",
+    sandboxInstanceId: StorySnapshotSandboxInstanceId,
+    sequence: 2,
+    source: "worker",
+    status: "failed",
+  }),
+] satisfies readonly SandboxOperationEvent[];
+
 function sandboxOperationLifecycleEvent(input: {
+  attributes?: Record<string, unknown>;
   id: string;
   message: string;
   operationId: string;
@@ -1044,7 +1111,7 @@ function sandboxOperationLifecycleEvent(input: {
   status: NonNullable<SandboxOperationEvent["status"]>;
 }): SandboxOperationEvent {
   return {
-    attributes: {},
+    attributes: input.attributes ?? {},
     createdAt: "2026-05-13T10:00:00.000Z",
     id: input.id,
     message: input.message,
@@ -1060,6 +1127,84 @@ function sandboxOperationLifecycleEvent(input: {
     status: input.status,
     stream: null,
   };
+}
+
+const SnapshotCompileErrorStoryMessages = {
+  "snapshot-failed-invalid-binding-connection-reference": [
+    "Snapshot creation failed because Linear is missing its connection. Reconnect Linear, then retry snapshot creation.",
+    "",
+    "Cause: Integration binding 'ibd_story_linear_missing_connection' references connection 'icn_deleted'.",
+  ].join("\n"),
+  "snapshot-failed-invalid-connection-target-reference": [
+    "Snapshot creation failed because Linear could not be found. Check that Linear is still available, then retry snapshot creation.",
+    "",
+    "Cause: Connection 'icn_story_linear' references target 'linear-default' but the target no longer exists.",
+  ].join("\n"),
+  "snapshot-failed-connection-mismatch": [
+    "Snapshot creation failed because Linear is connected to the wrong profile or organization. Review the Linear connection, then retry snapshot creation.",
+    "",
+    "Cause: Binding 'ibd_story_linear' belongs to a different organization than profile 'sbp_story_customer_support'.",
+  ].join("\n"),
+  "snapshot-failed-target-disabled": [
+    "Snapshot creation failed because Linear is currently disabled. Enable Linear, then retry snapshot creation.",
+    "",
+    "Cause: Integration target 'linear-default' is disabled.",
+  ].join("\n"),
+  "snapshot-failed-connection-not-active": [
+    "Snapshot creation failed because Linear is no longer connected. Reconnect Linear, then retry snapshot creation.",
+    "",
+    "Cause: Connection 'icn_story_linear' is revoked.",
+  ].join("\n"),
+  "snapshot-failed-kind-mismatch": [
+    "Snapshot creation failed because Linear is configured with the wrong type. Update the Linear binding, then retry snapshot creation.",
+    "",
+    "Cause: Binding 'ibd_story_linear' has kind 'agent' but definition 'linear::linear-default' has kind 'connector'.",
+  ].join("\n"),
+  "snapshot-failed-invalid-target-config": [
+    "Snapshot creation failed because Linear has incomplete setup. Review the Linear settings, then retry snapshot creation.",
+    "",
+    "Cause: Target config for 'linear-default' did not satisfy 'linear::linear-default' schema.",
+  ].join("\n"),
+  "snapshot-failed-invalid-target-secrets": [
+    "Snapshot creation failed because Linear's saved credentials could not be used. Reconnect Linear or update its credentials, then retry snapshot creation.",
+    "",
+    "Cause: Target 'linear-default' has invalid encrypted target secrets.",
+  ].join("\n"),
+  "snapshot-failed-invalid-binding-config": [
+    "Snapshot creation failed because Linear has incomplete setup. Review the Linear binding settings, then retry snapshot creation.",
+    "",
+    "Cause: Binding config for 'ibd_story_linear' did not satisfy 'linear::linear-default' schema.",
+  ].join("\n"),
+  "snapshot-failed-route-conflict": [
+    "Snapshot creation failed because Linear has a network access conflict. Review the Linear integration settings, then retry snapshot creation.",
+    "",
+    "Cause: Route 'egress_linear' conflicts with route 'egress_linear_api' for host 'api.linear.app'.",
+  ].join("\n"),
+  "snapshot-failed-artifact-conflict": [
+    "Snapshot creation failed because Linear conflicts with another integration during setup. Review the enabled integrations, then retry snapshot creation.",
+    "",
+    "Cause: Runtime artifact '/usr/local/bin/linear' is provided by more than one integration.",
+  ].join("\n"),
+  "snapshot-failed-runtime-client-setup-conflict": [
+    "Snapshot creation failed because Linear conflicts with another integration in the agent setup. Review the enabled integrations, then retry snapshot creation.",
+    "",
+    "Cause: Runtime client 'claude' received duplicate MCP server id 'linear'.",
+  ].join("\n"),
+  "snapshot-failed-runtime-client-setup-invalid-ref": [
+    "Snapshot creation failed because Linear references setup that is not available. Review the Linear integration setup, then retry snapshot creation.",
+    "",
+    "Cause: Runtime client setup references MCP server 'linear' before it is defined.",
+  ].join("\n"),
+} satisfies Record<SnapshotCompileErrorStoryStatus, string>;
+
+function isSnapshotCompileErrorStoryStatus(
+  status: SnapshotStoryStatus,
+): status is SnapshotCompileErrorStoryStatus {
+  return Object.hasOwn(SnapshotCompileErrorStoryMessages, status);
+}
+
+function createSnapshotCompileErrorMessage(status: SnapshotCompileErrorStoryStatus): string {
+  return SnapshotCompileErrorStoryMessages[status];
 }
 
 function renderUnavailableIntegrationsSectionPanel(input: {
@@ -1095,7 +1240,10 @@ function SandboxProfileEditorPageStoryView(
       queryClient: client,
       resources: StoryGithubResources,
     });
-    if (input.snapshotState === "creating-snapshot-with-events") {
+    if (
+      input.snapshotState === "creating-snapshot-with-events" ||
+      (input.snapshotState !== undefined && isSnapshotCompileErrorStoryStatus(input.snapshotState))
+    ) {
       client.setQueryData(
         sandboxOperationEventsQueryKey({
           afterSequence: null,
@@ -1103,7 +1251,10 @@ function SandboxProfileEditorPageStoryView(
           sandboxInstanceId: StorySnapshotSandboxInstanceId,
         }),
         {
-          events: SnapshotCreationOperationEvents,
+          events:
+            input.snapshotState === "creating-snapshot-with-events"
+              ? SnapshotCreationOperationEvents
+              : SnapshotCompileFailureOperationEvents,
         },
       );
     }

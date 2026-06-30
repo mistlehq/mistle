@@ -78,6 +78,7 @@ export type SnapshotPanelState =
     }
   | {
       kind: "publish-snapshot-error";
+      message: string | null;
       operationId: string | null;
       publishedVersion: number;
       runnableVersion: number | null;
@@ -179,6 +180,7 @@ export function resolveSnapshotPanelState(
     if (!version.usable) {
       return {
         kind: "publish-snapshot-error",
+        message: latestSnapshotJob.errorMessage,
         operationId: latestSnapshotJob.id,
         publishedVersion: version.version,
         runnableVersion: activeVersion,
@@ -199,6 +201,7 @@ export function resolveSnapshotPanelState(
   if (!version.usable) {
     return {
       kind: "publish-snapshot-error",
+      message: null,
       operationId: null,
       publishedVersion: version.version,
       runnableVersion: activeVersion,
@@ -313,6 +316,11 @@ export function SandboxProfileSnapshotPanelView(input: {
     );
   }
 
+  const publishSnapshotFailureNotice =
+    input.state.kind === "publish-snapshot-error"
+      ? resolvePublishSnapshotFailureNotice(input.state)
+      : null;
+
   return (
     <SandboxProfileEditorHorizontalTabContent>
       <SnapshotPanelDescription />
@@ -323,12 +331,9 @@ export function SandboxProfileSnapshotPanelView(input: {
         visible={input.publishSuccessMessage}
       />
 
-      {input.state.kind === "publish-snapshot-error" ? (
-        <Notice title="Snapshot creation failed" variant="alert">
-          {formatPublishSnapshotFailureMessage({
-            publishedVersion: input.state.publishedVersion,
-            runnableVersion: input.state.runnableVersion,
-          })}
+      {publishSnapshotFailureNotice !== null ? (
+        <Notice title={publishSnapshotFailureNotice.title} variant="alert">
+          {publishSnapshotFailureNotice.description}
         </Notice>
       ) : null}
 
@@ -503,6 +508,48 @@ export function resolveRetainedSnapshotOperationState(input: {
   }
 
   return input.retainedState;
+}
+
+function resolvePublishSnapshotFailureNotice(
+  state: Extract<SnapshotPanelState, { kind: "publish-snapshot-error" }>,
+): {
+  title: string;
+  description: string;
+} {
+  if (state.message !== null) {
+    const parsedMessage = parseSnapshotFailureRecoveryMessage(state.message);
+    if (parsedMessage !== null) {
+      return parsedMessage;
+    }
+  }
+
+  return {
+    title: "Snapshot creation failed",
+    description: formatPublishSnapshotFailureMessage({
+      publishedVersion: state.publishedVersion,
+      runnableVersion: state.runnableVersion,
+    }),
+  };
+}
+
+function parseSnapshotFailureRecoveryMessage(message: string): {
+  title: string;
+  description: string;
+} | null {
+  const summary = message.split("\n\nCause:", 1)[0]?.trim();
+  if (summary === undefined) {
+    return null;
+  }
+
+  const match = /^Snapshot creation failed because (?<reason>.+?)\. (?<action>.+)$/u.exec(summary);
+  if (match?.groups?.reason === undefined || match.groups.action === undefined) {
+    return null;
+  }
+
+  return {
+    title: `Snapshot failed: ${match.groups.reason}`,
+    description: match.groups.action,
+  };
 }
 
 function SnapshotStatusAction(input: {

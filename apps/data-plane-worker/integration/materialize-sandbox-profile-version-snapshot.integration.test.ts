@@ -4,6 +4,8 @@
 
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
+  IntegrationBindingKinds,
+  IntegrationConnectionStatuses,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -258,6 +260,158 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
         where: (table, { eq }) => eq(table.id, sandboxInstanceId),
       }),
     ).resolves.toBeUndefined();
+  });
+
+  it("marks compile-time integration binding kind mismatches as specific snapshot failures", async ({
+    env,
+  }) => {
+    const organizationId = "org_snapshot_compile_kind_mismatch_integration";
+    const sandboxProfileId = "sbp_snapshot_compile_kind_mismatch_integration";
+    const targetKey = "linear_default_snapshot_compile_kind_mismatch";
+    const connectionId = "icn_snapshot_compile_kind_mismatch";
+    const bindingId = "ibd_snapshot_compile_kind_mismatch";
+    const snapshotJobId = "ssj_snapshot_compile_kind_mismatch";
+    const sandboxInstanceId = "sbi_snapshot_compile_kind_mismatch";
+    const workflowRunId = "wr_snapshot_compile_kind_mismatch";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.organizations).values({
+      id: organizationId,
+      name: "Snapshot Compile Kind Mismatch Org",
+      slug: "snapshot-compile-kind-mismatch",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values({
+      targetKey,
+      familyId: "linear",
+      variantId: "linear-default",
+      enabled: true,
+      config: {},
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+      id: connectionId,
+      organizationId,
+      targetKey,
+      displayName: "Linear",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {},
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values({
+      id: sandboxProfileId,
+      organizationId,
+      displayName: "Snapshot Compile Kind Mismatch Profile",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values({
+      sandboxProfileId,
+      version: 1,
+      state: SandboxProfileVersionStates.PUBLISHED,
+      publishedAt: "2026-01-01T00:00:00.000Z",
+      setupScript: "printf 'compile-kind-mismatch' > /tmp/mistle-snapshot-marker.txt",
+      sandboxProvider: SandboxProvider.DOCKER,
+    });
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values({
+        id: bindingId,
+        sandboxProfileId,
+        sandboxProfileVersion: 1,
+        connectionId,
+        kind: IntegrationBindingKinds.AGENT,
+        config: {},
+      });
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionSnapshotJobs)
+      .values({
+        id: snapshotJobId,
+        sandboxProfileId,
+        sandboxProfileVersion: 1,
+        trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+        state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+      });
+
+    const runtimeConfig = createDataPlaneWorkerRuntimeConfig({
+      app: createWorkerConfig(env),
+    });
+    const controlPlaneInternalClient = createControlPlaneInternalClient(env);
+
+    await expect(
+      executeMaterializeSandboxProfileVersionSnapshot({
+        ctx: {
+          config: runtimeConfig,
+          controlPlaneInternalClient,
+          clock: systemClock,
+          db: env.dataPlaneDb,
+          tables: env.dataPlaneTables,
+          logger: dataPlaneWorkerLogger,
+          processEnv: {},
+          sandboxdArtifactResolver: undefined,
+          sandboxRuntimeProviderResolver: createSandboxRuntimeProviderResolver({
+            config: runtimeConfig,
+            controlPlaneInternalClient,
+          }),
+        },
+        workflowInput: {
+          snapshotJobId,
+          sandboxInstanceId,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+          snapshotPreparationScriptKind: "setup",
+          image: {
+            imageId: "integration-snapshot-compile-kind-mismatch-image",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            kind: "base",
+            provider: SandboxProvider.DOCKER,
+          },
+          sandboxRuntime: {
+            provider: SandboxProvider.DOCKER,
+          },
+        },
+        workflowRunId,
+        step: createInlineStepApi(),
+      }),
+    ).rejects.toThrow("Snapshot creation failed because Linear is configured with the wrong type.");
+
+    const persistedJob = await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findFirst(
+      {
+        where: (table, { eq }) => eq(table.id, snapshotJobId),
+      },
+    );
+    expect(persistedJob).toMatchObject({
+      id: snapshotJobId,
+      state: SandboxProfileVersionSnapshotJobStates.FAILED,
+      workflowRunId,
+      errorCode: "snapshot_runtime_plan_kind_mismatch",
+    });
+    expect(persistedJob?.errorMessage).toContain(
+      "Snapshot creation failed because Linear is configured with the wrong type. Update the Linear binding, then retry snapshot creation.",
+    );
+    expect(persistedJob?.errorMessage).toContain(
+      `Binding '${bindingId}' has kind 'agent' but definition 'linear::linear-default' has kind 'connector'.`,
+    );
+
+    const sandboxInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({
+      where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+    });
+    expect(sandboxInstance).toMatchObject({
+      id: sandboxInstanceId,
+      status: SandboxInstanceStatuses.FAILED,
+      failureCode: "snapshot_runtime_plan_kind_mismatch",
+    });
+
+    const operationEvents = await env.dataPlaneDb.query.sandboxOperationEvents.findMany({
+      orderBy: (table, { asc }) => [asc(table.sequence)],
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxInstanceId, sandboxInstanceId), eq(table.operationId, snapshotJobId)),
+    });
+    expect(operationEvents).toHaveLength(2);
+    expect(operationEvents.map((event) => event.status)).toEqual(["started", "failed"]);
+    expect(operationEvents.map((event) => event.message)).toEqual([
+      "Snapshot runtime plan compile started.",
+      "Snapshot runtime plan compile failed.",
+    ]);
+    expect(operationEvents.map((event) => event.attributes.timelineKey)).toEqual([
+      "compile",
+      "compile",
+    ]);
   });
 
   it("applies the snapshot sandbox provisioning lifecycle sequence", async ({ env }) => {

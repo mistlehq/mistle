@@ -34,6 +34,22 @@ import { markSandboxInstanceStopped } from "../stop-sandbox-instance/mark-sandbo
 
 const SnapshotMaterializationFailureCodes = {
   RUNTIME_PLAN_COMPILE_FAILED: "snapshot_runtime_plan_compile_failed",
+  RUNTIME_PLAN_KIND_MISMATCH: "snapshot_runtime_plan_kind_mismatch",
+  RUNTIME_PLAN_INVALID_BINDING_CONFIG: "snapshot_runtime_plan_invalid_binding_config",
+  RUNTIME_PLAN_INVALID_TARGET_CONFIG: "snapshot_runtime_plan_invalid_target_config",
+  RUNTIME_PLAN_INVALID_TARGET_SECRETS: "snapshot_runtime_plan_invalid_target_secrets",
+  RUNTIME_PLAN_CONNECTION_MISMATCH: "snapshot_runtime_plan_connection_mismatch",
+  RUNTIME_PLAN_CONNECTION_NOT_ACTIVE: "snapshot_runtime_plan_connection_not_active",
+  RUNTIME_PLAN_TARGET_DISABLED: "snapshot_runtime_plan_target_disabled",
+  RUNTIME_PLAN_INVALID_BINDING_CONNECTION_REFERENCE:
+    "snapshot_runtime_plan_invalid_binding_connection_reference",
+  RUNTIME_PLAN_INVALID_CONNECTION_TARGET_REFERENCE:
+    "snapshot_runtime_plan_invalid_connection_target_reference",
+  RUNTIME_PLAN_ROUTE_CONFLICT: "snapshot_runtime_plan_route_conflict",
+  RUNTIME_PLAN_ARTIFACT_CONFLICT: "snapshot_runtime_plan_artifact_conflict",
+  RUNTIME_PLAN_RUNTIME_CLIENT_SETUP_CONFLICT: "snapshot_runtime_plan_runtime_client_setup_conflict",
+  RUNTIME_PLAN_RUNTIME_CLIENT_SETUP_INVALID_REF:
+    "snapshot_runtime_plan_runtime_client_setup_invalid_ref",
   SANDBOX_RUNTIME_RESOLVE_FAILED: "snapshot_sandbox_runtime_resolve_failed",
   STATUS_TRANSITION_TO_STARTING_FAILED: "snapshot_status_transition_to_starting_failed",
   SANDBOX_START_FAILED: "snapshot_sandbox_start_failed",
@@ -62,6 +78,12 @@ type SnapshotCaptureResult =
       captured: false;
       errorMessage: string;
     };
+
+type SnapshotMaterializationFailure = {
+  detailMessage?: string;
+  failureCode: string;
+  summary: string;
+};
 
 type MaterializeSnapshotWorkflowExecutionContext = Pick<
   WorkflowContext,
@@ -351,26 +373,6 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       );
     }
 
-    currentPhase = "compile";
-    const compiledRuntimePlan = await step.run(
-      { name: "compile-snapshot-runtime-plan" },
-      async () => {
-        const compileResult =
-          await ctx.controlPlaneInternalClient.compileSandboxProfileVersionRuntimePlan({
-            organizationId: workflowInput.organizationId,
-            profileId: workflowInput.sandboxProfileId,
-            profileVersion: workflowInput.sandboxProfileVersion,
-            snapshotPreparationScriptKind: workflowInput.snapshotPreparationScriptKind,
-            image: {
-              imageId: workflowInput.image.imageId,
-              kind: workflowInput.image.kind,
-            },
-          });
-
-        return compileResult.runtimePlan;
-      },
-    );
-
     currentPhase = "ensure";
     await step.run({ name: "ensure-snapshot-sandbox-instance" }, async () => {
       await ensureSandboxInstance(
@@ -394,6 +396,40 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       );
     });
     ensuredSandboxInstance = true;
+
+    currentPhase = "compile";
+    const compiledRuntimePlan = await recordWorkerSandboxLifecyclePhase(
+      operationEvents,
+      {
+        attributes: {
+          runtimeProvider: requestedRuntimeProvider,
+          snapshotJobId: workflowInput.snapshotJobId,
+          timelineKey: "compile",
+          timelineLabel: "Compiling runtime plan",
+        },
+        completedMessage: "Snapshot runtime plan compile completed.",
+        failedMessage: "Snapshot runtime plan compile failed.",
+        phase: "runtime_plan",
+        startedMessage: "Snapshot runtime plan compile started.",
+      },
+      async () => {
+        return step.run({ name: "compile-snapshot-runtime-plan" }, async () => {
+          const compileResult =
+            await ctx.controlPlaneInternalClient.compileSandboxProfileVersionRuntimePlan({
+              organizationId: workflowInput.organizationId,
+              profileId: workflowInput.sandboxProfileId,
+              profileVersion: workflowInput.sandboxProfileVersion,
+              snapshotPreparationScriptKind: workflowInput.snapshotPreparationScriptKind,
+              image: {
+                imageId: workflowInput.image.imageId,
+                kind: workflowInput.image.kind,
+              },
+            });
+
+          return compileResult.runtimePlan;
+        });
+      },
+    );
 
     currentPhase = "prepare_image";
     const preparedImage = await recordWorkerSandboxLifecyclePhase(
@@ -707,19 +743,193 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
   } catch (error) {
     rethrowDurableStepErrorForRetry(error);
 
-    const failure = mapSnapshotFailure({
-      phase: currentPhase,
-    });
+    const failure =
+      currentPhase === "compile"
+        ? (mapCompileSnapshotFailure(error) ??
+          mapSnapshotFailure({
+            phase: currentPhase,
+          }))
+        : mapSnapshotFailure({
+            phase: currentPhase,
+          });
 
     await handleSnapshotFailure({
       failureCode: failure.failureCode,
       summary: failure.summary,
-      error,
+      error: failure.detailMessage === undefined ? error : failure.detailMessage,
     });
 
     throw new Error(failure.summary, {
       cause: error,
     });
+  }
+}
+
+function mapCompileSnapshotFailure(error: unknown): SnapshotMaterializationFailure | null {
+  if (!(error instanceof ControlPlaneInternalClientRequestError)) {
+    return null;
+  }
+
+  if (error.status !== 400 || error.code === undefined) {
+    return null;
+  }
+
+  const detailMessage = error.detailMessage;
+  const failureCode = resolveSnapshotRuntimePlanFailureCode(error.code);
+  if (failureCode === null) {
+    return null;
+  }
+
+  return {
+    detailMessage,
+    failureCode,
+    summary: resolveSnapshotRuntimePlanFailureSummary({
+      code: error.code,
+      integrationLabel: resolveCompileFailureIntegrationLabel(detailMessage),
+    }),
+  };
+}
+
+function resolveSnapshotRuntimePlanFailureCode(code: string): string | null {
+  switch (code) {
+    case "INVALID_BINDING_CONNECTION_REFERENCE":
+      return SnapshotMaterializationFailureCodes.RUNTIME_PLAN_INVALID_BINDING_CONNECTION_REFERENCE;
+    case "INVALID_CONNECTION_TARGET_REFERENCE":
+      return SnapshotMaterializationFailureCodes.RUNTIME_PLAN_INVALID_CONNECTION_TARGET_REFERENCE;
+    case "CONNECTION_MISMATCH":
+      return SnapshotMaterializationFailureCodes.RUNTIME_PLAN_CONNECTION_MISMATCH;
+    case "TARGET_DISABLED":
+      return SnapshotMaterializationFailureCodes.RUNTIME_PLAN_TARGET_DISABLED;
+    case "CONNECTION_NOT_ACTIVE":
+      return SnapshotMaterializationFailureCodes.RUNTIME_PLAN_CONNECTION_NOT_ACTIVE;
+    case "KIND_MISMATCH":
+      return SnapshotMaterializationFailureCodes.RUNTIME_PLAN_KIND_MISMATCH;
+    case "INVALID_TARGET_CONFIG":
+      return SnapshotMaterializationFailureCodes.RUNTIME_PLAN_INVALID_TARGET_CONFIG;
+    case "INVALID_TARGET_SECRETS":
+      return SnapshotMaterializationFailureCodes.RUNTIME_PLAN_INVALID_TARGET_SECRETS;
+    case "INVALID_BINDING_CONFIG":
+      return SnapshotMaterializationFailureCodes.RUNTIME_PLAN_INVALID_BINDING_CONFIG;
+    case "ROUTE_CONFLICT":
+      return SnapshotMaterializationFailureCodes.RUNTIME_PLAN_ROUTE_CONFLICT;
+    case "ARTIFACT_CONFLICT":
+      return SnapshotMaterializationFailureCodes.RUNTIME_PLAN_ARTIFACT_CONFLICT;
+    case "RUNTIME_CLIENT_SETUP_CONFLICT":
+      return SnapshotMaterializationFailureCodes.RUNTIME_PLAN_RUNTIME_CLIENT_SETUP_CONFLICT;
+    case "RUNTIME_CLIENT_SETUP_INVALID_REF":
+      return SnapshotMaterializationFailureCodes.RUNTIME_PLAN_RUNTIME_CLIENT_SETUP_INVALID_REF;
+    default:
+      return null;
+  }
+}
+
+function resolveCompileFailureIntegrationLabel(message: string): string | null {
+  const definitionMatch = /'([a-z0-9-]+)::[a-z0-9-]+'/iu.exec(message);
+  if (definitionMatch?.[1] !== undefined) {
+    return formatIntegrationLabel(definitionMatch[1]);
+  }
+
+  const routeMatch = /egress[_-]([a-z0-9-]+)/iu.exec(message);
+  if (routeMatch?.[1] !== undefined) {
+    return formatIntegrationLabel(routeMatch[1]);
+  }
+
+  const runtimeServerMatch = /MCP server id '([a-z0-9-]+)'/iu.exec(message);
+  if (runtimeServerMatch?.[1] !== undefined) {
+    return formatIntegrationLabel(runtimeServerMatch[1]);
+  }
+
+  const linearIdMatch =
+    /\b(?:linear|Linear)[_-][a-z0-9_-]+|\b[a-z0-9_-]+[_-](?:linear|Linear)\b/u.exec(message);
+  if (linearIdMatch !== null) {
+    return "Linear";
+  }
+
+  return null;
+}
+
+function formatIntegrationLabel(value: string): string {
+  const normalizedValue = value.trim().toLowerCase();
+  switch (normalizedValue) {
+    case "aws":
+      return "AWS";
+    case "gcp":
+      return "Google Cloud";
+    case "github":
+      return "GitHub";
+    case "google":
+      return "Google";
+    case "googleads":
+      return "Google Ads";
+    case "google-analytics":
+      return "Google Analytics";
+    case "google-business-profile":
+      return "Google Business Profile";
+    case "google-search-console":
+      return "Google Search Console";
+    case "google-workspace":
+      return "Google Workspace";
+    case "linear":
+      return "Linear";
+    case "openai":
+      return "OpenAI";
+    case "wasenderapi":
+      return "WasenderAPI";
+    default:
+      return normalizedValue
+        .split("-")
+        .map((part) => {
+          if (part.length === 0) {
+            return part;
+          }
+
+          return `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`;
+        })
+        .join(" ");
+  }
+}
+
+function resolveSnapshotRuntimePlanFailureSummary(input: {
+  code: string;
+  integrationLabel: string | null;
+}): string {
+  const integration = input.integrationLabel ?? "an integration";
+
+  switch (input.code) {
+    case "INVALID_BINDING_CONNECTION_REFERENCE":
+      return `Snapshot creation failed because ${integration} is missing its connection. Reconnect ${integration}, then retry snapshot creation.`;
+    case "INVALID_CONNECTION_TARGET_REFERENCE":
+      return `Snapshot creation failed because ${integration} could not be found. Check that ${integration} is still available, then retry snapshot creation.`;
+    case "CONNECTION_MISMATCH":
+      return `Snapshot creation failed because ${integration} is connected to the wrong profile or organization. Review the ${integration} connection, then retry snapshot creation.`;
+    case "TARGET_DISABLED":
+      return `Snapshot creation failed because ${integration} is currently disabled. Enable ${integration}, then retry snapshot creation.`;
+    case "CONNECTION_NOT_ACTIVE":
+      return `Snapshot creation failed because ${integration} is no longer connected. Reconnect ${integration}, then retry snapshot creation.`;
+    case "KIND_MISMATCH":
+      return `Snapshot creation failed because ${integration} is configured with the wrong type. Update the ${integration} binding, then retry snapshot creation.`;
+    case "INVALID_TARGET_CONFIG":
+      return `Snapshot creation failed because ${integration} has incomplete setup. Review the ${integration} settings, then retry snapshot creation.`;
+    case "INVALID_TARGET_SECRETS":
+      return `Snapshot creation failed because ${integration}'s saved credentials could not be used. Reconnect ${integration} or update its credentials, then retry snapshot creation.`;
+    case "INVALID_BINDING_CONFIG":
+      return `Snapshot creation failed because ${integration} has incomplete setup. Review the ${integration} binding settings, then retry snapshot creation.`;
+    case "ROUTE_CONFLICT":
+      return input.integrationLabel === null
+        ? "Snapshot creation failed because two integrations are trying to use the same network access rule. Review the enabled integrations, then retry snapshot creation."
+        : `Snapshot creation failed because ${integration} has a network access conflict. Review the ${integration} integration settings, then retry snapshot creation.`;
+    case "ARTIFACT_CONFLICT":
+      return input.integrationLabel === null
+        ? "Snapshot creation failed because two integrations are trying to install the same runtime file. Review the enabled integrations, then retry snapshot creation."
+        : `Snapshot creation failed because ${integration} conflicts with another integration during setup. Review the enabled integrations, then retry snapshot creation.`;
+    case "RUNTIME_CLIENT_SETUP_CONFLICT":
+      return input.integrationLabel === null
+        ? "Snapshot creation failed because two integrations are configuring the agent in conflicting ways. Review the enabled integrations, then retry snapshot creation."
+        : `Snapshot creation failed because ${integration} conflicts with another integration in the agent setup. Review the enabled integrations, then retry snapshot creation.`;
+    case "RUNTIME_CLIENT_SETUP_INVALID_REF":
+      return `Snapshot creation failed because ${integration} references setup that is not available. Review the ${integration} integration setup, then retry snapshot creation.`;
+    default:
+      return "Failed to compile snapshot runtime plan.";
   }
 }
 
@@ -741,10 +951,7 @@ function mapSnapshotFailure(input: {
     | "destroy"
     | "mark_stopped"
     | "mark_succeeded";
-}): {
-  failureCode: string;
-  summary: string;
-} {
+}): SnapshotMaterializationFailure {
   if (input.phase === "resolve") {
     return {
       failureCode: SnapshotMaterializationFailureCodes.SANDBOX_RUNTIME_RESOLVE_FAILED,
