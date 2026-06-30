@@ -171,6 +171,14 @@ export type ResolvedIntegrationTargetMetadata = {
           inputType: "password" | "text" | "textarea";
           slotKey: string;
         }[];
+        ui?: {
+          create?: {
+            submitLabel: string;
+            helperText: string;
+            showCallbackUrl?: boolean | undefined;
+            showIdentityLinkingCallbackUrl?: boolean | undefined;
+          };
+        };
       }
     | {
         id: string;
@@ -296,6 +304,13 @@ function resolveConnectionMethod(
                 : {
                     startForm: cloneSetupStartForm(method.setupFlow.startForm),
                   }),
+            },
+          }),
+      ...(method.ui?.create === undefined
+        ? {}
+        : {
+            ui: {
+              create: method.ui.create,
             },
           }),
       secretFields: method.secretFields.map((field) => ({

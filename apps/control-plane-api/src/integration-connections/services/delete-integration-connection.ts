@@ -340,6 +340,118 @@ async function revokeConnectionAuthorizationBestEffort(
   }
 }
 
+async function cleanupManagedWebhookRegistrationsBestEffort(input: {
+  db: ControlPlaneDatabase;
+  integrationRegistry: AppContext["var"]["integrationRegistry"];
+  integrationsConfig: AppContext["var"]["config"]["integrations"];
+  controlPlaneBaseUrl: string;
+  organizationId: string;
+  connection: Awaited<ReturnType<typeof resolveConnectionWithTargetOrThrow>>;
+}): Promise<void> {
+  const webhookSourcesForRegistrationCleanup =
+    await input.db.query.integrationWebhookSources.findMany({
+      where: (table, { eq: whereEq }) =>
+        whereEq(table.integrationConnectionId, input.connection.id),
+    });
+
+  if (webhookSourcesForRegistrationCleanup.length === 0) {
+    return;
+  }
+
+  try {
+    const definition = input.integrationRegistry.getDefinition({
+      familyId: input.connection.target.familyId,
+      variantId: input.connection.target.variantId,
+    });
+
+    if (definition?.webhookSource === undefined) {
+      return;
+    }
+
+    const { webhookSourceCapability, parsedTargetConfig, parsedTargetSecrets } =
+      resolveWebhookSourceCapabilityOrThrow({
+        integrationRegistry: input.integrationRegistry,
+        integrationsConfig: input.integrationsConfig,
+        target: input.connection.target,
+      });
+
+    if (webhookSourceCapability.lifecycle !== IntegrationWebhookSourceLifecycles.MANAGED) {
+      return;
+    }
+
+    const deleteRegistration =
+      webhookSourceCapability.deleteRegistration?.bind(webhookSourceCapability);
+
+    if (deleteRegistration === undefined) {
+      return;
+    }
+
+    const connectionSecrets = await resolveConnectionSecretsOrThrow({
+      db: input.db,
+      integrationRegistry: input.integrationRegistry,
+      connection: input.connection,
+      integrationsConfig: input.integrationsConfig,
+    });
+
+    for (const source of webhookSourcesForRegistrationCleanup) {
+      try {
+        await deleteRegistration({
+          organizationId: input.organizationId,
+          targetKey: input.connection.targetKey,
+          controlPlaneBaseUrl: input.controlPlaneBaseUrl,
+          target: {
+            familyId: input.connection.target.familyId,
+            variantId: input.connection.target.variantId,
+            enabled: input.connection.target.enabled,
+            config: parsedTargetConfig,
+            secrets: parsedTargetSecrets,
+          },
+          connection: {
+            id: input.connection.id,
+            status: "active",
+            config: resolveConnectionConfigOrThrow({
+              connectionId: input.connection.id,
+              config: input.connection.config,
+            }),
+          },
+          connectionSecrets,
+          source: {
+            id: source.id,
+            targetKey: source.targetKey,
+            organizationId: source.organizationId,
+            integrationConnectionId: source.integrationConnectionId,
+            ...(source.displayName === null ? {} : { displayName: source.displayName }),
+            endpointKey: source.endpointKey,
+            ...(source.remoteRegistrationId === null
+              ? {}
+              : { remoteRegistrationId: source.remoteRegistrationId }),
+            providerMetadata: source.providerMetadata,
+          },
+        });
+      } catch (error) {
+        logger.warn(
+          {
+            err: error,
+            connectionId: input.connection.id,
+            sourceId: source.id,
+            targetKey: input.connection.targetKey,
+          },
+          "Failed to delete managed integration webhook registration",
+        );
+      }
+    }
+  } catch (error) {
+    logger.warn(
+      {
+        err: error,
+        connectionId: input.connection.id,
+        targetKey: input.connection.targetKey,
+      },
+      "Failed to prepare managed integration webhook registration cleanup",
+    );
+  }
+}
+
 export async function deleteIntegrationConnection(
   ctx: {
     db: ControlPlaneDatabase;
@@ -370,75 +482,14 @@ export async function deleteIntegrationConnection(
       organizationId: input.organizationId,
       connection,
     });
-    const webhookSourcesForRegistrationCleanup = await tx.query.integrationWebhookSources.findMany({
-      where: (table, { eq: whereEq }) => whereEq(table.integrationConnectionId, connection.id),
+    await cleanupManagedWebhookRegistrationsBestEffort({
+      db: tx,
+      integrationRegistry: ctx.integrationRegistry,
+      integrationsConfig: ctx.integrationsConfig,
+      controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
+      organizationId: input.organizationId,
+      connection,
     });
-
-    if (webhookSourcesForRegistrationCleanup.length > 0) {
-      const definition = ctx.integrationRegistry.getDefinition({
-        familyId: connection.target.familyId,
-        variantId: connection.target.variantId,
-      });
-
-      if (definition?.webhookSource !== undefined) {
-        const { webhookSourceCapability, parsedTargetConfig, parsedTargetSecrets } =
-          resolveWebhookSourceCapabilityOrThrow({
-            integrationRegistry: ctx.integrationRegistry,
-            integrationsConfig: ctx.integrationsConfig,
-            target: connection.target,
-          });
-
-        if (webhookSourceCapability.lifecycle === IntegrationWebhookSourceLifecycles.MANAGED) {
-          const deleteRegistration =
-            webhookSourceCapability.deleteRegistration?.bind(webhookSourceCapability);
-
-          if (deleteRegistration !== undefined) {
-            const connectionSecrets = await resolveConnectionSecretsOrThrow({
-              db: tx,
-              integrationRegistry: ctx.integrationRegistry,
-              connection,
-              integrationsConfig: ctx.integrationsConfig,
-            });
-
-            for (const source of webhookSourcesForRegistrationCleanup) {
-              await deleteRegistration({
-                organizationId: input.organizationId,
-                targetKey: connection.targetKey,
-                controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
-                target: {
-                  familyId: connection.target.familyId,
-                  variantId: connection.target.variantId,
-                  enabled: connection.target.enabled,
-                  config: parsedTargetConfig,
-                  secrets: parsedTargetSecrets,
-                },
-                connection: {
-                  id: connection.id,
-                  status: "active",
-                  config: resolveConnectionConfigOrThrow({
-                    connectionId: connection.id,
-                    config: connection.config,
-                  }),
-                },
-                connectionSecrets,
-                source: {
-                  id: source.id,
-                  targetKey: source.targetKey,
-                  organizationId: source.organizationId,
-                  integrationConnectionId: source.integrationConnectionId,
-                  ...(source.displayName === null ? {} : { displayName: source.displayName }),
-                  endpointKey: source.endpointKey,
-                  ...(source.remoteRegistrationId === null
-                    ? {}
-                    : { remoteRegistrationId: source.remoteRegistrationId }),
-                  providerMetadata: source.providerMetadata,
-                },
-              });
-            }
-          }
-        }
-      }
-    }
 
     await tx
       .delete(tables.sandboxProfileVersionIntegrationBindings)

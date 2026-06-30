@@ -315,6 +315,53 @@ describe("IntegrationConnectionEditorPage", () => {
     ).toBeTruthy();
   });
 
+  it("renders identity-linking redirect URI guidance for form methods that request it", () => {
+    renderEditorPage({
+      editor: {
+        methods: [
+          {
+            id: "linear-oauth-app",
+            label: "Linear OAuth app",
+            kind: "form",
+            secretFields: [
+              {
+                name: "clientSecret",
+                label: "OAuth client secret",
+                inputType: "password",
+              },
+            ],
+            ui: {
+              create: {
+                submitLabel: "Save Linear OAuth app",
+                helperText:
+                  "Stores Linear OAuth app credentials for organization identity linking.",
+                showIdentityLinkingCallbackUrl: true,
+              },
+            },
+          },
+        ],
+        mode: "create",
+        targetConfig: {},
+        targetDisplayName: "Linear",
+        targetFamilyId: "linear",
+        targetKey: "linear-default",
+        targetVariantId: "linear-default",
+      },
+      methodId: "linear-oauth-app",
+    });
+
+    expect(
+      screen.getByText(
+        "Stores Linear OAuth app credentials for organization identity linking. To let users link their accounts, add this redirect URI to the provider app.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("http://localhost:3000/p/identity-linking/callbacks/linear"),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy identity-linking redirect URI" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save Linear OAuth app" })).toBeTruthy();
+  });
+
   it("renders definition-driven config fields for form methods", () => {
     renderEditorPage({
       configForm: {

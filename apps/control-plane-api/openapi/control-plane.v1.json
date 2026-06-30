@@ -17576,6 +17576,33 @@
                                         "additionalProperties": false
                                       },
                                       "minItems": 1
+                                    },
+                                    "ui": {
+                                      "type": "object",
+                                      "properties": {
+                                        "create": {
+                                          "type": "object",
+                                          "properties": {
+                                            "submitLabel": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "helperText": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "showCallbackUrl": {
+                                              "type": "boolean"
+                                            },
+                                            "showIdentityLinkingCallbackUrl": {
+                                              "type": "boolean"
+                                            }
+                                          },
+                                          "required": ["submitLabel", "helperText"],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "additionalProperties": false
                                     }
                                   },
                                   "required": ["id", "label", "kind", "secretFields"],
@@ -17732,6 +17759,9 @@
                                               "minLength": 1
                                             },
                                             "showCallbackUrl": {
+                                              "type": "boolean"
+                                            },
+                                            "showIdentityLinkingCallbackUrl": {
                                               "type": "boolean"
                                             }
                                           },

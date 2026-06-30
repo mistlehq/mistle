@@ -22,6 +22,7 @@ const IntegrationConnectionMethodCreateUiSchema = z
     submitLabel: z.string().min(1),
     helperText: z.string().min(1),
     showCallbackUrl: z.boolean().optional(),
+    showIdentityLinkingCallbackUrl: z.boolean().optional(),
   })
   .strict();
 
@@ -56,6 +57,12 @@ const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
       postCreate: IntegrationFormConnectionMethodPostCreateMetadataSchema.optional(),
       setupFlow: IntegrationFormConnectionMethodSetupFlowMetadataSchema.optional(),
       secretFields: z.array(IntegrationConnectionMethodSecretFieldSchema).min(1),
+      ui: z
+        .object({
+          create: IntegrationConnectionMethodCreateUiSchema.optional(),
+        })
+        .strict()
+        .optional(),
     })
     .strict(),
   z
