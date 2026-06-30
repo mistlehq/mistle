@@ -9,8 +9,8 @@ import {
   type SentryConnectionConfig,
   SentryConnectionMethodIds,
   SentryCredentialSecretTypes,
-  SentryInternalIntegrationConnectionConfigSchema,
-  SentryInternalIntegrationCredentialSlotKeys,
+  SentryWebhookSigningSecretConnectionConfigSchema,
+  SentryWebhookSigningSecretCredentialSlotKeys,
   SentryMcpOAuthConnectionConfigSchema,
   SentryMcpUrl,
 } from "./auth.js";
@@ -22,19 +22,19 @@ import { SentryTargetConfigSchema } from "./target-config-schema.js";
 import { SentryTargetSecretSchema } from "./target-secret-schema.js";
 import { SentryToolIds } from "./tool-ids.js";
 
-export type SentryMcpBaseIntegrationDefinition = IntegrationDefinition<
+export type SentryDefaultBaseIntegrationDefinition = IntegrationDefinition<
   typeof SentryTargetConfigSchema,
   typeof SentryTargetSecretSchema,
   typeof SentryBindingConfigSchema,
   SentryConnectionConfig
 >;
 
-export const SentryMcpBaseDefinition: SentryMcpBaseIntegrationDefinition = {
+export const SentryDefaultBaseDefinition: SentryDefaultBaseIntegrationDefinition = {
   familyId: "sentry",
-  variantId: "sentry-mcp",
+  variantId: "sentry-default",
   kind: IntegrationKinds.CONNECTOR,
   displayName: "Sentry",
-  description: "Enable Sentry hosted MCP access for issues, traces, releases, and projects.",
+  description: "Enable Sentry issue webhooks and hosted MCP access.",
   logoKey: "sentry",
   targetConfigSchema: SentryTargetConfigSchema,
   targetSecretSchema: SentryTargetSecretSchema,
@@ -58,8 +58,8 @@ export const SentryMcpBaseDefinition: SentryMcpBaseIntegrationDefinition = {
       },
     },
     {
-      id: SentryConnectionMethodIds.INTERNAL_INTEGRATION,
-      label: "Sentry Internal Integration",
+      id: SentryConnectionMethodIds.WEBHOOK_SIGNING_SECRET,
+      label: "Sentry webhooks",
       kind: "form",
       secretFields: [
         {
@@ -69,15 +69,14 @@ export const SentryMcpBaseDefinition: SentryMcpBaseIntegrationDefinition = {
           description: "Client secret from the Sentry Internal Integration used to sign webhooks.",
           inputType: "password",
           secretType: SentryCredentialSecretTypes.OAUTH2_CLIENT_SECRET,
-          slotKey: SentryInternalIntegrationCredentialSlotKeys.CLIENT_SECRET,
+          slotKey: SentryWebhookSigningSecretCredentialSlotKeys.CLIENT_SECRET,
         },
       ],
-      configSchema: SentryInternalIntegrationConnectionConfigSchema,
+      configSchema: SentryWebhookSigningSecretConnectionConfigSchema,
       ui: {
         create: {
-          submitLabel: "Save Sentry integration",
-          helperText:
-            "Save a Sentry Internal Integration client secret for issue webhook verification.",
+          submitLabel: "Save Sentry webhook secret",
+          helperText: "Save a Sentry Internal Integration client secret for webhook verification.",
         },
       },
     },

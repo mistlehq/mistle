@@ -18,7 +18,7 @@ describe("webhook trigger requirements", () => {
       "github::github-cloud",
       "github::github-enterprise-server",
       "linear::linear-default",
-      "sentry::sentry-mcp",
+      "sentry::sentry-default",
       "slack::slack-default",
       "wasenderapi::wasenderapi-mcp",
       "whapi::whapi-mcp",
@@ -172,7 +172,7 @@ describe("webhook trigger requirements", () => {
   });
 
   it("maps Sentry issue trigger requirements to issue webhook subscriptions", () => {
-    const sentryDefinition = requireDefinition("sentry", "sentry-mcp");
+    const sentryDefinition = requireDefinition("sentry", "sentry-default");
 
     expect(
       sentryDefinition.supportedWebhookEvents?.map((eventDefinition) => eventDefinition.eventType),

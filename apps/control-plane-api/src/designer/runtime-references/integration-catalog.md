@@ -823,14 +823,14 @@ Trigger events:
 ## Sentry
 
 Provider family ID: `sentry`
-Integration target key: `sentry-mcp`
-Variant ID: `sentry-mcp`
-Description: Enable Sentry hosted MCP access for issues, traces, releases, and projects.
+Integration target key: `sentry-default`
+Variant ID: `sentry-default`
+Description: Enable Sentry issue webhooks and hosted MCP access.
 
 Setup methods:
 
 - `oauth2-authorization-code` (redirect): Sentry MCP OAuth
-- `sentry-internal-integration` (form): Sentry Internal Integration
+- `sentry-webhook-signing-secret` (form): Sentry webhooks
 
 Resource kinds:
 

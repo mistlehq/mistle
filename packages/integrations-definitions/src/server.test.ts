@@ -154,7 +154,7 @@ describe("integrations-definitions server", () => {
     });
     const sentryDefinition = registry.getDefinition({
       familyId: "sentry",
-      variantId: "sentry-mcp",
+      variantId: "sentry-default",
     });
     const signozDefinition = registry.getDefinition({
       familyId: "signoz",

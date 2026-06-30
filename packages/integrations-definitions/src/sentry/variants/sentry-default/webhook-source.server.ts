@@ -5,7 +5,7 @@ import {
 
 import { buildIntegrationWebhookCallbackUrl } from "../../../shared/webhook-callback-url.server.js";
 import {
-  SentryInternalIntegrationConnectionConfigSchema,
+  SentryWebhookSigningSecretConnectionConfigSchema,
   type SentryConnectionConfig,
 } from "./auth.js";
 
@@ -16,7 +16,7 @@ export const SentryWebhookSourceCapability: IntegrationWebhookSourceCapability<
 > = {
   lifecycle: IntegrationWebhookSourceLifecycles.IMPLICIT,
   supportsConnection(input) {
-    return SentryInternalIntegrationConnectionConfigSchema.safeParse(input.connection.config)
+    return SentryWebhookSigningSecretConnectionConfigSchema.safeParse(input.connection.config)
       .success;
   },
   describeSource(input) {

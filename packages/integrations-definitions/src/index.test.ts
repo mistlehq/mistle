@@ -163,7 +163,7 @@ describe("integrations-definitions index", () => {
     });
     const sentryDefinition = registry.getDefinition({
       familyId: "sentry",
-      variantId: "sentry-mcp",
+      variantId: "sentry-default",
     });
     const signozDefinition = registry.getDefinition({
       familyId: "signoz",
@@ -967,7 +967,7 @@ describe("integrations-definitions index", () => {
     expect(xeroDefinition?.mcp).toBeDefined();
     expect(sentryDefinition).toMatchObject({
       familyId: "sentry",
-      variantId: "sentry-mcp",
+      variantId: "sentry-default",
       kind: "connector",
       displayName: "Sentry",
       connectionMethods: [
@@ -983,15 +983,15 @@ describe("integrations-definitions index", () => {
           },
         },
         {
-          id: "sentry-internal-integration",
-          label: "Sentry Internal Integration",
+          id: "sentry-webhook-signing-secret",
+          label: "Sentry webhooks",
           kind: "form",
           secretFields: [
             {
               name: "clientSecret",
               label: "Client secret",
               inputType: "password",
-              slotKey: "sentry.sentry-mcp.sentry-internal-integration.client-secret",
+              slotKey: "sentry.sentry-default.sentry-webhook-signing-secret.client-secret",
             },
           ],
         },
@@ -1502,7 +1502,7 @@ describe("integrations-definitions index", () => {
       "modal::modal-default",
       "opencomputer::opencomputer-default",
       "tensorlake::tensorlake-default",
-      "sentry::sentry-mcp",
+      "sentry::sentry-default",
       "signoz::signoz-mcp",
       "slack::slack-default",
       "shopify::shopify-default",

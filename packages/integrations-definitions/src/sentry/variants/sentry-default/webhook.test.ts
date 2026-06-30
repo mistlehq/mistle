@@ -110,7 +110,7 @@ describe("Sentry webhook support", () => {
           id: "icn_sentry",
           status: "active",
           config: {
-            connection_method: "sentry-internal-integration",
+            connection_method: "sentry-webhook-signing-secret",
           },
         },
       }),
@@ -131,11 +131,11 @@ describe("Sentry webhook support", () => {
     expect(
       SentryWebhookSourceCapability.describeSource({
         organizationId: "org_123",
-        targetKey: "sentry-mcp",
+        targetKey: "sentry-default",
         controlPlaneBaseUrl: "https://control-plane.example.com",
         target: {
           familyId: "sentry",
-          variantId: "sentry-mcp",
+          variantId: "sentry-default",
           enabled: true,
           config: {},
           secrets: {},
@@ -144,12 +144,12 @@ describe("Sentry webhook support", () => {
           id: "icn_sentry",
           status: "active",
           config: {
-            connection_method: "sentry-internal-integration",
+            connection_method: "sentry-webhook-signing-secret",
           },
         },
         source: {
           id: "iws_sentry",
-          targetKey: "sentry-mcp",
+          targetKey: "sentry-default",
           organizationId: "org_123",
           integrationConnectionId: "icn_sentry",
           endpointKey: "eps_sentry",
@@ -158,17 +158,18 @@ describe("Sentry webhook support", () => {
       }),
     ).toEqual({
       displayName: "Sentry issue webhook",
-      callbackUrl: "https://control-plane.example.com/p/integration/webhooks/sentry-mcp/eps_sentry",
+      callbackUrl:
+        "https://control-plane.example.com/p/integration/webhooks/sentry-default/eps_sentry",
       providerMetadata: {},
     });
   });
 
   it("normalizes a signed Sentry issue webhook into a trigger event", async () => {
     const result = await SentryWebhookHandler.resolveWebhookRequest({
-      targetKey: "sentry-mcp",
+      targetKey: "sentry-default",
       target: {
         familyId: "sentry",
-        variantId: "sentry-mcp",
+        variantId: "sentry-default",
         enabled: true,
         config: {},
         secrets: {},
@@ -194,10 +195,10 @@ describe("Sentry webhook support", () => {
   it("rejects unsupported Sentry webhook resources and issue actions", () => {
     expect(() =>
       SentryWebhookHandler.resolveWebhookRequest({
-        targetKey: "sentry-mcp",
+        targetKey: "sentry-default",
         target: {
           familyId: "sentry",
-          variantId: "sentry-mcp",
+          variantId: "sentry-default",
           enabled: true,
           config: {},
           secrets: {},
@@ -209,10 +210,10 @@ describe("Sentry webhook support", () => {
 
     expect(() =>
       SentryWebhookHandler.resolveWebhookRequest({
-        targetKey: "sentry-mcp",
+        targetKey: "sentry-default",
         target: {
           familyId: "sentry",
-          variantId: "sentry-mcp",
+          variantId: "sentry-default",
           enabled: true,
           config: {},
           secrets: {},
@@ -229,10 +230,10 @@ describe("Sentry webhook support", () => {
   it("requires documented delivery and issue identifiers", () => {
     expect(() =>
       SentryWebhookHandler.resolveWebhookRequest({
-        targetKey: "sentry-mcp",
+        targetKey: "sentry-default",
         target: {
           familyId: "sentry",
-          variantId: "sentry-mcp",
+          variantId: "sentry-default",
           enabled: true,
           config: {},
           secrets: {},
@@ -246,10 +247,10 @@ describe("Sentry webhook support", () => {
 
     expect(() =>
       SentryWebhookHandler.resolveWebhookRequest({
-        targetKey: "sentry-mcp",
+        targetKey: "sentry-default",
         target: {
           familyId: "sentry",
-          variantId: "sentry-mcp",
+          variantId: "sentry-default",
           enabled: true,
           config: {},
           secrets: {},
@@ -268,10 +269,10 @@ describe("Sentry webhook support", () => {
 
   it("keeps repeated same-issue same-action deliveries distinct by request id", async () => {
     const firstResult = await SentryWebhookHandler.resolveWebhookRequest({
-      targetKey: "sentry-mcp",
+      targetKey: "sentry-default",
       target: {
         familyId: "sentry",
-        variantId: "sentry-mcp",
+        variantId: "sentry-default",
         enabled: true,
         config: {},
         secrets: {},
@@ -280,10 +281,10 @@ describe("Sentry webhook support", () => {
       rawBody: encodePayload(SampleSentryIssuePayload),
     });
     const secondResult = await SentryWebhookHandler.resolveWebhookRequest({
-      targetKey: "sentry-mcp",
+      targetKey: "sentry-default",
       target: {
         familyId: "sentry",
-        variantId: "sentry-mcp",
+        variantId: "sentry-default",
         enabled: true,
         config: {},
         secrets: {},
@@ -356,10 +357,10 @@ describe("Sentry webhook support", () => {
     });
 
     const result = await SentryWebhookHandler.resolveWebhookRequest({
-      targetKey: "sentry-mcp",
+      targetKey: "sentry-default",
       target: {
         familyId: "sentry",
-        variantId: "sentry-mcp",
+        variantId: "sentry-default",
         enabled: true,
         config: {},
         secrets: {},
@@ -373,10 +374,10 @@ describe("Sentry webhook support", () => {
 
     expect(
       SentryWebhookHandler.verify({
-        targetKey: "sentry-mcp",
+        targetKey: "sentry-default",
         target: {
           familyId: "sentry",
-          variantId: "sentry-mcp",
+          variantId: "sentry-default",
           enabled: true,
           config: {},
           secrets: {},
@@ -386,7 +387,7 @@ describe("Sentry webhook support", () => {
           id: "icn_sentry",
           status: "active",
           config: {
-            connection_method: "sentry-internal-integration",
+            connection_method: "sentry-webhook-signing-secret",
           },
         },
         connectionSecrets: {
@@ -408,10 +409,10 @@ describe("Sentry webhook support", () => {
       rawBody,
     });
     const result = await SentryWebhookHandler.resolveWebhookRequest({
-      targetKey: "sentry-mcp",
+      targetKey: "sentry-default",
       target: {
         familyId: "sentry",
-        variantId: "sentry-mcp",
+        variantId: "sentry-default",
         enabled: true,
         config: {},
         secrets: {},
@@ -435,10 +436,10 @@ describe("Sentry webhook support", () => {
     });
     expect(
       SentryWebhookHandler.verify({
-        targetKey: "sentry-mcp",
+        targetKey: "sentry-default",
         target: {
           familyId: "sentry",
-          variantId: "sentry-mcp",
+          variantId: "sentry-default",
           enabled: true,
           config: {},
           secrets: {},
@@ -448,7 +449,7 @@ describe("Sentry webhook support", () => {
           id: "icn_sentry",
           status: "active",
           config: {
-            connection_method: "sentry-internal-integration",
+            connection_method: "sentry-webhook-signing-secret",
           },
         },
         connectionSecrets: {
@@ -463,10 +464,10 @@ describe("Sentry webhook support", () => {
 
   it("requires a Sentry client secret and signature header before accepting webhooks", async () => {
     const result = await SentryWebhookHandler.resolveWebhookRequest({
-      targetKey: "sentry-mcp",
+      targetKey: "sentry-default",
       target: {
         familyId: "sentry",
-        variantId: "sentry-mcp",
+        variantId: "sentry-default",
         enabled: true,
         config: {},
         secrets: {},
@@ -480,10 +481,10 @@ describe("Sentry webhook support", () => {
 
     expect(
       SentryWebhookHandler.verify({
-        targetKey: "sentry-mcp",
+        targetKey: "sentry-default",
         target: {
           familyId: "sentry",
-          variantId: "sentry-mcp",
+          variantId: "sentry-default",
           enabled: true,
           config: {},
           secrets: {},
@@ -493,7 +494,7 @@ describe("Sentry webhook support", () => {
           id: "icn_sentry",
           status: "active",
           config: {
-            connection_method: "sentry-internal-integration",
+            connection_method: "sentry-webhook-signing-secret",
           },
         },
         connectionSecrets: {},
@@ -509,10 +510,10 @@ describe("Sentry webhook support", () => {
 
     expect(
       SentryWebhookHandler.verify({
-        targetKey: "sentry-mcp",
+        targetKey: "sentry-default",
         target: {
           familyId: "sentry",
-          variantId: "sentry-mcp",
+          variantId: "sentry-default",
           enabled: true,
           config: {},
           secrets: {},
@@ -522,7 +523,7 @@ describe("Sentry webhook support", () => {
           id: "icn_sentry",
           status: "active",
           config: {
-            connection_method: "sentry-internal-integration",
+            connection_method: "sentry-webhook-signing-secret",
           },
         },
         connectionSecrets: {

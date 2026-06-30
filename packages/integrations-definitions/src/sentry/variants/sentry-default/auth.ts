@@ -5,7 +5,7 @@ import {
 import { z } from "zod";
 
 export const SentryFamilyId = "sentry";
-export const SentryMcpVariantId = "sentry-mcp";
+export const SentryDefaultVariantId = "sentry-default";
 export const SentryMcpIssuerUrl = "https://mcp.sentry.dev";
 export const SentryMcpUrl = "https://mcp.sentry.dev/mcp";
 
@@ -19,19 +19,19 @@ export const SentryCredentialSecretTypes: {
 
 export const SentryCredentialSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
   familyId: SentryFamilyId,
-  variantId: SentryMcpVariantId,
+  variantId: SentryDefaultVariantId,
 });
 
-export const SentryInternalIntegrationCredentialSlotKeys: {
-  CLIENT_SECRET: "sentry.sentry-mcp.sentry-internal-integration.client-secret";
+export const SentryWebhookSigningSecretCredentialSlotKeys: {
+  CLIENT_SECRET: "sentry.sentry-default.sentry-webhook-signing-secret.client-secret";
 } = {
-  CLIENT_SECRET: "sentry.sentry-mcp.sentry-internal-integration.client-secret",
+  CLIENT_SECRET: "sentry.sentry-default.sentry-webhook-signing-secret.client-secret",
 };
 
 export const SentryConnectionMethodIds: {
-  INTERNAL_INTEGRATION: "sentry-internal-integration";
+  WEBHOOK_SIGNING_SECRET: "sentry-webhook-signing-secret";
 } = {
-  INTERNAL_INTEGRATION: "sentry-internal-integration",
+  WEBHOOK_SIGNING_SECRET: "sentry-webhook-signing-secret",
 };
 
 export const SentryMcpOAuthScopes = ["org:read", "project:write", "team:write", "event:write"];
@@ -43,15 +43,15 @@ export const SentryMcpOAuthConnectionConfigSchema = z
   })
   .strict();
 
-export const SentryInternalIntegrationConnectionConfigSchema = z
+export const SentryWebhookSigningSecretConnectionConfigSchema = z
   .object({
-    connection_method: z.literal(SentryConnectionMethodIds.INTERNAL_INTEGRATION),
+    connection_method: z.literal(SentryConnectionMethodIds.WEBHOOK_SIGNING_SECRET),
   })
   .strict();
 
 export const SentryConnectionConfigSchema = z.union([
   SentryMcpOAuthConnectionConfigSchema,
-  SentryInternalIntegrationConnectionConfigSchema,
+  SentryWebhookSigningSecretConnectionConfigSchema,
 ]);
 
 export type SentryConnectionConfig = z.output<typeof SentryConnectionConfigSchema>;
