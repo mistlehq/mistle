@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, relative, sep, join } from "node:path";
 
 import { systemSleeper } from "@mistle/time";
 import { GenericContainer, type StartedTestContainer, type WaitStrategy } from "testcontainers";
@@ -13,7 +13,7 @@ export const DesignerEvalCodexAppServerListenUrl = `ws://0.0.0.0:${String(
   DesignerEvalCodexAppServerPort,
 )}`;
 export const DesignerEvalCodexAppServerReadyPath = "/readyz";
-const DesignerEvalWebSocketTokenPath = "/var/lib/mistle/codex-app-server-ws-token";
+const DesignerEvalWebSocketTokenPath = "/tmp/mistle-codex-app-server-ws-token";
 
 export type DesignerEvalContainerRuntimeClient = {
   imageRef: string;
@@ -147,14 +147,10 @@ export function createDesignerEvalContainerDefinition(input: {
     container = container.withName(input.containerName);
   }
 
-  const materializedFileMounts: DesignerEvalContainerBindMount[] = input.materializedFiles.map(
-    (file) => ({
-      source: file.localPath,
-      target: file.runtimePath,
-      mode: "ro",
-    }),
-  );
-  const bindMounts = [...materializedFileMounts, ...input.bindMounts];
+  const bindMounts = [
+    ...createDesignerEvalMaterializedFileDirectoryMounts(input.materializedFiles),
+    ...input.bindMounts,
+  ];
 
   if (bindMounts.length > 0) {
     container = container.withBindMounts(
@@ -167,6 +163,69 @@ export function createDesignerEvalContainerDefinition(input: {
   }
 
   return container;
+}
+
+export function createDesignerEvalMaterializedFileDirectoryMounts(
+  materializedFiles: readonly MaterializedDesignerRuntimeFile[],
+): readonly DesignerEvalContainerBindMount[] {
+  const mounts = new Map<string, DesignerEvalContainerBindMount>();
+
+  for (const file of materializedFiles) {
+    const target = resolveMaterializedFileMountTarget(file.runtimePath);
+    const source = resolveMaterializedFileMountSource({
+      localPath: file.localPath,
+      runtimePath: file.runtimePath,
+      target,
+    });
+    mounts.set(target, {
+      source,
+      target,
+      mode: target === "/root/.codex" ? "rw" : "ro",
+    });
+  }
+
+  return [...mounts.values()];
+}
+
+function resolveMaterializedFileMountTarget(runtimePath: string): string {
+  if (runtimePath === "/root/.codex" || runtimePath.startsWith("/root/.codex/")) {
+    return "/root/.codex";
+  }
+  if (runtimePath === "/root/.mistle" || runtimePath.startsWith("/root/.mistle/")) {
+    return "/root/.mistle";
+  }
+  if (runtimePath === "/etc/codex" || runtimePath.startsWith("/etc/codex/")) {
+    return "/etc/codex";
+  }
+
+  return dirname(runtimePath);
+}
+
+function resolveMaterializedFileMountSource(input: {
+  localPath: string;
+  runtimePath: string;
+  target: string;
+}): string {
+  const runtimePathFromTarget = relative(input.target, input.runtimePath);
+  if (runtimePathFromTarget.startsWith("..") || runtimePathFromTarget === "") {
+    throw new Error(
+      `Materialized runtime file '${input.runtimePath}' is not under mount target '${input.target}'.`,
+    );
+  }
+
+  return dirnameForRelativePathSegments({
+    path: input.localPath,
+    relativePath: runtimePathFromTarget,
+  });
+}
+
+function dirnameForRelativePathSegments(input: { path: string; relativePath: string }): string {
+  let current = input.path;
+  for (const _segment of input.relativePath.split(sep)) {
+    current = dirname(current);
+  }
+
+  return current;
 }
 
 export function createDesignerEvalCodexAppServerCommand(command: readonly string[]): string[] {
