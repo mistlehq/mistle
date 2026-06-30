@@ -73,6 +73,12 @@ export const SentryDefaultBaseDefinition: SentryDefaultBaseIntegrationDefinition
         },
       ],
       configSchema: SentryWebhookSigningSecretConnectionConfigSchema,
+      connectionDetail: {
+        installation: {
+          hideWebhookSourceSection: true,
+          includeWebhookCallbackUrl: true,
+        },
+      },
       ui: {
         create: {
           submitLabel: "Save Sentry webhook secret",

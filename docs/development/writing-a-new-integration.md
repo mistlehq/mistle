@@ -53,7 +53,7 @@ OAuth resource/audience values.
 
 | Integration shape             | References                                                                                         |
 | ----------------------------- | -------------------------------------------------------------------------------------------------- |
-| Hosted MCP with OAuth         | `src/sentry/variants/sentry-mcp`, `src/gcp/variants/gcp-mcp`                                       |
+| Hosted MCP with OAuth         | `src/sentry/variants/sentry-default`, `src/gcp/variants/gcp-mcp`                                   |
 | Hosted MCP with API token     | `src/cloudflare/variants/cloudflare-mcp`                                                           |
 | Multi-server MCP catalog      | `src/gcp/variants/gcp-mcp`, `src/cloudflare/variants/cloudflare-mcp`                               |
 | Model provider                | `src/openrouter/variants/openrouter-default`, `src/fireworks`, `src/kimi`                          |

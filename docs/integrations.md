@@ -32,6 +32,8 @@ Refer to [packages/docs/guides/google-workspace-integration-setup.mdx](../packag
 
 Refer to [docs/integrations/resend.md](./integrations/resend.md) for Resend MCP setup guidance.
 
+Refer to [docs/integrations/sentry.md](./integrations/sentry.md) for Sentry hosted MCP and issue webhook setup guidance.
+
 Refer to [packages/docs/guides/whapi-integration-setup.mdx](../packages/docs/guides/whapi-integration-setup.mdx) for Whapi MCP and webhook setup guidance.
 
 Refer to [docs/architecture.md](./architecture.md) for more details about credentialless sandboxes and caveats.
