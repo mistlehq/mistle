@@ -148,6 +148,7 @@ function saveSelectedProviderResourcesToMemory(input: {
     connectionId: input.body.connectionId,
     kind: "git",
     config: {
+      ...readObjectConfig(matchingBinding?.config),
       repositories: selectedHandles,
     },
   };
@@ -170,6 +171,14 @@ function saveSelectedProviderResourcesToMemory(input: {
     selectedHandles,
     createdBinding,
   });
+}
+
+function readObjectConfig(config: unknown): Record<string, unknown> {
+  if (typeof config !== "object" || config === null || Array.isArray(config)) {
+    return {};
+  }
+
+  return Object.fromEntries(Object.entries(config));
 }
 
 function validateProviderResourceSave(input: {

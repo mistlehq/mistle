@@ -99,6 +99,60 @@ describe("Designer eval control plane", () => {
     }
   });
 
+  it("preserves existing binding tools when selected provider resources are updated", async () => {
+    const evalCase = getDesignerEvalCase("github-pr-review-basic");
+    const state = createDesignerEvalSessionState({
+      evalCase,
+      runKey: "github_pr_review_basic",
+    });
+    const githubConnectionId = readSeededGithubConnectionId(state.seededState.providerConnections);
+    state.productState.targetDraft.integrationBindings = [
+      {
+        id: "ibd_eval_existing_github",
+        connectionId: githubConnectionId,
+        kind: "git",
+        config: {
+          tools: ["github-cli"],
+          repositories: ["mistlehq/previous"],
+        },
+      },
+    ];
+    const controlPlane = await startDesignerEvalControlPlane({ state });
+
+    try {
+      const apiClient = createDesignerEvalApiClient({
+        baseUrl: controlPlane.baseUrl,
+      });
+      const response = SaveDesignerSelectedProviderResourcesResponseSchema.parse(
+        await apiClient.postJson(
+          `/v1/designer/sessions/${state.designerSession.id}/dashboard-actions/save-selected-provider-resources`,
+          {
+            targetDraft: state.seededState.targetDraft,
+            connectionId: githubConnectionId,
+            resourceKind: "repository",
+            selectedHandles: ["mistlehq/mistle"],
+            bindingIntent: "git-repositories",
+          },
+        ),
+      );
+
+      expect(response.createdBinding).toBe(false);
+      expect(state.productState.targetDraft.integrationBindings).toEqual([
+        {
+          id: "ibd_eval_existing_github",
+          connectionId: githubConnectionId,
+          kind: "git",
+          config: {
+            tools: ["github-cli"],
+            repositories: ["mistlehq/mistle"],
+          },
+        },
+      ]);
+    } finally {
+      await controlPlane.close();
+    }
+  });
+
   it("rejects selected provider resources that were not seeded for the eval run", async () => {
     const evalCase = getDesignerEvalCase("github-pr-review-basic");
     const state = createDesignerEvalSessionState({

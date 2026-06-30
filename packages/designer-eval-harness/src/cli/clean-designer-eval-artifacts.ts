@@ -9,7 +9,10 @@ type CleanDesignerEvalArtifactsOptions = {
   caseId?: string;
   date?: string;
   dryRun: boolean;
+  force: boolean;
 };
+
+const DefaultDesignerEvalArtifactRoot = resolve(RepositoryRootPath, ".local/designer-evals/runs");
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
@@ -35,6 +38,11 @@ async function resolveCleanupTargets(
 ): Promise<readonly string[]> {
   if (options.date !== undefined && options.beforeDate !== undefined) {
     throw new Error("Use either --date or --before, not both.");
+  }
+  if (options.artifactRoot !== DefaultDesignerEvalArtifactRoot && !options.force) {
+    throw new Error(
+      `Refusing to clean custom Designer eval artifact root '${options.artifactRoot}' without --force.`,
+    );
   }
 
   const rootExists = await pathExists(options.artifactRoot);
@@ -102,11 +110,12 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 function parseArgs(args: readonly string[]): CleanDesignerEvalArtifactsOptions {
-  let artifactRoot = resolve(RepositoryRootPath, ".local/designer-evals/runs");
+  let artifactRoot = DefaultDesignerEvalArtifactRoot;
   let beforeDate: string | undefined;
   let caseId: string | undefined;
   let date: string | undefined;
   let dryRun = false;
+  let force = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -139,6 +148,10 @@ function parseArgs(args: readonly string[]): CleanDesignerEvalArtifactsOptions {
       dryRun = true;
       continue;
     }
+    if (arg === "--force") {
+      force = true;
+      continue;
+    }
     if (arg === "--help") {
       printHelp();
       process.exit(0);
@@ -153,6 +166,7 @@ function parseArgs(args: readonly string[]): CleanDesignerEvalArtifactsOptions {
     ...(caseId === undefined ? {} : { caseId }),
     ...(date === undefined ? {} : { date }),
     dryRun,
+    force,
   };
 }
 
@@ -178,6 +192,7 @@ Options:
   --case-id <id>              Remove only this case under matching date folders.
   --date <YYYY-MM-DD>         Remove one date folder.
   --dry-run                   Print matched paths without removing them.
+  --force                     Required when cleaning a custom --artifact-root.
 `);
 }
 
