@@ -6,17 +6,46 @@ icon: /icons/integrations/sentry.svg
 
 ## Overview
 
-Connect to Sentry through Sentry hosted MCP OAuth.
+Connect to Sentry through Sentry hosted MCP OAuth and Sentry issue webhooks.
 
-The Sentry integration exposes hosted MCP access for issues, traces, releases, and projects.
+The Sentry integration exposes hosted MCP access for issues, traces, releases, and projects. Mistle can also receive Sentry issue webhook events as triggers.
 
-## Connect In Mistle
+## Connect Sentry MCP
 
 Open **Integrations** in the dashboard, choose **Sentry**, then select **Sentry MCP OAuth**.
 
 The browser redirects to Sentry, the user approves access, and the returned OAuth credentials are stored for the connection.
 
 There are no user-entered secret fields for this target.
+
+## Connect Sentry Issue Webhooks
+
+Use the **Sentry webhooks** connection method with a Sentry Internal Integration.
+
+In Sentry:
+
+1. Create an Internal Integration for the Sentry organization.
+2. In **Internal Integration Details**, set **Webhook URL** to a temporary HTTPS endpoint that you control if Sentry requires a value before saving.
+3. Leave issue webhooks disabled until the Mistle callback URL is installed.
+4. Save the integration.
+5. Copy the integration client secret.
+
+In Mistle:
+
+1. Open **Integrations** in the dashboard, choose **Sentry**, then select **Sentry webhooks**.
+2. Paste the Sentry Internal Integration client secret.
+3. Save the connection.
+4. Copy the **Webhook callback URL** from the connection detail page.
+
+Return to Sentry, replace the temporary URL with the Mistle **Webhook callback URL** in the Internal Integration **Webhook URL** field, then enable issue webhooks for the integration.
+
+Mistle supports these Sentry issue webhook trigger events:
+
+- `sentry.issue.created`
+- `sentry.issue.resolved`
+- `sentry.issue.assigned`
+- `sentry.issue.archived`
+- `sentry.issue.unresolved`
 
 ## Use With A Sandbox Profile
 
