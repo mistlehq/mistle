@@ -204,7 +204,7 @@ describe("Designer eval control plane", () => {
 
       expect(response.status).toBe(500);
       expect(await response.json()).toEqual({
-        error: `Designer eval can only mutate seeded draft ${state.seededState.targetDraft.profileId}@${String(state.seededState.targetDraft.version)}.`,
+        error: "Designer eval control-plane request failed.",
       });
       expect(state.productState.targetDraft.integrationBindings).toEqual(originalBindings);
     } finally {
@@ -253,7 +253,7 @@ describe("Designer eval control plane", () => {
 
       expect(response.status).toBe(500);
       expect(await response.json()).toEqual({
-        error: "Designer eval binding 'ibd_eval_malformed_github' config must be an object.",
+        error: "Designer eval control-plane request failed.",
       });
       expect(state.productState.targetDraft.integrationBindings).toEqual(originalBindings);
     } finally {
@@ -293,7 +293,7 @@ describe("Designer eval control plane", () => {
 
       expect(response.status).toBe(500);
       expect(await response.json()).toEqual({
-        error: "Selected provider resource 'mistlehq/not-seeded' was not seeded for this eval.",
+        error: "Designer eval control-plane request failed.",
       });
       expect(state.productState.targetDraft.integrationBindings).toHaveLength(1);
     } finally {

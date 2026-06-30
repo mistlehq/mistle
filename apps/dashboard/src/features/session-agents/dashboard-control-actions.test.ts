@@ -155,17 +155,20 @@ describe("dashboard control actions", () => {
             maxItems: 6,
           },
         },
-        anyOf: expect.arrayContaining([
-          {
-            properties: {
-              inputKind: {
-                const: "integrationConnectionResourceMultiSelect",
-              },
-            },
-            required: ["inputKind", "resourceSelection"],
-          },
-        ]),
         allOf: expect.arrayContaining([
+          {
+            if: {
+              properties: {
+                inputKind: {
+                  const: "integrationConnectionResourceMultiSelect",
+                },
+              },
+              required: ["inputKind"],
+            },
+            then: {
+              required: ["resourceSelection"],
+            },
+          },
           {
             if: {
               required: ["resourceSelection"],
@@ -307,6 +310,25 @@ describe("dashboard control actions", () => {
             label: "Whapi Ver",
           },
         ],
+      },
+    });
+  });
+
+  it("parses freeform Designer user input dynamic tool calls", () => {
+    const parsed = parseDashboardControlDynamicToolCall({
+      namespace: DashboardControlDynamicToolNamespace,
+      tool: DesignerUserInputRequestDynamicToolName,
+      arguments: {
+        id: "setup-question",
+        question: "Which GitHub organization should this reviewer monitor?",
+      },
+    });
+
+    expect(parsed).toEqual({
+      action: DesignerUserInputRequestAction,
+      input: {
+        id: "setup-question",
+        question: "Which GitHub organization should this reviewer monitor?",
       },
     });
   });
@@ -741,13 +763,14 @@ describe("dashboard control actions", () => {
     }
   });
 
-  it("rejects Designer user input calls without an answer surface", () => {
+  it("rejects Designer user input calls with an empty options list", () => {
     const parsed = parseDashboardControlDynamicToolCall({
       namespace: DashboardControlDynamicToolNamespace,
       tool: DesignerUserInputRequestDynamicToolName,
       arguments: {
         id: "profile-choice",
         question: "Which sandbox profile should run the triaging agent?",
+        options: [],
       },
     });
 

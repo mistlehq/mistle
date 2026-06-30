@@ -59,10 +59,9 @@ async function handleDesignerEvalControlPlaneRequest(input: {
 }): Promise<void> {
   try {
     await routeDesignerEvalControlPlaneRequest(input);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+  } catch {
     writeJson(input.response, 500, {
-      error: message,
+      error: "Designer eval control-plane request failed.",
     });
   }
 }

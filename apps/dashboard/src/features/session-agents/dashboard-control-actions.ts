@@ -112,7 +112,7 @@ const DesignerUserInputRequestInputSchema = z
         return input.resourceSelection !== undefined;
       }
 
-      return input.options !== undefined && input.options.length > 0;
+      return input.options === undefined || input.options.length > 0;
     },
     {
       message: "Input kind requires a matching answer surface.",
@@ -697,18 +697,20 @@ export const DesignerUserInputRequestDynamicToolSpec = {
       submitAction: DesignerUserInputSubmitActionJsonSchema,
     },
     required: ["id", "question"],
-    anyOf: [
-      { required: ["options"] },
-      {
-        properties: {
-          inputKind: {
-            const: "integrationConnectionResourceMultiSelect",
-          },
-        },
-        required: ["inputKind", "resourceSelection"],
-      },
-    ],
     allOf: [
+      {
+        if: {
+          properties: {
+            inputKind: {
+              const: "integrationConnectionResourceMultiSelect",
+            },
+          },
+          required: ["inputKind"],
+        },
+        then: {
+          required: ["resourceSelection"],
+        },
+      },
       {
         if: {
           required: ["resourceSelection"],
