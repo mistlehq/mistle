@@ -14,7 +14,7 @@ import { createDesignerEvalSessionState } from "../control-plane/in-memory-state
 import { startDesignerEvalContainer } from "../docker/designer-eval-container.ts";
 import { compileEvalDesignerRuntime } from "../runtime/compile-eval-designer-runtime.ts";
 import { materializeDesignerRuntimeFiles } from "../runtime/materialize-runtime-files.ts";
-import { resolveDesignerEvalCodexRuntimeClient } from "../runtime/resolve-codex-runtime-client.ts";
+import { resolveDesignerEvalCodexRuntime } from "../runtime/resolve-codex-runtime-client.ts";
 import { RepositoryRootPath, resolveRepositoryPath } from "./paths.ts";
 
 async function main(): Promise<void> {
@@ -33,22 +33,16 @@ async function main(): Promise<void> {
     designerSessionId: options.designerSessionId,
     initialPrompt: options.prompt,
     openAiProviderMode: "local_subscription",
-    organizationId: options.organizationId,
     seededState: state.seededState,
   });
-  const codexClient = runtimePlan.runtimeClients.find(
-    (runtimeClient) => runtimeClient.clientId === "codex-cli",
-  );
-  if (codexClient === undefined) {
-    throw new Error("Designer runtime plan did not include the codex-cli runtime client.");
-  }
+  const resolvedRuntime = resolveDesignerEvalCodexRuntime(runtimePlan);
 
   const materializedFiles = await materializeDesignerRuntimeFiles({
-    files: codexClient.setup.files,
+    files: resolvedRuntime.setupFiles,
     outputDir: options.outputDir,
   });
   const startedContainer = await startDesignerEvalContainer({
-    runtimeClient: resolveDesignerEvalCodexRuntimeClient(runtimePlan),
+    runtimeClient: resolvedRuntime.containerRuntimeClient,
     materializedFiles,
     bindMounts: await resolveCodexAuthBindMounts({
       codexAuth: options.codexAuth ?? evalConfig.codex.auth,
@@ -76,7 +70,6 @@ function parseArgs(args: readonly string[]): {
   codexAuthPath?: string;
   containerName?: string;
   designerSessionId: string;
-  organizationId: string;
   outputDir: string;
   prompt: string;
   startupTimeoutMs: number;
@@ -87,7 +80,6 @@ function parseArgs(args: readonly string[]): {
   let codexAuthPath: string | undefined;
   let containerName: string | undefined;
   let designerSessionId = "dsn_eval_docker_runtime";
-  let organizationId = "org_eval_docker_runtime";
   let outputDir = resolve(RepositoryRootPath, ".local/designer-evals/docker-runtime-files");
   let prompt = "Help me build an agent that reviews GitHub pull requests.";
   let startupTimeoutMs = 60_000;
@@ -125,11 +117,6 @@ function parseArgs(args: readonly string[]): {
       index += 1;
       continue;
     }
-    if (arg === "--organization-id" && next !== undefined) {
-      organizationId = next;
-      index += 1;
-      continue;
-    }
     if (arg === "--output-dir" && next !== undefined) {
       outputDir = resolveRepositoryPath(next);
       index += 1;
@@ -160,7 +147,6 @@ function parseArgs(args: readonly string[]): {
     ...(codexAuthPath === undefined ? {} : { codexAuthPath }),
     ...(containerName === undefined ? {} : { containerName }),
     designerSessionId,
-    organizationId,
     outputDir,
     prompt,
     startupTimeoutMs,
@@ -229,7 +215,6 @@ Options:
   --codex-auth-path <path>      Local Codex auth file. Defaults to config auth_path or ~/.codex/auth.json.
   --container-name <name>       Optional Docker container name.
   --designer-session-id <id>    Designer session id for MCP credential config.
-  --organization-id <id>        Organization id for runtime artifact refs.
   --output-dir <dir>            Local runtime file output directory.
   --prompt <text>               Initial Designer prompt.
   --startup-timeout-ms <ms>     Docker container startup timeout. Defaults to 60000.

@@ -14,7 +14,6 @@ describe("createDesignerRuntimePlan", () => {
         url: "http://127.0.0.1:4000/mcp",
       },
       openAiProviderMode: "local_subscription",
-      organizationId: "org_eval_local_auth",
     });
 
     const configFile = runtimePlan.runtimeClients
@@ -37,7 +36,6 @@ describe("createDesignerRuntimePlan", () => {
         enabled: true,
         url: "http://127.0.0.1:4000/mcp",
       },
-      organizationId: "org_eval_platform_auth",
     });
 
     const configFile = runtimePlan.runtimeClients
@@ -59,7 +57,6 @@ describe("createDesignerRuntimePlan", () => {
         enabled: false,
       },
       openAiProviderMode: "local_subscription",
-      organizationId: "org_eval_without_mistle_mcp",
     });
 
     const configFile = runtimePlan.runtimeClients

@@ -83,11 +83,7 @@ export type DesignerEvalAssertion =
     }
   | {
       kind: "saved-selected-provider-resources";
-      profileId: string;
-      version: number;
       connectionId: string;
-      resourceKind: string;
-      bindingIntent: string;
       selectedHandles: readonly string[];
     }
   | {

@@ -11,7 +11,6 @@ export type CompileEvalDesignerRuntimeInput = {
   designerSessionId: string;
   initialPrompt: string;
   openAiProviderMode?: "platform" | "local_subscription";
-  organizationId: string;
   seededState: DesignerEvalSeededState;
 };
 
@@ -31,7 +30,6 @@ export function compileEvalDesignerRuntime(input: CompileEvalDesignerRuntimeInpu
     ...(input.openAiProviderMode === undefined
       ? {}
       : { openAiProviderMode: input.openAiProviderMode }),
-    organizationId: input.organizationId,
   });
 }
 

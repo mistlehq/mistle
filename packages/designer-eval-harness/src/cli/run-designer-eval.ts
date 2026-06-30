@@ -33,13 +33,9 @@ import {
   type DirectCodexJsonRpcClient,
 } from "../runtime/direct-codex-json-rpc-client.ts";
 import { materializeDesignerRuntimeFiles } from "../runtime/materialize-runtime-files.ts";
-import { resolveDesignerEvalCodexRuntimeClient } from "../runtime/resolve-codex-runtime-client.ts";
+import { resolveDesignerEvalCodexRuntime } from "../runtime/resolve-codex-runtime-client.ts";
 import { renderTranscriptMarkdown } from "../transcript/transcript.ts";
-import type {
-  DesignerEvalAssertion,
-  DesignerEvalDashboardControlAction,
-  DesignerEvalSeededState,
-} from "../types.ts";
+import type { DesignerEvalDashboardControlAction } from "../types.ts";
 import { RepositoryRootPath, resolveRepositoryPath } from "./paths.ts";
 
 async function main(): Promise<void> {
@@ -85,21 +81,15 @@ async function main(): Promise<void> {
       designerSessionId,
       initialPrompt: evalCase.prompt,
       openAiProviderMode: "local_subscription",
-      organizationId: state.designerSession.organizationId,
       seededState: state.seededState,
     });
-    const codexClient = runtimePlan.runtimeClients.find(
-      (runtimeClient) => runtimeClient.clientId === "codex-cli",
-    );
-    if (codexClient === undefined) {
-      throw new Error("Designer runtime plan did not include the codex-cli runtime client.");
-    }
+    const resolvedRuntime = resolveDesignerEvalCodexRuntime(runtimePlan);
     const materializedFiles = await materializeDesignerRuntimeFiles({
-      files: codexClient.setup.files,
+      files: resolvedRuntime.setupFiles,
       outputDir: join(artifacts.artifactDir, "runtime-files"),
     });
     startedContainer = await startDesignerEvalContainer({
-      runtimeClient: resolveDesignerEvalCodexRuntimeClient(runtimePlan),
+      runtimeClient: resolvedRuntime.containerRuntimeClient,
       materializedFiles,
       bindMounts: await resolveCodexAuthBindMounts({
         codexAuth: options.codexAuth ?? evalConfig.codex.auth,
@@ -217,10 +207,7 @@ async function main(): Promise<void> {
 
     const result = evaluateDesignerEvalRun({
       caseId: evalCase.id,
-      assertions: resolveSeededAssertions({
-        assertions: evalCase.assertions,
-        seededState: state.seededState,
-      }),
+      assertions: evalCase.assertions,
       dashboardControlActions: dashboardActions,
       productStateAfter,
       transcriptMarkdown,
@@ -265,23 +252,6 @@ function createDashboardControlFailureResponse(message: string): {
       },
     ],
   };
-}
-
-function resolveSeededAssertions(input: {
-  assertions: readonly DesignerEvalAssertion[];
-  seededState: DesignerEvalSeededState;
-}): readonly DesignerEvalAssertion[] {
-  return input.assertions.map((assertion) => {
-    if (assertion.kind !== "saved-selected-provider-resources") {
-      return assertion;
-    }
-
-    return {
-      ...assertion,
-      profileId: input.seededState.targetDraft.profileId,
-      version: input.seededState.targetDraft.version,
-    };
-  });
 }
 
 function parseArgs(args: readonly string[]): {

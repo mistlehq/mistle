@@ -1,13 +1,9 @@
 import {
   CompiledRuntimePlanSchema,
-  type CompiledRuntimeArtifactSpec,
   type EgressCredentialRoute,
   IntegrationMcpConfigFormats,
   IntegrationMcpTransports,
   type ResolvedIntegrationMcpServer,
-  type RuntimeArtifactRefs,
-  type RuntimeArtifactSpec,
-  type RuntimeExecCommand,
   SandboxImageSources,
   applyMcpConfigToRuntimeClients,
   createDisabledAssociatedResourceEventRouting,
@@ -40,14 +36,6 @@ ${input.initialPrompt
   };
 }
 
-const DesignerSandboxPaths = {
-  userHomeDir: "/root",
-  workspaceDir: "/root",
-  runtimeDataDir: "/var/lib/mistle",
-  runtimeArtifactDir: "/var/lib/mistle/artifacts",
-  runtimeArtifactBinDir: "/usr/local/bin",
-} as const;
-
 function createDesignerDocsMcpServer(): ResolvedIntegrationMcpServer {
   return {
     source: {
@@ -61,105 +49,6 @@ function createDesignerDocsMcpServer(): ResolvedIntegrationMcpServer {
       url: DesignerDocsMcpServerUrl,
     },
   };
-}
-
-function createRuntimeExecCommand(command: RuntimeExecCommand): RuntimeExecCommand {
-  return {
-    args: [...command.args],
-    ...(command.env === undefined ? {} : { env: { ...command.env } }),
-    ...(command.cwd === undefined ? {} : { cwd: command.cwd }),
-    ...(command.timeoutMs === undefined ? {} : { timeoutMs: command.timeoutMs }),
-  };
-}
-
-function createDesignerRuntimeArtifactRefs(input: {
-  organizationId: string;
-  sandboxProfileId: string;
-  version: number;
-}): RuntimeArtifactRefs {
-  return {
-    command: {
-      exec: (command) => ({
-        op: "exec",
-        command: createRuntimeExecCommand(command),
-      }),
-    },
-    sandboxPaths: DesignerSandboxPaths,
-    artifactBinPath: (binaryName) => `${DesignerSandboxPaths.runtimeArtifactBinDir}/${binaryName}`,
-    mise: {
-      install: (installInput) => ({
-        op: "mise_install",
-        tools: [...installInput.tools],
-        ...(installInput.force === undefined ? {} : { force: installInput.force }),
-        ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
-      }),
-    },
-    githubReleases: {
-      install: (installInput) => ({
-        op: "github_release_install",
-        repository: installInput.repository,
-        release:
-          installInput.release.kind === "latest"
-            ? { kind: "latest" }
-            : installInput.release.match === "exact"
-              ? {
-                  kind: "tag",
-                  match: "exact",
-                  tag: installInput.release.tag,
-                }
-              : {
-                  kind: "tag",
-                  match: "latest_matching_prefix",
-                  prefix: installInput.release.prefix,
-                },
-        asset:
-          installInput.asset.kind === "exact"
-            ? { ...installInput.asset }
-            : {
-                kind: "by_arch",
-                x86_64: { ...installInput.asset.x86_64 },
-                aarch64: { ...installInput.asset.aarch64 },
-              },
-        installPath: installInput.installPath,
-        ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
-      }),
-    },
-    compileContext: {
-      organizationId: input.organizationId,
-      sandboxProfileId: input.sandboxProfileId,
-      version: input.version,
-      targetKey: "agent-runtime",
-      bindingId: `agent-runtime-${DesignerRuntimeId}`,
-    },
-  };
-}
-
-function compileDesignerRuntimeArtifacts(input: {
-  artifacts: ReadonlyArray<RuntimeArtifactSpec>;
-  organizationId: string;
-}): ReadonlyArray<CompiledRuntimeArtifactSpec> {
-  const refs = createDesignerRuntimeArtifactRefs({
-    organizationId: input.organizationId,
-    sandboxProfileId: DESIGNER_RUNTIME_PROFILE_ID,
-    version: DESIGNER_RUNTIME_PROFILE_VERSION,
-  });
-
-  return input.artifacts.map((artifact) => {
-    const install =
-      typeof artifact.lifecycle.install === "function"
-        ? artifact.lifecycle.install({ refs })
-        : artifact.lifecycle.install;
-
-    return {
-      artifactKey: artifact.artifactKey,
-      name: artifact.name,
-      ...(artifact.description === undefined ? {} : { description: artifact.description }),
-      ...(artifact.env === undefined ? {} : { env: { ...artifact.env } }),
-      lifecycle: {
-        install,
-      },
-    };
-  });
 }
 
 export type DesignerRuntimeMistleMcpConfig =
@@ -182,7 +71,6 @@ export function createDesignerRuntimePlan(input: {
   initialPrompt: string;
   mistleMcp: DesignerRuntimeMistleMcpConfig;
   openAiProviderMode?: "platform" | "local_subscription";
-  organizationId: string;
 }) {
   const egressRoutes = [
     ...(input.openAiProviderMode === "local_subscription"
@@ -221,6 +109,9 @@ export function createDesignerRuntimePlan(input: {
     ],
     mcpServers,
   });
+  if ((codexRuntime.artifacts ?? []).length > 0) {
+    throw new Error("Designer installed Codex runtime must not require runtime artifacts.");
+  }
   const runtimeClients =
     codexRuntime.renderRuntimeClients === undefined
       ? codexRuntime.runtimeClients
@@ -249,11 +140,6 @@ export function createDesignerRuntimePlan(input: {
         }
       : runtimeClient,
   );
-  const artifacts = compileDesignerRuntimeArtifacts({
-    artifacts: codexRuntime.artifacts ?? [],
-    organizationId: input.organizationId,
-  });
-
   return CompiledRuntimePlanSchema.parse({
     sandboxProfileId: DESIGNER_RUNTIME_PROFILE_ID,
     version: DESIGNER_RUNTIME_PROFILE_VERSION,
@@ -263,7 +149,7 @@ export function createDesignerRuntimePlan(input: {
     },
     associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     egressRoutes,
-    artifacts,
+    artifacts: [],
     workspaceSources: [],
     runtimeClients: runtimeClientsWithDesignerReferences,
     agentRuntimes: codexRuntime.agentRuntimes,

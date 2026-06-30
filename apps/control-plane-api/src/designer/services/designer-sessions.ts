@@ -344,7 +344,6 @@ export async function createDesignerSession(
       enabled: true,
       url: ctx.mcpConfig.url,
     },
-    organizationId: input.organizationId,
   });
   const startedSandbox = await ctx.dataPlaneClient.startSandboxInstance({
     organizationId: input.organizationId,

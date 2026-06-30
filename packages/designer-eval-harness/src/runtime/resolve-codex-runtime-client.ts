@@ -1,10 +1,15 @@
-import type { CompiledRuntimePlan } from "@mistle/integrations-core";
+import type { CompiledRuntimePlan, RuntimeClientSetupFile } from "@mistle/integrations-core";
 
 import type { DesignerEvalContainerRuntimeClient } from "../docker/designer-eval-container.ts";
 
-export function resolveDesignerEvalCodexRuntimeClient(
+export type DesignerEvalCodexRuntime = {
+  containerRuntimeClient: DesignerEvalContainerRuntimeClient;
+  setupFiles: readonly RuntimeClientSetupFile[];
+};
+
+export function resolveDesignerEvalCodexRuntime(
   runtimePlan: CompiledRuntimePlan,
-): DesignerEvalContainerRuntimeClient {
+): DesignerEvalCodexRuntime {
   const codexClient = runtimePlan.runtimeClients.find(
     (runtimeClient) => runtimeClient.clientId === "codex-cli",
   );
@@ -22,7 +27,10 @@ export function resolveDesignerEvalCodexRuntimeClient(
   }
 
   return {
-    imageRef: runtimePlan.image.imageRef,
-    command: codexProcess.command.args,
+    containerRuntimeClient: {
+      imageRef: runtimePlan.image.imageRef,
+      command: codexProcess.command.args,
+    },
+    setupFiles: codexClient.setup.files,
   };
 }

@@ -250,21 +250,6 @@ export function createDesignerEvalCodexAppServerCommand(command: readonly string
   ];
 }
 
-export function createStartedDesignerEvalContainer(input: {
-  container: StartedTestContainer;
-  websocketAuthToken: string;
-}): StartedDesignerEvalContainer {
-  return {
-    websocketAuthToken: input.websocketAuthToken,
-    websocketUrl: `ws://${input.container.getHost()}:${String(
-      input.container.getMappedPort(DesignerEvalCodexAppServerPort),
-    )}`,
-    stop: async () => {
-      await input.container.stop();
-    },
-  };
-}
-
 function createDesignerEvalCodexAppServerAuthArgs(): string[] {
   return ["--ws-auth", "capability-token", "--ws-token-file", DesignerEvalWebSocketTokenPath];
 }

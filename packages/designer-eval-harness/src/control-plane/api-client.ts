@@ -39,7 +39,7 @@ export function createDesignerEvalApiClient(input: {
   };
 }
 
-export async function requestJson(input: {
+async function requestJson(input: {
   baseUrl: string;
   cookie: string | null;
   method: "GET" | "POST" | "PUT";
@@ -64,19 +64,6 @@ export async function requestJson(input: {
   }
 
   return payload;
-}
-
-export function readStringField(payload: unknown, field: string): string {
-  if (typeof payload !== "object" || payload === null) {
-    throw new Error(`Expected response payload to include '${field}'.`);
-  }
-
-  const value = Reflect.get(payload, field);
-  if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`Expected response payload field '${field}' to be a non-empty string.`);
-  }
-
-  return value;
 }
 
 function parseJsonResponse(responseText: string): unknown {

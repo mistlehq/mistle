@@ -15,5 +15,5 @@ export { DesignerEvalJudgeResultSchema, renderJudgeResultMarkdown } from "./judg
 export { compileEvalDesignerRuntime } from "./runtime/compile-eval-designer-runtime.js";
 export { connectDirectCodexJsonRpcClient } from "./runtime/direct-codex-json-rpc-client.js";
 export { materializeDesignerRuntimeFiles } from "./runtime/materialize-runtime-files.js";
-export { resolveDesignerEvalCodexRuntimeClient } from "./runtime/resolve-codex-runtime-client.js";
+export { resolveDesignerEvalCodexRuntime } from "./runtime/resolve-codex-runtime-client.js";
 export type * from "./types.js";

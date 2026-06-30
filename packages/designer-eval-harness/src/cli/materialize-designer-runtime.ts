@@ -8,7 +8,7 @@ import {
 import { createDesignerEvalSessionState } from "../control-plane/in-memory-state.ts";
 import { compileEvalDesignerRuntime } from "../runtime/compile-eval-designer-runtime.ts";
 import { materializeDesignerRuntimeFiles } from "../runtime/materialize-runtime-files.ts";
-import { resolveDesignerEvalCodexRuntimeClient } from "../runtime/resolve-codex-runtime-client.ts";
+import { resolveDesignerEvalCodexRuntime } from "../runtime/resolve-codex-runtime-client.ts";
 import { RepositoryRootPath, resolveRepositoryPath } from "./paths.ts";
 
 async function main(): Promise<void> {
@@ -27,26 +27,19 @@ async function main(): Promise<void> {
     designerSessionId: options.designerSessionId,
     initialPrompt: options.prompt,
     openAiProviderMode: "local_subscription",
-    organizationId: options.organizationId,
     seededState: state.seededState,
   });
-  const codexClient = runtimePlan.runtimeClients.find(
-    (runtimeClient) => runtimeClient.clientId === "codex-cli",
-  );
-  if (codexClient === undefined) {
-    throw new Error("Designer runtime plan did not include the codex-cli runtime client.");
-  }
+  const resolvedRuntime = resolveDesignerEvalCodexRuntime(runtimePlan);
 
   const materialized = await materializeDesignerRuntimeFiles({
-    files: codexClient.setup.files,
+    files: resolvedRuntime.setupFiles,
     outputDir: options.outputDir,
   });
-  const dockerRuntimeClient = resolveDesignerEvalCodexRuntimeClient(runtimePlan);
 
   console.log(`Materialized ${String(materialized.length)} Designer runtime file(s).`);
   console.log(`Output: ${options.outputDir}`);
-  console.log(`Image: ${dockerRuntimeClient.imageRef}`);
-  console.log(`Command: ${dockerRuntimeClient.command.join(" ")}`);
+  console.log(`Image: ${resolvedRuntime.containerRuntimeClient.imageRef}`);
+  console.log(`Command: ${resolvedRuntime.containerRuntimeClient.command.join(" ")}`);
   for (const file of materialized) {
     console.log(`- ${file.fileId}: ${file.runtimePath} -> ${file.localPath}`);
   }
@@ -56,14 +49,12 @@ function parseArgs(args: readonly string[]): {
   caseId: string;
   configPath: string;
   designerSessionId: string;
-  organizationId: string;
   outputDir: string;
   prompt: string;
 } {
   let caseId = "github-pr-review-basic";
   let configPath = DefaultDesignerEvalConfigPath;
   let designerSessionId = "dsn_eval_runtime_materialization";
-  let organizationId = "org_eval_runtime_materialization";
   let outputDir = resolve(RepositoryRootPath, ".local/designer-evals/runtime-files");
   let prompt = "Help me build an agent that reviews GitHub pull requests.";
 
@@ -82,11 +73,6 @@ function parseArgs(args: readonly string[]): {
     }
     if (arg === "--designer-session-id" && next !== undefined) {
       designerSessionId = next;
-      index += 1;
-      continue;
-    }
-    if (arg === "--organization-id" && next !== undefined) {
-      organizationId = next;
       index += 1;
       continue;
     }
@@ -112,7 +98,6 @@ function parseArgs(args: readonly string[]): {
     caseId,
     configPath,
     designerSessionId,
-    organizationId,
     outputDir,
     prompt,
   };
@@ -125,7 +110,6 @@ Options:
   --case-id <id>                Eval case id. Defaults to github-pr-review-basic.
   --config <path>               Designer eval config path. Defaults to ${DefaultDesignerEvalConfigPath}.
   --designer-session-id <id>    Designer session id for MCP credential config.
-  --organization-id <id>        Organization id for runtime artifact refs.
   --output-dir <dir>            Local output directory.
   --prompt <text>               Initial Designer prompt.
 `);

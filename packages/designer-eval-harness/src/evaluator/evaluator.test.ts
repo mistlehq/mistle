@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { DesignerEvalDashboardControlAction, DesignerEvalProductState } from "../types.ts";
+import type {
+  DesignerEvalDashboardControlAction,
+  DesignerEvalProductState,
+  DesignerEvalProductStateIntegrationBinding,
+} from "../types.ts";
 import { evaluateDesignerEvalRun, renderEvaluationMarkdown } from "./evaluator.ts";
 
 describe("Designer eval evaluator", () => {
@@ -29,37 +33,18 @@ describe("Designer eval evaluator", () => {
         },
       },
     ];
-    const productStateAfter: DesignerEvalProductState = {
-      providerConnections: [
+    const productStateAfter = createGithubProductState({
+      integrationBindings: [
         {
-          id: "icn_eval_github_pr_review_basic_repo",
-          label: "GitHub",
-          providerFamilyId: "github",
-          targetKey: "github-cloud",
-        },
-      ],
-      availableProviderResources: [
-        {
+          id: "ibd_saved",
           connectionId: "icn_eval_github_pr_review_basic_repo",
-          kind: "repository",
-          handle: "mistlehq/mistle",
+          kind: "git",
+          config: {
+            repositories: ["mistlehq/mistle"],
+          },
         },
       ],
-      targetDraft: {
-        profileId: "sbp_eval_github_pr_review_basic",
-        version: 1,
-        integrationBindings: [
-          {
-            id: "ibd_saved",
-            connectionId: "icn_eval_github_pr_review_basic_repo",
-            kind: "git",
-            config: {
-              repositories: ["mistlehq/mistle"],
-            },
-          },
-        ],
-      },
-    };
+    });
 
     const result = evaluateDesignerEvalRun({
       caseId: "github-pr-review-basic",
@@ -73,11 +58,7 @@ describe("Designer eval evaluator", () => {
         },
         {
           kind: "saved-selected-provider-resources",
-          profileId: "sbp_eval_github_pr_review_basic",
-          version: 1,
           connectionId: "icn_eval_github_pr_review_basic_repo",
-          resourceKind: "repository",
-          bindingIntent: "git-repositories",
           selectedHandles: ["mistlehq/mistle"],
         },
       ],
@@ -122,28 +103,7 @@ describe("Designer eval evaluator", () => {
           response: {},
         },
       ],
-      productStateAfter: {
-        providerConnections: [
-          {
-            id: "icn_eval_github_pr_review_basic_repo",
-            label: "GitHub",
-            providerFamilyId: "github",
-            targetKey: "github-cloud",
-          },
-        ],
-        availableProviderResources: [
-          {
-            connectionId: "icn_eval_github_pr_review_basic_repo",
-            kind: "repository",
-            handle: "mistlehq/mistle",
-          },
-        ],
-        targetDraft: {
-          profileId: "sbp_eval_github_pr_review_basic",
-          version: 1,
-          integrationBindings: [],
-        },
-      },
+      productStateAfter: createGithubProductState({ integrationBindings: [] }),
     });
 
     expect(result.passed).toBe(false);
@@ -156,46 +116,23 @@ describe("Designer eval evaluator", () => {
       assertions: [
         {
           kind: "saved-selected-provider-resources",
-          profileId: "sbp_eval_github_pr_review_basic",
-          version: 1,
           connectionId: "icn_eval_github_pr_review_basic_repo",
-          resourceKind: "repository",
-          bindingIntent: "git-repositories",
           selectedHandles: ["mistlehq/mistle"],
         },
       ],
       dashboardControlActions: [],
-      productStateAfter: {
-        providerConnections: [
+      productStateAfter: createGithubProductState({
+        integrationBindings: [
           {
-            id: "icn_eval_github_pr_review_basic_repo",
-            label: "GitHub",
-            providerFamilyId: "github",
-            targetKey: "github-cloud",
-          },
-        ],
-        availableProviderResources: [
-          {
+            id: "ibd_saved",
             connectionId: "icn_eval_github_pr_review_basic_repo",
-            kind: "repository",
-            handle: "mistlehq/mistle",
+            kind: "git",
+            config: {
+              repositories: ["mistlehq/mistle", "mistlehq/other"],
+            },
           },
         ],
-        targetDraft: {
-          profileId: "sbp_eval_github_pr_review_basic",
-          version: 1,
-          integrationBindings: [
-            {
-              id: "ibd_saved",
-              connectionId: "icn_eval_github_pr_review_basic_repo",
-              kind: "git",
-              config: {
-                repositories: ["mistlehq/mistle", "mistlehq/other"],
-              },
-            },
-          ],
-        },
-      },
+      }),
     });
 
     expect(result.passed).toBe(false);
@@ -297,3 +234,30 @@ describe("Designer eval evaluator", () => {
     expect(result.passed).toBe(true);
   });
 });
+
+function createGithubProductState(input: {
+  integrationBindings: readonly DesignerEvalProductStateIntegrationBinding[];
+}): DesignerEvalProductState {
+  return {
+    providerConnections: [
+      {
+        id: "icn_eval_github_pr_review_basic_repo",
+        label: "GitHub",
+        providerFamilyId: "github",
+        targetKey: "github-cloud",
+      },
+    ],
+    availableProviderResources: [
+      {
+        connectionId: "icn_eval_github_pr_review_basic_repo",
+        kind: "repository",
+        handle: "mistlehq/mistle",
+      },
+    ],
+    targetDraft: {
+      profileId: "sbp_eval_github_pr_review_basic",
+      version: 1,
+      integrationBindings: input.integrationBindings,
+    },
+  };
+}

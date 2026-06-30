@@ -78,11 +78,7 @@ const GithubPrReviewBasicCase: DesignerEvalCase = {
     },
     {
       kind: "saved-selected-provider-resources",
-      profileId: "sbp_eval_github_pr_review_basic",
-      version: 1,
       connectionId: "icn_eval_github_pr_review_basic_repo",
-      resourceKind: "repository",
-      bindingIntent: "git-repositories",
       selectedHandles: ["mistlehq/mistle"],
     },
   ],
