@@ -121,11 +121,49 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain('reason: "stale_query"');
   });
 
+  it("only steers the requested active Claude Code query", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      'throw new Error("query/steer requires params.expectedQueryId.");',
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "if (conversation.activeQueryId !== params.expectedQueryId)",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      '"Claude Code query/steer expected active query "',
+    );
+  });
+
   it("hydrates resumed Claude Code sessions from persisted SDK transcripts", () => {
     expect(ClaudeCodeRuntimeServerBundle).toContain("getSessionMessages");
     expect(ClaudeCodeRuntimeServerBundle).toContain("function readConversationQueries");
     expect(ClaudeCodeRuntimeServerBundle).toContain('if (typeof message.content === "string")');
     expect(ClaudeCodeRuntimeServerBundle).toContain("conversation.queries = queries;");
+  });
+
+  it("clears prior Claude Code session errors before a new query", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain("lastError: undefined");
+    expect(ClaudeCodeRuntimeServerBundle).toContain("conversation.lastError = undefined;");
+  });
+
+  it("ignores stale Claude Code query failures after a newer query starts", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain("latestSubmittedQueryId: null");
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "conversation.latestSubmittedQueryId = queryId;",
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "if (conversation.latestSubmittedQueryId === queryId)",
+    );
+  });
+
+  it("reports failed idle Claude Code sessions as error sessions", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain("function resolveConversationStatus");
+    expect(ClaudeCodeRuntimeServerBundle).toContain('return "active";');
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      'return conversation.lastError === undefined ? "idle" : "error";',
+    );
+    expect(ClaudeCodeRuntimeServerBundle).toContain(
+      "type: resolveConversationStatus(conversation)",
+    );
   });
 
   it("exposes Claude Code sessions and queries instead of Codex thread and turn RPCs", () => {

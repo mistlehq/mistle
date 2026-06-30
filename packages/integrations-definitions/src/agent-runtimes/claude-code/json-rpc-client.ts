@@ -8,6 +8,8 @@ import {
   type SandboxSessionResetInfo,
 } from "@mistle/sandbox-session-client";
 
+import { ClaudeCodeRuntimeMethods } from "./protocol.js";
+
 type PendingRequest = {
   method: string;
   resolve: (value: unknown) => void;
@@ -84,13 +86,13 @@ export class ClaudeCodeJsonRpcClient {
 
   async initialize(): Promise<unknown> {
     this.#sessionClient.markInitializing();
-    const initializeResult = await this.call("initialize", {
+    const initializeResult = await this.call(ClaudeCodeRuntimeMethods.INITIALIZE, {
       clientInfo: {
         name: "mistle",
         version: "1",
       },
     });
-    await this.notify("initialized", {});
+    await this.notify(ClaudeCodeRuntimeMethods.INITIALIZED, {});
     if (this.#sessionClient.state !== "initializing") {
       throw new Error("Claude Code session connection ended before initialization completed.");
     }

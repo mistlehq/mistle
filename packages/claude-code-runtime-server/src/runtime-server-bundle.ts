@@ -224,7 +224,9 @@ function createConversationState(input) {
     providerConversationId: input.providerConversationId,
     cwd: input.cwd,
     activeQueryId: null,
+    latestSubmittedQueryId: null,
     queries: [],
+    lastError: undefined,
     sdkSessionId: input.sdkSessionId,
     sdkLookupCwd: input.sdkLookupCwd,
     activeQueryAbortController: undefined,
@@ -943,11 +945,22 @@ function appendSubmittedUserQuery(conversation, queryId, inputText) {
 
 function startQuery(conversation, inputText) {
   const queryId = randomUUID();
+  conversation.lastError = undefined;
+  conversation.latestSubmittedQueryId = queryId;
   appendSubmittedUserQuery(conversation, queryId, inputText);
   void runClaudeQuery(conversation, queryId, inputText).catch((error) => {
-    conversation.lastError = error instanceof Error ? error.message : String(error);
+    if (conversation.latestSubmittedQueryId === queryId) {
+      conversation.lastError = error instanceof Error ? error.message : String(error);
+    }
   });
   return queryId;
+}
+
+function resolveConversationStatus(conversation) {
+  if (conversation.activeQueryId !== null) {
+    return "active";
+  }
+  return conversation.lastError === undefined ? "idle" : "error";
 }
 
 async function handleRequest(request) {
@@ -1055,7 +1068,7 @@ async function handleRequest(request) {
           id: conversation.providerConversationId,
           cwd: conversation.cwd,
           status: {
-            type: conversation.activeQueryId === null ? "idle" : "active",
+            type: resolveConversationStatus(conversation),
           },
           activeQueryId: conversation.activeQueryId,
           queries,
@@ -1084,8 +1097,7 @@ async function handleRequest(request) {
         replied: true,
       };
     }
-    case "query/start":
-    case "query/steer": {
+    case "query/start": {
       return handleIdempotentRequest(request, () => {
         const params = request.params ?? {};
         if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
@@ -1095,6 +1107,38 @@ async function handleRequest(request) {
           throw new Error(request.method + " requires params.inputText.");
         }
         const conversation = requireSession(params.sessionId);
+        const queryId = startQuery(conversation, params.inputText);
+        return {
+          query: {
+            id: queryId,
+            status: "running",
+          },
+          queryId,
+        };
+      });
+    }
+    case "query/steer": {
+      return handleIdempotentRequest(request, () => {
+        const params = request.params ?? {};
+        if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
+          throw new Error("query/steer requires params.sessionId.");
+        }
+        if (typeof params.expectedQueryId !== "string" || params.expectedQueryId.length === 0) {
+          throw new Error("query/steer requires params.expectedQueryId.");
+        }
+        if (typeof params.inputText !== "string") {
+          throw new Error("query/steer requires params.inputText.");
+        }
+        const conversation = requireSession(params.sessionId);
+        if (conversation.activeQueryId !== params.expectedQueryId) {
+          throw new Error(
+            "Claude Code query/steer expected active query " +
+              params.expectedQueryId +
+              " but current active query is " +
+              (conversation.activeQueryId ?? "none") +
+              ".",
+          );
+        }
         const queryId = startQuery(conversation, params.inputText);
         return {
           query: {

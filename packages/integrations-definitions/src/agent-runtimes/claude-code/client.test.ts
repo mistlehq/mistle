@@ -29,6 +29,40 @@ describe("parseClaudeCodeSessionListResult", () => {
 });
 
 describe("parseClaudeCodeSessionReadResult", () => {
+  it("parses Claude Code error sessions with last error", () => {
+    expect(
+      parseClaudeCodeSessionReadResult({
+        session: {
+          id: "session_123",
+          cwd: "/workspace",
+          status: {
+            type: "error",
+          },
+          activeQueryId: null,
+          queries: [],
+          pendingPermissions: [],
+          lastError: "Claude Code failed.",
+          config: {
+            availableCommands: [],
+            availableModels: [],
+            model: null,
+            modelReasoningEffort: null,
+          },
+          contextUsage: null,
+        },
+      }),
+    ).toMatchObject({
+      session: {
+        id: "session_123",
+        status: {
+          type: "error",
+        },
+        activeQueryId: null,
+        lastError: "Claude Code failed.",
+      },
+    });
+  });
+
   it("parses Claude Code model config and context usage for the composer", () => {
     expect(
       parseClaudeCodeSessionReadResult({

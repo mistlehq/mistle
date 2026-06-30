@@ -247,20 +247,21 @@ function createClaudeCodeRuntimeInput(input: {
   startedPrompts?: string[];
   steeredPrompts: string[];
 }): ClaudeCodeRuntimeInput {
+  const isBusy = input.isBusy !== false;
   return {
     bootstrap: ReadyBootstrap,
     chat: {
       interruptQuery: async () => {
         return;
       },
-      canInterruptTurn: true,
-      canSteerTurn: true,
+      canInterruptTurn: isBusy,
+      canSteerTurn: isBusy,
       chatState: {
         completedErrorMessage: null,
         entries: [],
         pendingPermissions: input.pendingPermissions ?? [],
-        pendingQueryId: input.isBusy === false ? null : "query_123",
-        status: input.isBusy === false ? "idle" : "busy",
+        pendingQueryId: isBusy ? "query_123" : null,
+        status: isBusy ? "busy" : "idle",
         sessionId: input.chatSessionId ?? "session_123",
         queries: [],
       },

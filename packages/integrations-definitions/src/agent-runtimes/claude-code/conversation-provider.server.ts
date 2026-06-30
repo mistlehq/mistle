@@ -1,4 +1,5 @@
 import type {
+  AgentConversationCollaborationModeSettings,
   AgentConversationConnection,
   AgentConversationInspectResult,
   AgentConversationProvider,
@@ -8,23 +9,15 @@ import { AgentStreamClient, SandboxSessionTransport } from "@mistle/sandbox-sess
 import { createNodeSandboxSessionRuntime } from "@mistle/sandbox-session-client/node";
 
 import { ClaudeCodeJsonRpcClient } from "./json-rpc-client.js";
+import {
+  buildClaudeCodeQuerySteerParams,
+  ClaudeCodeRuntimeMethods,
+  extractClaudeCodeQueryId,
+  extractClaudeCodeSessionId,
+  readClaudeCodeNestedString,
+} from "./protocol.js";
 
 const ClaudeCodeConnections = new WeakMap<AgentConversationConnection, ClaudeCodeJsonRpcClient>();
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readNestedString(value: unknown, path: readonly string[]): string | null {
-  let currentValue: unknown = value;
-  for (const segment of path) {
-    if (!isRecord(currentValue)) {
-      return null;
-    }
-    currentValue = currentValue[segment];
-  }
-  return typeof currentValue === "string" && currentValue.length > 0 ? currentValue : null;
-}
 
 function getClaudeCodeClient(connection: AgentConversationConnection): ClaudeCodeJsonRpcClient {
   const claudeCodeClient = ClaudeCodeConnections.get(connection);
@@ -34,25 +27,8 @@ function getClaudeCodeClient(connection: AgentConversationConnection): ClaudeCod
   return claudeCodeClient;
 }
 
-function extractSessionId(result: unknown, method: string): string {
-  const sessionId = readNestedString(result, ["session", "id"]);
-  if (sessionId === null) {
-    throw new Error(`Claude Code ${method} response did not include session.id.`);
-  }
-  return sessionId;
-}
-
-function extractQueryId(result: unknown, method: string): string {
-  const queryId =
-    readNestedString(result, ["query", "id"]) ?? readNestedString(result, ["queryId"]);
-  if (queryId === null) {
-    throw new Error(`Claude Code ${method} response did not include query id.`);
-  }
-  return queryId;
-}
-
 function normalizeSessionStatus(value: unknown): AgentConversationInspectResult["status"] {
-  const statusType = readNestedString(value, ["session", "status", "type"]);
+  const statusType = readClaudeCodeNestedString(value, ["session", "status", "type"]);
   switch (statusType) {
     case "active":
       return AgentConversationStatuses.ACTIVE;
@@ -70,15 +46,45 @@ function normalizeSessionStatus(value: unknown): AgentConversationInspectResult[
 }
 
 function readActiveQueryId(value: unknown): string | null {
-  return readNestedString(value, ["session", "activeQueryId"]);
+  return readClaudeCodeNestedString(value, ["session", "activeQueryId"]);
 }
 
 function extractGeneratedTitle(result: unknown): string {
-  const title = readNestedString(result, ["title"]);
+  const title = readClaudeCodeNestedString(result, ["title"]);
   if (title === null) {
     throw new Error("Claude Code title/generate response did not include title.");
   }
   return title;
+}
+
+export function buildClaudeCodeCreateSessionParams(input: {
+  cwd?: string | undefined;
+  options?: Readonly<Record<string, unknown>> | undefined;
+}): Record<string, unknown> {
+  return input.cwd === undefined ? {} : { cwd: input.cwd };
+}
+
+export function buildClaudeCodeStartQueryParams(input: {
+  collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
+  inputText: string;
+  providerConversationId: string;
+}): Record<string, unknown> {
+  return {
+    sessionId: input.providerConversationId,
+    inputText: input.inputText,
+  };
+}
+
+export function buildClaudeCodeSteerQueryParams(input: {
+  inputText: string;
+  providerConversationId: string;
+  providerExecutionId: string;
+}): Record<string, unknown> {
+  return buildClaudeCodeQuerySteerParams({
+    sessionId: input.providerConversationId,
+    expectedQueryId: input.providerExecutionId,
+    inputText: input.inputText,
+  });
 }
 
 async function connectClaudeCodeConversationProvider(input: {
@@ -128,28 +134,31 @@ export function createClaudeCodeConversationProvider(): AgentConversationProvide
     createConversation: async (input) => {
       const claudeCodeClient = getClaudeCodeClient(input.connection);
       const result = await claudeCodeClient.call(
-        "session/create",
-        {
-          ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
-          ...(input.options === undefined ? {} : { options: input.options }),
-        },
+        ClaudeCodeRuntimeMethods.SESSION_CREATE,
+        buildClaudeCodeCreateSessionParams({
+          cwd: input.cwd,
+          options: input.options,
+        }),
         {
           idempotency: input.idempotency,
         },
       );
       return {
-        providerConversationId: extractSessionId(result, "session/create"),
+        providerConversationId: extractClaudeCodeSessionId(
+          result,
+          ClaudeCodeRuntimeMethods.SESSION_CREATE,
+        ),
       };
     },
     resumeConversation: async (input) => {
       const claudeCodeClient = getClaudeCodeClient(input.connection);
-      await claudeCodeClient.call("session/resume", {
+      await claudeCodeClient.call(ClaudeCodeRuntimeMethods.SESSION_RESUME, {
         sessionId: input.providerConversationId,
       });
     },
     inspectConversation: async (input) => {
       const claudeCodeClient = getClaudeCodeClient(input.connection);
-      const result = await claudeCodeClient.call("session/read", {
+      const result = await claudeCodeClient.call(ClaudeCodeRuntimeMethods.SESSION_READ, {
         sessionId: input.providerConversationId,
       });
       return {
@@ -164,7 +173,7 @@ export function createClaudeCodeConversationProvider(): AgentConversationProvide
       });
       try {
         const claudeCodeClient = getClaudeCodeClient(connection);
-        const result = await claudeCodeClient.call("title/generate", {
+        const result = await claudeCodeClient.call(ClaudeCodeRuntimeMethods.TITLE_GENERATE, {
           inputText: input.inputText,
           sessionId: input.providerConversationId,
         });
@@ -178,58 +187,56 @@ export function createClaudeCodeConversationProvider(): AgentConversationProvide
     startExecution: async (input) => {
       const claudeCodeClient = getClaudeCodeClient(input.connection);
       const result = await claudeCodeClient.call(
-        "query/start",
-        {
-          sessionId: input.providerConversationId,
+        ClaudeCodeRuntimeMethods.QUERY_START,
+        buildClaudeCodeStartQueryParams({
+          collaborationModeSettings: input.collaborationModeSettings,
+          providerConversationId: input.providerConversationId,
           inputText: input.inputText,
-          ...(input.collaborationModeSettings === undefined
-            ? {}
-            : { collaborationModeSettings: input.collaborationModeSettings }),
-        },
+        }),
         {
           idempotency: input.idempotency,
         },
       );
       return {
-        providerExecutionId: extractQueryId(result, "query/start"),
+        providerExecutionId: extractClaudeCodeQueryId(result, ClaudeCodeRuntimeMethods.QUERY_START),
       };
     },
     steerExecution: async (input) => {
       const claudeCodeClient = getClaudeCodeClient(input.connection);
       const result = await claudeCodeClient.call(
-        "query/steer",
-        {
-          sessionId: input.providerConversationId,
-          expectedQueryId: input.providerExecutionId,
+        ClaudeCodeRuntimeMethods.QUERY_STEER,
+        buildClaudeCodeSteerQueryParams({
+          providerConversationId: input.providerConversationId,
+          providerExecutionId: input.providerExecutionId,
           inputText: input.inputText,
-        },
+        }),
         {
           idempotency: input.idempotency,
         },
       );
       return {
-        providerExecutionId: extractQueryId(result, "query/steer"),
+        providerExecutionId: extractClaudeCodeQueryId(result, ClaudeCodeRuntimeMethods.QUERY_STEER),
       };
     },
     submitAssociatedResourceDelivery: async (input) => {
       const claudeCodeClient = getClaudeCodeClient(input.connection);
       const result = await claudeCodeClient.call(
-        "query/start",
-        {
-          sessionId: input.providerConversationId,
+        ClaudeCodeRuntimeMethods.QUERY_START,
+        buildClaudeCodeStartQueryParams({
+          providerConversationId: input.providerConversationId,
           inputText: input.inputText,
-        },
+        }),
         {
           idempotency: input.idempotency,
         },
       );
       return {
-        providerExecutionId: extractQueryId(result, "query/start"),
+        providerExecutionId: extractClaudeCodeQueryId(result, ClaudeCodeRuntimeMethods.QUERY_START),
       };
     },
     interruptExecution: async (input) => {
       const claudeCodeClient = getClaudeCodeClient(input.connection);
-      await claudeCodeClient.call("query/interrupt", {
+      await claudeCodeClient.call(ClaudeCodeRuntimeMethods.QUERY_INTERRUPT, {
         sessionId: input.providerConversationId,
         queryId: input.providerExecutionId,
       });
