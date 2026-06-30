@@ -40,12 +40,6 @@ const GitHubOrgMemberActorPolicy: WebhookTriggerActorPolicy = {
         handle: "octocat",
       },
     },
-    {
-      kind: "attribute",
-      attributeKey: "is_bot",
-      attributeValue: "false",
-      valueType: "boolean",
-    },
   ],
 };
 

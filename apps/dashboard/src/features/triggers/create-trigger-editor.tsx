@@ -33,6 +33,7 @@ import {
   resolveSelectedProfileTriggerState,
 } from "./use-webhook-trigger-editor-state.js";
 import { useWebhookTriggerEventPrerequisites } from "./use-webhook-trigger-prerequisites.js";
+import { WebhookTriggerActorPolicyFields } from "./webhook-trigger-actor-policy-fields.js";
 import type {
   WebhookTriggerEventOption,
   WebhookTriggerEventParameterRulesByEventType,
@@ -1027,13 +1028,25 @@ export function CreateTriggerEditor(input: CreateTriggerEditorProps): React.JSX.
       validationSummaryError={state.validationSummaryError}
       extraSectionsBeforeMessage={
         state.kind === "trigger" ? (
-          <WebhookTriggerInstructionsSection
-            disabled={state.isSaving}
-            instructionsLabelId="trigger-instructions-label"
-            loadResourceReferences={resourceReferenceLoader}
-            onValueChange={state.onWebhookInstructionsChange}
-            value={state.formValues.instructions}
-          />
+          <>
+            <WebhookTriggerActorPolicyFields
+              connections={state.connections}
+              disabled={state.isSaving}
+              eventActorPolicies={state.formValues.eventActorPolicies}
+              onActorPoliciesChange={(policies) => {
+                state.onWebhookValueChange("eventActorPolicies", policies);
+              }}
+              selectedEventIds={state.formValues.eventIds}
+              webhookEventOptions={state.webhookEventOptions}
+            />
+            <WebhookTriggerInstructionsSection
+              disabled={state.isSaving}
+              instructionsLabelId="trigger-instructions-label"
+              loadResourceReferences={resourceReferenceLoader}
+              onValueChange={state.onWebhookInstructionsChange}
+              value={state.formValues.instructions}
+            />
+          </>
         ) : undefined
       }
       typeSpecificSection={
@@ -1047,7 +1060,6 @@ export function CreateTriggerEditor(input: CreateTriggerEditorProps): React.JSX.
         ) : (
           <WebhookTriggerTypeSpecificSection
             connectionOptions={state.connectionOptions}
-            connections={state.connections}
             disabled={state.isSaving}
             fieldErrors={state.fieldErrors}
             formState={formState}

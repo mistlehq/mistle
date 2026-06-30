@@ -30,41 +30,6 @@ export const TriggerWebhookActorPolicyResourceReferenceSchema = z.union([
     .strict(),
 ]);
 
-const TriggerWebhookActorPolicyAttributeRuleSchema = z
-  .object({
-    kind: z.literal("attribute"),
-    attributeKey: z.string().min(1),
-    attributeValue: z.string().min(1),
-    valueType: z.enum(["boolean", "number", "string"]),
-  })
-  .strict()
-  .superRefine((rule, ctx) => {
-    if (
-      rule.valueType === "boolean" &&
-      rule.attributeValue !== "true" &&
-      rule.attributeValue !== "false"
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Boolean actor policy attribute values must be exactly 'true' or 'false'.",
-        path: ["attributeValue"],
-      });
-      return;
-    }
-
-    if (rule.valueType === "number") {
-      const numericValue = Number(rule.attributeValue);
-      if (!Number.isFinite(numericValue) || String(numericValue) !== rule.attributeValue) {
-        ctx.addIssue({
-          code: "custom",
-          message:
-            "Number actor policy attribute values must be canonical finite JavaScript numbers.",
-          path: ["attributeValue"],
-        });
-      }
-    }
-  });
-
 export const TriggerWebhookActorPolicyRuleSchema = z.discriminatedUnion("kind", [
   z
     .object({
@@ -72,7 +37,6 @@ export const TriggerWebhookActorPolicyRuleSchema = z.discriminatedUnion("kind", 
       actor: TriggerWebhookActorPolicyResourceReferenceSchema,
     })
     .strict(),
-  TriggerWebhookActorPolicyAttributeRuleSchema,
   z
     .object({
       kind: z.literal("relationship"),
@@ -83,11 +47,22 @@ export const TriggerWebhookActorPolicyRuleSchema = z.discriminatedUnion("kind", 
     .strict(),
 ]);
 
-export const TriggerWebhookActorPolicySchema = z
-  .object({
-    anyOf: z.array(TriggerWebhookActorPolicyRuleSchema).min(1),
-  })
-  .strict();
+const TriggerWebhookActorPolicyRuleListSchema = z.array(TriggerWebhookActorPolicyRuleSchema).min(1);
+
+export const TriggerWebhookActorPolicySchema = z.union([
+  z
+    .object({
+      anyOf: TriggerWebhookActorPolicyRuleListSchema,
+      noneOf: TriggerWebhookActorPolicyRuleListSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      anyOf: TriggerWebhookActorPolicyRuleListSchema.optional(),
+      noneOf: TriggerWebhookActorPolicyRuleListSchema,
+    })
+    .strict(),
+]);
 
 export const TriggerWebhookEventConditionSchema = z
   .object({

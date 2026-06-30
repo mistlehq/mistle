@@ -98,7 +98,19 @@ const Connections: readonly IntegrationConnection[] = [
       {
         kind: "bot",
         selectionMode: "multi",
-        count: 2,
+        count: 4,
+        syncState: "ready",
+      },
+      {
+        kind: "org",
+        selectionMode: "multi",
+        count: 1,
+        syncState: "ready",
+      },
+      {
+        kind: "team",
+        selectionMode: "multi",
+        count: 4,
         syncState: "ready",
       },
     ],
@@ -319,6 +331,57 @@ const ExistingTriggerWithBotActorValues: WebhookTriggerFormValues = {
       repository: isRule("mistlehq/platform"),
       botActor: isRule("dependabot[bot]"),
       baseBranch: isRule("main"),
+    },
+  },
+};
+
+const ExistingIssueCommentActorAllowlistValues: WebhookTriggerFormValues = {
+  ...ExistingTriggerValues,
+  name: "GitHub comment triage",
+  conversationKeyTemplate: "{{payload.repository.full_name}}:issue-or-pr:{{payload.issue.number}}",
+  eventIds: [StoryIssueCommentCreatedConditionId],
+  eventParameterRules: {
+    [StoryIssueCommentCreatedConditionId]: {
+      repository: isRule("mistlehq/mistle"),
+    },
+  },
+  eventActorPolicies: {
+    [StoryIssueCommentCreatedConditionId]: {
+      anyOf: [
+        {
+          kind: "resource",
+          actor: {
+            resourceKind: "bot",
+            handle: "mistle-reviewer[bot]",
+          },
+        },
+        {
+          kind: "resource",
+          actor: {
+            resourceKind: "bot",
+            handle: "hacktron-ai[bot]",
+          },
+        },
+        {
+          kind: "resource",
+          actor: {
+            resourceKind: "bot",
+            handle: "superagent-sh[bot]",
+          },
+        },
+        {
+          kind: "relationship",
+          relationshipKind: "belongs_to",
+          actorSet: {
+            resourceKind: "org",
+            handle: "mistlehq",
+          },
+          scope: {
+            resourceKind: "org",
+            handle: "mistlehq",
+          },
+        },
+      ],
     },
   },
 };
@@ -551,6 +614,15 @@ export const EditPageWithBotActor: Story = {
     mode: "edit",
     onDelete: function onDelete() {},
     values: ExistingTriggerWithBotActorValues,
+  },
+};
+
+export const EditPageWithMixedGitHubActorAllowlist: Story = {
+  name: "Edit page with mixed GitHub actor allowlist",
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    values: ExistingIssueCommentActorAllowlistValues,
   },
 };
 

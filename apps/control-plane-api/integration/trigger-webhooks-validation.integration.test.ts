@@ -223,16 +223,16 @@ describe.concurrent("trigger webhooks validation integration", () => {
     expect(body.code).toBe("VALIDATION_ERROR");
   });
 
-  it("rejects non-canonical actor attribute policy values on create", async ({ env }) => {
+  it("rejects actor attribute policies on create", async ({ env }) => {
     const session = await env.auth.createSession({
-      email: "integration-new-trigger-webhooks-invalid-actor-attribute-create@example.com",
+      email: "integration-new-trigger-webhooks-actor-attribute-create@example.com",
     });
     await seedTriggerWebhookTargets(env);
     await seedWebhookTriggerFixture(env, {
       organizationId: session.organizationId,
-      connectionId: "icn_trigger_webhook_invalid_actor_attribute_create",
-      webhookSourceId: "iws_trigger_webhook_invalid_actor_attribute_create",
-      profileId: "sbp_trigger_webhook_invalid_actor_attribute_create",
+      connectionId: "icn_trigger_webhook_actor_attribute_create",
+      webhookSourceId: "iws_trigger_webhook_actor_attribute_create",
+      profileId: "sbp_trigger_webhook_actor_attribute_create",
       profileVersion: 1,
     });
 
@@ -244,9 +244,9 @@ describe.concurrent("trigger webhooks validation integration", () => {
       },
       body: JSON.stringify({
         ...createWebhookTriggerRequestBody({
-          name: "Invalid actor attribute",
-          integrationWebhookSourceId: "iws_trigger_webhook_invalid_actor_attribute_create",
-          sandboxProfileId: "sbp_trigger_webhook_invalid_actor_attribute_create",
+          name: "Actor attribute",
+          integrationWebhookSourceId: "iws_trigger_webhook_actor_attribute_create",
+          sandboxProfileId: "sbp_trigger_webhook_actor_attribute_create",
           sandboxProfileVersion: 1,
         }),
         eventConditions: [

@@ -21,6 +21,7 @@ import type {
   CreateWebhookTriggerInput,
   UpdateWebhookTriggerPatch,
   WebhookTrigger,
+  WebhookTriggerActorPolicy,
 } from "./webhook-triggers-types.js";
 
 type ResolvedSelectedEvents = {
@@ -28,6 +29,9 @@ type ResolvedSelectedEvents = {
   webhookSourceIds: string[];
   webhookSourceId: string | null;
 };
+type WebhookTriggerActorPolicyInput = NonNullable<
+  CreateWebhookTriggerInput["eventConditions"][number]["actorPolicy"]
+>;
 
 function ruleHasConfiguredValue(rule: { value: string; values?: readonly string[] }): boolean {
   return (
@@ -302,7 +306,7 @@ function toEventConditionsValue(input: {
     const eventOption = input.eventOptions.find((option) => option.id === eventOptionId);
     const eventType = eventOption?.eventType ?? eventOptionId.split("::").slice(1).join("::");
     const payloadFilter = payloadFiltersByConditionId[conditionId];
-    const actorPolicy = input.values.eventActorPolicies?.[conditionId];
+    const actorPolicy = toActorPolicyValue(input.values.eventActorPolicies?.[conditionId]);
     if (payloadFilter !== undefined) {
       assertConditionPayloadFilter(payloadFilter);
     }
@@ -313,6 +317,30 @@ function toEventConditionsValue(input: {
       ...(payloadFilter === undefined ? {} : { payloadFilter }),
     };
   });
+}
+
+function toActorPolicyValue(
+  actorPolicy: WebhookTriggerActorPolicy | undefined,
+): WebhookTriggerActorPolicyInput | undefined {
+  if (actorPolicy === undefined) {
+    return undefined;
+  }
+
+  const anyOf = actorPolicy.anyOf ?? [];
+  const noneOf = actorPolicy.noneOf ?? [];
+  if (anyOf.length === 0 && noneOf.length === 0) {
+    return undefined;
+  }
+
+  if (anyOf.length === 0) {
+    return { noneOf };
+  }
+
+  if (noneOf.length === 0) {
+    return { anyOf };
+  }
+
+  return { anyOf, noneOf };
 }
 
 function toPrimaryRepositoryId(value: string): string | null {

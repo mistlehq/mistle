@@ -1,3 +1,8 @@
+import type {
+  WebhookTriggerActorPolicy,
+  WebhookTriggerActorPolicyRule,
+  WebhookTriggerActorPolicyRuleList,
+} from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { parseWebhookPayloadFilter } from "@mistle/webhooks";
 
@@ -23,12 +28,6 @@ export type WebhookTriggerActorPolicyRuleInput =
       actor: WebhookTriggerActorPolicyResourceReferenceInput;
     }
   | {
-      kind: "attribute";
-      attributeKey: string;
-      attributeValue: string;
-      valueType: "boolean" | "number" | "string";
-    }
-  | {
       kind: "relationship";
       relationshipKind: string;
       actorSet: WebhookTriggerActorPolicyResourceReferenceInput;
@@ -36,7 +35,8 @@ export type WebhookTriggerActorPolicyRuleInput =
     };
 
 export type WebhookTriggerActorPolicyInput = {
-  anyOf: WebhookTriggerActorPolicyRuleInput[];
+  anyOf?: WebhookTriggerActorPolicyRuleInput[] | undefined;
+  noneOf?: WebhookTriggerActorPolicyRuleInput[] | undefined;
 };
 
 export type WebhookTriggerEventConditionInput = {
@@ -47,7 +47,7 @@ export type WebhookTriggerEventConditionInput = {
 
 export type NormalizedWebhookTriggerEventCondition = {
   eventType: string;
-  actorPolicy?: WebhookTriggerActorPolicyInput | undefined;
+  actorPolicy?: WebhookTriggerActorPolicy | undefined;
   payloadFilter?: Record<string, unknown> | undefined;
 };
 
@@ -77,12 +77,49 @@ function normalizeConditionPayloadFilter(
 
 function normalizeActorPolicy(
   actorPolicy: WebhookTriggerActorPolicyInput | undefined,
-): WebhookTriggerActorPolicyInput | undefined {
+): WebhookTriggerActorPolicy | undefined {
   if (actorPolicy === undefined) {
     return undefined;
   }
 
-  return TriggerWebhookActorPolicySchema.parse(actorPolicy);
+  const parsedPolicy = TriggerWebhookActorPolicySchema.parse(actorPolicy);
+  const anyOf = createActorPolicyRuleList(parsedPolicy.anyOf);
+  const noneOf = createActorPolicyRuleList(parsedPolicy.noneOf);
+
+  if (anyOf === undefined && noneOf === undefined) {
+    throw new Error("Expected actor policy validation to require at least one rule list.");
+  }
+
+  if (anyOf === undefined) {
+    if (noneOf === undefined) {
+      throw new Error("Expected actor policy validation to require at least one rule list.");
+    }
+
+    return { noneOf };
+  }
+
+  if (noneOf === undefined) {
+    return { anyOf };
+  }
+
+  return { anyOf, noneOf };
+}
+
+function createActorPolicyRuleList(
+  rules: readonly WebhookTriggerActorPolicyRuleInput[] | undefined,
+): WebhookTriggerActorPolicyRuleList | undefined {
+  const [firstRule, ...remainingRules] = rules ?? [];
+  if (firstRule === undefined) {
+    return undefined;
+  }
+
+  return [normalizeActorPolicyRule(firstRule), ...remainingRules.map(normalizeActorPolicyRule)];
+}
+
+function normalizeActorPolicyRule(
+  rule: WebhookTriggerActorPolicyRuleInput,
+): WebhookTriggerActorPolicyRule {
+  return rule;
 }
 
 export function normalizeWebhookTriggerEventConditions(

@@ -1,5 +1,6 @@
 import { TriggerKinds } from "@mistle/db/control-plane";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { mcpCreateTriggerInputSchema, mcpUpdateTriggerInputSchema } from "./tool-schemas.js";
 
@@ -24,16 +25,29 @@ const WebhookTriggerActorPolicy = {
         resourceId: "res_organization_1",
       },
     },
+  ],
+  noneOf: [
     {
-      kind: "attribute",
-      attributeKey: "isBot",
-      attributeValue: "false",
-      valueType: "boolean",
+      kind: "resource",
+      actor: {
+        resourceKind: "user",
+        handle: "blocked-user",
+      },
     },
   ],
 };
 
 describe("MCP trigger tool schemas", () => {
+  it("advertises actor policies as requiring a non-empty allow or deny rule list", () => {
+    const jsonSchema = z.toJSONSchema(mcpCreateTriggerInputSchema);
+
+    const serializedSchema = JSON.stringify(jsonSchema);
+    expect(serializedSchema).toContain('"anyOf"');
+    expect(serializedSchema).toContain('"required":["anyOf"]');
+    expect(serializedSchema).toContain('"required":["noneOf"]');
+    expect(serializedSchema).not.toContain('"attributeKey"');
+  });
+
   it("preserves webhook event actor policies in create_trigger input", () => {
     const input = {
       kind: TriggerKinds.WEBHOOK,
