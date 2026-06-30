@@ -21,7 +21,6 @@ import {
 } from "../session-agents/session-workbench-handoff-runtimes.js";
 import {
   resolveSessionWorkbenchRuntimeId,
-  selectSessionWorkbenchRuntimeValue,
   SessionWorkbenchRuntimeModules,
 } from "../session-agents/session-workbench-runtime-registry.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
@@ -174,12 +173,11 @@ export function useSessionWorkbenchHandoffControl(input: {
   );
   const resolveLifecycleForWorkbench = useCallback(
     (agentRuntimeId: string | null) =>
-      selectSessionWorkbenchRuntimeValue({
-        runtimeId: resolveSessionWorkbenchRuntimeId({
+      lifecyclesForWorkbenchByRuntimeId[
+        resolveSessionWorkbenchRuntimeId({
           runtimeAgentRuntimeId: agentRuntimeId,
-        }),
-        valuesByRuntimeId: lifecyclesForWorkbenchByRuntimeId,
-      }),
+        })
+      ],
     [lifecyclesForWorkbenchByRuntimeId],
   );
   const cliPtyState = useSandboxPtyState({

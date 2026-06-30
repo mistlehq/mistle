@@ -8,7 +8,6 @@ import type { SessionComposerModelSelectionInput } from "../pages/session-compos
 import type { SessionTerminalContentInset } from "../pages/session-terminal-surface.js";
 
 export type SessionRuntimeWorkbenchCapability = {
-  runtimeId: AgentRuntimeId;
   displayName: string;
   cliTerminalContentInset: SessionTerminalContentInset;
   composerModelSelection: SessionComposerModelSelectionInput;
@@ -37,7 +36,6 @@ export const SessionWorkbenchRuntimeModules = {
   CODEX: {
     runtimeId: AgentRuntimeIdCatalog.CODEX,
     capabilities: {
-      runtimeId: AgentRuntimeIdCatalog.CODEX,
       displayName: "Codex",
       cliTerminalContentInset: "default",
       composerModelSelection: {
@@ -59,7 +57,6 @@ export const SessionWorkbenchRuntimeModules = {
   CLAUDE_CODE: {
     runtimeId: AgentRuntimeIdCatalog.CLAUDE_CODE,
     capabilities: {
-      runtimeId: AgentRuntimeIdCatalog.CLAUDE_CODE,
       displayName: "Claude Code",
       cliTerminalContentInset: "none",
       composerModelSelection: {
@@ -81,7 +78,6 @@ export const SessionWorkbenchRuntimeModules = {
   OPENCODE: {
     runtimeId: AgentRuntimeIdCatalog.OPENCODE,
     capabilities: {
-      runtimeId: AgentRuntimeIdCatalog.OPENCODE,
       displayName: "OpenCode",
       cliTerminalContentInset: "none",
       composerModelSelection: {
@@ -103,7 +99,6 @@ export const SessionWorkbenchRuntimeModules = {
   PI: {
     runtimeId: AgentRuntimeIdCatalog.PI,
     capabilities: {
-      runtimeId: AgentRuntimeIdCatalog.PI,
       displayName: "Pi",
       cliTerminalContentInset: "none",
       composerModelSelection: {
@@ -152,11 +147,4 @@ export function getSessionWorkbenchRuntimeModule(input: {
   runtimeId: AgentRuntimeId;
 }): SessionWorkbenchRuntimeModule {
   return SessionWorkbenchRuntimeModulesByRuntimeId[input.runtimeId];
-}
-
-export function selectSessionWorkbenchRuntimeValue<TValue>(input: {
-  runtimeId: AgentRuntimeId;
-  valuesByRuntimeId: Record<AgentRuntimeId, TValue>;
-}): TValue {
-  return input.valuesByRuntimeId[input.runtimeId];
 }

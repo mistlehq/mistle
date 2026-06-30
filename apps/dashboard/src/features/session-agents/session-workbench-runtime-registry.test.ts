@@ -11,7 +11,6 @@ describe("session workbench runtime registry", () => {
     expect(SessionWorkbenchRuntimeModules.CODEX).toEqual({
       runtimeId: "codex",
       capabilities: {
-        runtimeId: "codex",
         displayName: "Codex",
         cliTerminalContentInset: "default",
         composerModelSelection: {
@@ -36,7 +35,6 @@ describe("session workbench runtime registry", () => {
     expect(SessionWorkbenchRuntimeModules.CLAUDE_CODE).toEqual({
       runtimeId: "claude-code",
       capabilities: {
-        runtimeId: "claude-code",
         displayName: "Claude Code",
         cliTerminalContentInset: "none",
         composerModelSelection: {
@@ -61,7 +59,6 @@ describe("session workbench runtime registry", () => {
     expect(SessionWorkbenchRuntimeModules.OPENCODE).toEqual({
       runtimeId: "opencode",
       capabilities: {
-        runtimeId: "opencode",
         displayName: "OpenCode",
         cliTerminalContentInset: "none",
         composerModelSelection: {
@@ -86,7 +83,6 @@ describe("session workbench runtime registry", () => {
     expect(SessionWorkbenchRuntimeModules.PI).toEqual({
       runtimeId: "pi",
       capabilities: {
-        runtimeId: "pi",
         displayName: "Pi",
         cliTerminalContentInset: "none",
         composerModelSelection: {
