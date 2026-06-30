@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { SessionRuntimeWorkbenchCapabilities } from "./session-runtime-workbench-capabilities.js";
+import {
+  getSessionRuntimeWorkbenchCapabilities,
+  resolveSessionWorkbenchRuntimeId,
+  SessionRuntimeWorkbenchCapabilities,
+} from "./session-runtime-workbench-capabilities.js";
 
 describe("SessionRuntimeWorkbenchCapabilities", () => {
   it("describes the Codex workbench contract", () => {
@@ -57,5 +61,36 @@ describe("SessionRuntimeWorkbenchCapabilities", () => {
       supportsSteering: true,
       preservesCliLaunchContext: false,
     });
+  });
+
+  it("resolves known runtime ids through the workbench registry", () => {
+    expect(
+      getSessionRuntimeWorkbenchCapabilities({
+        runtimeId: resolveSessionWorkbenchRuntimeId({
+          runtimeAgentRuntimeId: "opencode",
+        }),
+      }),
+    ).toBe(SessionRuntimeWorkbenchCapabilities.OPENCODE);
+  });
+
+  it("uses Codex while the runtime id is not loaded", () => {
+    expect(
+      resolveSessionWorkbenchRuntimeId({
+        runtimeAgentRuntimeId: undefined,
+      }),
+    ).toBe("codex");
+    expect(
+      resolveSessionWorkbenchRuntimeId({
+        runtimeAgentRuntimeId: null,
+      }),
+    ).toBe("codex");
+  });
+
+  it("rejects unknown runtime ids instead of falling back to Codex", () => {
+    expect(() =>
+      resolveSessionWorkbenchRuntimeId({
+        runtimeAgentRuntimeId: "unknown-runtime",
+      }),
+    ).toThrow("Unsupported session workbench agent runtime 'unknown-runtime'.");
   });
 });

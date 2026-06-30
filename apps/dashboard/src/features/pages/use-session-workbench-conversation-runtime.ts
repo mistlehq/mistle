@@ -1,3 +1,7 @@
+import {
+  AgentRuntimeIdCatalog,
+  type AgentRuntimeId,
+} from "@mistle/integrations-definitions/agent-runtimes/catalog";
 import type { QueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
@@ -365,11 +369,9 @@ function buildPiRuntimeConversationNavigatorState(input: {
 }
 
 export function useSessionWorkbenchConversationRuntime(input: {
+  activeRuntimeId: AgentRuntimeId;
   claudeCodeSessionState: UseClaudeCodeSessionStateResult;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
-  isClaudeCodeRuntime: boolean;
-  isOpenCodeRuntime: boolean;
-  isPiRuntime: boolean;
   openCodeSessionState: UseOpenCodeSessionStateResult;
   piSessionState: UsePiSessionStateResult;
   queryClient: QueryClient;
@@ -386,7 +388,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
   const sessionMessage = sessionState.sessionMessage;
   const { bootstrap: openCodeComposerBootstrap, configControl: openCodeConfigControl } =
     useOpenCodeWorkbenchComposerState({
-      enabled: input.isOpenCodeRuntime,
+      enabled: input.activeRuntimeId === AgentRuntimeIdCatalog.OPENCODE,
       sandboxInstanceId: input.sandboxInstanceId,
       selectedRepositoryPath: input.selectedRepositoryPath,
       sessionState: openCodeSessionState,
@@ -403,9 +405,9 @@ export function useSessionWorkbenchConversationRuntime(input: {
       sessionState: input.claudeCodeSessionState,
     });
   const activeRuntimeConversationId =
-    input.isClaudeCodeRuntime || input.isOpenCodeRuntime || input.isPiRuntime
-      ? null
-      : (input.sessionSnapshot?.activeRuntimeConversationId ?? null);
+    input.activeRuntimeId === AgentRuntimeIdCatalog.CODEX
+      ? (input.sessionSnapshot?.activeRuntimeConversationId ?? null)
+      : null;
   const contextUsage =
     sessionState.threadTokenUsageSnapshot?.threadId ===
     sessionState.lifecycle.sessionSnapshot?.activeThreadId
@@ -718,28 +720,35 @@ export function useSessionWorkbenchConversationRuntime(input: {
       steerPiTurn,
     ],
   );
-  const activeRuntime = input.isClaudeCodeRuntime
-    ? claudeCodeRuntime
-    : input.isPiRuntime
-      ? piRuntime
-      : input.isOpenCodeRuntime
-        ? openCodeRuntime
-        : codexRuntime;
-  const runtimeConversationNavigator = input.isClaudeCodeRuntime
-    ? buildClaudeCodeRuntimeConversationNavigatorState({
+  const runtimesByRuntimeId: Record<AgentRuntimeId, SessionWorkbenchRuntimeAdapter> = {
+    [AgentRuntimeIdCatalog.CLAUDE_CODE]: claudeCodeRuntime,
+    [AgentRuntimeIdCatalog.CODEX]: codexRuntime,
+    [AgentRuntimeIdCatalog.OPENCODE]: openCodeRuntime,
+    [AgentRuntimeIdCatalog.PI]: piRuntime,
+  };
+  const navigatorBuildersByRuntimeId: Record<
+    AgentRuntimeId,
+    () => RuntimeConversationNavigatorState
+  > = {
+    [AgentRuntimeIdCatalog.CLAUDE_CODE]: () =>
+      buildClaudeCodeRuntimeConversationNavigatorState({
         claudeCodeSessionState: input.claudeCodeSessionState,
-      })
-    : input.isPiRuntime
-      ? buildPiRuntimeConversationNavigatorState({
-          piSessionState: input.piSessionState,
-        })
-      : input.isOpenCodeRuntime
-        ? buildOpenCodeRuntimeConversationNavigatorState({
-            openCodeSessionState,
-          })
-        : buildCodexRuntimeConversationNavigatorState({
-            sessionState,
-          });
+      }),
+    [AgentRuntimeIdCatalog.CODEX]: () =>
+      buildCodexRuntimeConversationNavigatorState({
+        sessionState,
+      }),
+    [AgentRuntimeIdCatalog.OPENCODE]: () =>
+      buildOpenCodeRuntimeConversationNavigatorState({
+        openCodeSessionState,
+      }),
+    [AgentRuntimeIdCatalog.PI]: () =>
+      buildPiRuntimeConversationNavigatorState({
+        piSessionState: input.piSessionState,
+      }),
+  };
+  const activeRuntime = runtimesByRuntimeId[input.activeRuntimeId];
+  const runtimeConversationNavigator = navigatorBuildersByRuntimeId[input.activeRuntimeId]();
   const attachmentTargetId = activeRuntime.conversation.attachmentTargetId;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:

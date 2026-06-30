@@ -185,9 +185,7 @@ export function useSessionWorkbenchController(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     selectedRepositoryPathRef,
   });
-  const isClaudeCodeRuntime = repositoryControl.isClaudeCodeRuntime;
-  const isOpenCodeRuntime = repositoryControl.isOpenCodeRuntime;
-  const isPiRuntime = repositoryControl.isPiRuntime;
+  const activeRuntimeId = repositoryControl.activeRuntimeId;
   const selectedRepositoryPath = repositoryControl.selectedRepositoryPath;
   const chromeState = useSessionWorkbenchChromeState({
     canConnect: workbenchLifecycleState.connectionReadiness.canConnect,
@@ -200,11 +198,9 @@ export function useSessionWorkbenchController(input: {
   });
   const sessionSnapshot = workbenchLifecycleState.sessionSnapshot;
   const conversationRuntime = useSessionWorkbenchConversationRuntime({
+    activeRuntimeId,
     claudeCodeSessionState,
     ensureTransportConnected: transportManager.ensureTransportConnected,
-    isClaudeCodeRuntime,
-    isOpenCodeRuntime,
-    isPiRuntime,
     openCodeSessionState,
     piSessionState,
     queryClient,

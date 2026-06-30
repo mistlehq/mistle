@@ -17,7 +17,10 @@ import {
   type UseOpenCodeSessionStateResult,
 } from "./opencode/session-state/index.js";
 import { buildPiCliPtyOpenInput, type UsePiSessionStateResult } from "./pi/session-state/index.js";
-import { SessionRuntimeWorkbenchCapabilities } from "./session-runtime-workbench-capabilities.js";
+import {
+  resolveSessionWorkbenchRuntimeId,
+  SessionRuntimeWorkbenchCapabilities,
+} from "./session-runtime-workbench-capabilities.js";
 
 type RuntimeConversationConnectInput =
   | InitialSessionConnectInput
@@ -322,13 +325,17 @@ export function resolveSessionLifecycleForWorkbench(input: {
   openCodeLifecycle: SessionLifecycleForWorkbench;
   piLifecycle: SessionLifecycleForWorkbench;
 }): SessionLifecycleForWorkbench {
-  if (input.agentRuntimeId === SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE.runtimeId) {
+  const activeRuntimeId = resolveSessionWorkbenchRuntimeId({
+    runtimeAgentRuntimeId: input.agentRuntimeId,
+  });
+
+  if (activeRuntimeId === SessionRuntimeWorkbenchCapabilities.CLAUDE_CODE.runtimeId) {
     return input.claudeCodeLifecycle;
   }
-  if (input.agentRuntimeId === SessionRuntimeWorkbenchCapabilities.OPENCODE.runtimeId) {
+  if (activeRuntimeId === SessionRuntimeWorkbenchCapabilities.OPENCODE.runtimeId) {
     return input.openCodeLifecycle;
   }
-  if (input.agentRuntimeId === SessionRuntimeWorkbenchCapabilities.PI.runtimeId) {
+  if (activeRuntimeId === SessionRuntimeWorkbenchCapabilities.PI.runtimeId) {
     return input.piLifecycle;
   }
   return input.codexLifecycle;
