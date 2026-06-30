@@ -6,10 +6,6 @@ import type { UseCodexSessionStateResult } from "../session-agents/codex/session
 import type { UseOpenCodeSessionStateResult } from "../session-agents/opencode/session-state/index.js";
 import type { UsePiSessionStateResult } from "../session-agents/pi/session-state/index.js";
 import {
-  resolveSessionWorkbenchRuntimeId,
-  SessionRuntimeWorkbenchCapabilities,
-} from "../session-agents/session-runtime-workbench-capabilities.js";
-import {
   buildCodexHandoffRuntime,
   buildCodexLifecycleForHandoff,
   buildCodexLifecycleForWorkbench,
@@ -23,6 +19,10 @@ import {
   buildPiLifecycleForHandoff,
   buildPiLifecycleForWorkbench,
 } from "../session-agents/session-workbench-handoff-runtimes.js";
+import {
+  resolveSessionWorkbenchRuntimeId,
+  SessionRuntimeWorkbenchCapabilities,
+} from "../session-agents/session-workbench-runtime-registry.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
 import type { SessionLifecycleForWorkbench } from "./use-session-workbench-lifecycle-state.js";

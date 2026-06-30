@@ -17,7 +17,7 @@ import {
   type UseOpenCodeSessionStateResult,
 } from "./opencode/session-state/index.js";
 import { buildPiCliPtyOpenInput, type UsePiSessionStateResult } from "./pi/session-state/index.js";
-import { SessionRuntimeWorkbenchCapabilities } from "./session-runtime-workbench-capabilities.js";
+import { SessionRuntimeWorkbenchCapabilities } from "./session-workbench-runtime-registry.js";
 
 type RuntimeConversationConnectInput =
   | InitialSessionConnectInput

@@ -4,9 +4,9 @@ import {
   getSessionRuntimeWorkbenchCapabilities,
   resolveSessionWorkbenchRuntimeId,
   SessionRuntimeWorkbenchCapabilities,
-} from "./session-runtime-workbench-capabilities.js";
+} from "./session-workbench-runtime-registry.js";
 
-describe("SessionRuntimeWorkbenchCapabilities", () => {
+describe("session workbench runtime registry", () => {
   it("describes the Codex workbench contract", () => {
     expect(SessionRuntimeWorkbenchCapabilities.CODEX).toEqual({
       runtimeId: "codex",

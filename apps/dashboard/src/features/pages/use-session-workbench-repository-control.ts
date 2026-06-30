@@ -5,7 +5,7 @@ import {
   getSessionRuntimeWorkbenchCapabilities,
   resolveSessionWorkbenchRuntimeId,
   SessionRuntimeWorkbenchCapabilities,
-} from "../session-agents/session-runtime-workbench-capabilities.js";
+} from "../session-agents/session-workbench-runtime-registry.js";
 import {
   resolveInitialSelectedRepositoryPath,
   resolveSessionTerminalCwd,

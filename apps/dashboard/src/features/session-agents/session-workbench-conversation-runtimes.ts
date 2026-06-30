@@ -32,7 +32,7 @@ import {
   type UsePiSessionStateResult,
 } from "./pi/session-state/index.js";
 import type { RespondToServerRequest, ServerRequestEntry } from "./server-requests/index.js";
-import { SessionRuntimeWorkbenchCapabilities } from "./session-runtime-workbench-capabilities.js";
+import { SessionRuntimeWorkbenchCapabilities } from "./session-workbench-runtime-registry.js";
 
 type SessionConversationChatState = Pick<
   ChatState,
