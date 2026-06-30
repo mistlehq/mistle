@@ -72,7 +72,7 @@
     "@modelcontextprotocol/server": "2.0.0-alpha.2",
     "@opentelemetry/api": "^1.9.0",
     "@scalar/hono-api-reference": "^0.11.0",
-    "better-auth": "1.6.11",
+    "better-auth": "1.6.20",
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
     "hono": "4.12.25",
