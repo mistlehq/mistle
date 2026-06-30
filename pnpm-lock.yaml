@@ -915,8 +915,8 @@ importers:
         specifier: ^0.31.10
         version: 0.31.10(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.28.17)(pg@8.20.0)(postgres@3.4.9))
       squawk-cli:
-        specifier: ^2.46.0
-        version: 2.46.0
+        specifier: ^2.58.0
+        version: 2.58.0
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -6040,6 +6040,31 @@ packages:
 
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
+
+  '@squawk-cli/darwin-arm64@2.58.0':
+    resolution: {integrity: sha512-NNKG0goT3xocFOYXLqWrcwCIHB/ICaxVfIYMHvjqy8emd/plbeHRpBT9LYsh8cJVMkzIJ2noVX3KHud3/1JFow==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@squawk-cli/darwin-x64@2.58.0':
+    resolution: {integrity: sha512-eh+4p+3y8QZarrbaFn9Wwr8Mge0lCvIYkNavYsdXuC3yfiO35ObBdinsp9xlO3gbjqxY+y+J9nT6rpB7V60J2A==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@squawk-cli/linux-arm64@2.58.0':
+    resolution: {integrity: sha512-XA8EJH2zrkDv2Tk/ubwOFZ+Slhiwl8lYSP74HsZyvRiS+uGpmnBjdafCjTp3ypMfIB9TwXSFDDTJ0+HQ9Y02ZA==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@squawk-cli/linux-x64@2.58.0':
+    resolution: {integrity: sha512-WbFd90kKfgE29UymrH4EmUbSuRyxCnjE/jFFlzCnRwVVFj2XcHIM7S9HErYhPKfAMc7Q2o0p1tJ6aHZKQc/t5A==}
+    cpu: [x64]
+    os: [linux]
+
+  '@squawk-cli/win32-x64@2.58.0':
+    resolution: {integrity: sha512-Kvvb4rhjX5HyahF3Nb9vp1R9gq2oQa3zo2kCDzd++Rm46iGDJzzKcbpM8Ndfe+e0O0MIka8Zc2rZvHj48iUMPQ==}
+    cpu: [x64]
+    os: [win32]
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -11819,8 +11844,8 @@ packages:
   sprintf-js@1.0.3:
     resolution: {integrity: sha512-D9cPgkvLlV3t3IzL0D0YLvGA9Ahk4PcvVwUbN0dSGr1aP0Nrt4AEnTUbuGvquEC0mA64Gqt1fzirlRs5ibXx8g==}
 
-  squawk-cli@2.46.0:
-    resolution: {integrity: sha512-54b4tzu7K+EVBaN88aL8TwgUv8oMLrXcmHOIWbyPwG2vbYxNuvsfh7q2SJ75KpvSQWrd6hj+VUhkuBcPktjyBQ==}
+  squawk-cli@2.58.0:
+    resolution: {integrity: sha512-wNrLF1Nh0tXcn1D1kfTDMvpmCopk4bjRjJkJ49Hhnn6gvXUHVylBa8MfqbsgKYb0dwcsAh2EXZAA7nkHR6mkiw==}
     hasBin: true
 
   ssh-remote-port-forward@1.0.4:
@@ -18461,6 +18486,21 @@ snapshots:
       tslib: 2.8.1
 
   '@socket.io/component-emitter@3.1.2': {}
+
+  '@squawk-cli/darwin-arm64@2.58.0':
+    optional: true
+
+  '@squawk-cli/darwin-x64@2.58.0':
+    optional: true
+
+  '@squawk-cli/linux-arm64@2.58.0':
+    optional: true
+
+  '@squawk-cli/linux-x64@2.58.0':
+    optional: true
+
+  '@squawk-cli/win32-x64@2.58.0':
+    optional: true
 
   '@standard-schema/spec@1.1.0': {}
 
@@ -25578,11 +25618,13 @@ snapshots:
 
   sprintf-js@1.0.3: {}
 
-  squawk-cli@2.46.0:
-    dependencies:
-      node-fetch: 2.6.7
-    transitivePeerDependencies:
-      - encoding
+  squawk-cli@2.58.0:
+    optionalDependencies:
+      '@squawk-cli/darwin-arm64': 2.58.0
+      '@squawk-cli/darwin-x64': 2.58.0
+      '@squawk-cli/linux-arm64': 2.58.0
+      '@squawk-cli/linux-x64': 2.58.0
+      '@squawk-cli/win32-x64': 2.58.0
 
   ssh-remote-port-forward@1.0.4:
     dependencies:
