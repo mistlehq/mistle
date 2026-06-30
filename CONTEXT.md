@@ -838,7 +838,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Dashboard-mediated provider-resource selection discovery may include non-authoritative UI hints for the corresponding **User input request** while the server remains authoritative for save validation.
 - A dashboard-mediated **Dashboard control action** that changes saved configuration should return the user's submitted answer together with a server-issued receipt describing the product resource that changed.
 - A dashboard-mediated provider-resource selection receipt should identify the target draft **Sandbox profile version**, **Integration connection**, provider resource kind, binding intent, resolved **Integration binding**, selected handles, and whether the binding was created.
-- A **Designer canvas tab** may accept a dashboard-internal route before that route has a supported embedded rendering surface.
+- A **Designer canvas tab** should only accept a dashboard-internal route when the **Designer canvas** has a supported embedded rendering surface for that route.
 - A **Designer page** is the top-level dashboard entry point for **Mistle Designer sessions**.
 - The **Designer page** presents a composer for starting a new **Mistle Designer session** before the list of past **Mistle Designer sessions**.
 - Submitting the **Designer page** composer creates a **Mistle Designer session**, opens that session's designer workspace, and seeds the first Designer chat turn from the submitted prompt.
@@ -885,6 +885,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Designer blueprint** is explanatory and actionable, but it is not authoritative product state.
 - For open-ended build requests, **Mistle Designer** should propose and show a **Designer blueprint** before selecting or mutating specific product resources.
 - **Mistle Designer** should not start open-ended design work by inventorying existing **Sandbox profiles** unless the user's request is explicitly about modifying an existing profile or the proposed **Designer blueprint** needs live resource state to be accurate.
+- **Mistle Designer** should use product-state tools rather than the **Designer canvas** list route when discovering **Sandbox profiles**.
 - When the target **Sandbox profile** is ambiguous, **Mistle Designer** should discuss "use an existing Sandbox profile" versus "create a new Sandbox profile" in chat after showing the workflow blueprint.
 - **Mistle Designer** should use the dashboard control tool to show the **Designer blueprint** for alignment before creating triggers, updating trigger instructions, saving sandbox profile draft changes, or asking narrowly about implementation resources.
 - User alignment on a **Designer blueprint** may authorize **Mistle Designer** to create or update the matching saved draft **Sandbox profile version** without a separate per-field confirmation.
@@ -893,7 +894,8 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - After **Designer blueprint** alignment, **Mistle Designer** may publish a saved draft **Sandbox profile version** when the aligned outcome requires a published version.
 - Publishing a **Sandbox profile version** through **Mistle Designer** does not imply starting a **Sandbox session**.
 - **Mistle Designer** may discard a saved draft **Sandbox profile version** when discarding that draft is the aligned outcome.
-- An **Approved runtime action** may apply integration setup or selection, trigger configuration changes that are not inherent to an aligned concrete step, sandbox profile draft changes that are not inherent to an aligned concrete step, publishing a **Sandbox profile version**, or starting a **Sandbox session** only through the corresponding supported product action; it is not represented as a **Designer blueprint** item.
+- An **Approved runtime action** may apply integration setup or selection, trigger configuration changes that are not inherent to an aligned concrete step, sandbox profile draft changes that are not inherent to an aligned concrete step, publishing a **Sandbox profile version**, deleting a **Sandbox profile**, or starting a **Sandbox session** only through the corresponding supported product action; it is not represented as a **Designer blueprint** item.
+- Before deleting a **Sandbox profile**, **Mistle Designer** should present the exact target **Sandbox profiles** and receive an explicit **Runtime approval response** for those targets.
 - First-pass **Designer blueprint** actions open existing product surfaces with prefilled state where supported, rather than executing product changes directly from the blueprint.
 - A **Designer blueprint** remains useful after confirmation by updating **Designer blueprint item state** metadata such as proposed, needs setup, ready to confirm, applied, or blocked.
 - **Designer blueprint item states** are maintained by **Mistle Designer** rather than inferred as a strict live projection of product state.
@@ -1354,6 +1356,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - "active thread" could imply a different sandbox — resolved: use **Active Codex thread** for the selected chat conversation inside the same **Sandbox session**.
 - Switching threads could imply changing the whole workbench — resolved: thread switching changes the **Active Codex thread** without changing the **Sandbox session**.
 - "delete session" could mean hard deletion or user-visible removal — resolved: use **Deleted session** for a session hidden from ordinary lists while retaining its historical record.
+- "invalid sandbox profile" is not a global **Sandbox profile** state — resolved: when **Mistle Designer** discusses cleanup, it should present task-scoped cleanup candidates with per-profile reasons before deletion.
 - "GitHub team" could mean either an organization-scoped GitHub team identity or the requested review target value delivered in a pull request webhook — resolved: use **GitHub team review target** for the trigger-filter value, which is the GitHub team slug.
 - "self" in provider-event routing could mean the same Mistle user, same sandbox session, or same provider actor — resolved: use **Self-authored association event** for provider events authored by the same **Provider actor** Mistle uses for the event's **Integration connection**.
 - GitHub `user` resources were backed by commit contribution history even though trigger filters used them as actors and review targets — resolved: **GitHub user** resources are access-backed accounts, not contributor-history accounts.
