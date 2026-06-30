@@ -1538,6 +1538,7 @@ function SandboxProfileEditorPageStoryView(
                       isPending: false,
                     }}
                     integrationRows={integrationRows}
+                    integrationRowErrorsByClientId={{}}
                     integrationSaveError={null}
                     agentRuntimeConnectionErrorMessage={
                       input.agentRuntimeConnectionErrorMessage ?? null

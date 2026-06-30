@@ -99,6 +99,7 @@ type SandboxProfileIntegrationsSetupSectionProps = {
   };
   integrationSaveError: string | null;
   integrationRows: readonly SandboxProfileBindingEditorRow[];
+  integrationRowErrorsByClientId: Readonly<Record<string, string>>;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
   gitCommitSigningIntegrationConnectionId: string | null;
@@ -351,8 +352,13 @@ function ConnectionSelectionCell(input: {
   );
   if (input.availableConnections.length === 0) {
     return (
-      <div className={SandboxProfileIntegrationCellContentClassName}>
+      <div className="grid gap-1.5">
         <p className="text-muted-foreground text-sm">No connections available.</p>
+        {input.invalid === true &&
+        input.errorMessage !== null &&
+        input.errorMessage !== undefined ? (
+          <p className="text-destructive text-xs">{input.errorMessage}</p>
+        ) : null}
       </div>
     );
   }
@@ -560,6 +566,25 @@ function RemoveIntegrationBindingButton(input: {
   );
 }
 
+function connectionSupportsSandboxProfileBinding(input: {
+  connection: IntegrationConnectionSummary;
+  target: IntegrationTargetSummary | undefined;
+}): boolean {
+  if (input.target?.connectionMethods === undefined) {
+    return true;
+  }
+
+  const connectionMethodId = input.connection.config?.["connection_method"];
+  if (typeof connectionMethodId !== "string") {
+    return true;
+  }
+
+  const method = input.target.connectionMethods.find(
+    (candidate) => candidate.id === connectionMethodId,
+  );
+  return method?.sandboxProfileBinding?.supported !== false;
+}
+
 function resolveKindChoices(input: {
   kind: SandboxIntegrationBindingKind;
   availableConnections: readonly IntegrationConnectionSummary[];
@@ -590,7 +615,12 @@ function resolveKindChoices(input: {
     }
 
     const hasSelectableConnections = input.availableConnections.some(
-      (connection) => connection.targetKey === target.targetKey,
+      (connection) =>
+        connection.targetKey === target.targetKey &&
+        connectionSupportsSandboxProfileBinding({
+          connection,
+          target,
+        }),
     );
     if (!hasSelectableConnections && input.includeDisconnectedTargets !== true) {
       continue;
@@ -696,12 +726,22 @@ function resolveAgentBindingRowsForRuntime(input: {
 function resolveConnectionsForTarget(
   targetKey: string | null,
   availableConnections: readonly IntegrationConnectionSummary[],
+  availableTargets: readonly IntegrationTargetSummary[],
 ): IntegrationConnectionSummary[] {
   if (targetKey === null) {
     return [];
   }
 
-  return availableConnections.filter((connection) => connection.targetKey === targetKey);
+  const target = availableTargets.find((candidate) => candidate.targetKey === targetKey);
+
+  return availableConnections.filter(
+    (connection) =>
+      connection.targetKey === targetKey &&
+      connectionSupportsSandboxProfileBinding({
+        connection,
+        target,
+      }),
+  );
 }
 
 function resolveGitConnectionChoices(input: {
@@ -1189,7 +1229,11 @@ export function SandboxProfileIntegrationsSetupSection(
   }
 
   async function addConnector(choice: IntegrationChoice): Promise<void> {
-    const connections = resolveConnectionsForTarget(choice.id, input.availableConnections);
+    const connections = resolveConnectionsForTarget(
+      choice.id,
+      input.availableConnections,
+      input.availableTargets,
+    );
     const nextConnection = connections[0];
     if (nextConnection === undefined) {
       return;
@@ -1488,6 +1532,7 @@ export function SandboxProfileIntegrationsSetupSection(
                             availableConnections={resolveConnectionsForTarget(
                               choice.id,
                               input.availableConnections,
+                              input.availableTargets,
                             )}
                             onConnectionChange={(nextConnectionId) => {
                               if (controlsAreDisabled) {
@@ -1567,6 +1612,7 @@ export function SandboxProfileIntegrationsSetupSection(
                         availableTargets: input.availableTargets,
                         associatedResourceRouting: slackAssociatedResourceRouting,
                       });
+                    const rowErrorMessage = input.integrationRowErrorsByClientId[row.clientId];
 
                     return (
                       <ResponsiveFieldListRow
@@ -1596,6 +1642,7 @@ export function SandboxProfileIntegrationsSetupSection(
                               availableConnections={resolveConnectionsForTarget(
                                 presentation.target.targetKey,
                                 input.availableConnections,
+                                input.availableTargets,
                               )}
                               onConnectionChange={(nextConnectionId) => {
                                 if (controlsAreDisabled) {
@@ -1605,6 +1652,8 @@ export function SandboxProfileIntegrationsSetupSection(
                               }}
                               selectedConnectionId={row.connectionId}
                               disabled={controlsAreDisabled}
+                              errorMessage={rowErrorMessage}
+                              invalid={rowErrorMessage !== undefined}
                               readOnly={isReadOnly}
                             />
                           ) : (

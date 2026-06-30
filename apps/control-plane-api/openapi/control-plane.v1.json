@@ -19940,6 +19940,35 @@
                                       },
                                       "additionalProperties": false
                                     },
+                                    "sandboxProfileBinding": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "supported": {
+                                              "type": "boolean",
+                                              "enum": [true]
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "supported": {
+                                              "type": "boolean",
+                                              "enum": [false]
+                                            },
+                                            "reason": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": ["supported"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
                                     "createBehavior": {
                                       "type": "string",
                                       "enum": ["single-step", "draft-then-setup"]
@@ -21020,6 +21049,35 @@
                                       },
                                       "additionalProperties": false
                                     },
+                                    "sandboxProfileBinding": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "supported": {
+                                              "type": "boolean",
+                                              "enum": [true]
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "supported": {
+                                              "type": "boolean",
+                                              "enum": [false]
+                                            },
+                                            "reason": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": ["supported"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
                                     "ui": {
                                       "type": "object",
                                       "properties": {
@@ -21202,6 +21260,35 @@
                                         }
                                       },
                                       "additionalProperties": false
+                                    },
+                                    "sandboxProfileBinding": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "supported": {
+                                              "type": "boolean",
+                                              "enum": [true]
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "supported": {
+                                              "type": "boolean",
+                                              "enum": [false]
+                                            },
+                                            "reason": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": ["supported"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
                                     },
                                     "ui": {
                                       "type": "object",

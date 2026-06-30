@@ -1,5 +1,6 @@
 import {
   IntegrationConnectionMethodDetailMetadataSchema,
+  IntegrationConnectionMethodSandboxProfileBindingMetadataSchema,
   IntegrationFormConnectionMethodPostCreateMetadataSchema,
   IntegrationFormConnectionMethodSetupFlowMetadataSchema,
   type IntegrationManagedWebhookSourcePostCreateMetadata,
@@ -227,6 +228,8 @@ export const IntegrationTargetSchema = z
               label: z.string().min(1),
               kind: z.literal("form"),
               connectionDetail: IntegrationConnectionMethodDetailMetadataSchema.optional(),
+              sandboxProfileBinding:
+                IntegrationConnectionMethodSandboxProfileBindingMetadataSchema.optional(),
               createBehavior: z.enum(["single-step", "draft-then-setup"]).optional(),
               postCreate: IntegrationFormConnectionMethodPostCreateMetadataSchema.optional(),
               setupFlow: IntegrationFormConnectionMethodSetupFlowMetadataSchema.optional(),
@@ -259,6 +262,8 @@ export const IntegrationTargetSchema = z
               label: z.string().min(1),
               kind: z.literal("redirect"),
               connectionDetail: IntegrationConnectionMethodDetailMetadataSchema.optional(),
+              sandboxProfileBinding:
+                IntegrationConnectionMethodSandboxProfileBindingMetadataSchema.optional(),
               ui: z
                 .object({
                   create: IntegrationConnectionMethodCreateUiSchema,
@@ -273,6 +278,8 @@ export const IntegrationTargetSchema = z
               label: z.string().min(1),
               kind: z.literal("device-authorization"),
               connectionDetail: IntegrationConnectionMethodDetailMetadataSchema.optional(),
+              sandboxProfileBinding:
+                IntegrationConnectionMethodSandboxProfileBindingMetadataSchema.optional(),
               ui: z
                 .object({
                   create: IntegrationDeviceAuthorizationConnectionMethodCreateUiSchema,

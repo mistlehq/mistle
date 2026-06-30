@@ -884,6 +884,15 @@ export type IntegrationConnectionMethodDetailMetadata = {
     | undefined;
 };
 
+export type IntegrationConnectionMethodSandboxProfileBindingMetadata =
+  | {
+      supported?: true | undefined;
+    }
+  | {
+      reason?: string | undefined;
+      supported: false;
+    };
+
 export type IntegrationManagedWebhookSourcePostCreateMetadata = {
   autoCreate?: boolean | undefined;
   failureNoticeTitle: string;
@@ -1137,6 +1146,7 @@ type IntegrationConnectionMethodDefinitionBase<
   connectionDetail?: IntegrationConnectionMethodDetailMetadata;
   id: IntegrationConnectionMethodId;
   label: string;
+  sandboxProfileBinding?: IntegrationConnectionMethodSandboxProfileBindingMetadata | undefined;
   configSchema?: IntegrationConfigSchema<TConnectionConfig>;
   configForm?: IntegrationFormDefinition<
     TTargetConfig,

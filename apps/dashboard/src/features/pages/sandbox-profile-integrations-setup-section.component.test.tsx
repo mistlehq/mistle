@@ -1093,6 +1093,68 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(setupLink.getAttribute("target")).toBe("_blank");
   });
 
+  it("links setup from the add dialog when a connector only has non-bindable connections", () => {
+    const linearTarget: IntegrationTargetSummary = {
+      targetKey: "target-linear",
+      displayName: "Linear",
+      logoKey: "linear",
+      familyId: "linear",
+      variantId: "linear-default",
+      config: {},
+      connectionMethods: [
+        {
+          id: "linear-oauth-app",
+          label: "Linear OAuth app",
+          kind: "form",
+          sandboxProfileBinding: {
+            supported: false,
+            reason:
+              "Linear OAuth app connections configure identity linking and cannot be used in sandbox profile bindings.",
+          },
+          secretFields: [
+            {
+              name: "clientSecret",
+              label: "OAuth client secret",
+              inputType: "password",
+            },
+          ],
+        },
+      ],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [
+            {
+              id: "linear-oauth-app",
+              displayName: "Linear OAuth app",
+              targetKey: linearTarget.targetKey,
+              status: "active",
+              config: {
+                connection_method: "linear-oauth-app",
+              },
+            },
+          ],
+          availableTargets: [linearTarget],
+          integrationRows: [],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add integration or tool" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Add integration or tool" });
+    expect(within(dialog).getByText("Linear")).toBeDefined();
+    expect(within(dialog).queryByRole("button", { name: "Add" })).toBeNull();
+
+    const setupLink = within(dialog).getByRole("link", { name: "Setup integration" });
+    expect(setupLink.getAttribute("href")).toBe("/integrations/target-linear/add");
+  });
+
   it("filters the add integration or tool dialog with the shared integrations search field", () => {
     render(
       <TestSandboxProfileIntegrationsSetupSection
@@ -1342,6 +1404,197 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     ).toBe("true");
     expect(screen.queryByText("Save failed")).toBeNull();
   });
+
+  it("shows connector binding save errors on the affected connection field", () => {
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryJiraConnection],
+          availableTargets: [StoryJiraTarget],
+          integrationRows: [
+            {
+              clientId: "jira-row",
+              connectionId: StoryJiraConnection.id,
+              kind: "connector",
+              config: {},
+            },
+          ],
+          integrationRowErrorsByClientId: {
+            "jira-row":
+              "Linear OAuth app connections are setup-only for identity linking and cannot be used in Linear connector bindings.",
+          },
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        "Linear OAuth app connections are setup-only for identity linking and cannot be used in Linear connector bindings.",
+      ),
+    ).toBeDefined();
+    expect(
+      screen.getByRole("combobox", { name: "Jira connection" }).getAttribute("aria-invalid"),
+    ).toBe("true");
+    expect(screen.queryByText("Save failed")).toBeNull();
+  });
+
+  it("keeps connector binding save errors visible when every connection is filtered out", () => {
+    const linearTarget: IntegrationTargetSummary = {
+      targetKey: "target-linear",
+      displayName: "Linear",
+      logoKey: "linear",
+      familyId: "linear",
+      variantId: "linear-default",
+      config: {},
+      connectionMethods: [
+        {
+          id: "linear-oauth-app",
+          label: "Linear OAuth app",
+          kind: "form",
+          sandboxProfileBinding: {
+            supported: false,
+            reason:
+              "Linear OAuth app connections configure identity linking and cannot be used in sandbox profile bindings.",
+          },
+          secretFields: [
+            {
+              name: "clientSecret",
+              label: "OAuth client secret",
+              inputType: "password",
+            },
+          ],
+        },
+      ],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [
+            {
+              id: "linear-oauth-app",
+              displayName: "Linear OAuth app",
+              targetKey: linearTarget.targetKey,
+              status: "active",
+              config: {
+                connection_method: "linear-oauth-app",
+              },
+            },
+          ],
+          availableTargets: [linearTarget],
+          integrationRows: [
+            {
+              clientId: "linear-row",
+              connectionId: "linear-oauth-app",
+              kind: "connector",
+              config: {},
+            },
+          ],
+          integrationRowErrorsByClientId: {
+            "linear-row":
+              "Linear OAuth app connections are setup-only for identity linking and cannot be used in Linear connector bindings.",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("No connections available.")).toBeDefined();
+    expect(
+      screen.getByText(
+        "Linear OAuth app connections are setup-only for identity linking and cannot be used in Linear connector bindings.",
+      ),
+    ).toBeDefined();
+  });
+
+  it("hides connections whose method does not support sandbox profile bindings", () => {
+    const linearTarget: IntegrationTargetSummary = {
+      targetKey: "target-linear",
+      displayName: "Linear",
+      logoKey: "linear",
+      familyId: "linear",
+      variantId: "linear-default",
+      config: {},
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+            },
+          ],
+        },
+        {
+          id: "linear-oauth-app",
+          label: "Linear OAuth app",
+          kind: "form",
+          sandboxProfileBinding: {
+            supported: false,
+            reason:
+              "Linear OAuth app connections configure identity linking and cannot be used in sandbox profile bindings.",
+          },
+          secretFields: [
+            {
+              name: "clientSecret",
+              label: "OAuth client secret",
+              inputType: "password",
+            },
+          ],
+        },
+      ],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [
+            {
+              id: "linear-api-key",
+              displayName: "Linear API key",
+              targetKey: linearTarget.targetKey,
+              status: "active",
+              config: {
+                connection_method: "api-key",
+              },
+            },
+            {
+              id: "linear-oauth-app",
+              displayName: "Linear OAuth app",
+              targetKey: linearTarget.targetKey,
+              status: "active",
+              config: {
+                connection_method: "linear-oauth-app",
+              },
+            },
+          ],
+          availableTargets: [linearTarget],
+          integrationRows: [
+            {
+              clientId: "linear-row",
+              connectionId: "linear-api-key",
+              kind: "connector",
+              config: {},
+            },
+          ],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Linear connection" }));
+
+    const listbox = screen.getByRole("listbox");
+    expect(within(listbox).getByText("Linear API key")).toBeDefined();
+    expect(within(listbox).queryByText("Linear OAuth app")).toBeNull();
+  });
 });
 
 const StoryGcpTarget: IntegrationTargetSummary = {
@@ -1444,6 +1697,7 @@ function TestSandboxProfileIntegrationsSetupSection(input: {
     gitCommitSigningIntegrationConnectionId: null,
     identityLinkedGitConnectionIds: [],
     integrationRows: [],
+    integrationRowErrorsByClientId: {},
     integrationSaveError: null,
     runtimeSettings: <div>Sandbox Runtime</div>,
     onAddIntegrationBindingRow: async () => true,

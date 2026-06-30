@@ -43,6 +43,7 @@ export type IntegrationTargetSummary = {
   logoKey?: string | undefined;
   familyId: string;
   variantId: string;
+  connectionMethods?: IntegrationTarget["connectionMethods"];
   config: Record<string, unknown>;
   supportedAssociatedResourceEvents?: IntegrationTarget["supportedAssociatedResourceEvents"];
   targetHealth: {

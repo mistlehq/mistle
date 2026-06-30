@@ -1314,6 +1314,35 @@ describe("SandboxProfileEditorPage", () => {
     expect(owner).toBe("runtime");
   });
 
+  it("routes invalid binding config reference draft save errors to integrations", () => {
+    const owner = resolveDraftSaveErrorOwner(
+      new SandboxProfilesApiError({
+        operation: "putSandboxProfileVersionDraft",
+        status: 400,
+        body: {
+          code: "INVALID_BINDING_CONFIG_REFERENCE",
+          details: {
+            issues: [
+              {
+                clientRef: "binding-2",
+                bindingIdOrDraftIndex: "draft:1",
+                validatorCode: "linear.setup_only_connection_method",
+                field: "connection.config.connection_method",
+                safeMessage:
+                  "Linear OAuth app connections are setup-only for identity linking and cannot be used in Linear connector bindings.",
+              },
+            ],
+          },
+        },
+        code: "INVALID_BINDING_CONFIG_REFERENCE",
+        message:
+          "Binding 'draft:1' has invalid config reference: Linear OAuth app connections are setup-only for identity linking and cannot be used in Linear connector bindings.",
+      }),
+    );
+
+    expect(owner).toBe("integrations");
+  });
+
   it("shows setup script test output before the setup script input", () => {
     render(
       <SandboxProfileSetupScriptPanel
@@ -4231,13 +4260,13 @@ describe("SandboxProfileEditorPage", () => {
   it("surfaces draft save failures inside the sandbox profile tab", () => {
     renderDraftActionsHarness({
       draftSaveError:
-        "Saving draft failed. Fix the highlighted profile settings below and try again.",
+        "Saving draft failed. Review the profile setting messages below and try again.",
     });
 
     expect(screen.queryByText("Profile version action failed")).toBeNull();
     expect(
       screen.getByText(
-        "Saving draft failed. Fix the highlighted profile settings below and try again.",
+        "Saving draft failed. Review the profile setting messages below and try again.",
       ),
     ).toBeDefined();
   });

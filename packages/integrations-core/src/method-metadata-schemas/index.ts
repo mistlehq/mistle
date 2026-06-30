@@ -3,6 +3,7 @@ import { z } from "zod";
 import type {
   IntegrationConnectionMethodDetailFieldSource,
   IntegrationConnectionMethodDetailMetadata,
+  IntegrationConnectionMethodSandboxProfileBindingMetadata,
   IntegrationFormConnectionMethodPostCreateMetadata,
   IntegrationFormConnectionMethodProviderConfigurationSetup,
   IntegrationFormConnectionMethodSetupCompletionRequirement,
@@ -70,6 +71,21 @@ export const IntegrationConnectionMethodDetailMetadataSchema: z.ZodType<Integrat
         .optional(),
     })
     .strict();
+
+export const IntegrationConnectionMethodSandboxProfileBindingMetadataSchema: z.ZodType<IntegrationConnectionMethodSandboxProfileBindingMetadata> =
+  z.union([
+    z
+      .object({
+        supported: z.literal(true).optional(),
+      })
+      .strict(),
+    z
+      .object({
+        supported: z.literal(false),
+        reason: z.string().min(1).optional(),
+      })
+      .strict(),
+  ]);
 
 export const IntegrationFormConnectionMethodPostCreateMetadataSchema: z.ZodType<IntegrationFormConnectionMethodPostCreateMetadata> =
   z

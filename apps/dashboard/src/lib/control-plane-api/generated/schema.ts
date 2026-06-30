@@ -6014,6 +6014,16 @@ export interface paths {
                           successNoticeTitle: string;
                         };
                       };
+                      sandboxProfileBinding?:
+                        | {
+                            /** @enum {boolean} */
+                            supported?: true;
+                          }
+                        | {
+                            reason?: string;
+                            /** @enum {boolean} */
+                            supported: false;
+                          };
                       secretFields: {
                         description?: string;
                         /** @enum {string} */
@@ -6288,6 +6298,16 @@ export interface paths {
                       /** @enum {string} */
                       kind: "redirect";
                       label: string;
+                      sandboxProfileBinding?:
+                        | {
+                            /** @enum {boolean} */
+                            supported?: true;
+                          }
+                        | {
+                            reason?: string;
+                            /** @enum {boolean} */
+                            supported: false;
+                          };
                       ui: {
                         create: {
                           helperText: string;
@@ -6343,6 +6363,16 @@ export interface paths {
                       /** @enum {string} */
                       kind: "device-authorization";
                       label: string;
+                      sandboxProfileBinding?:
+                        | {
+                            /** @enum {boolean} */
+                            supported?: true;
+                          }
+                        | {
+                            reason?: string;
+                            /** @enum {boolean} */
+                            supported: false;
+                          };
                       ui: {
                         create: {
                           submitLabel: string;
