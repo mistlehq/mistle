@@ -943,6 +943,28 @@ describe("DesignerCanvasWorkspace", () => {
     });
   });
 
+  it("reserves right-side viewport room for blueprint loopback edges", () => {
+    expect(
+      resolveDesignerBlueprintInitialFocusViewportForNodes({
+        nodes: [
+          {
+            position: { x: 0, y: 0 },
+          },
+          {
+            position: { x: 260, y: 360 },
+          },
+        ],
+        rightPadding: 260,
+        width: 1000,
+        zoom: 0.82,
+      }),
+    ).toEqual({
+      x: 172,
+      y: 56,
+      zoom: 0.82,
+    });
+  });
+
   it("returns no blueprint viewport before the canvas has a measured width", () => {
     expect(
       resolveDesignerBlueprintInitialFocusViewportForNodes({
