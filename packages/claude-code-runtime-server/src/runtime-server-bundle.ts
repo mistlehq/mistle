@@ -1084,8 +1084,7 @@ async function handleRequest(request) {
         replied: true,
       };
     }
-    case "query/start":
-    case "query/steer": {
+    case "query/start": {
       return handleIdempotentRequest(request, () => {
         const params = request.params ?? {};
         if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
@@ -1095,6 +1094,38 @@ async function handleRequest(request) {
           throw new Error(request.method + " requires params.inputText.");
         }
         const conversation = requireSession(params.sessionId);
+        const queryId = startQuery(conversation, params.inputText);
+        return {
+          query: {
+            id: queryId,
+            status: "running",
+          },
+          queryId,
+        };
+      });
+    }
+    case "query/steer": {
+      return handleIdempotentRequest(request, () => {
+        const params = request.params ?? {};
+        if (typeof params.sessionId !== "string" || params.sessionId.length === 0) {
+          throw new Error("query/steer requires params.sessionId.");
+        }
+        if (typeof params.expectedQueryId !== "string" || params.expectedQueryId.length === 0) {
+          throw new Error("query/steer requires params.expectedQueryId.");
+        }
+        if (typeof params.inputText !== "string") {
+          throw new Error("query/steer requires params.inputText.");
+        }
+        const conversation = requireSession(params.sessionId);
+        if (conversation.activeQueryId !== params.expectedQueryId) {
+          throw new Error(
+            "Claude Code query/steer expected active query " +
+              params.expectedQueryId +
+              " but current active query is " +
+              (conversation.activeQueryId ?? "none") +
+              ".",
+          );
+        }
         const queryId = startQuery(conversation, params.inputText);
         return {
           query: {

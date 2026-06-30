@@ -7,14 +7,16 @@ import {
 } from "./client.js";
 
 describe("buildClaudeCodeSessionSteerQueryParams", () => {
-  it("documents that dashboard session steer currently omits an expected query id", () => {
+  it("includes the expected active query id for dashboard session steer", () => {
     expect(
       buildClaudeCodeSessionSteerQueryParams({
         sessionId: "session_123",
+        expectedQueryId: "query_123",
         inputText: "Adjust the current run.",
       }),
     ).toEqual({
       sessionId: "session_123",
+      expectedQueryId: "query_123",
       inputText: "Adjust the current run.",
     });
   });

@@ -126,6 +126,7 @@ export type ClaudeCodeSessionClient = {
     sessionId: string;
   }): Promise<{ queryId: string }>;
   steerQuery(input: {
+    expectedQueryId: string;
     idempotency?: AgentConversationIdempotencyMetadata;
     inputText: string;
     sessionId: string;
@@ -390,11 +391,13 @@ export function parseClaudeCodeSessionReadResult(result: unknown): ClaudeCodeSes
 }
 
 export function buildClaudeCodeSessionSteerQueryParams(input: {
+  expectedQueryId: string;
   inputText: string;
   sessionId: string;
 }): Record<string, unknown> {
   return {
     sessionId: input.sessionId,
+    expectedQueryId: input.expectedQueryId,
     inputText: input.inputText,
   };
 }
@@ -516,6 +519,7 @@ export function createClaudeCodeSessionClient(
         ClaudeCodeRuntimeMethods.QUERY_STEER,
         buildClaudeCodeSessionSteerQueryParams({
           sessionId: steerInput.sessionId,
+          expectedQueryId: steerInput.expectedQueryId,
           inputText: steerInput.inputText,
         }),
         {

@@ -624,8 +624,12 @@ export function useClaudeCodeSessionState(input: {
     async (steerInput: { submittedPrompt: string }): Promise<void> => {
       const client = clientRef.current;
       const sessionId = sessionSnapshot?.activeSessionId ?? null;
+      const expectedQueryId = chatState.pendingQueryId;
       if (client === null || sessionId === null) {
         throw new Error("Connect Claude Code before steering.");
+      }
+      if (expectedQueryId === null) {
+        throw new Error("Claude Code can only be steered while a query is active.");
       }
       const prompt = steerInput.submittedPrompt.trim();
       if (prompt.length === 0) {
@@ -636,6 +640,7 @@ export function useClaudeCodeSessionState(input: {
       try {
         await client.steerQuery({
           sessionId,
+          expectedQueryId,
           inputText: prompt,
         });
         setSessionErrorMessage(null);
@@ -653,7 +658,7 @@ export function useClaudeCodeSessionState(input: {
         setIsSteeringTurn(false);
       }
     },
-    [pollSessionUntilIdle, sessionSnapshot?.activeSessionId],
+    [chatState.pendingQueryId, pollSessionUntilIdle, sessionSnapshot?.activeSessionId],
   );
 
   const interruptQuery = useCallback(async (): Promise<void> => {
