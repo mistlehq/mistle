@@ -127,11 +127,11 @@ export function buildCodexConversationRuntime(input: {
   plans: UseCodexSessionStateResult["plans"];
   reviews: UseCodexSessionStateResult["reviews"];
 }): SessionWorkbenchRuntimeAdapter {
-  const capabilities = SessionWorkbenchRuntimeModules.CODEX.capabilities;
+  const runtimeModule = SessionWorkbenchRuntimeModules.CODEX;
 
   return {
-    displayName: capabilities.displayName,
-    cliTerminalContentInset: capabilities.cliTerminalContentInset,
+    displayName: runtimeModule.metadata.displayName,
+    cliTerminalContentInset: runtimeModule.presentation.cliTerminalContentInset,
     conversation: {
       activeConversationId: input.activeConversationId,
       attachmentTargetId: input.activeConversationId,
@@ -146,7 +146,7 @@ export function buildCodexConversationRuntime(input: {
         activeTurnState:
           input.chat.canInterruptTurn || input.chat.canSteerTurn ? "running" : "idle",
         canInterrupt: input.chat.canInterruptTurn,
-        canSteer: capabilities.supportsSteering && input.chat.canSteerTurn,
+        canSteer: runtimeModule.composerPolicy.supportsSteering && input.chat.canSteerTurn,
         completedTurnErrorMessage: input.chat.chatState.completedErrorMessage,
         interruptTurn: input.chat.interruptTurn,
         isInterrupting: input.chat.isInterruptingTurn,
@@ -235,7 +235,7 @@ export function buildCodexConversationRuntime(input: {
 
         return input.goals.executeTypedComposerCommand(commandInput);
       },
-      modelSelection: capabilities.composerModelSelection,
+      modelSelection: runtimeModule.composerPolicy.composerModelSelection,
     },
     serverRequestsState: {
       isRespondingToServerRequest: input.serverRequests.isRespondingToServerRequest,
@@ -289,7 +289,7 @@ export function buildOpenCodeConversationRuntime(input: {
   startTurn: SessionTurnControl["startTurn"];
   steerTurn: SessionTurnControl["steerTurn"];
 }): SessionWorkbenchRuntimeAdapter {
-  const capabilities = SessionWorkbenchRuntimeModules.OPENCODE.capabilities;
+  const runtimeModule = SessionWorkbenchRuntimeModules.OPENCODE;
   const isTurnRunning = input.chat.chatState.status === "busy";
   const respondToServerRequest = (requestId: string | number, result: unknown): void => {
     let response: ReturnType<typeof resolveOpenCodePermissionResponse>;
@@ -315,8 +315,8 @@ export function buildOpenCodeConversationRuntime(input: {
   };
 
   return {
-    displayName: capabilities.displayName,
-    cliTerminalContentInset: capabilities.cliTerminalContentInset,
+    displayName: runtimeModule.metadata.displayName,
+    cliTerminalContentInset: runtimeModule.presentation.cliTerminalContentInset,
     conversation: {
       activeConversationId: input.sessionSnapshot?.activeSessionId ?? null,
       attachmentTargetId: input.sessionSnapshot?.activeSessionId ?? null,
@@ -329,7 +329,7 @@ export function buildOpenCodeConversationRuntime(input: {
       turnControl: {
         activeTurnState: isTurnRunning ? "running" : "idle",
         canInterrupt: input.chat.canInterruptTurn,
-        canSteer: capabilities.supportsSteering && isTurnRunning,
+        canSteer: runtimeModule.composerPolicy.supportsSteering && isTurnRunning,
         completedTurnErrorMessage: input.chat.chatState.completedErrorMessage,
         interruptTurn: (): void => {
           void input.chat.abortSession();
@@ -362,7 +362,7 @@ export function buildOpenCodeConversationRuntime(input: {
           });
         return true;
       },
-      modelSelection: capabilities.composerModelSelection,
+      modelSelection: runtimeModule.composerPolicy.composerModelSelection,
     },
     serverRequestsState: {
       isRespondingToServerRequest: input.chat.isRespondingToPermission,
@@ -384,7 +384,7 @@ export function buildClaudeCodeConversationRuntime(input: {
   startTurn: SessionTurnControl["startTurn"];
   steerTurn: SessionTurnControl["steerTurn"];
 }): SessionWorkbenchRuntimeAdapter {
-  const capabilities = SessionWorkbenchRuntimeModules.CLAUDE_CODE.capabilities;
+  const runtimeModule = SessionWorkbenchRuntimeModules.CLAUDE_CODE;
   const isTurnRunning = input.chat.chatState.status === "busy";
   const activeSessionId = input.sessionSnapshot?.activeSessionId ?? null;
   const pendingPermissionRequests =
@@ -417,8 +417,8 @@ export function buildClaudeCodeConversationRuntime(input: {
   };
 
   return {
-    displayName: capabilities.displayName,
-    cliTerminalContentInset: capabilities.cliTerminalContentInset,
+    displayName: runtimeModule.metadata.displayName,
+    cliTerminalContentInset: runtimeModule.presentation.cliTerminalContentInset,
     conversation: {
       activeConversationId: activeSessionId,
       attachmentTargetId: activeSessionId,
@@ -431,7 +431,8 @@ export function buildClaudeCodeConversationRuntime(input: {
       turnControl: {
         activeTurnState: isTurnRunning ? "running" : "idle",
         canInterrupt: input.chat.canInterruptTurn,
-        canSteer: capabilities.supportsSteering && isTurnRunning && input.chat.canSteerTurn,
+        canSteer:
+          runtimeModule.composerPolicy.supportsSteering && isTurnRunning && input.chat.canSteerTurn,
         completedTurnErrorMessage: input.chat.chatState.completedErrorMessage,
         interruptTurn: (): void => {
           void input.chat.interruptQuery();
@@ -473,7 +474,7 @@ export function buildClaudeCodeConversationRuntime(input: {
           });
         return true;
       },
-      modelSelection: capabilities.composerModelSelection,
+      modelSelection: runtimeModule.composerPolicy.composerModelSelection,
     },
     serverRequestsState: {
       isRespondingToServerRequest: input.chat.isRespondingToPermission,
@@ -494,7 +495,7 @@ export function buildPiConversationRuntime(input: {
   startTurn: SessionTurnControl["startTurn"];
   steerTurn: SessionTurnControl["steerTurn"];
 }): SessionWorkbenchRuntimeAdapter {
-  const capabilities = SessionWorkbenchRuntimeModules.PI.capabilities;
+  const runtimeModule = SessionWorkbenchRuntimeModules.PI;
   const isTurnRunning = input.chat.chatState.status === "busy";
   const respondToServerRequest = (requestId: string | number, result: unknown): void => {
     const request = input.chat.pendingExtensionUIRequests.find(
@@ -525,8 +526,8 @@ export function buildPiConversationRuntime(input: {
   };
 
   return {
-    displayName: capabilities.displayName,
-    cliTerminalContentInset: capabilities.cliTerminalContentInset,
+    displayName: runtimeModule.metadata.displayName,
+    cliTerminalContentInset: runtimeModule.presentation.cliTerminalContentInset,
     conversation: {
       activeConversationId: input.sessionSnapshot?.activeConversationId ?? null,
       attachmentTargetId:
@@ -542,7 +543,8 @@ export function buildPiConversationRuntime(input: {
       turnControl: {
         activeTurnState: isTurnRunning ? "running" : "idle",
         canInterrupt: input.chat.canInterruptTurn,
-        canSteer: capabilities.supportsSteering && isTurnRunning && input.chat.canSteerTurn,
+        canSteer:
+          runtimeModule.composerPolicy.supportsSteering && isTurnRunning && input.chat.canSteerTurn,
         completedTurnErrorMessage: input.chat.chatState.completedErrorMessage,
         interruptTurn: (): void => {
           void input.chat.abortConversation();
@@ -599,7 +601,7 @@ export function buildPiConversationRuntime(input: {
           });
         return true;
       },
-      modelSelection: capabilities.composerModelSelection,
+      modelSelection: runtimeModule.composerPolicy.composerModelSelection,
     },
     serverRequestsState: {
       isRespondingToServerRequest: input.chat.isRespondingToExtensionUIRequest,

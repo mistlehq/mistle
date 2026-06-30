@@ -57,7 +57,7 @@ export function useSessionWorkbenchRepositoryControl(input: {
     enabled: input.canConnect,
     ensureTransportConnected: input.ensureTransportConnected,
     initialSelectedRepositoryPath,
-    runtimeDisplayName: activeRuntimeModule.capabilities.displayName,
+    runtimeDisplayName: activeRuntimeModule.metadata.displayName,
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const selectedRepositoryPath = primaryRepositoryState.selectedRepositoryPath;

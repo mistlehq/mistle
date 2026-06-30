@@ -10,14 +10,20 @@ describe("session workbench runtime registry", () => {
   it("describes the Codex workbench contract", () => {
     expect(SessionWorkbenchRuntimeModules.CODEX).toEqual({
       runtimeId: "codex",
-      capabilities: {
+      metadata: {
         displayName: "Codex",
+      },
+      presentation: {
         cliTerminalContentInset: "default",
+      },
+      composerPolicy: {
         composerModelSelection: {
           required: true,
           showControls: true,
         },
         supportsSteering: true,
+      },
+      handoffPolicy: {
         preservesCliLaunchContext: false,
       },
       conversationPolicy: {
@@ -34,14 +40,20 @@ describe("session workbench runtime registry", () => {
   it("describes the Claude Code workbench contract", () => {
     expect(SessionWorkbenchRuntimeModules.CLAUDE_CODE).toEqual({
       runtimeId: "claude-code",
-      capabilities: {
+      metadata: {
         displayName: "Claude Code",
+      },
+      presentation: {
         cliTerminalContentInset: "none",
+      },
+      composerPolicy: {
         composerModelSelection: {
           required: false,
           showControls: true,
         },
         supportsSteering: true,
+      },
+      handoffPolicy: {
         preservesCliLaunchContext: false,
       },
       conversationPolicy: {
@@ -58,14 +70,20 @@ describe("session workbench runtime registry", () => {
   it("describes the OpenCode workbench contract", () => {
     expect(SessionWorkbenchRuntimeModules.OPENCODE).toEqual({
       runtimeId: "opencode",
-      capabilities: {
+      metadata: {
         displayName: "OpenCode",
+      },
+      presentation: {
         cliTerminalContentInset: "none",
+      },
+      composerPolicy: {
         composerModelSelection: {
           required: false,
           showControls: true,
         },
         supportsSteering: true,
+      },
+      handoffPolicy: {
         preservesCliLaunchContext: true,
       },
       conversationPolicy: {
@@ -82,14 +100,20 @@ describe("session workbench runtime registry", () => {
   it("describes the Pi workbench contract", () => {
     expect(SessionWorkbenchRuntimeModules.PI).toEqual({
       runtimeId: "pi",
-      capabilities: {
+      metadata: {
         displayName: "Pi",
+      },
+      presentation: {
         cliTerminalContentInset: "none",
+      },
+      composerPolicy: {
         composerModelSelection: {
           required: false,
           showControls: true,
         },
         supportsSteering: true,
+      },
+      handoffPolicy: {
         preservesCliLaunchContext: false,
       },
       conversationPolicy: {

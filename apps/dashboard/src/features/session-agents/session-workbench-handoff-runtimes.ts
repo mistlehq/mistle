@@ -321,14 +321,15 @@ export function buildCodexHandoffRuntime(input: {
   serverRequests: UseCodexSessionStateResult["serverRequests"];
   threadAuthority: UseCodexSessionStateResult["threadAuthority"];
 }): SessionMainPanelHandoffRuntime {
+  const runtimeModule = SessionWorkbenchRuntimeModules.CODEX;
+
   return {
     buildCliPtyOpenInput: buildCodexCliPtyOpenInput,
     clearActiveThreadIdAfterCliLaunch: input.threadAuthority.clearActiveThreadIdAfterCliLaunch,
-    displayName: SessionWorkbenchRuntimeModules.CODEX.capabilities.displayName,
+    displayName: runtimeModule.metadata.displayName,
     hydrateChatFromConversation: input.chat.hydrateChatFromThread,
     lifecycle: input.lifecycle,
-    preserveCliLaunchForRestore:
-      SessionWorkbenchRuntimeModules.CODEX.capabilities.preservesCliLaunchContext,
+    preserveCliLaunchForRestore: runtimeModule.handoffPolicy.preservesCliLaunchContext,
     resetServerRequests: input.serverRequests.resetServerRequests,
     restoreConversationId: input.threadAuthority.providerThreadId,
     restoreProviderConversationId: input.threadAuthority.providerThreadId,
@@ -341,14 +342,15 @@ export function buildOpenCodeHandoffRuntime(input: {
   lifecycle: SessionMainPanelHandoffLifecycle;
   sessionSnapshot: UseOpenCodeSessionStateResult["lifecycle"]["sessionSnapshot"];
 }): SessionMainPanelHandoffRuntime {
+  const runtimeModule = SessionWorkbenchRuntimeModules.OPENCODE;
+
   return {
     buildCliPtyOpenInput: buildOpenCodeCliPtyOpenInput,
     clearActiveThreadIdAfterCliLaunch: () => {},
-    displayName: SessionWorkbenchRuntimeModules.OPENCODE.capabilities.displayName,
+    displayName: runtimeModule.metadata.displayName,
     hydrateChatFromConversation: input.chat.hydrateChatFromSessionOrThrow,
     lifecycle: input.lifecycle,
-    preserveCliLaunchForRestore:
-      SessionWorkbenchRuntimeModules.OPENCODE.capabilities.preservesCliLaunchContext,
+    preserveCliLaunchForRestore: runtimeModule.handoffPolicy.preservesCliLaunchContext,
     resetServerRequests: () => {},
     restoreConversationId: input.sessionSnapshot?.activeSessionId ?? null,
     restoreProviderConversationId: input.sessionSnapshot?.providerSessionId ?? null,
@@ -375,14 +377,15 @@ export function buildClaudeCodeHandoffRuntime(input: {
   lifecycle: SessionMainPanelHandoffLifecycle;
   sessionSnapshot: UseClaudeCodeSessionStateResult["lifecycle"]["sessionSnapshot"];
 }): SessionMainPanelHandoffRuntime {
+  const runtimeModule = SessionWorkbenchRuntimeModules.CLAUDE_CODE;
+
   return {
     buildCliPtyOpenInput: buildClaudeCodeCliPtyOpenInput,
     clearActiveThreadIdAfterCliLaunch: () => {},
-    displayName: SessionWorkbenchRuntimeModules.CLAUDE_CODE.capabilities.displayName,
+    displayName: runtimeModule.metadata.displayName,
     hydrateChatFromConversation: input.chat.hydrateChatFromSessionOrThrow,
     lifecycle: input.lifecycle,
-    preserveCliLaunchForRestore:
-      SessionWorkbenchRuntimeModules.CLAUDE_CODE.capabilities.preservesCliLaunchContext,
+    preserveCliLaunchForRestore: runtimeModule.handoffPolicy.preservesCliLaunchContext,
     resetServerRequests: () => {},
     restoreConversationId: input.sessionSnapshot?.activeSessionId ?? null,
     restoreProviderConversationId: input.sessionSnapshot?.providerSessionId ?? null,
@@ -410,14 +413,15 @@ export function buildPiHandoffRuntime(input: {
   lifecycle: SessionMainPanelHandoffLifecycle;
   sessionSnapshot: UsePiSessionStateResult["lifecycle"]["sessionSnapshot"];
 }): SessionMainPanelHandoffRuntime {
+  const runtimeModule = SessionWorkbenchRuntimeModules.PI;
+
   return {
     buildCliPtyOpenInput: buildPiCliPtyOpenInput,
     clearActiveThreadIdAfterCliLaunch: () => {},
-    displayName: SessionWorkbenchRuntimeModules.PI.capabilities.displayName,
+    displayName: runtimeModule.metadata.displayName,
     hydrateChatFromConversation: input.chat.confirmChatRestoredAfterReconnect,
     lifecycle: input.lifecycle,
-    preserveCliLaunchForRestore:
-      SessionWorkbenchRuntimeModules.PI.capabilities.preservesCliLaunchContext,
+    preserveCliLaunchForRestore: runtimeModule.handoffPolicy.preservesCliLaunchContext,
     resetServerRequests: () => {},
     restoreConversationId: input.sessionSnapshot?.activeConversationId ?? null,
     restoreProviderConversationId: input.sessionSnapshot?.providerConversationId ?? null,
