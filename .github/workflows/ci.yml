@@ -255,7 +255,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: static-ts-pnpm-store-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -264,7 +264,7 @@ jobs:
 
       - name: Restore Turbo local cache
         id: static-ts-turbo-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-static-ts-${{ github.sha }}
@@ -347,7 +347,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: build-ts-pnpm-store-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -356,7 +356,7 @@ jobs:
 
       - name: Restore Turbo local cache
         id: build-ts-turbo-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-build-ts-${{ github.sha }}
@@ -444,7 +444,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: static-rust-pnpm-store-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -453,7 +453,7 @@ jobs:
 
       - name: Restore Turbo local cache
         id: static-rust-turbo-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-static-rust-${{ github.sha }}
@@ -532,7 +532,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: knip-pnpm-store-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -593,7 +593,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: test-ts-pnpm-store-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -602,7 +602,7 @@ jobs:
 
       - name: Restore Turbo local cache
         id: test-ts-turbo-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-${{ github.sha }}
@@ -680,7 +680,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: test-ts-component-pnpm-store-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -689,7 +689,7 @@ jobs:
 
       - name: Restore Turbo local cache
         id: test-ts-component-turbo-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-component-${{ github.sha }}
@@ -766,7 +766,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: test-ts-integration-pnpm-store-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -775,7 +775,7 @@ jobs:
 
       - name: Restore Turbo local cache
         id: test-ts-integration-turbo-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-integration-${{ github.sha }}
@@ -847,7 +847,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: control-plane-migration-smoke-pnpm-store-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -920,7 +920,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: data-plane-migration-smoke-pnpm-store-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -994,7 +994,7 @@ jobs:
 
       - name: Restore commit-sign container cargo cache
         id: test-commit-sign-container-cargo-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: .local/commit-sign-test/cargo-home
           key: ${{ runner.os }}-commit-sign-test-cargo-home-${{ hashFiles('packages/commit-sign/Cargo.lock') }}
@@ -1003,7 +1003,7 @@ jobs:
 
       - name: Restore commit-sign container target cache
         id: test-commit-sign-container-target-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: .local/commit-sign-test/target-alpine-container
           key: ${{ runner.os }}-commit-sign-test-target-alpine-${{ hashFiles('packages/commit-sign/Cargo.lock') }}-${{ github.sha }}
@@ -1013,7 +1013,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: test-commit-sign-pnpm-store-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -1106,7 +1106,7 @@ jobs:
 
       - name: Restore sandboxd container cargo cache
         id: test-sandboxd-container-cargo-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: .local/sandboxd-test/cargo-home
           key: ${{ runner.os }}-sandboxd-test-cargo-home-${{ hashFiles('packages/sandboxd/Cargo.lock') }}
@@ -1115,7 +1115,7 @@ jobs:
 
       - name: Restore sandboxd container target cache
         id: test-sandboxd-container-target-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: .local/sandboxd-test/target-ubuntu-container
           key: ${{ runner.os }}-sandboxd-test-target-ubuntu-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-${{ github.sha }}
@@ -1125,7 +1125,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: test-sandboxd-pnpm-store-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -1236,7 +1236,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: test-mstl-pnpm-store-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
