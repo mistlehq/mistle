@@ -195,6 +195,107 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     });
   });
 
+  it("rejects integration bindings whose kind does not match the selected connection target", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-binding-kind-mismatch@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "linear-default-draft-put-kind-mismatch",
+        familyId: "linear",
+        variantId: "linear-default",
+        enabled: true,
+        config: {},
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_draft_put_kind_mismatch_linear_001",
+        organizationId: session.organizationId,
+        targetKey: "linear-default-draft-put-kind-mismatch",
+        displayName: "Draft Put Linear Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_kind_mismatch_001",
+        organizationId: session.organizationId,
+        displayName: "Draft Put Binding Kind Mismatch Profile",
+        createdAt: "2026-05-08T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_kind_mismatch_001",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_kind_mismatch_001/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          integrationBindings: {
+            bindings: [
+              {
+                clientRef: "linear-default",
+                connectionId: "icn_draft_put_kind_mismatch_linear_001",
+                kind: IntegrationBindingKinds.AGENT,
+                config: {},
+              },
+            ],
+          },
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = PutSandboxProfileVersionDraftBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      code: "INVALID_BINDING_CONFIG_REFERENCE",
+      message:
+        "Binding 'draft:0' has invalid config reference: Binding kind 'agent' does not match integration 'linear::linear-default' kind 'connector'.",
+      details: {
+        issues: [
+          {
+            clientRef: "linear-default",
+            bindingIdOrDraftIndex: "draft:0",
+            validatorCode: "system.binding_kind_mismatch",
+            field: "kind",
+            safeMessage:
+              "Binding kind 'agent' does not match integration 'linear::linear-default' kind 'connector'.",
+          },
+        ],
+      },
+    });
+
+    const persistedBindings =
+      await env.controlPlaneDb.query.sandboxProfileVersionIntegrationBindings.findMany({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.sandboxProfileId, "sbp_draft_put_kind_mismatch_001"),
+            eq(table.sandboxProfileVersion, 1),
+          ),
+      });
+    expect(persistedBindings).toEqual([]);
+  });
+
   it("updates the selected skills config using the source origin URL", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-sandbox-profile-draft-put-skills@example.com",

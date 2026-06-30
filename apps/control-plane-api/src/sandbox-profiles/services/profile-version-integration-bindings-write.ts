@@ -343,6 +343,24 @@ export async function validateProfileVersionIntegrationBindings(
       familyId: resolvedTarget.familyId,
       variantId: resolvedTarget.variantId,
     });
+    if (definition.kind !== binding.kind) {
+      const bindingIdOrDraftIndex = binding.id ?? `draft:${String(bindingIndex)}`;
+      throw new SandboxProfilesIntegrationBindingsBadRequestError(
+        SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
+        `Binding '${bindingIdOrDraftIndex}' has invalid config reference: Binding kind '${binding.kind}' does not match integration '${definition.familyId}::${definition.variantId}' kind '${definition.kind}'.`,
+        {
+          issues: [
+            {
+              ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
+              bindingIdOrDraftIndex,
+              validatorCode: "system.binding_kind_mismatch",
+              field: "kind",
+              safeMessage: `Binding kind '${binding.kind}' does not match integration '${definition.familyId}::${definition.variantId}' kind '${definition.kind}'.`,
+            },
+          ],
+        },
+      );
+    }
     const validationResult = runDefinitionBindingWriteValidation({
       definition,
       targetKey: resolvedConnection.targetKey,
