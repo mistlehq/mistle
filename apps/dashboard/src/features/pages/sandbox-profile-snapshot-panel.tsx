@@ -316,6 +316,11 @@ export function SandboxProfileSnapshotPanelView(input: {
     );
   }
 
+  const publishSnapshotFailureNotice =
+    input.state.kind === "publish-snapshot-error"
+      ? resolvePublishSnapshotFailureNotice(input.state)
+      : null;
+
   return (
     <SandboxProfileEditorHorizontalTabContent>
       <SnapshotPanelDescription />
@@ -326,9 +331,9 @@ export function SandboxProfileSnapshotPanelView(input: {
         visible={input.publishSuccessMessage}
       />
 
-      {input.state.kind === "publish-snapshot-error" ? (
-        <Notice title={resolvePublishSnapshotFailureNotice(input.state).title} variant="alert">
-          {resolvePublishSnapshotFailureNotice(input.state).description}
+      {publishSnapshotFailureNotice !== null ? (
+        <Notice title={publishSnapshotFailureNotice.title} variant="alert">
+          {publishSnapshotFailureNotice.description}
         </Notice>
       ) : null}
 

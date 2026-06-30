@@ -774,7 +774,7 @@ function mapCompileSnapshotFailure(error: unknown): SnapshotMaterializationFailu
     return null;
   }
 
-  const detailMessage = removeInternalCompileFailurePrefix(error.message);
+  const detailMessage = error.detailMessage;
   const failureCode = resolveSnapshotRuntimePlanFailureCode(error.code);
   if (failureCode === null) {
     return null;
@@ -788,13 +788,6 @@ function mapCompileSnapshotFailure(error: unknown): SnapshotMaterializationFailu
       integrationLabel: resolveCompileFailureIntegrationLabel(detailMessage),
     }),
   };
-}
-
-function removeInternalCompileFailurePrefix(message: string): string {
-  return message.replace(
-    /^Control-plane internal runtime plan compile failed with status 400:\s*/u,
-    "",
-  );
 }
 
 function resolveSnapshotRuntimePlanFailureCode(code: string): string | null {
@@ -846,6 +839,12 @@ function resolveCompileFailureIntegrationLabel(message: string): string | null {
     return formatIntegrationLabel(runtimeServerMatch[1]);
   }
 
+  const linearIdMatch =
+    /\b(?:linear|Linear)[_-][a-z0-9_-]+|\b[a-z0-9_-]+[_-](?:linear|Linear)\b/u.exec(message);
+  if (linearIdMatch !== null) {
+    return "Linear";
+  }
+
   return null;
 }
 
@@ -890,18 +889,11 @@ function formatIntegrationLabel(value: string): string {
   }
 }
 
-function labelOrFallback(input: { integrationLabel: string | null; fallback: string }): string {
-  return input.integrationLabel ?? input.fallback;
-}
-
 function resolveSnapshotRuntimePlanFailureSummary(input: {
   code: string;
   integrationLabel: string | null;
 }): string {
-  const integration = labelOrFallback({
-    integrationLabel: input.integrationLabel,
-    fallback: "an integration",
-  });
+  const integration = input.integrationLabel ?? "an integration";
 
   switch (input.code) {
     case "INVALID_BINDING_CONNECTION_REFERENCE":

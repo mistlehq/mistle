@@ -21,7 +21,7 @@ const ExistingSnapshotRefreshSchedule = {
   nextScheduledAt: "2026-04-30T01:00:00.000Z",
 } satisfies NonNullable<SnapshotRefreshSchedule>;
 
-describe("SandboxProfileSnapshotRefreshScheduleForm", () => {
+describe("SandboxProfileSnapshotPanelView", () => {
   it("shows the persisted publish snapshot failure message when snapshot creation fails", () => {
     render(
       <SandboxProfileSnapshotPanelView
@@ -57,7 +57,9 @@ describe("SandboxProfileSnapshotRefreshScheduleForm", () => {
     expect(screen.queryByText("Snapshot creation failed")).toBeNull();
     expect(screen.queryByText(/Binding 'ibd_story_linear' has kind 'agent'/u)).toBeNull();
   });
+});
 
+describe("SandboxProfileSnapshotRefreshScheduleForm", () => {
   it("returns to the automatic snapshot refresh summary after saving maintenance script edits", () => {
     render(<RefreshScheduleSaveHarness />);
 

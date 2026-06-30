@@ -126,12 +126,19 @@ function extractErrorCode(input: unknown): string | undefined {
 export class ControlPlaneInternalClientRequestError extends Error {
   readonly status: number;
   readonly code: string | undefined;
+  readonly detailMessage: string;
 
-  constructor(input: { status: number; message: string; code: string | undefined }) {
+  constructor(input: {
+    status: number;
+    message: string;
+    code: string | undefined;
+    detailMessage: string;
+  }) {
     super(input.message);
     this.name = "ControlPlaneInternalClientRequestError";
     this.status = input.status;
     this.code = input.code;
+    this.detailMessage = input.detailMessage;
   }
 }
 
@@ -166,10 +173,12 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
+    const detailMessage = extractErrorMessage(result.error);
     throw new ControlPlaneInternalClientRequestError({
       status: result.response.status,
       code: extractErrorCode(result.error),
-      message: `Control-plane internal credential resolution failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+      detailMessage,
+      message: `Control-plane internal credential resolution failed with status ${String(result.response.status)}: ${detailMessage}`,
     });
   }
 
@@ -231,10 +240,12 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
+    const detailMessage = extractErrorMessage(result.error);
     throw new ControlPlaneInternalClientRequestError({
       status: result.response.status,
       code: extractErrorCode(result.error),
-      message: `Control-plane internal linked-principal commit signing failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+      detailMessage,
+      message: `Control-plane internal linked-principal commit signing failed with status ${String(result.response.status)}: ${detailMessage}`,
     });
   }
 
@@ -271,10 +282,12 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
+    const detailMessage = extractErrorMessage(result.error);
     throw new ControlPlaneInternalClientRequestError({
       status: result.response.status,
       code: extractErrorCode(result.error),
-      message: `Control-plane internal runtime plan compile failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+      detailMessage,
+      message: `Control-plane internal runtime plan compile failed with status ${String(result.response.status)}: ${detailMessage}`,
     });
   }
 
@@ -330,10 +343,12 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
+    const detailMessage = extractErrorMessage(result.error);
     throw new ControlPlaneInternalClientRequestError({
       status: result.response.status,
       code: extractErrorCode(result.error),
-      message: `Control-plane internal sandbox read failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+      detailMessage,
+      message: `Control-plane internal sandbox read failed with status ${String(result.response.status)}: ${detailMessage}`,
     });
   }
 
@@ -370,10 +385,12 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
+    const detailMessage = extractErrorMessage(result.error);
     throw new ControlPlaneInternalClientRequestError({
       status: result.response.status,
       code: extractErrorCode(result.error),
-      message: `Control-plane internal provider resource association registration failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+      detailMessage,
+      message: `Control-plane internal provider resource association registration failed with status ${String(result.response.status)}: ${detailMessage}`,
     });
   }
 
@@ -398,10 +415,12 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
+    const detailMessage = extractErrorMessage(result.error);
     throw new ControlPlaneInternalClientRequestError({
       status: result.response.status,
       code: extractErrorCode(result.error),
-      message: `Control-plane internal snapshot job claim failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+      detailMessage,
+      message: `Control-plane internal snapshot job claim failed with status ${String(result.response.status)}: ${detailMessage}`,
     });
   }
 
@@ -419,10 +438,12 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
+    const detailMessage = extractErrorMessage(result.error);
     throw new ControlPlaneInternalClientRequestError({
       status: result.response.status,
       code: extractErrorCode(result.error),
-      message: `Control-plane internal sandbox runtime credential resolution failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+      detailMessage,
+      message: `Control-plane internal sandbox runtime credential resolution failed with status ${String(result.response.status)}: ${detailMessage}`,
     });
   }
 
@@ -448,10 +469,12 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
+    const detailMessage = extractErrorMessage(result.error);
     throw new ControlPlaneInternalClientRequestError({
       status: result.response.status,
       code: extractErrorCode(result.error),
-      message: `Control-plane internal snapshot job success update failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+      detailMessage,
+      message: `Control-plane internal snapshot job success update failed with status ${String(result.response.status)}: ${detailMessage}`,
     });
   }
 
@@ -478,10 +501,12 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
+    const detailMessage = extractErrorMessage(result.error);
     throw new ControlPlaneInternalClientRequestError({
       status: result.response.status,
       code: extractErrorCode(result.error),
-      message: `Control-plane internal snapshot job failure update failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+      detailMessage,
+      message: `Control-plane internal snapshot job failure update failed with status ${String(result.response.status)}: ${detailMessage}`,
     });
   }
 

@@ -87,6 +87,21 @@ export {
   StorySlackTarget,
 };
 
+type SnapshotCompileErrorStoryStatus =
+  | "snapshot-failed-invalid-binding-connection-reference"
+  | "snapshot-failed-invalid-connection-target-reference"
+  | "snapshot-failed-connection-mismatch"
+  | "snapshot-failed-target-disabled"
+  | "snapshot-failed-connection-not-active"
+  | "snapshot-failed-kind-mismatch"
+  | "snapshot-failed-invalid-target-config"
+  | "snapshot-failed-invalid-target-secrets"
+  | "snapshot-failed-invalid-binding-config"
+  | "snapshot-failed-route-conflict"
+  | "snapshot-failed-artifact-conflict"
+  | "snapshot-failed-runtime-client-setup-conflict"
+  | "snapshot-failed-runtime-client-setup-invalid-ref";
+
 export const DefaultSandboxProfileEditorStoryArgs = {
   displayName: "Customer Support Sandbox",
   setupScript: `#!/usr/bin/env bash
@@ -112,19 +127,7 @@ export type SandboxProfileEditorPageStoryArgs = {
     | "creating-snapshot"
     | "snapshot-ready"
     | "snapshot-failed"
-    | "snapshot-failed-invalid-binding-connection-reference"
-    | "snapshot-failed-invalid-connection-target-reference"
-    | "snapshot-failed-connection-mismatch"
-    | "snapshot-failed-target-disabled"
-    | "snapshot-failed-connection-not-active"
-    | "snapshot-failed-kind-mismatch"
-    | "snapshot-failed-invalid-target-config"
-    | "snapshot-failed-invalid-target-secrets"
-    | "snapshot-failed-invalid-binding-config"
-    | "snapshot-failed-route-conflict"
-    | "snapshot-failed-artifact-conflict"
-    | "snapshot-failed-runtime-client-setup-conflict"
-    | "snapshot-failed-runtime-client-setup-invalid-ref"
+    | SnapshotCompileErrorStoryStatus
     | "refresh-failed";
   snapshotRefreshScheduleState?:
     | "none"
@@ -1126,93 +1129,82 @@ function sandboxOperationLifecycleEvent(input: {
   };
 }
 
-function isSnapshotCompileErrorStoryStatus(status: SnapshotStoryStatus): boolean {
-  return status.startsWith("snapshot-failed-") && status !== "snapshot-failed";
+const SnapshotCompileErrorStoryMessages = {
+  "snapshot-failed-invalid-binding-connection-reference": [
+    "Snapshot creation failed because Linear is missing its connection. Reconnect Linear, then retry snapshot creation.",
+    "",
+    "Cause: Integration binding 'ibd_story_linear_missing_connection' references connection 'icn_deleted'.",
+  ].join("\n"),
+  "snapshot-failed-invalid-connection-target-reference": [
+    "Snapshot creation failed because Linear could not be found. Check that Linear is still available, then retry snapshot creation.",
+    "",
+    "Cause: Connection 'icn_story_linear' references target 'linear-default' but the target no longer exists.",
+  ].join("\n"),
+  "snapshot-failed-connection-mismatch": [
+    "Snapshot creation failed because Linear is connected to the wrong profile or organization. Review the Linear connection, then retry snapshot creation.",
+    "",
+    "Cause: Binding 'ibd_story_linear' belongs to a different organization than profile 'sbp_story_customer_support'.",
+  ].join("\n"),
+  "snapshot-failed-target-disabled": [
+    "Snapshot creation failed because Linear is currently disabled. Enable Linear, then retry snapshot creation.",
+    "",
+    "Cause: Integration target 'linear-default' is disabled.",
+  ].join("\n"),
+  "snapshot-failed-connection-not-active": [
+    "Snapshot creation failed because Linear is no longer connected. Reconnect Linear, then retry snapshot creation.",
+    "",
+    "Cause: Connection 'icn_story_linear' is revoked.",
+  ].join("\n"),
+  "snapshot-failed-kind-mismatch": [
+    "Snapshot creation failed because Linear is configured with the wrong type. Update the Linear binding, then retry snapshot creation.",
+    "",
+    "Cause: Binding 'ibd_story_linear' has kind 'agent' but definition 'linear::linear-default' has kind 'connector'.",
+  ].join("\n"),
+  "snapshot-failed-invalid-target-config": [
+    "Snapshot creation failed because Linear has incomplete setup. Review the Linear settings, then retry snapshot creation.",
+    "",
+    "Cause: Target config for 'linear-default' did not satisfy 'linear::linear-default' schema.",
+  ].join("\n"),
+  "snapshot-failed-invalid-target-secrets": [
+    "Snapshot creation failed because Linear's saved credentials could not be used. Reconnect Linear or update its credentials, then retry snapshot creation.",
+    "",
+    "Cause: Target 'linear-default' has invalid encrypted target secrets.",
+  ].join("\n"),
+  "snapshot-failed-invalid-binding-config": [
+    "Snapshot creation failed because Linear has incomplete setup. Review the Linear binding settings, then retry snapshot creation.",
+    "",
+    "Cause: Binding config for 'ibd_story_linear' did not satisfy 'linear::linear-default' schema.",
+  ].join("\n"),
+  "snapshot-failed-route-conflict": [
+    "Snapshot creation failed because Linear has a network access conflict. Review the Linear integration settings, then retry snapshot creation.",
+    "",
+    "Cause: Route 'egress_linear' conflicts with route 'egress_linear_api' for host 'api.linear.app'.",
+  ].join("\n"),
+  "snapshot-failed-artifact-conflict": [
+    "Snapshot creation failed because Linear conflicts with another integration during setup. Review the enabled integrations, then retry snapshot creation.",
+    "",
+    "Cause: Runtime artifact '/usr/local/bin/linear' is provided by more than one integration.",
+  ].join("\n"),
+  "snapshot-failed-runtime-client-setup-conflict": [
+    "Snapshot creation failed because Linear conflicts with another integration in the agent setup. Review the enabled integrations, then retry snapshot creation.",
+    "",
+    "Cause: Runtime client 'claude' received duplicate MCP server id 'linear'.",
+  ].join("\n"),
+  "snapshot-failed-runtime-client-setup-invalid-ref": [
+    "Snapshot creation failed because Linear references setup that is not available. Review the Linear integration setup, then retry snapshot creation.",
+    "",
+    "Cause: Runtime client setup references MCP server 'linear' before it is defined.",
+  ].join("\n"),
+} satisfies Record<SnapshotCompileErrorStoryStatus, string>;
+
+function isSnapshotCompileErrorStoryStatus(
+  status: SnapshotStoryStatus,
+): status is SnapshotCompileErrorStoryStatus {
+  return Object.hasOwn(SnapshotCompileErrorStoryMessages, status);
 }
 
-function createSnapshotCompileErrorMessage(status: SnapshotStoryStatus): string {
-  switch (status) {
-    case "snapshot-failed-invalid-binding-connection-reference":
-      return [
-        "Snapshot creation failed because Linear is missing its connection. Reconnect Linear, then retry snapshot creation.",
-        "",
-        "Cause: Integration binding 'ibd_story_missing_connection' references connection 'icn_deleted'.",
-      ].join("\n");
-    case "snapshot-failed-invalid-connection-target-reference":
-      return [
-        "Snapshot creation failed because Linear could not be found. Check that Linear is still available, then retry snapshot creation.",
-        "",
-        "Cause: Connection 'icn_story_linear' references target 'linear-default' but the target no longer exists.",
-      ].join("\n");
-    case "snapshot-failed-connection-mismatch":
-      return [
-        "Snapshot creation failed because Linear is connected to the wrong profile or organization. Review the Linear connection, then retry snapshot creation.",
-        "",
-        "Cause: Binding 'ibd_story_linear' belongs to a different organization than profile 'sbp_story_customer_support'.",
-      ].join("\n");
-    case "snapshot-failed-target-disabled":
-      return [
-        "Snapshot creation failed because Linear is currently disabled. Enable Linear, then retry snapshot creation.",
-        "",
-        "Cause: Integration target 'linear-default' is disabled.",
-      ].join("\n");
-    case "snapshot-failed-connection-not-active":
-      return [
-        "Snapshot creation failed because Linear is no longer connected. Reconnect Linear, then retry snapshot creation.",
-        "",
-        "Cause: Connection 'icn_story_linear' is revoked.",
-      ].join("\n");
-    case "snapshot-failed-kind-mismatch":
-      return [
-        "Snapshot creation failed because Linear is configured with the wrong type. Update the Linear binding, then retry snapshot creation.",
-        "",
-        "Cause: Binding 'ibd_story_linear' has kind 'agent' but definition 'linear::linear-default' has kind 'connector'.",
-      ].join("\n");
-    case "snapshot-failed-invalid-target-config":
-      return [
-        "Snapshot creation failed because Linear has incomplete setup. Review the Linear settings, then retry snapshot creation.",
-        "",
-        "Cause: Target config for 'linear-default' did not satisfy 'linear::linear-default' schema.",
-      ].join("\n");
-    case "snapshot-failed-invalid-target-secrets":
-      return [
-        "Snapshot creation failed because Linear's saved credentials could not be used. Reconnect Linear or update its credentials, then retry snapshot creation.",
-        "",
-        "Cause: Target 'linear-default' has invalid encrypted target secrets.",
-      ].join("\n");
-    case "snapshot-failed-invalid-binding-config":
-      return [
-        "Snapshot creation failed because Linear has incomplete setup. Review the Linear binding settings, then retry snapshot creation.",
-        "",
-        "Cause: Binding config for 'ibd_story_linear' did not satisfy 'linear::linear-default' schema.",
-      ].join("\n");
-    case "snapshot-failed-route-conflict":
-      return [
-        "Snapshot creation failed because Linear has a network access conflict. Review the Linear integration settings, then retry snapshot creation.",
-        "",
-        "Cause: Route 'egress_linear' conflicts with route 'egress_linear_api' for host 'api.linear.app'.",
-      ].join("\n");
-    case "snapshot-failed-artifact-conflict":
-      return [
-        "Snapshot creation failed because Linear conflicts with another integration during setup. Review the enabled integrations, then retry snapshot creation.",
-        "",
-        "Cause: Runtime artifact '/usr/local/bin/linear' is provided by more than one integration.",
-      ].join("\n");
-    case "snapshot-failed-runtime-client-setup-conflict":
-      return [
-        "Snapshot creation failed because Linear conflicts with another integration in the agent setup. Review the enabled integrations, then retry snapshot creation.",
-        "",
-        "Cause: Runtime client 'claude' received duplicate MCP server id 'linear'.",
-      ].join("\n");
-    case "snapshot-failed-runtime-client-setup-invalid-ref":
-      return [
-        "Snapshot creation failed because Linear references setup that is not available. Review the Linear integration setup, then retry snapshot creation.",
-        "",
-        "Cause: Runtime client setup references MCP server 'linear' before it is defined.",
-      ].join("\n");
-    default:
-      throw new Error(`Unhandled snapshot compile error story status '${status}'.`);
-  }
+function createSnapshotCompileErrorMessage(status: SnapshotCompileErrorStoryStatus): string {
+  return SnapshotCompileErrorStoryMessages[status];
 }
 
 function renderUnavailableIntegrationsSectionPanel(input: {
