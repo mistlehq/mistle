@@ -141,6 +141,7 @@ describe("ClaudeCodeRuntimeServerBundle", () => {
   });
 
   it("reports failed idle Claude Code sessions as error sessions", () => {
+    expect(ClaudeCodeRuntimeServerBundle).toContain("conversation.lastError = undefined;");
     expect(ClaudeCodeRuntimeServerBundle).toContain("function resolveConversationStatus");
     expect(ClaudeCodeRuntimeServerBundle).toContain('return "active";');
     expect(ClaudeCodeRuntimeServerBundle).toContain(

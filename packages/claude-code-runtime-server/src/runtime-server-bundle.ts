@@ -943,6 +943,7 @@ function appendSubmittedUserQuery(conversation, queryId, inputText) {
 
 function startQuery(conversation, inputText) {
   const queryId = randomUUID();
+  conversation.lastError = undefined;
   appendSubmittedUserQuery(conversation, queryId, inputText);
   void runClaudeQuery(conversation, queryId, inputText).catch((error) => {
     conversation.lastError = error instanceof Error ? error.message : String(error);
