@@ -15,17 +15,9 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): AgentMail OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `agentmail-mcp`: AgentMail MCP (default)
-
-Trigger events:
-
-- None
 
 ## Anthropic
 
@@ -38,18 +30,6 @@ Setup methods:
 
 - `api-key` (form): API key
 
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
-
 ## Autumn
 
 Provider family ID: `autumn`
@@ -60,18 +40,6 @@ Description: Enable Autumn hosted MCP access for billing, customer, plan, balanc
 Setup methods:
 
 - `api-key` (form): Secret key
-
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
 
 ## AWS
 
@@ -84,18 +52,10 @@ Setup methods:
 
 - `aws-assume-role` (form): Access key + AssumeRole
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `aws-cli`: AWS CLI (default)
 - `aws-cloudwatch-mcp`: CloudWatch MCP
-
-Trigger events:
-
-- None
 
 ## BugSnag
 
@@ -108,17 +68,9 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): BugSnag OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `bugsnag-mcp`: BugSnag MCP (default)
-
-Trigger events:
-
-- None
 
 ## Cloudflare
 
@@ -131,18 +83,6 @@ Setup methods:
 
 - `api-key` (form): API token
 
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
-
 ## Datadog
 
 Provider family ID: `datadog`
@@ -154,17 +94,9 @@ Setup methods:
 
 - `api-key` (form): API key + application key
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `datadog-mcp`: Datadog MCP (default)
-
-Trigger events:
-
-- None
 
 ## DataForSEO
 
@@ -177,17 +109,9 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): DataForSEO OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `dataforseo-mcp`: DataForSEO MCP (default)
-
-Trigger events:
-
-- None
 
 ## DeepSeek
 
@@ -199,18 +123,6 @@ Description: Enable DeepSeek model access with API key authentication.
 Setup methods:
 
 - `api-key` (form): API key
-
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
 
 ## Discord
 
@@ -257,17 +169,9 @@ Setup methods:
 
 - `api-key` (form): API key
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `e2b-cli`: E2B CLI
-
-Trigger events:
-
-- None
 
 ## Expo
 
@@ -280,18 +184,6 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Expo MCP OAuth
 
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
-
 ## Fireworks AI
 
 Provider family ID: `fireworks`
@@ -302,18 +194,6 @@ Description: Enable Fireworks AI model access with API key authentication.
 Setup methods:
 
 - `api-key` (form): API key
-
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
 
 ## GitHub
 
@@ -412,18 +292,10 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Google OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `googleads-cli`: Google Ads CLI
 - `googleads-mcp`: Google Ads MCP (default)
-
-Trigger events:
-
-- None
 
 ## Google Analytics
 
@@ -436,18 +308,10 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Google OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `google-analytics-cli`: Google Analytics CLI
 - `google-analytics-mcp`: Google Analytics MCP (default)
-
-Trigger events:
-
-- None
 
 ## Google Business Profile
 
@@ -460,18 +324,10 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Google OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `google-business-profile-cli`: Google Business Profile CLI
 - `google-business-profile-mcp`: Google Business Profile MCP (default)
-
-Trigger events:
-
-- None
 
 ## Google Cloud
 
@@ -484,18 +340,6 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Google OAuth
 
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
-
 ## Google Search Console
 
 Provider family ID: `google-search-console`
@@ -507,18 +351,10 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Google OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `google-search-console-cli`: Google Search Console CLI
 - `google-search-console-mcp`: Google Search Console MCP (default)
-
-Trigger events:
-
-- None
 
 ## Google Workspace
 
@@ -532,18 +368,6 @@ Setup methods:
 - `oauth2-authorization-code` (redirect): Google OAuth
 - `google-workspace-service-account` (form): Service account
 
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
-
 ## Inception Labs
 
 Provider family ID: `inception`
@@ -554,18 +378,6 @@ Description: Enable Inception Labs model access with API key authentication.
 Setup methods:
 
 - `api-key` (form): API key
-
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
 
 ## Jira
 
@@ -579,10 +391,6 @@ Setup methods:
 - `jira-personal-api-token` (form): Personal API token
 - `jira-service-account-api-token` (form): Service account API token
 - `jira-service-account-oauth-client-credentials` (form): Service account OAuth client credentials
-
-Resource kinds:
-
-- None
 
 Binding tools:
 
@@ -607,18 +415,6 @@ Setup methods:
 
 - `api-key` (form): API key
 
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
-
 ## Klaviyo
 
 Provider family ID: `klaviyo`
@@ -630,17 +426,9 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Klaviyo OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `klaviyo-mcp`: Klaviyo MCP (default)
-
-Trigger events:
-
-- None
 
 ## Linear
 
@@ -653,10 +441,6 @@ Setup methods:
 
 - `api-key` (form): API key
 - `linear-oauth-app` (form): Linear OAuth app
-
-Resource kinds:
-
-- None
 
 Binding tools:
 
@@ -694,18 +478,10 @@ Setup methods:
 
 - `api-key` (form): Access token
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `metaads-cli`: Meta Ads CLI
 - `metaads-mcp`: Meta Ads MCP (default)
-
-Trigger events:
-
-- None
 
 ## MiniMax
 
@@ -718,18 +494,6 @@ Setup methods:
 
 - `api-key` (form): API key
 
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
-
 ## Modal
 
 Provider family ID: `modal`
@@ -740,18 +504,6 @@ Description: Run sandboxes on Modal VM Sandboxes with your organization's token.
 Setup methods:
 
 - `api-key` (form): Token
-
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
 
 ## Notion
 
@@ -764,17 +516,9 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Notion MCP OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `notion-mcp`: Notion MCP (default)
-
-Trigger events:
-
-- None
 
 ## OpenAI
 
@@ -788,18 +532,6 @@ Setup methods:
 - `api-key` (form): API key
 - `chatgpt-device-code` (device-authorization): ChatGPT subscription
 
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
-
 ## OpenCode Go
 
 Provider family ID: `opencode`
@@ -810,18 +542,6 @@ Description: Enable OpenCode Go model access with API key authentication.
 Setup methods:
 
 - `api-key` (form): API key
-
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
 
 ## OpenComputer
 
@@ -834,17 +554,9 @@ Setup methods:
 
 - `api-key` (form): API key
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `opencomputer-cli`: OpenComputer CLI
-
-Trigger events:
-
-- None
 
 ## OpenRouter
 
@@ -857,18 +569,6 @@ Setup methods:
 
 - `api-key` (form): API key
 
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None
-
 ## PlanetScale
 
 Provider family ID: `planetscale`
@@ -880,18 +580,10 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): PlanetScale OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `planetscale-mcp`: PlanetScale MCP
 - `planetscale-insights-mcp`: PlanetScale Insights MCP
-
-Trigger events:
-
-- None
 
 ## PostHog
 
@@ -904,17 +596,9 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): PostHog OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `posthog-mcp`: PostHog MCP (default)
-
-Trigger events:
-
-- None
 
 ## Railway
 
@@ -927,17 +611,9 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Railway OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `railway-mcp`: Railway MCP (default)
-
-Trigger events:
-
-- None
 
 ## Render
 
@@ -950,17 +626,9 @@ Setup methods:
 
 - `api-key` (form): API key
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `render-mcp`: Render MCP (default)
-
-Trigger events:
-
-- None
 
 ## Resend
 
@@ -973,17 +641,9 @@ Setup methods:
 
 - `api-key` (form): API key
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `resend-mcp`: Resend MCP (default)
-
-Trigger events:
-
-- None
 
 ## Sentry
 
@@ -996,10 +656,6 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Sentry MCP OAuth
 - `sentry-webhook-signing-secret` (form): Sentry webhooks
-
-Resource kinds:
-
-- None
 
 Binding tools:
 
@@ -1025,18 +681,10 @@ Setup methods:
 - `oauth2-authorization-code` (redirect): Custom distribution OAuth
 - `shopify-custom-app-client-credentials` (form): Custom app client credentials
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `shopify-cli`: Shopify CLI
 - `shopify-mcp`: Shopify MCP (default)
-
-Trigger events:
-
-- None
 
 ## SigNoz
 
@@ -1049,17 +697,9 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): SigNoz OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `signoz-mcp`: SigNoz MCP
-
-Trigger events:
-
-- None
 
 ## Slack
 
@@ -1102,17 +742,9 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Stripe MCP OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `stripe-mcp`: Stripe MCP (default)
-
-Trigger events:
-
-- None
 
 ## Supabase
 
@@ -1125,17 +757,9 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Supabase MCP OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `supabase-mcp`: Supabase MCP (default)
-
-Trigger events:
-
-- None
 
 ## Tensorlake
 
@@ -1148,17 +772,9 @@ Setup methods:
 
 - `api-key` (form): API key
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `tensorlake-cli`: Tensorlake CLI
-
-Trigger events:
-
-- None
 
 ## WasenderAPI
 
@@ -1170,10 +786,6 @@ Description: Enable WasenderAPI hosted MCP access for WhatsApp sessions.
 Setup methods:
 
 - `api-key` (form): Personal access token
-
-Resource kinds:
-
-- None
 
 Binding tools:
 
@@ -1214,10 +826,6 @@ Description: Enable Whapi MCP access and webhook triggers for WhatsApp channels.
 Setup methods:
 
 - `api-key` (form): API token
-
-Resource kinds:
-
-- None
 
 Binding tools:
 
@@ -1260,17 +868,9 @@ Setup methods:
 
 - `oauth2-authorization-code` (redirect): Xero OAuth
 
-Resource kinds:
-
-- None
-
 Binding tools:
 
 - `xero-mcp`: Xero MCP (default)
-
-Trigger events:
-
-- None
 
 ## Z.ai
 
@@ -1282,15 +882,3 @@ Description: Enable Z.ai model access with API key authentication.
 Setup methods:
 
 - `api-key` (form): API key
-
-Resource kinds:
-
-- None
-
-Binding tools:
-
-- None
-
-Trigger events:
-
-- None

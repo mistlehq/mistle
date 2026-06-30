@@ -1,0 +1,9 @@
+[runtime]
+image_ref = "127.0.0.1:5001/mistle/designer-base:dev"
+codex_cli_path = "codex"
+
+[codex]
+auth = "local"
+
+[mcp]
+mode = "disabled"

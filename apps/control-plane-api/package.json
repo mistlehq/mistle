@@ -19,6 +19,20 @@
       "node": "./dist/types.js",
       "import": "./dist/types.js",
       "default": "./dist/types.js"
+    },
+    "./designer/runtime-plan": {
+      "types": "./src/designer/services/compile-designer-runtime-plan.ts",
+      "workspace-src": "./src/designer/services/compile-designer-runtime-plan.ts",
+      "node": "./dist/designer/services/compile-designer-runtime-plan.js",
+      "import": "./dist/designer/services/compile-designer-runtime-plan.js",
+      "default": "./dist/designer/services/compile-designer-runtime-plan.js"
+    },
+    "./designer": {
+      "types": "./src/designer/index.ts",
+      "workspace-src": "./src/designer/index.ts",
+      "node": "./dist/designer/index.js",
+      "import": "./dist/designer/index.js",
+      "default": "./dist/designer/index.js"
     }
   },
   "scripts": {

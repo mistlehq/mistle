@@ -1,0 +1,42 @@
+{
+  "name": "@mistle/designer-eval-harness",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "workspace-src": "./src/index.ts",
+      "node": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "artifacts:clean": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx ./src/cli/clean-designer-eval-artifacts.ts",
+    "eval:agent": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx ./src/cli/run-designer-eval-agent.ts",
+    "eval": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx ./src/cli/run-designer-eval.ts",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint --type-aware --deny-warnings .",
+    "runtime:docker": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx ./src/cli/start-designer-eval-container.ts",
+    "runtime:materialize": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx ./src/cli/materialize-designer-runtime.ts",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@mistle/control-plane-api": "workspace:*",
+    "@mistle/integrations-core": "workspace:*",
+    "@mistle/integrations-definitions": "workspace:*",
+    "@mistle/sandbox-session-client": "workspace:*",
+    "@mistle/time": "workspace:*",
+    "smol-toml": "^1.6.1",
+    "testcontainers": "^12.0.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
+    "vitest": "^4.1.8",
+    "ws": "^8.21.0"
+  }
+}

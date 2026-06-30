@@ -93,11 +93,9 @@ function renderDefinitionSection(definition: AnyIntegrationDefinition): string[]
     }
   }
 
-  lines.push("", "Resource kinds:", "");
   const resourceDefinitions = definition.resourceDefinitions ?? [];
-  if (resourceDefinitions.length === 0) {
-    lines.push("- None");
-  } else {
+  if (resourceDefinitions.length > 0) {
+    lines.push("", "Resource kinds:", "");
     for (const resource of resourceDefinitions) {
       lines.push(
         `- \`${resource.kind}\`: ${resource.displayNamePlural} (${resource.selectionMode})`,
@@ -105,11 +103,9 @@ function renderDefinitionSection(definition: AnyIntegrationDefinition): string[]
     }
   }
 
-  lines.push("", "Binding tools:", "");
   const bindingTools = resolveBindingToolReferences(definition);
-  if (bindingTools.length === 0) {
-    lines.push("- None");
-  } else {
+  if (bindingTools.length > 0) {
+    lines.push("", "Binding tools:", "");
     for (const tool of bindingTools) {
       const labelSuffix = tool.label === undefined ? "" : `: ${tool.label}`;
       const defaultSuffix = tool.selectedByDefault ? " (default)" : "";
@@ -117,11 +113,9 @@ function renderDefinitionSection(definition: AnyIntegrationDefinition): string[]
     }
   }
 
-  lines.push("", "Trigger events:", "");
   const supportedWebhookEvents = definition.supportedWebhookEvents ?? [];
-  if (supportedWebhookEvents.length === 0) {
-    lines.push("- None");
-  } else {
+  if (supportedWebhookEvents.length > 0) {
+    lines.push("", "Trigger events:", "");
     for (const event of supportedWebhookEvents) {
       lines.push(`- \`${event.eventType}\`: ${event.displayName}`);
     }

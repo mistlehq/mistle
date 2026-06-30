@@ -33,4 +33,33 @@ describe("Designer integration catalog", () => {
     expect(markdown).toContain("Integration target key: `github-cloud`");
     expect(markdown).toContain("- `github-cli`: GitHub CLI (default)");
   });
+
+  it("omits optional catalog sections when the integration has no values", () => {
+    const markdown = renderDesignerIntegrationCatalogMarkdown(
+      createIntegrationRegistry().listDefinitions(),
+    );
+
+    const anthropicSection = readCatalogSection(markdown, "Anthropic");
+
+    expect(anthropicSection).toContain("Setup methods:");
+    expect(anthropicSection).not.toContain("Resource kinds:");
+    expect(anthropicSection).not.toContain("Binding tools:");
+    expect(anthropicSection).not.toContain("Trigger events:");
+    expect(anthropicSection).not.toContain("- None");
+  });
 });
+
+function readCatalogSection(markdown: string, displayName: string): string {
+  const sectionHeading = `## ${displayName}`;
+  const sectionStart = markdown.indexOf(sectionHeading);
+  if (sectionStart === -1) {
+    throw new Error(`Catalog section '${displayName}' was not rendered.`);
+  }
+
+  const nextSectionStart = markdown.indexOf("\n## ", sectionStart + sectionHeading.length);
+  if (nextSectionStart === -1) {
+    return markdown.slice(sectionStart);
+  }
+
+  return markdown.slice(sectionStart, nextSectionStart);
+}

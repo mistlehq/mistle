@@ -73,6 +73,22 @@ A sandbox-backed **Mistle Designer** workspace backed one-to-one by a sandbox in
 _Avoid_: Sandbox session when referring to the guided setup workspace rather than the configured agent runtime session
 _Code name_: designer
 
+**Designer eval client**:
+A non-browser client for evaluating a real **Mistle Designer session** by handling supported **Dashboard control actions**, supplying scripted **User input request** responses, and recording artifacts.
+_Avoid_: Headless Designer runtime, alternate Designer runtime, browser automation
+
+**Designer eval case**:
+A repeatable **Mistle Designer** evaluation scenario with a user request, required product state, scripted user responses, and expected behavioral assertions.
+_Avoid_: Test fixture when referring to the whole evaluation scenario
+
+**Designer eval seed**:
+The product state a **Designer eval case** creates or requires before starting its **Mistle Designer session**.
+_Avoid_: Local dev state, ambient database state
+
+**Designer eval artifact**:
+A file written by a **Designer eval client** to preserve a transcript, dashboard-control trace, product-state snapshot, or evaluation result for one **Designer eval case** run.
+_Avoid_: Test output when the file is intended for human review or regression comparison
+
 **Designer managed instructions**:
 Mistle-owned instructions that guide **Mistle Designer** behavior inside a **Mistle Designer session**.
 _Avoid_: Repo guidance, contributor instructions, Designer instructions when the source of authority is ambiguous
@@ -863,6 +879,12 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Session-time tool installation in a **Mistle Designer session** is sandbox workspace state produced by the agent, not a change to the **Runtime plan**.
 - Future **Mistle Designer session** access to newly selected **Integration connections** may change without changing the **Runtime plan**.
 - **Mistle Designer session** setup changes do not automatically change the target **Sandbox profile version configuration**.
+- A **Designer eval case** may require a reversible saved change to a draft **Sandbox profile version** as evidence that **Mistle Designer** produced actionable product progress.
+- A **Designer eval client** should submit dashboard-mediated product actions through the same validated **Dashboard control action** path as the dashboard client.
+- First-pass **Designer eval client** implementation may live as a root developer script until eval-case and artifact boundaries justify a reusable package.
+- A **Designer eval seed** may create prerequisite product state directly, but the product change being evaluated should be produced through the same validated product path used by a dashboard-mediated **Dashboard control action**.
+- First-pass **Designer eval artifacts** should preserve the transcript, raw runtime events, dashboard-control trace, product-state snapshots, and evaluation result; provider MCP call traces may wait until they are available from existing runtime events without special runtime changes.
+- First-pass **Designer eval cases** may run as local/manual developer workflows before becoming CI gates.
 - **Mistle Designer** may route a user to an existing integration setup flow rather than creating an **Integration connection** directly.
 - An **App setup completion signal** should be collected through a **User input request** when **Mistle Designer** is waiting on an **App setup step**.
 - An **App setup completion signal** must be followed by live product-state verification before **Mistle Designer** selects provider resources or updates **Sandbox profile version configuration**.

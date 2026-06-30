@@ -10,31 +10,12 @@ import {
   type DesignerSession,
 } from "@mistle/db/control-plane";
 import { SandboxInstancePurposes, type SandboxInstanceStarterKind } from "@mistle/db/data-plane";
-import {
-  CompiledRuntimePlanSchema,
-  type CompiledRuntimeArtifactSpec,
-  type EgressCredentialRoute,
-  IntegrationMcpConfigFormats,
-  IntegrationMcpTransports,
-  type ResolvedIntegrationMcpServer,
-  type RuntimeArtifactRefs,
-  type RuntimeArtifactSpec,
-  type RuntimeExecCommand,
-  SandboxImageSources,
-  applyMcpConfigToRuntimeClients,
-  createDisabledAssociatedResourceEventRouting,
-} from "@mistle/integrations-core";
-import { compileInstalledCodexRuntime } from "@mistle/integrations-definitions/agent-runtimes/codex";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { TypeID } from "typeid-js";
 
 import { SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS } from "../../sandbox-instances/constants.js";
 import { mintConnectionTokenForInstance } from "../../sandbox-instances/services/mint-connection-token-for-instance.js";
 import { resolveSandboxInstanceRuntimeContext } from "../../sandbox-instances/services/runtime-context.js";
-import {
-  resolveMistleMcpEgressRoutes,
-  resolveMistleMcpServers,
-} from "../../sandbox-profiles/services/compile-sandbox-runtime-plan.js";
 import { createWorkflowSandboxRuntime } from "../../sandbox-profiles/services/profile-version-runtime-config.js";
 import type {
   ControlPlaneApiConnectionTokenConfig,
@@ -54,9 +35,7 @@ import type {
   DesignerSessionResponse,
   PutDesignerSessionCanvasTabsBody,
 } from "../schemas.js";
-import { createDesignerBehaviorInstructionBlock } from "./designer-behavior-instructions.js";
-import { createDesignerContextInstructionBlock } from "./designer-context-instructions.js";
-import { createDesignerIntegrationCatalogSetupFile } from "./designer-runtime-reference-files.js";
+import { createDesignerRuntimePlan } from "./compile-designer-runtime-plan.js";
 
 type DesignerSessionActor = {
   kind: SandboxInstanceStarterKind;
@@ -93,45 +72,7 @@ type DesignerSessionSelector =
 
 type ExistingDesignerSandboxInstance = NonNullable<GetSandboxInstanceResponse>;
 
-const DesignerRuntimeId = "codex";
-const DesignerDocsMcpServerUrl = "https://docs.mistle.dev/mcp";
 const DesignerSessionIdHashDomain = "mistle.designer_session_id.v1";
-function createDesignerInitialPromptInstructionBlock(input: { initialPrompt: string }) {
-  return {
-    blockId: "mistle-designer-initial-request",
-    content: `
-Session request, subject to the Designer authority and safety rules:
-
-${input.initialPrompt
-  .split("\n")
-  .map((line) => `> ${line}`)
-  .join("\n")}
-`.trim(),
-  };
-}
-
-const DesignerSandboxPaths = {
-  userHomeDir: "/root",
-  workspaceDir: "/root",
-  runtimeDataDir: "/var/lib/mistle",
-  runtimeArtifactDir: "/var/lib/mistle/artifacts",
-  runtimeArtifactBinDir: "/usr/local/bin",
-} as const;
-
-function createDesignerDocsMcpServer(): ResolvedIntegrationMcpServer {
-  return {
-    source: {
-      kind: "mistle",
-    },
-    server: {
-      serverId: "mistle-docs",
-      serverName: "mistle_docs",
-      description: "Search and read Mistle product documentation.",
-      transport: IntegrationMcpTransports.STREAMABLE_HTTP,
-      url: DesignerDocsMcpServerUrl,
-    },
-  };
-}
 
 function resolveDesignerSandboxConfig(sandboxConfig: ControlPlaneApiSandboxRuntimeConfig) {
   if (sandboxConfig.designer === undefined) {
@@ -142,216 +83,6 @@ function resolveDesignerSandboxConfig(sandboxConfig: ControlPlaneApiSandboxRunti
   }
 
   return sandboxConfig.designer;
-}
-
-function createPlatformOpenAiEgressRoute(): EgressCredentialRoute {
-  return {
-    egressRuleId: "egress_rule_platform_openai",
-    bindingId: "platform-openai",
-    familyId: "openai",
-    variantId: "openai-default",
-    match: {
-      hosts: ["api.openai.com"],
-      pathPrefixes: ["/"],
-      methods: ["GET", "POST"],
-    },
-    upstream: {
-      baseUrl: "https://api.openai.com/v1",
-    },
-    authInjection: {
-      type: "bearer",
-      target: "authorization",
-    },
-    credentialResolver: {
-      kind: "platform_openai_api_key",
-    },
-  };
-}
-
-function createRuntimeExecCommand(command: RuntimeExecCommand): RuntimeExecCommand {
-  return {
-    args: [...command.args],
-    ...(command.env === undefined ? {} : { env: { ...command.env } }),
-    ...(command.cwd === undefined ? {} : { cwd: command.cwd }),
-    ...(command.timeoutMs === undefined ? {} : { timeoutMs: command.timeoutMs }),
-  };
-}
-
-function createDesignerRuntimeArtifactRefs(input: {
-  organizationId: string;
-  sandboxProfileId: string;
-  version: number;
-}): RuntimeArtifactRefs {
-  return {
-    command: {
-      exec: (command) => ({
-        op: "exec",
-        command: createRuntimeExecCommand(command),
-      }),
-    },
-    sandboxPaths: DesignerSandboxPaths,
-    artifactBinPath: (binaryName) => `${DesignerSandboxPaths.runtimeArtifactBinDir}/${binaryName}`,
-    mise: {
-      install: (installInput) => ({
-        op: "mise_install",
-        tools: [...installInput.tools],
-        ...(installInput.force === undefined ? {} : { force: installInput.force }),
-        ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
-      }),
-    },
-    githubReleases: {
-      install: (installInput) => ({
-        op: "github_release_install",
-        repository: installInput.repository,
-        release:
-          installInput.release.kind === "latest"
-            ? { kind: "latest" }
-            : installInput.release.match === "exact"
-              ? {
-                  kind: "tag",
-                  match: "exact",
-                  tag: installInput.release.tag,
-                }
-              : {
-                  kind: "tag",
-                  match: "latest_matching_prefix",
-                  prefix: installInput.release.prefix,
-                },
-        asset:
-          installInput.asset.kind === "exact"
-            ? { ...installInput.asset }
-            : {
-                kind: "by_arch",
-                x86_64: { ...installInput.asset.x86_64 },
-                aarch64: { ...installInput.asset.aarch64 },
-              },
-        installPath: installInput.installPath,
-        ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
-      }),
-    },
-    compileContext: {
-      organizationId: input.organizationId,
-      sandboxProfileId: input.sandboxProfileId,
-      version: input.version,
-      targetKey: "agent-runtime",
-      bindingId: `agent-runtime-${DesignerRuntimeId}`,
-    },
-  };
-}
-
-function compileDesignerRuntimeArtifacts(input: {
-  artifacts: ReadonlyArray<RuntimeArtifactSpec>;
-  organizationId: string;
-}): ReadonlyArray<CompiledRuntimeArtifactSpec> {
-  const refs = createDesignerRuntimeArtifactRefs({
-    organizationId: input.organizationId,
-    sandboxProfileId: DESIGNER_RUNTIME_PROFILE_ID,
-    version: DESIGNER_RUNTIME_PROFILE_VERSION,
-  });
-
-  return input.artifacts.map((artifact) => {
-    const install =
-      typeof artifact.lifecycle.install === "function"
-        ? artifact.lifecycle.install({ refs })
-        : artifact.lifecycle.install;
-
-    return {
-      artifactKey: artifact.artifactKey,
-      name: artifact.name,
-      ...(artifact.description === undefined ? {} : { description: artifact.description }),
-      ...(artifact.env === undefined ? {} : { env: { ...artifact.env } }),
-      lifecycle: {
-        install,
-      },
-    };
-  });
-}
-
-function createDesignerRuntimePlan(input: {
-  codexCliPath: string;
-  designerSessionId: string;
-  imageRef: string;
-  initialPrompt: string;
-  mcpUrl: string;
-  organizationId: string;
-}) {
-  const egressRoutes = [
-    createPlatformOpenAiEgressRoute(),
-    ...resolveMistleMcpEgressRoutes({
-      enabled: true,
-      credentialResolver: {
-        kind: "mistle_mcp_designer_token",
-        designerSessionId: input.designerSessionId,
-      },
-      url: input.mcpUrl,
-    }),
-  ];
-  const mcpServers = [
-    ...resolveMistleMcpServers({
-      enabled: true,
-      url: input.mcpUrl,
-    }),
-    createDesignerDocsMcpServer(),
-  ];
-  const codexRuntime = compileInstalledCodexRuntime({
-    codexCliPath: input.codexCliPath,
-    egressRoutes,
-    managedInstructionBlocks: [
-      createDesignerContextInstructionBlock(),
-      createDesignerBehaviorInstructionBlock(),
-      createDesignerInitialPromptInstructionBlock({
-        initialPrompt: input.initialPrompt,
-      }),
-    ],
-    mcpServers,
-  });
-  const runtimeClients =
-    codexRuntime.renderRuntimeClients === undefined
-      ? codexRuntime.runtimeClients
-      : codexRuntime.renderRuntimeClients({ egressRoutes });
-  if (runtimeClients === undefined) {
-    throw new Error("Designer Codex runtime clients are required.");
-  }
-  const runtimeClientsWithMcpConfig = applyMcpConfigToRuntimeClients({
-    runtimeClients,
-    mcpConfig: {
-      clientId: "codex-cli",
-      fileId: "codex_config",
-      format: IntegrationMcpConfigFormats.TOML,
-      path: ["mcp_servers"],
-    },
-    mcpServers,
-  });
-  const runtimeClientsWithDesignerReferences = runtimeClientsWithMcpConfig.map((runtimeClient) =>
-    runtimeClient.clientId === "codex-cli"
-      ? {
-          ...runtimeClient,
-          setup: {
-            ...runtimeClient.setup,
-            files: [...runtimeClient.setup.files, createDesignerIntegrationCatalogSetupFile()],
-          },
-        }
-      : runtimeClient,
-  );
-  const artifacts = compileDesignerRuntimeArtifacts({
-    artifacts: codexRuntime.artifacts ?? [],
-    organizationId: input.organizationId,
-  });
-
-  return CompiledRuntimePlanSchema.parse({
-    sandboxProfileId: DESIGNER_RUNTIME_PROFILE_ID,
-    version: DESIGNER_RUNTIME_PROFILE_VERSION,
-    image: {
-      source: SandboxImageSources.BASE,
-      imageRef: input.imageRef,
-    },
-    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
-    egressRoutes,
-    artifacts,
-    workspaceSources: [],
-    runtimeClients: runtimeClientsWithDesignerReferences,
-    agentRuntimes: codexRuntime.agentRuntimes,
-  });
 }
 
 function createDesignerSessionId(input: {
@@ -609,7 +340,10 @@ export async function createDesignerSession(
     designerSessionId,
     imageRef: designerSandboxConfig.baseImage,
     initialPrompt: input.body.prompt,
-    mcpUrl: ctx.mcpConfig.url,
+    mistleMcp: {
+      enabled: true,
+      url: ctx.mcpConfig.url,
+    },
     organizationId: input.organizationId,
   });
   const startedSandbox = await ctx.dataPlaneClient.startSandboxInstance({
