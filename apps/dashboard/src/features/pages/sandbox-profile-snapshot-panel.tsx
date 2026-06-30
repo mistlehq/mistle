@@ -521,11 +521,6 @@ function resolvePublishSnapshotFailureNotice(
     if (parsedMessage !== null) {
       return parsedMessage;
     }
-
-    return {
-      title: "Snapshot creation failed",
-      description: state.message,
-    };
   }
 
   return {

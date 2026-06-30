@@ -57,6 +57,40 @@ describe("SandboxProfileSnapshotPanelView", () => {
     expect(screen.queryByText("Snapshot creation failed")).toBeNull();
     expect(screen.queryByText(/Binding 'ibd_story_linear' has kind 'agent'/u)).toBeNull();
   });
+
+  it("keeps version-aware recovery guidance for unparsed publish snapshot failure messages", () => {
+    render(
+      <SandboxProfileSnapshotPanelView
+        canRunMaintenanceRefresh={false}
+        isActionPending={false}
+        onMaintenanceRefreshSnapshot={() => {}}
+        onPublishSuccessMessageDismiss={() => {}}
+        onRefreshSnapshot={() => {}}
+        onRetryPublishSnapshot={() => {}}
+        publishSuccessMessage={false}
+        publishSuccessMessageKey="idle"
+        refreshScheduleSection={null}
+        showMaintenanceRefreshAction={false}
+        state={{
+          kind: "publish-snapshot-error",
+          message: "Snapshot materialization failed.",
+          operationId: null,
+          publishedVersion: 4,
+          runnableVersion: 3,
+          sandboxInstanceId: null,
+        }}
+        version={4}
+      />,
+    );
+
+    expect(screen.getByText("Snapshot creation failed")).toBeDefined();
+    expect(
+      screen.getByText(
+        "Version 4 was published, but its snapshot could not be created. New sessions and triggers will continue using v3 until the snapshot is retried successfully.",
+      ),
+    ).toBeDefined();
+    expect(screen.queryByText("Snapshot materialization failed.")).toBeNull();
+  });
 });
 
 describe("SandboxProfileSnapshotRefreshScheduleForm", () => {

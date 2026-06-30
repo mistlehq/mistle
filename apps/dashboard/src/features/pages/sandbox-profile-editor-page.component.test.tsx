@@ -1820,12 +1820,12 @@ describe("SandboxProfileEditorPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Snapshots" }));
 
     expect(screen.getByText("Snapshot creation failed")).toBeDefined();
-    expect(screen.getByText("Snapshot materialization failed.")).toBeDefined();
     expect(
-      screen.queryByText(
+      screen.getByText(
         "Version 3 was published, but its snapshot could not be created. New sessions and triggers will continue using v2 until the snapshot is retried successfully.",
       ),
-    ).toBeNull();
+    ).toBeDefined();
+    expect(screen.queryByText("Snapshot materialization failed.")).toBeNull();
     expect(screen.getByText("Sandbox Profile v3's snapshot is unavailable")).toBeDefined();
     expect(
       screen.getByText("v2's snapshot will be used for new sessions and triggers."),
