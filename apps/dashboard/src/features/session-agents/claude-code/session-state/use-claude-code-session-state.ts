@@ -913,7 +913,7 @@ export function useClaudeCodeSessionState(input: {
     },
     chat: {
       canInterruptTurn: chatState.status === "busy",
-      canSteerTurn: chatState.status === "busy",
+      canSteerTurn: chatState.status === "busy" && chatState.pendingQueryId !== null,
       chatState,
       hydrateChatFromSessionOrThrow,
       interruptQuery,

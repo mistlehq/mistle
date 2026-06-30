@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildClaudeCodeQuerySteerParams,
   ClaudeCodeRuntimeMethods,
   extractClaudeCodeQueryId,
   extractClaudeCodeSessionId,
@@ -56,5 +57,21 @@ describe("extractClaudeCodeQueryId", () => {
     expect(() => extractClaudeCodeQueryId({}, ClaudeCodeRuntimeMethods.QUERY_START)).toThrow(
       "Claude Code query/start response did not include query id.",
     );
+  });
+});
+
+describe("buildClaudeCodeQuerySteerParams", () => {
+  it("includes the expected active query id for Claude Code query steering", () => {
+    expect(
+      buildClaudeCodeQuerySteerParams({
+        sessionId: "session_123",
+        expectedQueryId: "query_123",
+        inputText: "Adjust the current run.",
+      }),
+    ).toEqual({
+      sessionId: "session_123",
+      expectedQueryId: "query_123",
+      inputText: "Adjust the current run.",
+    });
   });
 });

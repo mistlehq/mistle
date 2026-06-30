@@ -225,6 +225,7 @@ function createConversationState(input) {
     cwd: input.cwd,
     activeQueryId: null,
     queries: [],
+    lastError: undefined,
     sdkSessionId: input.sdkSessionId,
     sdkLookupCwd: input.sdkLookupCwd,
     activeQueryAbortController: undefined,

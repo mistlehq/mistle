@@ -1,26 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  buildClaudeCodeSessionSteerQueryParams,
-  parseClaudeCodeSessionListResult,
-  parseClaudeCodeSessionReadResult,
-} from "./client.js";
-
-describe("buildClaudeCodeSessionSteerQueryParams", () => {
-  it("includes the expected active query id for dashboard session steer", () => {
-    expect(
-      buildClaudeCodeSessionSteerQueryParams({
-        sessionId: "session_123",
-        expectedQueryId: "query_123",
-        inputText: "Adjust the current run.",
-      }),
-    ).toEqual({
-      sessionId: "session_123",
-      expectedQueryId: "query_123",
-      inputText: "Adjust the current run.",
-    });
-  });
-});
+import { parseClaudeCodeSessionListResult, parseClaudeCodeSessionReadResult } from "./client.js";
 
 describe("parseClaudeCodeSessionListResult", () => {
   it("preserves empty Claude Code session titles for the navigator display fallback", () => {
@@ -49,7 +29,7 @@ describe("parseClaudeCodeSessionListResult", () => {
 });
 
 describe("parseClaudeCodeSessionReadResult", () => {
-  it("parses failed idle Claude Code sessions as error sessions", () => {
+  it("parses Claude Code error sessions with last error", () => {
     expect(
       parseClaudeCodeSessionReadResult({
         session: {

@@ -47,3 +47,15 @@ export function extractClaudeCodeQueryId(result: unknown, method: string): strin
   }
   return queryId;
 }
+
+export function buildClaudeCodeQuerySteerParams(input: {
+  expectedQueryId: string;
+  inputText: string;
+  sessionId: string;
+}): Record<string, unknown> {
+  return {
+    sessionId: input.sessionId,
+    expectedQueryId: input.expectedQueryId,
+    inputText: input.inputText,
+  };
+}

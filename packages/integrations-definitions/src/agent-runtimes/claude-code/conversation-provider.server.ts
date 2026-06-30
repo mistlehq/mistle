@@ -10,6 +10,7 @@ import { createNodeSandboxSessionRuntime } from "@mistle/sandbox-session-client/
 
 import { ClaudeCodeJsonRpcClient } from "./json-rpc-client.js";
 import {
+  buildClaudeCodeQuerySteerParams,
   ClaudeCodeRuntimeMethods,
   extractClaudeCodeQueryId,
   extractClaudeCodeSessionId,
@@ -79,11 +80,11 @@ export function buildClaudeCodeSteerQueryParams(input: {
   providerConversationId: string;
   providerExecutionId: string;
 }): Record<string, unknown> {
-  return {
+  return buildClaudeCodeQuerySteerParams({
     sessionId: input.providerConversationId,
     expectedQueryId: input.providerExecutionId,
     inputText: input.inputText,
-  };
+  });
 }
 
 async function connectClaudeCodeConversationProvider(input: {

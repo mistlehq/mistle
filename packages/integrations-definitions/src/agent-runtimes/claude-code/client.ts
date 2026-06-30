@@ -3,6 +3,7 @@ import { AgentStreamClient, type SandboxSessionTransport } from "@mistle/sandbox
 
 import { ClaudeCodeJsonRpcClient } from "./json-rpc-client.js";
 import {
+  buildClaudeCodeQuerySteerParams,
   ClaudeCodeRuntimeMethods,
   extractClaudeCodeQueryId,
   extractClaudeCodeSessionId,
@@ -390,18 +391,6 @@ export function parseClaudeCodeSessionReadResult(result: unknown): ClaudeCodeSes
   };
 }
 
-export function buildClaudeCodeSessionSteerQueryParams(input: {
-  expectedQueryId: string;
-  inputText: string;
-  sessionId: string;
-}): Record<string, unknown> {
-  return {
-    sessionId: input.sessionId,
-    expectedQueryId: input.expectedQueryId,
-    inputText: input.inputText,
-  };
-}
-
 export function createClaudeCodeSessionClient(
   input: ClaudeCodeSessionClientInput,
 ): ClaudeCodeSessionClient {
@@ -517,7 +506,7 @@ export function createClaudeCodeSessionClient(
     async steerQuery(steerInput) {
       const result = await rpcClient.call(
         ClaudeCodeRuntimeMethods.QUERY_STEER,
-        buildClaudeCodeSessionSteerQueryParams({
+        buildClaudeCodeQuerySteerParams({
           sessionId: steerInput.sessionId,
           expectedQueryId: steerInput.expectedQueryId,
           inputText: steerInput.inputText,
