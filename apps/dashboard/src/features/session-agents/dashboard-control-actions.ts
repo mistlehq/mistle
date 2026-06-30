@@ -824,19 +824,10 @@ function createDashboardControlCustomAnswerUserInputOption(
     return null;
   }
 
-  if (customAnswer.inputKind === "textarea") {
-    return {
-      label: customAnswer.label,
-      defaultValue: customAnswer.defaultValue ?? null,
-      inputKind: "textarea",
-      isOther: true,
-      placeholder: customAnswer.placeholder ?? null,
-    };
-  }
-
   return {
     label: customAnswer.label,
     defaultValue: customAnswer.defaultValue ?? null,
+    ...(customAnswer.inputKind === "textarea" ? { inputKind: "textarea" } : {}),
     isOther: true,
     placeholder: customAnswer.placeholder ?? null,
   };
