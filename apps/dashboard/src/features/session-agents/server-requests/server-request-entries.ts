@@ -43,6 +43,7 @@ export type ToolRequestUserInputEntry = {
       defaultValue?: string | null;
       inputKind?: "textarea";
       isOther: boolean;
+      placeholder?: string | null;
     }[];
     question: string;
     resourceSelection?: {

@@ -684,32 +684,42 @@ function ToolUserInputRequestPanelContent(input: {
                 )}
                 {otherOption === undefined ? null : otherOption.inputKind === "textarea" ? (
                   <div className="mx-4">
-                    <Textarea
-                      className="min-h-32"
-                      disabled={input.isRespondingToServerRequest}
-                      onChange={(event) => {
-                        input.setUserInputAnswers((current) => ({
-                          ...current,
-                          [answerKey]: event.target.value,
-                        }));
-                      }}
-                      placeholder={otherOption.label}
-                      value={selectedAnswer}
-                    />
+                    <label className="space-y-1.5">
+                      <span className="text-muted-foreground text-xs font-medium">
+                        {otherOption.label}
+                      </span>
+                      <Textarea
+                        className="min-h-32"
+                        disabled={input.isRespondingToServerRequest}
+                        onChange={(event) => {
+                          input.setUserInputAnswers((current) => ({
+                            ...current,
+                            [answerKey]: event.target.value,
+                          }));
+                        }}
+                        placeholder={otherOption.placeholder ?? otherOption.label}
+                        value={selectedAnswer}
+                      />
+                    </label>
                   </div>
                 ) : (
                   <div className="mx-4">
-                    <Input
-                      disabled={input.isRespondingToServerRequest}
-                      onChange={(event) => {
-                        input.setUserInputAnswers((current) => ({
-                          ...current,
-                          [answerKey]: event.target.value,
-                        }));
-                      }}
-                      placeholder={otherOption.label}
-                      value={selectedAnswer}
-                    />
+                    <label className="space-y-1.5">
+                      <span className="text-muted-foreground text-xs font-medium">
+                        {otherOption.label}
+                      </span>
+                      <Input
+                        disabled={input.isRespondingToServerRequest}
+                        onChange={(event) => {
+                          input.setUserInputAnswers((current) => ({
+                            ...current,
+                            [answerKey]: event.target.value,
+                          }));
+                        }}
+                        placeholder={otherOption.placeholder ?? otherOption.label}
+                        value={selectedAnswer}
+                      />
+                    </label>
                   </div>
                 )}
               </div>

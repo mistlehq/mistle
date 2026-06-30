@@ -202,6 +202,67 @@ describe("ServerRequestsPanel", () => {
     ]);
   });
 
+  it("renders custom user input labels separately from placeholder text", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: 18,
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [
+              {
+                header: "Sandbox profile",
+                id: "profile-choice",
+                question: "Which sandbox profile should run the triaging agent?",
+                options: [
+                  {
+                    label: "Create new",
+                    isOther: false,
+                  },
+                  {
+                    label: "Use another profile",
+                    placeholder: "Paste a sandbox profile ID",
+                    isOther: true,
+                  },
+                ],
+              },
+            ],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+      />,
+    );
+
+    const customAnswerInput = screen.getByLabelText("Use another profile");
+    expect(customAnswerInput.getAttribute("placeholder")).toBe("Paste a sandbox profile ID");
+
+    fireEvent.change(customAnswerInput, {
+      target: {
+        value: "sbp_existing",
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(submittedResults).toEqual([
+      {
+        answers: [
+          {
+            id: "profile-choice",
+            value: "sbp_existing",
+          },
+        ],
+      },
+    ]);
+  });
+
   it("cancels tool/requestUserInput requests without submitting answers", () => {
     const submittedResults: unknown[] = [];
 

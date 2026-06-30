@@ -314,6 +314,7 @@ export async function validateProfileVersionIntegrationBindings(
   const validatedBindings: ValidatedIntegrationBinding[] = [];
 
   for (const [bindingIndex, binding] of input.bindings.entries()) {
+    const bindingIdOrDraftIndex = binding.id ?? `draft:${String(bindingIndex)}`;
     const resolvedConnection = availableConnectionsById.get(binding.connectionId);
     if (resolvedConnection === undefined) {
       throw new SandboxProfilesIntegrationBindingsBadRequestError(
@@ -325,12 +326,12 @@ export async function validateProfileVersionIntegrationBindings(
     if (resolvedTarget === undefined) {
       throw new SandboxProfilesIntegrationBindingsBadRequestError(
         SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
-        `Binding '${binding.id ?? `draft:${String(bindingIndex)}`}' has invalid config reference: Target '${resolvedConnection.targetKey}' could not be resolved.`,
+        `Binding '${bindingIdOrDraftIndex}' has invalid config reference: Target '${resolvedConnection.targetKey}' could not be resolved.`,
         {
           issues: [
             {
               ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
-              bindingIdOrDraftIndex: binding.id ?? `draft:${String(bindingIndex)}`,
+              bindingIdOrDraftIndex,
               validatorCode: "system.invalid_target_reference",
               field: "targetKey",
               safeMessage: `Target '${resolvedConnection.targetKey}' could not be resolved for binding validation.`,
@@ -343,6 +344,23 @@ export async function validateProfileVersionIntegrationBindings(
       familyId: resolvedTarget.familyId,
       variantId: resolvedTarget.variantId,
     });
+    if (definition.kind !== binding.kind) {
+      throw new SandboxProfilesIntegrationBindingsBadRequestError(
+        SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
+        `Binding '${bindingIdOrDraftIndex}' has invalid config reference: Binding kind '${binding.kind}' does not match integration '${definition.familyId}::${definition.variantId}' kind '${definition.kind}'.`,
+        {
+          issues: [
+            {
+              ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
+              bindingIdOrDraftIndex,
+              validatorCode: "system.binding_kind_mismatch",
+              field: "kind",
+              safeMessage: `Binding kind '${binding.kind}' does not match integration '${definition.familyId}::${definition.variantId}' kind '${definition.kind}'.`,
+            },
+          ],
+        },
+      );
+    }
     const validationResult = runDefinitionBindingWriteValidation({
       definition,
       targetKey: resolvedConnection.targetKey,
@@ -359,17 +377,17 @@ export async function validateProfileVersionIntegrationBindings(
         kind: binding.kind,
         config: binding.config,
       },
-      bindingIdOrDraftIndex: binding.id ?? `draft:${String(bindingIndex)}`,
+      bindingIdOrDraftIndex,
     });
     if (!validationResult.ok) {
       const firstIssue = validationResult.issues[0];
       throw new SandboxProfilesIntegrationBindingsBadRequestError(
         SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
-        `Binding '${binding.id ?? `draft:${String(bindingIndex)}`}' has invalid config reference: ${firstIssue?.safeMessage ?? "Binding config is invalid."}`,
+        `Binding '${bindingIdOrDraftIndex}' has invalid config reference: ${firstIssue?.safeMessage ?? "Binding config is invalid."}`,
         {
           issues: validationResult.issues.map((issue) => ({
             ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
-            bindingIdOrDraftIndex: binding.id ?? `draft:${String(bindingIndex)}`,
+            bindingIdOrDraftIndex,
             validatorCode: issue.code,
             field: issue.field,
             safeMessage: issue.safeMessage,
@@ -381,7 +399,7 @@ export async function validateProfileVersionIntegrationBindings(
     validatedBindings.push({
       ...(binding.id === undefined ? {} : { id: binding.id }),
       ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
-      bindingIdOrDraftIndex: binding.id ?? `draft:${String(bindingIndex)}`,
+      bindingIdOrDraftIndex,
       kind: binding.kind,
       bindingConfig: toRecord(validationResult.parsed.bindingConfig),
       connectionId: binding.connectionId,

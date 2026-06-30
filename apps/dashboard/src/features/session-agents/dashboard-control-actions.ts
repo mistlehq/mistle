@@ -72,9 +72,10 @@ const DesignerUserInputOptionSchema = z
   })
   .strict();
 
-const DesignerUserInputFreeFormSchema = z
+const DesignerUserInputCustomAnswerSchema = z
   .object({
     label: z.string().min(1).max(160),
+    placeholder: z.string().min(1).max(240).optional(),
     defaultValue: z.string().max(4000).optional(),
     inputKind: z.enum(["input", "textarea"]).optional(),
   })
@@ -111,7 +112,7 @@ const DesignerUserInputRequestInputSchema = z
     question: z.string().min(1).max(500),
     inputKind: z.enum(["text", "integrationConnectionResourceMultiSelect"]).optional(),
     options: z.array(DesignerUserInputOptionSchema).max(6).optional(),
-    freeForm: DesignerUserInputFreeFormSchema.optional(),
+    customAnswer: DesignerUserInputCustomAnswerSchema.optional(),
     resourceSelection: DesignerUserInputIntegrationConnectionResourceSelectionSchema.optional(),
     submitAction: DesignerUserInputSaveSelectedProviderResourcesSubmitActionSchema.optional(),
   })
@@ -123,7 +124,8 @@ const DesignerUserInputRequestInputSchema = z
       }
 
       return (
-        (input.options !== undefined && input.options.length > 0) || input.freeForm !== undefined
+        (input.options !== undefined && input.options.length > 0) ||
+        input.customAnswer !== undefined
       );
     },
     {
@@ -133,9 +135,9 @@ const DesignerUserInputRequestInputSchema = z
   .refine(
     (input) =>
       input.inputKind !== "integrationConnectionResourceMultiSelect" ||
-      (input.options === undefined && input.freeForm === undefined),
+      (input.options === undefined && input.customAnswer === undefined),
     {
-      message: "Resource selection input cannot include options or freeForm.",
+      message: "Resource selection input cannot include options or customAnswer.",
     },
   )
   .refine(
@@ -578,7 +580,7 @@ const DesignerUserInputOptionJsonSchema = {
   required: ["label"],
 };
 
-const DesignerUserInputFreeFormJsonSchema = {
+const DesignerUserInputCustomAnswerJsonSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
@@ -586,7 +588,13 @@ const DesignerUserInputFreeFormJsonSchema = {
       type: "string",
       minLength: 1,
       maxLength: 160,
-      description: "Placeholder label for the free-form response.",
+      description: "Visible label for the inline custom answer field.",
+    },
+    placeholder: {
+      type: "string",
+      minLength: 1,
+      maxLength: 240,
+      description: "Placeholder text for the inline custom answer field.",
     },
     defaultValue: {
       type: "string",
@@ -703,7 +711,7 @@ export const DesignerUserInputRequestDynamicToolSpec = {
   namespace: DashboardControlDynamicToolNamespace,
   name: DesignerUserInputRequestDynamicToolName,
   description:
-    "Ask the user exactly one setup question in the dashboard. Use this for Designer decisions that need a selectable choice, short free-form response, or integration connection resource selection.",
+    "Ask the user for exactly one actionable decision in the dashboard and wait for the response. Use this when Designer needs the user to choose a next action, confirm setup completion, answer a configuration question, provide an inline custom answer, or select integration resources.",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -729,7 +737,7 @@ export const DesignerUserInputRequestDynamicToolSpec = {
         type: "string",
         enum: ["text", "integrationConnectionResourceMultiSelect"],
         description:
-          "Omit or use text for options/freeForm questions. Use integrationConnectionResourceMultiSelect to let the dashboard list and select provider resources from an integration connection.",
+          "Omit or use text for options/customAnswer questions. Use integrationConnectionResourceMultiSelect to let the dashboard list and select provider resources from an integration connection.",
       },
       options: {
         type: "array",
@@ -739,14 +747,14 @@ export const DesignerUserInputRequestDynamicToolSpec = {
         description:
           "Selectable options. Include the recommended option first when there is a recommendation. Keep option labels short and clear.",
       },
-      freeForm: DesignerUserInputFreeFormJsonSchema,
+      customAnswer: DesignerUserInputCustomAnswerJsonSchema,
       resourceSelection: DesignerUserInputIntegrationConnectionResourceSelectionJsonSchema,
       submitAction: DesignerUserInputSubmitActionJsonSchema,
     },
     required: ["id", "question"],
     anyOf: [
       { required: ["options"] },
-      { required: ["freeForm"] },
+      { required: ["customAnswer"] },
       {
         properties: {
           inputKind: {
@@ -809,26 +817,19 @@ function isKnownDashboardControlDynamicToolName(toolName: string | undefined): b
   );
 }
 
-function createDashboardControlFreeFormUserInputOption(
-  freeForm: DesignerUserInputRequestInput["freeForm"],
+function createDashboardControlCustomAnswerUserInputOption(
+  customAnswer: DesignerUserInputRequestInput["customAnswer"],
 ): NonNullable<ToolRequestUserInputEntry["questions"][number]["options"]>[number] | null {
-  if (freeForm === undefined) {
+  if (customAnswer === undefined) {
     return null;
   }
 
-  if (freeForm.inputKind === "textarea") {
-    return {
-      label: freeForm.label,
-      defaultValue: freeForm.defaultValue ?? null,
-      inputKind: "textarea",
-      isOther: true,
-    };
-  }
-
   return {
-    label: freeForm.label,
-    defaultValue: freeForm.defaultValue ?? null,
+    label: customAnswer.label,
+    defaultValue: customAnswer.defaultValue ?? null,
+    ...(customAnswer.inputKind === "textarea" ? { inputKind: "textarea" } : {}),
     isOther: true,
+    placeholder: customAnswer.placeholder ?? null,
   };
 }
 
@@ -909,7 +910,9 @@ export function createDashboardControlUserInputServerRequest(input: {
   requestId: string | number;
   userInput: DesignerUserInputRequestInput;
 }): ToolRequestUserInputEntry {
-  const freeFormOption = createDashboardControlFreeFormUserInputOption(input.userInput.freeForm);
+  const customAnswerOption = createDashboardControlCustomAnswerUserInputOption(
+    input.userInput.customAnswer,
+  );
 
   return {
     requestId: input.requestId,
@@ -956,7 +959,7 @@ export function createDashboardControlUserInputServerRequest(input: {
                   label: option.label,
                   isOther: false,
                 })),
-                ...(freeFormOption === null ? [] : [freeFormOption]),
+                ...(customAnswerOption === null ? [] : [customAnswerOption]),
               ],
             }),
       },

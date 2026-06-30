@@ -46,6 +46,22 @@ An organization connection to an external provider that is complete enough to se
 _Avoid_: App when referring to a specific configured connection, app setup step when the connection is incomplete, credential, integration binding
 _Maps to_: Integration connection
 
+**Mistle resource access**:
+Optional access that lets the configured agent call Mistle's own APIs and MCP tools at runtime. It is separate from external Connected apps such as Linear, GitHub, or Slack, and separate from Designer's own session access to Mistle product state.
+_Avoid_: Required setup for every agent, provider credential, external app API key, Designer runtime credential
+_Maps to_: Sandbox profile version `mistleMcpEnabled`; `mistleMcpApiKeyId`; Mistle MCP egress route; organization API key MCP token
+
+Use when the configured agent's workflow needs to inspect or change Mistle product resources such as sandbox profiles, draft setup scripts, triggers, profile versions, or sessions.
+
+Concrete use cases:
+
+- A Linear or GitHub ops agent that updates the relevant sandbox profile or trigger after platform work is approved.
+- A setup-maintenance agent that reads and updates draft setup scripts across sandbox profiles.
+- A workflow-manager agent that checks published profile version readiness, starts sessions, or coordinates follow-up sessions.
+- A Mistle health or audit agent that inspects triggers, profile versions, sessions, and configuration drift.
+
+Leave off for ordinary provider workflows where the agent only uses external Connected apps, repositories, provider MCP tools, or provider events.
+
 **Agent**:
 The background worker the user is building or changing.
 _Avoid_: Sandbox profile when not selecting or editing the product object directly, Designer runtime

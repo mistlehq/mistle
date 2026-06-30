@@ -13,3 +13,5 @@ Custom responses are text-only. Attachments, skill mentions, blueprint comments,
 If submitting a custom response fails, the composer keeps the user's text, the **User input request** returns to pending with its response error, and the dashboard must not fall back to steering or create a transcript entry.
 
 Designer `dashboard_control.request_user_input` custom responses use the same dynamic-tool response wrapper as structured answers and cancellation: the dashboard returns a successful tool response whose text content is JSON containing `customResponse.text`. Designer managed instructions should treat that JSON as the user's custom response to the pending decision.
+
+Inline custom-answer fields inside a `dashboard_control.request_user_input` request are different from `customResponse`. An inline custom answer is scoped to a specific question and submits through the structured `answers` response shape; `customResponse` remains the composer escape hatch for an unlisted answer or change in direction.
