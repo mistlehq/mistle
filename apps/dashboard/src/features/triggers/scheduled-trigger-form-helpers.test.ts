@@ -64,7 +64,7 @@ describe("toScheduledTriggerFormValues", () => {
       enabled: true,
       cronExpression: DefaultScheduledTriggerCronExpression,
       timezone: readBrowserTimezone(),
-      conversationMode: ScheduledTriggerConversationModes.SAME,
+      conversationMode: ScheduledTriggerConversationModes.NEW_EACH_RUN,
       inputTemplate: "",
     });
   });
@@ -156,6 +156,12 @@ describe("toCreateScheduledTriggerPayload", () => {
         primaryRepositoryId: "repo_001",
       },
     });
+  });
+
+  it("builds a create request for new conversations on each run by default", () => {
+    expect(
+      toCreateScheduledTriggerPayload(toScheduledTriggerFormValues(null)).conversationKeyTemplate,
+    ).toBe(ScheduledTriggerNewConversationEachRunKeyTemplate);
   });
 
   it("builds a create request for new conversations on each run", () => {

@@ -27,7 +27,7 @@ const EmptyCreateValues: ScheduledTriggerFormValues = {
   enabled: true,
   cronExpression: "",
   timezone: "",
-  conversationMode: ScheduledTriggerConversationModes.SAME,
+  conversationMode: ScheduledTriggerConversationModes.NEW_EACH_RUN,
   inputTemplate: "",
 };
 

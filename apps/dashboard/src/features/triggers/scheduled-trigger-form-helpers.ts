@@ -80,7 +80,7 @@ export function toScheduledTriggerFormValues(
       enabled: true,
       cronExpression: DefaultScheduledTriggerCronExpression,
       timezone: readBrowserTimezone(),
-      conversationMode: ScheduledTriggerConversationModes.SAME,
+      conversationMode: ScheduledTriggerConversationModes.NEW_EACH_RUN,
       inputTemplate: "",
     };
   }
