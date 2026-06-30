@@ -1,4 +1,9 @@
-import { IntegrationWebhookSourceLifecycles } from "@mistle/integrations-core";
+import {
+  IntegrationWebhookSourceLifecycles,
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
+  isWebhookTriggerSupportedByCapabilities,
+  parseWebhookTriggerCapabilitiesProviderMetadata,
+} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { SentrySupportedWebhookEvents } from "./supported-webhook-events.js";
@@ -100,7 +105,7 @@ describe("Sentry webhook support", () => {
     ]);
   });
 
-  it("describes an implicit Sentry issue webhook source for internal integrations", () => {
+  it("describes an implicit Sentry issue webhook source for internal integrations", async () => {
     expect(SentryWebhookSourceCapability.lifecycle).toBe(
       IntegrationWebhookSourceLifecycles.IMPLICIT,
     );
@@ -128,40 +133,55 @@ describe("Sentry webhook support", () => {
       }),
     ).toBe(false);
 
-    expect(
-      SentryWebhookSourceCapability.describeSource({
-        organizationId: "org_123",
+    const describedSource = await SentryWebhookSourceCapability.describeSource({
+      organizationId: "org_123",
+      targetKey: "sentry-default",
+      controlPlaneBaseUrl: "https://control-plane.example.com",
+      target: {
+        familyId: "sentry",
+        variantId: "sentry-default",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      connection: {
+        id: "icn_sentry",
+        status: "active",
+        config: {
+          connection_method: "sentry-webhook-signing-secret",
+        },
+      },
+      source: {
+        id: "iws_sentry",
         targetKey: "sentry-default",
-        controlPlaneBaseUrl: "https://control-plane.example.com",
-        target: {
-          familyId: "sentry",
-          variantId: "sentry-default",
-          enabled: true,
-          config: {},
-          secrets: {},
-        },
-        connection: {
-          id: "icn_sentry",
-          status: "active",
-          config: {
-            connection_method: "sentry-webhook-signing-secret",
-          },
-        },
-        source: {
-          id: "iws_sentry",
-          targetKey: "sentry-default",
-          organizationId: "org_123",
-          integrationConnectionId: "icn_sentry",
-          endpointKey: "eps_sentry",
-          providerMetadata: {},
-        },
-      }),
-    ).toEqual({
+        organizationId: "org_123",
+        integrationConnectionId: "icn_sentry",
+        endpointKey: "eps_sentry",
+        providerMetadata: {},
+      },
+    });
+
+    expect(describedSource).toEqual({
       displayName: "Sentry issue webhook",
       callbackUrl:
         "https://control-plane.example.com/p/integration/webhooks/sentry-default/eps_sentry",
-      providerMetadata: {},
+      providerMetadata: {
+        [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+          events: ["issue"],
+        },
+      },
     });
+    const capabilities = parseWebhookTriggerCapabilitiesProviderMetadata(
+      describedSource.providerMetadata,
+    );
+    expect(
+      SentrySupportedWebhookEvents.every((eventDefinition) =>
+        isWebhookTriggerSupportedByCapabilities({
+          capabilities,
+          requirements: eventDefinition.requirements,
+        }),
+      ),
+    ).toBe(true);
   });
 
   it("normalizes a signed Sentry issue webhook into a trigger event", async () => {

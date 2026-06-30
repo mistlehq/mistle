@@ -1,5 +1,6 @@
 import {
   IntegrationWebhookSourceLifecycles,
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
   type IntegrationWebhookSourceCapability,
 } from "@mistle/integrations-core";
 
@@ -32,7 +33,12 @@ export const SentryWebhookSourceCapability: IntegrationWebhookSourceCapability<
         targetKey: input.targetKey,
         endpointKey,
       }),
-      providerMetadata: input.source.providerMetadata,
+      providerMetadata: {
+        ...input.source.providerMetadata,
+        [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+          events: ["issue"],
+        },
+      },
     };
   },
 };
