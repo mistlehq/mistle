@@ -163,7 +163,7 @@ describe("integrations-definitions index", () => {
     });
     const sentryDefinition = registry.getDefinition({
       familyId: "sentry",
-      variantId: "sentry-mcp",
+      variantId: "sentry-default",
     });
     const signozDefinition = registry.getDefinition({
       familyId: "signoz",
@@ -967,7 +967,7 @@ describe("integrations-definitions index", () => {
     expect(xeroDefinition?.mcp).toBeDefined();
     expect(sentryDefinition).toMatchObject({
       familyId: "sentry",
-      variantId: "sentry-mcp",
+      variantId: "sentry-default",
       kind: "connector",
       displayName: "Sentry",
       connectionMethods: [
@@ -982,9 +982,32 @@ describe("integrations-definitions index", () => {
             },
           },
         },
+        {
+          id: "sentry-webhook-signing-secret",
+          label: "Sentry webhooks",
+          kind: "form",
+          secretFields: [
+            {
+              name: "clientSecret",
+              label: "Client secret",
+              inputType: "password",
+              slotKey: "sentry.sentry-default.sentry-webhook-signing-secret.client-secret",
+            },
+          ],
+        },
       ],
     });
     expect(sentryDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(sentryDefinition?.webhookHandler).toBeUndefined();
+    expect(sentryDefinition?.webhookSource).toBeUndefined();
+    expect(sentryDefinition?.supportedWebhookEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: "sentry.issue.created",
+          providerEventType: "issue.created",
+        }),
+      ]),
+    );
     expect(signozDefinition).toMatchObject({
       familyId: "signoz",
       variantId: "signoz-mcp",
@@ -1479,7 +1502,7 @@ describe("integrations-definitions index", () => {
       "modal::modal-default",
       "opencomputer::opencomputer-default",
       "tensorlake::tensorlake-default",
-      "sentry::sentry-mcp",
+      "sentry::sentry-default",
       "signoz::signoz-mcp",
       "slack::slack-default",
       "shopify::shopify-default",

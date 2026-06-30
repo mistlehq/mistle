@@ -154,7 +154,7 @@ describe("integrations-definitions server", () => {
     });
     const sentryDefinition = registry.getDefinition({
       familyId: "sentry",
-      variantId: "sentry-mcp",
+      variantId: "sentry-default",
     });
     const signozDefinition = registry.getDefinition({
       familyId: "signoz",
@@ -556,8 +556,10 @@ describe("integrations-definitions server", () => {
     expect(notionDefinition?.webhookHandler).toBeUndefined();
     expect(notionDefinition?.webhookSource).toBeUndefined();
     expect(sentryDefinition?.oauth2AuthorizationCode).toBeDefined();
-    expect(sentryDefinition?.webhookHandler).toBeUndefined();
-    expect(sentryDefinition?.webhookSource).toBeUndefined();
+    expect(sentryDefinition?.webhookHandler).toBeDefined();
+    expect(sentryDefinition?.webhookSource).toMatchObject({
+      lifecycle: "implicit",
+    });
     expect(signozDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(signozDefinition?.webhookHandler).toBeUndefined();
     expect(signozDefinition?.webhookSource).toBeUndefined();

@@ -5,27 +5,36 @@ import {
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 
-import { type SentryConnectionConfig, SentryConnectionConfigSchema, SentryMcpUrl } from "./auth.js";
+import {
+  type SentryConnectionConfig,
+  SentryConnectionMethodIds,
+  SentryCredentialSecretTypes,
+  SentryWebhookSigningSecretConnectionConfigSchema,
+  SentryWebhookSigningSecretCredentialSlotKeys,
+  SentryMcpOAuthConnectionConfigSchema,
+  SentryMcpUrl,
+} from "./auth.js";
 import { resolveSentryBindingConfigForm } from "./binding-config-form.js";
 import { SentryBindingConfigSchema } from "./binding-config-schema.js";
 import { compileSentryBinding } from "./compile-binding.js";
+import { SentrySupportedWebhookEvents } from "./supported-webhook-events.js";
 import { SentryTargetConfigSchema } from "./target-config-schema.js";
 import { SentryTargetSecretSchema } from "./target-secret-schema.js";
 import { SentryToolIds } from "./tool-ids.js";
 
-export type SentryMcpBaseIntegrationDefinition = IntegrationDefinition<
+export type SentryDefaultBaseIntegrationDefinition = IntegrationDefinition<
   typeof SentryTargetConfigSchema,
   typeof SentryTargetSecretSchema,
   typeof SentryBindingConfigSchema,
   SentryConnectionConfig
 >;
 
-export const SentryMcpBaseDefinition: SentryMcpBaseIntegrationDefinition = {
+export const SentryDefaultBaseDefinition: SentryDefaultBaseIntegrationDefinition = {
   familyId: "sentry",
-  variantId: "sentry-mcp",
+  variantId: "sentry-default",
   kind: IntegrationKinds.CONNECTOR,
   displayName: "Sentry",
-  description: "Enable Sentry hosted MCP access for issues, traces, releases, and projects.",
+  description: "Enable Sentry issue webhooks and hosted MCP access.",
   logoKey: "sentry",
   targetConfigSchema: SentryTargetConfigSchema,
   targetSecretSchema: SentryTargetSecretSchema,
@@ -36,7 +45,7 @@ export const SentryMcpBaseDefinition: SentryMcpBaseIntegrationDefinition = {
       id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
       label: "Sentry MCP OAuth",
       kind: "redirect",
-      configSchema: SentryConnectionConfigSchema,
+      configSchema: SentryMcpOAuthConnectionConfigSchema,
       ui: {
         create: {
           submitLabel: "Connect Sentry",
@@ -48,7 +57,31 @@ export const SentryMcpBaseDefinition: SentryMcpBaseIntegrationDefinition = {
         },
       },
     },
+    {
+      id: SentryConnectionMethodIds.WEBHOOK_SIGNING_SECRET,
+      label: "Sentry webhooks",
+      kind: "form",
+      secretFields: [
+        {
+          name: "clientSecret",
+          label: "Client secret",
+          placeholder: "Enter Sentry integration client secret",
+          description: "Client secret from the Sentry Internal Integration used to sign webhooks.",
+          inputType: "password",
+          secretType: SentryCredentialSecretTypes.OAUTH2_CLIENT_SECRET,
+          slotKey: SentryWebhookSigningSecretCredentialSlotKeys.CLIENT_SECRET,
+        },
+      ],
+      configSchema: SentryWebhookSigningSecretConnectionConfigSchema,
+      ui: {
+        create: {
+          submitLabel: "Save Sentry webhook secret",
+          helperText: "Save a Sentry Internal Integration client secret for webhook verification.",
+        },
+      },
+    },
   ],
+  supportedWebhookEvents: SentrySupportedWebhookEvents,
   mcp: (input) =>
     input.binding.config.tools.includes(SentryToolIds.SENTRY_MCP)
       ? [

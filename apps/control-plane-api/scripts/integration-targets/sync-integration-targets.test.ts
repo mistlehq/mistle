@@ -283,9 +283,9 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
-        targetKey: "sentry-mcp",
+        targetKey: "sentry-default",
         familyId: "sentry",
-        variantId: "sentry-mcp",
+        variantId: "sentry-default",
         enabled: false,
         config: {},
       },

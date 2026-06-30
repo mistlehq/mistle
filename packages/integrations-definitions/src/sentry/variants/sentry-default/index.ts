@@ -4,6 +4,7 @@ export * from "./binding-config-form.js";
 export * from "./binding-config-schema.js";
 export * from "./compile-binding.js";
 export * from "./definition.js";
+export * from "./supported-webhook-events.js";
 export * from "./target-config-schema.js";
 export * from "./target-secret-schema.js";
 export * from "./tool-ids.js";

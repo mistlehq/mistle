@@ -1,1 +1,1 @@
-export * from "./variants/sentry-mcp/index.js";
+export * from "./variants/sentry-default/index.js";

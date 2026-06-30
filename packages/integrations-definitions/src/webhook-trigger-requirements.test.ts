@@ -18,6 +18,7 @@ describe("webhook trigger requirements", () => {
       "github::github-cloud",
       "github::github-enterprise-server",
       "linear::linear-default",
+      "sentry::sentry-default",
       "slack::slack-default",
       "wasenderapi::wasenderapi-mcp",
       "whapi::whapi-mcp",
@@ -168,6 +169,36 @@ describe("webhook trigger requirements", () => {
       "linear.reaction.updated",
       "linear.reaction.removed",
     ]);
+  });
+
+  it("maps Sentry issue trigger requirements to issue webhook subscriptions", () => {
+    const sentryDefinition = requireDefinition("sentry", "sentry-default");
+
+    expect(
+      sentryDefinition.supportedWebhookEvents?.map((eventDefinition) => eventDefinition.eventType),
+    ).toEqual([
+      "sentry.issue.created",
+      "sentry.issue.resolved",
+      "sentry.issue.assigned",
+      "sentry.issue.archived",
+      "sentry.issue.unresolved",
+    ]);
+
+    for (const eventType of [
+      "sentry.issue.created",
+      "sentry.issue.resolved",
+      "sentry.issue.assigned",
+      "sentry.issue.archived",
+      "sentry.issue.unresolved",
+    ]) {
+      expect(requireEvent(sentryDefinition, eventType).requirements).toEqual({
+        anyOf: [
+          {
+            event: "issue",
+          },
+        ],
+      });
+    }
   });
 });
 

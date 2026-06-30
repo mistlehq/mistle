@@ -823,13 +823,14 @@ Trigger events:
 ## Sentry
 
 Provider family ID: `sentry`
-Integration target key: `sentry-mcp`
-Variant ID: `sentry-mcp`
-Description: Enable Sentry hosted MCP access for issues, traces, releases, and projects.
+Integration target key: `sentry-default`
+Variant ID: `sentry-default`
+Description: Enable Sentry issue webhooks and hosted MCP access.
 
 Setup methods:
 
 - `oauth2-authorization-code` (redirect): Sentry MCP OAuth
+- `sentry-webhook-signing-secret` (form): Sentry webhooks
 
 Resource kinds:
 
@@ -837,7 +838,11 @@ Resource kinds:
 
 Trigger events:
 
-- None
+- `sentry.issue.created`: Issue created
+- `sentry.issue.resolved`: Issue resolved
+- `sentry.issue.assigned`: Issue assigned
+- `sentry.issue.archived`: Issue archived
+- `sentry.issue.unresolved`: Issue unresolved
 
 ## Shopify
 

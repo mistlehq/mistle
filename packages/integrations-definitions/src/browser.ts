@@ -48,7 +48,7 @@ import {
   OpenComputerSandboxRuntimeDefinition,
   TensorlakeSandboxRuntimeDefinition,
 } from "./sandbox-runtimes/index.js";
-import { SentryMcpBaseDefinition } from "./sentry/variants/sentry-mcp/base-definition.js";
+import { SentryDefaultBaseDefinition } from "./sentry/variants/sentry-default/base-definition.js";
 import { ShopifyBaseDefinition } from "./shopify/variants/shopify-default/base-definition.js";
 import { SignozMcpBaseDefinition } from "./signoz/variants/signoz-mcp/base-definition.js";
 import { SlackBaseDefinition } from "./slack/variants/slack-default/base-definition.js";
@@ -97,7 +97,7 @@ export const E2BSandboxRuntimeBrowserDefinition = E2BSandboxRuntimeDefinition;
 export const ModalSandboxRuntimeBrowserDefinition = ModalSandboxRuntimeDefinition;
 export const OpenComputerSandboxRuntimeBrowserDefinition = OpenComputerSandboxRuntimeDefinition;
 export const TensorlakeSandboxRuntimeBrowserDefinition = TensorlakeSandboxRuntimeDefinition;
-export const SentryBrowserDefinition = SentryMcpBaseDefinition;
+export const SentryBrowserDefinition = SentryDefaultBaseDefinition;
 export const SignozBrowserDefinition = SignozMcpBaseDefinition;
 export const SlackBrowserDefinition = SlackBaseDefinition;
 export const ShopifyBrowserDefinition = ShopifyBaseDefinition;
