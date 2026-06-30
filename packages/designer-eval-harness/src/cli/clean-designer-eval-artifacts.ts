@@ -13,6 +13,7 @@ type CleanDesignerEvalArtifactsOptions = {
 };
 
 const DefaultDesignerEvalArtifactRoot = resolve(RepositoryRootPath, ".local/designer-evals/runs");
+const DesignerEvalCaseIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
@@ -135,7 +136,7 @@ function parseArgs(args: readonly string[]): CleanDesignerEvalArtifactsOptions {
       continue;
     }
     if (arg === "--case-id" && next !== undefined) {
-      caseId = next;
+      caseId = parseCaseIdArg(next);
       index += 1;
       continue;
     }
@@ -173,6 +174,13 @@ function parseArgs(args: readonly string[]): CleanDesignerEvalArtifactsOptions {
 function parseDateArg(value: string, label: string): string {
   if (!isDateString(value)) {
     throw new Error(`${label} must use YYYY-MM-DD format.`);
+  }
+  return value;
+}
+
+function parseCaseIdArg(value: string): string {
+  if (!DesignerEvalCaseIdPattern.test(value)) {
+    throw new Error("--case-id must contain only lowercase letters, numbers, and single hyphens.");
   }
   return value;
 }
