@@ -207,7 +207,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@aws-sdk/client-sts": "3.1047.0",
+    "@aws-sdk/client-sts": "3.1075.0",
     "@mistle/claude-code-runtime-server": "workspace:*",
     "@mistle/http": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
