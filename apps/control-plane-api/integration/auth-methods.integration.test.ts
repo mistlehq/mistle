@@ -20,6 +20,7 @@ describe.concurrent("auth methods integration", () => {
       methods: {
         emailOtp: true,
         google: false,
+        github: false,
       },
       allowSignups: true,
     });
@@ -44,6 +45,7 @@ describe.concurrent("auth methods with Stripe billing integration", () => {
       methods: {
         emailOtp: true,
         google: false,
+        github: false,
       },
       allowSignups: true,
     });
@@ -68,6 +70,7 @@ describe.concurrent("auth methods with disabled signups integration", () => {
       methods: {
         emailOtp: true,
         google: false,
+        github: false,
       },
       allowSignups: false,
     });

@@ -65,7 +65,7 @@ const ObjectStoreSchema = z
   })
   .strict();
 
-const AuthMethodSchema = z.enum(["otp", "google"]);
+const AuthMethodSchema = z.enum(["otp", "google", "github"]);
 
 const ControlPlaneApiWelcomeEmailSchema = z
   .object({
@@ -280,6 +280,13 @@ const ControlPlaneApiAuthSchema = z
       })
       .strict()
       .optional(),
+    github: z
+      .object({
+        client_id: z.string().trim().min(1),
+        client_secret: z.string().trim().min(1),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -296,6 +303,14 @@ const ControlPlaneApiAuthSchema = z
         code: "custom",
         path: ["google"],
         message: "Google auth config is required when google auth is enabled.",
+      });
+    }
+
+    if (value.enabled_methods?.includes("github") === true && value.github === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["github"],
+        message: "GitHub auth config is required when github auth is enabled.",
       });
     }
   });

@@ -101,8 +101,11 @@ export function selectGlobalConfig(config: Config): GlobalConfig {
 
 export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConfig {
   const googleAuth = config.services.control_plane_api.auth.google;
+  const githubAuth = config.services.control_plane_api.auth.github;
   const isGoogleAuthEnabled =
     config.services.control_plane_api.auth.enabled_methods?.includes("google") === true;
+  const isGitHubAuthEnabled =
+    config.services.control_plane_api.auth.enabled_methods?.includes("github") === true;
 
   return {
     server: {
@@ -160,6 +163,14 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
             google: {
               clientId: googleAuth.client_id,
               clientSecret: googleAuth.client_secret,
+            },
+          }),
+      ...(githubAuth === undefined || !isGitHubAuthEnabled
+        ? {}
+        : {
+            github: {
+              clientId: githubAuth.client_id,
+              clientSecret: githubAuth.client_secret,
             },
           }),
     },

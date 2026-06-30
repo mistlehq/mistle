@@ -17,12 +17,12 @@ export function resolveOAuthCallbackError(searchParams: URLSearchParams): string
   }
 
   if (error === "access_denied") {
-    return "Google sign-in was cancelled.";
+    return "Social sign-in was cancelled.";
   }
 
   if (errorDescription !== null && errorDescription.trim().length > 0) {
     return errorDescription;
   }
 
-  return "Unable to continue with Google.";
+  return "Unable to continue with social sign-in.";
 }

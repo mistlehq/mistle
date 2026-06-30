@@ -1,6 +1,7 @@
 export const AuthMethodIds = {
   EMAIL_OTP: "emailOtp",
   GOOGLE: "google",
+  GITHUB: "github",
 } as const;
 
 export type AuthMethodId = (typeof AuthMethodIds)[keyof typeof AuthMethodIds];
@@ -13,6 +14,7 @@ export type AuthMethod = {
 
 export type AuthMethodAvailability = {
   google: boolean;
+  github: boolean;
 };
 
 const AuthMethodCatalog: readonly AuthMethod[] = [
@@ -25,6 +27,11 @@ const AuthMethodCatalog: readonly AuthMethod[] = [
     id: AuthMethodIds.GOOGLE,
     kind: "social",
     label: "Google",
+  },
+  {
+    id: AuthMethodIds.GITHUB,
+    kind: "social",
+    label: "GitHub",
   },
 ] as const;
 

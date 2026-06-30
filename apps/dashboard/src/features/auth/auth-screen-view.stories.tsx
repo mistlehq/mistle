@@ -85,7 +85,7 @@ export const GoogleRedirecting: Story = {
 
 export const GoogleCallbackError: Story = {
   args: {
-    authError: "Google sign-in was cancelled.",
+    authError: "Social sign-in was cancelled.",
     emailStageAfterForm: <GoogleAuthAfterForm isPending={false} />,
   },
 };

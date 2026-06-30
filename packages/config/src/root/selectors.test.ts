@@ -12,11 +12,15 @@ import {
 function createRootConfig(input: {
   allowSignups?: boolean;
   billingStripe?: { enabled: false; secret_key?: string } | { enabled: true; secret_key: string };
-  enabledMethods?: Array<"otp" | "google">;
+  enabledMethods?: Array<"otp" | "google" | "github">;
   gatewayRelay?: Config["gateway_relay"];
   dataPlaneGatewayHealth?: Config["services"]["data_plane_gateway"]["health"];
   dataPlaneGatewayPortAccess?: Config["services"]["data_plane_gateway"]["port_access"];
   google?: {
+    client_id: string;
+    client_secret: string;
+  };
+  github?: {
     client_id: string;
     client_secret: string;
   };
@@ -61,6 +65,7 @@ function createRootConfig(input: {
             allowed_attempts: 3,
           },
           ...(input.google === undefined ? {} : { google: input.google }),
+          ...(input.github === undefined ? {} : { github: input.github }),
         },
         mcp: {
           url: "https://mcp.example.com/mcp",
@@ -286,6 +291,47 @@ describe("selectControlPlaneApiConfig", () => {
     );
 
     expect(config.auth.google).toBeUndefined();
+  });
+
+  it("omits GitHub auth when credentials are configured but github is not enabled", () => {
+    const config = selectControlPlaneApiConfig(
+      createRootConfig({
+        enabledMethods: ["otp"],
+        github: {
+          client_id: "github-client-id",
+          client_secret: "github-client-secret",
+        },
+      }),
+    );
+
+    expect(config.auth.github).toBeUndefined();
+  });
+
+  it("includes GitHub auth when github is enabled and configured", () => {
+    const config = selectControlPlaneApiConfig(
+      createRootConfig({
+        enabledMethods: ["otp", "github"],
+        github: {
+          client_id: "github-client-id",
+          client_secret: "github-client-secret",
+        },
+      }),
+    );
+
+    expect(config.auth.github).toEqual({
+      clientId: "github-client-id",
+      clientSecret: "github-client-secret",
+    });
+  });
+
+  it("omits GitHub auth when github is enabled but credentials are not configured", () => {
+    const config = selectControlPlaneApiConfig(
+      createRootConfig({
+        enabledMethods: ["otp", "github"],
+      }),
+    );
+
+    expect(config.auth.github).toBeUndefined();
   });
 
   it("selects enabled signup allowance", () => {

@@ -8,6 +8,7 @@ export const AuthMethodsResponseSchema = z
       .object({
         emailOtp: z.literal(true),
         google: z.boolean(),
+        github: z.boolean(),
       })
       .strict(),
     allowSignups: z.boolean(),

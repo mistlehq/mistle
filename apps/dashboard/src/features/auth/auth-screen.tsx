@@ -22,6 +22,7 @@ import {
 } from "./auth-redirect.js";
 import { AuthScreenView } from "./auth-screen-view.js";
 import { ErrorNotice } from "./error-notice.js";
+import { GitHubSignInButton } from "./github-sign-in-button.js";
 import { GoogleSignInButton } from "./google-sign-in-button.js";
 import { resolveErrorMessage, resolveOAuthCallbackError } from "./messages.js";
 
@@ -39,6 +40,7 @@ export function AuthScreen(): React.JSX.Element {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isSigningInWithGoogle, setIsSigningInWithGoogle] = useState(false);
+  const [isSigningInWithGitHub, setIsSigningInWithGitHub] = useState(false);
   const [authError, setAuthError] = useState<string | null>(initialAuthError);
   const isSignedIn = (sessionQuery.data ?? null) !== null;
   const [postLoginPath] = useState(() =>
@@ -126,8 +128,28 @@ export function AuthScreen(): React.JSX.Element {
   }
 
   async function handleSignInWithGoogle(): Promise<void> {
+    await handleSignInWithSocialProvider({
+      provider: "google",
+      providerDisplayName: "Google",
+      setIsSigningIn: setIsSigningInWithGoogle,
+    });
+  }
+
+  async function handleSignInWithGitHub(): Promise<void> {
+    await handleSignInWithSocialProvider({
+      provider: "github",
+      providerDisplayName: "GitHub",
+      setIsSigningIn: setIsSigningInWithGitHub,
+    });
+  }
+
+  async function handleSignInWithSocialProvider(input: {
+    provider: "github" | "google";
+    providerDisplayName: string;
+    setIsSigningIn: (value: boolean) => void;
+  }): Promise<void> {
     setAuthError(null);
-    setIsSigningInWithGoogle(true);
+    input.setIsSigningIn(true);
 
     const callbackUrl = new URL("/auth/login/callback", globalThis.location.origin);
     callbackUrl.searchParams.set("redirectTo", postLoginPath);
@@ -136,18 +158,23 @@ export function AuthScreen(): React.JSX.Element {
 
     try {
       const response = await authClient.signIn.social({
-        provider: "google",
+        provider: input.provider,
         callbackURL: callbackUrl.toString(),
         errorCallbackURL: errorCallbackUrl.toString(),
       });
 
       if (response.error) {
-        setAuthError(resolveErrorMessage(response.error, "Unable to continue with Google."));
-        setIsSigningInWithGoogle(false);
+        setAuthError(
+          resolveErrorMessage(
+            response.error,
+            `Unable to continue with ${input.providerDisplayName}.`,
+          ),
+        );
+        input.setIsSigningIn(false);
       }
     } catch {
-      setAuthError("Unable to continue with Google.");
-      setIsSigningInWithGoogle(false);
+      setAuthError(`Unable to continue with ${input.providerDisplayName}.`);
+      input.setIsSigningIn(false);
     }
   }
 
@@ -186,15 +213,37 @@ export function AuthScreen(): React.JSX.Element {
 
   const authMethods = resolveEnabledAuthMethods({
     google: authMethodsQuery.data.methods.google,
+    github: authMethodsQuery.data.methods.github,
   });
   const hasGoogleAuthMethod = hasEnabledAuthMethod(authMethods, AuthMethodIds.GOOGLE);
+  const hasGitHubAuthMethod = hasEnabledAuthMethod(authMethods, AuthMethodIds.GITHUB);
+  const isSigningInWithSocialProvider = isSigningInWithGoogle || isSigningInWithGitHub;
 
-  const emailStageAfterForm = hasGoogleAuthMethod ? (
-    <div className="gap-4 pt-1 flex flex-col">
-      <InlineDividerLabel label="Or" />
-      <GoogleSignInButton isPending={isSigningInWithGoogle} onClick={handleSignInWithGoogle} />
-    </div>
-  ) : undefined;
+  const socialSignInButtons = (
+    <>
+      {hasGoogleAuthMethod ? (
+        <GoogleSignInButton
+          disabled={isSigningInWithSocialProvider}
+          isPending={isSigningInWithGoogle}
+          onClick={handleSignInWithGoogle}
+        />
+      ) : null}
+      {hasGitHubAuthMethod ? (
+        <GitHubSignInButton
+          disabled={isSigningInWithSocialProvider}
+          isPending={isSigningInWithGitHub}
+          onClick={handleSignInWithGitHub}
+        />
+      ) : null}
+    </>
+  );
+  const emailStageAfterForm =
+    hasGoogleAuthMethod || hasGitHubAuthMethod ? (
+      <div className="gap-4 pt-1 flex flex-col">
+        <InlineDividerLabel label="Or" />
+        {socialSignInButtons}
+      </div>
+    ) : undefined;
 
   return (
     <AuthScreenView

@@ -18,13 +18,18 @@ import {
 import { AuthScreen } from "./auth-screen.js";
 import { resolveOAuthCallbackError } from "./messages.js";
 
-function renderAuthScreen(input: { initialEntry: string; googleAuthEnabled?: boolean }) {
+function renderAuthScreen(input: {
+  initialEntry: string;
+  googleAuthEnabled?: boolean;
+  githubAuthEnabled?: boolean;
+}) {
   const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
   queryClient.setQueryData(SESSION_QUERY_KEY, null);
   queryClient.setQueryData(AUTH_METHODS_QUERY_KEY, {
     methods: {
       emailOtp: true,
       google: input.googleAuthEnabled ?? true,
+      github: input.githubAuthEnabled ?? true,
     },
     allowSignups: true,
   });
@@ -212,9 +217,9 @@ describe("resolveOAuthCallbackError", () => {
   });
 
   it.each([
-    ["error=access_denied", "Google sign-in was cancelled."],
+    ["error=access_denied", "Social sign-in was cancelled."],
     ["error=server_error&error_description=OAuth%20state%20mismatch", "OAuth state mismatch"],
-    ["error=server_error", "Unable to continue with Google."],
+    ["error=server_error", "Unable to continue with social sign-in."],
   ])("resolves %s to %s", (search, expectedMessage) => {
     expect(resolveOAuthCallbackError(new URLSearchParams(search))).toBe(expectedMessage);
   });
@@ -222,7 +227,7 @@ describe("resolveOAuthCallbackError", () => {
 
 describe("AuthScreen", () => {
   it.each([
-    ["/auth/login?error=access_denied", "Google sign-in was cancelled."],
+    ["/auth/login?error=access_denied", "Social sign-in was cancelled."],
     [
       "/auth/login?error=server_error&error_description=OAuth%20state%20mismatch",
       "OAuth state mismatch",
@@ -242,6 +247,7 @@ describe("AuthScreen", () => {
       }),
     ).toBeTruthy();
     expect(await screen.findByRole("button", { name: "Continue with Google" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Continue with GitHub" })).toBeTruthy();
   });
 
   it("hides Google sign-in when the control plane reports Google auth is disabled", async () => {
@@ -249,5 +255,14 @@ describe("AuthScreen", () => {
 
     expect(await screen.findByRole("button", { name: "Continue with email" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Continue with Google" })).toBeNull();
+    expect(await screen.findByRole("button", { name: "Continue with GitHub" })).toBeTruthy();
+  });
+
+  it("hides GitHub sign-in when the control plane reports GitHub auth is disabled", async () => {
+    renderAuthScreen({ initialEntry: "/auth/login", githubAuthEnabled: false });
+
+    expect(await screen.findByRole("button", { name: "Continue with email" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Continue with Google" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Continue with GitHub" })).toBeNull();
   });
 });

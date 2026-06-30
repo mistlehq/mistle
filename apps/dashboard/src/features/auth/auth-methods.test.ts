@@ -7,6 +7,7 @@ describe("resolveEnabledAuthMethods", () => {
     expect(
       resolveEnabledAuthMethods({
         google: true,
+        github: true,
       }),
     ).toEqual([
       {
@@ -19,12 +20,18 @@ describe("resolveEnabledAuthMethods", () => {
         kind: "social",
         label: "Google",
       },
+      {
+        id: AuthMethodIds.GITHUB,
+        kind: "social",
+        label: "GitHub",
+      },
     ]);
   });
 
   it("filters out disabled auth methods", () => {
     const authMethods = resolveEnabledAuthMethods({
       google: false,
+      github: false,
     });
 
     expect(authMethods).toEqual([
@@ -35,5 +42,6 @@ describe("resolveEnabledAuthMethods", () => {
       },
     ]);
     expect(hasEnabledAuthMethod(authMethods, AuthMethodIds.GOOGLE)).toBe(false);
+    expect(hasEnabledAuthMethod(authMethods, AuthMethodIds.GITHUB)).toBe(false);
   });
 });
