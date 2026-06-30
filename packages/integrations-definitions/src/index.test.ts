@@ -994,6 +994,12 @@ describe("integrations-definitions index", () => {
               slotKey: "sentry.sentry-default.sentry-webhook-signing-secret.client-secret",
             },
           ],
+          connectionDetail: {
+            installation: {
+              hideWebhookSourceSection: true,
+              includeWebhookCallbackUrl: true,
+            },
+          },
         },
       ],
     });
