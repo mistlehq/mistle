@@ -7,11 +7,20 @@ import {
 import type { SessionComposerModelSelectionInput } from "../pages/session-composer/index.js";
 import type { SessionTerminalContentInset } from "../pages/session-terminal-surface.js";
 
-export type SessionRuntimeWorkbenchCapability = {
+type SessionWorkbenchRuntimeMetadata = {
   displayName: string;
+};
+
+type SessionWorkbenchRuntimePresentation = {
   cliTerminalContentInset: SessionTerminalContentInset;
+};
+
+type SessionWorkbenchRuntimeComposerPolicy = {
   composerModelSelection: SessionComposerModelSelectionInput;
   supportsSteering: boolean;
+};
+
+type SessionWorkbenchRuntimeHandoffPolicy = {
   preservesCliLaunchContext: boolean;
 };
 
@@ -27,7 +36,10 @@ type SessionWorkbenchRuntimeConversationPolicy = {
 
 export type SessionWorkbenchRuntimeModule = {
   runtimeId: AgentRuntimeId;
-  capabilities: SessionRuntimeWorkbenchCapability;
+  metadata: SessionWorkbenchRuntimeMetadata;
+  presentation: SessionWorkbenchRuntimePresentation;
+  composerPolicy: SessionWorkbenchRuntimeComposerPolicy;
+  handoffPolicy: SessionWorkbenchRuntimeHandoffPolicy;
   conversationPolicy: SessionWorkbenchRuntimeConversationPolicy;
   repositoryPolicy: SessionWorkbenchRuntimeRepositoryPolicy;
 };
@@ -35,14 +47,20 @@ export type SessionWorkbenchRuntimeModule = {
 export const SessionWorkbenchRuntimeModules = {
   CODEX: {
     runtimeId: AgentRuntimeIdCatalog.CODEX,
-    capabilities: {
+    metadata: {
       displayName: "Codex",
+    },
+    presentation: {
       cliTerminalContentInset: "default",
+    },
+    composerPolicy: {
       composerModelSelection: {
         required: true,
         showControls: true,
       },
       supportsSteering: true,
+    },
+    handoffPolicy: {
       preservesCliLaunchContext: false,
     },
     conversationPolicy: {
@@ -56,14 +74,20 @@ export const SessionWorkbenchRuntimeModules = {
   },
   CLAUDE_CODE: {
     runtimeId: AgentRuntimeIdCatalog.CLAUDE_CODE,
-    capabilities: {
+    metadata: {
       displayName: "Claude Code",
+    },
+    presentation: {
       cliTerminalContentInset: "none",
+    },
+    composerPolicy: {
       composerModelSelection: {
         required: false,
         showControls: true,
       },
       supportsSteering: true,
+    },
+    handoffPolicy: {
       preservesCliLaunchContext: false,
     },
     conversationPolicy: {
@@ -77,14 +101,20 @@ export const SessionWorkbenchRuntimeModules = {
   },
   OPENCODE: {
     runtimeId: AgentRuntimeIdCatalog.OPENCODE,
-    capabilities: {
+    metadata: {
       displayName: "OpenCode",
+    },
+    presentation: {
       cliTerminalContentInset: "none",
+    },
+    composerPolicy: {
       composerModelSelection: {
         required: false,
         showControls: true,
       },
       supportsSteering: true,
+    },
+    handoffPolicy: {
       preservesCliLaunchContext: true,
     },
     conversationPolicy: {
@@ -98,14 +128,20 @@ export const SessionWorkbenchRuntimeModules = {
   },
   PI: {
     runtimeId: AgentRuntimeIdCatalog.PI,
-    capabilities: {
+    metadata: {
       displayName: "Pi",
+    },
+    presentation: {
       cliTerminalContentInset: "none",
+    },
+    composerPolicy: {
       composerModelSelection: {
         required: false,
         showControls: true,
       },
       supportsSteering: true,
+    },
+    handoffPolicy: {
       preservesCliLaunchContext: false,
     },
     conversationPolicy: {
