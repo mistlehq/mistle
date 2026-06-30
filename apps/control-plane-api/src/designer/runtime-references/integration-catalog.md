@@ -19,6 +19,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `agentmail-mcp`: AgentMail MCP (default)
+
 Trigger events:
 
 - None
@@ -35,6 +39,10 @@ Setup methods:
 - `api-key` (form): API key
 
 Resource kinds:
+
+- None
+
+Binding tools:
 
 - None
 
@@ -57,6 +65,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- None
+
 Trigger events:
 
 - None
@@ -75,6 +87,11 @@ Setup methods:
 Resource kinds:
 
 - None
+
+Binding tools:
+
+- `aws-cli`: AWS CLI (default)
+- `aws-cloudwatch-mcp`: CloudWatch MCP
 
 Trigger events:
 
@@ -95,6 +112,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `bugsnag-mcp`: BugSnag MCP (default)
+
 Trigger events:
 
 - None
@@ -111,6 +132,10 @@ Setup methods:
 - `api-key` (form): API token
 
 Resource kinds:
+
+- None
+
+Binding tools:
 
 - None
 
@@ -133,6 +158,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `datadog-mcp`: Datadog MCP (default)
+
 Trigger events:
 
 - None
@@ -152,6 +181,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `dataforseo-mcp`: DataForSEO MCP (default)
+
 Trigger events:
 
 - None
@@ -168,6 +201,10 @@ Setup methods:
 - `api-key` (form): API key
 
 Resource kinds:
+
+- None
+
+Binding tools:
 
 - None
 
@@ -190,6 +227,11 @@ Resource kinds:
 
 - `guild`: guilds (multi)
 - `channel`: channels (multi)
+
+Binding tools:
+
+- `discord-cli`: Discord CLI
+- `discord-mcp`: Discord MCP
 
 Trigger events:
 
@@ -219,6 +261,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `e2b-cli`: E2B CLI
+
 Trigger events:
 
 - None
@@ -238,6 +284,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- None
+
 Trigger events:
 
 - None
@@ -254,6 +304,10 @@ Setup methods:
 - `api-key` (form): API key
 
 Resource kinds:
+
+- None
+
+Binding tools:
 
 - None
 
@@ -281,6 +335,10 @@ Resource kinds:
 - `org`: organizations (multi)
 - `team`: teams (multi)
 - `bot`: GitHub App bots (multi)
+
+Binding tools:
+
+- `github-cli`: GitHub CLI (default)
 
 Trigger events:
 
@@ -321,6 +379,10 @@ Resource kinds:
 - `team`: teams (multi)
 - `bot`: GitHub App bots (multi)
 
+Binding tools:
+
+- `github-cli`: GitHub CLI (default)
+
 Trigger events:
 
 - `github.issues.opened`: Issue opened
@@ -354,6 +416,11 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `googleads-cli`: Google Ads CLI
+- `googleads-mcp`: Google Ads MCP (default)
+
 Trigger events:
 
 - None
@@ -372,6 +439,11 @@ Setup methods:
 Resource kinds:
 
 - None
+
+Binding tools:
+
+- `google-analytics-cli`: Google Analytics CLI
+- `google-analytics-mcp`: Google Analytics MCP (default)
 
 Trigger events:
 
@@ -392,6 +464,11 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `google-business-profile-cli`: Google Business Profile CLI
+- `google-business-profile-mcp`: Google Business Profile MCP (default)
+
 Trigger events:
 
 - None
@@ -408,6 +485,10 @@ Setup methods:
 - `oauth2-authorization-code` (redirect): Google OAuth
 
 Resource kinds:
+
+- None
+
+Binding tools:
 
 - None
 
@@ -430,6 +511,11 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `google-search-console-cli`: Google Search Console CLI
+- `google-search-console-mcp`: Google Search Console MCP (default)
+
 Trigger events:
 
 - None
@@ -450,6 +536,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- None
+
 Trigger events:
 
 - None
@@ -466,6 +556,10 @@ Setup methods:
 - `api-key` (form): API key
 
 Resource kinds:
+
+- None
+
+Binding tools:
 
 - None
 
@@ -490,6 +584,11 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `jira-cli`: Jira CLI (default)
+- `jira-mcp`: Jira MCP
+
 Trigger events:
 
 - `jira:issue_created`: Issue created
@@ -512,6 +611,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- None
+
 Trigger events:
 
 - None
@@ -530,6 +633,10 @@ Setup methods:
 Resource kinds:
 
 - None
+
+Binding tools:
+
+- `klaviyo-mcp`: Klaviyo MCP (default)
 
 Trigger events:
 
@@ -550,6 +657,10 @@ Setup methods:
 Resource kinds:
 
 - None
+
+Binding tools:
+
+- `linear-mcp`: Linear MCP
 
 Trigger events:
 
@@ -587,6 +698,11 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `metaads-cli`: Meta Ads CLI
+- `metaads-mcp`: Meta Ads MCP (default)
+
 Trigger events:
 
 - None
@@ -603,6 +719,10 @@ Setup methods:
 - `api-key` (form): API key
 
 Resource kinds:
+
+- None
+
+Binding tools:
 
 - None
 
@@ -625,6 +745,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- None
+
 Trigger events:
 
 - None
@@ -644,6 +768,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `notion-mcp`: Notion MCP (default)
+
 Trigger events:
 
 - None
@@ -661,6 +789,10 @@ Setup methods:
 - `chatgpt-device-code` (device-authorization): ChatGPT subscription
 
 Resource kinds:
+
+- None
+
+Binding tools:
 
 - None
 
@@ -683,6 +815,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- None
+
 Trigger events:
 
 - None
@@ -702,6 +838,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `opencomputer-cli`: OpenComputer CLI
+
 Trigger events:
 
 - None
@@ -718,6 +858,10 @@ Setup methods:
 - `api-key` (form): API key
 
 Resource kinds:
+
+- None
+
+Binding tools:
 
 - None
 
@@ -740,6 +884,11 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `planetscale-mcp`: PlanetScale MCP
+- `planetscale-insights-mcp`: PlanetScale Insights MCP
+
 Trigger events:
 
 - None
@@ -758,6 +907,10 @@ Setup methods:
 Resource kinds:
 
 - None
+
+Binding tools:
+
+- `posthog-mcp`: PostHog MCP (default)
 
 Trigger events:
 
@@ -778,6 +931,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `railway-mcp`: Railway MCP (default)
+
 Trigger events:
 
 - None
@@ -796,6 +953,10 @@ Setup methods:
 Resource kinds:
 
 - None
+
+Binding tools:
+
+- `render-mcp`: Render MCP (default)
 
 Trigger events:
 
@@ -816,6 +977,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `resend-mcp`: Resend MCP (default)
+
 Trigger events:
 
 - None
@@ -835,6 +1000,10 @@ Setup methods:
 Resource kinds:
 
 - None
+
+Binding tools:
+
+- `sentry-mcp`: Sentry MCP (default)
 
 Trigger events:
 
@@ -860,6 +1029,11 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `shopify-cli`: Shopify CLI
+- `shopify-mcp`: Shopify MCP (default)
+
 Trigger events:
 
 - None
@@ -878,6 +1052,10 @@ Setup methods:
 Resource kinds:
 
 - None
+
+Binding tools:
+
+- `signoz-mcp`: SigNoz MCP
 
 Trigger events:
 
@@ -901,6 +1079,11 @@ Resource kinds:
 - `user`: users (multi)
 - `user_group`: user groups (multi)
 
+Binding tools:
+
+- `slack-cli`: Slack CLI (default)
+- `slack-mcp`: Slack MCP
+
 Trigger events:
 
 - `slack:message`: Message
@@ -923,6 +1106,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `stripe-mcp`: Stripe MCP (default)
+
 Trigger events:
 
 - None
@@ -941,6 +1128,10 @@ Setup methods:
 Resource kinds:
 
 - None
+
+Binding tools:
+
+- `supabase-mcp`: Supabase MCP (default)
 
 Trigger events:
 
@@ -961,6 +1152,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `tensorlake-cli`: Tensorlake CLI
+
 Trigger events:
 
 - None
@@ -979,6 +1174,10 @@ Setup methods:
 Resource kinds:
 
 - None
+
+Binding tools:
+
+- `wasenderapi-mcp`: WasenderAPI MCP (default)
 
 Trigger events:
 
@@ -1019,6 +1218,10 @@ Setup methods:
 Resource kinds:
 
 - None
+
+Binding tools:
+
+- `whapi-mcp`: Whapi MCP (default)
 
 Trigger events:
 
@@ -1061,6 +1264,10 @@ Resource kinds:
 
 - None
 
+Binding tools:
+
+- `xero-mcp`: Xero MCP (default)
+
 Trigger events:
 
 - None
@@ -1077,6 +1284,10 @@ Setup methods:
 - `api-key` (form): API key
 
 Resource kinds:
+
+- None
+
+Binding tools:
 
 - None
 

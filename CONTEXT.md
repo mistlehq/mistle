@@ -208,6 +208,10 @@ _Avoid_: Runtime plane, runtime config when referring to the compiled activation
 An external-provider capability selected through an integration binding and exposed to an **Agent runtime** as part of the **Runtime plan**.
 _Avoid_: Mistle MCP, agent runtime MCP when the server belongs to a provider integration
 
+**Provider tool**:
+An external-provider capability selected through an integration binding and exposed to an **Agent runtime** as part of the **Runtime plan**. A **Provider tool** may be a CLI, a **Provider MCP server**, or another provider-specific runtime capability.
+_Avoid_: Mistle resource access, selected provider resource, provider trigger
+
 **Draft integration connection**:
 An **Integration connection** created before all provider setup requirements are satisfied.
 _Avoid_: Placeholder connection, fake connection

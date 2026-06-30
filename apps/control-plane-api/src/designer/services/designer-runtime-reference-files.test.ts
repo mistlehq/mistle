@@ -18,5 +18,6 @@ describe("Designer runtime reference files", () => {
     });
     expect(setupFile.content).toContain("# Designer Integration Catalog");
     expect(setupFile.content).toContain("Integration target key: `linear-default`");
+    expect(setupFile.content).toContain("- `linear-mcp`: Linear MCP");
   });
 });

@@ -1,6 +1,10 @@
 import { Buffer } from "node:buffer";
 
-import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
+import {
+  resolveIntegrationForm,
+  type AnyIntegrationDefinition,
+  type IntegrationFormContext,
+} from "@mistle/integrations-core";
 
 export const DesignerIntegrationCatalogSourcePath =
   "apps/control-plane-api/src/designer/runtime-references/integration-catalog.md";
@@ -10,6 +14,12 @@ export const DesignerIntegrationCatalogFileId = "designer_integration_catalog";
 export const DesignerIntegrationCatalogMaxBytes = 65_536;
 
 const GeneratedHeader = `<!-- Generated from the Mistle integration registry. Do not edit by hand. Run pnpm --filter @mistle/control-plane-api designer:integration-catalog:generate. -->`;
+
+type BindingToolReference = {
+  id: string;
+  label?: string | undefined;
+  selectedByDefault: boolean;
+};
 
 export function renderDesignerIntegrationCatalogMarkdown(
   definitions: ReadonlyArray<AnyIntegrationDefinition>,
@@ -95,6 +105,18 @@ function renderDefinitionSection(definition: AnyIntegrationDefinition): string[]
     }
   }
 
+  lines.push("", "Binding tools:", "");
+  const bindingTools = resolveBindingToolReferences(definition);
+  if (bindingTools.length === 0) {
+    lines.push("- None");
+  } else {
+    for (const tool of bindingTools) {
+      const labelSuffix = tool.label === undefined ? "" : `: ${tool.label}`;
+      const defaultSuffix = tool.selectedByDefault ? " (default)" : "";
+      lines.push(`- \`${tool.id}\`${labelSuffix}${defaultSuffix}`);
+    }
+  }
+
   lines.push("", "Trigger events:", "");
   const supportedWebhookEvents = definition.supportedWebhookEvents ?? [];
   if (supportedWebhookEvents.length === 0) {
@@ -107,4 +129,78 @@ function renderDefinitionSection(definition: AnyIntegrationDefinition): string[]
 
   lines.push("");
   return lines;
+}
+
+function resolveBindingToolReferences(
+  definition: AnyIntegrationDefinition,
+): readonly BindingToolReference[] {
+  const form = resolveIntegrationForm({
+    schema: definition.bindingConfigSchema,
+    form: definition.bindingConfigForm,
+    context: createCatalogFormContext(definition),
+  });
+
+  return readBindingToolReferences({
+    schema: form.schema,
+    uiSchema: form.uiSchema,
+  });
+}
+
+function createCatalogFormContext(definition: AnyIntegrationDefinition): IntegrationFormContext {
+  return {
+    familyId: definition.familyId,
+    variantId: definition.variantId,
+    kind: definition.kind,
+    target: {
+      rawConfig: {},
+      config: {},
+    },
+    connection: {
+      id: "designer-catalog-connection",
+      rawConfig: {},
+      config: {},
+      resources: [],
+    },
+    currentValue: {},
+  };
+}
+
+function readBindingToolReferences(input: {
+  schema?: Record<string, unknown> | undefined;
+  uiSchema?: Record<string, unknown> | undefined;
+}): readonly BindingToolReference[] {
+  const properties = readJsonObject(input.schema?.properties);
+  const toolsSchema = readJsonObject(properties?.tools);
+  const itemsSchema = readJsonObject(toolsSchema?.items);
+  const toolIds = readStringArray(itemsSchema?.enum);
+  const defaultToolIds = new Set(readStringArray(toolsSchema?.default));
+  const toolsUiSchema = readJsonObject(input.uiSchema?.tools);
+  const toolLabels = readStringArray(toolsUiSchema?.["ui:enumNames"]);
+
+  return toolIds.map((toolId, index) => ({
+    id: toolId,
+    ...(toolLabels[index] === undefined ? {} : { label: toolLabels[index] }),
+    selectedByDefault: defaultToolIds.has(toolId),
+  }));
+}
+
+function readJsonObject(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    record[key] = entry;
+  }
+
+  return record;
+}
+
+function readStringArray(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((entry) => typeof entry === "string");
 }

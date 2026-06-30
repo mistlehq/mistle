@@ -18,6 +18,19 @@ describe("Designer integration catalog", () => {
     expect(markdown).toContain("Provider family ID: `linear`");
     expect(markdown).toContain("Integration target key: `linear-default`");
     expect(markdown).toContain("- `linear-oauth-app` (form): Linear OAuth app");
+    expect(markdown).toContain("Binding tools:");
+    expect(markdown).toContain("- `linear-mcp`: Linear MCP");
     expect(markdown).toContain("- `linear.issue.created`: Issue created");
+  });
+
+  it("renders binding tool defaults for GitHub sandbox capability selection", () => {
+    const markdown = renderDesignerIntegrationCatalogMarkdown(
+      createIntegrationRegistry().listDefinitions(),
+    );
+
+    assertDesignerIntegrationCatalogWithinBudget(markdown);
+    expect(markdown).toContain("## GitHub");
+    expect(markdown).toContain("Integration target key: `github-cloud`");
+    expect(markdown).toContain("- `github-cli`: GitHub CLI (default)");
   });
 });
