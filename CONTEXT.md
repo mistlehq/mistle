@@ -164,17 +164,9 @@ _Avoid_: Provider write when no explicit operation handler has executed
 A runtime request that asks the user to answer a structured question before the agent continues.
 _Avoid_: Approval request when the user is choosing configuration rather than granting permission
 
-**User input request cancellation**:
-A user's explicit choice not to answer a pending **User input request**, allowing the runtime to continue handling the active turn without treating the choice as a full turn interruption.
-_Avoid_: Runtime approval decline, turn interruption
-
 **User input request custom response**:
 A user-authored response submitted through the composer for a pending **User input request**, either to provide an unlisted answer or redirect the conversation.
-_Avoid_: Steer message, turn interruption, cancellation
-
-**User input request custom answer**:
-An inline answer field scoped to one question in a **User input request**. A **User input request custom answer** is submitted as a structured answer for that question rather than as a **User input request custom response**.
-_Avoid_: Free-form response, composer custom response, turn interruption
+_Avoid_: Custom answer, inline freeform answer, steer message, turn interruption, cancellation
 
 **App setup completion signal**:
 A user's indication that they have completed a user-owned **App setup step** in the dashboard. An **App setup completion signal** unblocks **Mistle Designer** to verify product state, but it is not proof that the resulting **Integration connection** is usable.
@@ -955,7 +947,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Future **Mistle Designer** work may read and refresh scoped **Provider configuration resources** needed for the current setup path.
 - Future **Mistle Designer** work may make **Provider configuration changes** only after explicit user approval.
 - **Runtime approval requests** are the generic mechanism for surfacing side-effecting runtime tool calls to the user; product or provider writes still require an explicit supported operation path after approval.
-- A **User input request** may be resolved by a structured answer, a **User input request custom response**, or **User input request cancellation**. A **User input request custom answer** is an inline way to produce a structured answer for a specific question.
+- A **User input request** may be resolved by a structured answer or a **User input request custom response**. Stopping the active turn is a session control, not a **User input request** response.
 - First-pass **Mistle Designer sessions** do not require detailed durable activity history for **Provider configuration changes**.
 - Publishing the first **Sandbox profile version** is publish-worthy when no **Source sandbox profile version** exists.
 - Publishing the first **Sandbox profile version** does not require a **Source sandbox profile version**.

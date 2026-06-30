@@ -72,15 +72,6 @@ const DesignerUserInputOptionSchema = z
   })
   .strict();
 
-const DesignerUserInputCustomAnswerSchema = z
-  .object({
-    label: z.string().min(1).max(160),
-    placeholder: z.string().min(1).max(240).optional(),
-    defaultValue: z.string().max(4000).optional(),
-    inputKind: z.enum(["input", "textarea"]).optional(),
-  })
-  .strict();
-
 const DesignerUserInputSaveSelectedProviderResourcesSubmitActionSchema = z
   .object({
     kind: z.literal("saveSelectedProviderResourcesToSandboxProfileDraft"),
@@ -107,12 +98,10 @@ const DesignerUserInputIntegrationConnectionResourceSelectionSchema = z
 
 const DesignerUserInputRequestInputSchema = z
   .object({
-    header: z.string().min(1).max(80).optional(),
     id: z.string().min(1).max(120),
     question: z.string().min(1).max(500),
     inputKind: z.enum(["text", "integrationConnectionResourceMultiSelect"]).optional(),
     options: z.array(DesignerUserInputOptionSchema).max(6).optional(),
-    customAnswer: DesignerUserInputCustomAnswerSchema.optional(),
     resourceSelection: DesignerUserInputIntegrationConnectionResourceSelectionSchema.optional(),
     submitAction: DesignerUserInputSaveSelectedProviderResourcesSubmitActionSchema.optional(),
   })
@@ -123,10 +112,7 @@ const DesignerUserInputRequestInputSchema = z
         return input.resourceSelection !== undefined;
       }
 
-      return (
-        (input.options !== undefined && input.options.length > 0) ||
-        input.customAnswer !== undefined
-      );
+      return input.options !== undefined && input.options.length > 0;
     },
     {
       message: "Input kind requires a matching answer surface.",
@@ -134,10 +120,9 @@ const DesignerUserInputRequestInputSchema = z
   )
   .refine(
     (input) =>
-      input.inputKind !== "integrationConnectionResourceMultiSelect" ||
-      (input.options === undefined && input.customAnswer === undefined),
+      input.inputKind !== "integrationConnectionResourceMultiSelect" || input.options === undefined,
     {
-      message: "Resource selection input cannot include options or customAnswer.",
+      message: "Resource selection input cannot include options.",
     },
   )
   .refine(
@@ -576,35 +561,6 @@ const DesignerUserInputOptionJsonSchema = {
   required: ["label"],
 };
 
-const DesignerUserInputCustomAnswerJsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    label: {
-      type: "string",
-      minLength: 1,
-      maxLength: 160,
-      description: "Visible label for the inline custom answer field.",
-    },
-    placeholder: {
-      type: "string",
-      minLength: 1,
-      maxLength: 240,
-      description: "Placeholder text for the inline custom answer field.",
-    },
-    defaultValue: {
-      type: "string",
-      maxLength: 4000,
-    },
-    inputKind: {
-      type: "string",
-      enum: ["input", "textarea"],
-      description: "Use textarea only when the user needs to edit multi-line text.",
-    },
-  },
-  required: ["label"],
-};
-
 const DesignerUserInputIntegrationConnectionResourceSelectionJsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -707,17 +663,11 @@ export const DesignerUserInputRequestDynamicToolSpec = {
   namespace: DashboardControlDynamicToolNamespace,
   name: DesignerUserInputRequestDynamicToolName,
   description:
-    "Ask the user for exactly one actionable decision in the dashboard and wait for the response. Use this when Designer needs the user to choose a next action, confirm setup completion, answer a configuration question, provide an inline custom answer, or select integration resources.",
+    "Ask the user for exactly one actionable decision in the dashboard and wait for the response. Use this when Designer needs the user to choose a next action, confirm setup completion, answer a configuration question, or select integration resources.",
   inputSchema: {
     type: "object",
     additionalProperties: false,
     properties: {
-      header: {
-        type: "string",
-        minLength: 1,
-        maxLength: 80,
-        description: "Short label for the decision, such as Suggested next actions.",
-      },
       id: {
         type: "string",
         minLength: 1,
@@ -733,7 +683,7 @@ export const DesignerUserInputRequestDynamicToolSpec = {
         type: "string",
         enum: ["text", "integrationConnectionResourceMultiSelect"],
         description:
-          "Omit or use text for options/customAnswer questions. Use integrationConnectionResourceMultiSelect to let the dashboard list and select provider resources from an integration connection.",
+          "Omit or use text for option questions. Use integrationConnectionResourceMultiSelect to let the dashboard list and select provider resources from an integration connection.",
       },
       options: {
         type: "array",
@@ -743,14 +693,12 @@ export const DesignerUserInputRequestDynamicToolSpec = {
         description:
           "Selectable options. Include the recommended option first when there is a recommendation. Keep option labels short and clear.",
       },
-      customAnswer: DesignerUserInputCustomAnswerJsonSchema,
       resourceSelection: DesignerUserInputIntegrationConnectionResourceSelectionJsonSchema,
       submitAction: DesignerUserInputSubmitActionJsonSchema,
     },
     required: ["id", "question"],
     anyOf: [
       { required: ["options"] },
-      { required: ["customAnswer"] },
       {
         properties: {
           inputKind: {
@@ -811,22 +759,6 @@ function isKnownDashboardControlDynamicToolName(toolName: string | undefined): b
     toolName === DesignerCanvasTabShowDynamicToolName ||
     toolName === DesignerUserInputRequestDynamicToolName
   );
-}
-
-function createDashboardControlCustomAnswerUserInputOption(
-  customAnswer: DesignerUserInputRequestInput["customAnswer"],
-): NonNullable<ToolRequestUserInputEntry["questions"][number]["options"]>[number] | null {
-  if (customAnswer === undefined) {
-    return null;
-  }
-
-  return {
-    label: customAnswer.label,
-    defaultValue: customAnswer.defaultValue ?? null,
-    ...(customAnswer.inputKind === "textarea" ? { inputKind: "textarea" } : {}),
-    isOther: true,
-    placeholder: customAnswer.placeholder ?? null,
-  };
 }
 
 export function isDashboardControlDynamicToolCallRequest(
@@ -906,17 +838,13 @@ export function createDashboardControlUserInputServerRequest(input: {
   requestId: string | number;
   userInput: DesignerUserInputRequestInput;
 }): ToolRequestUserInputEntry {
-  const customAnswerOption = createDashboardControlCustomAnswerUserInputOption(
-    input.userInput.customAnswer,
-  );
-
   return {
     requestId: input.requestId,
     method: "tool/requestUserInput",
     kind: "tool-user-input",
     questions: [
       {
-        header: input.userInput.header ?? null,
+        header: null,
         id: input.userInput.id,
         ...(input.userInput.inputKind === undefined
           ? {}
@@ -955,7 +883,6 @@ export function createDashboardControlUserInputServerRequest(input: {
                   label: option.label,
                   isOther: false,
                 })),
-                ...(customAnswerOption === null ? [] : [customAnswerOption]),
               ],
             }),
       },
@@ -968,18 +895,6 @@ export function createDashboardControlUserInputServerRequest(input: {
 export function createDashboardControlUserInputResponse(input: {
   result: unknown;
 }): DashboardControlDynamicToolCallResponse {
-  const cancel = z
-    .object({
-      decision: z.literal("cancel"),
-    })
-    .safeParse(input.result);
-
-  if (cancel.success) {
-    return createSuccessfulDashboardControlJsonResponse({
-      decision: "cancel",
-    });
-  }
-
   const customResponse = z
     .object({
       customResponse: z

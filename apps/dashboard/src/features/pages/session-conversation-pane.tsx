@@ -59,6 +59,7 @@ type SessionConversationBottomPanelProps = SessionConversationSharedPanelProps &
   onRemoveQueuedPrompt?: (queuedPromptId: string) => void;
   showWorkingIndicator?: boolean;
   statusMessage: ChatComposerStatusMessage | null;
+  supportsUserInputRequestCustomResponse?: boolean;
 };
 
 type SessionConversationBottomPanelControllerProps = SessionConversationSharedPanelProps & {
@@ -221,6 +222,7 @@ export function SessionConversationBottomPanel({
   onRemoveQueuedPrompt,
   showWorkingIndicator = false,
   statusMessage,
+  supportsUserInputRequestCustomResponse = false,
 }: SessionConversationBottomPanelProps): React.JSX.Element {
   const shouldShowWorkingIndicator = showWorkingIndicator && serverRequestPanelEntries.length === 0;
 
@@ -230,6 +232,7 @@ export function SessionConversationBottomPanel({
         entries={serverRequestPanelEntries}
         isRespondingToServerRequest={isRespondingToServerRequest}
         onRespondToServerRequest={onRespondToServerRequest}
+        supportsUserInputRequestCustomResponse={supportsUserInputRequestCustomResponse}
       />
       {statusMessage === null ? null : <ComposerStatusBanner statusMessage={statusMessage} />}
       {shouldShowWorkingIndicator ? (
@@ -309,6 +312,7 @@ export function SessionConversationBottomPanelController({
       onRemoveQueuedPrompt={composerUiState.removeQueuedPrompt}
       queuedPrompts={composerUiState.queuedPrompts}
       statusMessage={composerUiState.statusMessage}
+      supportsUserInputRequestCustomResponse={supportsUserInputRequestCustomResponse === true}
       {...(showWorkingIndicator === undefined ? {} : { showWorkingIndicator })}
     />
   );

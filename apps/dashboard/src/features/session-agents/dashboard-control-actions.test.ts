@@ -146,26 +146,13 @@ describe("dashboard control actions", () => {
       namespace: DashboardControlDynamicToolNamespace,
       name: DesignerUserInputRequestDynamicToolName,
       description:
-        "Ask the user for exactly one actionable decision in the dashboard and wait for the response. Use this when Designer needs the user to choose a next action, confirm setup completion, answer a configuration question, provide an inline custom answer, or select integration resources.",
+        "Ask the user for exactly one actionable decision in the dashboard and wait for the response. Use this when Designer needs the user to choose a next action, confirm setup completion, answer a configuration question, or select integration resources.",
       inputSchema: {
         properties: {
           options: {
             description:
               "Selectable options. Include the recommended option first when there is a recommendation. Keep option labels short and clear.",
             maxItems: 6,
-          },
-          customAnswer: {
-            properties: {
-              placeholder: {
-                description: "Placeholder text for the inline custom answer field.",
-                maxLength: 240,
-                minLength: 1,
-                type: "string",
-              },
-              inputKind: {
-                enum: ["input", "textarea"],
-              },
-            },
           },
         },
         anyOf: expect.arrayContaining([
@@ -195,6 +182,9 @@ describe("dashboard control actions", () => {
         ]),
       },
     });
+    expect(DesignerUserInputRequestDynamicToolSpec.inputSchema.properties).not.toHaveProperty(
+      "header",
+    );
   });
 
   it("parses Designer canvas tab open dynamic tool calls", () => {
@@ -291,7 +281,6 @@ describe("dashboard control actions", () => {
       namespace: DashboardControlDynamicToolNamespace,
       tool: DesignerUserInputRequestDynamicToolName,
       arguments: {
-        header: "Sandbox profile",
         id: "profile-choice",
         question: "Which sandbox profile should run the triaging agent?",
         options: [
@@ -308,7 +297,6 @@ describe("dashboard control actions", () => {
     expect(parsed).toEqual({
       action: DesignerUserInputRequestAction,
       input: {
-        header: "Sandbox profile",
         id: "profile-choice",
         question: "Which sandbox profile should run the triaging agent?",
         options: [
@@ -323,12 +311,11 @@ describe("dashboard control actions", () => {
     });
   });
 
-  it("parses Designer user input dynamic tool calls with custom answers", () => {
+  it("rejects Designer user input dynamic tool calls with custom answers", () => {
     const parsed = parseDashboardControlDynamicToolCall({
       namespace: DashboardControlDynamicToolNamespace,
       tool: DesignerUserInputRequestDynamicToolName,
       arguments: {
-        header: "Sandbox profile",
         id: "profile-choice",
         question: "Which sandbox profile should run the triaging agent?",
         options: [
@@ -345,22 +332,13 @@ describe("dashboard control actions", () => {
     });
 
     expect(parsed).toEqual({
-      action: DesignerUserInputRequestAction,
-      input: {
-        header: "Sandbox profile",
-        id: "profile-choice",
-        question: "Which sandbox profile should run the triaging agent?",
-        options: [
-          {
-            label: "Create new",
-          },
-        ],
-        customAnswer: {
-          label: "Use another profile",
-          placeholder: "Paste a sandbox profile ID",
-          inputKind: "input",
+      contentItems: [
+        {
+          type: "inputText",
+          text: "Designer user input request is invalid.",
         },
-      },
+      ],
+      success: false,
     });
   });
 
@@ -482,50 +460,10 @@ describe("dashboard control actions", () => {
     });
   });
 
-  it("maps Designer custom answers to server request other options", () => {
-    const serverRequest = createDashboardControlUserInputServerRequest({
-      requestId: "request-1",
-      userInput: {
-        header: "Sandbox profile",
-        id: "profile-choice",
-        question: "Which sandbox profile should run the triaging agent?",
-        options: [
-          {
-            label: "Create new",
-          },
-        ],
-        customAnswer: {
-          label: "Use another profile",
-          placeholder: "Paste a sandbox profile ID",
-          inputKind: "input",
-        },
-      },
-    });
-
-    expect(serverRequest).toMatchObject({
-      questions: [
-        {
-          options: [
-            {
-              label: "Create new",
-              isOther: false,
-            },
-            {
-              label: "Use another profile",
-              isOther: true,
-              placeholder: "Paste a sandbox profile ID",
-            },
-          ],
-        },
-      ],
-    });
-  });
-
   it("maps Designer user input requests to server requests", () => {
     const serverRequest = createDashboardControlUserInputServerRequest({
       requestId: "request-1",
       userInput: {
-        header: "Sandbox profile",
         id: "profile-choice",
         question: "Which sandbox profile should run the triaging agent?",
         options: [
@@ -542,7 +480,7 @@ describe("dashboard control actions", () => {
       kind: "tool-user-input",
       questions: [
         {
-          header: "Sandbox profile",
+          header: null,
           id: "profile-choice",
           question: "Which sandbox profile should run the triaging agent?",
           options: [
@@ -624,22 +562,20 @@ describe("dashboard control actions", () => {
       success: true,
     });
 
-    const cancelResponse = createDashboardControlUserInputResponse({
+    const unsupportedCancelResponse = createDashboardControlUserInputResponse({
       result: {
         decision: "cancel",
       },
     });
 
-    expect(cancelResponse).toEqual({
+    expect(unsupportedCancelResponse).toEqual({
       contentItems: [
         {
           type: "inputText",
-          text: JSON.stringify({
-            decision: "cancel",
-          }),
+          text: "Designer user input response was invalid.",
         },
       ],
-      success: true,
+      success: false,
     });
   });
 
