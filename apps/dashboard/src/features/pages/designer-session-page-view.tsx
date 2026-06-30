@@ -1,7 +1,7 @@
 import "dockview/dist/styles/dockview.css";
 import "@xyflow/react/dist/style.css";
 import "./session-terminal-workspace.css";
-import { Button, DialogShortcut, Textarea } from "@mistle/ui";
+import { Button, cn, DialogShortcut, Textarea } from "@mistle/ui";
 import {
   ArrowsSplitIcon,
   AtomIcon,
@@ -16,6 +16,7 @@ import {
   Background,
   Controls,
   Handle,
+  NodeToolbar,
   Position,
   ReactFlow,
   type Edge,
@@ -42,6 +43,7 @@ import {
   useMemo,
   useState,
   type FunctionComponent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 
@@ -953,10 +955,17 @@ type DesignerBlueprintVisualNodeData = DesignerBlueprintLayoutNodeData & {
   onAddComment: (comment: PendingSessionBlueprintCommentInput) => void;
   onClearAddCommentSuppression: (itemId: string) => void;
   onDeleteComment: (commentId: string) => void;
+  onOpenComment: (comment: DesignerBlueprintOpenComment) => void;
   onSuppressAddComment: (itemId: string) => void;
   onUpdateComment: (commentId: string, body: string) => void;
+  openComment: DesignerBlueprintOpenComment;
   pendingComment?: PendingSessionBlueprintComment | undefined;
 };
+
+type DesignerBlueprintOpenComment = {
+  itemId: string;
+  kind: "draft" | "pending";
+} | null;
 
 type DesignerBlueprintLayoutNode = Node<DesignerBlueprintLayoutNodeData, "blueprint">;
 type DesignerBlueprintVisualNode = Node<DesignerBlueprintVisualNodeData, "blueprint">;
@@ -992,6 +1001,7 @@ export function DesignerBlueprintCanvasPanel(input: {
   const [suppressedAddCommentItemIds, setSuppressedAddCommentItemIds] = useState<
     ReadonlySet<string>
   >(() => new Set());
+  const [openComment, setOpenComment] = useState<DesignerBlueprintOpenComment>(null);
 
   const suppressAddCommentForItem = useCallback((itemId: string) => {
     setSuppressedAddCommentItemIds((currentItemIds) => {
@@ -1012,6 +1022,23 @@ export function DesignerBlueprintCanvasPanel(input: {
       return nextItemIds;
     });
   }, []);
+
+  function closeOpenCommentWhenPointerStartsOutside(event: ReactPointerEvent<HTMLElement>): void {
+    if (openComment === null) {
+      return;
+    }
+
+    if (!(event.target instanceof Element)) {
+      setOpenComment(null);
+      return;
+    }
+
+    if (event.target.closest("[data-designer-blueprint-floating-comment]") !== null) {
+      return;
+    }
+
+    setOpenComment(null);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1045,6 +1072,7 @@ export function DesignerBlueprintCanvasPanel(input: {
       <section
         className="min-h-0 flex-1 overflow-hidden bg-muted/20"
         aria-label="Designer blueprint graph"
+        onPointerDownCapture={closeOpenCommentWhenPointerStartsOutside}
       >
         {layoutError === null ? null : (
           <div className="flex h-full items-center justify-center p-6 text-sm text-destructive">
@@ -1058,8 +1086,10 @@ export function DesignerBlueprintCanvasPanel(input: {
               onAddComment: input.onAddComment,
               onClearAddCommentSuppression: clearAddCommentSuppressionForItem,
               onDeleteComment: input.onDeleteComment,
+              onOpenComment: setOpenComment,
               onSuppressAddComment: suppressAddCommentForItem,
               onUpdateComment: input.onUpdateComment,
+              openComment,
               pendingComments: input.pendingComments,
               suppressedAddCommentItemIds,
             })}
@@ -1121,22 +1151,29 @@ function DesignerBlueprintVisualNodeComponent(
   input: NodeProps<DesignerBlueprintVisualNode>,
 ): React.JSX.Element {
   const [draftBody, setDraftBody] = useState("");
-  const [isDraftingComment, setIsDraftingComment] = useState(false);
-  const [expandedPendingCommentId, setExpandedPendingCommentId] = useState<string | null>(null);
   const pendingComment = input.data.pendingComment;
+  const isDraftingComment =
+    input.data.openComment?.itemId === input.data.item.id &&
+    input.data.openComment.kind === "draft";
   const isPendingCommentExpanded =
-    pendingComment !== undefined && expandedPendingCommentId === pendingComment.id;
+    pendingComment !== undefined &&
+    input.data.openComment?.itemId === input.data.item.id &&
+    input.data.openComment.kind === "pending";
   const canStartDraftingComment =
     pendingComment === undefined && !isDraftingComment && !input.data.isAddCommentSuppressed;
 
   function cancelDraft(): void {
     setDraftBody("");
-    setIsDraftingComment(false);
+    input.data.onOpenComment(null);
   }
 
   function startDraftingComment(): void {
     input.data.onClearAddCommentSuppression(input.data.item.id);
-    setIsDraftingComment(true);
+    setDraftBody("");
+    input.data.onOpenComment({
+      itemId: input.data.item.id,
+      kind: "draft",
+    });
   }
 
   function submitDraft(): void {
@@ -1154,7 +1191,7 @@ function DesignerBlueprintVisualNodeComponent(
       }),
     );
     setDraftBody("");
-    setIsDraftingComment(false);
+    input.data.onOpenComment(null);
   }
 
   return (
@@ -1218,18 +1255,21 @@ function DesignerBlueprintVisualNodeComponent(
         <DesignerBlueprintCollapsedCommentButton
           label={`Open blueprint comment for ${input.data.label}`}
           onOpen={() => {
-            setExpandedPendingCommentId(pendingComment.id);
+            input.data.onOpenComment({
+              itemId: input.data.item.id,
+              kind: "pending",
+            });
           }}
           testId={`designer-blueprint-collapsed-comment-${input.data.item.id}`}
         />
       )}
       {pendingComment === undefined || !isPendingCommentExpanded ? null : (
-        <DesignerBlueprintFloatingComment>
+        <DesignerBlueprintFloatingNodeComment nodeId={input.id}>
           <DesignerBlueprintPendingCommentEditor
             body={pendingComment.body}
             title="Pending comment"
             onCollapse={() => {
-              setExpandedPendingCommentId(null);
+              input.data.onOpenComment(null);
             }}
             onBodyChange={(body) => {
               input.data.onUpdateComment(pendingComment.id, body);
@@ -1237,20 +1277,20 @@ function DesignerBlueprintVisualNodeComponent(
             onDelete={() => {
               input.data.onSuppressAddComment(input.data.item.id);
               input.data.onDeleteComment(pendingComment.id);
-              setExpandedPendingCommentId(null);
+              input.data.onOpenComment(null);
             }}
           />
-        </DesignerBlueprintFloatingComment>
+        </DesignerBlueprintFloatingNodeComment>
       )}
       {pendingComment !== undefined || !isDraftingComment ? null : (
-        <DesignerBlueprintFloatingComment>
+        <DesignerBlueprintFloatingNodeComment nodeId={input.id}>
           <DesignerBlueprintDraftCommentEditor
             body={draftBody}
             onBodyChange={setDraftBody}
             onCancel={cancelDraft}
             onSubmit={submitDraft}
           />
-        </DesignerBlueprintFloatingComment>
+        </DesignerBlueprintFloatingNodeComment>
       )}
       <Handle
         className="opacity-0"
@@ -1262,12 +1302,34 @@ function DesignerBlueprintVisualNodeComponent(
   );
 }
 
+function DesignerBlueprintFloatingNodeComment(input: {
+  children: ReactNode;
+  nodeId: string;
+}): React.JSX.Element {
+  return (
+    <NodeToolbar
+      align="start"
+      isVisible
+      nodeId={input.nodeId}
+      offset={12}
+      position={Position.Right}
+    >
+      <DesignerBlueprintFloatingComment>{input.children}</DesignerBlueprintFloatingComment>
+    </NodeToolbar>
+  );
+}
+
 export function DesignerBlueprintFloatingComment(input: {
   children: ReactNode;
+  className?: string | undefined;
 }): React.JSX.Element {
   return (
     <div
-      className="nodrag nopan absolute left-[calc(100%+0.75rem)] top-0 z-20 w-72 rounded-md border border-border bg-background p-2 shadow-lg"
+      className={cn(
+        "nodrag nopan w-72 rounded-md border border-border bg-background p-2 shadow-lg",
+        input.className,
+      )}
+      data-designer-blueprint-floating-comment=""
       data-testid="designer-blueprint-floating-comment"
     >
       {input.children}
@@ -1629,8 +1691,10 @@ function mapDesignerBlueprintGraphNodesForComments(input: {
   onAddComment: (comment: PendingSessionBlueprintCommentInput) => void;
   onClearAddCommentSuppression: (itemId: string) => void;
   onDeleteComment: (commentId: string) => void;
+  onOpenComment: (comment: DesignerBlueprintOpenComment) => void;
   onSuppressAddComment: (itemId: string) => void;
   onUpdateComment: (commentId: string, body: string) => void;
+  openComment: DesignerBlueprintOpenComment;
   pendingComments: readonly PendingSessionBlueprintComment[];
   suppressedAddCommentItemIds: ReadonlySet<string>;
 }): DesignerBlueprintVisualNode[] {
@@ -1646,8 +1710,10 @@ function mapDesignerBlueprintGraphNodesForComments(input: {
       onAddComment: input.onAddComment,
       onClearAddCommentSuppression: input.onClearAddCommentSuppression,
       onDeleteComment: input.onDeleteComment,
+      onOpenComment: input.onOpenComment,
       onSuppressAddComment: input.onSuppressAddComment,
       onUpdateComment: input.onUpdateComment,
+      openComment: input.openComment,
       ...createDesignerBlueprintPendingCommentData({
         item: node.data.item,
         pendingComments: input.pendingComments,

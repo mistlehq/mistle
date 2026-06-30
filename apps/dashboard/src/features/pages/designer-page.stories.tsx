@@ -664,7 +664,9 @@ function BlueprintCommentStatePreview(input: {
           {input.floating === false ? (
             input.children
           ) : (
-            <DesignerBlueprintFloatingComment>{input.children}</DesignerBlueprintFloatingComment>
+            <DesignerBlueprintFloatingComment className="absolute left-[calc(100%+0.75rem)] top-0 z-20">
+              {input.children}
+            </DesignerBlueprintFloatingComment>
           )}
         </div>
       </div>
