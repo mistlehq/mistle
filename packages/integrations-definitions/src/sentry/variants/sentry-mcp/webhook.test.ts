@@ -50,8 +50,13 @@ function encodePayload(payload: Record<string, unknown>): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(payload));
 }
 
+function encodeRawJson(rawJson: string): Uint8Array {
+  return new TextEncoder().encode(rawJson);
+}
+
 function createHeaders(input?: {
   includeRequestId?: boolean;
+  rawBody?: Uint8Array;
   resource?: string;
   signature?: string;
   requestId?: string;
@@ -60,7 +65,7 @@ function createHeaders(input?: {
     input?.signature ??
     buildSentryWebhookSignature({
       clientSecret: SentryClientSecret,
-      payload: SampleSentryIssuePayload,
+      rawBody: input?.rawBody ?? encodePayload(SampleSentryIssuePayload),
     });
 
   const headers: Record<string, string> = {
@@ -175,7 +180,7 @@ describe("Sentry webhook support", () => {
     expect(result).toEqual({
       kind: "event",
       event: {
-        externalEventId: "issue.created:1234567890",
+        externalEventId: "issue.created:1234567890:request_123",
         externalDeliveryId: "request_123",
         providerEventType: "issue.created",
         eventType: "sentry.issue.created",
@@ -261,24 +266,77 @@ describe("Sentry webhook support", () => {
     ).toThrow("Sentry issue webhook payload is missing data.issue.id.");
   });
 
+  it("keeps repeated same-issue same-action deliveries distinct by request id", async () => {
+    const firstResult = await SentryWebhookHandler.resolveWebhookRequest({
+      targetKey: "sentry-mcp",
+      target: {
+        familyId: "sentry",
+        variantId: "sentry-mcp",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      headers: createHeaders({ requestId: "request_first" }),
+      rawBody: encodePayload(SampleSentryIssuePayload),
+    });
+    const secondResult = await SentryWebhookHandler.resolveWebhookRequest({
+      targetKey: "sentry-mcp",
+      target: {
+        familyId: "sentry",
+        variantId: "sentry-mcp",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      headers: createHeaders({ requestId: "request_second" }),
+      rawBody: encodePayload(SampleSentryIssuePayload),
+    });
+
+    expect(firstResult).toEqual({
+      kind: "event",
+      event: {
+        externalEventId: "issue.created:1234567890:request_first",
+        externalDeliveryId: "request_first",
+        providerEventType: "issue.created",
+        eventType: "sentry.issue.created",
+        payload: SampleSentryIssuePayload,
+        occurredAt: "2025-11-10T20:56:00.738Z",
+        sourceOrderKey: "2025-11-10T20:56:00.738Z#request_first",
+      },
+    });
+    expect(secondResult).toEqual({
+      kind: "event",
+      event: {
+        externalEventId: "issue.created:1234567890:request_second",
+        externalDeliveryId: "request_second",
+        providerEventType: "issue.created",
+        eventType: "sentry.issue.created",
+        payload: SampleSentryIssuePayload,
+        occurredAt: "2025-11-10T20:56:00.738Z",
+        sourceOrderKey: "2025-11-10T20:56:00.738Z#request_second",
+      },
+    });
+  });
+
   it("verifies Sentry webhook signatures with the integration client secret", async () => {
+    const rawBody = encodePayload(SampleSentryIssuePayload);
     const signature = buildSentryWebhookSignature({
       clientSecret: SentryClientSecret,
-      payload: SampleSentryIssuePayload,
+      rawBody,
     });
 
     expect(
       verifySentryWebhookSignature({
         clientSecret: SentryClientSecret,
         signature,
-        payload: SampleSentryIssuePayload,
+        rawBody,
       }),
     ).toEqual({ ok: true });
     expect(
       verifySentryWebhookSignature({
         clientSecret: SentryClientSecret,
         signature: "not-hex",
-        payload: SampleSentryIssuePayload,
+        rawBody,
       }),
     ).toEqual({
       ok: false,
@@ -289,7 +347,7 @@ describe("Sentry webhook support", () => {
       verifySentryWebhookSignature({
         clientSecret: "wrong-secret",
         signature,
-        payload: SampleSentryIssuePayload,
+        rawBody,
       }),
     ).toEqual({
       ok: false,
@@ -307,7 +365,7 @@ describe("Sentry webhook support", () => {
         secrets: {},
       },
       headers: createHeaders({ signature }),
-      rawBody: encodePayload(SampleSentryIssuePayload),
+      rawBody,
     });
     if (result.kind !== "event") {
       throw new Error("Expected Sentry issue webhook to resolve to an event.");
@@ -336,7 +394,69 @@ describe("Sentry webhook support", () => {
         },
         webhookSourceSecrets: {},
         headers: createHeaders({ signature }),
-        rawBody: encodePayload(SampleSentryIssuePayload),
+        rawBody,
+      }),
+    ).toEqual({ ok: true });
+  });
+
+  it("verifies the exact raw Sentry body instead of reserialized JSON", async () => {
+    const rawBody = encodeRawJson(
+      '{"action":"created","data":{"issue":{"id":"1234567890","title":"Unicode \\u2603","lastSeen":"2025-11-10T20:56:00.738000+00:00"}}}',
+    );
+    const signature = buildSentryWebhookSignature({
+      clientSecret: SentryClientSecret,
+      rawBody,
+    });
+    const result = await SentryWebhookHandler.resolveWebhookRequest({
+      targetKey: "sentry-mcp",
+      target: {
+        familyId: "sentry",
+        variantId: "sentry-mcp",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      headers: createHeaders({ rawBody, requestId: "request_raw_body" }),
+      rawBody,
+    });
+    if (result.kind !== "event") {
+      throw new Error("Expected Sentry issue webhook to resolve to an event.");
+    }
+
+    expect(result.event.payload).toEqual({
+      action: "created",
+      data: {
+        issue: {
+          id: "1234567890",
+          title: "Unicode ☃",
+          lastSeen: "2025-11-10T20:56:00.738000+00:00",
+        },
+      },
+    });
+    expect(
+      SentryWebhookHandler.verify({
+        targetKey: "sentry-mcp",
+        target: {
+          familyId: "sentry",
+          variantId: "sentry-mcp",
+          enabled: true,
+          config: {},
+          secrets: {},
+        },
+        event: result.event,
+        connection: {
+          id: "icn_sentry",
+          status: "active",
+          config: {
+            connection_method: "sentry-internal-integration",
+          },
+        },
+        connectionSecrets: {
+          clientSecret: SentryClientSecret,
+        },
+        webhookSourceSecrets: {},
+        headers: createHeaders({ rawBody, signature, requestId: "request_raw_body" }),
+        rawBody,
       }),
     ).toEqual({ ok: true });
   });

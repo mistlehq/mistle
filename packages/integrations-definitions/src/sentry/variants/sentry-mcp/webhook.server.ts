@@ -103,7 +103,7 @@ function resolveRequiredHeader(
 ): string {
   const value = resolveHeader(headers, headerName);
   if (value === undefined) {
-    throw new Error(`Sentry webhook is missing ${headerName} header.`);
+    throw createInvalidSentryWebhookRequestError(`Sentry webhook is missing ${headerName} header.`);
   }
 
   return value;
@@ -179,18 +179,16 @@ function resolvePathRoutedConnection(
 
 export function buildSentryWebhookSignature(input: {
   clientSecret: string;
-  payload: Record<string, unknown>;
+  rawBody: Uint8Array;
 }): string {
   // Source: https://docs.sentry.io/integrations/integration-platform/webhooks/
-  return createHmac("sha256", input.clientSecret)
-    .update(JSON.stringify(input.payload), "utf8")
-    .digest("hex");
+  return createHmac("sha256", input.clientSecret).update(input.rawBody).digest("hex");
 }
 
 export function verifySentryWebhookSignature(input: {
   clientSecret: string;
   signature: string;
-  payload: Record<string, unknown>;
+  rawBody: Uint8Array;
 }): IntegrationWebhookVerifyResult {
   if (!/^[0-9a-f]+$/i.test(input.signature) || input.signature.length % 2 !== 0) {
     return {
@@ -202,7 +200,7 @@ export function verifySentryWebhookSignature(input: {
 
   const expectedSignature = buildSentryWebhookSignature({
     clientSecret: input.clientSecret,
-    payload: input.payload,
+    rawBody: input.rawBody,
   });
   const expectedBytes = Buffer.from(expectedSignature, "hex");
   const actualBytes = Buffer.from(input.signature, "hex");
@@ -236,7 +234,7 @@ export const SentryWebhookHandler: IntegrationWebhookHandler<
     const requestId = resolveRequiredHeader(input.headers, SentryRequestIdHeaderName);
     const issueIdentifier = resolveSentryIssueIdentifier(payload);
     const event: IntegrationWebhookEvent = {
-      externalEventId: `${eventDefinition.providerEventType}:${issueIdentifier}`,
+      externalEventId: `${eventDefinition.providerEventType}:${issueIdentifier}:${requestId}`,
       externalDeliveryId: requestId,
       providerEventType: eventDefinition.providerEventType,
       eventType: eventDefinition.eventType,
@@ -285,7 +283,7 @@ export const SentryWebhookHandler: IntegrationWebhookHandler<
     return verifySentryWebhookSignature({
       clientSecret,
       signature,
-      payload: input.event.payload,
+      rawBody: input.rawBody,
     });
   },
 };
