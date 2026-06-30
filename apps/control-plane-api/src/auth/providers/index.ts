@@ -2,6 +2,7 @@ import type { BetterAuthOptions } from "better-auth";
 import type { BetterAuthPlugin } from "better-auth";
 
 import { createEmailOtpProvider } from "./email-otp.js";
+import { createGitHubSocialProvider } from "./github.js";
 import { createGoogleSocialProvider } from "./google.js";
 import type { AuthProviderAssembly, AuthProviderConfig } from "./types.js";
 
@@ -28,7 +29,17 @@ export function createAuthProviders(input: CreateAuthProvidersInput): AuthProvid
   let socialProviders = createEmptySocialProviders();
 
   if (input.config.google !== null) {
-    socialProviders = createGoogleSocialProvider(input.config.google);
+    socialProviders = {
+      ...socialProviders,
+      ...createGoogleSocialProvider(input.config.google),
+    };
+  }
+
+  if (input.config.github !== null) {
+    socialProviders = {
+      ...socialProviders,
+      ...createGitHubSocialProvider(input.config.github),
+    };
   }
 
   return {

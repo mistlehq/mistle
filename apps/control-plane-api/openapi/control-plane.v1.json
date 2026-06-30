@@ -29,9 +29,12 @@
                         },
                         "google": {
                           "type": "boolean"
+                        },
+                        "github": {
+                          "type": "boolean"
                         }
                       },
-                      "required": ["emailOtp", "google"],
+                      "required": ["emailOtp", "google", "github"],
                       "additionalProperties": false
                     },
                     "allowSignups": {

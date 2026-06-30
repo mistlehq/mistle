@@ -157,6 +157,13 @@ const ControlPlaneApiAuthGoogleConfigSchema = z
   })
   .strict();
 
+const ControlPlaneApiAuthGitHubConfigSchema = z
+  .object({
+    clientId: z.string().min(1),
+    clientSecret: z.string().min(1),
+  })
+  .strict();
+
 const ControlPlaneApiWelcomeEmailConfigSchema = z
   .object({
     enabled: z.boolean().default(false),
@@ -201,6 +208,7 @@ export const ControlPlaneApiAuthConfigSchema = z
     otpExpiresInSeconds: z.number().int().min(30),
     otpAllowedAttempts: z.number().int().min(1).max(10),
     google: ControlPlaneApiAuthGoogleConfigSchema.optional(),
+    github: ControlPlaneApiAuthGitHubConfigSchema.optional(),
   })
   .strict();
 

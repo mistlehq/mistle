@@ -74,6 +74,31 @@ describe("exportServiceConfigToEnv", () => {
       name: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_ALLOW_SIGNUPS",
       value: true,
     });
+    const entriesWithGitHubAuth = exportServiceConfigToEnv({
+      app: AppIds.CONTROL_PLANE_API,
+      config: {
+        ...loadedConfig,
+        app: {
+          ...loadedConfig.app,
+          auth: {
+            ...loadedConfig.app.auth,
+            github: {
+              clientId: "github-client-id",
+              clientSecret: "github-client-secret",
+            },
+          },
+        },
+      },
+    });
+
+    expectEntry(entriesWithGitHubAuth, {
+      name: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GITHUB_CLIENT_ID",
+      value: "github-client-id",
+    });
+    expectEntry(entriesWithGitHubAuth, {
+      name: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GITHUB_CLIENT_SECRET",
+      value: "github-client-secret",
+    });
     expectEntry(entries, {
       name: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_URL",
       value: "https://mcp.mistle.example/mcp",

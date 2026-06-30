@@ -467,6 +467,14 @@ const ControlPlaneApiEnvDescriptors = [
     path: ["auth", "google", "clientSecret"],
   },
   {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GITHUB_CLIENT_ID",
+    path: ["auth", "github", "clientId"],
+  },
+  {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GITHUB_CLIENT_SECRET",
+    path: ["auth", "github", "clientSecret"],
+  },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_URL",
     path: ["mcp", "url"],
   },

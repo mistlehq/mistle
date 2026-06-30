@@ -63,6 +63,11 @@ allowed_attempts = 3
 #client_id = "replace-with-google-client-id"
 #client_secret = "replace-with-google-client-secret"
 
+# Required when enabled_methods includes "github".
+#[services.control_plane_api.auth.github]
+#client_id = "replace-with-github-client-id"
+#client_secret = "replace-with-github-client-secret"
+
 [services.control_plane_api.mcp]
 url = "https://mcp.mistle.example/mcp"
 trust_forwarded_headers = false

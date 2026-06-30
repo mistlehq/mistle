@@ -11,7 +11,7 @@ import { z } from "zod";
 import { enqueueStripeCustomerProvisioning } from "../organizations/services/organization-billing.js";
 import { AUTH_ROUTE_BASE_PATH } from "./constants.js";
 import { createAuthProviders } from "./providers/index.js";
-import type { GoogleProviderConfig } from "./providers/types.js";
+import type { GitHubProviderConfig, GoogleProviderConfig } from "./providers/types.js";
 import { applyActiveOrganizationToSession } from "./services/apply-active-organization-to-session.js";
 import { createInitialOrganizationCredentialKey } from "./services/create-initial-organization-credential-key.js";
 import { createSendOrganizationInvitationService } from "./services/create-send-organization-invitation.js";
@@ -30,6 +30,9 @@ export type ControlPlaneAuthConfig = {
   authGoogleClientId: string | null;
   authGoogleClientSecret: string | null;
   authGoogleProviderOverrides?: Omit<GoogleProviderConfig, "clientId" | "clientSecret">;
+  authGitHubClientId: string | null;
+  authGitHubClientSecret: string | null;
+  authGitHubProviderOverrides?: Omit<GitHubProviderConfig, "clientId" | "clientSecret">;
   welcomeEmail: {
     enabled: boolean;
     callUrl?: string | undefined;
@@ -86,6 +89,16 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
             ? {}
             : config.authGoogleProviderOverrides),
         };
+  const githubConfig =
+    config.authGitHubClientId === null || config.authGitHubClientSecret === null
+      ? null
+      : {
+          clientId: config.authGitHubClientId,
+          clientSecret: config.authGitHubClientSecret,
+          ...(config.authGitHubProviderOverrides === undefined
+            ? {}
+            : config.authGitHubProviderOverrides),
+        };
   const providers = createAuthProviders({
     config: {
       emailOtp: {
@@ -96,6 +109,8 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
       },
       google:
         googleConfig === null ? null : { ...googleConfig, allowSignups: config.authAllowSignups },
+      github:
+        githubConfig === null ? null : { ...githubConfig, allowSignups: config.authAllowSignups },
     },
     sendVerificationOTP,
   });

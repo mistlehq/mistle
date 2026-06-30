@@ -25,9 +25,15 @@ export type GoogleProviderConfig = {
   } | null>;
 };
 
+export type GitHubProviderConfig = {
+  clientId: string;
+  clientSecret: string;
+};
+
 export type AuthProviderConfig = {
   emailOtp: EmailOtpProviderConfig;
   google: (GoogleProviderConfig & { allowSignups: boolean }) | null;
+  github: (GitHubProviderConfig & { allowSignups: boolean }) | null;
 };
 
 export type AuthProviderAssembly = {

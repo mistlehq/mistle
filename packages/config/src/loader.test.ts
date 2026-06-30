@@ -26,6 +26,8 @@ function buildControlPlaneApiServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_LENGTH: "6",
     MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_EXPIRES_IN_SECONDS: "300",
     MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_ALLOWED_ATTEMPTS: "5",
+    MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GITHUB_CLIENT_ID: "github-client-id",
+    MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GITHUB_CLIENT_SECRET: "github-client-secret",
     MISTLE_SERVICES_CONTROL_PLANE_API_MCP_URL: "https://mcp.example/mcp",
     MISTLE_SERVICES_CONTROL_PLANE_API_MCP_TRUST_FORWARDED_HEADERS: "true",
     MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET: "mcp-auth-secret",
@@ -303,6 +305,10 @@ describe("loadConfig", () => {
       migrationUrl: "postgresql://direct.example/mistle",
       namespaceId: "staging",
       databasePoolMax: 2,
+    });
+    expect(loadedConfig.app.auth.github).toEqual({
+      clientId: "github-client-id",
+      clientSecret: "github-client-secret",
     });
     expect(loadedConfig.app.platformCredentials).toEqual({
       openai: {

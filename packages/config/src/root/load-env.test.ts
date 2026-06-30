@@ -53,13 +53,15 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_SERVICES_CONTROL_PLANE_API_WORKFLOW_DATABASE_POOL_MAX: "2",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_SECRET: "auth-secret",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "https://app.example.com",
-      MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_ENABLED_METHODS: "otp,google",
+      MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_ENABLED_METHODS: "otp,google,github",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_ALLOW_SIGNUPS: "false",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_LENGTH: "6",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_EXPIRES_IN_SECONDS: "300",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_ALLOWED_ATTEMPTS: "3",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID: "google-client-id",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET: "google-client-secret",
+      MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GITHUB_CLIENT_ID: "github-client-id",
+      MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GITHUB_CLIENT_SECRET: "github-client-secret",
       MISTLE_SERVICES_CONTROL_PLANE_API_MCP_URL: "https://mcp.example.com/mcp",
       MISTLE_SERVICES_CONTROL_PLANE_API_MCP_TRUST_FORWARDED_HEADERS: "true",
       MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET: "mcp-auth-secret",
@@ -225,7 +227,7 @@ describe("loadRootConfigFromEnv", () => {
           auth: {
             secret: "auth-secret",
             trusted_origins: ["https://app.example.com"],
-            enabled_methods: ["otp", "google"],
+            enabled_methods: ["otp", "google", "github"],
             allow_signups: false,
             otp: {
               length: 6,
@@ -235,6 +237,10 @@ describe("loadRootConfigFromEnv", () => {
             google: {
               client_id: "google-client-id",
               client_secret: "google-client-secret",
+            },
+            github: {
+              client_id: "github-client-id",
+              client_secret: "github-client-secret",
             },
           },
           mcp: {

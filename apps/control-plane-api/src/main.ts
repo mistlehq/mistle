@@ -151,6 +151,8 @@ function createAuthConfig(config: ControlPlaneApiRuntimeConfig["app"]): ControlP
     authOTPAllowedAttempts: config.auth.otpAllowedAttempts,
     authGoogleClientId: config.auth.google?.clientId ?? null,
     authGoogleClientSecret: config.auth.google?.clientSecret ?? null,
+    authGitHubClientId: config.auth.github?.clientId ?? null,
+    authGitHubClientSecret: config.auth.github?.clientSecret ?? null,
     ...(config.__dangerouslyEnableTestIsolation?.googleAuth === undefined
       ? {}
       : {

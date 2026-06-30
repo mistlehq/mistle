@@ -947,6 +947,7 @@ export interface paths {
               methods: {
                 /** @enum {boolean} */
                 emailOtp: true;
+                github: boolean;
                 google: boolean;
               };
             };
