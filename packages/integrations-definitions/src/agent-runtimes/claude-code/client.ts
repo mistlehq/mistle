@@ -389,6 +389,16 @@ export function parseClaudeCodeSessionReadResult(result: unknown): ClaudeCodeSes
   };
 }
 
+export function buildClaudeCodeSessionSteerQueryParams(input: {
+  inputText: string;
+  sessionId: string;
+}): Record<string, unknown> {
+  return {
+    sessionId: input.sessionId,
+    inputText: input.inputText,
+  };
+}
+
 export function createClaudeCodeSessionClient(
   input: ClaudeCodeSessionClientInput,
 ): ClaudeCodeSessionClient {
@@ -504,10 +514,10 @@ export function createClaudeCodeSessionClient(
     async steerQuery(steerInput) {
       const result = await rpcClient.call(
         ClaudeCodeRuntimeMethods.QUERY_STEER,
-        {
+        buildClaudeCodeSessionSteerQueryParams({
           sessionId: steerInput.sessionId,
           inputText: steerInput.inputText,
-        },
+        }),
         {
           idempotency: steerInput.idempotency,
         },

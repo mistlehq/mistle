@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildClaudeCodeCreateSessionParams,
   buildClaudeCodeStartQueryParams,
+  buildClaudeCodeSteerQueryParams,
 } from "./conversation-provider.server.js";
 
 describe("buildClaudeCodeCreateSessionParams", () => {
@@ -56,6 +57,22 @@ describe("buildClaudeCodeStartQueryParams", () => {
     ).toEqual({
       sessionId: "session_123",
       inputText: "Handle this event.",
+    });
+  });
+});
+
+describe("buildClaudeCodeSteerQueryParams", () => {
+  it("includes the provider execution id as the expected active query id", () => {
+    expect(
+      buildClaudeCodeSteerQueryParams({
+        providerConversationId: "session_123",
+        providerExecutionId: "query_123",
+        inputText: "Adjust the current run.",
+      }),
+    ).toEqual({
+      sessionId: "session_123",
+      expectedQueryId: "query_123",
+      inputText: "Adjust the current run.",
     });
   });
 });

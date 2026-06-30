@@ -74,6 +74,18 @@ export function buildClaudeCodeStartQueryParams(input: {
   };
 }
 
+export function buildClaudeCodeSteerQueryParams(input: {
+  inputText: string;
+  providerConversationId: string;
+  providerExecutionId: string;
+}): Record<string, unknown> {
+  return {
+    sessionId: input.providerConversationId,
+    expectedQueryId: input.providerExecutionId,
+    inputText: input.inputText,
+  };
+}
+
 async function connectClaudeCodeConversationProvider(input: {
   connectionUrl: string;
   connectTimeoutMs?: number;
@@ -192,11 +204,11 @@ export function createClaudeCodeConversationProvider(): AgentConversationProvide
       const claudeCodeClient = getClaudeCodeClient(input.connection);
       const result = await claudeCodeClient.call(
         ClaudeCodeRuntimeMethods.QUERY_STEER,
-        {
-          sessionId: input.providerConversationId,
-          expectedQueryId: input.providerExecutionId,
+        buildClaudeCodeSteerQueryParams({
+          providerConversationId: input.providerConversationId,
+          providerExecutionId: input.providerExecutionId,
           inputText: input.inputText,
-        },
+        }),
         {
           idempotency: input.idempotency,
         },
