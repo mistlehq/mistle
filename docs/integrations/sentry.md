@@ -15,9 +15,10 @@ Use the **Sentry webhooks** connection method with a Sentry Internal Integration
 In Sentry:
 
 1. Create an Internal Integration for the Sentry organization.
-2. In **Internal Integration Details**, set **Webhook URL** to a temporary HTTPS placeholder such as `https://example.com/sentry/webhook/`.
-3. Enable issue webhooks for the integration.
-4. Copy the integration client secret.
+2. In **Internal Integration Details**, set **Webhook URL** to a temporary HTTPS endpoint that you control if Sentry requires a value before saving.
+3. Leave issue webhooks disabled until the Mistle callback URL is installed.
+4. Save the integration.
+5. Copy the integration client secret.
 
 In Mistle:
 
@@ -26,7 +27,7 @@ In Mistle:
 3. Save the connection.
 4. Copy the **Webhook callback URL** from the connection detail page.
 
-Return to Sentry and replace the temporary placeholder with the Mistle **Webhook callback URL** in the Internal Integration **Webhook URL** field.
+Return to Sentry, replace the temporary URL with the Mistle **Webhook callback URL** in the Internal Integration **Webhook URL** field, then enable issue webhooks for the integration.
 
 The webhook callback URL is available after the Mistle connection is saved because Mistle creates the webhook source for the connection at that point.
 
