@@ -2,6 +2,13 @@ import type { AgentConversationIdempotencyMetadata } from "@mistle/integrations-
 import { AgentStreamClient, type SandboxSessionTransport } from "@mistle/sandbox-session-client";
 
 import { ClaudeCodeJsonRpcClient } from "./json-rpc-client.js";
+import {
+  ClaudeCodeRuntimeMethods,
+  extractClaudeCodeQueryId,
+  extractClaudeCodeSessionId,
+  isClaudeCodeRecord,
+  readClaudeCodeNestedString,
+} from "./protocol.js";
 
 export type ClaudeCodeSessionStatus = "active" | "error" | "idle" | "notLoaded";
 
@@ -129,36 +136,21 @@ export type ClaudeCodeSessionClientInput = {
   transport: SandboxSessionTransport;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function readNestedRecord(value: unknown, path: readonly string[]): Record<string, unknown> | null {
   let currentValue: unknown = value;
   for (const segment of path) {
-    if (!isRecord(currentValue)) {
+    if (!isClaudeCodeRecord(currentValue)) {
       return null;
     }
     currentValue = currentValue[segment];
   }
-  return isRecord(currentValue) ? currentValue : null;
-}
-
-function readNestedString(value: unknown, path: readonly string[]): string | null {
-  let currentValue: unknown = value;
-  for (const segment of path) {
-    if (!isRecord(currentValue)) {
-      return null;
-    }
-    currentValue = currentValue[segment];
-  }
-  return typeof currentValue === "string" && currentValue.length > 0 ? currentValue : null;
+  return isClaudeCodeRecord(currentValue) ? currentValue : null;
 }
 
 function readNestedStringValue(value: unknown, path: readonly string[]): string | null {
   let currentValue: unknown = value;
   for (const segment of path) {
-    if (!isRecord(currentValue)) {
+    if (!isClaudeCodeRecord(currentValue)) {
       return null;
     }
     currentValue = currentValue[segment];
@@ -169,7 +161,7 @@ function readNestedStringValue(value: unknown, path: readonly string[]): string 
 function readNestedNumber(value: unknown, path: readonly string[]): number | null {
   let currentValue: unknown = value;
   for (const segment of path) {
-    if (!isRecord(currentValue)) {
+    if (!isClaudeCodeRecord(currentValue)) {
       return null;
     }
     currentValue = currentValue[segment];
@@ -182,23 +174,6 @@ function parseStringArray(value: unknown, fieldName: string): readonly string[] 
     throw new Error(`Claude Code session config response included invalid ${fieldName}.`);
   }
   return value;
-}
-
-function extractSessionId(result: unknown, method: string): string {
-  const sessionId = readNestedString(result, ["session", "id"]);
-  if (sessionId === null) {
-    throw new Error(`Claude Code ${method} response did not include session.id.`);
-  }
-  return sessionId;
-}
-
-function extractQueryId(result: unknown, method: string): string {
-  const queryId =
-    readNestedString(result, ["query", "id"]) ?? readNestedString(result, ["queryId"]);
-  if (queryId === null) {
-    throw new Error(`Claude Code ${method} response did not include query id.`);
-  }
-  return queryId;
 }
 
 function normalizeClaudeCodeSessionStatus(value: string | null): ClaudeCodeSessionStatus {
@@ -214,10 +189,10 @@ function normalizeClaudeCodeSessionStatus(value: string | null): ClaudeCodeSessi
 }
 
 function parseClaudeCodeSessionSummary(value: unknown): ClaudeCodeSessionSummary {
-  if (!isRecord(value)) {
+  if (!isClaudeCodeRecord(value)) {
     throw new Error("Claude Code session/list response included an invalid session.");
   }
-  const sessionId = readNestedString(value, ["id"]);
+  const sessionId = readClaudeCodeNestedString(value, ["id"]);
   if (sessionId === null) {
     throw new Error("Claude Code session/list response included a session without id.");
   }
@@ -229,18 +204,18 @@ function parseClaudeCodeSessionSummary(value: unknown): ClaudeCodeSessionSummary
   return {
     id: sessionId,
     title,
-    cwd: readNestedString(value, ["cwd"]),
+    cwd: readClaudeCodeNestedString(value, ["cwd"]),
     createdAt: readNestedNumber(value, ["createdAt"]),
     updatedAt,
   };
 }
 
 function parseClaudeCodeReasoningEffortOption(value: unknown): ClaudeCodeReasoningEffortOption {
-  if (!isRecord(value)) {
+  if (!isClaudeCodeRecord(value)) {
     throw new Error("Claude Code session config response included an invalid reasoning option.");
   }
-  const optionValue = readNestedString(value, ["value"]);
-  const label = readNestedString(value, ["label"]);
+  const optionValue = readClaudeCodeNestedString(value, ["value"]);
+  const label = readClaudeCodeNestedString(value, ["label"]);
   if (optionValue === null || label === null) {
     throw new Error("Claude Code session config response included an incomplete reasoning option.");
   }
@@ -251,11 +226,11 @@ function parseClaudeCodeReasoningEffortOption(value: unknown): ClaudeCodeReasoni
 }
 
 function parseClaudeCodeModelSummary(value: unknown): ClaudeCodeModelSummary {
-  if (!isRecord(value)) {
+  if (!isClaudeCodeRecord(value)) {
     throw new Error("Claude Code session config response included an invalid model.");
   }
-  const model = readNestedString(value, ["model"]);
-  const displayName = readNestedString(value, ["displayName"]);
+  const model = readClaudeCodeNestedString(value, ["model"]);
+  const displayName = readClaudeCodeNestedString(value, ["displayName"]);
   if (model === null || displayName === null) {
     throw new Error("Claude Code session config response included a model without metadata.");
   }
@@ -266,7 +241,7 @@ function parseClaudeCodeModelSummary(value: unknown): ClaudeCodeModelSummary {
   return {
     model,
     displayName,
-    defaultReasoningEffort: readNestedString(value, ["defaultReasoningEffort"]),
+    defaultReasoningEffort: readClaudeCodeNestedString(value, ["defaultReasoningEffort"]),
     reasoningEffortOptions: reasoningEffortOptions.map(parseClaudeCodeReasoningEffortOption),
     inputModalities: parseStringArray(value["inputModalities"], "inputModalities"),
     isDefault: value["isDefault"] === true,
@@ -274,10 +249,10 @@ function parseClaudeCodeModelSummary(value: unknown): ClaudeCodeModelSummary {
 }
 
 function parseClaudeCodeCommandSummary(value: unknown): ClaudeCodeCommandSummary {
-  if (!isRecord(value)) {
+  if (!isClaudeCodeRecord(value)) {
     throw new Error("Claude Code session config response included an invalid command.");
   }
-  const name = readNestedString(value, ["name"]);
+  const name = readClaudeCodeNestedString(value, ["name"]);
   if (name === null) {
     throw new Error("Claude Code session config response included a command without name.");
   }
@@ -288,7 +263,7 @@ function parseClaudeCodeCommandSummary(value: unknown): ClaudeCodeCommandSummary
 }
 
 function parseClaudeCodeSessionConfig(value: unknown): ClaudeCodeSessionConfig {
-  if (!isRecord(value)) {
+  if (!isClaudeCodeRecord(value)) {
     throw new Error("Claude Code session/read response did not include session config.");
   }
   const rawAvailableCommands = value["availableCommands"];
@@ -302,8 +277,8 @@ function parseClaudeCodeSessionConfig(value: unknown): ClaudeCodeSessionConfig {
   return {
     availableCommands: rawAvailableCommands.map(parseClaudeCodeCommandSummary),
     availableModels: rawAvailableModels.map(parseClaudeCodeModelSummary),
-    model: readNestedString(value, ["model"]),
-    modelReasoningEffort: readNestedString(value, ["modelReasoningEffort"]),
+    model: readClaudeCodeNestedString(value, ["model"]),
+    modelReasoningEffort: readClaudeCodeNestedString(value, ["modelReasoningEffort"]),
   };
 }
 
@@ -319,12 +294,12 @@ function parseClaudeCodeSessionConfigRpcResult(
 }
 
 function parseClaudeCodePermissionRequest(value: unknown): ClaudeCodePermissionRequest {
-  if (!isRecord(value)) {
+  if (!isClaudeCodeRecord(value)) {
     throw new Error("Claude Code session/read response included an invalid permission request.");
   }
-  const id = readNestedString(value, ["id"]);
-  const sessionId = readNestedString(value, ["sessionId"]);
-  const toolName = readNestedString(value, ["toolName"]);
+  const id = readClaudeCodeNestedString(value, ["id"]);
+  const sessionId = readClaudeCodeNestedString(value, ["sessionId"]);
+  const toolName = readClaudeCodeNestedString(value, ["toolName"]);
   if (id === null || sessionId === null || toolName === null) {
     throw new Error("Claude Code permission request response did not include required metadata.");
   }
@@ -340,7 +315,7 @@ function parseClaudeCodeContextUsage(value: unknown): ClaudeCodeContextUsage | n
   if (value === null || value === undefined) {
     return null;
   }
-  if (!isRecord(value)) {
+  if (!isClaudeCodeRecord(value)) {
     throw new Error("Claude Code session/read response included invalid contextUsage.");
   }
   const contextWindow = readNestedNumber(value, ["contextWindow"]);
@@ -357,7 +332,7 @@ function parseClaudeCodeContextUsage(value: unknown): ClaudeCodeContextUsage | n
 export function parseClaudeCodeSessionListResult(
   result: unknown,
 ): readonly ClaudeCodeSessionSummary[] {
-  if (!isRecord(result)) {
+  if (!isClaudeCodeRecord(result)) {
     throw new Error("Claude Code session/list response did not include sessions.");
   }
   const rawSessions = result["sessions"];
@@ -372,7 +347,7 @@ export function parseClaudeCodeSessionReadResult(result: unknown): ClaudeCodeSes
   if (session === null) {
     throw new Error("Claude Code session/read response did not include session.");
   }
-  const sessionId = readNestedString(result, ["session", "id"]);
+  const sessionId = readClaudeCodeNestedString(result, ["session", "id"]);
   if (sessionId === null) {
     throw new Error("Claude Code session/read response did not include session.id.");
   }
@@ -392,19 +367,19 @@ export function parseClaudeCodeSessionReadResult(result: unknown): ClaudeCodeSes
       id: sessionId,
       status: {
         type: normalizeClaudeCodeSessionStatus(
-          readNestedString(result, ["session", "status", "type"]),
+          readClaudeCodeNestedString(result, ["session", "status", "type"]),
         ),
       },
-      activeQueryId: readNestedString(result, ["session", "activeQueryId"]),
+      activeQueryId: readClaudeCodeNestedString(result, ["session", "activeQueryId"]),
       config: parseClaudeCodeSessionConfig(session["config"]),
       contextUsage: parseClaudeCodeContextUsage(session["contextUsage"]),
-      cwd: readNestedString(result, ["session", "cwd"]),
+      cwd: readClaudeCodeNestedString(result, ["session", "cwd"]),
       pendingPermissions: rawPendingPermissions.map(parseClaudeCodePermissionRequest),
       queries: rawQueries.map((query, index) => ({
-        queryId: isRecord(query)
-          ? (readNestedString(query, ["queryId"]) ?? `query_${String(index)}`)
+        queryId: isClaudeCodeRecord(query)
+          ? (readClaudeCodeNestedString(query, ["queryId"]) ?? `query_${String(index)}`)
           : `query_${String(index)}`,
-        message: isRecord(query) ? query["message"] : query,
+        message: isClaudeCodeRecord(query) ? query["message"] : query,
       })),
       lastError:
         typeof session["lastError"] === "string" && session["lastError"].length > 0
@@ -433,24 +408,24 @@ export function createClaudeCodeSessionClient(
     },
     async createSession(createInput = {}) {
       const result = await rpcClient.call(
-        "session/create",
+        ClaudeCodeRuntimeMethods.SESSION_CREATE,
         createInput.cwd === undefined || createInput.cwd === null ? {} : { cwd: createInput.cwd },
         {
           idempotency: createInput.idempotency,
         },
       );
       return {
-        sessionId: extractSessionId(result, "session/create"),
+        sessionId: extractClaudeCodeSessionId(result, ClaudeCodeRuntimeMethods.SESSION_CREATE),
       };
     },
     async interruptQuery(interruptInput) {
-      await rpcClient.call("query/interrupt", {
+      await rpcClient.call(ClaudeCodeRuntimeMethods.QUERY_INTERRUPT, {
         queryId: interruptInput.queryId,
         sessionId: interruptInput.sessionId,
       });
     },
     async listSessions(listInput = {}) {
-      const result = await rpcClient.call("session/list", {
+      const result = await rpcClient.call(ClaudeCodeRuntimeMethods.SESSION_LIST, {
         ...(listInput.cwd === undefined || listInput.cwd === null ? {} : { cwd: listInput.cwd }),
         ...(listInput.limit === undefined ? {} : { limit: listInput.limit }),
         ...(listInput.offset === undefined ? {} : { offset: listInput.offset }),
@@ -458,13 +433,13 @@ export function createClaudeCodeSessionClient(
       return parseClaudeCodeSessionListResult(result);
     },
     async readSession(readInput) {
-      const result = await rpcClient.call("session/read", {
+      const result = await rpcClient.call(ClaudeCodeRuntimeMethods.SESSION_READ, {
         sessionId: readInput.sessionId,
       });
       return parseClaudeCodeSessionReadResult(result);
     },
     async respondToPermission(permissionInput) {
-      await rpcClient.call("permission/reply", {
+      await rpcClient.call(ClaudeCodeRuntimeMethods.PERMISSION_REPLY, {
         sessionId: permissionInput.sessionId,
         requestId: permissionInput.requestId,
         ...(permissionInput.decision === undefined ? {} : { decision: permissionInput.decision }),
@@ -473,21 +448,27 @@ export function createClaudeCodeSessionClient(
       });
     },
     async refreshCommandCatalog(refreshInput) {
-      const result = await rpcClient.call("session/command-catalog", {
+      const result = await rpcClient.call(ClaudeCodeRuntimeMethods.SESSION_COMMAND_CATALOG, {
         sessionId: refreshInput.sessionId,
         ...(refreshInput.refresh === undefined ? {} : { refresh: refreshInput.refresh }),
       });
-      return parseClaudeCodeSessionConfigRpcResult(result, "session/command-catalog");
+      return parseClaudeCodeSessionConfigRpcResult(
+        result,
+        ClaudeCodeRuntimeMethods.SESSION_COMMAND_CATALOG,
+      );
     },
     async refreshModelCatalog(refreshInput) {
-      const result = await rpcClient.call("session/model-catalog", {
+      const result = await rpcClient.call(ClaudeCodeRuntimeMethods.SESSION_MODEL_CATALOG, {
         sessionId: refreshInput.sessionId,
         ...(refreshInput.refresh === undefined ? {} : { refresh: refreshInput.refresh }),
       });
-      return parseClaudeCodeSessionConfigRpcResult(result, "session/model-catalog");
+      return parseClaudeCodeSessionConfigRpcResult(
+        result,
+        ClaudeCodeRuntimeMethods.SESSION_MODEL_CATALOG,
+      );
     },
     async resumeSession(resumeInput) {
-      await rpcClient.call("session/resume", {
+      await rpcClient.call(ClaudeCodeRuntimeMethods.SESSION_RESUME, {
         sessionId: resumeInput.sessionId,
         ...(resumeInput.cwd === undefined || resumeInput.cwd === null
           ? {}
@@ -495,16 +476,19 @@ export function createClaudeCodeSessionClient(
       });
     },
     async setSessionConfig(configInput) {
-      const result = await rpcClient.call("session/configure", {
+      const result = await rpcClient.call(ClaudeCodeRuntimeMethods.SESSION_CONFIGURE, {
         sessionId: configInput.sessionId,
         model: configInput.model,
         modelReasoningEffort: configInput.modelReasoningEffort,
       });
-      return parseClaudeCodeSessionConfigRpcResult(result, "session/configure");
+      return parseClaudeCodeSessionConfigRpcResult(
+        result,
+        ClaudeCodeRuntimeMethods.SESSION_CONFIGURE,
+      );
     },
     async startQuery(startInput) {
       const result = await rpcClient.call(
-        "query/start",
+        ClaudeCodeRuntimeMethods.QUERY_START,
         {
           sessionId: startInput.sessionId,
           inputText: startInput.inputText,
@@ -514,12 +498,12 @@ export function createClaudeCodeSessionClient(
         },
       );
       return {
-        queryId: extractQueryId(result, "query/start"),
+        queryId: extractClaudeCodeQueryId(result, ClaudeCodeRuntimeMethods.QUERY_START),
       };
     },
     async steerQuery(steerInput) {
       const result = await rpcClient.call(
-        "query/steer",
+        ClaudeCodeRuntimeMethods.QUERY_STEER,
         {
           sessionId: steerInput.sessionId,
           inputText: steerInput.inputText,
@@ -529,7 +513,7 @@ export function createClaudeCodeSessionClient(
         },
       );
       return {
-        queryId: extractQueryId(result, "query/steer"),
+        queryId: extractClaudeCodeQueryId(result, ClaudeCodeRuntimeMethods.QUERY_STEER),
       };
     },
   };
