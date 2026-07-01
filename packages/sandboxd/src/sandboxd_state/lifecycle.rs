@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -63,7 +64,8 @@ use crate::sandboxd_state::runtime_environment::{
 use crate::sandboxd_state::setup_script::run_setup_script_with_output_sink;
 use crate::sandboxd_state::snapshot::scrub_snapshot_runtime_artifacts;
 use crate::startup_diagnostics::{
-    ActivationDiagnosticsLogger, ActivationTranscriptStream, activation_diagnostics_string,
+    ActivationDiagnosticsLogger, ActivationTranscriptStream, activation_diagnostics_bool,
+    activation_diagnostics_string,
 };
 use crate::supervision::{
     ComponentHealthSnapshot, SandboxdHealthSnapshot, SandboxdSupervisorHandle, SupervisedComponent,
@@ -340,6 +342,7 @@ impl SandboxdState {
             "start_egress_proxy",
             timeline_attributes("egress-proxy", "Starting egress proxy"),
         );
+        record_egress_proxy_start_diagnostics(&diagnostics_logger, session_input);
         egress_proxy = match EgressProxy::start(
             &runtime_plan,
             session_input,
@@ -354,6 +357,7 @@ impl SandboxdState {
                     "error".to_string(),
                     activation_diagnostics_string(error.to_string()),
                 );
+                attributes.extend(collect_egress_proxy_start_diagnostics(session_input));
                 record_operation_phase_failure(
                     &diagnostics_logger,
                     "start_egress_proxy",
@@ -1492,6 +1496,142 @@ fn ensure_dev_link(dev_directory: &Path, name: &str, target: &Path) -> Result<()
         }
         Err(error) => Err(format!("failed to inspect '{}': {error}", path.display())),
     }
+}
+
+fn record_egress_proxy_start_diagnostics(
+    diagnostics_logger: &Option<ActivationDiagnosticsLogger>,
+    session_input: &SessionRuntimeInput,
+) {
+    if diagnostics_logger.is_none() {
+        return;
+    }
+
+    record_operation_phase_started_with_attributes(
+        diagnostics_logger,
+        "start_egress_proxy_environment_diagnostics",
+        hidden_timeline_attributes(),
+    );
+    record_operation_phase_completed_with_attributes(
+        diagnostics_logger,
+        "start_egress_proxy_environment_diagnostics",
+        collect_egress_proxy_start_diagnostics(session_input),
+    );
+}
+
+fn collect_egress_proxy_start_diagnostics(
+    session_input: &SessionRuntimeInput,
+) -> BTreeMap<String, serde_json::Value> {
+    let mut attributes = hidden_timeline_attributes();
+    attributes.insert(
+        "transparentProxyConfigured".to_string(),
+        activation_diagnostics_bool(session_input.transparent_proxy.is_some()),
+    );
+    attributes.insert(
+        "devFd".to_string(),
+        activation_diagnostics_string(read_link_diagnostic("/dev/fd")),
+    );
+    attributes.insert(
+        "devStdin".to_string(),
+        activation_diagnostics_string(read_link_diagnostic("/dev/stdin")),
+    );
+    attributes.insert(
+        "devStdout".to_string(),
+        activation_diagnostics_string(read_link_diagnostic("/dev/stdout")),
+    );
+    attributes.insert(
+        "devStderr".to_string(),
+        activation_diagnostics_string(read_link_diagnostic("/dev/stderr")),
+    );
+    attributes.insert(
+        "procSelfFd".to_string(),
+        activation_diagnostics_string(read_directory_entries_diagnostic("/proc/self/fd", 32)),
+    );
+    attributes.insert(
+        "nftTables".to_string(),
+        activation_diagnostics_string(run_diagnostic_command(&[
+            "timeout", "3s", "nft", "list", "tables",
+        ])),
+    );
+    attributes.insert(
+        "nftRuleset".to_string(),
+        activation_diagnostics_string(run_diagnostic_command(&[
+            "timeout", "3s", "nft", "list", "ruleset",
+        ])),
+    );
+    attributes.insert(
+        "ipAddress".to_string(),
+        activation_diagnostics_string(run_diagnostic_command(&[
+            "timeout", "3s", "ip", "-brief", "addr",
+        ])),
+    );
+    attributes.insert(
+        "ipRoute".to_string(),
+        activation_diagnostics_string(run_diagnostic_command(&[
+            "timeout", "3s", "ip", "route", "show", "table", "all",
+        ])),
+    );
+    attributes
+}
+
+fn read_link_diagnostic(path: &str) -> String {
+    match fs::read_link(path) {
+        Ok(target) => target.display().to_string(),
+        Err(error) => format!("error: {error}"),
+    }
+}
+
+fn read_directory_entries_diagnostic(path: &str, limit: usize) -> String {
+    let entries = match fs::read_dir(path) {
+        Ok(entries) => entries,
+        Err(error) => return format!("error: {error}"),
+    };
+    let mut values = entries
+        .filter_map(|entry| entry.ok())
+        .take(limit)
+        .map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            match fs::read_link(entry.path()) {
+                Ok(target) => format!("{name}->{target}", target = target.display()),
+                Err(_) => name,
+            }
+        })
+        .collect::<Vec<_>>();
+    values.sort();
+    values.join(", ")
+}
+
+fn run_diagnostic_command(arguments: &[&str]) -> String {
+    const OUTPUT_LIMIT: usize = 4096;
+    let Some((command, args)) = arguments.split_first() else {
+        return "error: missing command".to_string();
+    };
+
+    match Command::new(command).args(args).output() {
+        Ok(output) => {
+            let stdout = truncate_diagnostic_text(&String::from_utf8_lossy(&output.stdout));
+            let stderr = truncate_diagnostic_text(&String::from_utf8_lossy(&output.stderr));
+            format!(
+                "status={status}; stdout={stdout}; stderr={stderr}",
+                status = output.status
+            )
+        }
+        Err(error) => format!("error: {error}"),
+    }
+    .chars()
+    .take(OUTPUT_LIMIT)
+    .collect()
+}
+
+fn truncate_diagnostic_text(value: &str) -> String {
+    const LIMIT: usize = 2048;
+    let trimmed = value.trim();
+    if trimmed.len() <= LIMIT {
+        return trimmed.to_string();
+    }
+    format!(
+        "{}...[truncated]",
+        trimmed.chars().take(LIMIT).collect::<String>()
+    )
 }
 
 fn egress_proxy_inputs_match(
