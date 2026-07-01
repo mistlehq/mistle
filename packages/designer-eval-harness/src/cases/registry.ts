@@ -1,4 +1,5 @@
 import type { DesignerEvalCase, DesignerEvalInputResponse } from "../types.ts";
+import { DesignerEvalDecisionIds } from "./decision-ids.ts";
 
 type ScriptedAnswerValue = string | readonly string[];
 
@@ -46,14 +47,39 @@ const GithubPrReviewBasicCase: DesignerEvalCase = {
     targetDraft: {
       profileId: "sbp_eval_github_pr_review_basic",
       version: 1,
+      initialIntegrationBindings: [
+        {
+          id: "ibd_eval_github_pr_review_basic_agent",
+          connectionId: "icn_eval_github_pr_review_basic_agent",
+          kind: "agent",
+          config: {},
+        },
+        {
+          id: "ibd_eval_github_pr_review_basic_repo",
+          connectionId: "icn_eval_github_pr_review_basic_repo",
+          kind: "git",
+          config: {
+            tools: ["github-cli"],
+          },
+        },
+      ],
     },
   },
   scriptedInputs: {
-    pr_review_trigger_scope: {
+    [DesignerEvalDecisionIds.CONFIRM_OPERATING_MODEL]: {
       kind: "answers",
       answers: [
         {
-          id: "pr_review_trigger_scope",
+          id: DesignerEvalDecisionIds.CONFIRM_OPERATING_MODEL,
+          value: "Use this model",
+        },
+      ],
+    },
+    [DesignerEvalDecisionIds.PR_REVIEW_TRIGGER_SCOPE]: {
+      kind: "answers",
+      answers: [
+        {
+          id: DesignerEvalDecisionIds.PR_REVIEW_TRIGGER_SCOPE,
           value: "Opened, updated, ready",
         },
       ],
@@ -76,6 +102,15 @@ const GithubPrReviewBasicCase: DesignerEvalCase = {
         },
       ],
     },
+    [DesignerEvalDecisionIds.GITHUB_REPOSITORY_SELECTION]: {
+      kind: "answers",
+      answers: [
+        {
+          id: DesignerEvalDecisionIds.GITHUB_REPOSITORY_SELECTION,
+          value: ["mistlehq/mistle"],
+        },
+      ],
+    },
     select_repository: {
       kind: "answers",
       answers: [
@@ -85,12 +120,21 @@ const GithubPrReviewBasicCase: DesignerEvalCase = {
         },
       ],
     },
-    approval_boundary: {
+    [DesignerEvalDecisionIds.APPROVAL_BOUNDARY]: {
       kind: "answers",
       answers: [
         {
-          id: "approval_boundary",
+          id: DesignerEvalDecisionIds.APPROVAL_BOUNDARY,
           value: "Ask before posting review comments",
+        },
+      ],
+    },
+    [DesignerEvalDecisionIds.NEXT_SETUP_ACTION]: {
+      kind: "answers",
+      answers: [
+        {
+          id: DesignerEvalDecisionIds.NEXT_SETUP_ACTION,
+          value: "Stop here",
         },
       ],
     },
@@ -103,6 +147,23 @@ const GithubPrReviewBasicCase: DesignerEvalCase = {
       kind: "saved-selected-provider-resources",
       connectionId: "icn_eval_github_pr_review_basic_repo",
       selectedHandles: ["mistlehq/mistle"],
+    },
+    {
+      kind: "blueprint-has-provider-lifecycle",
+      requiredConcepts: ["github", "pull request", "review"],
+    },
+    {
+      kind: "blueprint-excludes-setup-nodes",
+      disallowedConcepts: ["publish", "repository selection"],
+    },
+    {
+      kind: "required-binding-tools-present",
+      connectionId: "icn_eval_github_pr_review_basic_repo",
+      tools: ["github-cli"],
+    },
+    {
+      kind: "setup-incompleteness-disclosed",
+      requiredPhrases: ["approval"],
     },
   ],
 };
@@ -168,7 +229,7 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
         "select_github_repositories",
         "select_github_repository",
         "select_github_repo",
-        "github_repository_selection",
+        DesignerEvalDecisionIds.GITHUB_REPOSITORY_SELECTION,
         "github_repository",
         "github_repo",
         "repository_selection",
@@ -178,8 +239,9 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     ),
     ...scriptedAnswerAliases(
       [
-        "confirm_operating_model",
+        DesignerEvalDecisionIds.CONFIRM_OPERATING_MODEL,
         "confirm_ai_factory_model",
+        "operating_model",
         "ai_factory_operating_model",
         "ai_software_factory_operating_model",
         "software_factory_operating_model",
@@ -191,7 +253,7 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     ...scriptedAnswerAliases(
       [
         "workflow_approval_boundary",
-        "approval_boundary",
+        DesignerEvalDecisionIds.APPROVAL_BOUNDARY,
         "pr_approval_boundary",
         "pr_handoff_boundary",
         "handoff_boundary",
@@ -208,16 +270,28 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
         "linear_ready_state",
         "linear_ready_scope",
         "linear_readiness_rule",
-        "linear_pickup_rule",
+        DesignerEvalDecisionIds.LINEAR_PICKUP_RULE,
         "readiness_rule",
       ],
       "Ready status",
     ),
     ...scriptedAnswerAliases(
+      [DesignerEvalDecisionIds.LINEAR_STATUS_MAPPING],
+      "Ready for Agent -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done",
+    ),
+    ...scriptedAnswerAliases(
+      [
+        DesignerEvalDecisionIds.CONFIGURATION_SHAPE,
+        "profile_configuration_shape",
+        "agent_role_configuration",
+      ],
+      "One sandbox profile with role-separated implementation and review instructions",
+    ),
+    ...scriptedAnswerAliases(
       [
         "next_action",
         "next_factory_step",
-        "next_setup_action",
+        DesignerEvalDecisionIds.NEXT_SETUP_ACTION,
         "next_setup_step",
         "profile_config_next_step",
         "profile_configuration_next_step",
@@ -265,12 +339,101 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     },
     {
       kind: "setup-incompleteness-disclosed",
-      requiredPhrases: ["linear", "setup", "labels", "statuses"],
+      requiredPhrases: ["linear", "setup", "label", "statuses"],
+    },
+    {
+      kind: "configured-tools-not-claimed-missing",
+      connectionTools: [
+        {
+          connectionId: "icn_eval_ai_factory_github",
+          tools: ["github-cli"],
+        },
+        {
+          connectionId: "icn_eval_ai_factory_linear",
+          tools: ["linear-mcp"],
+        },
+      ],
+      forbiddenPhrases: [
+        "Bind Linear with `linear-mcp`",
+        "Verify GitHub binding includes `github-cli`",
+        "ensure GitHub CLI and Linear MCP are selected",
+        "ensure the sandbox profile exposes the Linear MCP tool and GitHub CLI tool",
+        "ensure provider tools are selected",
+      ],
+    },
+    {
+      kind: "transcript-excludes-internal-progress",
+      forbiddenPhrases: [
+        "I’m going to check the available Mistle tools",
+        "I only have the dashboard-control path",
+        "no product mutation MCP tools were exposed",
+        "I’ll save the reversible profile configuration",
+      ],
+    },
+    {
+      kind: "transcript-includes-required-phrases",
+      label: "Factory configuration handoff",
+      requiredPhrases: [
+        "Implementation agent instructions",
+        "Review agent instructions",
+        "Ready -> Agent In Progress -> Ready for Review",
+        "operating guide",
+        "Configuration shape",
+        "one sandbox profile",
+        "role-separated",
+        "Next action",
+      ],
+    },
+    {
+      kind: "transcript-includes-sections",
+      label: "Factory handoff sections",
+      requiredSections: [
+        "Implementation agent instructions",
+        "Review agent instructions",
+        "Linear status mapping",
+        "Human operating guide",
+        "Configuration shape",
+        "Next action",
+      ],
     },
   ],
 };
 
-const Cases = [GithubPrReviewBasicCase, AiSoftwareFactoryLinearGithubCase];
+const AiSoftwareFactoryHandoffQualityCase: DesignerEvalCase = {
+  ...AiSoftwareFactoryLinearGithubCase,
+  id: "ai-software-factory-handoff-quality",
+  prompt:
+    "Build an AI software factory with Linear and GitHub. Stop once the blueprint, repository choice, approval boundary, and profile configuration handoff are ready.",
+  assertions: [
+    {
+      kind: "transcript-includes-sections",
+      label: "Factory handoff sections",
+      requiredSections: [
+        "Implementation agent instructions",
+        "Review agent instructions",
+        "Linear status mapping",
+        "Human operating guide",
+        "Configuration shape",
+        "Next action",
+      ],
+    },
+    {
+      kind: "transcript-excludes-internal-progress",
+      forbiddenPhrases: [
+        "I’m going to check the available Mistle tools",
+        "I only have the dashboard-control path",
+        "no product mutation MCP tools were exposed",
+        "I’ll save the reversible profile configuration",
+      ],
+    },
+  ],
+};
+
+const Cases = [
+  GithubPrReviewBasicCase,
+  AiSoftwareFactoryLinearGithubCase,
+  AiSoftwareFactoryHandoffQualityCase,
+];
 
 export function listDesignerEvalCases(): readonly DesignerEvalCase[] {
   return Cases;

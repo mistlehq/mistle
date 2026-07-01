@@ -75,6 +75,29 @@ function evaluateAssertion(input: {
         requiredPhrases: input.assertion.requiredPhrases,
         transcriptMarkdown: input.transcriptMarkdown,
       });
+    case "configured-tools-not-claimed-missing":
+      return evaluateConfiguredToolsNotClaimedMissing({
+        assertion: input.assertion,
+        productStateAfter: input.productStateAfter,
+        transcriptMarkdown: input.transcriptMarkdown,
+      });
+    case "transcript-excludes-internal-progress":
+      return evaluateTranscriptExcludesInternalProgress({
+        forbiddenPhrases: input.assertion.forbiddenPhrases,
+        transcriptMarkdown: input.transcriptMarkdown,
+      });
+    case "transcript-includes-required-phrases":
+      return evaluateTranscriptIncludesRequiredPhrases({
+        label: input.assertion.label,
+        requiredPhrases: input.assertion.requiredPhrases,
+        transcriptMarkdown: input.transcriptMarkdown,
+      });
+    case "transcript-includes-sections":
+      return evaluateTranscriptIncludesSections({
+        label: input.assertion.label,
+        requiredSections: input.assertion.requiredSections,
+        transcriptMarkdown: input.transcriptMarkdown,
+      });
     case "saved-selected-provider-resources":
       return evaluateSavedSelectedProviderResources({
         assertion: input.assertion,
@@ -231,6 +254,153 @@ function evaluateSetupIncompletenessDisclosed(input: {
       missingPhrases.length === 0
         ? `Transcript includes required disclosure phrases: ${input.requiredPhrases.join(", ")}.`
         : `Transcript is missing disclosure phrases: ${missingPhrases.join(", ")}.`,
+  };
+}
+
+function evaluateTranscriptIncludesSections(input: {
+  label: string;
+  requiredSections: readonly string[];
+  transcriptMarkdown?: string | undefined;
+}): DesignerEvalCheckResult {
+  if (input.transcriptMarkdown === undefined) {
+    return {
+      passed: false,
+      label: input.label,
+      detail: "Transcript markdown was not supplied to the evaluator.",
+    };
+  }
+
+  const headings = collectTranscriptSectionHeadings(input.transcriptMarkdown);
+  const missingSections = input.requiredSections.filter(
+    (section) => !headings.has(section.toLowerCase()),
+  );
+
+  return {
+    passed: missingSections.length === 0,
+    label: input.label,
+    detail:
+      missingSections.length === 0
+        ? `Transcript includes required sections: ${input.requiredSections.join(", ")}.`
+        : `Transcript is missing required sections: ${missingSections.join(", ")}.`,
+  };
+}
+
+function collectTranscriptSectionHeadings(transcriptMarkdown: string): ReadonlySet<string> {
+  const headings = new Set<string>();
+  for (const line of transcriptMarkdown.split("\n")) {
+    const headingMatch =
+      /^(?:#{1,6}\s+(?<markdownHeading>[^\n#]+?)|\*\*(?<boldHeading>[^*\n]+?)\*\*)/u.exec(
+        line.trim(),
+      );
+    const heading =
+      headingMatch?.groups?.markdownHeading?.trim() ?? headingMatch?.groups?.boldHeading?.trim();
+    if (heading === undefined || heading.length === 0) {
+      continue;
+    }
+
+    headings.add(heading.replace(/:$/u, "").toLowerCase());
+  }
+
+  return headings;
+}
+
+function evaluateTranscriptIncludesRequiredPhrases(input: {
+  label: string;
+  requiredPhrases: readonly string[];
+  transcriptMarkdown?: string | undefined;
+}): DesignerEvalCheckResult {
+  if (input.transcriptMarkdown === undefined) {
+    return {
+      passed: false,
+      label: input.label,
+      detail: "Transcript markdown was not supplied to the evaluator.",
+    };
+  }
+
+  const transcriptText = input.transcriptMarkdown.toLowerCase();
+  const missingPhrases = input.requiredPhrases.filter(
+    (phrase) => !transcriptText.includes(phrase.toLowerCase()),
+  );
+
+  return {
+    passed: missingPhrases.length === 0,
+    label: input.label,
+    detail:
+      missingPhrases.length === 0
+        ? `Transcript includes required phrases: ${input.requiredPhrases.join(", ")}.`
+        : `Transcript is missing required phrases: ${missingPhrases.join(", ")}.`,
+  };
+}
+
+function evaluateTranscriptExcludesInternalProgress(input: {
+  forbiddenPhrases: readonly string[];
+  transcriptMarkdown?: string | undefined;
+}): DesignerEvalCheckResult {
+  if (input.transcriptMarkdown === undefined) {
+    return {
+      passed: false,
+      label: "Transcript excludes internal progress",
+      detail: "Transcript markdown was not supplied to the evaluator.",
+    };
+  }
+
+  const transcriptText = input.transcriptMarkdown.toLowerCase();
+  const matchedForbiddenPhrases = input.forbiddenPhrases.filter((phrase) =>
+    transcriptText.includes(phrase.toLowerCase()),
+  );
+
+  return {
+    passed: matchedForbiddenPhrases.length === 0,
+    label: "Transcript excludes internal progress",
+    detail:
+      matchedForbiddenPhrases.length === 0
+        ? "Transcript does not include internal tool-probing or self-directed progress narration."
+        : `Transcript includes internal tool-probing or self-directed progress narration: ${matchedForbiddenPhrases.join(", ")}.`,
+  };
+}
+
+function evaluateConfiguredToolsNotClaimedMissing(input: {
+  assertion: Extract<DesignerEvalAssertion, { kind: "configured-tools-not-claimed-missing" }>;
+  productStateAfter: DesignerEvalProductState;
+  transcriptMarkdown?: string | undefined;
+}): DesignerEvalCheckResult {
+  if (input.transcriptMarkdown === undefined) {
+    return {
+      passed: false,
+      label: "Configured tools not claimed missing",
+      detail: "Transcript markdown was not supplied to the evaluator.",
+    };
+  }
+
+  const missingConfiguredTools = input.assertion.connectionTools.flatMap((connectionTool) => {
+    const matchingBinding = input.productStateAfter.targetDraft.integrationBindings.find(
+      (binding) => binding.connectionId === connectionTool.connectionId,
+    );
+    const configuredTools =
+      matchingBinding === undefined ? [] : readStringArrayProperty(matchingBinding.config, "tools");
+    return connectionTool.tools.filter((tool) => !configuredTools.includes(tool));
+  });
+
+  if (missingConfiguredTools.length > 0) {
+    return {
+      passed: true,
+      label: "Configured tools not claimed missing",
+      detail: `Required tools are not all configured, so missing-tool claim check was skipped: ${missingConfiguredTools.join(", ")}.`,
+    };
+  }
+
+  const transcriptText = input.transcriptMarkdown.toLowerCase();
+  const matchedForbiddenPhrases = input.assertion.forbiddenPhrases.filter((phrase) =>
+    transcriptText.includes(phrase.toLowerCase()),
+  );
+
+  return {
+    passed: matchedForbiddenPhrases.length === 0,
+    label: "Configured tools not claimed missing",
+    detail:
+      matchedForbiddenPhrases.length === 0
+        ? "Transcript does not describe already configured required tools as missing."
+        : `Transcript describes already configured required tools as missing: ${matchedForbiddenPhrases.join(", ")}.`,
   };
 }
 

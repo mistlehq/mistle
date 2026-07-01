@@ -108,6 +108,7 @@ async function main(): Promise<void> {
     });
     const dashboardActions: DesignerEvalDashboardControlAction[] = [];
     let transcriptMarkdown = "";
+    let serverRequestFailed = false;
     let rejectServerRequestFailure: (error: Error) => void = () => {};
     const serverRequestFailure = new Promise<never>((_resolve, reject) => {
       rejectServerRequestFailure = reject;
@@ -162,7 +163,11 @@ async function main(): Promise<void> {
             message: failure.message,
           });
           await rpcClient.respond(request.id, failureResponse).catch(() => {});
-          rejectServerRequestFailure(failure);
+          if (!serverRequestFailed) {
+            serverRequestFailed = true;
+            rejectServerRequestFailure(failure);
+            rpcClient.dispose();
+          }
         }
       })();
     });
@@ -194,6 +199,24 @@ async function main(): Promise<void> {
         markdown: transcriptMarkdown,
         rawThread: threadRead.response,
       });
+    } catch (error) {
+      const failure = error instanceof Error ? error : new Error(String(error));
+      const productStateAfter = readDesignerEvalProductState({
+        state,
+      });
+      await artifacts.writeProductStateAfter(productStateAfter);
+      await artifacts.writeEvaluation({
+        caseId: evalCase.id,
+        passed: false,
+        checks: [
+          {
+            passed: false,
+            label: "Designer eval runtime failure",
+            detail: failure.message,
+          },
+        ],
+      });
+      throw failure;
     } finally {
       unsubscribeServerRequests();
       unsubscribeNotifications();

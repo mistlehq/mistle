@@ -234,6 +234,152 @@ describe("Designer eval evaluator", () => {
 
     expect(result.passed).toBe(true);
   });
+
+  it("fails when the transcript claims configured provider tools are still missing", () => {
+    const result = evaluateDesignerEvalRun({
+      caseId: "ai-software-factory-linear-github",
+      assertions: [
+        {
+          kind: "configured-tools-not-claimed-missing",
+          connectionTools: [
+            {
+              connectionId: "icn_linear",
+              tools: ["linear-mcp"],
+            },
+            {
+              connectionId: "icn_github",
+              tools: ["github-cli"],
+            },
+          ],
+          forbiddenPhrases: [
+            "Bind Linear with `linear-mcp`",
+            "Verify GitHub binding includes `github-cli`",
+          ],
+        },
+      ],
+      dashboardControlActions: [],
+      productStateAfter: createAiFactoryProductState({
+        linearTools: ["linear-mcp"],
+        githubTools: ["github-cli"],
+      }),
+      transcriptMarkdown:
+        "Still remaining: Bind Linear with `linear-mcp`. Verify GitHub binding includes `github-cli`.",
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.checks[0]?.detail).toContain("already configured");
+  });
+
+  it("skips configured-tool claim checks when required tools are not configured", () => {
+    const result = evaluateDesignerEvalRun({
+      caseId: "ai-software-factory-linear-github",
+      assertions: [
+        {
+          kind: "configured-tools-not-claimed-missing",
+          connectionTools: [
+            {
+              connectionId: "icn_linear",
+              tools: ["linear-mcp"],
+            },
+          ],
+          forbiddenPhrases: ["Bind Linear with `linear-mcp`"],
+        },
+      ],
+      dashboardControlActions: [],
+      productStateAfter: createAiFactoryProductState({
+        linearTools: [],
+        githubTools: ["github-cli"],
+      }),
+      transcriptMarkdown: "Still remaining: Bind Linear with `linear-mcp`.",
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.checks[0]?.detail).toContain("skipped");
+  });
+
+  it("fails when the transcript includes internal tool-probing narration", () => {
+    const result = evaluateDesignerEvalRun({
+      caseId: "ai-software-factory-linear-github",
+      assertions: [
+        {
+          kind: "transcript-excludes-internal-progress",
+          forbiddenPhrases: ["I’m going to check the available Mistle tools"],
+        },
+      ],
+      dashboardControlActions: [],
+      productStateAfter: createAiFactoryProductState({
+        linearTools: ["linear-mcp"],
+        githubTools: ["github-cli"],
+      }),
+      transcriptMarkdown:
+        "I’m going to check the available Mistle tools before I explain the next setup step.",
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.checks[0]?.detail).toContain("internal tool-probing");
+  });
+
+  it("checks required handoff phrases in the transcript", () => {
+    const result = evaluateDesignerEvalRun({
+      caseId: "ai-software-factory-linear-github",
+      assertions: [
+        {
+          kind: "transcript-includes-required-phrases",
+          label: "Factory handoff",
+          requiredPhrases: [
+            "Implementation agent instructions",
+            "Review agent instructions",
+            "Ready -> Agent In Progress -> Ready for Review",
+            "operating guide",
+          ],
+        },
+      ],
+      dashboardControlActions: [],
+      productStateAfter: createAiFactoryProductState({
+        linearTools: ["linear-mcp"],
+        githubTools: ["github-cli"],
+      }),
+      transcriptMarkdown:
+        "Implementation agent instructions. Review agent instructions. Ready -> Agent In Progress -> Ready for Review. I can create an operating guide next.",
+    });
+
+    expect(result.passed).toBe(true);
+  });
+
+  it("checks required handoff sections in the transcript", () => {
+    const result = evaluateDesignerEvalRun({
+      caseId: "ai-software-factory-handoff-quality",
+      assertions: [
+        {
+          kind: "transcript-includes-sections",
+          label: "Factory handoff sections",
+          requiredSections: [
+            "Implementation agent instructions",
+            "Review agent instructions",
+            "Linear status mapping",
+            "Human operating guide",
+            "Configuration shape",
+            "Next action",
+          ],
+        },
+      ],
+      dashboardControlActions: [],
+      productStateAfter: createAiFactoryProductState({
+        linearTools: ["linear-mcp"],
+        githubTools: ["github-cli"],
+      }),
+      transcriptMarkdown: [
+        "**Implementation agent instructions**",
+        "**Review agent instructions**",
+        "**Linear status mapping**",
+        "**Human operating guide**",
+        "**Configuration shape**",
+        "**Next action:** review the draft.",
+      ].join("\n\n"),
+    });
+
+    expect(result.passed).toBe(true);
+  });
 });
 
 function createGithubProductState(input: {
@@ -259,6 +405,51 @@ function createGithubProductState(input: {
       profileId: "sbp_eval_github_pr_review_basic",
       version: 1,
       integrationBindings: input.integrationBindings,
+    },
+  };
+}
+
+function createAiFactoryProductState(input: {
+  linearTools: readonly string[];
+  githubTools: readonly string[];
+}): DesignerEvalProductState {
+  return {
+    providerConnections: [
+      {
+        id: "icn_linear",
+        label: "Linear",
+        providerFamilyId: "linear",
+        targetKey: "linear-default",
+      },
+      {
+        id: "icn_github",
+        label: "GitHub",
+        providerFamilyId: "github",
+        targetKey: "github-cloud",
+      },
+    ],
+    availableProviderResources: [],
+    targetDraft: {
+      profileId: "sbp_eval_ai_factory",
+      version: 1,
+      integrationBindings: [
+        {
+          id: "ibd_linear",
+          connectionId: "icn_linear",
+          kind: "connector",
+          config: {
+            tools: [...input.linearTools],
+          },
+        },
+        {
+          id: "ibd_github",
+          connectionId: "icn_github",
+          kind: "git",
+          config: {
+            tools: [...input.githubTools],
+          },
+        },
+      ],
     },
   };
 }

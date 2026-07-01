@@ -835,8 +835,9 @@ describe("DesignerCanvasWorkspace", () => {
     });
     expect(await screen.findByText("Classify issue")).toBeDefined();
     expect(await screen.findByText("Route readiness outcome")).toBeDefined();
-    expect(await screen.findByText(/Ready to implement -> Triage summary/u)).toBeDefined();
-    expect(await screen.findByText(/Needs clarification -> Triage summary/u)).toBeDefined();
+    expect(
+      await screen.findByText(/Triage summary: Ready to implement; Needs clarification/u),
+    ).toBeDefined();
     expect(screen.queryByText("2 routing rules")).toBeNull();
     expect(await screen.findByText("Triage summary")).toBeDefined();
     expect(screen.getByRole("region", { name: "Designer blueprint graph" })).toBeDefined();
@@ -1013,9 +1014,8 @@ describe("DesignerCanvasWorkspace", () => {
         description:
           "Send accepted work toward human merge; send requested changes back to implementation; mark unclear or blocked work appropriately.",
         routingSummary: [
-          "Changes requested -> Plan, edit, and test",
-          "Accepted -> Update issue status",
-          "Blocked or unclear -> Update issue status",
+          "Plan, edit, and test: Changes requested",
+          "Update issue status: Accepted; Blocked or unclear",
         ].join("\n"),
       }),
     ).toBeGreaterThan(150);

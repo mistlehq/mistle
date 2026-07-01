@@ -81,6 +81,16 @@ Designer must not claim the configured agent is ready when any required provider
 
 Designer must not claim the team process is ready if it has not defined issue readiness, workflow states, implementation/review responsibility, and feedback loops.
 
+Designer must not describe already configured draft profile tools, such as `linear-mcp` or `github-cli`, as still missing. It should distinguish configured draft capabilities from remaining setup such as instructions, labels, statuses, publishing, and triggers.
+
+Designer should not narrate internal tool probing, command lookup, or capability inspection. It should state only the user-relevant outcome, blocker, approval request, or handoff.
+
+When the chosen approval boundary requires approval before provider writes, Designer should call the outputs PR proposals and Linear update proposals until approval is granted.
+
+If Designer cannot save profile instructions directly, it should still produce a concrete handoff with draft implementation-agent instructions, draft review-agent instructions, a Linear status mapping such as `Ready -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done`, and an offer to create a human operating guide.
+
+The handoff should explicitly state the configuration shape: either one sandbox profile with role-separated implementation/review instructions, or separate implementation and review profiles. It should end with one recommended next action rather than a flat list of equal-priority setup tasks.
+
 ## Capability Gap To Surface
 
 If Designer cannot directly update Linear labels, statuses, issue templates, or related provider-side configuration, it should say that Designer currently lacks direct Linear setup capability and list the required user or product follow-up.

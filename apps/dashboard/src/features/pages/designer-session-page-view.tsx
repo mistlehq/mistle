@@ -1955,10 +1955,13 @@ function formatDesignerBlueprintNodeLabel(item: DesignerBlueprintItem): string {
   return item.eventLabel ?? "Trigger";
 }
 
-function formatDesignerBlueprintRoutingRule(
+function formatDesignerBlueprintRoutingRuleBranch(
   rule: Extract<DesignerBlueprintItem, { kind: "routing_policy" }>["rules"][number],
-  itemLabelById: ReadonlyMap<string, string>,
 ): string {
+  if (rule.label !== undefined) {
+    return rule.label;
+  }
+
   const conditions = rule.when
     .map((condition) => {
       const value = condition.value;
@@ -1967,13 +1970,16 @@ function formatDesignerBlueprintRoutingRule(
       return `${condition.field} ${condition.operator.replaceAll("_", " ")}${formattedValue}`;
     })
     .join("; ");
-  const routeTo =
-    rule.routeTo === undefined ? "" : ` -> ${itemLabelById.get(rule.routeTo) ?? rule.routeTo}`;
-  if (rule.label !== undefined) {
-    return `${rule.label}${routeTo}`;
-  }
 
-  return `When ${conditions}${routeTo}`;
+  return `When ${conditions}`;
+}
+
+function formatDesignerBlueprintRoutingDestination(
+  rule: Extract<DesignerBlueprintItem, { kind: "routing_policy" }>["rules"][number],
+  itemLabelById: ReadonlyMap<string, string>,
+): string | undefined {
+  const routeTo = rule.routeTo;
+  return routeTo === undefined ? undefined : (itemLabelById.get(routeTo) ?? routeTo);
 }
 
 function formatDesignerBlueprintRoutingSummary(input: {
@@ -1985,9 +1991,28 @@ function formatDesignerBlueprintRoutingSummary(input: {
     return undefined;
   }
 
-  return item.rules
-    .map((rule) => formatDesignerBlueprintRoutingRule(rule, input.itemLabelById))
-    .join("\n");
+  const branchLabelsByDestination = new Map<string, string[]>();
+  const untargetedBranchLabels: string[] = [];
+
+  for (const rule of item.rules) {
+    const branchLabel = formatDesignerBlueprintRoutingRuleBranch(rule);
+    const destination = formatDesignerBlueprintRoutingDestination(rule, input.itemLabelById);
+    if (destination === undefined) {
+      untargetedBranchLabels.push(branchLabel);
+      continue;
+    }
+
+    const branchLabels = branchLabelsByDestination.get(destination) ?? [];
+    branchLabels.push(branchLabel);
+    branchLabelsByDestination.set(destination, branchLabels);
+  }
+
+  return [
+    ...[...branchLabelsByDestination.entries()].map(
+      ([destination, branchLabels]) => `${destination}: ${branchLabels.join("; ")}`,
+    ),
+    ...untargetedBranchLabels,
+  ].join("\n");
 }
 
 function createDesignerBlueprintRoutingSummaryData(input: {

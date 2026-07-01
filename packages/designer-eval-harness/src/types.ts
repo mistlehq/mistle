@@ -82,6 +82,28 @@ export type DesignerEvalAssertion =
       requiredPhrases: readonly string[];
     }
   | {
+      kind: "configured-tools-not-claimed-missing";
+      connectionTools: readonly {
+        connectionId: string;
+        tools: readonly string[];
+      }[];
+      forbiddenPhrases: readonly string[];
+    }
+  | {
+      kind: "transcript-excludes-internal-progress";
+      forbiddenPhrases: readonly string[];
+    }
+  | {
+      kind: "transcript-includes-required-phrases";
+      label: string;
+      requiredPhrases: readonly string[];
+    }
+  | {
+      kind: "transcript-includes-sections";
+      label: string;
+      requiredSections: readonly string[];
+    }
+  | {
       kind: "saved-selected-provider-resources";
       connectionId: string;
       selectedHandles: readonly string[];
