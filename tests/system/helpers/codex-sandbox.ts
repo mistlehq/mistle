@@ -26,6 +26,7 @@ const RUNTIME_READY_POLL_INTERVAL_MS = 100;
 const SANDBOX_SESSION_CONNECT_TIMEOUT_MS = 120_000;
 const SANDBOX_STATUS_TIMEOUT_OPERATION_EVENT_LIMIT = 80;
 const SANDBOX_STATUS_TIMEOUT_DETAIL_LIMIT = 2_000;
+const SANDBOX_EXEC_FAILURE_DIAGNOSTIC_OPERATION_EVENT_LIMIT = 120;
 
 const IntegrationConnectionResponseSchema = z.looseObject({
   id: z.string().min(1),
@@ -465,14 +466,29 @@ export async function runSandboxExecCommandInSandbox(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
 
-  return runSandboxExecCommand({
-    fixture: input.fixture,
-    connectionUrl,
-    command: input.command,
-    ...(input.args === undefined ? {} : { args: input.args }),
-    ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
-    ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
-  });
+  try {
+    return await runSandboxExecCommand({
+      fixture: input.fixture,
+      connectionUrl,
+      command: input.command,
+      ...(input.args === undefined ? {} : { args: input.args }),
+      ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+      ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+    });
+  } catch (error) {
+    const diagnostic = await collectSandboxOperationDiagnostics({
+      fixture: input.fixture,
+      authenticatedSession: input.authenticatedSession,
+      sandboxInstanceId: input.sandboxInstanceId,
+      operationEventLimit: SANDBOX_EXEC_FAILURE_DIAGNOSTIC_OPERATION_EVENT_LIMIT,
+    });
+    const diagnosticSuffix =
+      diagnostic === null ? "" : `\n\nExec failure diagnostics:\n${diagnostic}`;
+    throw new Error(
+      `Sandbox exec command '${input.command}' failed before returning a result: ${error instanceof Error ? error.message : String(error)}.${diagnosticSuffix}`,
+      { cause: error },
+    );
+  }
 }
 
 export async function triggerSandboxdEgressProxyKill(input: {
@@ -573,10 +589,11 @@ export async function waitForSandboxStatus(input: {
     description: `sandbox '${input.sandboxInstanceId}' status=${input.expectedStatus}`,
     timeoutMs: input.timeoutMs ?? SANDBOX_READY_TIMEOUT_MS,
     diagnoseTimeout: () =>
-      collectSandboxStatusTimeoutDiagnostics({
+      collectSandboxOperationDiagnostics({
         fixture: input.fixture,
         authenticatedSession: input.authenticatedSession,
         sandboxInstanceId: input.sandboxInstanceId,
+        operationEventLimit: SANDBOX_STATUS_TIMEOUT_OPERATION_EVENT_LIMIT,
       }),
     evaluate: async () => {
       const response = await input.fixture.request(
@@ -609,12 +626,18 @@ export async function waitForSandboxStatus(input: {
   });
 }
 
-async function collectSandboxStatusTimeoutDiagnostics(input: {
+async function collectSandboxOperationDiagnostics(input: {
   fixture: CodexSandboxFixture;
   authenticatedSession: CodexSandboxAuthenticatedSession;
   sandboxInstanceId: string;
+  operationEventLimit: number;
 }): Promise<string | null> {
   try {
+    const runtimeState = await input.fixture
+      .readSandboxRuntimeState(input.sandboxInstanceId)
+      .catch((error: unknown) => ({
+        diagnosticReadError: error instanceof Error ? error.message : String(error),
+      }));
     const sandbox = await requestJsonOrThrow({
       request: async (path, init) => fetch(`${input.fixture.dataPlaneApiBaseUrl}${path}`, init),
       path: `/internal/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}?${new URLSearchParams({ organizationId: input.authenticatedSession.organizationId }).toString()}`,
@@ -644,7 +667,7 @@ async function collectSandboxStatusTimeoutDiagnostics(input: {
         {
           organizationId: input.authenticatedSession.organizationId,
           operationId: startupOperation.operationId,
-          limit: String(SANDBOX_STATUS_TIMEOUT_OPERATION_EVENT_LIMIT),
+          limit: String(input.operationEventLimit),
         },
       ).toString()}`,
       expectedStatus: 200,
@@ -665,6 +688,7 @@ async function collectSandboxStatusTimeoutDiagnostics(input: {
 
     return [
       `status=${sandbox.status}; connectable=${String(sandbox.connectable)}; failureCode=${sandbox.failureCode ?? "null"}; startupOperation=${startupOperation.operationKind}:${startupOperation.operationId}`,
+      `runtimeState=${renderTimeoutDiagnosticJson(runtimeState)}`,
       ...renderedEvents,
     ].join("\n");
   } catch (error) {
