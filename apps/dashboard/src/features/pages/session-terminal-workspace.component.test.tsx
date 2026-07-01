@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import type { DockviewApi } from "dockview";
+import type { DockviewApi } from "dockview-react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
