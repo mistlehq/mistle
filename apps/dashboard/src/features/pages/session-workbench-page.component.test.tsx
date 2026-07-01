@@ -113,7 +113,7 @@ describe("SessionWorkbenchPage", () => {
   it("does not reserve alert space when there are no alerts", () => {
     renderSessionWorkbenchPage();
 
-    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByTestId("session-workbench-alert-region")).toBeNull();
   });
 
   it("uses the cached sandbox session title as the browser tab title", () => {

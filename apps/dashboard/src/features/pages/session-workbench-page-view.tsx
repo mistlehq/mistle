@@ -423,7 +423,10 @@ export function SessionWorkbenchPageView({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {alert === null ? null : (
-        <div className="mx-auto flex w-full max-w-3xl flex-none flex-col gap-4 px-4 py-6">
+        <div
+          className="mx-auto flex w-full max-w-3xl flex-none flex-col gap-4 px-4 py-6"
+          data-testid="session-workbench-alert-region"
+        >
           <Notice
             aria-live={alert.variant === "default" ? "polite" : undefined}
             key={`${alert.title}:${alert.description}`}
