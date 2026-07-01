@@ -132,6 +132,17 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       if (input.runtimeProvider !== undefined && input.providerSandboxId !== undefined) {
         const runtimeProvider = input.runtimeProvider;
         const providerSandboxId = input.providerSandboxId;
+        await operationEvents.record({
+          attributes: {
+            failureCode: input.failureCode,
+            failureMessage: input.failureMessage,
+            providerSandboxId,
+            runtimeProvider,
+          },
+          message: "Sandbox startup failure cleanup started.",
+          phase: "teardown",
+          status: "started",
+        });
         logger.warn(
           {
             failureCode: input.failureCode,
@@ -160,8 +171,29 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 providerSandboxId,
               },
             );
+            await operationEvents.record({
+              attributes: {
+                failureCode: input.failureCode,
+                providerSandboxId,
+                runtimeProvider,
+              },
+              message: "Sandbox provider destroy after startup failure completed.",
+              phase: "teardown",
+              status: "completed",
+            });
           });
         } catch (error) {
+          await operationEvents.record({
+            attributes: {
+              error: error instanceof Error ? error.message : String(error),
+              failureCode: input.failureCode,
+              providerSandboxId,
+              runtimeProvider,
+            },
+            message: "Sandbox provider destroy after startup failure failed.",
+            phase: "teardown",
+            status: "failed",
+          });
           logger.error(
             {
               err: error,
@@ -182,7 +214,37 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           failureCode: input.failureCode,
           failureMessage: input.failureMessage,
         });
+        await operationEvents.record({
+          attributes: {
+            failureCode: input.failureCode,
+            failureMessage: input.failureMessage,
+            ...(input.providerSandboxId === undefined
+              ? {}
+              : { providerSandboxId: input.providerSandboxId }),
+            ...(input.runtimeProvider === undefined
+              ? {}
+              : { runtimeProvider: input.runtimeProvider }),
+          },
+          message: "Sandbox instance failed status transition completed.",
+          phase: "teardown",
+          status: "completed",
+        });
       } catch (error) {
+        await operationEvents.record({
+          attributes: {
+            error: error instanceof Error ? error.message : String(error),
+            failureCode: input.failureCode,
+            ...(input.providerSandboxId === undefined
+              ? {}
+              : { providerSandboxId: input.providerSandboxId }),
+            ...(input.runtimeProvider === undefined
+              ? {}
+              : { runtimeProvider: input.runtimeProvider }),
+          },
+          message: "Sandbox instance failed status transition failed.",
+          phase: "teardown",
+          status: "failed",
+        });
         logger.error(
           {
             err: error,
@@ -636,6 +698,15 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         },
         "Sandbox provider start completed.",
       );
+      await operationEvents.record({
+        attributes: {
+          providerSandboxId: startedSandbox.providerSandboxId,
+          runtimeProvider: startedSandbox.runtimeProvider,
+        },
+        message: "Sandbox provider start returned provider sandbox.",
+        phase: "provider",
+        status: "completed",
+      });
     } catch (error) {
       rethrowDurableStepErrorForRetry(error);
       logger.error({ err: error }, "Sandbox provider start failed.");
@@ -807,9 +878,27 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             : { gitIdentity: workflowInput.gitIdentity }),
         };
 
+        await operationEvents.record({
+          attributes: {
+            providerSandboxId: startedSandbox.providerSandboxId,
+            runtimeProvider: startedSandbox.runtimeProvider,
+          },
+          message: "Sandbox runtime activation call started.",
+          phase: "sandboxd",
+          status: "started",
+        });
         await activateSandboxRuntime(runtimeControlContext, {
           ...runtimeControlInputFields,
           operationKind,
+        });
+        await operationEvents.record({
+          attributes: {
+            providerSandboxId: startedSandbox.providerSandboxId,
+            runtimeProvider: startedSandbox.runtimeProvider,
+          },
+          message: "Sandbox runtime activation call completed.",
+          phase: "sandboxd",
+          status: "completed",
         });
       });
 
@@ -866,6 +955,16 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
 
     let didBootstrapAttach: boolean;
     try {
+      await operationEvents.record({
+        attributes: {
+          providerSandboxId: startedSandbox.providerSandboxId,
+          runtimeProvider: startedSandbox.runtimeProvider,
+          timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
+        },
+        message: "Sandbox bootstrap attachment wait started.",
+        phase: "agent_endpoint",
+        status: "started",
+      });
       didBootstrapAttach = await step.run(
         { name: "wait-for-sandbox-bootstrap-attachment" },
         async () => {
@@ -897,8 +996,32 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         },
         "Finished waiting for sandbox bootstrap attachment.",
       );
+      await operationEvents.record({
+        attributes: {
+          didBootstrapAttach,
+          providerSandboxId: startedSandbox.providerSandboxId,
+          runtimeProvider: startedSandbox.runtimeProvider,
+          timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
+        },
+        message: didBootstrapAttach
+          ? "Sandbox bootstrap attachment wait completed."
+          : "Sandbox bootstrap attachment wait timed out.",
+        phase: "agent_endpoint",
+        status: didBootstrapAttach ? "completed" : "failed",
+      });
     } catch (error) {
       rethrowDurableStepErrorForRetry(error);
+      await operationEvents.record({
+        attributes: {
+          error: error instanceof Error ? error.message : String(error),
+          providerSandboxId: startedSandbox.providerSandboxId,
+          runtimeProvider: startedSandbox.runtimeProvider,
+          timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
+        },
+        message: "Sandbox bootstrap attachment wait failed.",
+        phase: "agent_endpoint",
+        status: "failed",
+      });
       logger.error(
         {
           err: error,
