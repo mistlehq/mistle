@@ -270,9 +270,12 @@ function evaluateTranscriptIncludesSections(input: {
     };
   }
 
-  const headings = collectTranscriptSectionHeadings(input.transcriptMarkdown);
+  const headings = collectTranscriptSectionHeadings(
+    input.transcriptMarkdown,
+    input.requiredSections,
+  );
   const missingSections = input.requiredSections.filter(
-    (section) => !headings.has(section.toLowerCase()),
+    (section) => !headings.has(normalizeTranscriptSectionHeading(section)),
   );
 
   return {
@@ -285,23 +288,54 @@ function evaluateTranscriptIncludesSections(input: {
   };
 }
 
-function collectTranscriptSectionHeadings(transcriptMarkdown: string): ReadonlySet<string> {
+function collectTranscriptSectionHeadings(
+  transcriptMarkdown: string,
+  requiredSections: readonly string[],
+): ReadonlySet<string> {
   const headings = new Set<string>();
+  const requiredSectionHeadings = requiredSections.map(normalizeTranscriptSectionHeading);
   for (const line of transcriptMarkdown.split("\n")) {
+    const trimmedLine = line.trim();
     const headingMatch =
-      /^(?:#{1,6}\s+(?<markdownHeading>[^\n#]+?)|\*\*(?<boldHeading>[^*\n]+?)\*\*)/u.exec(
-        line.trim(),
+      /^(?:#{1,6}\s+(?<markdownHeading>[^\n]+)|\*\*(?<boldHeading>[^*\n]+?)\*\*)/u.exec(
+        trimmedLine,
       );
-    const heading =
+    const markdownHeading =
       headingMatch?.groups?.markdownHeading?.trim() ?? headingMatch?.groups?.boldHeading?.trim();
-    if (heading === undefined || heading.length === 0) {
+    const heading = markdownHeading ?? trimmedLine;
+    const normalizedHeading = normalizeTranscriptSectionHeading(heading);
+    const requiredHeading = findRequiredTranscriptSectionHeading(
+      normalizedHeading,
+      requiredSectionHeadings,
+    );
+    if (requiredHeading === undefined) {
       continue;
     }
 
-    headings.add(heading.replace(/:$/u, "").toLowerCase());
+    headings.add(requiredHeading);
   }
 
   return headings;
+}
+
+function normalizeTranscriptSectionHeading(heading: string): string {
+  return heading.replace(/:$/u, "").trim().toLowerCase();
+}
+
+function findRequiredTranscriptSectionHeading(
+  normalizedHeading: string,
+  requiredSectionHeadings: readonly string[],
+): string | undefined {
+  for (const requiredHeading of requiredSectionHeadings) {
+    if (
+      normalizedHeading === requiredHeading ||
+      normalizedHeading.startsWith(`${requiredHeading}:`)
+    ) {
+      return requiredHeading;
+    }
+  }
+
+  return undefined;
 }
 
 function evaluateTranscriptIncludesRequiredPhrases(input: {

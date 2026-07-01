@@ -1594,7 +1594,11 @@ function buildDesignerBlueprintProcessLaneGraph(input: {
       x: 0,
       y: nextY,
     });
-    nextY += getDesignerBlueprintProcessLaneSlotHeight(node.data) + DesignerBlueprintProcessLaneGap;
+    nextY +=
+      resolveDesignerBlueprintProcessLaneSlotHeight({
+        description: node.data.description,
+        routingSummary: node.data.routingSummary,
+      }) + DesignerBlueprintProcessLaneGap;
   }
 
   return {
@@ -1625,13 +1629,6 @@ function buildDesignerBlueprintProcessLaneGraph(input: {
       position: positionByNodeId.get(node.id) ?? node.position,
     })),
   };
-}
-
-function getDesignerBlueprintProcessLaneSlotHeight(data: DesignerBlueprintLayoutNodeData): number {
-  return resolveDesignerBlueprintProcessLaneSlotHeight({
-    description: data.description,
-    routingSummary: data.routingSummary,
-  });
 }
 
 export function resolveDesignerBlueprintProcessLaneSlotHeight(input: {
@@ -1739,7 +1736,7 @@ function buildDesignerBlueprintUnresolvedNodes(input: {
   return input.blueprint.items.map((item) =>
     createDesignerBlueprintLayoutNode({
       id: item.id,
-      data: createDesignerBlueprintLayoutNodeData({
+      data: {
         ...(item.description === undefined ? {} : { description: item.description }),
         ...createDesignerBlueprintIntegrationLogoData({
           item,
@@ -1756,7 +1753,7 @@ function buildDesignerBlueprintUnresolvedNodes(input: {
           item,
           itemLabelById,
         }),
-      }),
+      },
     }),
   );
 }
@@ -1771,12 +1768,6 @@ function createDesignerBlueprintLayoutNode(input: {
     data: input.data,
     position: { x: 0, y: 0 },
   };
-}
-
-function createDesignerBlueprintLayoutNodeData(
-  input: DesignerBlueprintLayoutNodeData,
-): DesignerBlueprintLayoutNodeData {
-  return input;
 }
 
 function createDesignerBlueprintPendingCommentData(input: {

@@ -3,6 +3,22 @@ import { DesignerEvalDecisionIds } from "./decision-ids.ts";
 
 type ScriptedAnswerValue = string | readonly string[];
 
+const AiFactoryInternalProgressForbiddenPhrases = [
+  "I’m going to check the available Mistle tools",
+  "I only have the dashboard-control path",
+  "no product mutation MCP tools were exposed",
+  "I’ll save the reversible profile configuration",
+];
+
+const AiFactoryRequiredHandoffSections = [
+  "Implementation agent instructions",
+  "Review agent instructions",
+  "Linear status mapping",
+  "Human operating guide",
+  "Configuration shape",
+  "Next action",
+];
+
 function scriptedAnswerAliases(
   ids: readonly string[],
   value: ScriptedAnswerValue,
@@ -363,12 +379,7 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     },
     {
       kind: "transcript-excludes-internal-progress",
-      forbiddenPhrases: [
-        "I’m going to check the available Mistle tools",
-        "I only have the dashboard-control path",
-        "no product mutation MCP tools were exposed",
-        "I’ll save the reversible profile configuration",
-      ],
+      forbiddenPhrases: AiFactoryInternalProgressForbiddenPhrases,
     },
     {
       kind: "transcript-includes-required-phrases",
@@ -387,14 +398,7 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     {
       kind: "transcript-includes-sections",
       label: "Factory handoff sections",
-      requiredSections: [
-        "Implementation agent instructions",
-        "Review agent instructions",
-        "Linear status mapping",
-        "Human operating guide",
-        "Configuration shape",
-        "Next action",
-      ],
+      requiredSections: AiFactoryRequiredHandoffSections,
     },
   ],
 };
@@ -408,23 +412,11 @@ const AiSoftwareFactoryHandoffQualityCase: DesignerEvalCase = {
     {
       kind: "transcript-includes-sections",
       label: "Factory handoff sections",
-      requiredSections: [
-        "Implementation agent instructions",
-        "Review agent instructions",
-        "Linear status mapping",
-        "Human operating guide",
-        "Configuration shape",
-        "Next action",
-      ],
+      requiredSections: AiFactoryRequiredHandoffSections,
     },
     {
       kind: "transcript-excludes-internal-progress",
-      forbiddenPhrases: [
-        "I’m going to check the available Mistle tools",
-        "I only have the dashboard-control path",
-        "no product mutation MCP tools were exposed",
-        "I’ll save the reversible profile configuration",
-      ],
+      forbiddenPhrases: AiFactoryInternalProgressForbiddenPhrases,
     },
   ],
 };

@@ -380,6 +380,81 @@ describe("Designer eval evaluator", () => {
 
     expect(result.passed).toBe(true);
   });
+
+  it("checks exact plain handoff section headings in the transcript", () => {
+    const result = evaluateDesignerEvalRun({
+      caseId: "ai-software-factory-handoff-quality",
+      assertions: [
+        {
+          kind: "transcript-includes-sections",
+          label: "Factory handoff sections",
+          requiredSections: [
+            "Implementation agent instructions",
+            "Review agent instructions",
+            "Linear status mapping",
+            "Human operating guide",
+            "Configuration shape",
+            "Next action",
+          ],
+        },
+      ],
+      dashboardControlActions: [],
+      productStateAfter: createAiFactoryProductState({
+        linearTools: ["linear-mcp"],
+        githubTools: ["github-cli"],
+      }),
+      transcriptMarkdown: [
+        "Implementation agent instructions:",
+        "Use the Linear intake and GitHub PR proposal flow.",
+        "Review agent instructions:",
+        "Review acceptance criteria, tests, and rework routing.",
+        "Linear status mapping:",
+        "Ready -> Agent In Progress -> Ready for Review.",
+        "Human operating guide:",
+        "Paste these instructions into the profile UI.",
+        "Configuration shape:",
+        "One sandbox profile with role-separated instructions.",
+        "Next action: Review the profile draft.",
+      ].join("\n\n"),
+    });
+
+    expect(result.passed).toBe(true);
+  });
+
+  it("checks Markdown handoff section headings in the transcript", () => {
+    const result = evaluateDesignerEvalRun({
+      caseId: "ai-software-factory-handoff-quality",
+      assertions: [
+        {
+          kind: "transcript-includes-sections",
+          label: "Factory handoff sections",
+          requiredSections: [
+            "Implementation agent instructions",
+            "Review agent instructions",
+            "Linear status mapping",
+            "Human operating guide",
+            "Configuration shape",
+            "Next action",
+          ],
+        },
+      ],
+      dashboardControlActions: [],
+      productStateAfter: createAiFactoryProductState({
+        linearTools: ["linear-mcp"],
+        githubTools: ["github-cli"],
+      }),
+      transcriptMarkdown: [
+        "## Implementation agent instructions",
+        "## Review agent instructions",
+        "## Linear status mapping",
+        "## Human operating guide",
+        "## Configuration shape",
+        "## Next action: Review the profile draft.",
+      ].join("\n\n"),
+    });
+
+    expect(result.passed).toBe(true);
+  });
 });
 
 function createGithubProductState(input: {
