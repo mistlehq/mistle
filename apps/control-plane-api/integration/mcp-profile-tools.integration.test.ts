@@ -334,6 +334,17 @@ describe.concurrent("MCP profile tools integration", () => {
       organizationId: session.organizationId,
       profileId: "sbp_mcp_delete",
     });
+
+    const persistedProfile = await env.controlPlaneDb.query.sandboxProfiles.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.id, "sbp_mcp_delete"), eq(table.organizationId, session.organizationId)),
+    });
+    expect(persistedProfile).toEqual({
+      id: "sbp_mcp_delete",
+    });
   });
 
   it("creates a profile, updates metadata, and updates draft configuration with bindings", async ({
