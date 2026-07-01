@@ -299,6 +299,7 @@ export async function ensureImplicitConnectionWebhookSource(input: {
   organizationId: string;
   connectionId: string;
   targetKey: string;
+  providerMetadata?: Record<string, unknown> | undefined;
 }): Promise<IntegrationWebhookSource> {
   const tables = getControlPlaneDatabaseSchema(input.db);
 
@@ -326,6 +327,7 @@ export async function ensureImplicitConnectionWebhookSource(input: {
       targetKey: input.targetKey,
       endpointKey,
       status: IntegrationWebhookSourceStatuses.ACTIVE,
+      ...(input.providerMetadata === undefined ? {} : { providerMetadata: input.providerMetadata }),
     })
     .returning();
 
@@ -549,6 +551,7 @@ export async function listIntegrationWebhookSources(
       organizationId: input.organizationId,
       connectionId: connection.id,
       targetKey: connection.targetKey,
+      providerMetadata: webhookSourceCapability.initialSourceProviderMetadata,
     });
     const descriptor = await resolveWebhookSourceDescriptor({
       controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
@@ -861,6 +864,7 @@ export async function refreshIntegrationWebhookSourceTriggerCapabilities(
           organizationId: input.organizationId,
           connectionId: connection.id,
           targetKey: connection.targetKey,
+          providerMetadata: webhookSourceCapability.initialSourceProviderMetadata,
         })
       : await resolveManagedConnectionWebhookSourceForRefresh({
           db: ctx.db,

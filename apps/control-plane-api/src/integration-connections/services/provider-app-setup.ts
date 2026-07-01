@@ -564,6 +564,7 @@ async function resolveWebhookCallbackUrl(input: {
     organizationId: input.connection.organizationId,
     connectionId: input.connection.id,
     targetKey: input.connection.targetKey,
+    providerMetadata: webhookSourceCapability.initialSourceProviderMetadata,
   });
   const webhookSourceDescriptor = await webhookSourceCapability.describeSource({
     organizationId: input.connection.organizationId,

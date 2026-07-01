@@ -244,6 +244,7 @@ export async function createFormConnection(
           organizationId: input.organizationId,
           connectionId: createdConnection.id,
           targetKey: input.targetKey,
+          providerMetadata: webhookSourceCapability.initialSourceProviderMetadata,
         });
       }
 

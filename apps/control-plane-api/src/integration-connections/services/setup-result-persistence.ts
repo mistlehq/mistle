@@ -201,6 +201,7 @@ export async function persistProviderAppSetupResult(input: {
           organizationId: input.organizationId,
           connectionId: updatedConnection.id,
           targetKey: updatedConnection.targetKey,
+          providerMetadata: webhookSourceCapability.initialSourceProviderMetadata,
         });
 
         const providerMetadata = input.webhookSourceUpdate?.providerMetadata;

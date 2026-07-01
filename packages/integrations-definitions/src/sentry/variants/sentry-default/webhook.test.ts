@@ -150,6 +150,11 @@ describe("Sentry webhook support", () => {
         },
       }),
     ).toBe(false);
+    expect(SentryWebhookSourceCapability.initialSourceProviderMetadata).toEqual({
+      [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+        events: ["issue"],
+      },
+    });
 
     const describedSource = await SentryWebhookSourceCapability.describeSource({
       organizationId: "org_123",
