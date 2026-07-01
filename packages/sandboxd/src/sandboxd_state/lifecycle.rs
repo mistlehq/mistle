@@ -337,12 +337,17 @@ impl SandboxdState {
 
         let mut egress_proxy: Option<EgressProxy>;
 
+        let mut egress_proxy_start_attributes =
+            timeline_attributes("egress-proxy", "Starting egress proxy");
+        if diagnostics_logger.is_some() {
+            egress_proxy_start_attributes
+                .extend(collect_egress_proxy_start_diagnostics(session_input));
+        }
         record_operation_phase_started_with_attributes(
             &diagnostics_logger,
             "start_egress_proxy",
-            timeline_attributes("egress-proxy", "Starting egress proxy"),
+            egress_proxy_start_attributes,
         );
-        record_egress_proxy_start_diagnostics(&diagnostics_logger, session_input);
         egress_proxy = match EgressProxy::start(
             &runtime_plan,
             session_input,
@@ -1496,26 +1501,6 @@ fn ensure_dev_link(dev_directory: &Path, name: &str, target: &Path) -> Result<()
         }
         Err(error) => Err(format!("failed to inspect '{}': {error}", path.display())),
     }
-}
-
-fn record_egress_proxy_start_diagnostics(
-    diagnostics_logger: &Option<ActivationDiagnosticsLogger>,
-    session_input: &SessionRuntimeInput,
-) {
-    if diagnostics_logger.is_none() {
-        return;
-    }
-
-    record_operation_phase_started_with_attributes(
-        diagnostics_logger,
-        "start_egress_proxy_environment_diagnostics",
-        hidden_timeline_attributes(),
-    );
-    record_operation_phase_completed_with_attributes(
-        diagnostics_logger,
-        "start_egress_proxy_environment_diagnostics",
-        collect_egress_proxy_start_diagnostics(session_input),
-    );
 }
 
 fn collect_egress_proxy_start_diagnostics(
