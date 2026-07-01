@@ -59,24 +59,6 @@ const SentryIssuePayloadReferences: readonly IntegrationWebhookPayloadReference[
   },
 ];
 
-const SentryIssueIdParameter: IntegrationWebhookEventParameterDefinition = {
-  id: "issueId",
-  label: "issue",
-  kind: "string",
-  payloadPath: ["data", "issue", "id"],
-  prefix: "for",
-  placeholder: "Sentry issue ID",
-};
-
-const SentryIssueShortIdParameter: IntegrationWebhookEventParameterDefinition = {
-  id: "issueShortId",
-  label: "issue",
-  kind: "string",
-  payloadPath: ["data", "issue", "shortId"],
-  prefix: "for",
-  placeholder: "PROJECT-123",
-};
-
 const SentryProjectSlugParameter: IntegrationWebhookEventParameterDefinition = {
   id: "projectSlug",
   label: "project",
@@ -86,31 +68,16 @@ const SentryProjectSlugParameter: IntegrationWebhookEventParameterDefinition = {
   placeholder: "project-slug",
 };
 
-const SentryIssueCategoryParameter: IntegrationWebhookEventParameterDefinition = {
-  id: "issueCategory",
-  label: "category",
+const SentryIssueTitleParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "issueTitle",
+  label: "title",
   kind: "string",
-  payloadPath: ["data", "issue", "issueCategory"],
-  prefix: "with",
-  placeholder: "error",
+  payloadPath: ["data", "issue", "title"],
+  prefix: "with title containing",
+  placeholder: "Error generated with event_id",
 };
 
-const SentryIssueTypeParameter: IntegrationWebhookEventParameterDefinition = {
-  id: "issueType",
-  label: "type",
-  kind: "string",
-  payloadPath: ["data", "issue", "issueType"],
-  prefix: "with",
-  placeholder: "error",
-};
-
-const SentryIssueParameters = [
-  SentryIssueIdParameter,
-  SentryIssueShortIdParameter,
-  SentryProjectSlugParameter,
-  SentryIssueCategoryParameter,
-  SentryIssueTypeParameter,
-];
+const SentryIssueParameters = [SentryProjectSlugParameter, SentryIssueTitleParameter];
 
 function createSentryIssueWebhookRequirements(): IntegrationWebhookTriggerRequirements {
   return {

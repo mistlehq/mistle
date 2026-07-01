@@ -103,6 +103,24 @@ describe("Sentry webhook support", () => {
       "issue.archived",
       "issue.unresolved",
     ]);
+    expect(SentrySupportedWebhookEvents[0]?.parameters).toEqual([
+      {
+        id: "projectSlug",
+        label: "project",
+        kind: "string",
+        payloadPath: ["data", "issue", "project", "slug"],
+        prefix: "in",
+        placeholder: "project-slug",
+      },
+      {
+        id: "issueTitle",
+        label: "title",
+        kind: "string",
+        payloadPath: ["data", "issue", "title"],
+        prefix: "with title containing",
+        placeholder: "Error generated with event_id",
+      },
+    ]);
   });
 
   it("describes an implicit Sentry issue webhook source for internal integrations", async () => {
