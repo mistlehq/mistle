@@ -35,13 +35,41 @@ where
         install_path,
         timeout_ms,
         managed_env,
+        output_sink,
     } = input;
+    record_artifact_install_diagnostic(
+        output_sink.as_ref(),
+        format!(
+            "github release install client setup started repository={repository} release={} installPath={install_path}",
+            describe_release_selector(release),
+        ),
+    );
     let client = build_github_client(managed_env)?;
+    record_artifact_install_diagnostic(
+        output_sink.as_ref(),
+        format!(
+            "github release install client setup completed repository={repository} managedProxy={} managedCertificate={}",
+            managed_env_has_proxy(managed_env),
+            managed_env_has_certificate(managed_env),
+        ),
+    );
     let budget = StepBudget::new(timeout_ms, clock);
     let selector_description = describe_release_selector(release);
+    record_artifact_install_diagnostic(
+        output_sink.as_ref(),
+        format!(
+            "github release install workspace setup started repository={repository} release {selector_description} installPath={install_path}",
+        ),
+    );
     let workspace = InstallWorkspace::new(install_path)?;
     let asset_shape = select_release_asset_shape(asset)?;
     let asset_name = github_release_asset_shape_file_name(asset_shape);
+    record_artifact_install_diagnostic(
+        output_sink.as_ref(),
+        format!(
+            "github release install resolving asset repository={repository} release {selector_description} asset={asset_name} installPath={install_path}",
+        ),
+    );
     let download_url = resolve_github_release_asset_download_url(
         &client,
         repository,
@@ -51,9 +79,21 @@ where
         &budget,
         sleeper,
     )?;
+    record_artifact_install_diagnostic(
+        output_sink.as_ref(),
+        format!(
+            "github release install resolved asset repository={repository} release {selector_description} asset={asset_name} downloadUrl={download_url}",
+        ),
+    );
 
     let download_failure_context = format!(
         "github release asset download failed for {repository} release {selector_description} asset {asset_name}"
+    );
+    record_artifact_install_diagnostic(
+        output_sink.as_ref(),
+        format!(
+            "github release install download started repository={repository} release {selector_description} asset={asset_name}",
+        ),
     );
     download_github_asset_to_path(
         &client,
@@ -63,19 +103,50 @@ where
         &budget,
         sleeper,
     )?;
+    record_artifact_install_diagnostic(
+        output_sink.as_ref(),
+        format!(
+            "github release install download completed repository={repository} release {selector_description} asset={asset_name}",
+        ),
+    );
     budget.remaining_timeout_duration()?;
+    record_artifact_install_diagnostic(
+        output_sink.as_ref(),
+        format!(
+            "github release install checksum started repository={repository} release {selector_description} asset={asset_name}",
+        ),
+    );
     verify_github_release_asset_sha256(
         workspace.download_path(),
         github_release_asset_shape_sha256(asset_shape),
         &download_failure_context,
     )?;
+    record_artifact_install_diagnostic(
+        output_sink.as_ref(),
+        format!(
+            "github release install checksum completed repository={repository} release {selector_description} asset={asset_name}",
+        ),
+    );
     budget.remaining_timeout_duration()?;
 
+    record_artifact_install_diagnostic(
+        output_sink.as_ref(),
+        format!(
+            "github release install materialize started repository={repository} release {selector_description} asset={asset_name} installPath={install_path}",
+        ),
+    );
     materialize_github_release_asset(workspace, asset_shape, &budget).map_err(|error| {
         format!(
             "github release asset install failed for {repository} release {selector_description} asset {asset_name} installPath={install_path}: {error}"
         )
-    })
+    })?;
+    record_artifact_install_diagnostic(
+        output_sink.as_ref(),
+        format!(
+            "github release install materialize completed repository={repository} release {selector_description} asset={asset_name} installPath={install_path}",
+        ),
+    );
+    Ok(())
 }
 
 pub(super) fn resolve_github_release_asset_download_url<C, S>(
@@ -174,6 +245,21 @@ pub(super) fn apply_managed_github_client_env(
     }
 
     Ok(builder)
+}
+
+fn managed_env_has_proxy(managed_env: Option<&BTreeMap<String, String>>) -> bool {
+    managed_env.is_some_and(|managed_env| {
+        managed_env.contains_key("HTTPS_PROXY")
+            || managed_env.contains_key("https_proxy")
+            || managed_env.contains_key("ALL_PROXY")
+            || managed_env.contains_key("all_proxy")
+    })
+}
+
+fn managed_env_has_certificate(managed_env: Option<&BTreeMap<String, String>>) -> bool {
+    managed_env.is_some_and(|managed_env| {
+        managed_env.contains_key("SSL_CERT_FILE") || managed_env.contains_key("CURL_CA_BUNDLE")
+    })
 }
 
 pub(super) fn resolve_github_release<C, S>(

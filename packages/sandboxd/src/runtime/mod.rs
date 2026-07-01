@@ -17,7 +17,7 @@ use std::fmt;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::command::CommandOutputSink;
+use crate::command::{CommandOutputSink, CommandOutputStream};
 use crate::protocol::session::SessionRuntimeInput;
 use crate::skills::{SkillsReconcileSelection, SkillsRuntime, reconcile_materialized_skills};
 
@@ -196,18 +196,44 @@ pub fn apply_compiled_runtime_plan_with_output_sink_and_observer(
     }
     for (artifact_index, artifact) in runtime_plan.artifacts.iter().enumerate() {
         for (install_index, install_step) in artifact.lifecycle.install.iter().enumerate() {
+            record_runtime_plan_install_step_diagnostic(
+                output_sink.as_ref(),
+                format!(
+                    "artifact install step started artifactIndex={artifact_index} installIndex={install_index} artifactKey={} op={}",
+                    artifact.artifact_key,
+                    artifact_install::artifact_install_step_op(install_step),
+                ),
+            );
             artifact_install::apply_artifact_install_step(
                 install_step,
                 managed_env,
                 output_sink.clone(),
             )
-            .map_err(|error| RuntimePlanApplyError::ArtifactInstall {
-                artifact_index,
-                install_index,
-                artifact_key: artifact.artifact_key.clone(),
-                op: artifact_install::artifact_install_step_op(install_step),
-                error,
+            .map_err(|error| {
+                record_runtime_plan_install_step_diagnostic(
+                    output_sink.as_ref(),
+                    format!(
+                        "artifact install step failed artifactIndex={artifact_index} installIndex={install_index} artifactKey={} op={} error={error}",
+                        artifact.artifact_key,
+                        artifact_install::artifact_install_step_op(install_step),
+                    ),
+                );
+                RuntimePlanApplyError::ArtifactInstall {
+                    artifact_index,
+                    install_index,
+                    artifact_key: artifact.artifact_key.clone(),
+                    op: artifact_install::artifact_install_step_op(install_step),
+                    error,
+                }
             })?;
+            record_runtime_plan_install_step_diagnostic(
+                output_sink.as_ref(),
+                format!(
+                    "artifact install step completed artifactIndex={artifact_index} installIndex={install_index} artifactKey={} op={}",
+                    artifact.artifact_key,
+                    artifact_install::artifact_install_step_op(install_step),
+                ),
+            );
         }
     }
     if runtime_plan
@@ -286,6 +312,15 @@ pub fn apply_compiled_runtime_plan_with_output_sink_and_observer(
     apply_runtime_client_setup_files(runtime_plan, observer)?;
 
     Ok(())
+}
+
+fn record_runtime_plan_install_step_diagnostic(
+    output_sink: Option<&Arc<dyn CommandOutputSink>>,
+    message: String,
+) {
+    if let Some(output_sink) = output_sink {
+        output_sink.record_output(CommandOutputStream::Stderr, message.as_bytes());
+    }
 }
 
 /// Applies only runtime client setup files from one compiled runtime plan.
