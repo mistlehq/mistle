@@ -19,6 +19,7 @@ import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import {
   DesignerCanvasWorkspace,
+  resolveDesignerBlueprintProcessLaneSlotHeight,
   resolveDesignerBlueprintInitialFocusViewportForNodes,
 } from "./designer-session-page-view.js";
 import { OrganizationIntegrationsSettingsPage } from "./organization-integrations-settings-page.js";
@@ -756,6 +757,38 @@ describe("DesignerCanvasWorkspace", () => {
                 state: "needs_setup",
               },
               {
+                id: "readiness-route",
+                kind: "routing_policy",
+                label: "Route readiness outcome",
+                description:
+                  "Send ready work to implementation and unclear work back for clarification.",
+                state: "proposed",
+                rules: [
+                  {
+                    label: "Ready to implement",
+                    when: [
+                      {
+                        field: "issue.ready",
+                        operator: "equals",
+                        value: true,
+                      },
+                    ],
+                    routeTo: "triage-summary",
+                  },
+                  {
+                    label: "Needs clarification",
+                    when: [
+                      {
+                        field: "issue.ready",
+                        operator: "equals",
+                        value: false,
+                      },
+                    ],
+                    routeTo: "triage-summary",
+                  },
+                ],
+              },
+              {
                 id: "triage-summary",
                 kind: "workflow_output",
                 label: "Triage summary",
@@ -770,8 +803,13 @@ describe("DesignerCanvasWorkspace", () => {
               },
               {
                 from: "classify-issue",
+                to: "readiness-route",
+                kind: "routes_to",
+              },
+              {
+                from: "readiness-route",
                 to: "triage-summary",
-                kind: "produces",
+                kind: "routes_to",
               },
             ],
             actions: [
@@ -796,6 +834,10 @@ describe("DesignerCanvasWorkspace", () => {
       ).toBeDefined();
     });
     expect(await screen.findByText("Classify issue")).toBeDefined();
+    expect(await screen.findByText("Route readiness outcome")).toBeDefined();
+    expect(await screen.findByText(/Ready to implement -> Triage summary/u)).toBeDefined();
+    expect(await screen.findByText(/Needs clarification -> Triage summary/u)).toBeDefined();
+    expect(screen.queryByText("2 routing rules")).toBeNull();
     expect(await screen.findByText("Triage summary")).toBeDefined();
     expect(screen.getByRole("region", { name: "Designer blueprint graph" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "Create trigger" })).toBeNull();
@@ -963,6 +1005,20 @@ describe("DesignerCanvasWorkspace", () => {
       y: 56,
       zoom: 0.82,
     });
+  });
+
+  it("reserves process-lane space for tall blueprint routing summaries", () => {
+    expect(
+      resolveDesignerBlueprintProcessLaneSlotHeight({
+        description:
+          "Send accepted work toward human merge; send requested changes back to implementation; mark unclear or blocked work appropriately.",
+        routingSummary: [
+          "Changes requested -> Plan, edit, and test",
+          "Accepted -> Update issue status",
+          "Blocked or unclear -> Update issue status",
+        ].join("\n"),
+      }),
+    ).toBeGreaterThan(150);
   });
 
   it("returns no blueprint viewport before the canvas has a measured width", () => {

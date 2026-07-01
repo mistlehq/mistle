@@ -934,12 +934,12 @@ const DesignerBlueprintNodeWidth = 280;
 const DesignerBlueprintNodeBaseHeight = 126;
 const DesignerBlueprintNodeDescriptionLineHeight = 16;
 const DesignerBlueprintNodeDescriptionCharsPerLine = 34;
-const DesignerBlueprintNodeRoutingSummaryHeight = 28;
+const DesignerBlueprintNodeRoutingSummaryLineHeight = 18;
+const DesignerBlueprintNodeRoutingSummaryCharsPerLine = 32;
 const DesignerBlueprintInitialViewport = { x: 48, y: 32, zoom: 0.95 };
 const DesignerBlueprintInitialFocusTopPadding = 56;
 const DesignerBlueprintProcessLaneGap = 32;
 const DesignerBlueprintProcessLaneMinSlotHeight = 128;
-const DesignerBlueprintProcessLaneMaxSlotHeight = 150;
 const DesignerBlueprintProcessLaneInitialZoom = 0.82;
 const DesignerBlueprintLoopbackEdgeOffset = 180;
 const DesignerBlueprintProcessLaneInitialFocusRightPadding =
@@ -1285,7 +1285,7 @@ function DesignerBlueprintVisualNodeComponent(
               </p>
             )}
             {input.data.routingSummary === undefined ? null : (
-              <p className="mt-2 rounded-sm bg-muted px-2 py-1 text-xs leading-relaxed text-muted-foreground">
+              <p className="mt-2 whitespace-pre-line rounded-sm bg-muted px-2 py-1 text-xs leading-relaxed text-muted-foreground">
                 {input.data.routingSummary}
               </p>
             )}
@@ -1628,9 +1628,19 @@ function buildDesignerBlueprintProcessLaneGraph(input: {
 }
 
 function getDesignerBlueprintProcessLaneSlotHeight(data: DesignerBlueprintLayoutNodeData): number {
+  return resolveDesignerBlueprintProcessLaneSlotHeight({
+    description: data.description,
+    routingSummary: data.routingSummary,
+  });
+}
+
+export function resolveDesignerBlueprintProcessLaneSlotHeight(input: {
+  description?: string | undefined;
+  routingSummary?: string | undefined;
+}): number {
   return Math.max(
     DesignerBlueprintProcessLaneMinSlotHeight,
-    Math.min(getDesignerBlueprintNodeHeight(data), DesignerBlueprintProcessLaneMaxSlotHeight),
+    getDesignerBlueprintNodeContentHeight(input),
   );
 }
 
@@ -1722,6 +1732,10 @@ function buildDesignerBlueprintUnresolvedNodes(input: {
   blueprint: DesignerBlueprintDocument;
   integrationMetadataByTargetKey: ReadonlyMap<string, DesignerBlueprintIntegrationMetadata>;
 }): DesignerBlueprintLayoutNode[] {
+  const itemLabelById = new Map(
+    input.blueprint.items.map((item) => [item.id, formatDesignerBlueprintNodeLabel(item)]),
+  );
+
   return input.blueprint.items.map((item) =>
     createDesignerBlueprintLayoutNode({
       id: item.id,
@@ -1738,7 +1752,10 @@ function buildDesignerBlueprintUnresolvedNodes(input: {
         }),
         item,
         label: formatDesignerBlueprintNodeLabel(item),
-        ...createDesignerBlueprintRoutingSummaryData(item),
+        ...createDesignerBlueprintRoutingSummaryData({
+          item,
+          itemLabelById,
+        }),
       }),
     }),
   );
@@ -1819,11 +1836,14 @@ function buildDesignerBlueprintDisplayEdges(
   ];
 }
 
-function getDesignerBlueprintNodeHeight(data: DesignerBlueprintLayoutNodeData): number {
+function getDesignerBlueprintNodeContentHeight(input: {
+  description?: string | undefined;
+  routingSummary?: string | undefined;
+}): number {
   return (
     DesignerBlueprintNodeBaseHeight +
-    getDesignerBlueprintDescriptionHeight(data.description) +
-    (data.routingSummary === undefined ? 0 : DesignerBlueprintNodeRoutingSummaryHeight)
+    getDesignerBlueprintDescriptionHeight(input.description) +
+    getDesignerBlueprintRoutingSummaryHeight(input.routingSummary)
   );
 }
 
@@ -1834,6 +1854,22 @@ function getDesignerBlueprintDescriptionHeight(description: string | undefined):
 
   const lineCount = Math.ceil(description.length / DesignerBlueprintNodeDescriptionCharsPerLine);
   return Math.max(lineCount, 1) * DesignerBlueprintNodeDescriptionLineHeight;
+}
+
+function getDesignerBlueprintRoutingSummaryHeight(routingSummary: string | undefined): number {
+  if (routingSummary === undefined) {
+    return 0;
+  }
+
+  const lineCount = routingSummary
+    .split("\n")
+    .reduce(
+      (count, line) =>
+        count +
+        Math.max(Math.ceil(line.length / DesignerBlueprintNodeRoutingSummaryCharsPerLine), 1),
+      0,
+    );
+  return lineCount * DesignerBlueprintNodeRoutingSummaryLineHeight;
 }
 
 type DesignerBlueprintIntegrationMetadata = {
@@ -1921,6 +1957,7 @@ function formatDesignerBlueprintNodeLabel(item: DesignerBlueprintItem): string {
 
 function formatDesignerBlueprintRoutingRule(
   rule: Extract<DesignerBlueprintItem, { kind: "routing_policy" }>["rules"][number],
+  itemLabelById: ReadonlyMap<string, string>,
 ): string {
   const conditions = rule.when
     .map((condition) => {
@@ -1930,29 +1967,34 @@ function formatDesignerBlueprintRoutingRule(
       return `${condition.field} ${condition.operator.replaceAll("_", " ")}${formattedValue}`;
     })
     .join("; ");
-  const routeTo = rule.routeTo === undefined ? "" : ` -> ${rule.routeTo}`;
-  return `${rule.label ?? "When"}: ${conditions}${routeTo}`;
+  const routeTo =
+    rule.routeTo === undefined ? "" : ` -> ${itemLabelById.get(rule.routeTo) ?? rule.routeTo}`;
+  if (rule.label !== undefined) {
+    return `${rule.label}${routeTo}`;
+  }
+
+  return `When ${conditions}${routeTo}`;
 }
 
-function formatDesignerBlueprintRoutingSummary(item: DesignerBlueprintItem): string | undefined {
+function formatDesignerBlueprintRoutingSummary(input: {
+  item: DesignerBlueprintItem;
+  itemLabelById: ReadonlyMap<string, string>;
+}): string | undefined {
+  const item = input.item;
   if (item.kind !== "routing_policy") {
     return undefined;
   }
 
-  if (item.rules.length === 1) {
-    const rule = item.rules[0];
-    if (rule !== undefined) {
-      return formatDesignerBlueprintRoutingRule(rule);
-    }
-  }
-
-  return `${item.rules.length} routing rules`;
+  return item.rules
+    .map((rule) => formatDesignerBlueprintRoutingRule(rule, input.itemLabelById))
+    .join("\n");
 }
 
-function createDesignerBlueprintRoutingSummaryData(
-  item: DesignerBlueprintItem,
-): Pick<DesignerBlueprintLayoutNodeData, "routingSummary"> | Record<string, never> {
-  const routingSummary = formatDesignerBlueprintRoutingSummary(item);
+function createDesignerBlueprintRoutingSummaryData(input: {
+  item: DesignerBlueprintItem;
+  itemLabelById: ReadonlyMap<string, string>;
+}): Pick<DesignerBlueprintLayoutNodeData, "routingSummary"> | Record<string, never> {
+  const routingSummary = formatDesignerBlueprintRoutingSummary(input);
   return routingSummary === undefined ? {} : { routingSummary };
 }
 
