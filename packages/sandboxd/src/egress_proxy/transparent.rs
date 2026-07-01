@@ -36,7 +36,6 @@ use rtnetlink::packet_route::{
 use rtnetlink::{MulticastGroup, RouteMessageBuilder, new_connection, new_multicast_connection};
 #[cfg(test)]
 use serde::Deserialize;
-#[cfg(target_os = "linux")]
 use serde_json::Value;
 use tokio::net::{TcpSocket, TcpStream};
 
@@ -122,9 +121,47 @@ impl TransparentPacketRules {
     ) -> Result<Self, EgressProxyError> {
         #[cfg(not(target_os = "linux"))]
         let _ = log_context;
+        #[cfg(target_os = "linux")]
+        emit_egress_proxy_log(
+            log_context.clock,
+            log_context.sandbox_instance_id,
+            "egress_proxy_transparent_packet_rules_install_started",
+            &[],
+        );
         let plan = build_nftables_rule_plan(configuration, listener_port)?;
+        #[cfg(target_os = "linux")]
+        emit_egress_proxy_log(
+            log_context.clock,
+            log_context.sandbox_instance_id,
+            "egress_proxy_transparent_packet_rules_plan_built",
+            &[
+                ("tableName", Value::String(plan.table_name.clone())),
+                (
+                    "localDestinationIpv4Cidrs",
+                    string_array_value(&plan.local_destination_ipv4_cidrs),
+                ),
+                (
+                    "excludedIpv4Cidrs",
+                    string_array_value(&plan.excluded_ipv4_cidrs),
+                ),
+            ],
+        );
+        #[cfg(target_os = "linux")]
+        emit_egress_proxy_log(
+            log_context.clock,
+            log_context.sandbox_instance_id,
+            "egress_proxy_transparent_packet_rules_cleanup_started",
+            &[("tableName", Value::String(plan.table_name.clone()))],
+        );
         cleanup_transparent_nftables_table(&plan.table_name)?;
-        install_nftables_rule_plan(&plan)?;
+        #[cfg(target_os = "linux")]
+        emit_egress_proxy_log(
+            log_context.clock,
+            log_context.sandbox_instance_id,
+            "egress_proxy_transparent_packet_rules_cleanup_completed",
+            &[("tableName", Value::String(plan.table_name.clone()))],
+        );
+        install_nftables_rule_plan(&plan, Some(log_context))?;
         #[cfg(target_os = "linux")]
         let local_destination_reconciler = match start_transparent_local_destination_reconciler(
             plan.table_name.clone(),
@@ -141,6 +178,13 @@ impl TransparentPacketRules {
                 ));
             }
         };
+        #[cfg(target_os = "linux")]
+        emit_egress_proxy_log(
+            log_context.clock,
+            log_context.sandbox_instance_id,
+            "egress_proxy_transparent_packet_rules_install_completed",
+            &[("tableName", Value::String(plan.table_name.clone()))],
+        );
         Ok(Self {
             table_name: plan.table_name,
             local_destination_ipv4_cidrs: plan.local_destination_ipv4_cidrs,
@@ -223,13 +267,48 @@ pub(super) fn build_nftables_rule_plan_with_local_destinations(
     })
 }
 
-fn install_nftables_rule_plan(plan: &NftablesRulePlan) -> Result<(), EgressProxyError> {
-    for command in build_nftables_install_commands(plan) {
+fn install_nftables_rule_plan(
+    plan: &NftablesRulePlan,
+    log_context: Option<EgressProxyLogContext<'_>>,
+) -> Result<(), EgressProxyError> {
+    for (command_index, command) in build_nftables_install_commands(plan)
+        .into_iter()
+        .enumerate()
+    {
+        if let Some(log_context) = log_context {
+            emit_egress_proxy_log(
+                log_context.clock,
+                log_context.sandbox_instance_id,
+                "egress_proxy_transparent_nft_command_started",
+                &[
+                    ("tableName", Value::String(plan.table_name.clone())),
+                    (
+                        "commandIndex",
+                        Value::Number(serde_json::Number::from(command_index)),
+                    ),
+                    ("command", Value::String(command.join(" "))),
+                ],
+            );
+        }
         if let Err(error) = run_nft_command(&command) {
             return Err(cleanup_after_nftables_install_error(
                 &plan.table_name,
                 error,
             ));
+        }
+        if let Some(log_context) = log_context {
+            emit_egress_proxy_log(
+                log_context.clock,
+                log_context.sandbox_instance_id,
+                "egress_proxy_transparent_nft_command_completed",
+                &[
+                    ("tableName", Value::String(plan.table_name.clone())),
+                    (
+                        "commandIndex",
+                        Value::Number(serde_json::Number::from(command_index)),
+                    ),
+                ],
+            );
         }
     }
     Ok(())
@@ -693,9 +772,7 @@ pub(super) fn start_transparent_local_destination_reconciler_for_table(
     let mut plan = build_nftables_rule_plan(configuration, listener_port)?;
     plan.table_name = table_name.to_string();
     cleanup_transparent_nftables_table(&plan.table_name)?;
-    for command in build_nftables_install_commands(&plan) {
-        run_nft_command(&command)?;
-    }
+    install_nftables_rule_plan(&plan, None)?;
     start_transparent_local_destination_reconciler(
         plan.table_name,
         periodic_interval,
