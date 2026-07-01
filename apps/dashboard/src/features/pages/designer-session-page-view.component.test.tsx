@@ -776,6 +776,17 @@ describe("DesignerCanvasWorkspace", () => {
                     routeTo: "triage-summary",
                   },
                   {
+                    label: "Needs manual escalation",
+                    when: [
+                      {
+                        field: "issue.priority",
+                        operator: "equals",
+                        value: "urgent",
+                      },
+                    ],
+                    routeTo: "urgent-queue",
+                  },
+                  {
                     label: "Needs clarification",
                     when: [
                       {
@@ -786,12 +797,35 @@ describe("DesignerCanvasWorkspace", () => {
                     ],
                     routeTo: "triage-summary",
                   },
+                  {
+                    label: "Needs backlog review",
+                    when: [
+                      {
+                        field: "issue.priority",
+                        operator: "equals",
+                        value: "low",
+                      },
+                    ],
+                    routeTo: "backlog-queue",
+                  },
                 ],
               },
               {
                 id: "triage-summary",
                 kind: "workflow_output",
                 label: "Triage summary",
+                state: "proposed",
+              },
+              {
+                id: "urgent-queue",
+                kind: "workflow_output",
+                label: "Queue",
+                state: "proposed",
+              },
+              {
+                id: "backlog-queue",
+                kind: "workflow_output",
+                label: "Queue",
                 state: "proposed",
               },
             ],
@@ -809,6 +843,16 @@ describe("DesignerCanvasWorkspace", () => {
               {
                 from: "readiness-route",
                 to: "triage-summary",
+                kind: "routes_to",
+              },
+              {
+                from: "readiness-route",
+                to: "urgent-queue",
+                kind: "routes_to",
+              },
+              {
+                from: "readiness-route",
+                to: "backlog-queue",
                 kind: "routes_to",
               },
             ],
@@ -838,6 +882,10 @@ describe("DesignerCanvasWorkspace", () => {
     expect(
       await screen.findByText(/Triage summary: Ready to implement; Needs clarification/u),
     ).toBeDefined();
+    expect(
+      await screen.findByText(/Queue \(urgent-queue\): Needs manual escalation/u),
+    ).toBeDefined();
+    expect(await screen.findByText(/Queue \(backlog-queue\): Needs backlog review/u)).toBeDefined();
     expect(screen.queryByText("2 routing rules")).toBeNull();
     expect(await screen.findByText("Triage summary")).toBeDefined();
     expect(screen.getByRole("region", { name: "Designer blueprint graph" })).toBeDefined();

@@ -34,6 +34,7 @@ describe.concurrent("MCP OAuth discovery", () => {
       scopes_supported: [
         "sandboxProfile:read",
         "sandboxProfile:update",
+        "sandboxProfile:delete",
         "sandboxSession:create",
         "sandboxSession:read",
         "sandboxSession:connect",
@@ -102,6 +103,7 @@ describe.concurrent("MCP OAuth discovery", () => {
       token_endpoint_auth_methods_supported: ["none"],
       scopes_supported: [
         "organization:read",
+        "sandboxProfile:delete",
         "sandboxProfile:read",
         "sandboxProfile:update",
         "sandboxSession:connect",

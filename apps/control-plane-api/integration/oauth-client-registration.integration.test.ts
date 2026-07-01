@@ -28,7 +28,7 @@ describe.concurrent("OAuth dynamic client registration", () => {
       redirect_uris: ["http://127.0.0.1:61750/callback", "https://client.example.test/oauth"],
       grant_types: [OAuthGrantTypes.AUTHORIZATION_CODE, OAuthGrantTypes.REFRESH_TOKEN],
       response_types: ["code"],
-      scope: "sandboxProfile:read sandboxSession:create",
+      scope: "sandboxProfile:read sandboxProfile:delete sandboxSession:create",
       token_endpoint_auth_method: "none",
     });
 
@@ -45,7 +45,9 @@ describe.concurrent("OAuth dynamic client registration", () => {
       OAuthGrantTypes.REFRESH_TOKEN,
     ]);
     expect(registration.response_types).toStrictEqual(["code"]);
-    expect(registration.scope).toBe("sandboxProfile:read sandboxSession:create");
+    expect(registration.scope).toBe(
+      "sandboxProfile:read sandboxProfile:delete sandboxSession:create",
+    );
     expect(registration.token_endpoint_auth_method).toBe("none");
 
     const client = await env.controlPlaneDb.query.oauthClients.findFirst({
@@ -86,7 +88,7 @@ describe.concurrent("OAuth dynamic client registration", () => {
       where: (table, { eq }) => eq(table.oauthClientId, client.id),
     });
     expect(new Set(scopes.map((row) => row.scope))).toStrictEqual(
-      new Set(["sandboxProfile:read", "sandboxSession:create"]),
+      new Set(["sandboxProfile:read", "sandboxProfile:delete", "sandboxSession:create"]),
     );
   });
 

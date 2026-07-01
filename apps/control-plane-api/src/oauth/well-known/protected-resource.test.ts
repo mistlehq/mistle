@@ -20,6 +20,7 @@ describe("createMcpProtectedResourceMetadata", () => {
       scopes_supported: [
         "sandboxProfile:read",
         "sandboxProfile:update",
+        "sandboxProfile:delete",
         "sandboxSession:create",
         "sandboxSession:read",
         "sandboxSession:connect",

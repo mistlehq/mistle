@@ -1965,12 +1965,32 @@ function formatDesignerBlueprintRoutingRuleBranch(
   return `When ${conditions}`;
 }
 
+function createDesignerBlueprintItemLabelCounts(
+  itemLabelById: ReadonlyMap<string, string>,
+): ReadonlyMap<string, number> {
+  const labelCounts = new Map<string, number>();
+  for (const label of itemLabelById.values()) {
+    labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
+  }
+
+  return labelCounts;
+}
+
 function formatDesignerBlueprintRoutingDestination(
   rule: Extract<DesignerBlueprintItem, { kind: "routing_policy" }>["rules"][number],
   itemLabelById: ReadonlyMap<string, string>,
-): string | undefined {
+  itemLabelCounts: ReadonlyMap<string, number>,
+): { id: string; label: string } | undefined {
   const routeTo = rule.routeTo;
-  return routeTo === undefined ? undefined : (itemLabelById.get(routeTo) ?? routeTo);
+  if (routeTo === undefined) {
+    return undefined;
+  }
+
+  const label = itemLabelById.get(routeTo) ?? routeTo;
+  return {
+    id: routeTo,
+    label: (itemLabelCounts.get(label) ?? 0) > 1 ? `${label} (${routeTo})` : label,
+  };
 }
 
 function formatDesignerBlueprintRoutingSummary(input: {
@@ -1982,25 +2002,33 @@ function formatDesignerBlueprintRoutingSummary(input: {
     return undefined;
   }
 
-  const branchLabelsByDestination = new Map<string, string[]>();
+  const branchLabelsByDestinationId = new Map<string, { label: string; branchLabels: string[] }>();
   const untargetedBranchLabels: string[] = [];
+  const itemLabelCounts = createDesignerBlueprintItemLabelCounts(input.itemLabelById);
 
   for (const rule of item.rules) {
     const branchLabel = formatDesignerBlueprintRoutingRuleBranch(rule);
-    const destination = formatDesignerBlueprintRoutingDestination(rule, input.itemLabelById);
+    const destination = formatDesignerBlueprintRoutingDestination(
+      rule,
+      input.itemLabelById,
+      itemLabelCounts,
+    );
     if (destination === undefined) {
       untargetedBranchLabels.push(branchLabel);
       continue;
     }
 
-    const branchLabels = branchLabelsByDestination.get(destination) ?? [];
-    branchLabels.push(branchLabel);
-    branchLabelsByDestination.set(destination, branchLabels);
+    const destinationSummary = branchLabelsByDestinationId.get(destination.id) ?? {
+      label: destination.label,
+      branchLabels: [],
+    };
+    destinationSummary.branchLabels.push(branchLabel);
+    branchLabelsByDestinationId.set(destination.id, destinationSummary);
   }
 
   return [
-    ...[...branchLabelsByDestination.entries()].map(
-      ([destination, branchLabels]) => `${destination}: ${branchLabels.join("; ")}`,
+    ...[...branchLabelsByDestinationId.values()].map(
+      (destination) => `${destination.label}: ${destination.branchLabels.join("; ")}`,
     ),
     ...untargetedBranchLabels,
   ].join("\n");

@@ -7,6 +7,7 @@ import type { AppContextBindings, ControlPlaneApiMcpConfig } from "../../types.j
 export const McpOAuthScopes = [
   OrganizationPermissions.SANDBOX_PROFILE_READ,
   OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+  OrganizationPermissions.SANDBOX_PROFILE_DELETE,
   OrganizationPermissions.SANDBOX_SESSION_CREATE,
   OrganizationPermissions.SANDBOX_SESSION_READ,
   OrganizationPermissions.SANDBOX_SESSION_CONNECT,
