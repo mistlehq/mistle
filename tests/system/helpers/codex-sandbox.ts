@@ -24,9 +24,9 @@ const SANDBOX_CONNECTION_TOKEN_MINT_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 1_000;
 const RUNTIME_READY_POLL_INTERVAL_MS = 100;
 const SANDBOX_SESSION_CONNECT_TIMEOUT_MS = 120_000;
-const SANDBOX_STATUS_TIMEOUT_OPERATION_EVENT_LIMIT = 80;
+const SANDBOX_STATUS_TIMEOUT_OPERATION_EVENT_LIMIT = 500;
 const SANDBOX_STATUS_TIMEOUT_DETAIL_LIMIT = 2_000;
-const SANDBOX_EXEC_FAILURE_DIAGNOSTIC_OPERATION_EVENT_LIMIT = 120;
+const SANDBOX_EXEC_FAILURE_DIAGNOSTIC_OPERATION_EVENT_LIMIT = 500;
 
 const IntegrationConnectionResponseSchema = z.looseObject({
   id: z.string().min(1),
@@ -707,7 +707,9 @@ function shouldRenderTimeoutOperationEvent(event: SandboxStatusTimeoutOperationE
 
   return (
     event.recordKind === "transcript" &&
-    (event.phase === "egress" || event.phase === "operation_stream") &&
+    (event.phase === "egress" ||
+      event.phase === "operation_stream" ||
+      event.phase === "runtime_plan") &&
     (event.stream === "stderr" || event.stream === "system")
   );
 }
