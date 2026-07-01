@@ -5,6 +5,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { getDesignerEvalCase } from "../cases/registry.ts";
+import type { DesignerEvalProductStateIntegrationBinding } from "../types.ts";
 import { createDesignerEvalApiClient } from "./api-client.ts";
 import { startDesignerEvalControlPlane } from "./eval-control-plane.ts";
 import { createDesignerEvalSessionState } from "./in-memory-state.ts";
@@ -71,6 +72,10 @@ describe("Designer eval control plane", () => {
       runKey: "github_pr_review_basic",
     });
     const githubConnectionId = readSeededGithubConnectionId(state.seededState.providerConnections);
+    const githubBinding = readSeededGithubBinding(
+      state.productState.targetDraft.integrationBindings,
+      githubConnectionId,
+    );
     const controlPlane = await startDesignerEvalControlPlane({ state });
 
     try {
@@ -97,15 +102,16 @@ describe("Designer eval control plane", () => {
         connectionId: githubConnectionId,
         resourceKind: "repository",
         bindingIntent: "git-repositories",
-        bindingId: `ibd_${githubConnectionId}_git`,
+        bindingId: githubBinding.id,
         selectedHandles: ["mistlehq/mistle"],
-        createdBinding: true,
+        createdBinding: false,
       });
       expect(state.productState.targetDraft.integrationBindings).toContainEqual({
         id: response.bindingId,
         connectionId: githubConnectionId,
         kind: "git",
         config: {
+          tools: ["github-cli"],
           repositories: ["mistlehq/mistle"],
         },
       });
@@ -268,6 +274,7 @@ describe("Designer eval control plane", () => {
       runKey: "github_pr_review_basic",
     });
     const githubConnectionId = readSeededGithubConnectionId(state.seededState.providerConnections);
+    const originalBindings = structuredClone(state.productState.targetDraft.integrationBindings);
     const controlPlane = await startDesignerEvalControlPlane({ state });
 
     try {
@@ -295,7 +302,7 @@ describe("Designer eval control plane", () => {
       expect(await response.json()).toEqual({
         error: "Designer eval control-plane request failed.",
       });
-      expect(state.productState.targetDraft.integrationBindings).toHaveLength(1);
+      expect(state.productState.targetDraft.integrationBindings).toEqual(originalBindings);
     } finally {
       await controlPlane.close();
     }
@@ -311,4 +318,16 @@ function readSeededGithubConnectionId(
   }
 
   return connection.id;
+}
+
+function readSeededGithubBinding(
+  bindings: readonly DesignerEvalProductStateIntegrationBinding[],
+  connectionId: string,
+): DesignerEvalProductStateIntegrationBinding {
+  const binding = bindings.find((candidate) => candidate.connectionId === connectionId);
+  if (binding === undefined) {
+    throw new Error("Expected seeded GitHub binding.");
+  }
+
+  return binding;
 }
