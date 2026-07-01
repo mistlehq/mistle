@@ -1,4 +1,4 @@
-import "dockview/dist/styles/dockview.css";
+import "dockview-react/dist/styles/dockview.css";
 import "@xyflow/react/dist/style.css";
 import "./session-terminal-workspace.css";
 import { Button, cn, DialogShortcut, Textarea } from "@mistle/ui";
@@ -36,7 +36,7 @@ import {
   type DockviewWillDropEvent,
   type DockviewWillShowOverlayLocationEvent,
   type IDockviewPanelProps,
-} from "dockview";
+} from "dockview-react";
 import {
   createContext,
   useCallback,

@@ -2,7 +2,7 @@ import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { Button } from "@mistle/ui";
 import { PlusIcon } from "@phosphor-icons/react";
 
-import "dockview/dist/styles/dockview.css";
+import "dockview-react/dist/styles/dockview.css";
 import "./session-terminal-workspace.css";
 import {
   DockviewReact,
@@ -10,7 +10,7 @@ import {
   type DockviewGroupPanel,
   type IDockviewHeaderActionsProps,
   type IDockviewPanelProps,
-} from "dockview";
+} from "dockview-react";
 import {
   createContext,
   forwardRef,

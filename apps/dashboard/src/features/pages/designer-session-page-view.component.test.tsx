@@ -2,7 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { DockviewApi } from "dockview";
+import type { DockviewApi } from "dockview-react";
 import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeAll, describe, expect, it } from "vitest";
