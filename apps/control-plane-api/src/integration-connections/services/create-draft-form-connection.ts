@@ -111,6 +111,7 @@ export async function createDraftFormConnection(
         organizationId: input.organizationId,
         connectionId: createdConnection.id,
         targetKey: input.targetKey,
+        providerMetadata: webhookSourceCapability.initialSourceProviderMetadata,
       });
     }
 

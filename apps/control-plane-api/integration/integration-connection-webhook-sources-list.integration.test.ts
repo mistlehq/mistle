@@ -3,7 +3,11 @@
  */
 
 import { IntegrationConnectionStatuses } from "@mistle/db/control-plane";
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import {
+  IntegrationConnectionMethodIds,
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
+} from "@mistle/integrations-core";
+import { SentryConnectionMethodIds } from "@mistle/integrations-definitions";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { and, eq } from "drizzle-orm";
@@ -56,6 +60,67 @@ describe.concurrent("integration connection webhook sources list integration", (
         ),
     });
     expect(persistedSource).toBeDefined();
+  });
+
+  it("persists trigger capabilities on the implicit source created with a Sentry webhook connection", async ({
+    env,
+  }) => {
+    const targetKey = "sentry-default-implicit-webhook-source";
+    await seedSentryTarget(env, targetKey);
+    const session = await env.auth.createSession({
+      email: "integration-new-webhook-sources-sentry-implicit@example.com",
+    });
+
+    const response = await createFormConnection({
+      env,
+      targetKey,
+      cookie: session.cookie,
+      body: {
+        displayName: "Sentry webhook",
+        methodId: SentryConnectionMethodIds.WEBHOOK_SIGNING_SECRET,
+        config: {
+          connection_method: SentryConnectionMethodIds.WEBHOOK_SIGNING_SECRET,
+        },
+        secrets: {
+          clientSecret: "sentry-client-secret",
+        },
+      },
+    });
+
+    expect(response.status).toBe(201);
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(await response.json());
+
+    const listedResponse = await listWebhookSources(env, {
+      connectionId: createdConnection.id,
+      cookie: session.cookie,
+    });
+    expect(listedResponse.status).toBe(200);
+    const listedSources = ListIntegrationWebhookSourcesResponseSchema.parse(
+      await listedResponse.json(),
+    );
+    expect(listedSources).toHaveLength(1);
+    expect(listedSources[0]?.providerMetadata).toEqual({
+      [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+        events: ["issue"],
+      },
+    });
+
+    const persistedSource = await env.controlPlaneDb.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, session.organizationId),
+          eq(table.targetKey, targetKey),
+          eq(table.integrationConnectionId, createdConnection.id),
+        ),
+    });
+    if (persistedSource === undefined) {
+      throw new Error(`Expected implicit webhook source for '${createdConnection.id}'.`);
+    }
+    expect(persistedSource.providerMetadata).toEqual({
+      [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+        events: ["issue"],
+      },
+    });
   });
 
   it("does not expose webhook sources for GitHub API-key connections", async ({ env }) => {
@@ -185,5 +250,14 @@ async function seedGitHubTarget(env: IntegrationTestEnvironment, targetKey: stri
       api_base_url: "https://api.github.com",
       web_base_url: "https://github.com",
     },
+  });
+}
+
+async function seedSentryTarget(env: IntegrationTestEnvironment, targetKey: string): Promise<void> {
+  await seedIntegrationTarget(env, {
+    targetKey,
+    familyId: "sentry",
+    variantId: "sentry-default",
+    config: {},
   });
 }

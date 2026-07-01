@@ -136,6 +136,7 @@ async function resolveProviderConfigurationWebhookCallbackUrl(input: {
     organizationId: input.connection.organizationId,
     connectionId: input.connection.id,
     targetKey: input.connection.targetKey,
+    providerMetadata: webhookSourceCapability.initialSourceProviderMetadata,
   });
   const descriptor = await webhookSourceCapability.describeSource({
     organizationId: input.connection.organizationId,
@@ -269,11 +270,17 @@ export async function completeProviderConfigurationSetup(
     return;
   }
 
+  const { webhookSourceCapability } = resolveWebhookSourceCapabilityOrThrow({
+    integrationRegistry: ctx.integrationRegistry,
+    integrationsConfig: ctx.integrationsConfig,
+    target: input.connection.target,
+  });
   const webhookSource = await ensureImplicitConnectionWebhookSource({
     db: ctx.db,
     organizationId: input.connection.organizationId,
     connectionId: input.connection.id,
     targetKey: input.connection.targetKey,
+    providerMetadata: webhookSourceCapability.initialSourceProviderMetadata,
   });
   const tables = getControlPlaneDatabaseSchema(ctx.db);
   const updatedSources = await ctx.db

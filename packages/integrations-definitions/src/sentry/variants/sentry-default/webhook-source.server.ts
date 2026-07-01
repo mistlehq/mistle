@@ -10,6 +10,12 @@ import {
   type SentryConnectionConfig,
 } from "./auth.js";
 
+const SentryIssueWebhookTriggerCapabilitiesProviderMetadata = {
+  [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+    events: ["issue"],
+  },
+};
+
 export const SentryWebhookSourceCapability: IntegrationWebhookSourceCapability<
   Record<string, never>,
   Record<string, never>,
@@ -20,6 +26,7 @@ export const SentryWebhookSourceCapability: IntegrationWebhookSourceCapability<
     return SentryWebhookSigningSecretConnectionConfigSchema.safeParse(input.connection.config)
       .success;
   },
+  initialSourceProviderMetadata: SentryIssueWebhookTriggerCapabilitiesProviderMetadata,
   describeSource(input) {
     const endpointKey = input.source.endpointKey;
     if (endpointKey === undefined) {
@@ -35,9 +42,7 @@ export const SentryWebhookSourceCapability: IntegrationWebhookSourceCapability<
       }),
       providerMetadata: {
         ...input.source.providerMetadata,
-        [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
-          events: ["issue"],
-        },
+        ...SentryIssueWebhookTriggerCapabilitiesProviderMetadata,
       },
     };
   },

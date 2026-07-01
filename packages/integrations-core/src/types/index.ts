@@ -2914,6 +2914,8 @@ export type IntegrationWebhookSourceCapability<
       config: TConnectionConfig;
     };
   }): MaybePromise<boolean>;
+  /** Provider metadata to persist when creating a new implicit source row. */
+  initialSourceProviderMetadata?: Record<string, unknown> | undefined;
   /** Returns the UI/API-facing description of a persisted source row. */
   describeSource(
     input: IntegrationWebhookSourceDescribeInput<TTargetConfig, TTargetSecrets, TConnectionConfig>,
