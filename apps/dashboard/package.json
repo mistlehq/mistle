@@ -52,7 +52,7 @@
     "better-auth": "1.6.20",
     "dockview-react": "^7.0.2",
     "openapi-fetch": "^0.17.0",
-    "posthog-js": "^1.386.6",
+    "posthog-js": "^1.393.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router": "~7.15.0",
