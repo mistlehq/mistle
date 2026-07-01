@@ -50,7 +50,7 @@
     "@xterm/xterm": "^6.0.0",
     "@xyflow/react": "^12.11.0",
     "better-auth": "1.6.20",
-    "dockview": "^6.6.1",
+    "dockview": "^7.0.2",
     "openapi-fetch": "^0.17.0",
     "posthog-js": "^1.386.6",
     "react": "^19.2.7",
