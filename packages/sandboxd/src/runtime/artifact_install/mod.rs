@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::command::CommandOutputSink;
+use crate::command::{CommandOutputSink, CommandOutputStream};
 use crate::time::{Clock, Sleeper, SystemClock, ThreadSleeper};
 
 mod archive;
@@ -92,10 +92,20 @@ where
                 install_path,
                 timeout_ms: *timeout_ms,
                 managed_env,
+                output_sink,
             },
             clock,
             sleeper,
         ),
+    }
+}
+
+pub(super) fn record_artifact_install_diagnostic(
+    output_sink: Option<&Arc<dyn CommandOutputSink>>,
+    message: String,
+) {
+    if let Some(output_sink) = output_sink {
+        output_sink.record_output(CommandOutputStream::Stderr, message.as_bytes());
     }
 }
 
@@ -106,6 +116,7 @@ pub(super) struct GitHubReleaseInstallRequest<'a> {
     pub(super) install_path: &'a str,
     pub(super) timeout_ms: Option<u64>,
     pub(super) managed_env: Option<&'a BTreeMap<String, String>>,
+    pub(super) output_sink: Option<Arc<dyn CommandOutputSink>>,
 }
 
 #[cfg(test)]
