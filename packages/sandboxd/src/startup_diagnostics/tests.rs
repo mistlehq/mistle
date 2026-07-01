@@ -332,6 +332,10 @@ fn maps_egress_start_and_stop_to_distinct_lifecycle_phases() {
         Some("egress")
     );
     assert_eq!(
+        super::operation_lifecycle_phase("start_egress_proxy_environment_diagnostics"),
+        Some("egress")
+    );
+    assert_eq!(
         super::operation_lifecycle_phase("stop_egress_proxy"),
         Some("teardown")
     );

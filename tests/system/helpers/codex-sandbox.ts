@@ -8,6 +8,7 @@ import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import { systemSleeper } from "@mistle/time";
 import { z } from "zod";
 
+import { createDataPlaneSandboxInstancesClient } from "../../../packages/data-plane-internal-client/src/index.js";
 import { CodexConversationProviderInitializeClientInfo } from "../../../packages/integrations-definitions/src/agent-runtimes/codex/initialize-client-info.js";
 import type { SandboxRuntimeStateSnapshot } from "../../../packages/sandbox-runtime-contract/src/runtime-state.js";
 import { ExecStreamClient } from "../../../packages/sandbox-session-client/src/exec-stream-client.js";
@@ -24,6 +25,8 @@ const SANDBOX_CONNECTION_TOKEN_MINT_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 1_000;
 const RUNTIME_READY_POLL_INTERVAL_MS = 100;
 const SANDBOX_SESSION_CONNECT_TIMEOUT_MS = 120_000;
+const SANDBOX_STATUS_TIMEOUT_OPERATION_EVENT_LIMIT = 80;
+const SANDBOX_STATUS_TIMEOUT_DETAIL_LIMIT = 2_000;
 
 const IntegrationConnectionResponseSchema = z.looseObject({
   id: z.string().min(1),
@@ -542,6 +545,12 @@ export async function waitForSandboxStatus(input: {
   return waitForCondition({
     description: `sandbox '${input.sandboxInstanceId}' status=${input.expectedStatus}`,
     timeoutMs: input.timeoutMs ?? SANDBOX_READY_TIMEOUT_MS,
+    diagnoseTimeout: () =>
+      collectSandboxStatusTimeoutDiagnostics({
+        fixture: input.fixture,
+        authenticatedSession: input.authenticatedSession,
+        sandboxInstanceId: input.sandboxInstanceId,
+      }),
     evaluate: async () => {
       const response = await input.fixture.request(
         `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}`,
@@ -571,6 +580,108 @@ export async function waitForSandboxStatus(input: {
       return sandboxStatus.status === input.expectedStatus ? sandboxStatus : null;
     },
   });
+}
+
+async function collectSandboxStatusTimeoutDiagnostics(input: {
+  fixture: CodexSandboxFixture;
+  authenticatedSession: CodexSandboxAuthenticatedSession;
+  sandboxInstanceId: string;
+}): Promise<string | null> {
+  const client = createDataPlaneSandboxInstancesClient({
+    baseUrl: input.fixture.dataPlaneApiBaseUrl,
+    serviceToken: input.fixture.internalAuthServiceToken,
+  });
+
+  try {
+    const sandbox = await client.getSandboxInstance({
+      instanceId: input.sandboxInstanceId,
+      organizationId: input.authenticatedSession.organizationId,
+    });
+    if (sandbox === null) {
+      return `sandbox '${input.sandboxInstanceId}' was not found by the internal data-plane API`;
+    }
+
+    const startupOperation = sandbox.startupOperation;
+    if (startupOperation === null) {
+      return `sandbox '${input.sandboxInstanceId}' has no recorded start/resume operation; current status=${sandbox.status}`;
+    }
+
+    const operationEvents = await client.listSandboxOperationEvents({
+      sandboxInstanceId: input.sandboxInstanceId,
+      organizationId: input.authenticatedSession.organizationId,
+      operationId: startupOperation.operationId,
+      limit: SANDBOX_STATUS_TIMEOUT_OPERATION_EVENT_LIMIT,
+    });
+
+    const renderedEvents = operationEvents.events
+      .filter((event) => shouldRenderTimeoutOperationEvent(event))
+      .map((event) => renderTimeoutOperationEvent(event));
+
+    return [
+      `status=${sandbox.status}; connectable=${String(sandbox.connectable)}; failureCode=${sandbox.failureCode ?? "null"}; startupOperation=${startupOperation.operationKind}:${startupOperation.operationId}`,
+      ...renderedEvents,
+    ].join("\n");
+  } catch (error) {
+    return `failed to collect sandbox operation events: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+type SandboxStatusTimeoutOperationEvent = Awaited<
+  ReturnType<ReturnType<typeof createDataPlaneSandboxInstancesClient>["listSandboxOperationEvents"]>
+>["events"][number];
+
+function shouldRenderTimeoutOperationEvent(event: SandboxStatusTimeoutOperationEvent): boolean {
+  if (event.recordKind === "lifecycle") {
+    return true;
+  }
+
+  return (
+    event.recordKind === "transcript" &&
+    (event.phase === "egress" || event.phase === "operation_stream") &&
+    (event.stream === "stderr" || event.stream === "system")
+  );
+}
+
+function renderTimeoutOperationEvent(event: SandboxStatusTimeoutOperationEvent): string {
+  const parts = [
+    `#${String(event.sequence)}`,
+    event.recordKind,
+    event.source,
+    event.phase ?? "no-phase",
+    event.status ?? event.stream ?? "no-status",
+    event.message,
+  ];
+  const attributes = renderTimeoutDiagnosticJson(event.attributes);
+  const transcript = renderTimeoutTranscriptPayload(event);
+  return [
+    parts.join(" "),
+    attributes === "{}" ? null : `attributes=${attributes}`,
+    transcript === null ? null : `payload=${transcript}`,
+  ]
+    .filter((part) => part !== null)
+    .join(" ");
+}
+
+function renderTimeoutTranscriptPayload(event: SandboxStatusTimeoutOperationEvent): string | null {
+  if (event.payloadBase64 === null) {
+    return null;
+  }
+
+  return truncateSandboxStatusTimeoutDetail(
+    Buffer.from(event.payloadBase64, "base64").toString("utf8").trim(),
+  );
+}
+
+function renderTimeoutDiagnosticJson(value: unknown): string {
+  return truncateSandboxStatusTimeoutDetail(JSON.stringify(value));
+}
+
+function truncateSandboxStatusTimeoutDetail(value: string): string {
+  if (value.length <= SANDBOX_STATUS_TIMEOUT_DETAIL_LIMIT) {
+    return value;
+  }
+
+  return `${value.slice(0, SANDBOX_STATUS_TIMEOUT_DETAIL_LIMIT)}...[truncated]`;
 }
 
 export async function waitForSandboxConnectable(input: {
@@ -705,6 +816,7 @@ export async function waitForCondition<T>(input: {
   timeoutMs: number;
   pollIntervalMs?: number;
   evaluate: () => Promise<T | null>;
+  diagnoseTimeout?: () => Promise<string | null>;
 }): Promise<T> {
   const deadlineEpochMs = Date.now() + input.timeoutMs;
   const pollIntervalMs = input.pollIntervalMs ?? POLL_INTERVAL_MS;
@@ -729,7 +841,11 @@ export async function waitForCondition<T>(input: {
         lastRetryableError === undefined
           ? ""
           : ` Last retryable error: ${lastRetryableError.message}`;
-      throw new Error(`Timed out waiting for ${input.description}.${suffix}`);
+      const timeoutDiagnostic =
+        input.diagnoseTimeout === undefined ? null : await input.diagnoseTimeout();
+      const diagnosticSuffix =
+        timeoutDiagnostic === null ? "" : `\n\nTimeout diagnostics:\n${timeoutDiagnostic}`;
+      throw new Error(`Timed out waiting for ${input.description}.${suffix}${diagnosticSuffix}`);
     }
 
     await systemSleeper.sleep(Math.min(pollIntervalMs, remainingMs));

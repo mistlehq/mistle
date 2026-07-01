@@ -126,7 +126,7 @@ pub(super) fn operation_lifecycle_phase(phase: &str) -> Option<&'static str> {
         "attach_runtime_agent_endpoint" => Some("agent_endpoint"),
         "apply_runtime_plan" => Some("runtime_plan"),
         "run_setup_script" => Some("setup_script"),
-        "start_egress_proxy" => Some("egress"),
+        "start_egress_proxy" | "start_egress_proxy_environment_diagnostics" => Some("egress"),
         "start_runtime_adapters" => Some("runtime_adapters"),
         "start_runtime_processes" => Some("runtime_processes"),
         "start_tunnel_session" | "stop_tunnel_session" | "attach_runtime_environment" => {
