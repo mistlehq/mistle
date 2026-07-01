@@ -8,7 +8,6 @@ import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import { systemSleeper } from "@mistle/time";
 import { z } from "zod";
 
-import { createDataPlaneSandboxInstancesClient } from "../../../packages/data-plane-internal-client/src/index.js";
 import { CodexConversationProviderInitializeClientInfo } from "../../../packages/integrations-definitions/src/agent-runtimes/codex/initialize-client-info.js";
 import type { SandboxRuntimeStateSnapshot } from "../../../packages/sandbox-runtime-contract/src/runtime-state.js";
 import { ExecStreamClient } from "../../../packages/sandbox-session-client/src/exec-stream-client.js";
@@ -58,6 +57,16 @@ const SandboxInstanceStatusResponseSchema = z.looseObject({
   failureMessage: z.string().nullable(),
 });
 
+const InternalSandboxInstanceResponseSchema = SandboxInstanceStatusResponseSchema.extend({
+  startupOperation: z
+    .object({
+      operationId: z.string().min(1),
+      operationKind: z.enum(["start", "resume"]),
+    })
+    .strict()
+    .nullable(),
+}).nullable();
+
 const StopSandboxInstanceResponseSchema = z
   .object({
     status: z.literal("accepted"),
@@ -105,6 +114,24 @@ const SandboxInstancePtySessionResponseSchema = z
     url: z.url(),
     token: z.string().min(1),
     expiresAt: z.string().min(1),
+  })
+  .strict();
+
+const SandboxOperationEventsResponseSchema = z
+  .object({
+    events: z.array(
+      z.looseObject({
+        sequence: z.number().int(),
+        recordKind: z.enum(["lifecycle", "transcript"]),
+        source: z.enum(["worker", "gateway", "sandboxd"]),
+        phase: z.string().nullable(),
+        status: z.string().nullable(),
+        stream: z.string().nullable(),
+        message: z.string(),
+        payloadBase64: z.string().nullable(),
+        attributes: z.record(z.string(), z.unknown()),
+      }),
+    ),
   })
   .strict();
 
@@ -587,15 +614,20 @@ async function collectSandboxStatusTimeoutDiagnostics(input: {
   authenticatedSession: CodexSandboxAuthenticatedSession;
   sandboxInstanceId: string;
 }): Promise<string | null> {
-  const client = createDataPlaneSandboxInstancesClient({
-    baseUrl: input.fixture.dataPlaneApiBaseUrl,
-    serviceToken: input.fixture.internalAuthServiceToken,
-  });
-
   try {
-    const sandbox = await client.getSandboxInstance({
-      instanceId: input.sandboxInstanceId,
-      organizationId: input.authenticatedSession.organizationId,
+    const sandbox = await requestJsonOrThrow({
+      request: async (path, init) => fetch(`${input.fixture.dataPlaneApiBaseUrl}${path}`, init),
+      path: `/internal/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}?${new URLSearchParams({ organizationId: input.authenticatedSession.organizationId }).toString()}`,
+      expectedStatus: 200,
+      description: "internal sandbox timeout diagnostic read",
+      schema: InternalSandboxInstanceResponseSchema,
+      init: {
+        method: "GET",
+        headers: {
+          [InternalAuthServiceTokenHeader]: input.fixture.internalAuthServiceToken,
+          ...input.fixture.dataPlaneApiHeaders,
+        },
+      },
     });
     if (sandbox === null) {
       return `sandbox '${input.sandboxInstanceId}' was not found by the internal data-plane API`;
@@ -606,11 +638,25 @@ async function collectSandboxStatusTimeoutDiagnostics(input: {
       return `sandbox '${input.sandboxInstanceId}' has no recorded start/resume operation; current status=${sandbox.status}`;
     }
 
-    const operationEvents = await client.listSandboxOperationEvents({
-      sandboxInstanceId: input.sandboxInstanceId,
-      organizationId: input.authenticatedSession.organizationId,
-      operationId: startupOperation.operationId,
-      limit: SANDBOX_STATUS_TIMEOUT_OPERATION_EVENT_LIMIT,
+    const operationEvents = await requestJsonOrThrow({
+      request: async (path, init) => fetch(`${input.fixture.dataPlaneApiBaseUrl}${path}`, init),
+      path: `/internal/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/operation-events?${new URLSearchParams(
+        {
+          organizationId: input.authenticatedSession.organizationId,
+          operationId: startupOperation.operationId,
+          limit: String(SANDBOX_STATUS_TIMEOUT_OPERATION_EVENT_LIMIT),
+        },
+      ).toString()}`,
+      expectedStatus: 200,
+      description: "internal sandbox operation events timeout diagnostic read",
+      schema: SandboxOperationEventsResponseSchema,
+      init: {
+        method: "GET",
+        headers: {
+          [InternalAuthServiceTokenHeader]: input.fixture.internalAuthServiceToken,
+          ...input.fixture.dataPlaneApiHeaders,
+        },
+      },
     });
 
     const renderedEvents = operationEvents.events
@@ -626,8 +672,8 @@ async function collectSandboxStatusTimeoutDiagnostics(input: {
   }
 }
 
-type SandboxStatusTimeoutOperationEvent = Awaited<
-  ReturnType<ReturnType<typeof createDataPlaneSandboxInstancesClient>["listSandboxOperationEvents"]>
+type SandboxStatusTimeoutOperationEvent = z.infer<
+  typeof SandboxOperationEventsResponseSchema
 >["events"][number];
 
 function shouldRenderTimeoutOperationEvent(event: SandboxStatusTimeoutOperationEvent): boolean {
