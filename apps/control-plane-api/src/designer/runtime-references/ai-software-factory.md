@@ -37,6 +37,10 @@ Ask the user to confirm or correct the direction before treating the blueprint a
 
 Keep the blueprint focused on factory behavior, not setup tasks. For an AI software factory, prefer 6-8 core workflow items. Combine related concerns instead of expanding every trigger, route, and output into a separate node.
 
+When using a separate review agent, do not add a separate "PR ready for review" trigger node unless the workflow has multiple independent entry points. Keep the PR output and the review-agent step adjacent so the core factory stays within 6-8 items.
+
+Name the review routing item as a feedback route or otherwise use the word `feedback` in the latest blueprint. The factory must visibly route review feedback back to implementation.
+
 Good blueprint items usually include:
 
 - issue intake trigger or manual start with the readiness rule
@@ -48,7 +52,7 @@ Good blueprint items usually include:
 - issue-system status update, including blocked or unclear work
 - improvement output for recurring process or instruction gaps
 
-Do not make setup steps into workflow nodes. Repository selection, app setup, profile selection, publishing, and trigger creation belong in chat or setup-focused canvas tabs.
+Do not make setup steps into workflow nodes. Repository selection, app setup, profile selection, publishing, and trigger creation belong in chat or setup-focused canvas tabs. Do not attach setup actions to AI software factory blueprint items; use dashboard requests or setup-focused tabs for those actions after the workflow is aligned.
 
 ## Issue Readiness Contract
 
@@ -139,6 +143,23 @@ The guide should explain:
 - when to escalate
 - how recurring failures update the factory process
 
+## Profile Instruction Handoff
+
+If Designer cannot directly save profile instructions in the current session, include a concrete instruction draft in the handoff instead of only saying instructions remain. Do this before any final "stop here" handoff.
+
+Use these exact handoff headings:
+
+- `Implementation agent instructions`: a concise draft covering Linear intake, readiness checks, GitHub work, validation, PR proposal behavior, Linear update proposal behavior, escalation, and approval boundaries.
+- `Review agent instructions`: a concise draft covering acceptance criteria review, regression/test review, feedback routing, rework criteria, human handoff, and review-quality improvement notes.
+- `Linear status mapping`: use a concrete mapping such as `Ready -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done`, or clearly state the user's equivalent statuses.
+- `Human operating guide`: offer to create a README, onboarding issue, example Linear issue, or team workflow guide as the next artifact.
+
+Also state the current configuration shape explicitly. If only one sandbox profile is being edited, say `Configuration shape: one sandbox profile with role-separated implementation and review instructions`. If stronger isolation is needed later, say separate implementation and review profiles can be created as a later improvement.
+
+End with one clear `Next action:` line. Make the next action singular, such as pasting the instruction drafts into the opened profile UI, reviewing the profile draft, or approving publish. Do not leave several remaining tasks with equal priority.
+
+Keep this handoff user-facing. Do not describe internal tool discovery, command lookup, or missing implementation mechanics unless it is the actual blocker the user must act on.
+
 ## Setup Awareness
 
 For Linear and GitHub, Designer should identify these pieces:
@@ -154,6 +175,12 @@ For Linear and GitHub, Designer should identify these pieces:
 - trigger and publishing steps that still require explicit approval
 
 Do not claim the factory is ready if provider setup, labels, statuses, trigger creation, publishing, or profile capability remains incomplete. When Linear setup is incomplete, explicitly say in the final handoff that Linear labels and statuses still need setup or confirmation, even if the chosen pickup rule uses only one `Ready` status.
+
+If the current sandbox profile draft already has required provider tools such as `linear-mcp` or `github-cli`, do not describe those tools as missing or still needing to be bound. Instead, distinguish configured draft capabilities from remaining setup such as instructions, labels, statuses, publishing, and triggers.
+
+When the selected approval boundary requires approval before provider writes, describe the workflow outputs as a PR proposal and Linear update proposal until approval is granted. Do not say the factory will create PRs or post Linear updates directly in that mode.
+
+If Designer cannot edit profile instructions or publish in the current session, do not narrate internal tool checks. Say the user-relevant blocker directly: profile instructions, publishing, or trigger creation must be completed in the opened dashboard/profile UI or in a session with product mutation tools.
 
 ## Provider-Specific Notes
 

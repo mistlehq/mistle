@@ -20,6 +20,7 @@ import { listProfiles } from "../../sandbox-profiles/services/list-profiles.js";
 import { publishProfileVersion } from "../../sandbox-profiles/services/publish-profile-version.js";
 import { putProfileVersionDraft } from "../../sandbox-profiles/services/put-profile-version-draft.js";
 import { putProfileVersionMaintenanceScript } from "../../sandbox-profiles/services/put-profile-version-maintenance-script.js";
+import { requestDeleteProfile } from "../../sandbox-profiles/services/request-delete-profile.js";
 import { updateProfile } from "../../sandbox-profiles/services/update-profile.js";
 import type { MistleMcpServerContext } from "../server.js";
 import {
@@ -50,6 +51,13 @@ const MutatingToolAnnotations: ToolAnnotations = {
   readOnlyHint: false,
   destructiveHint: false,
   idempotentHint: true,
+  openWorldHint: false,
+};
+
+const DestructiveToolAnnotations: ToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: true,
+  idempotentHint: false,
   openWorldHint: false,
 };
 
@@ -230,6 +238,45 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
       );
 
       return structuredResult(profile);
+    },
+  );
+
+  server.registerTool(
+    "profile_delete",
+    {
+      title: "Delete sandbox profile",
+      description:
+        "Request deletion of a sandbox profile and enqueue asynchronous sandbox profile resource cleanup. This is destructive and should be used only after explicit user approval.",
+      inputSchema: mcpSandboxProfileIdParamsSchema,
+      annotations: {
+        ...DestructiveToolAnnotations,
+        title: "Delete sandbox profile",
+      },
+    },
+    async ({ profileId }) => {
+      requireMcpToolPermission(
+        context.organizationActor,
+        OrganizationPermissions.SANDBOX_PROFILE_DELETE,
+      );
+      requireMcpSandboxProfileIdScope(context.organizationActor, {
+        profileId,
+      });
+
+      const deletionRequest = await requestDeleteProfile(
+        {
+          db: context.db,
+          openWorkflow: context.openWorkflow,
+        },
+        {
+          organizationId: context.organizationActor.organizationId,
+          profileId,
+        },
+      );
+
+      return structuredResult({
+        status: "accepted",
+        profileId: deletionRequest.profileId,
+      });
     },
   );
 

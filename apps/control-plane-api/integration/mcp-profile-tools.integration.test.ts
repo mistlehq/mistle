@@ -24,6 +24,7 @@ import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
+import { RequestDeleteSandboxProfileWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
@@ -43,11 +44,13 @@ import {
   PublishSandboxProfileVersionResponseSchema,
   PutSandboxProfileVersionDraftResponseSchema,
   SandboxProfileSchema,
+  SandboxProfileDeletionAcceptedResponseSchema,
   SandboxProfileVersionMaintenanceScriptSchema,
   SandboxProfileVersionSetupScriptSchema,
   StartSandboxProfileSetupScriptTestRunResponseSchema,
 } from "../src/sandbox-profiles/index.js";
 import { createApiKeyCredential, createApiKeyToken } from "./helpers/api-keys.js";
+import { waitForQueuedControlPlaneWorkflowInput } from "./helpers/control-plane-workflows.js";
 import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
 import { callMcpJsonRpcResponse, callMcpTool, listMcpTools } from "./helpers/mcp-json-rpc.js";
 import {
@@ -136,6 +139,7 @@ describe.concurrent("MCP profile tools integration", () => {
         OrganizationPermissions.SANDBOX_PROFILE_READ,
         OrganizationPermissions.SANDBOX_PROFILE_CREATE,
         OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+        OrganizationPermissions.SANDBOX_PROFILE_DELETE,
         OrganizationPermissions.SANDBOX_SESSION_CREATE,
         OrganizationPermissions.SANDBOX_SESSION_READ,
         OrganizationPermissions.SANDBOX_SESSION_CONNECT,
@@ -161,6 +165,7 @@ describe.concurrent("MCP profile tools integration", () => {
       "list_trigger_webhook_events",
       "list_triggers",
       "profile_create",
+      "profile_delete",
       "profile_draft_create",
       "profile_draft_discard",
       "profile_draft_setup_script_put",
@@ -280,6 +285,55 @@ describe.concurrent("MCP profile tools integration", () => {
     expect(profile.id).toBe("sbp_mcp_get");
     expect(profile.organizationId).toBe(session.organizationId);
     expect(profile.displayName).toBe("MCP Get Profile");
+  });
+
+  it("requests sandbox profile deletion and enqueues the cleanup workflow", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-profile-delete@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP profile deleter",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_DELETE],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_mcp_delete",
+        organizationId: session.organizationId,
+        displayName: "MCP Delete Profile",
+        createdAt: "2026-03-02T00:00:00.000Z",
+      }),
+    );
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "profile_delete",
+      arguments: {
+        profileId: "sbp_mcp_delete",
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(SandboxProfileDeletionAcceptedResponseSchema.parse(result.structuredContent)).toEqual({
+      status: "accepted",
+      profileId: "sbp_mcp_delete",
+    });
+
+    const workflowInput = await waitForQueuedControlPlaneWorkflowInput({
+      env,
+      workflowName: RequestDeleteSandboxProfileWorkflowSpec.name,
+      inputEquals: {
+        organizationId: session.organizationId,
+        profileId: "sbp_mcp_delete",
+      },
+    });
+    expect(workflowInput).toMatchObject({
+      organizationId: session.organizationId,
+      profileId: "sbp_mcp_delete",
+    });
   });
 
   it("creates a profile, updates metadata, and updates draft configuration with bindings", async ({

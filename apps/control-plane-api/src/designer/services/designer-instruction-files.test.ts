@@ -22,6 +22,17 @@ describe("Designer managed instruction files", () => {
     expect(loadDesignerInstructionContent("designer-context.md").length).toBeGreaterThan(0);
     expect(loadDesignerInstructionContent("designer-behavior.md").length).toBeGreaterThan(0);
   });
+
+  it("instructs Designer to pair blueprint canvas changes with readable flow text", () => {
+    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
+
+    expect(behaviorInstructions).toContain(
+      "Whenever you first show or later update a blueprint, describe the same flow in chat as concise point form",
+    );
+    expect(behaviorInstructions).toContain(
+      "When updating an existing blueprint, first state what changed from the previous version",
+    );
+  });
 });
 
 function loadCanonicalDesignerInstructionFile(fileName: string): string {
