@@ -13,3 +13,11 @@ export {
   saveDesignerSelectedProviderResourcesBodySchema as SaveDesignerSelectedProviderResourcesBodySchema,
   saveDesignerSelectedProviderResourcesResponseSchema as SaveDesignerSelectedProviderResourcesResponseSchema,
 } from "./schemas.js";
+export type {
+  CreateDesignerSessionBody,
+  DesignerSessionListItemResponse,
+  DesignerSessionResponse,
+  PutDesignerSessionCanvasTabsBody,
+  SaveDesignerSelectedProviderResourcesBody,
+  SaveDesignerSelectedProviderResourcesResponse,
+} from "./schemas.js";

@@ -5,6 +5,7 @@ export type ComposerActionPanelProps = {
   details: React.ReactNode;
   padding?: "flush-x";
   title: React.ReactNode | null;
+  verticalPadding?: "balanced";
 };
 
 export type ComposerActionPanelStackProps = {
@@ -19,7 +20,8 @@ export function ComposerActionPanel(input: ComposerActionPanelProps): React.JSX.
   return (
     <article
       className={[
-        "rounded-md border bg-background pt-4 pb-2",
+        "rounded-md border bg-background",
+        input.verticalPadding === "balanced" ? "py-3" : "pt-4 pb-2",
         input.padding === "flush-x" ? "px-0" : "px-4",
       ].join(" ")}
     >

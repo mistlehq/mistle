@@ -6,7 +6,11 @@ type JsonValue = boolean | number | string | null | JsonObject | JsonValue[];
 type JsonObject = { readonly [key: string]: JsonValue | undefined };
 
 const WorkspacePackageRoots = ["apps", "packages", "tests"];
-const SourceOnlyPackages = new Set(["@mistle/test-harness", "@mistle/ui"]);
+const SourceOnlyPackages = new Set([
+  "@mistle/designer-eval-harness",
+  "@mistle/test-harness",
+  "@mistle/ui",
+]);
 const WrapperRuntimePackages = new Set(["@mistle/sandbox-session-client"]);
 const ExportConditionOrder = ["types", "workspace-src", "node", "import", "default"];
 const PackageImportPattern =

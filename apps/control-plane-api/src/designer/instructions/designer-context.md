@@ -62,6 +62,13 @@ Concrete use cases:
 
 Leave off for ordinary provider workflows where the agent only uses external Connected apps, repositories, provider MCP tools, or provider events.
 
+**Provider tool**:
+A CLI, MCP server, or provider-specific runtime capability selected on an external Connected app binding. Provider tools are what let the configured agent actually use that Connected app inside its sandbox session.
+_Avoid_: Mistle resource access, trigger event, selected repository, App setup step
+_Maps to_: Sandbox profile version integration binding `config.tools`; compiled runtime tool artifacts, MCP servers, and egress routes
+
+Use when the agent workflow needs to read or write provider data, inspect repositories, create branches or pull requests, comment on issues, or use provider APIs from inside the target sandbox profile.
+
 **Agent**:
 The background worker the user is building or changing.
 _Avoid_: Sandbox profile when not selecting or editing the product object directly, Designer runtime

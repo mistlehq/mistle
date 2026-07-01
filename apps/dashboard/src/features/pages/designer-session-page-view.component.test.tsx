@@ -469,8 +469,21 @@ function StatefulDesignerBlueprintCommentWorkspace(): React.JSX.Element {
                 description: "Determine type, priority, owner, and missing information.",
                 state: "needs_setup",
               },
+              {
+                id: "triage-summary",
+                kind: "workflow_output",
+                label: "Triage summary",
+                description: "Summarize the issue routing decision.",
+                state: "applied",
+              },
             ],
-            links: [],
+            links: [
+              {
+                from: "classify-issue",
+                to: "triage-summary",
+                kind: "produces",
+              },
+            ],
             actions: [],
           },
         },
@@ -800,6 +813,9 @@ describe("DesignerCanvasWorkspace", () => {
     );
     expect(addCommentHint.textContent).toContain("Click to add comment");
     fireEvent.click(addCommentNode);
+    expect(addCommentNode.contains(screen.getByTestId("designer-blueprint-floating-comment"))).toBe(
+      false,
+    );
     fireEvent.change(screen.getByTestId("designer-blueprint-new-comment"), {
       target: { value: "Ask for missing severity before assigning an owner." },
     });
@@ -812,6 +828,9 @@ describe("DesignerCanvasWorkspace", () => {
       await screen.findByTestId("designer-blueprint-collapsed-comment-classify-issue"),
     );
     expect(await screen.findByText("Pending comment")).toBeDefined();
+    expect(addCommentNode.contains(screen.getByTestId("designer-blueprint-floating-comment"))).toBe(
+      false,
+    );
     expect(screen.getByTestId("designer-blueprint-comment")).toHaveProperty(
       "value",
       "Ask for missing severity before assigning an owner.",
@@ -848,6 +867,62 @@ describe("DesignerCanvasWorkspace", () => {
     expect(screen.queryByTestId("designer-blueprint-add-comment-hint-classify-issue")).toBeNull();
   });
 
+  it("keeps only one blueprint comment editor open at a time", async () => {
+    renderDesignerCanvasRoute({
+      element: <StatefulDesignerBlueprintCommentWorkspace />,
+    });
+
+    const classifyIssueNode = await screen.findByTestId("designer-blueprint-node-classify-issue");
+    const triageSummaryNode = await screen.findByTestId("designer-blueprint-node-triage-summary");
+
+    fireEvent.click(classifyIssueNode);
+    expect(screen.getAllByTestId("designer-blueprint-floating-comment")).toHaveLength(1);
+    expect(screen.getByTestId("designer-blueprint-new-comment")).toBeDefined();
+
+    fireEvent.click(triageSummaryNode);
+    expect(screen.getAllByTestId("designer-blueprint-floating-comment")).toHaveLength(1);
+    expect(screen.getByTestId("designer-blueprint-new-comment")).toBeDefined();
+
+    fireEvent.change(screen.getByTestId("designer-blueprint-new-comment"), {
+      target: { value: "Include the final routing reason." },
+    });
+    fireEvent.keyDown(screen.getByTestId("designer-blueprint-new-comment"), {
+      key: "Enter",
+    });
+
+    fireEvent.click(
+      await screen.findByTestId("designer-blueprint-collapsed-comment-triage-summary"),
+    );
+    expect(screen.getAllByTestId("designer-blueprint-floating-comment")).toHaveLength(1);
+    expect(screen.getByTestId("designer-blueprint-comment")).toHaveProperty(
+      "value",
+      "Include the final routing reason.",
+    );
+
+    fireEvent.click(classifyIssueNode);
+    expect(screen.getAllByTestId("designer-blueprint-floating-comment")).toHaveLength(1);
+    expect(screen.getByTestId("designer-blueprint-new-comment")).toBeDefined();
+  });
+
+  it("closes an open blueprint comment when the pointer starts outside the comment box", async () => {
+    renderDesignerCanvasRoute({
+      element: <StatefulDesignerBlueprintCommentWorkspace />,
+    });
+
+    const classifyIssueNode = await screen.findByTestId("designer-blueprint-node-classify-issue");
+
+    fireEvent.click(classifyIssueNode);
+    const draftComment = screen.getByTestId("designer-blueprint-floating-comment");
+    expect(screen.getByTestId("designer-blueprint-new-comment")).toBeDefined();
+
+    fireEvent.pointerDown(draftComment);
+    expect(screen.getByTestId("designer-blueprint-new-comment")).toBeDefined();
+
+    fireEvent.pointerDown(screen.getByRole("region", { name: "Designer blueprint graph" }));
+    expect(screen.queryByTestId("designer-blueprint-new-comment")).toBeNull();
+    expect(screen.queryByTestId("designer-blueprint-floating-comment")).toBeNull();
+  });
+
   it("centers the blueprint graph horizontally near the top of the canvas viewport", () => {
     expect(
       resolveDesignerBlueprintInitialFocusViewportForNodes({
@@ -865,6 +940,28 @@ describe("DesignerCanvasWorkspace", () => {
       x: 25,
       y: 33.2,
       zoom: 0.95,
+    });
+  });
+
+  it("reserves right-side viewport room for blueprint loopback edges", () => {
+    expect(
+      resolveDesignerBlueprintInitialFocusViewportForNodes({
+        nodes: [
+          {
+            position: { x: 0, y: 0 },
+          },
+          {
+            position: { x: 260, y: 360 },
+          },
+        ],
+        rightPadding: 260,
+        width: 1000,
+        zoom: 0.82,
+      }),
+    ).toEqual({
+      x: 172,
+      y: 56,
+      zoom: 0.82,
     });
   });
 

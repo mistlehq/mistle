@@ -43,7 +43,7 @@ const MixedServerRequestEntries: readonly ServerRequestEntry[] = [
     kind: "tool-user-input",
     questions: [
       {
-        header: "Model",
+        header: null,
         id: "model-selection",
         options: [
           {
@@ -102,7 +102,7 @@ const SuggestedNextActionEntries: readonly ServerRequestEntry[] = [
     kind: "tool-user-input",
     questions: [
       {
-        header: "Suggested next actions",
+        header: null,
         id: "suggested-next-action",
         options: [
           {
@@ -134,15 +134,78 @@ const FreeformUserInputEntries: readonly ServerRequestEntry[] = [
     kind: "tool-user-input",
     questions: [
       {
-        header: "Goal",
+        header: null,
         id: "goal",
+        question: "What should the agent optimize for?",
+      },
+    ],
+    status: "pending",
+    responseErrorMessage: null,
+  },
+];
+
+const SelectableOptionsWithComposerCustomResponseEntries: readonly ServerRequestEntry[] = [
+  {
+    requestId: "options-with-composer-custom-response-user-input-request-1",
+    method: "tool/requestUserInput",
+    kind: "tool-user-input",
+    questions: [
+      {
+        header: null,
+        id: "sandbox-profile",
         options: [
           {
-            label: "Describe the outcome",
-            isOther: true,
+            label: "AI Software Factory",
+            isOther: false,
+          },
+          {
+            label: "Linear Coding Agent",
+            isOther: false,
           },
         ],
-        question: "What should the agent optimize for?",
+        question: "Which sandbox profile should receive the configuration?",
+      },
+    ],
+    status: "pending",
+    responseErrorMessage: null,
+  },
+];
+
+const MultipleQuestionUserInputEntries: readonly ServerRequestEntry[] = [
+  {
+    requestId: "multiple-question-user-input-request-1",
+    method: "tool/requestUserInput",
+    kind: "tool-user-input",
+    questions: [
+      {
+        header: null,
+        id: "issue-system",
+        options: [
+          {
+            label: "Linear",
+            isOther: false,
+          },
+          {
+            label: "GitHub Issues",
+            isOther: false,
+          },
+        ],
+        question: "Which issue system should this workflow monitor?",
+      },
+      {
+        header: null,
+        id: "review-policy",
+        options: [
+          {
+            label: "Human review required",
+            isOther: false,
+          },
+          {
+            label: "Auto-open PR when tests pass",
+            isOther: false,
+          },
+        ],
+        question: "What approval boundary should the agent use?",
       },
     ],
     status: "pending",
@@ -157,7 +220,7 @@ const ResourceSelectionUserInputEntries: readonly ServerRequestEntry[] = [
     kind: "tool-user-input",
     questions: [
       {
-        header: "Repositories",
+        header: null,
         id: "github-review-repositories",
         inputKind: "integrationConnectionResourceMultiSelect",
         question: "Which GitHub repositories should this agent review?",
@@ -246,9 +309,9 @@ function createMixedServerRequestEntriesWithResponseErrors(): readonly ServerReq
 
 /**
  * Shows the shared pending server request panel used in session workbenches.
- * Review both `SuggestedNextActions` and `FreeformUserInput` to verify user input
- * cancellation placement: suggested actions keep Cancel in the top-right corner,
- * while freeform input keeps Cancel beside Submit in the footer.
+ * Review the user-input stories to verify the major panel permutations:
+ * auto-submit choices, composer-backed custom responses, resource selection,
+ * response errors, and disabled responding state.
  */
 const meta = {
   title: "Dashboard/Sessions/SessionWorkbench/ServerRequestsPanel",
@@ -280,6 +343,20 @@ export const SuggestedNextActions: Story = {
 export const FreeformUserInput: Story = {
   args: {
     entries: FreeformUserInputEntries,
+    supportsUserInputRequestCustomResponse: true,
+  },
+};
+
+export const SelectableOptionsWithComposerCustomResponse: Story = {
+  args: {
+    entries: SelectableOptionsWithComposerCustomResponseEntries,
+    supportsUserInputRequestCustomResponse: true,
+  },
+};
+
+export const MultipleQuestionUserInput: Story = {
+  args: {
+    entries: MultipleQuestionUserInputEntries,
   },
 };
 

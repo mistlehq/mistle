@@ -1,7 +1,7 @@
 import "dockview/dist/styles/dockview.css";
 import "@xyflow/react/dist/style.css";
 import "./session-terminal-workspace.css";
-import { Button, DialogShortcut, Textarea } from "@mistle/ui";
+import { Button, cn, DialogShortcut, Textarea } from "@mistle/ui";
 import {
   ArrowsSplitIcon,
   AtomIcon,
@@ -13,12 +13,16 @@ import {
 } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  BaseEdge,
   Background,
   Controls,
   Handle,
+  NodeToolbar,
   Position,
   ReactFlow,
   type Edge,
+  type EdgeProps,
+  type EdgeTypes,
   type Node,
   type NodeProps,
   type NodeTypes,
@@ -33,7 +37,6 @@ import {
   type DockviewWillShowOverlayLocationEvent,
   type IDockviewPanelProps,
 } from "dockview";
-import ELK from "elkjs/lib/elk.bundled.js";
 import {
   createContext,
   useCallback,
@@ -42,6 +45,7 @@ import {
   useMemo,
   useState,
   type FunctionComponent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 
@@ -933,7 +937,15 @@ const DesignerBlueprintNodeDescriptionCharsPerLine = 34;
 const DesignerBlueprintNodeRoutingSummaryHeight = 28;
 const DesignerBlueprintInitialViewport = { x: 48, y: 32, zoom: 0.95 };
 const DesignerBlueprintInitialFocusTopPadding = 56;
-let designerBlueprintElk: InstanceType<typeof ELK> | null = null;
+const DesignerBlueprintProcessLaneGap = 32;
+const DesignerBlueprintProcessLaneMinSlotHeight = 128;
+const DesignerBlueprintProcessLaneMaxSlotHeight = 150;
+const DesignerBlueprintProcessLaneInitialZoom = 0.82;
+const DesignerBlueprintLoopbackEdgeOffset = 180;
+const DesignerBlueprintProcessLaneInitialFocusRightPadding =
+  DesignerBlueprintLoopbackEdgeOffset + 80;
+const DesignerBlueprintRightSourceHandle = "right-source";
+const DesignerBlueprintRightTargetHandle = "right-target";
 
 type DesignerBlueprintLayoutNodeData = {
   description?: string;
@@ -953,10 +965,17 @@ type DesignerBlueprintVisualNodeData = DesignerBlueprintLayoutNodeData & {
   onAddComment: (comment: PendingSessionBlueprintCommentInput) => void;
   onClearAddCommentSuppression: (itemId: string) => void;
   onDeleteComment: (commentId: string) => void;
+  onOpenComment: (comment: DesignerBlueprintOpenComment) => void;
   onSuppressAddComment: (itemId: string) => void;
   onUpdateComment: (commentId: string, body: string) => void;
+  openComment: DesignerBlueprintOpenComment;
   pendingComment?: PendingSessionBlueprintComment | undefined;
 };
+
+type DesignerBlueprintOpenComment = {
+  itemId: string;
+  kind: "draft" | "pending";
+} | null;
 
 type DesignerBlueprintLayoutNode = Node<DesignerBlueprintLayoutNodeData, "blueprint">;
 type DesignerBlueprintVisualNode = Node<DesignerBlueprintVisualNodeData, "blueprint">;
@@ -970,6 +989,28 @@ type DesignerBlueprintGraph = {
 const DesignerBlueprintNodeTypes = {
   blueprint: DesignerBlueprintVisualNodeComponent,
 } satisfies NodeTypes;
+
+const DesignerBlueprintEdgeTypes = {
+  loopback: DesignerBlueprintLoopbackEdgeComponent,
+} satisfies EdgeTypes;
+
+function DesignerBlueprintLoopbackEdgeComponent(input: EdgeProps): React.JSX.Element {
+  const loopbackX = Math.max(input.sourceX, input.targetX) + DesignerBlueprintLoopbackEdgeOffset;
+  const path = [
+    `M ${input.sourceX} ${input.sourceY}`,
+    `C ${loopbackX} ${input.sourceY}`,
+    `${loopbackX} ${input.targetY}`,
+    `${input.targetX} ${input.targetY}`,
+  ].join(" ");
+
+  return (
+    <BaseEdge
+      path={path}
+      {...(input.markerEnd === undefined ? {} : { markerEnd: input.markerEnd })}
+      {...(input.style === undefined ? {} : { style: input.style })}
+    />
+  );
+}
 
 export function DesignerBlueprintCanvasPanel(input: {
   blueprint: DesignerBlueprintDocument;
@@ -992,6 +1033,7 @@ export function DesignerBlueprintCanvasPanel(input: {
   const [suppressedAddCommentItemIds, setSuppressedAddCommentItemIds] = useState<
     ReadonlySet<string>
   >(() => new Set());
+  const [openComment, setOpenComment] = useState<DesignerBlueprintOpenComment>(null);
 
   const suppressAddCommentForItem = useCallback((itemId: string) => {
     setSuppressedAddCommentItemIds((currentItemIds) => {
@@ -1013,27 +1055,43 @@ export function DesignerBlueprintCanvasPanel(input: {
     });
   }, []);
 
+  function closeOpenCommentWhenPointerStartsOutside(event: ReactPointerEvent<HTMLElement>): void {
+    if (openComment === null) {
+      return;
+    }
+
+    if (!(event.target instanceof Element)) {
+      setOpenComment(null);
+      return;
+    }
+
+    if (event.target.closest("[data-designer-blueprint-floating-comment]") !== null) {
+      return;
+    }
+
+    setOpenComment(null);
+  }
+
   useEffect(() => {
     let cancelled = false;
     setLayoutError(null);
 
-    buildDesignerBlueprintGraph({
-      blueprint: input.blueprint,
-      integrationMetadataByTargetKey,
-    })
-      .then((nextGraph) => {
-        if (!cancelled) {
-          setGraph(nextGraph);
-        }
-      })
-      .catch((error: unknown) => {
-        if (cancelled) {
-          return;
-        }
-        setLayoutError(
-          error instanceof Error ? error.message : "Designer blueprint graph layout failed.",
-        );
+    try {
+      const nextGraph = buildDesignerBlueprintGraph({
+        blueprint: input.blueprint,
+        integrationMetadataByTargetKey,
       });
+      if (!cancelled) {
+        setGraph(nextGraph);
+      }
+    } catch (error: unknown) {
+      if (cancelled) {
+        return;
+      }
+      setLayoutError(
+        error instanceof Error ? error.message : "Designer blueprint graph layout failed.",
+      );
+    }
 
     return () => {
       cancelled = true;
@@ -1045,6 +1103,7 @@ export function DesignerBlueprintCanvasPanel(input: {
       <section
         className="min-h-0 flex-1 overflow-hidden bg-muted/20"
         aria-label="Designer blueprint graph"
+        onPointerDownCapture={closeOpenCommentWhenPointerStartsOutside}
       >
         {layoutError === null ? null : (
           <div className="flex h-full items-center justify-center p-6 text-sm text-destructive">
@@ -1058,14 +1117,20 @@ export function DesignerBlueprintCanvasPanel(input: {
               onAddComment: input.onAddComment,
               onClearAddCommentSuppression: clearAddCommentSuppressionForItem,
               onDeleteComment: input.onDeleteComment,
+              onOpenComment: setOpenComment,
               onSuppressAddComment: suppressAddCommentForItem,
               onUpdateComment: input.onUpdateComment,
+              openComment,
               pendingComments: input.pendingComments,
               suppressedAddCommentItemIds,
             })}
             edges={graph.edges}
+            edgeTypes={DesignerBlueprintEdgeTypes}
             nodeTypes={DesignerBlueprintNodeTypes}
-            defaultViewport={DesignerBlueprintInitialViewport}
+            defaultViewport={{
+              ...DesignerBlueprintInitialViewport,
+              zoom: DesignerBlueprintProcessLaneInitialZoom,
+            }}
             minZoom={0.45}
             maxZoom={1.4}
             elementsSelectable={false}
@@ -1075,7 +1140,11 @@ export function DesignerBlueprintCanvasPanel(input: {
             panOnScroll
             proOptions={{ hideAttribution: true }}
           >
-            <DesignerBlueprintInitialFocus graph={graph} />
+            <DesignerBlueprintInitialFocus
+              graph={graph}
+              rightPadding={DesignerBlueprintProcessLaneInitialFocusRightPadding}
+              zoom={DesignerBlueprintProcessLaneInitialZoom}
+            />
             <Background gap={24} size={1} />
             <Controls showInteractive={false} />
           </ReactFlow>
@@ -1092,6 +1161,8 @@ export function DesignerBlueprintCanvasPanel(input: {
 
 function DesignerBlueprintInitialFocus(input: {
   graph: DesignerBlueprintGraph;
+  rightPadding: number;
+  zoom: number;
 }): React.JSX.Element | null {
   const reactFlow = useReactFlow<DesignerBlueprintVisualNode, DesignerBlueprintGraphEdge>();
   const width = useStore((state) => state.width);
@@ -1099,9 +1170,11 @@ function DesignerBlueprintInitialFocus(input: {
     () =>
       resolveDesignerBlueprintInitialFocusViewportForNodes({
         nodes: input.graph.nodes,
+        rightPadding: input.rightPadding,
         width,
+        zoom: input.zoom,
       }),
-    [input.graph.nodes, width],
+    [input.graph.nodes, input.rightPadding, input.zoom, width],
   );
 
   // ReactFlow owns the viewport imperatively; render props and remounting cannot
@@ -1121,22 +1194,29 @@ function DesignerBlueprintVisualNodeComponent(
   input: NodeProps<DesignerBlueprintVisualNode>,
 ): React.JSX.Element {
   const [draftBody, setDraftBody] = useState("");
-  const [isDraftingComment, setIsDraftingComment] = useState(false);
-  const [expandedPendingCommentId, setExpandedPendingCommentId] = useState<string | null>(null);
   const pendingComment = input.data.pendingComment;
+  const isDraftingComment =
+    input.data.openComment?.itemId === input.data.item.id &&
+    input.data.openComment.kind === "draft";
   const isPendingCommentExpanded =
-    pendingComment !== undefined && expandedPendingCommentId === pendingComment.id;
+    pendingComment !== undefined &&
+    input.data.openComment?.itemId === input.data.item.id &&
+    input.data.openComment.kind === "pending";
   const canStartDraftingComment =
     pendingComment === undefined && !isDraftingComment && !input.data.isAddCommentSuppressed;
 
   function cancelDraft(): void {
     setDraftBody("");
-    setIsDraftingComment(false);
+    input.data.onOpenComment(null);
   }
 
   function startDraftingComment(): void {
     input.data.onClearAddCommentSuppression(input.data.item.id);
-    setIsDraftingComment(true);
+    setDraftBody("");
+    input.data.onOpenComment({
+      itemId: input.data.item.id,
+      kind: "draft",
+    });
   }
 
   function submitDraft(): void {
@@ -1154,7 +1234,7 @@ function DesignerBlueprintVisualNodeComponent(
       }),
     );
     setDraftBody("");
-    setIsDraftingComment(false);
+    input.data.onOpenComment(null);
   }
 
   return (
@@ -1182,6 +1262,13 @@ function DesignerBlueprintVisualNodeComponent(
       tabIndex={canStartDraftingComment ? 0 : undefined}
     >
       <Handle className="opacity-0" isConnectable={false} position={Position.Top} type="target" />
+      <Handle
+        className="opacity-0"
+        id={DesignerBlueprintRightTargetHandle}
+        isConnectable={false}
+        position={Position.Right}
+        type="target"
+      />
       <div className="relative rounded-md border border-border bg-background p-2.5 shadow-sm transition-[border-color,box-shadow] group-hover:border-blue-500/70 group-hover:ring-2 group-hover:ring-blue-500/15 group-focus-within:border-blue-500/70 group-focus-within:ring-2 group-focus-within:ring-blue-500/15">
         <div className="flex items-start gap-2.5">
           <span
@@ -1218,18 +1305,21 @@ function DesignerBlueprintVisualNodeComponent(
         <DesignerBlueprintCollapsedCommentButton
           label={`Open blueprint comment for ${input.data.label}`}
           onOpen={() => {
-            setExpandedPendingCommentId(pendingComment.id);
+            input.data.onOpenComment({
+              itemId: input.data.item.id,
+              kind: "pending",
+            });
           }}
           testId={`designer-blueprint-collapsed-comment-${input.data.item.id}`}
         />
       )}
       {pendingComment === undefined || !isPendingCommentExpanded ? null : (
-        <DesignerBlueprintFloatingComment>
+        <DesignerBlueprintFloatingNodeComment nodeId={input.id}>
           <DesignerBlueprintPendingCommentEditor
             body={pendingComment.body}
             title="Pending comment"
             onCollapse={() => {
-              setExpandedPendingCommentId(null);
+              input.data.onOpenComment(null);
             }}
             onBodyChange={(body) => {
               input.data.onUpdateComment(pendingComment.id, body);
@@ -1237,20 +1327,20 @@ function DesignerBlueprintVisualNodeComponent(
             onDelete={() => {
               input.data.onSuppressAddComment(input.data.item.id);
               input.data.onDeleteComment(pendingComment.id);
-              setExpandedPendingCommentId(null);
+              input.data.onOpenComment(null);
             }}
           />
-        </DesignerBlueprintFloatingComment>
+        </DesignerBlueprintFloatingNodeComment>
       )}
       {pendingComment !== undefined || !isDraftingComment ? null : (
-        <DesignerBlueprintFloatingComment>
+        <DesignerBlueprintFloatingNodeComment nodeId={input.id}>
           <DesignerBlueprintDraftCommentEditor
             body={draftBody}
             onBodyChange={setDraftBody}
             onCancel={cancelDraft}
             onSubmit={submitDraft}
           />
-        </DesignerBlueprintFloatingComment>
+        </DesignerBlueprintFloatingNodeComment>
       )}
       <Handle
         className="opacity-0"
@@ -1258,16 +1348,45 @@ function DesignerBlueprintVisualNodeComponent(
         position={Position.Bottom}
         type="source"
       />
+      <Handle
+        className="opacity-0"
+        id={DesignerBlueprintRightSourceHandle}
+        isConnectable={false}
+        position={Position.Right}
+        type="source"
+      />
     </div>
+  );
+}
+
+function DesignerBlueprintFloatingNodeComment(input: {
+  children: ReactNode;
+  nodeId: string;
+}): React.JSX.Element {
+  return (
+    <NodeToolbar
+      align="start"
+      isVisible
+      nodeId={input.nodeId}
+      offset={12}
+      position={Position.Right}
+    >
+      <DesignerBlueprintFloatingComment>{input.children}</DesignerBlueprintFloatingComment>
+    </NodeToolbar>
   );
 }
 
 export function DesignerBlueprintFloatingComment(input: {
   children: ReactNode;
+  className?: string | undefined;
 }): React.JSX.Element {
   return (
     <div
-      className="nodrag nopan absolute left-[calc(100%+0.75rem)] top-0 z-20 w-72 rounded-md border border-border bg-background p-2 shadow-lg"
+      className={cn(
+        "nodrag nopan w-72 rounded-md border border-border bg-background p-2 shadow-lg",
+        input.className,
+      )}
+      data-designer-blueprint-floating-comment=""
       data-testid="designer-blueprint-floating-comment"
     >
       {input.children}
@@ -1450,70 +1569,100 @@ function DesignerBlueprintNodeKindIcon(input: {
   }
 }
 
-async function buildDesignerBlueprintGraph(input: {
+function buildDesignerBlueprintGraph(input: {
   blueprint: DesignerBlueprintDocument;
   integrationMetadataByTargetKey: ReadonlyMap<string, DesignerBlueprintIntegrationMetadata>;
-}): Promise<DesignerBlueprintGraph> {
+}): DesignerBlueprintGraph {
   const unresolvedNodes = buildDesignerBlueprintUnresolvedNodes(input);
   const displayEdges = buildDesignerBlueprintDisplayEdges(input.blueprint);
-  const layout = await getDesignerBlueprintElk().layout({
-    id: "designer-blueprint",
-    layoutOptions: {
-      "elk.algorithm": "layered",
-      "elk.direction": "DOWN",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "12",
-      "elk.spacing.nodeNode": "24",
-      "elk.edgeRouting": "SPLINES",
-    },
-    children: unresolvedNodes.map((node) => ({
-      id: node.id,
-      width: DesignerBlueprintNodeWidth,
-      height: getDesignerBlueprintNodeHeight(node.data),
-    })),
-    edges: displayEdges.map((edge) => ({
-      id: edge.id,
-      sources: [edge.source],
-      targets: [edge.target],
-    })),
+  return buildDesignerBlueprintProcessLaneGraph({
+    edges: displayEdges,
+    nodes: unresolvedNodes,
   });
+}
 
-  const positionByNodeId = new Map(
-    (layout.children ?? []).map((node) => [
-      node.id,
-      {
-        x: node.x ?? 0,
-        y: node.y ?? 0,
-      },
-    ]),
-  );
+function buildDesignerBlueprintProcessLaneGraph(input: {
+  edges: DesignerBlueprintGraphEdge[];
+  nodes: readonly DesignerBlueprintLayoutNode[];
+}): DesignerBlueprintGraph {
+  const indexByNodeId = new Map(input.nodes.map((node, index) => [node.id, index]));
+  const positionByNodeId = new Map<string, { x: number; y: number }>();
+  let nextY = 0;
+
+  for (const node of input.nodes) {
+    positionByNodeId.set(node.id, {
+      x: 0,
+      y: nextY,
+    });
+    nextY += getDesignerBlueprintProcessLaneSlotHeight(node.data) + DesignerBlueprintProcessLaneGap;
+  }
 
   return {
-    nodes: unresolvedNodes.map((node) => ({
+    edges: input.edges.map((edge) => {
+      if (
+        isDesignerBlueprintFeedbackEdge({
+          edge,
+          indexByNodeId,
+        })
+      ) {
+        return {
+          ...edge,
+          animated: true,
+          sourceHandle: DesignerBlueprintRightSourceHandle,
+          style: {
+            ...edge.style,
+            strokeDasharray: "6 4",
+          },
+          targetHandle: DesignerBlueprintRightTargetHandle,
+          type: "loopback",
+        };
+      }
+
+      return edge;
+    }),
+    nodes: input.nodes.map((node) => ({
       ...node,
       position: positionByNodeId.get(node.id) ?? node.position,
     })),
-    edges: displayEdges,
   };
+}
+
+function getDesignerBlueprintProcessLaneSlotHeight(data: DesignerBlueprintLayoutNodeData): number {
+  return Math.max(
+    DesignerBlueprintProcessLaneMinSlotHeight,
+    Math.min(getDesignerBlueprintNodeHeight(data), DesignerBlueprintProcessLaneMaxSlotHeight),
+  );
+}
+
+function isDesignerBlueprintFeedbackEdge(input: {
+  edge: DesignerBlueprintGraphEdge;
+  indexByNodeId: ReadonlyMap<string, number>;
+}): boolean {
+  const sourceIndex = input.indexByNodeId.get(input.edge.source);
+  const targetIndex = input.indexByNodeId.get(input.edge.target);
+  return sourceIndex !== undefined && targetIndex !== undefined && targetIndex < sourceIndex;
 }
 
 export function resolveDesignerBlueprintInitialFocusViewport(input: {
   graphBounds: DesignerBlueprintGraphBounds;
+  rightPadding?: number | undefined;
   width: number;
+  zoom?: number | undefined;
 }): Viewport {
+  const zoom = input.zoom ?? DesignerBlueprintInitialViewport.zoom;
+  const graphWidth = input.graphBounds.width + (input.rightPadding ?? 0);
   return {
-    x:
-      input.width / 2 -
-      (input.graphBounds.x + input.graphBounds.width / 2) * DesignerBlueprintInitialViewport.zoom,
-    y:
-      DesignerBlueprintInitialFocusTopPadding -
-      input.graphBounds.y * DesignerBlueprintInitialViewport.zoom,
-    zoom: DesignerBlueprintInitialViewport.zoom,
+    x: input.width / 2 - (input.graphBounds.x + graphWidth / 2) * zoom,
+    y: DesignerBlueprintInitialFocusTopPadding - input.graphBounds.y * zoom,
+    zoom,
   };
 }
 
 export function resolveDesignerBlueprintInitialFocusViewportForNodes(input: {
   nodes: readonly DesignerBlueprintPositionedNode[];
+  rightPadding?: number | undefined;
   width: number;
+  zoom?: number | undefined;
 }): Viewport | null {
   if (input.width <= 0) {
     return null;
@@ -1526,7 +1675,9 @@ export function resolveDesignerBlueprintInitialFocusViewportForNodes(input: {
 
   return resolveDesignerBlueprintInitialFocusViewport({
     graphBounds,
+    rightPadding: input.rightPadding,
     width: input.width,
+    zoom: input.zoom,
   });
 }
 
@@ -1565,11 +1716,6 @@ function getDesignerBlueprintGraphBounds(
     x: minX,
     y: minY,
   };
-}
-
-function getDesignerBlueprintElk(): InstanceType<typeof ELK> {
-  designerBlueprintElk ??= new ELK();
-  return designerBlueprintElk;
 }
 
 function buildDesignerBlueprintUnresolvedNodes(input: {
@@ -1629,8 +1775,10 @@ function mapDesignerBlueprintGraphNodesForComments(input: {
   onAddComment: (comment: PendingSessionBlueprintCommentInput) => void;
   onClearAddCommentSuppression: (itemId: string) => void;
   onDeleteComment: (commentId: string) => void;
+  onOpenComment: (comment: DesignerBlueprintOpenComment) => void;
   onSuppressAddComment: (itemId: string) => void;
   onUpdateComment: (commentId: string, body: string) => void;
+  openComment: DesignerBlueprintOpenComment;
   pendingComments: readonly PendingSessionBlueprintComment[];
   suppressedAddCommentItemIds: ReadonlySet<string>;
 }): DesignerBlueprintVisualNode[] {
@@ -1646,8 +1794,10 @@ function mapDesignerBlueprintGraphNodesForComments(input: {
       onAddComment: input.onAddComment,
       onClearAddCommentSuppression: input.onClearAddCommentSuppression,
       onDeleteComment: input.onDeleteComment,
+      onOpenComment: input.onOpenComment,
       onSuppressAddComment: input.onSuppressAddComment,
       onUpdateComment: input.onUpdateComment,
+      openComment: input.openComment,
       ...createDesignerBlueprintPendingCommentData({
         item: node.data.item,
         pendingComments: input.pendingComments,

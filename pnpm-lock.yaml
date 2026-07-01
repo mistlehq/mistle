@@ -455,9 +455,6 @@ importers:
       dockview:
         specifier: ^6.6.1
         version: 6.6.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      elkjs:
-        specifier: ^0.11.1
-        version: 0.11.1
       openapi-fetch:
         specifier: ^0.17.0
         version: 0.17.0
@@ -920,6 +917,46 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
+
+  packages/designer-eval-harness:
+    dependencies:
+      '@mistle/control-plane-api':
+        specifier: workspace:*
+        version: link:../../apps/control-plane-api
+      '@mistle/integrations-core':
+        specifier: workspace:*
+        version: link:../integrations-core
+      '@mistle/integrations-definitions':
+        specifier: workspace:*
+        version: link:../integrations-definitions
+      '@mistle/sandbox-session-client':
+        specifier: workspace:*
+        version: link:../sandbox-session-client
+      '@mistle/time':
+        specifier: workspace:*
+        version: link:../time
+      smol-toml:
+        specifier: ^1.6.1
+        version: 1.6.1
+      testcontainers:
+        specifier: ^12.0.1
+        version: 12.0.1
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+      tsx:
+        specifier: ^4.21.0
+        version: 4.22.4
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.4)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.4)(esbuild@0.25.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.3))
+      ws:
+        specifier: 8.21.0
+        version: 8.21.0
 
   packages/dev-data-plane-gateway-a: {}
 
@@ -8456,9 +8493,6 @@ packages:
 
   electron-to-chromium@1.5.368:
     resolution: {integrity: sha512-7RckJJK4uESJF9PxvfMWd3TGqIiieUTG4HxnKaKuIpGbcr+r2ZEB3g2gAhCP3Fqm42vJSzLfgab9eva/C4/XVw==}
-
-  elkjs@0.11.1:
-    resolution: {integrity: sha512-zxxR9k+rx5ktMwT/FwyLdPCrq7xN6e4VGGHH8hA01vVYKjTFik7nHOxBnAYtrgYUB1RpAiLvA1/U2YraWxyKKg==}
 
   embla-carousel-react@8.6.0:
     resolution: {integrity: sha512-0/PjqU7geVmo6F734pmPqpyHqiM99olvyecY7zdweCw+6tKEXnrE90pBiBbMMU8s5tICemzpQ3hi5EpxzGW+JA==}
@@ -20960,8 +20994,6 @@ snapshots:
       yaml: 2.8.3
 
   electron-to-chromium@1.5.368: {}
-
-  elkjs@0.11.1: {}
 
   embla-carousel-react@8.6.0(react@19.2.7):
     dependencies:

@@ -73,16 +73,32 @@ A sandbox-backed **Mistle Designer** workspace backed one-to-one by a sandbox in
 _Avoid_: Sandbox session when referring to the guided setup workspace rather than the configured agent runtime session
 _Code name_: designer
 
+**Designer eval client**:
+A non-browser client for evaluating a real **Mistle Designer session** by handling supported **Dashboard control actions**, supplying scripted **User input request** responses, and recording artifacts.
+_Avoid_: Headless Designer runtime, alternate Designer runtime, browser automation
+
+**Designer eval case**:
+A repeatable **Mistle Designer** evaluation scenario with a user request, required product state, scripted user responses, and expected behavioral assertions.
+_Avoid_: Test fixture when referring to the whole evaluation scenario
+
+**Designer eval seed**:
+The product state a **Designer eval case** creates or requires before starting its **Mistle Designer session**.
+_Avoid_: Local dev state, ambient database state
+
+**Designer eval artifact**:
+A file written by a **Designer eval client** to preserve a transcript, dashboard-control trace, product-state snapshot, or evaluation result for one **Designer eval case** run.
+_Avoid_: Test output when the file is intended for human review or regression comparison
+
 **Designer managed instructions**:
 Mistle-owned instructions that guide **Mistle Designer** behavior inside a **Mistle Designer session**.
 _Avoid_: Repo guidance, contributor instructions, Designer instructions when the source of authority is ambiguous
 
 **Designer runtime reference**:
-A generated, read-only reference artifact made available inside a **Mistle Designer session** for runtime lookup without becoming part of **Designer managed instructions**.
-_Avoid_: Designer managed instructions, hand-authored runtime docs
+A Mistle-owned reference artifact made available inside a **Mistle Designer session** for runtime lookup without becoming part of **Designer managed instructions**. A runtime reference may be generated from typed product metadata or curated by Mistle for stable product concepts.
+_Avoid_: Designer managed instructions, user project docs, ad hoc runtime notes
 
 **Designer integration catalog**:
-A **Designer runtime reference** that lists static integration metadata such as provider aliases, integration target identities, setup methods, supported resource kinds, and known provider caveats.
+A generated **Designer runtime reference** that lists static integration metadata such as provider aliases, integration target identities, setup methods, supported resource kinds, binding tools, and known provider caveats.
 _Avoid_: Integration connection state, organization integration status, hand-authored provider docs
 
 **Designer recommendation**:
@@ -148,17 +164,9 @@ _Avoid_: Provider write when no explicit operation handler has executed
 A runtime request that asks the user to answer a structured question before the agent continues.
 _Avoid_: Approval request when the user is choosing configuration rather than granting permission
 
-**User input request cancellation**:
-A user's explicit choice not to answer a pending **User input request**, allowing the runtime to continue handling the active turn without treating the choice as a full turn interruption.
-_Avoid_: Runtime approval decline, turn interruption
-
 **User input request custom response**:
 A user-authored response submitted through the composer for a pending **User input request**, either to provide an unlisted answer or redirect the conversation.
-_Avoid_: Steer message, turn interruption, cancellation
-
-**User input request custom answer**:
-An inline answer field scoped to one question in a **User input request**. A **User input request custom answer** is submitted as a structured answer for that question rather than as a **User input request custom response**.
-_Avoid_: Free-form response, composer custom response, turn interruption
+_Avoid_: Custom answer, inline freeform answer, steer message, turn interruption, cancellation
 
 **App setup completion signal**:
 A user's indication that they have completed a user-owned **App setup step** in the dashboard. An **App setup completion signal** unblocks **Mistle Designer** to verify product state, but it is not proof that the resulting **Integration connection** is usable.
@@ -207,6 +215,10 @@ _Avoid_: Runtime plane, runtime config when referring to the compiled activation
 **Provider MCP server**:
 An external-provider capability selected through an integration binding and exposed to an **Agent runtime** as part of the **Runtime plan**.
 _Avoid_: Mistle MCP, agent runtime MCP when the server belongs to a provider integration
+
+**Provider tool**:
+An external-provider capability selected through an integration binding and exposed to an **Agent runtime** as part of the **Runtime plan**. A **Provider tool** may be a CLI, a **Provider MCP server**, or another provider-specific runtime capability.
+_Avoid_: Mistle resource access, selected provider resource, provider trigger
 
 **Draft integration connection**:
 An **Integration connection** created before all provider setup requirements are satisfied.
@@ -859,6 +871,12 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Session-time tool installation in a **Mistle Designer session** is sandbox workspace state produced by the agent, not a change to the **Runtime plan**.
 - Future **Mistle Designer session** access to newly selected **Integration connections** may change without changing the **Runtime plan**.
 - **Mistle Designer session** setup changes do not automatically change the target **Sandbox profile version configuration**.
+- A **Designer eval case** may require a reversible saved change to a draft **Sandbox profile version** as evidence that **Mistle Designer** produced actionable product progress.
+- A **Designer eval client** should submit dashboard-mediated product actions through the same validated **Dashboard control action** path as the dashboard client.
+- The **Designer eval client** lives in `packages/designer-eval-harness`; eval runs may remain local/manual developer workflows before becoming CI gates.
+- A **Designer eval seed** may create prerequisite product state directly, but the product change being evaluated should be produced through the same validated product path used by a dashboard-mediated **Dashboard control action**.
+- First-pass **Designer eval artifacts** should preserve the transcript, raw runtime events, dashboard-control trace, product-state snapshots, and evaluation result; provider MCP call traces may wait until they are available from existing runtime events without special runtime changes.
+- First-pass **Designer eval cases** may run as local/manual developer workflows before becoming CI gates.
 - **Mistle Designer** may route a user to an existing integration setup flow rather than creating an **Integration connection** directly.
 - An **App setup completion signal** should be collected through a **User input request** when **Mistle Designer** is waiting on an **App setup step**.
 - An **App setup completion signal** must be followed by live product-state verification before **Mistle Designer** selects provider resources or updates **Sandbox profile version configuration**.
@@ -929,7 +947,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Future **Mistle Designer** work may read and refresh scoped **Provider configuration resources** needed for the current setup path.
 - Future **Mistle Designer** work may make **Provider configuration changes** only after explicit user approval.
 - **Runtime approval requests** are the generic mechanism for surfacing side-effecting runtime tool calls to the user; product or provider writes still require an explicit supported operation path after approval.
-- A **User input request** may be resolved by a structured answer, a **User input request custom response**, or **User input request cancellation**. A **User input request custom answer** is an inline way to produce a structured answer for a specific question.
+- A **User input request** may be resolved by a structured answer or a **User input request custom response**. Stopping the active turn is a session control, not a **User input request** response.
 - First-pass **Mistle Designer sessions** do not require detailed durable activity history for **Provider configuration changes**.
 - Publishing the first **Sandbox profile version** is publish-worthy when no **Source sandbox profile version** exists.
 - Publishing the first **Sandbox profile version** does not require a **Source sandbox profile version**.

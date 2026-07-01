@@ -12,6 +12,7 @@ import { noopRespondToServerRequest } from "../chat/components/chat-story-suppor
 import {
   DesignerBlueprintCurrentTabHref,
   DesignerBlueprintCurrentTabId,
+  type DesignerBlueprintDocument,
 } from "../designer/designer-blueprint-schema.js";
 import type { DesignerSession, DesignerSessionListItem } from "../designer/designer-service.js";
 import type {
@@ -248,6 +249,161 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
   },
 ];
 
+const AiSoftwareFactoryBlueprint = {
+  version: 1,
+  title: "AI Software Factory Draft",
+  outcome: {
+    label: "Issue-to-PR software factory",
+    description:
+      "Move well-defined software work from an issue system into implementation, pull request review, rework, and process improvement with agent assistance.",
+  },
+  items: [
+    {
+      id: "issue-ready",
+      kind: "trigger",
+      label: "Issue marked ready for agent",
+      description:
+        "Work enters the factory only after a readiness signal such as a status, label, or manual start confirms acceptance criteria are present.",
+      state: "proposed",
+      eventLabel: "Issue ready",
+    },
+    {
+      id: "readiness-check",
+      kind: "agent_step",
+      label: "Check readiness and scope",
+      description:
+        "Verify acceptance criteria, affected area, blockers, and repository target before implementation starts.",
+      state: "proposed",
+    },
+    {
+      id: "implement-change",
+      kind: "agent_step",
+      label: "Plan, edit, and test",
+      description:
+        "Create an implementation plan, change the code, and run the relevant checks before producing reviewable work.",
+      state: "proposed",
+    },
+    {
+      id: "pr-output",
+      kind: "workflow_output",
+      label: "Pull request opened or updated",
+      description:
+        "Produce a pull request with implementation notes, test evidence, and issue linkage.",
+      state: "proposed",
+    },
+    {
+      id: "review-step",
+      kind: "agent_step",
+      label: "Review change quality",
+      description:
+        "A separate review agent or human reviewer checks acceptance criteria, regressions, tests, and maintainability.",
+      state: "proposed",
+    },
+    {
+      id: "review-route",
+      kind: "routing_policy",
+      label: "Route review outcome",
+      description:
+        "Send accepted work toward human merge; send requested changes back to implementation; mark unclear or blocked work appropriately.",
+      state: "proposed",
+      rules: [
+        {
+          label: "Changes requested",
+          when: [
+            {
+              field: "review_outcome",
+              operator: "equals",
+              value: "changes_requested",
+            },
+          ],
+          routeTo: "implement-change",
+        },
+        {
+          label: "Accepted",
+          when: [
+            {
+              field: "review_outcome",
+              operator: "equals",
+              value: "accepted",
+            },
+          ],
+          routeTo: "issue-update",
+        },
+        {
+          label: "Blocked or unclear",
+          when: [
+            {
+              field: "review_outcome",
+              operator: "equals",
+              value: "blocked",
+            },
+          ],
+          routeTo: "issue-update",
+        },
+      ],
+    },
+    {
+      id: "issue-update",
+      kind: "agent_step",
+      label: "Update issue status",
+      description:
+        "Record PR links, review state, blockers, rework needs, or completion in the issue system.",
+      state: "proposed",
+    },
+    {
+      id: "improvement-output",
+      kind: "workflow_output",
+      label: "Factory improvement notes",
+      description:
+        "Capture repeated blockers, missing issue fields, weak tests, or recurring review feedback for later instruction and process updates.",
+      state: "proposed",
+    },
+  ],
+  links: [
+    {
+      from: "issue-ready",
+      to: "readiness-check",
+      kind: "triggers",
+    },
+    {
+      from: "readiness-check",
+      to: "implement-change",
+      kind: "hands_off_to",
+    },
+    {
+      from: "implement-change",
+      to: "pr-output",
+      kind: "produces",
+    },
+    {
+      from: "pr-output",
+      to: "review-step",
+      kind: "triggers",
+    },
+    {
+      from: "review-step",
+      to: "review-route",
+      kind: "routes_to",
+    },
+    {
+      from: "review-route",
+      to: "implement-change",
+      kind: "routes_to",
+    },
+    {
+      from: "review-route",
+      to: "issue-update",
+      kind: "routes_to",
+    },
+    {
+      from: "issue-update",
+      to: "improvement-output",
+      kind: "produces",
+    },
+  ],
+  actions: [],
+} satisfies DesignerBlueprintDocument;
+
 const StoryDesignerSessionConversationEntries = [
   {
     id: "designer-session-user-1",
@@ -429,6 +585,36 @@ function DesignerSessionWithCanvasStory(input?: {
         secondaryPanelDefaultSize: 58,
       })}
     </DesignerCanvasStoryRuntime>
+  );
+}
+
+function AiSoftwareFactoryBlueprintStory(): React.JSX.Element {
+  return (
+    <DesignerCanvasStoryRuntime>
+      <BlueprintCanvasStoryPanel title="AI software factory blueprint">
+        <DesignerBlueprintCanvasPanel
+          blueprint={AiSoftwareFactoryBlueprint}
+          onAddComment={function onAddComment() {}}
+          onDeleteComment={function onDeleteComment() {}}
+          onUpdateComment={function onUpdateComment() {}}
+          pendingComments={[]}
+        />
+      </BlueprintCanvasStoryPanel>
+    </DesignerCanvasStoryRuntime>
+  );
+}
+
+function BlueprintCanvasStoryPanel(input: {
+  children: React.ReactNode;
+  title: string;
+}): React.JSX.Element {
+  return (
+    <section className="flex h-screen min-h-0 flex-col overflow-hidden bg-background">
+      <div className="flex h-10 flex-none items-center border-b bg-background px-3 text-sm font-medium">
+        {input.title}
+      </div>
+      <div className="min-h-0 flex-1">{input.children}</div>
+    </section>
   );
 }
 
@@ -664,7 +850,9 @@ function BlueprintCommentStatePreview(input: {
           {input.floating === false ? (
             input.children
           ) : (
-            <DesignerBlueprintFloatingComment>{input.children}</DesignerBlueprintFloatingComment>
+            <DesignerBlueprintFloatingComment className="absolute left-[calc(100%+0.75rem)] top-0 z-20">
+              {input.children}
+            </DesignerBlueprintFloatingComment>
           )}
         </div>
       </div>
@@ -923,6 +1111,12 @@ export const SessionWithCanvasLongComment: Story = {
 export const BlueprintCommentStates: Story = {
   render: function RenderBlueprintCommentStatesStory(): React.JSX.Element {
     return <BlueprintCommentStateGalleryStory />;
+  },
+};
+
+export const AiSoftwareFactoryBlueprintLayout: Story = {
+  render: function RenderAiSoftwareFactoryBlueprintStory(): React.JSX.Element {
+    return <AiSoftwareFactoryBlueprintStory />;
   },
 };
 

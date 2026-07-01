@@ -263,25 +263,128 @@ describe("ServerRequestsPanel", () => {
     ]);
   });
 
-  it("cancels tool/requestUserInput requests without submitting answers", () => {
+  it("uses the composer custom response path for freeform user input when supported", () => {
     const submittedResults: unknown[] = [];
 
     render(
       <ServerRequestsPanel
         entries={[
           {
-            requestId: 17,
+            requestId: 18,
             method: "tool/requestUserInput",
             kind: "tool-user-input",
             questions: [
               {
-                header: "Choice",
-                id: "q1",
-                question: "Which option?",
+                header: "Goal",
+                id: "goal",
+                question: "What should the agent optimize for?",
+              },
+            ],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+        supportsUserInputRequestCustomResponse
+      />,
+    );
+
+    expect(screen.getByText("What should the agent optimize for?").textContent).toBe(
+      "What should the agent optimize for?",
+    );
+    expect(screen.queryByLabelText("Describe the outcome")).toBeNull();
+    expect(screen.queryByPlaceholderText("Describe the outcome")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+
+    expect(submittedResults).toEqual([]);
+  });
+
+  it("uses selectable options plus composer custom response when both are available", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: 19,
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [
+              {
+                header: "Sandbox profile",
+                id: "profile-choice",
+                question: "Which sandbox profile should run the triaging agent?",
                 options: [
                   {
-                    label: "Other",
+                    label: "Create new",
+                    isOther: false,
+                  },
+                  {
+                    label: "Use another profile",
+                    placeholder: "Paste a sandbox profile ID",
                     isOther: true,
+                  },
+                ],
+              },
+            ],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+        supportsUserInputRequestCustomResponse
+      />,
+    );
+
+    expect(screen.queryByLabelText("Use another profile")).toBeNull();
+    expect(screen.queryByPlaceholderText("Paste a sandbox profile ID")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Create new/u }));
+
+    expect(submittedResults).toEqual([
+      {
+        answers: [
+          {
+            id: "profile-choice",
+            value: "Create new",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("lets runtimes without composer custom responses cancel auto-submit user input choices", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: "triage-source-choice-request-1",
+            method: "tool/requestUserInput",
+            kind: "tool-user-input",
+            questions: [
+              {
+                header: "Intake source",
+                id: "triage-source-choice",
+                question: "What should the triaging agent watch first?",
+                options: [
+                  {
+                    label: "GitHub issues/PRs",
+                    isOther: false,
+                  },
+                  {
+                    label: "Slack messages",
+                    isOther: false,
                   },
                 ],
               },
@@ -371,28 +474,33 @@ describe("ServerRequestsPanel", () => {
     ]);
   });
 
-  it("cancels selectable tool/requestUserInput requests from the top-right action", () => {
-    const submittedResults: unknown[] = [];
-
+  it("does not render user input question headers", () => {
     render(
       <ServerRequestsPanel
         entries={[
           {
-            requestId: "triage-source-choice-request-1",
+            requestId: "multi-question-request-1",
             method: "tool/requestUserInput",
             kind: "tool-user-input",
             questions: [
               {
-                header: "Intake source",
-                id: "triage-source-choice",
-                question: "What should the triaging agent watch first?",
+                header: "Issue system",
+                id: "issue-system",
+                question: "Which issue system should this workflow monitor?",
                 options: [
                   {
-                    label: "GitHub issues/PRs",
+                    label: "Linear",
                     isOther: false,
                   },
+                ],
+              },
+              {
+                header: "Review policy",
+                id: "review-policy",
+                question: "What approval boundary should the agent use?",
+                options: [
                   {
-                    label: "Slack messages",
+                    label: "Human review required",
                     isOther: false,
                   },
                 ],
@@ -403,19 +511,14 @@ describe("ServerRequestsPanel", () => {
           },
         ]}
         isRespondingToServerRequest={false}
-        onRespondToServerRequest={(_requestId, result) => {
-          submittedResults.push(result);
-        }}
+        onRespondToServerRequest={() => {}}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-
-    expect(submittedResults).toEqual([
-      {
-        decision: "cancel",
-      },
-    ]);
+    expect(screen.queryByText("Issue system")).toBeNull();
+    expect(screen.queryByText("Review policy")).toBeNull();
+    expect(screen.getByText("Which issue system should this workflow monitor?")).toBeTruthy();
+    expect(screen.getByText("What approval boundary should the agent use?")).toBeTruthy();
   });
 
   it("renders long selectable user input options as numbered rows", () => {
