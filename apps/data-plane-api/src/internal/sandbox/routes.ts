@@ -4,6 +4,7 @@ import { OpenApiValidationHook } from "@mistle/http/errors.js";
 import { createRequireInternalAuthMiddleware } from "../../middleware/require-internal-auth.js";
 import type { AppContextBindings, AppRoutes } from "../../types.js";
 import { INTERNAL_SANDBOX_ROUTE_BASE_PATH } from "./constants.js";
+import * as pruneUnusedSandboxImages from "./sandbox-images/prune-unused/index.js";
 import * as applyRuntimeLifecycleEvent from "./sandbox-instances/apply-runtime-lifecycle-event/index.js";
 import * as createSandboxInstance from "./sandbox-instances/create-sandbox-instance/index.js";
 import * as deleteSandboxInstanceDeadline from "./sandbox-instances/delete-sandbox-instance-deadline/index.js";
@@ -35,6 +36,7 @@ export function createInternalSandboxRoutes(): AppRoutes<typeof INTERNAL_SANDBOX
   );
 
   routes.openapi(materializeSnapshotJob.route, materializeSnapshotJob.handler);
+  routes.openapi(pruneUnusedSandboxImages.route, pruneUnusedSandboxImages.handler);
   routes.openapi(createSandboxInstance.route, createSandboxInstance.handler);
   routes.openapi(listSandboxInstances.route, listSandboxInstances.handler);
   routes.openapi(searchSandboxInstances.route, searchSandboxInstances.handler);

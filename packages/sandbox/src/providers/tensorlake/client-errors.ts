@@ -22,6 +22,9 @@ export const TensorlakeClientOperationIds = {
   READ_OPERATION_LOG: "read_operation_log",
   RUN_COMMAND: "run_command",
   BUILD_BASE_IMAGE: "build_base_image",
+  LIST_SANDBOXES: "list_sandboxes",
+  LIST_SNAPSHOTS: "list_snapshots",
+  DELETE_SNAPSHOT: "delete_snapshot",
 } as const;
 export type TensorlakeClientOperation =
   (typeof TensorlakeClientOperationIds)[keyof typeof TensorlakeClientOperationIds];

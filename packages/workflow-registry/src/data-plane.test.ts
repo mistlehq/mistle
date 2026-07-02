@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   DeleteSandboxInstanceWorkflowSpec,
   HandleSandboxInstanceDeadlineWorkflowSpec,
+  PruneUnusedSandboxImagesWorkflowSpec,
   ReconcileSandboxInstanceWorkflowSpec,
   ResumeSandboxInstanceWorkflowSpec,
   StartSandboxInstanceWorkflowSpec,
@@ -33,6 +34,10 @@ describe("data-plane workflow registry", () => {
     });
     expect(HandleSandboxInstanceDeadlineWorkflowSpec).toEqual({
       name: "data-plane.sandbox-instance-deadlines.handle",
+      version: "1",
+    });
+    expect(PruneUnusedSandboxImagesWorkflowSpec).toEqual({
+      name: "data-plane.sandbox-images.prune-unused",
       version: "1",
     });
   });

@@ -23,6 +23,8 @@ export const HandleSandboxInstanceDeadlineWorkflowVersion = "1";
 export const MaterializeSandboxProfileVersionSnapshotWorkflowName =
   "data-plane.sandbox-profile-version-snapshots.materialize";
 export const MaterializeSandboxProfileVersionSnapshotWorkflowVersion = "1";
+export const PruneUnusedSandboxImagesWorkflowName = "data-plane.sandbox-images.prune-unused";
+export const PruneUnusedSandboxImagesWorkflowVersion = "1";
 
 export type SandboxStopReason = "idle" | "user";
 export type SandboxReconcileReason = "disconnect_grace_elapsed";
@@ -122,6 +124,46 @@ export const MaterializeSandboxProfileVersionSnapshotWorkflowSpec = defineWorkfl
 >({
   name: MaterializeSandboxProfileVersionSnapshotWorkflowName,
   version: MaterializeSandboxProfileVersionSnapshotWorkflowVersion,
+});
+
+export type PruneUnusedSandboxImagesWorkflowTargetInput = {
+  organizationId: string;
+  provider: SandboxProvider;
+  connectionId?: string;
+  referencedImages: ReadonlyArray<Pick<SandboxImageHandle, "provider" | "imageId">>;
+};
+
+export type PruneUnusedSandboxImagesWorkflowInput = {
+  cutoff: string;
+  targets: readonly PruneUnusedSandboxImagesWorkflowTargetInput[];
+};
+
+export type PruneUnusedSandboxImagesWorkflowTargetOutput = {
+  organizationId: string;
+  provider: SandboxProvider;
+  connectionId?: string;
+  providerImageCount: number;
+  referencedImageCount: number;
+  deletionCandidateCount: number;
+  deletedCount: number;
+  failedCount: number;
+};
+
+export type PruneUnusedSandboxImagesWorkflowOutput = {
+  providerImageCount: number;
+  referencedImageCount: number;
+  deletionCandidateCount: number;
+  deletedCount: number;
+  failedCount: number;
+  targets: readonly PruneUnusedSandboxImagesWorkflowTargetOutput[];
+};
+
+export const PruneUnusedSandboxImagesWorkflowSpec = defineWorkflowSpec<
+  PruneUnusedSandboxImagesWorkflowInput,
+  PruneUnusedSandboxImagesWorkflowOutput
+>({
+  name: PruneUnusedSandboxImagesWorkflowName,
+  version: PruneUnusedSandboxImagesWorkflowVersion,
 });
 
 export type ResumeSandboxInstanceWorkflowInput = {

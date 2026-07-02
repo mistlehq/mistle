@@ -54,6 +54,12 @@ export const ControlPlaneWorkerSandboxConfigSchema = z
   })
   .strict();
 
+export const PartialControlPlaneWorkerSandboxConfigSchema = z
+  .object({
+    defaultBaseImage: z.string().min(1).optional(),
+  })
+  .strict();
+
 const ControlPlaneWorkerStripeBillingConfigSchema = z.preprocess(
   defaultMissingEnabledToFalse,
   z.discriminatedUnion("enabled", [
@@ -102,7 +108,7 @@ export const PartialControlPlaneWorkerConfigSchema = z
     dataPlaneApi: ControlPlaneWorkerDataPlaneApiConfigSchema.partial().optional(),
     controlPlaneApi: ControlPlaneWorkerControlPlaneApiConfigSchema.partial().optional(),
     internalAuth: ControlPlaneWorkerInternalAuthConfigSchema.partial().optional(),
-    sandbox: ControlPlaneWorkerSandboxConfigSchema.partial().optional(),
+    sandbox: PartialControlPlaneWorkerSandboxConfigSchema.optional(),
     billing: ControlPlaneWorkerBillingConfigObjectSchema.partial().optional(),
   })
   .strict();

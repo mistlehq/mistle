@@ -7,6 +7,7 @@ import {
   SandboxProvider,
   type SandboxAdapter,
   type SandboxCaptureSnapshotRequest,
+  type SandboxDeleteImageRequest,
   type SandboxDestroyRequest,
   type SandboxHandle,
   type SandboxImageHandle,
@@ -27,8 +28,10 @@ import type { OpenComputerClient } from "./client.js";
 import {
   createOpenComputerCheckpointImageHandle,
   createOpenComputerSnapshotImageHandle,
+  parseOpenComputerImageHandle,
   resolveOpenComputerStartImage,
 } from "./image-handle.js";
+import { OpenComputerImageHandleKinds } from "./schemas.js";
 import type { ValidatedOpenComputerSandboxConfig } from "./schemas.js";
 import { createOpenComputerTransparentProxyConfiguration } from "./transparent-proxy.js";
 import type { OpenComputerSandboxInspectResult } from "./types.js";
@@ -164,6 +167,24 @@ export class OpenComputerSandboxAdapter implements SandboxAdapter {
       }
       throw error;
     }
+  }
+
+  async listImages(): Promise<readonly SandboxImageHandle[]> {
+    // OpenComputer profile snapshots are checkpoint handles, while provider snapshot inventory is
+    // a different artifact type. Do not expose account-wide snapshot inventory for pruning until
+    // checkpoint listing can provide a timestamped Mistle-owned candidate set.
+    return [];
+  }
+
+  async deleteImage(request: SandboxDeleteImageRequest): Promise<void> {
+    const image = parseOpenComputerImageHandle(request.image);
+    if (image.kind !== OpenComputerImageHandleKinds.SNAPSHOT) {
+      throw new SandboxConfigurationError(
+        "OpenComputer image deletion requires a snapshot image handle.",
+      );
+    }
+
+    await this.#client.deleteImage({ imageId: image.id });
   }
 
   async stop(request: SandboxStopRequest): Promise<void> {

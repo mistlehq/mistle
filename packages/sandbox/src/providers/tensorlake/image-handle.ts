@@ -15,12 +15,18 @@ export type TensorlakeStartImage = {
   readonly sourceBaseImageRef?: string;
 };
 
-export function createTensorlakeRegisteredImageHandle(imageName: string): SandboxImageHandle {
-  return createTensorlakeImageHandle(TensorlakeStartImageKinds.IMAGE, imageName);
+export function createTensorlakeRegisteredImageHandle(
+  imageName: string,
+  input?: { createdAt?: string },
+): SandboxImageHandle {
+  return createTensorlakeImageHandle(TensorlakeStartImageKinds.IMAGE, imageName, input);
 }
 
-export function createTensorlakeSnapshotImageHandle(snapshotId: string): SandboxImageHandle {
-  return createTensorlakeImageHandle(TensorlakeStartImageKinds.SNAPSHOT, snapshotId);
+export function createTensorlakeSnapshotImageHandle(
+  snapshotId: string,
+  input?: { createdAt?: string },
+): SandboxImageHandle {
+  return createTensorlakeImageHandle(TensorlakeStartImageKinds.SNAPSHOT, snapshotId, input);
 }
 
 export function parseTensorlakeImageHandle(handle: SandboxImageHandle): TensorlakeStartImage {
@@ -84,11 +90,12 @@ export function createTensorlakeRegisteredBaseImageName(baseImageRef: string): s
 function createTensorlakeImageHandle(
   kind: TensorlakeStartImageKind,
   id: string,
+  input?: { createdAt?: string },
 ): SandboxImageHandle {
   return {
     provider: SandboxProvider.TENSORLAKE,
     imageId: `${TensorlakeImageHandlePrefix}${kind}:${requireNonEmptyTensorlakeImageId(id)}`,
-    createdAt: new Date().toISOString(),
+    createdAt: input?.createdAt ?? new Date().toISOString(),
   };
 }
 

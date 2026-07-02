@@ -7,6 +7,7 @@ import {
   SandboxProvider,
   type SandboxAdapter,
   type SandboxCaptureSnapshotRequest,
+  type SandboxDeleteImageRequest,
   type SandboxDestroyRequest,
   type SandboxHandle,
   type SandboxImageHandle,
@@ -23,10 +24,11 @@ import {
   TensorlakeClientErrorCodes,
   TensorlakeClientOperationIds,
 } from "./client-errors.js";
-import type { TensorlakeClient } from "./client.js";
+import { isMistleTensorlakeSandboxName, type TensorlakeClient } from "./client.js";
 import {
   createTensorlakeRegisteredImageHandle,
   createTensorlakeSnapshotImageHandle,
+  parseTensorlakeImageHandle,
   resolveTensorlakeStartImage,
 } from "./image-handle.js";
 import { createTensorlakeTransparentProxyConfiguration } from "./transparent-proxy.js";
@@ -147,6 +149,45 @@ export class TensorlakeSandboxAdapter implements SandboxAdapter {
       }
       throw error;
     }
+  }
+
+  async listImages(): Promise<readonly SandboxImageHandle[]> {
+    const [snapshots, sandboxes] = await Promise.all([
+      this.#client.listSnapshots(),
+      this.#client.listSandboxNames(),
+    ]);
+    const sandboxNamesByProviderId = new Map(
+      sandboxes.map((sandbox) => [sandbox.sandboxId, sandbox.name]),
+    );
+
+    return snapshots.flatMap((snapshot) => {
+      const sandboxName = sandboxNamesByProviderId.get(snapshot.sandboxId) ?? null;
+      if (
+        snapshot.snapshotType !== "filesystem" ||
+        snapshot.status !== "completed" ||
+        snapshot.createdAt === null ||
+        !isMistleTensorlakeSandboxName(sandboxName)
+      ) {
+        return [];
+      }
+
+      return [
+        createTensorlakeSnapshotImageHandle(snapshot.snapshotId, {
+          createdAt: snapshot.createdAt,
+        }),
+      ];
+    });
+  }
+
+  async deleteImage(request: SandboxDeleteImageRequest): Promise<void> {
+    const image = parseTensorlakeImageHandle(request.image);
+    if (image.kind !== "snapshot") {
+      throw new SandboxConfigurationError("Tensorlake image deletion requires a snapshot handle.");
+    }
+
+    await this.#client.deleteSnapshot({
+      snapshotId: image.id,
+    });
   }
 
   async stop(request: SandboxStopRequest): Promise<void> {

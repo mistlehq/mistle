@@ -3,6 +3,7 @@ import {
   HandleTriggerRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
   HandleProviderResourceAssociationDeliveryWorkflowSpec,
+  PruneUnusedSandboxImagesWorkflowSpec,
   ProvisionStripeCustomerWorkflowSpec,
   RefreshIntegrationConnectionOAuth2CredentialWorkflowSpec,
   RequestDeleteSandboxProfileWorkflowSpec,
@@ -56,6 +57,12 @@ describe("control-plane worker openworkflow entrypoints", () => {
   it("preserves the provision Stripe customer workflow identity", () => {
     expect(readWorkflowSpec(ProvisionStripeCustomerWorkflowSpec.name)).toMatchObject(
       ProvisionStripeCustomerWorkflowSpec,
+    );
+  });
+
+  it("preserves the unused sandbox image pruning workflow identity", () => {
+    expect(readWorkflowSpec(PruneUnusedSandboxImagesWorkflowSpec.name)).toMatchObject(
+      PruneUnusedSandboxImagesWorkflowSpec,
     );
   });
 

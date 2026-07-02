@@ -7,6 +7,7 @@ import {
   SandboxProvider,
   type SandboxAdapter,
   type SandboxCaptureSnapshotRequest,
+  type SandboxDeleteImageRequest,
   type SandboxDestroyRequest,
   type SandboxHandle,
   type SandboxImageHandle,
@@ -129,6 +130,23 @@ export class ModalSandboxAdapter implements SandboxAdapter {
       }
       throw error;
     }
+  }
+
+  async listImages(): Promise<readonly SandboxImageHandle[]> {
+    // Modal snapshots can be deleted by id, but this cleanup path must not enumerate a shared
+    // provider account until we can identify Mistle-owned artifacts with creation timestamps.
+    return [];
+  }
+
+  async deleteImage(request: SandboxDeleteImageRequest): Promise<void> {
+    if (request.image.provider !== SandboxProvider.MODAL) {
+      throw new SandboxConfigurationError("Modal adapter received a non-Modal image handle.");
+    }
+    if (request.image.imageId.trim().length === 0) {
+      throw new SandboxConfigurationError("Modal image id is required.");
+    }
+
+    await this.#client.deleteImage({ imageId: request.image.imageId });
   }
 
   async stop(request: SandboxStopRequest): Promise<void> {

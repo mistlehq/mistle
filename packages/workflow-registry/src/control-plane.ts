@@ -108,6 +108,8 @@ export function createStripeCustomerProvisioningIdempotencyKey(organizationId: s
 export const RequestDeleteSandboxProfileWorkflowName =
   "control-plane.sandbox-profiles.request-delete-profile";
 export const RequestDeleteSandboxProfileWorkflowVersion = "1";
+export const PruneUnusedSandboxImagesWorkflowName = "control-plane.sandbox-images.prune-unused";
+export const PruneUnusedSandboxImagesWorkflowVersion = "1";
 
 export type RequestDeleteSandboxProfileWorkflowInput = {
   organizationId: string;
@@ -124,6 +126,23 @@ export const RequestDeleteSandboxProfileWorkflowSpec = defineWorkflowSpec<
 >({
   name: RequestDeleteSandboxProfileWorkflowName,
   version: RequestDeleteSandboxProfileWorkflowVersion,
+});
+
+export type PruneUnusedSandboxImagesWorkflowInput = Record<string, never>;
+
+export type PruneUnusedSandboxImagesWorkflowOutput = {
+  retentionHours: number;
+  referencedImageCount: number;
+  targetCount: number;
+  dataPlaneWorkflowRunId: string;
+};
+
+export const PruneUnusedSandboxImagesWorkflowSpec = defineWorkflowSpec<
+  PruneUnusedSandboxImagesWorkflowInput,
+  PruneUnusedSandboxImagesWorkflowOutput
+>({
+  name: PruneUnusedSandboxImagesWorkflowName,
+  version: PruneUnusedSandboxImagesWorkflowVersion,
 });
 
 export const StartSandboxProfileInstanceWorkflowName =

@@ -8,6 +8,7 @@ import {
   SandboxProvider,
   type SandboxAdapter,
   type SandboxCaptureSnapshotRequest,
+  type SandboxDeleteImageRequest,
   type SandboxDestroyRequest,
   type SandboxHandle,
   type SandboxImageHandle,
@@ -137,6 +138,28 @@ export class DockerSandboxAdapter implements SandboxAdapter {
 
       throw error;
     }
+  }
+
+  async listImages(): Promise<readonly SandboxImageHandle[]> {
+    const images = await this.#client.listImages();
+    return images.map((image) => ({
+      provider: SandboxProvider.DOCKER,
+      imageId: image.imageId,
+      createdAt: image.createdAt,
+    }));
+  }
+
+  async deleteImage(request: SandboxDeleteImageRequest): Promise<void> {
+    if (request.image.provider !== SandboxProvider.DOCKER) {
+      throw new SandboxConfigurationError("Docker adapter received a non-Docker image handle.");
+    }
+    if (request.image.imageId.trim().length === 0) {
+      throw new SandboxConfigurationError("Docker image id is required.");
+    }
+
+    await this.#client.deleteImage({
+      imageId: request.image.imageId,
+    });
   }
 
   async stop(request: SandboxStopRequest): Promise<void> {

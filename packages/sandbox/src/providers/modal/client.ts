@@ -42,6 +42,10 @@ export const ModalDefaultSandboxTimeoutMs = 24 * 60 * 60 * 1000;
 
 export type ModalStartSandboxResponse = { sandboxId: string };
 export type ModalCaptureSandboxSnapshotResponse = { imageId: string };
+export type ModalImageInfo = {
+  readonly imageId: string;
+  readonly createdAt: string;
+};
 export type ModalRunCommandResponse = {
   readonly stdout: string;
   readonly stderr: string;
@@ -58,6 +62,8 @@ export interface ModalClientApi {
   captureSandboxSnapshot(
     request: ModalCaptureSandboxSnapshotRequest,
   ): Promise<ModalCaptureSandboxSnapshotResponse>;
+  listImages(): Promise<readonly ModalImageInfo[]>;
+  deleteImage(request: { imageId: string }): Promise<void>;
   stopSandbox(request: ModalSandboxIdRequest): Promise<void>;
   destroySandbox(request: ModalSandboxIdRequest): Promise<void>;
   activate(request: ModalRuntimeControlRequest): Promise<void>;
@@ -191,6 +197,18 @@ export class ModalApiClient implements ModalClientApi {
       return { imageId: image.imageId };
     } catch (error) {
       throw mapModalClientError(ModalClientOperationIds.CREATE_SNAPSHOT, error);
+    }
+  }
+
+  async listImages(): Promise<readonly ModalImageInfo[]> {
+    return [];
+  }
+
+  async deleteImage(request: { imageId: string }): Promise<void> {
+    try {
+      await this.#client.images.delete(request.imageId);
+    } catch (error) {
+      throw mapModalClientError(ModalClientOperationIds.DELETE_IMAGE, error);
     }
   }
 

@@ -260,6 +260,10 @@ export interface SandboxDestroyRequest {
   readonly id: string;
 }
 
+export interface SandboxDeleteImageRequest {
+  readonly image: SandboxImageHandle;
+}
+
 export interface SandboxCaptureSnapshotRequest {
   readonly id: string;
   readonly providerRequestTimeoutMs?: number;
@@ -272,6 +276,8 @@ export interface SandboxAdapter {
   inspect(request: SandboxInspectRequest): Promise<SandboxInspectResult>;
   resume(request: SandboxResumeRequestV1): Promise<SandboxHandle>;
   captureSnapshot(request: SandboxCaptureSnapshotRequest): Promise<SandboxImageHandle>;
+  listImages(): Promise<readonly SandboxImageHandle[]>;
+  deleteImage(request: SandboxDeleteImageRequest): Promise<void>;
   stop(request: SandboxStopRequest): Promise<void>;
   destroy(request: SandboxDestroyRequest): Promise<void>;
 }

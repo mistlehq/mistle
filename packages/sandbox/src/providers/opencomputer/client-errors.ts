@@ -7,6 +7,8 @@ export const OpenComputerClientOperationIds = {
   GET_SANDBOX_INFO: "get_sandbox_info",
   RESUME_SANDBOX: "resume_sandbox",
   CREATE_CHECKPOINT: "create_checkpoint",
+  LIST_IMAGES: "list_images",
+  DELETE_IMAGE: "delete_image",
   HIBERNATE_SANDBOX: "hibernate_sandbox",
   DELETE_SANDBOX: "delete_sandbox",
   RUN_COMMAND: "run_command",

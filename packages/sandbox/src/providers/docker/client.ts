@@ -38,6 +38,11 @@ export type DockerCaptureSandboxSnapshotResponse = {
   imageId: string;
 };
 
+export type DockerImageInfo = {
+  imageId: string;
+  createdAt: string;
+};
+
 export interface DockerClient {
   prepareImage(request: { imageRef: string }): Promise<void>;
   startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse>;
@@ -46,13 +51,24 @@ export interface DockerClient {
   captureSandboxSnapshot(
     request: DockerCaptureSandboxSnapshotRequest,
   ): Promise<DockerCaptureSandboxSnapshotResponse>;
+  listImages(): Promise<readonly DockerImageInfo[]>;
+  deleteImage(request: { imageId: string }): Promise<void>;
   stopSandbox(request: DockerStopSandboxRequest): Promise<void>;
   destroySandbox(request: DockerDestroySandboxRequest): Promise<void>;
 }
 
+const DockerMistleSnapshotImageLabel = "mistle.sandbox.snapshot";
+
 const DockerCommitResponseSchema = z
   .object({
     Id: z.string().trim().min(1),
+  })
+  .strip();
+
+const DockerImageSummarySchema = z
+  .object({
+    Id: z.string().trim().min(1),
+    Created: z.number().int().nonnegative(),
   })
   .strip();
 
@@ -266,6 +282,7 @@ export class DockerApiClient implements DockerClient {
       await this.#runDockerClientOperation(DockerClientOperationIds.COMMIT_CONTAINER, () =>
         container.commit({
           pause: true,
+          changes: [`LABEL ${DockerMistleSnapshotImageLabel}=true`],
         }),
       ),
     );
@@ -273,6 +290,32 @@ export class DockerApiClient implements DockerClient {
     return {
       imageId: commitResult.Id,
     };
+  }
+
+  async listImages(): Promise<readonly DockerImageInfo[]> {
+    const images = await this.#runDockerClientOperation(DockerClientOperationIds.LIST_IMAGES, () =>
+      this.#docker.listImages({
+        filters: JSON.stringify({
+          label: [`${DockerMistleSnapshotImageLabel}=true`],
+        }),
+      }),
+    );
+
+    return images.map((image) => {
+      const parsedImage = DockerImageSummarySchema.parse(image);
+      return {
+        imageId: parsedImage.Id,
+        createdAt: new Date(parsedImage.Created * 1000).toISOString(),
+      };
+    });
+  }
+
+  async deleteImage(request: { imageId: string }): Promise<void> {
+    await this.#runDockerClientOperation(DockerClientOperationIds.DELETE_IMAGE, () =>
+      this.#docker.getImage(request.imageId).remove({
+        force: true,
+      }),
+    );
   }
 
   async stopSandbox(request: DockerStopSandboxRequest): Promise<void> {

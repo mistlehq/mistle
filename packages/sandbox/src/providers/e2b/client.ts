@@ -97,6 +97,11 @@ export type E2BCaptureSandboxSnapshotResponse = {
   snapshotId: string;
 };
 
+export type E2BImageInfo = {
+  readonly imageId: string;
+  readonly createdAt: string;
+};
+
 export interface E2BClient {
   prepareImage(request: { imageRef: string }): Promise<{ imageRef: string }>;
   startSandbox(request: E2BStartSandboxRequest): Promise<E2BStartSandboxResponse>;
@@ -105,6 +110,8 @@ export interface E2BClient {
   captureSandboxSnapshot(
     request: E2BCaptureSandboxSnapshotRequest,
   ): Promise<E2BCaptureSandboxSnapshotResponse>;
+  listImages(): Promise<readonly E2BImageInfo[]>;
+  deleteImage(request: { imageId: string }): Promise<void>;
   stopSandbox(request: E2BStopSandboxRequest): Promise<void>;
   destroySandbox(request: E2BDestroySandboxRequest): Promise<void>;
   activate(request: E2BInitRequest): Promise<void>;
@@ -521,6 +528,18 @@ export class E2BApiClient implements E2BClient {
       };
     } catch (error) {
       throw mapE2BClientError(E2BClientOperationIds.CREATE_SNAPSHOT, error);
+    }
+  }
+
+  async listImages(): Promise<readonly E2BImageInfo[]> {
+    return [];
+  }
+
+  async deleteImage(request: { imageId: string }): Promise<void> {
+    try {
+      await Sandbox.deleteSnapshot(request.imageId, this.#connectionOptions);
+    } catch (error) {
+      throw mapE2BClientError(E2BClientOperationIds.DELETE_IMAGE, error);
     }
   }
 

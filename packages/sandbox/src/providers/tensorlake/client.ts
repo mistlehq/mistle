@@ -110,6 +110,18 @@ export function createTensorlakeRunOptions(input: {
 
 export type TensorlakeStartSandboxResponse = { sandboxId: string };
 export type TensorlakeCaptureSandboxSnapshotResponse = { snapshotId: string };
+export type TensorlakeSnapshotInfo = {
+  snapshotId: string;
+  sandboxId: string;
+  status: string;
+  snapshotType: string | null;
+  sizeBytes: number | null;
+  createdAt: string | null;
+};
+export type TensorlakeSandboxNameInfo = {
+  sandboxId: string;
+  name: string | null;
+};
 
 export interface TensorlakeClient {
   prepareImage(request: { image: TensorlakeStartImage }): Promise<void>;
@@ -119,6 +131,9 @@ export interface TensorlakeClient {
   captureSandboxSnapshot(
     request: TensorlakeCaptureSandboxSnapshotRequest,
   ): Promise<TensorlakeCaptureSandboxSnapshotResponse>;
+  listSnapshots(): Promise<TensorlakeSnapshotInfo[]>;
+  listSandboxNames(): Promise<TensorlakeSandboxNameInfo[]>;
+  deleteSnapshot(request: { snapshotId: string }): Promise<void>;
   stopSandbox(request: TensorlakeSandboxIdRequest): Promise<void>;
   destroySandbox(request: TensorlakeSandboxIdRequest): Promise<void>;
   activate(request: TensorlakeRuntimeControlRequest): Promise<void>;
@@ -180,6 +195,24 @@ function toIsoString(value: Date | undefined): string | null {
   return value === undefined ? null : value.toISOString();
 }
 
+function toTensorlakeSnapshotInfo(snapshot: SnapshotInfo): TensorlakeSnapshotInfo {
+  return {
+    snapshotId: snapshot.snapshotId,
+    sandboxId: snapshot.sandboxId,
+    status: String(snapshot.status),
+    snapshotType: snapshot.snapshotType ?? null,
+    sizeBytes: snapshot.sizeBytes ?? null,
+    createdAt: toIsoString(snapshot.createdAt),
+  };
+}
+
+function toTensorlakeSandboxNameInfo(sandbox: SandboxInfo): TensorlakeSandboxNameInfo {
+  return {
+    sandboxId: sandbox.sandboxId,
+    name: sandbox.name ?? null,
+  };
+}
+
 export function createTensorlakeSandboxOptions(
   request: TensorlakeStartSandboxRequest,
 ): CreateAndConnectOptions {
@@ -205,6 +238,7 @@ export function createTensorlakeSandboxOptions(
 }
 
 const TensorlakeSandboxNameRegex = /^[a-z][a-z0-9-]{0,62}$/;
+const MistleTensorlakeSandboxNameRegex = /^mistle-sbi-[0-9a-z]{26}$/;
 
 export function createTensorlakeSandboxName(sandboxInstanceId: string): string {
   const name = `mistle-${sandboxInstanceId.replaceAll("_", "-")}`;
@@ -212,6 +246,10 @@ export function createTensorlakeSandboxName(sandboxInstanceId: string): string {
     throw new Error("Sandbox instance id cannot be converted to a valid Tensorlake sandbox name.");
   }
   return name;
+}
+
+export function isMistleTensorlakeSandboxName(name: string | null): boolean {
+  return name !== null && MistleTensorlakeSandboxNameRegex.test(name);
 }
 
 export function createTensorlakeDaemonEnv(
@@ -458,6 +496,35 @@ export class TensorlakeApiClient implements TensorlakeClient {
     }
   }
 
+  async listSnapshots(): Promise<TensorlakeSnapshotInfo[]> {
+    try {
+      const snapshots = await this.#client.listSnapshots();
+      return snapshots.map(toTensorlakeSnapshotInfo);
+    } catch (error) {
+      throw mapTensorlakeClientError(TensorlakeClientOperationIds.LIST_SNAPSHOTS, error);
+    }
+  }
+
+  async listSandboxNames(): Promise<TensorlakeSandboxNameInfo[]> {
+    try {
+      const [activeSandboxes, archivedSandboxes] = await Promise.all([
+        this.#client.list(),
+        this.#listArchivedSandboxNames(),
+      ]);
+      return [...activeSandboxes.map(toTensorlakeSandboxNameInfo), ...archivedSandboxes];
+    } catch (error) {
+      throw mapTensorlakeClientError(TensorlakeClientOperationIds.LIST_SANDBOXES, error);
+    }
+  }
+
+  async deleteSnapshot(request: { snapshotId: string }): Promise<void> {
+    try {
+      await this.#client.deleteSnapshot(request.snapshotId);
+    } catch (error) {
+      throw mapTensorlakeClientError(TensorlakeClientOperationIds.DELETE_SNAPSHOT, error);
+    }
+  }
+
   async stopSandbox(request: TensorlakeSandboxIdRequest): Promise<void> {
     const parsedRequest = TensorlakeSandboxIdRequestSchema.parse(request);
 
@@ -528,6 +595,21 @@ export class TensorlakeApiClient implements TensorlakeClient {
 
   close(): void {
     this.#client.close();
+  }
+
+  async #listArchivedSandboxNames(): Promise<TensorlakeSandboxNameInfo[]> {
+    const sandboxNames: TensorlakeSandboxNameInfo[] = [];
+    let cursor: string | undefined;
+
+    do {
+      const response = await this.#client.listArchived(
+        cursor === undefined ? undefined : { cursor },
+      );
+      sandboxNames.push(...response.sandboxes.map(toTensorlakeSandboxNameInfo));
+      cursor = response.nextCursor;
+    } while (cursor !== undefined);
+
+    return sandboxNames;
   }
 
   async #connect(sandboxId: string): Promise<Sandbox> {

@@ -15,6 +15,7 @@ import {
   createTensorlakeSandboxdControlCommand,
   createTensorlakeSandboxName,
   createTensorlakeSnapshotAndWaitOptions,
+  isMistleTensorlakeSandboxName,
   normalizeTensorlakeInspectDisposition,
   normalizeTensorlakeInspectState,
   resolveTensorlakeClaimedSandboxStartResponse,
@@ -151,6 +152,27 @@ describe("createTensorlakeSandboxName", () => {
         "sbi_abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz",
       ),
     ).toThrow("Sandbox instance id cannot be converted to a valid Tensorlake sandbox name.");
+  });
+});
+
+describe("isMistleTensorlakeSandboxName", () => {
+  it("matches the Tensorlake sandbox names created for Mistle sandbox instances", () => {
+    expect(isMistleTensorlakeSandboxName("mistle-sbi-01krb9bvpweh0t4pb7b1mcsmme")).toBe(true);
+  });
+
+  it("rejects provider ids, custom names, and missing names", () => {
+    expect(isMistleTensorlakeSandboxName("hr550lb6u4k2m8pbrz47g")).toBe(false);
+    expect(isMistleTensorlakeSandboxName("custom-sandbox")).toBe(false);
+    expect(isMistleTensorlakeSandboxName(null)).toBe(false);
+  });
+
+  it("rejects Tensorlake sandbox name prefix lookalikes", () => {
+    expect(isMistleTensorlakeSandboxName("mistle-sbi-manual")).toBe(false);
+    expect(isMistleTensorlakeSandboxName("mistle-sbi-01krb9bvpweh0t4pb7b1mcsmme-extra")).toBe(
+      false,
+    );
+    expect(isMistleTensorlakeSandboxName("mistle-sbi-01krb9bvpweh0t4pb7b1mcsm")).toBe(false);
+    expect(isMistleTensorlakeSandboxName("mistle-sbi-01KRB9BVPWEH0T4PB7B1MCSMME")).toBe(false);
   });
 });
 

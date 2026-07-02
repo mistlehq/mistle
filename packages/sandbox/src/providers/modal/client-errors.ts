@@ -8,6 +8,8 @@ export const ModalClientOperationIds = {
   GET_SANDBOX_INFO: "get_sandbox_info",
   RESUME_SANDBOX: "resume_sandbox",
   CREATE_SNAPSHOT: "create_snapshot",
+  LIST_IMAGES: "list_images",
+  DELETE_IMAGE: "delete_image",
   TERMINATE_SANDBOX: "terminate_sandbox",
   ACTIVATE: "activate",
   ENSURE_SANDBOXD: "ensure_sandboxd",

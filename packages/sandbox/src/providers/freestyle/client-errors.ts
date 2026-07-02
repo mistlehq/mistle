@@ -7,6 +7,8 @@ export const FreestyleClientOperationIds = {
   GET_SANDBOX_INFO: "get_sandbox_info",
   RESUME_SANDBOX: "resume_sandbox",
   CREATE_SNAPSHOT: "create_snapshot",
+  LIST_IMAGES: "list_images",
+  DELETE_IMAGE: "delete_image",
   SUSPEND_SANDBOX: "suspend_sandbox",
   DELETE_SANDBOX: "delete_sandbox",
   RUN_COMMAND: "run_command",

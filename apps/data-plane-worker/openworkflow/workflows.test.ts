@@ -2,6 +2,7 @@ import {
   DeleteSandboxInstanceWorkflowSpec,
   MaterializeSandboxProfileVersionSnapshotWorkflowSpec,
   HandleSandboxInstanceDeadlineWorkflowSpec,
+  PruneUnusedSandboxImagesWorkflowSpec,
   ReconcileSandboxInstanceWorkflowSpec,
   ResumeSandboxInstanceWorkflowSpec,
   StartSandboxInstanceWorkflowSpec,
@@ -31,6 +32,12 @@ describe("data-plane worker openworkflow entrypoints", () => {
     expect(
       readWorkflowSpec(MaterializeSandboxProfileVersionSnapshotWorkflowSpec.name),
     ).toMatchObject(MaterializeSandboxProfileVersionSnapshotWorkflowSpec);
+  });
+
+  it("preserves the unused sandbox image pruning workflow identity", () => {
+    expect(readWorkflowSpec(PruneUnusedSandboxImagesWorkflowSpec.name)).toMatchObject(
+      PruneUnusedSandboxImagesWorkflowSpec,
+    );
   });
 
   it("allows snapshot provider requests to run for one hour", () => {

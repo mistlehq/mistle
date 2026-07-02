@@ -233,6 +233,25 @@ export type MaterializeSandboxProfileVersionSnapshotJobInput =
   paths["/internal/sandbox/profile-version-snapshot-jobs/materialize"]["post"]["requestBody"]["content"]["application/json"];
 export type MaterializeSandboxProfileVersionSnapshotJobAcceptedResponse =
   paths["/internal/sandbox/profile-version-snapshot-jobs/materialize"]["post"]["responses"]["202"]["content"]["application/json"];
+export type PruneUnusedSandboxImagesInput = {
+  cutoff: string;
+  targets: Array<{
+    organizationId: string;
+    provider: SandboxProvider;
+    connectionId?: string;
+    referencedImages: Array<Pick<SandboxImageHandle, "provider" | "imageId">>;
+  }>;
+  idempotencyKey: string;
+};
+const PruneUnusedSandboxImagesAcceptedResponseSchema = z
+  .object({
+    status: z.literal("accepted"),
+    workflowRunId: z.string().min(1),
+  })
+  .strict();
+export type PruneUnusedSandboxImagesAcceptedResponse = z.infer<
+  typeof PruneUnusedSandboxImagesAcceptedResponseSchema
+>;
 export type GetSandboxInstanceInput = {
   organizationId: string;
   instanceId: string;
@@ -367,6 +386,9 @@ export type DataPlaneSandboxInstancesClient = {
   materializeSandboxProfileVersionSnapshotJob: (
     input: MaterializeSandboxProfileVersionSnapshotJobInput,
   ) => Promise<MaterializeSandboxProfileVersionSnapshotJobAcceptedResponse>;
+  pruneUnusedSandboxImages: (
+    input: PruneUnusedSandboxImagesInput,
+  ) => Promise<PruneUnusedSandboxImagesAcceptedResponse>;
   getSandboxInstanceMetadata: (
     input: GetSandboxInstanceMetadataInput,
   ) => Promise<SandboxInstanceMetadataResponse>;
@@ -412,6 +434,7 @@ function createClientError(input: {
   operation:
     | "start"
     | "materialize"
+    | "pruneImages"
     | "resume"
     | "stop"
     | "delete"
@@ -429,6 +452,7 @@ function createClientError(input: {
   const operationLabel: Record<typeof input.operation, string> = {
     start: "start",
     materialize: "materialize",
+    pruneImages: "prune images",
     resume: "resume",
     stop: "stop",
     delete: "delete",
@@ -1001,7 +1025,40 @@ export function createDataPlaneSandboxInstancesClient(
       throw createClientError({
         status: response.status,
         error: errorBody,
-        operation: "start",
+        operation: "materialize",
+      });
+    },
+
+    async pruneUnusedSandboxImages(pruneInput) {
+      const response = await fetch(
+        new URL("/internal/sandbox/images/prune-unused", internalClient.baseUrl),
+        {
+          method: "POST",
+          headers: createTestHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
+          body: JSON.stringify(pruneInput),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (response.status === 202) {
+        const responseBody = await response.json();
+        return PruneUnusedSandboxImagesAcceptedResponseSchema.parse(responseBody);
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "pruneImages",
       });
     },
 

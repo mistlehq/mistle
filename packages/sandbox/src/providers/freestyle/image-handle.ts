@@ -7,7 +7,10 @@ const FreestyleSandboxBaseImageNamePrefix = "mistle";
 const FreestyleSha256DigestPrefix = "@sha256:";
 const FreestyleBaseImageDigestLength = 24;
 
-export function createFreestyleSnapshotImageHandle(snapshotId: string): SandboxImageHandle {
+export function createFreestyleSnapshotImageHandle(
+  snapshotId: string,
+  input?: { readonly createdAt?: string },
+): SandboxImageHandle {
   if (snapshotId.trim().length === 0) {
     throw new SandboxConfigurationError("Freestyle snapshot id is required.");
   }
@@ -15,7 +18,7 @@ export function createFreestyleSnapshotImageHandle(snapshotId: string): SandboxI
   return {
     provider: SandboxProvider.FREESTYLE,
     imageId: snapshotId,
-    createdAt: new Date().toISOString(),
+    createdAt: input?.createdAt ?? new Date().toISOString(),
   };
 }
 

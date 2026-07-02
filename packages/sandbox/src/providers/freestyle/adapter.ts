@@ -7,6 +7,7 @@ import {
   SandboxProvider,
   type SandboxAdapter,
   type SandboxCaptureSnapshotRequest,
+  type SandboxDeleteImageRequest,
   type SandboxDestroyRequest,
   type SandboxHandle,
   type SandboxImageHandle,
@@ -131,6 +132,17 @@ export class FreestyleSandboxAdapter implements SandboxAdapter {
       }
       throw error;
     }
+  }
+
+  async listImages(): Promise<readonly SandboxImageHandle[]> {
+    // Freestyle snapshots can be deleted by id, but the provider does not currently expose a
+    // timestamped Mistle-owned inventory that is safe for account-wide pruning.
+    return [];
+  }
+
+  async deleteImage(request: SandboxDeleteImageRequest): Promise<void> {
+    const image = parseFreestyleImageHandle(request.image);
+    await this.#client.deleteImage({ snapshotId: image.snapshotId });
   }
 
   async stop(request: SandboxStopRequest): Promise<void> {

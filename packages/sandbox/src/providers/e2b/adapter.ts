@@ -7,6 +7,7 @@ import {
   SandboxProvider,
   type SandboxAdapter,
   type SandboxCaptureSnapshotRequest,
+  type SandboxDeleteImageRequest,
   type SandboxDestroyRequest,
   type SandboxHandle,
   type SandboxImageHandle,
@@ -30,11 +31,14 @@ function createSandboxHandle(sandboxId: string): SandboxHandle {
   };
 }
 
-function createSandboxImageHandle(imageId: string): SandboxImageHandle {
+function createSandboxImageHandle(
+  imageId: string,
+  input: { readonly createdAt: string },
+): SandboxImageHandle {
   return {
     provider: SandboxProvider.E2B,
     imageId,
-    createdAt: new Date().toISOString(),
+    createdAt: input.createdAt,
   };
 }
 
@@ -72,7 +76,9 @@ export class E2BSandboxAdapter implements SandboxAdapter {
       imageRef: request.image.imageId,
     });
 
-    return createSandboxImageHandle(response.imageRef);
+    return createSandboxImageHandle(response.imageRef, {
+      createdAt: new Date().toISOString(),
+    });
   }
 
   async start(request: SandboxStartRequest): Promise<SandboxHandle> {
@@ -134,7 +140,9 @@ export class E2BSandboxAdapter implements SandboxAdapter {
           : { requestTimeoutMs: request.providerRequestTimeoutMs }),
       });
 
-      return createSandboxImageHandle(response.snapshotId);
+      return createSandboxImageHandle(response.snapshotId, {
+        createdAt: new Date().toISOString(),
+      });
     } catch (error) {
       if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
         throw toSandboxNotFoundError(request.id, error);
@@ -142,6 +150,24 @@ export class E2BSandboxAdapter implements SandboxAdapter {
 
       throw error;
     }
+  }
+
+  async listImages(): Promise<readonly SandboxImageHandle[]> {
+    // E2B exposes template listing/deletion, but this cleanup path is destructive and needs a
+    // durable Mistle ownership signal for account-wide enumeration. Until we have one, do not
+    // surface provider inventory as prune candidates.
+    return [];
+  }
+
+  async deleteImage(request: SandboxDeleteImageRequest): Promise<void> {
+    if (request.image.provider !== SandboxProvider.E2B) {
+      throw new SandboxConfigurationError("E2B adapter received a non-E2B image handle.");
+    }
+    if (request.image.imageId.trim().length === 0) {
+      throw new SandboxConfigurationError("E2B image id is required.");
+    }
+
+    await this.#client.deleteImage({ imageId: request.image.imageId });
   }
 
   async stop(request: SandboxStopRequest): Promise<void> {

@@ -42,6 +42,8 @@ export const E2BClientOperationIds = {
    * https://e2b.dev/docs/sdk-reference/js-sdk/v2.14.0/sandbox
    */
   CREATE_SNAPSHOT: "create_snapshot",
+  LIST_IMAGES: "list_images",
+  DELETE_IMAGE: "delete_image",
   /**
    * `sandbox.pause()`.
    * Source:

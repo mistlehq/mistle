@@ -871,6 +871,12 @@ const ResumableStoppedSandboxAdapter: SandboxAdapter = {
   captureSnapshot: async () => {
     throw new Error("This test does not capture provider snapshots.");
   },
+  listImages: async () => {
+    throw new Error("This test does not list provider images.");
+  },
+  deleteImage: async () => {
+    throw new Error("This test does not delete provider images.");
+  },
   stop: async () => {
     throw new Error("This test does not stop provider sandboxes.");
   },

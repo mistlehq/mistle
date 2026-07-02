@@ -3,6 +3,7 @@ import { HandleProviderResourceAssociationDeliveryWorkflow } from "./handle-prov
 import { HandleTriggerConversationDeliveryWorkflow } from "./handle-trigger-conversation-delivery/workflow.js";
 import { HandleTriggerRunWorkflow } from "./handle-trigger-run/workflow.js";
 import { ProvisionStripeCustomerWorkflow } from "./provision-stripe-customer/workflow.js";
+import { PruneUnusedSandboxImagesWorkflow } from "./prune-unused-sandbox-images/workflow.js";
 import { RefreshIntegrationConnectionOAuth2CredentialWorkflow } from "./refresh-integration-connection-oauth2-credential/workflow.js";
 import { RequestDeleteSandboxProfileWorkflow } from "./request-delete-sandbox-profile/workflow.js";
 import { ScheduleDispatchBatchWorkflow } from "./schedule-dispatch/batch-workflow.js";
@@ -28,6 +29,7 @@ export const ControlPlaneWorkerWorkflows = [
   HandleTriggerRunWorkflow,
   HandleIntegrationWebhookEventWorkflow,
   ProvisionStripeCustomerWorkflow,
+  PruneUnusedSandboxImagesWorkflow,
   RefreshIntegrationConnectionOAuth2CredentialWorkflow,
   RequestDeleteSandboxProfileWorkflow,
   DispatchOneOffScheduleWorkflow,

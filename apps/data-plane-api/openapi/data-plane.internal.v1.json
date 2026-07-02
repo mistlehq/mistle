@@ -208,6 +208,155 @@
         }
       }
     },
+    "/internal/sandbox/images/prune-unused": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cutoff": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "organizationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "provider": {
+                          "type": "string",
+                          "enum": [
+                            "docker",
+                            "e2b",
+                            "freestyle",
+                            "modal",
+                            "opencomputer",
+                            "tensorlake"
+                          ]
+                        },
+                        "connectionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "referencedImages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "docker",
+                                  "e2b",
+                                  "freestyle",
+                                  "modal",
+                                  "opencomputer",
+                                  "tensorlake"
+                                ]
+                              },
+                              "imageId": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["provider", "imageId"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["organizationId", "provider", "referencedImages"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["cutoff", "targets", "idempotencyKey"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Enqueue unused sandbox image pruning.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["accepted"]
+                    },
+                    "workflowRunId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["status", "workflowRunId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/sandbox/instances": {
       "post": {
         "tags": ["Internal"],

@@ -31,12 +31,22 @@ export function createOpenComputerDeferredImageHandle(input: {
   );
 }
 
-export function createOpenComputerSnapshotImageHandle(snapshotName: string): SandboxImageHandle {
-  return createOpenComputerImageHandle(OpenComputerImageHandleKinds.SNAPSHOT, snapshotName);
+export function createOpenComputerSnapshotImageHandle(
+  snapshotName: string,
+  input?: { readonly createdAt?: string },
+): SandboxImageHandle {
+  return createOpenComputerImageHandle(OpenComputerImageHandleKinds.SNAPSHOT, snapshotName, input);
 }
 
-export function createOpenComputerCheckpointImageHandle(checkpointId: string): SandboxImageHandle {
-  return createOpenComputerImageHandle(OpenComputerImageHandleKinds.CHECKPOINT, checkpointId);
+export function createOpenComputerCheckpointImageHandle(
+  checkpointId: string,
+  input?: { readonly createdAt?: string },
+): SandboxImageHandle {
+  return createOpenComputerImageHandle(
+    OpenComputerImageHandleKinds.CHECKPOINT,
+    checkpointId,
+    input,
+  );
 }
 
 export function createOpenComputerTemplateImageHandle(templateId: string): SandboxImageHandle {
@@ -130,11 +140,12 @@ export function createOpenComputerBaseImageName(input: {
 function createOpenComputerImageHandle(
   kind: OpenComputerStartImage["kind"],
   id: string,
+  input?: { readonly createdAt?: string },
 ): SandboxImageHandle {
   return {
     provider: SandboxProvider.OPENCOMPUTER,
     imageId: `${kind}:${requireNonEmptyOpenComputerImageId(id)}`,
-    createdAt: new Date().toISOString(),
+    createdAt: input?.createdAt ?? new Date().toISOString(),
   };
 }
 

@@ -289,6 +289,9 @@ importers:
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@mistle/sandbox':
+        specifier: workspace:*
+        version: link:../../packages/sandbox
       '@mistle/sandbox-lifecycle':
         specifier: workspace:*
         version: link:../../packages/sandbox-lifecycle

@@ -71,6 +71,7 @@ const OpenComputerSnapshotInfoSchema = z.looseObject({
   manifest: z.unknown(),
   contentHash: z.string().trim().min(1).optional(),
   checkpointId: z.string().trim().min(1).optional(),
+  createdAt: z.string().nullable().optional(),
 });
 
 const OpenComputerExecSessionResponseSchema = z.looseObject({
@@ -114,6 +115,10 @@ type OpenComputerRunCommandResponse = z.output<typeof OpenComputerRunCommandResp
 
 export type OpenComputerStartSandboxResponse = { sandboxId: string };
 export type OpenComputerCaptureSandboxSnapshotResponse = { checkpointId: string };
+export type OpenComputerImageInfo = {
+  readonly imageId: string;
+  readonly createdAt: string;
+};
 export type OpenComputerRunCommandRequest = {
   readonly sandboxId: string;
   readonly command: string;
@@ -138,6 +143,8 @@ export interface OpenComputerClient {
   captureSandboxSnapshot(
     request: OpenComputerCaptureSandboxSnapshotRequest,
   ): Promise<OpenComputerCaptureSandboxSnapshotResponse>;
+  listImages(): Promise<readonly OpenComputerImageInfo[]>;
+  deleteImage(request: { imageId: string }): Promise<void>;
   verifyCheckpointStartable(request: OpenComputerVerifyCheckpointStartableRequest): Promise<void>;
   stopSandbox(request: OpenComputerSandboxIdRequest): Promise<void>;
   destroySandbox(request: OpenComputerSandboxIdRequest): Promise<void>;
@@ -480,6 +487,21 @@ export class OpenComputerApiClient implements OpenComputerClient {
       return { checkpointId };
     } catch (error) {
       throw mapOpenComputerClientError(OpenComputerClientOperationIds.CREATE_CHECKPOINT, error);
+    }
+  }
+
+  async listImages(): Promise<readonly OpenComputerImageInfo[]> {
+    return [];
+  }
+
+  async deleteImage(request: { imageId: string }): Promise<void> {
+    try {
+      await this.#createSnapshotsClient().delete(request.imageId);
+    } catch (error) {
+      throw mapOpenComputerClientError(
+        OpenComputerClientOperationIds.DELETE_IMAGE,
+        mapOpenComputerSdkError(error),
+      );
     }
   }
 

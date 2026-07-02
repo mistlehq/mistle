@@ -66,6 +66,7 @@ const FreestyleSnapshotInfoSchema = z.looseObject({
   ]),
   deleted: z.boolean().optional(),
   failureReason: z.string().nullable().optional(),
+  createdAt: z.string().nullable().optional(),
 });
 
 const ExecAwaitResponseSchema = z.looseObject({
@@ -110,6 +111,7 @@ export type FreestyleSnapshotInfo = {
   readonly state: FreestyleSnapshotState;
   readonly deleted?: boolean;
   readonly failureReason?: string | null;
+  readonly createdAt?: string | null;
 };
 
 export interface FreestyleClient {
@@ -123,6 +125,8 @@ export interface FreestyleClient {
   captureSandboxSnapshot(
     request: FreestyleCaptureSandboxSnapshotRequest,
   ): Promise<FreestyleCaptureSandboxSnapshotResponse>;
+  listImages(): Promise<readonly FreestyleSnapshotInfo[]>;
+  deleteImage(request: { snapshotId: string }): Promise<void>;
   stopSandbox(request: FreestyleSandboxIdRequest): Promise<void>;
   destroySandbox(request: FreestyleSandboxIdRequest): Promise<void>;
   activate(request: FreestyleRuntimeControlRequest): Promise<void>;
@@ -396,6 +400,26 @@ export class FreestyleApiClient implements FreestyleClient {
       return { snapshotId: response.snapshotId };
     } catch (error) {
       throw mapFreestyleClientError(FreestyleClientOperationIds.CREATE_SNAPSHOT, error);
+    }
+  }
+
+  async listImages(): Promise<readonly FreestyleSnapshotInfo[]> {
+    return [];
+  }
+
+  async deleteImage(request: { snapshotId: string }): Promise<void> {
+    if (request.snapshotId.trim().length === 0) {
+      throw new Error("Freestyle snapshot id is required.");
+    }
+
+    try {
+      await this.#jsonRequest({
+        method: "DELETE",
+        path: `/v1/vms/snapshots/${encodeURIComponent(request.snapshotId)}`,
+        schema: z.unknown(),
+      });
+    } catch (error) {
+      throw mapFreestyleClientError(FreestyleClientOperationIds.DELETE_IMAGE, error);
     }
   }
 
@@ -705,6 +729,7 @@ function toFreestyleSnapshotInfo(
     state: input.state,
     ...(input.deleted === undefined ? {} : { deleted: input.deleted }),
     ...(input.failureReason === undefined ? {} : { failureReason: input.failureReason }),
+    ...(input.createdAt === undefined ? {} : { createdAt: input.createdAt }),
   };
 }
 
