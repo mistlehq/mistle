@@ -248,6 +248,11 @@
       "config": {}
     },
     {
+      "targetKey": "telegram-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "github-cloud",
       "enabled": true,
       "config": {

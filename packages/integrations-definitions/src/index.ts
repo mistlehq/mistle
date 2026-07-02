@@ -53,6 +53,7 @@ import { SignozDefinition } from "./signoz/browser.js";
 import { SlackDefinition } from "./slack/browser.js";
 import { StripeDefinition } from "./stripe/browser.js";
 import { SupabaseDefinition } from "./supabase/browser.js";
+import { TelegramDefinition } from "./telegram/browser.js";
 import { WasenderApiDefinition } from "./wasenderapi/browser.js";
 import { WhapiDefinition } from "./whapi/browser.js";
 import { XeroDefinition } from "./xero/browser.js";
@@ -101,6 +102,7 @@ export * from "./slack/browser.js";
 export * from "./shopify/browser.js";
 export * from "./stripe/browser.js";
 export * from "./supabase/browser.js";
+export * from "./telegram/browser.js";
 export * from "./wasenderapi/browser.js";
 export * from "./whapi/browser.js";
 export * from "./xero/browser.js";
@@ -158,6 +160,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   ShopifyDefinition,
   StripeDefinition,
   SupabaseDefinition,
+  TelegramDefinition,
   WasenderApiDefinition,
   WhapiDefinition,
   XeroDefinition,

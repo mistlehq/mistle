@@ -792,6 +792,22 @@ Binding tools:
 
 - `supabase-mcp`: Supabase MCP (default)
 
+## Telegram
+
+Provider family ID: `telegram`
+Integration target key: `telegram-default`
+Variant ID: `telegram-default`
+Description: Enable access to Telegram Bot API operations and local Telegram MCP tools.
+
+Setup methods:
+
+- `telegram-bot` (form): Telegram bot
+
+Binding tools:
+
+- `telegram-cli`: Telegram CLI
+- `telegram-mcp`: Telegram MCP
+
 ## Tensorlake
 
 Provider family ID: `tensorlake`
