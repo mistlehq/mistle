@@ -254,8 +254,8 @@ importers:
         specifier: ^8.20.0
         version: 8.20.0
       '@types/sshpk':
-        specifier: ^1.17.4
-        version: 1.17.4
+        specifier: ^1.17.5
+        version: 1.17.5
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
@@ -6730,8 +6730,8 @@ packages:
   '@types/ssh2@1.15.5':
     resolution: {integrity: sha512-N1ASjp/nXH3ovBHddRJpli4ozpk6UdDYIX4RJWFa9L1YKnzdhTlVmiGHm4DZnj/jLbqZpes4aeR30EFGQtvhQQ==}
 
-  '@types/sshpk@1.17.4':
-    resolution: {integrity: sha512-5gI/7eJn6wmkuIuFY8JZJ1g5b30H9K5U5vKrvOuYu+hoZLb2xcVEgxhYZ2Vhbs0w/ACyzyfkJq0hQtBfSCugjw==}
+  '@types/sshpk@1.17.5':
+    resolution: {integrity: sha512-khJbOFAOnyLaqOoGIlDCF2ZghIb0jM1K1N0rRoKL0ObqUMwfkicu5zlJ5Wsp+Xn2EUduVwONXwsgbGk+COaCug==}
 
   '@types/tedious@4.0.14':
     resolution: {integrity: sha512-KHPsfX/FoVbUGbyYvk1q9MMQHLPeRZhRJZdO45Q4YjvFkv4hMNghCWTvy7rdKessBsmtz4euWCWAB6/tVpI1Iw==}
@@ -19284,7 +19284,7 @@ snapshots:
     dependencies:
       '@types/node': 18.19.130
 
-  '@types/sshpk@1.17.4':
+  '@types/sshpk@1.17.5':
     dependencies:
       '@types/asn1': 0.2.4
       '@types/node': 25.9.4
