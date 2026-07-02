@@ -52,6 +52,7 @@ describe.concurrent("active runtime plan loader integration", () => {
     ).resolves.toEqual({
       organizationId: "org_active_runtime_plan_loader",
       providerSandboxId: `provider-${sandboxInstanceId}`,
+      purpose: "session",
       runtimePlan,
       runtimePlanRevision: 1,
       sandboxInstanceStatus: SandboxInstanceStatuses.RUNNING,
