@@ -168,7 +168,7 @@ describe("compileCodexRuntime", () => {
           release: {
             kind: "tag",
             match: "exact",
-            tag: "rust-v0.140.0",
+            tag: "rust-v0.142.5",
           },
           asset: {
             kind: "by_arch",
@@ -176,13 +176,13 @@ describe("compileCodexRuntime", () => {
               fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
               format: "tar.gz",
               extractedPath: "codex-x86_64-unknown-linux-musl",
-              sha256: "48e591964d4bbaab7c0433daed41c65ea8f152fc0f1dd2334a42e3dd322a4906",
+              sha256: "cb933ec3cb61bf4b5fc88eecf5e6149829faa6172535b6ef0afb0154beb4aab8",
             },
             aarch64: {
               fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
               format: "tar.gz",
               extractedPath: "codex-aarch64-unknown-linux-musl",
-              sha256: "ec6c804d415e42dd28cc6f8c6cb5238b00c9af4bfb58b63be55e26ec4ee576c0",
+              sha256: "b18c75c49645918fae23beba0ab41c05f07941601510a2451ba97fe519573c38",
             },
           },
           installPath: "/usr/local/bin/codex",
