@@ -1154,6 +1154,19 @@ export type IntegrationFormConnectionMethodSetupCompletionRequirement =
       kind: "all-of";
     };
 
+export type IntegrationFormConnectionMethodCreateValidationInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  controlPlaneBaseUrl: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  config: TConnectionConfig;
+  secrets: Record<string, string>;
+};
+
 type IntegrationConnectionMethodDefinitionBase<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -1187,6 +1200,13 @@ export type IntegrationFormConnectionMethodDefinition<
   kind: "form";
   createBehavior?: IntegrationFormConnectionMethodCreateBehavior;
   postCreate?: IntegrationFormConnectionMethodPostCreateMetadata;
+  validateCreate?(
+    input: IntegrationFormConnectionMethodCreateValidationInput<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >,
+  ): MaybePromise<void>;
   setupFlow?: IntegrationFormConnectionMethodSetupFlow;
   secretFields: ReadonlyArray<IntegrationConnectionMethodSecretField>;
   ui?: {

@@ -685,8 +685,11 @@ describe("integrations-definitions server", () => {
       kind: "connector",
       displayName: "Telegram",
     });
-    expect(telegramDefinition?.webhookSource).toBeUndefined();
-    expect(telegramDefinition?.webhookHandler).toBeUndefined();
+    expect(telegramDefinition?.webhookSource).toBeDefined();
+    expect(telegramDefinition?.webhookHandler).toBeDefined();
+    expect(
+      telegramDefinition?.supportedWebhookEvents?.map((event) => event.providerEventType),
+    ).toEqual(expect.arrayContaining(["message", "callback_query", "message_reaction"]));
   });
 
   it("lists registered server definitions", () => {

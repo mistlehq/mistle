@@ -808,6 +808,33 @@ Binding tools:
 - `telegram-cli`: Telegram CLI
 - `telegram-mcp`: Telegram MCP
 
+Trigger events:
+
+- `telegram.message`: Message
+- `telegram.edited_message`: Edited message
+- `telegram.channel_post`: Channel post
+- `telegram.edited_channel_post`: Edited channel post
+- `telegram.business_connection`: Business connection
+- `telegram.business_message`: Business message
+- `telegram.edited_business_message`: Edited business message
+- `telegram.deleted_business_messages`: Deleted business messages
+- `telegram.message_reaction`: Message reaction
+- `telegram.message_reaction_count`: Message reaction count
+- `telegram.inline_query`: Inline query
+- `telegram.chosen_inline_result`: Chosen inline result
+- `telegram.callback_query`: Callback query
+- `telegram.shipping_query`: Shipping query
+- `telegram.pre_checkout_query`: Pre-checkout query
+- `telegram.purchased_paid_media`: Purchased paid media
+- `telegram.poll`: Poll
+- `telegram.poll_answer`: Poll answer
+- `telegram.my_chat_member`: Bot chat member status
+- `telegram.chat_member`: Chat member status
+- `telegram.chat_join_request`: Chat join request
+- `telegram.chat_boost`: Chat boost
+- `telegram.removed_chat_boost`: Removed chat boost
+- `telegram.managed_bot`: Managed bot
+
 ## Tensorlake
 
 Provider family ID: `tensorlake`

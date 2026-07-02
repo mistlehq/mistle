@@ -2,9 +2,11 @@ import {
   type ControlPlaneDatabase,
   getControlPlaneDatabaseSchema,
   IntegrationConnectionStatuses,
+  type IntegrationTarget,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type {
+  AnyIntegrationDefinition,
   IntegrationConnectionMethodId,
   IntegrationFormConnectionMethodPostCreateMetadata,
   IntegrationRegistry,
@@ -16,6 +18,7 @@ import {
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../../lib/crypto.js";
+import { resolveIntegrationTargetSecrets } from "../../lib/integration-target-secrets.js";
 import type { AppContext } from "../../types.js";
 import {
   IntegrationConnectionsBadRequestCodes,
@@ -26,6 +29,7 @@ import { buildIntegrationConnectionResponse } from "./build-integration-connecti
 import {
   buildFormConnectionConfigForMethodOrThrow,
   buildFormConnectionMethodContextOrThrow,
+  type ParsedFormSecret,
   parseFormConnectionConfigOrThrow,
   parseCreateFormSecretsOrThrow,
   resolveFormConnectionMethodOrThrow,
@@ -90,6 +94,68 @@ async function tryCreateManagedWebhookSource(
       status: "failed",
       message: error.message,
     };
+  }
+}
+
+function buildCreateValidationSecrets(
+  parsedSecrets: readonly ParsedFormSecret[],
+): Record<string, string> {
+  const secrets: Record<string, string> = {};
+  for (const parsedSecret of parsedSecrets) {
+    secrets[parsedSecret.field.name] = parsedSecret.normalizedValue;
+  }
+  return secrets;
+}
+
+async function validateFormConnectionCreateOrThrow(
+  ctx: {
+    integrationsConfig: AppContext["var"]["config"]["integrations"];
+    controlPlaneBaseUrl: string;
+  },
+  input: {
+    organizationId: string;
+    targetKey: string;
+    definition: AnyIntegrationDefinition;
+    target: IntegrationTarget;
+    formMethod: Extract<AnyIntegrationDefinition["connectionMethods"][number], { kind: "form" }>;
+    parsedConfig: Record<string, unknown>;
+    parsedSecrets: readonly ParsedFormSecret[];
+  },
+): Promise<void> {
+  const validateCreate = input.formMethod.validateCreate?.bind(input.formMethod);
+  if (validateCreate === undefined) {
+    return;
+  }
+
+  try {
+    await validateCreate({
+      organizationId: input.organizationId,
+      targetKey: input.targetKey,
+      controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
+      target: {
+        familyId: input.target.familyId,
+        variantId: input.target.variantId,
+        enabled: input.target.enabled,
+        config: input.definition.targetConfigSchema.parse(input.target.config),
+        secrets: input.definition.targetSecretSchema.parse(
+          resolveIntegrationTargetSecrets({
+            integrationsConfig: ctx.integrationsConfig,
+            target: input.target,
+          }),
+        ),
+      },
+      config: input.parsedConfig,
+      secrets: buildCreateValidationSecrets(input.parsedSecrets),
+    });
+  } catch (error) {
+    if (error instanceof BadRequestError) {
+      throw error;
+    }
+
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
+      error instanceof Error ? error.message : "Integration connection validation failed.",
+    );
   }
 }
 
@@ -158,6 +224,21 @@ export async function createFormConnection(
     secrets: input.secrets,
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
   });
+  await validateFormConnectionCreateOrThrow(
+    {
+      integrationsConfig,
+      controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
+    },
+    {
+      organizationId: input.organizationId,
+      targetKey: input.targetKey,
+      definition,
+      target,
+      formMethod,
+      parsedConfig,
+      parsedSecrets,
+    },
+  );
 
   const organizationCredentialKey = await db.query.organizationCredentialKeys.findFirst({
     where: (table, { eq }) => eq(table.organizationId, input.organizationId),
