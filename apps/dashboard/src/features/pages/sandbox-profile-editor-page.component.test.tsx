@@ -171,6 +171,36 @@ const SlackTriggerConnectionId = "icn_slack_test";
 const SlackTriggerWebhookSourceId = "iws_slack_test";
 const GitHubTriggerConnectionId = "icn_github_test";
 const GitHubTriggerWebhookSourceId = "iws_github_test";
+const SetupAssistantAgentBindings = [
+  {
+    id: "binding-agent",
+    connectionId: "connection-agent",
+    kind: "agent",
+    config: {},
+  },
+] as const;
+const SetupAssistantAgentConnections = [
+  {
+    id: "connection-agent",
+    displayName: "OpenAI connection",
+    targetKey: "openai-default",
+    status: "active",
+  },
+] as const;
+const SetupAssistantAgentTargets = [
+  {
+    targetKey: "openai-default",
+    displayName: "OpenAI",
+    familyId: "openai",
+    variantId: "openai-default",
+    config: {
+      api_base_url: "https://api.openai.com",
+    },
+    targetHealth: {
+      configStatus: "valid",
+    },
+  },
+] as const;
 
 function createSlackTriggerConnection(input: { id?: string } = {}): IntegrationConnection {
   return {
@@ -1201,6 +1231,12 @@ function readSetupScriptEditorValue(editor: HTMLElement): string {
   return getSetupScriptEditorView(editor).state.doc.toString();
 }
 
+async function waitForSetupScriptEditorValue(editor: HTMLElement, value: string): Promise<void> {
+  await waitFor(() => {
+    expect(readSetupScriptEditorValue(editor)).toBe(value);
+  });
+}
+
 function getSetupScriptEditorView(editor: HTMLElement): EditorView {
   const editorElement = editor.closest(".cm-editor");
   if (!(editorElement instanceof HTMLElement)) {
@@ -1933,10 +1969,13 @@ describe("SandboxProfileEditorPage", () => {
     );
   });
 
-  it("keeps automatic snapshot refresh editing open when maintenance Setup Assistant opens", async () => {
-    const { router } = renderSandboxProfileEditor({
+  it("keeps automatic snapshot refresh editing available with local maintenance edits", async () => {
+    renderSandboxProfileEditor({
+      bindings: SetupAssistantAgentBindings,
+      connections: SetupAssistantAgentConnections,
       maintenanceScript: "echo maintain",
       routeSection: "snapshot",
+      targets: SetupAssistantAgentTargets,
       versionState: "published",
     });
 
@@ -1954,12 +1993,13 @@ describe("SandboxProfileEditorPage", () => {
       value: "pnpm update\npnpm test",
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Setup Assistant" }));
-
-    const closeButton = await screen.findByRole("button", {
-      name: "Close Setup Assistant panel",
+    const setupAssistantButton = within(getAutomaticSnapshotRefreshSection()).getByRole("button", {
+      name: "Setup Assistant",
     });
-    expect(closeButton).toBeDefined();
+    expect(setupAssistantButton.hasAttribute("disabled")).toBe(false);
+    expect(setupAssistantButton.getAttribute("title")).toBe(
+      "Open the right panel to write this snapshot maintenance script.",
+    );
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
     expect(screen.getByLabelText("Cron expression")).toHaveProperty("value", "0 10 * * *");
@@ -1970,61 +2010,21 @@ describe("SandboxProfileEditorPage", () => {
       ),
     ).toBe("pnpm update\npnpm test");
     expect(screen.getByText("Snapshot maintenance script")).toBeDefined();
-
-    expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
-    expect(screen.getByLabelText("Cron expression")).toHaveProperty("value", "0 10 * * *");
-    expect(screen.getByLabelText("Timezone")).toHaveProperty("value", "Asia/Singapore");
-    expect(
-      readSetupScriptEditorValue(
-        screen.getByRole("textbox", { name: "Snapshot maintenance script" }),
-      ),
-    ).toBe("pnpm update\npnpm test");
-    const sandboxProfileTab = screen.getByRole("tab", { name: "Sandbox Profile" });
-    expect(sandboxProfileTab.hasAttribute("disabled")).toBe(false);
-
-    fireEvent.click(sandboxProfileTab);
-
-    expect(screen.getByText("Switch tabs and close Setup Assistant?")).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Switching tabs closes the Setup Assistant and stops its temporary sandbox. Unsaved script edits stay only while this profile editor remains open; save them before leaving or reloading.",
-      ),
-    ).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-
-    expect(router.state.location.pathname).toBe("/sandbox-profiles/sbp_test/snapshots");
-    expect(screen.getByRole("tab", { name: "Snapshots" }).getAttribute("aria-selected")).toBe(
-      "true",
-    );
-
-    fireEvent.click(sandboxProfileTab);
-    fireEvent.click(screen.getByRole("button", { name: "Switch tabs and close" }));
-
-    await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/sandbox-profiles/sbp_test/sandbox-profile");
-      expect(screen.queryByRole("button", { name: "Close Setup Assistant panel" })).toBeNull();
-    });
   }, 15_000);
 
-  it("applies externally updated maintenance scripts while the maintenance assistant is open", async () => {
+  it("applies externally updated maintenance scripts when there are no local edits", async () => {
     const { profileId, queryClient } = renderSandboxProfileEditor({
+      bindings: SetupAssistantAgentBindings,
+      connections: SetupAssistantAgentConnections,
       maintenanceScript: "pnpm update",
       routeSection: "snapshot",
+      targets: SetupAssistantAgentTargets,
       versionState: "published",
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     fireEvent.click(screen.getByRole("switch", { name: "Refresh enabled" }));
     const editor = screen.getByRole("textbox", { name: "Snapshot maintenance script" });
-
-    fireEvent.click(screen.getByRole("button", { name: "Setup Assistant" }));
-
-    expect(
-      await screen.findByRole("button", {
-        name: "Close Setup Assistant panel",
-      }),
-    ).toBeDefined();
 
     act(() => {
       queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {
@@ -2037,9 +2037,7 @@ describe("SandboxProfileEditorPage", () => {
       });
     });
 
-    await waitFor(() => {
-      expect(readSetupScriptEditorValue(editor)).toBe("pnpm update\npnpm test");
-    });
+    await waitForSetupScriptEditorValue(editor, "pnpm update\npnpm test");
   });
 
   it("keeps local maintenance script edits when a newer version is saved externally", async () => {
@@ -2075,9 +2073,7 @@ describe("SandboxProfileEditorPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Apply assistant version" }));
 
-    await waitFor(() => {
-      expect(readSetupScriptEditorValue(editor)).toBe("pnpm update\npnpm test");
-    });
+    await waitForSetupScriptEditorValue(editor, "pnpm update\npnpm test");
     expect(screen.queryByText("Maintenance script updated")).toBeNull();
   });
 
@@ -3493,201 +3489,6 @@ describe("SandboxProfileEditorPage", () => {
     ).toBeTruthy();
   });
 
-  it("opens the Setup Assistant panel from the setup script action", async () => {
-    const { router } = renderSandboxProfileEditor({
-      bindings: [
-        {
-          id: "binding-agent",
-          connectionId: "connection-agent",
-          kind: "agent",
-          config: {},
-        },
-      ],
-      connections: [
-        {
-          id: "connection-agent",
-          displayName: "OpenAI connection",
-          targetKey: "openai-default",
-          status: "active",
-        },
-      ],
-      routeSection: "sandbox-profile",
-      setupScript: "pnpm install\npnpm dev:bootstrap",
-      targets: [
-        {
-          targetKey: "openai-default",
-          displayName: "OpenAI",
-          familyId: "openai",
-          variantId: "openai-default",
-          config: {
-            api_base_url: "https://api.openai.com",
-          },
-          targetHealth: {
-            configStatus: "valid",
-          },
-        },
-      ],
-      versionState: "draft",
-    });
-
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Setup Assistant",
-      }),
-    );
-
-    expect(
-      await screen.findByRole("button", {
-        name: "Close Setup Assistant panel",
-      }),
-    ).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "TUI" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Open terminal" })).toBeTruthy();
-    const snapshotsTab = screen.getByRole("tab", { name: "Snapshots" });
-    expect(snapshotsTab.hasAttribute("disabled")).toBe(false);
-
-    fireEvent.click(snapshotsTab);
-
-    expect(screen.getByText("Switch tabs and close Setup Assistant?")).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Switching tabs closes the Setup Assistant and stops its temporary sandbox. Unsaved script edits stay only while this profile editor remains open; save them before leaving or reloading.",
-      ),
-    ).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-
-    expect(router.state.location.pathname).toBe("/sandbox-profiles/sbp_test/sandbox-profile/draft");
-    expect(screen.getByRole("tab", { name: "Sandbox Profile" }).getAttribute("aria-selected")).toBe(
-      "true",
-    );
-
-    fireEvent.click(snapshotsTab);
-    fireEvent.click(screen.getByRole("button", { name: "Switch tabs and close" }));
-
-    await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/sandbox-profiles/sbp_test/snapshots");
-      expect(screen.queryByRole("button", { name: "Close Setup Assistant panel" })).toBeNull();
-    });
-  });
-
-  it("prompts before publishing when the Setup Assistant panel is open", async () => {
-    renderSandboxProfileEditor({
-      bindings: [
-        {
-          id: "binding-agent",
-          connectionId: "connection-agent",
-          kind: "agent",
-          config: {},
-        },
-      ],
-      connections: [
-        {
-          id: "connection-agent",
-          displayName: "OpenAI connection",
-          targetKey: "openai-default",
-          status: "active",
-        },
-      ],
-      routeSection: "sandbox-profile",
-      setupScript: "pnpm install\npnpm dev:bootstrap",
-      targets: [
-        {
-          targetKey: "openai-default",
-          displayName: "OpenAI",
-          familyId: "openai",
-          variantId: "openai-default",
-          config: {
-            api_base_url: "https://api.openai.com",
-          },
-          targetHealth: {
-            configStatus: "valid",
-          },
-        },
-      ],
-      versionState: "draft",
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Setup Assistant" }));
-
-    expect(
-      await screen.findByRole("button", {
-        name: "Close Setup Assistant panel",
-      }),
-    ).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
-
-    expect(await screen.findByText("Publish and close Setup Assistant?")).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Publishing closes the Setup Assistant and stops its temporary sandbox. Any assistant work that has not been saved back to the draft will be lost.",
-      ),
-    ).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-
-    expect(screen.queryByText("Publish and close Setup Assistant?")).toBeNull();
-  });
-
-  it("closes the Setup Assistant panel immediately after stop confirmation during startup", async () => {
-    renderSandboxProfileEditor({
-      bindings: [
-        {
-          id: "binding-agent",
-          connectionId: "connection-agent",
-          kind: "agent",
-          config: {},
-        },
-      ],
-      connections: [
-        {
-          id: "connection-agent",
-          displayName: "OpenAI connection",
-          targetKey: "openai-default",
-          status: "active",
-        },
-      ],
-      routeSection: "sandbox-profile",
-      setupScript: "pnpm install\npnpm dev:bootstrap",
-      targets: [
-        {
-          targetKey: "openai-default",
-          displayName: "OpenAI",
-          familyId: "openai",
-          variantId: "openai-default",
-          config: {
-            api_base_url: "https://api.openai.com",
-          },
-          targetHealth: {
-            configStatus: "valid",
-          },
-        },
-      ],
-      versionState: "draft",
-    });
-
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Setup Assistant",
-      }),
-    );
-
-    const closeButton = await screen.findByRole("button", {
-      name: "Close Setup Assistant panel",
-    });
-    expect(closeButton.hasAttribute("disabled")).toBe(false);
-
-    fireEvent.click(closeButton);
-    expect(await screen.findByText("Stop Setup Assistant?")).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Stop and close" }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Close Setup Assistant panel" })).toBeNull();
-      expect(screen.queryByText("Stop Setup Assistant?")).toBeNull();
-    });
-  });
-
   it("asks whether to save before opening Setup Assistant when the saved draft is startable", () => {
     renderSandboxProfileEditor({
       bindings: [
@@ -3924,6 +3725,32 @@ describe("SandboxProfileEditorPage", () => {
     ).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Publish and close" }));
+    expect(confirmed).toBe(true);
+  });
+
+  it("uses switch-tabs-specific copy when tab navigation closes Setup Assistant", () => {
+    let confirmed = false;
+
+    render(
+      <SetupAssistantCloseDialog
+        isOpen
+        onCancel={() => {}}
+        onConfirm={() => {
+          confirmed = true;
+        }}
+        reason="switch-tabs"
+      />,
+    );
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByText("Switch tabs and close Setup Assistant?")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Switching tabs closes the Setup Assistant and stops its temporary sandbox. Unsaved script edits stay only while this profile editor remains open; save them before leaving or reloading.",
+      ),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Switch tabs and close" }));
     expect(confirmed).toBe(true);
   });
 
