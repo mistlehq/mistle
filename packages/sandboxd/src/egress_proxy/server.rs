@@ -56,6 +56,9 @@ use crate::egress_proxy::{
 
 const GATEWAY_SERVICE_RESTART_CLOSE_CODE: u16 = 4001;
 const GATEWAY_SERVICE_RESTART_CLOSE_REASON: &str = "service_restart";
+const DESIGNER_RUNTIME_MCP_INTEGRATION_CONNECTION_ID_HEADER_NAME: &str =
+    "x-mistle-integration-connection-id";
+const DESIGNER_RUNTIME_MCP_PROVIDER_TOOL_IDS_HEADER_NAME: &str = "x-mistle-provider-tool-ids";
 
 #[derive(Debug, Eq, PartialEq)]
 enum DirectGatewayWebSocketTunnelOutcome {
@@ -785,6 +788,7 @@ async fn forward_upgrade_request_through_direct_gateway(
             ))
         })?,
     );
+    add_route_bound_designer_runtime_mcp_headers(gateway_request.headers_mut(), route.as_ref())?;
 
     let gateway_socket = match connect_direct_gateway_websocket_request(gateway_request).await {
         Ok(socket) => socket,
@@ -915,6 +919,8 @@ async fn forward_request_through_direct_gateway(
     for (header_name, header_value) in filter_direct_gateway_request_headers(&parts.headers) {
         request_builder = request_builder.header(header_name, header_value);
     }
+    request_builder =
+        add_route_bound_designer_runtime_mcp_request_headers(request_builder, &route)?;
     let direct_request = request_builder
         .body(box_body(body.map_err(box_hyper_error)))
         .map_err(|error| {
@@ -1428,11 +1434,67 @@ pub(super) fn filter_direct_gateway_request_headers(
     filter_outbound_request_headers(headers)
         .into_iter()
         .filter(|(name, _)| {
-            !name
-                .as_str()
-                .eq_ignore_ascii_case(DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME)
+            !matches!(
+                name.as_str().to_ascii_lowercase().as_str(),
+                DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME
+                    | DESIGNER_RUNTIME_MCP_INTEGRATION_CONNECTION_ID_HEADER_NAME
+                    | DESIGNER_RUNTIME_MCP_PROVIDER_TOOL_IDS_HEADER_NAME
+            )
         })
         .collect()
+}
+
+fn add_route_bound_designer_runtime_mcp_request_headers(
+    mut request_builder: hyper::http::request::Builder,
+    route: &Option<EgressProxyRoute>,
+) -> Result<hyper::http::request::Builder, EgressProxyError> {
+    let Some(metadata) = route
+        .as_ref()
+        .and_then(|matched_route| matched_route.designer_runtime_mcp.as_ref())
+    else {
+        return Ok(request_builder);
+    };
+
+    request_builder = request_builder.header(
+        DESIGNER_RUNTIME_MCP_INTEGRATION_CONNECTION_ID_HEADER_NAME,
+        metadata.integration_connection_id.as_str(),
+    );
+    request_builder = request_builder.header(
+        DESIGNER_RUNTIME_MCP_PROVIDER_TOOL_IDS_HEADER_NAME,
+        metadata.provider_tool_ids.join(","),
+    );
+
+    Ok(request_builder)
+}
+
+fn add_route_bound_designer_runtime_mcp_headers(
+    headers: &mut hyper::HeaderMap<HeaderValue>,
+    route: Option<&EgressProxyRoute>,
+) -> Result<(), EgressProxyError> {
+    let Some(metadata) =
+        route.and_then(|matched_route| matched_route.designer_runtime_mcp.as_ref())
+    else {
+        return Ok(());
+    };
+
+    headers.insert(
+        HeaderName::from_static(DESIGNER_RUNTIME_MCP_INTEGRATION_CONNECTION_ID_HEADER_NAME),
+        HeaderValue::from_str(&metadata.integration_connection_id).map_err(|error| {
+            EgressProxyError::new(format!(
+                "failed to build Designer runtime MCP integration connection header: {error}"
+            ))
+        })?,
+    );
+    headers.insert(
+        HeaderName::from_static(DESIGNER_RUNTIME_MCP_PROVIDER_TOOL_IDS_HEADER_NAME),
+        HeaderValue::from_str(&metadata.provider_tool_ids.join(",")).map_err(|error| {
+            EgressProxyError::new(format!(
+                "failed to build Designer runtime MCP provider tool ids header: {error}"
+            ))
+        })?,
+    );
+
+    Ok(())
 }
 
 fn filter_outbound_response_headers(

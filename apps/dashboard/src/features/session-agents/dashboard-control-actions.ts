@@ -16,6 +16,8 @@ export const DashboardControlDynamicToolRequestMethod = "item/tool/call";
 export const DashboardControlDynamicToolNamespace = "dashboard_control";
 export const DesignerCanvasTabShowDynamicToolName = "show_designer_canvas_tab";
 export const DesignerUserInputRequestDynamicToolName = "request_user_input";
+export const CodexRuntimeMcpServersInstallDynamicToolName = "install_runtime_mcp_servers";
+export const CodexRuntimeMcpServersInstallAction = "codexRuntime.mcpServersInstall";
 
 const DesignerCanvasRouteTabShowInputSchema = z
   .object({
@@ -150,6 +152,21 @@ const DesignerUserInputRequestDynamicToolCallSchema = z
   })
   .loose();
 
+const CodexRuntimeMcpServersInstallInputSchema = z
+  .object({
+    connectionId: z.string().min(1).max(160),
+    toolIds: z.array(z.string().min(1).max(160)).min(1).max(20),
+  })
+  .strict();
+
+const CodexRuntimeMcpServersInstallDynamicToolCallSchema = z
+  .object({
+    namespace: z.literal(DashboardControlDynamicToolNamespace),
+    tool: z.literal(CodexRuntimeMcpServersInstallDynamicToolName),
+    arguments: CodexRuntimeMcpServersInstallInputSchema,
+  })
+  .loose();
+
 const DashboardControlDynamicToolCallIdentitySchema = z
   .object({
     namespace: z.string().nullable().optional(),
@@ -174,6 +191,9 @@ export type DesignerCanvasRouteTabShowInput = z.output<
 >;
 export type DesignerBlueprintTabShowInput = z.output<typeof DesignerBlueprintTabShowInputSchema>;
 export type DesignerUserInputRequestInput = z.output<typeof DesignerUserInputRequestInputSchema>;
+export type CodexRuntimeMcpServersInstallInput = z.output<
+  typeof CodexRuntimeMcpServersInstallInputSchema
+>;
 export type DashboardControlDynamicToolCallResponse = z.output<
   typeof DashboardControlDynamicToolInputSchema
 >;
@@ -190,11 +210,15 @@ export type DashboardControlActionRequest =
   | {
       action: typeof DesignerUserInputRequestAction;
       input: DesignerUserInputRequestInput;
+    }
+  | {
+      action: typeof CodexRuntimeMcpServersInstallAction;
+      input: CodexRuntimeMcpServersInstallInput;
     };
 
 export type DashboardControlCanvasActionRequest = Exclude<
   DashboardControlActionRequest,
-  { action: typeof DesignerUserInputRequestAction }
+  { action: typeof DesignerUserInputRequestAction | typeof CodexRuntimeMcpServersInstallAction }
 >;
 
 export type DashboardControlActionHandler = (
@@ -204,6 +228,9 @@ export type DashboardControlActionHandler = (
 export type DashboardControlActionSupport = {
   supportedActions: readonly string[];
   handleAction: DashboardControlActionHandler;
+  runtimeMcpServersInstallAction?: {
+    designerSessionId: string;
+  };
   userInputSubmitAction?: {
     designerSessionId: string;
   };
@@ -751,15 +778,46 @@ export const DesignerUserInputRequestDynamicToolSpec = {
   },
 } satisfies CodexDynamicToolSpec;
 
+export const CodexRuntimeMcpServersInstallDynamicToolSpec = {
+  namespace: DashboardControlDynamicToolNamespace,
+  name: CodexRuntimeMcpServersInstallDynamicToolName,
+  description:
+    "Install supported remote provider MCP tools into the active Designer Codex runtime for an existing organization integration connection, then reload MCP servers.",
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      connectionId: {
+        type: "string",
+        minLength: 1,
+        maxLength: 160,
+      },
+      toolIds: {
+        type: "array",
+        minItems: 1,
+        maxItems: 20,
+        items: {
+          type: "string",
+          minLength: 1,
+          maxLength: 160,
+        },
+      },
+    },
+    required: ["connectionId", "toolIds"],
+  },
+} satisfies CodexDynamicToolSpec;
+
 export const DashboardControlDynamicToolSpecs = [
   DesignerCanvasTabShowDynamicToolSpec,
   DesignerUserInputRequestDynamicToolSpec,
+  CodexRuntimeMcpServersInstallDynamicToolSpec,
 ] satisfies readonly CodexDynamicToolSpec[];
 
 function isKnownDashboardControlDynamicToolName(toolName: string | undefined): boolean {
   return (
     toolName === DesignerCanvasTabShowDynamicToolName ||
-    toolName === DesignerUserInputRequestDynamicToolName
+    toolName === DesignerUserInputRequestDynamicToolName ||
+    toolName === CodexRuntimeMcpServersInstallDynamicToolName
   );
 }
 
@@ -793,6 +851,15 @@ export function parseDashboardControlDynamicToolCall(
       };
     }
 
+    const parsedRuntimeMcpInstallRequest =
+      CodexRuntimeMcpServersInstallDynamicToolCallSchema.safeParse(params);
+    if (parsedRuntimeMcpInstallRequest.success) {
+      return {
+        action: CodexRuntimeMcpServersInstallAction,
+        input: parsedRuntimeMcpInstallRequest.data.arguments,
+      };
+    }
+
     const identity = DashboardControlDynamicToolCallIdentitySchema.safeParse(params);
     if (
       identity.success &&
@@ -813,6 +880,17 @@ export function parseDashboardControlDynamicToolCall(
       return createDashboardControlDynamicToolCallResponse({
         success: false,
         text: "Designer user input request is invalid.",
+      });
+    }
+
+    if (
+      identity.success &&
+      identity.data.namespace === DashboardControlDynamicToolNamespace &&
+      identity.data.tool === CodexRuntimeMcpServersInstallDynamicToolName
+    ) {
+      return createDashboardControlDynamicToolCallResponse({
+        success: false,
+        text: "Runtime MCP install input is invalid.",
       });
     }
 

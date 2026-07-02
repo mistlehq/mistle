@@ -16,6 +16,7 @@ use std::thread::JoinHandle;
 use crate::cgroups::{DEFAULT_CGROUP_ROOT, kill_sandbox_platform_scopes, kill_sandbox_user_scopes};
 use crate::codex_proxy::CodexProxyControlHandle;
 use crate::command::{CommandOutputSink, CommandOutputStream};
+use crate::control::ControlEgressRouteMatcher;
 use crate::daemon_liveness::DaemonLivenessMonitor;
 use crate::egress_proxy::EgressProxy;
 use crate::keepalive::KeepaliveManager;
@@ -1226,6 +1227,20 @@ impl SandboxdState {
             .map_err(|error: TunnelSessionError| {
                 SandboxdStateError::SigningUnavailable(error.to_string())
             })
+    }
+
+    pub fn refresh_egress_routes(
+        &mut self,
+        routes: Vec<ControlEgressRouteMatcher>,
+    ) -> Result<(), SandboxdStateError> {
+        let egress_proxy = self.egress_proxy.as_ref().ok_or_else(|| {
+            SandboxdStateError::StartEgressProxy(
+                "egress proxy is not running for this sandbox".to_string(),
+            )
+        })?;
+        egress_proxy
+            .upsert_control_routes(routes)
+            .map_err(|error| SandboxdStateError::StartEgressProxy(error.to_string()))
     }
 
     /// Stops the initialized runtime resources owned by the daemon.

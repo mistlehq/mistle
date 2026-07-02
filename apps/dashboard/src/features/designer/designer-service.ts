@@ -117,6 +117,47 @@ const SaveDesignerSelectedProviderResourcesReceiptSchema = z
   })
   .strict();
 
+const DesignerRuntimeProviderMcpServerInstallConfigSchema = z
+  .object({
+    serverName: z.string().min(1).max(160),
+    transport: z.literal("streamable_http"),
+    url: z.url(),
+    httpHeaders: z.record(z.string(), z.string()),
+  })
+  .strict();
+
+const DesignerRuntimeProviderEgressRouteMatcherSchema = z
+  .object({
+    egressRuleId: z.string().min(1).max(240),
+    hosts: z.array(z.string().min(1).max(253)).min(1).max(50),
+    pathPrefixes: z.array(z.string().min(1).max(2048)).min(1).max(50),
+    methods: z.array(z.string().min(1).max(32)).min(1).max(20).optional(),
+    designerRuntimeMcp: z
+      .object({
+        integrationConnectionId: z.string().min(1).max(160),
+        providerToolIds: z.array(z.string().min(1).max(160)).min(1).max(20),
+      })
+      .strict(),
+  })
+  .strict();
+
+const PrepareDesignerRuntimeProviderMcpInstallResponseSchema = z
+  .object({
+    status: z.literal("prepared"),
+    runtimeAction: z
+      .object({
+        type: z.literal("codex_mcp_config_install_and_reload"),
+        runtimeClientId: z.literal("codex-cli"),
+        mcpServers: z.array(DesignerRuntimeProviderMcpServerInstallConfigSchema).min(1).max(20),
+        egressRouteMatchers: z
+          .array(DesignerRuntimeProviderEgressRouteMatcherSchema)
+          .min(1)
+          .max(50),
+      })
+      .strict(),
+  })
+  .strict();
+
 export type DesignerSession = z.output<typeof DesignerSessionSchema>;
 export type DesignerSessionListItem = z.output<
   typeof ListDesignerSessionsResponseSchema
@@ -124,6 +165,9 @@ export type DesignerSessionListItem = z.output<
 export type DesignerSessionCanvasTab = z.output<typeof DesignerSessionCanvasTabSchema>;
 export type SaveDesignerSelectedProviderResourcesReceipt = z.output<
   typeof SaveDesignerSelectedProviderResourcesReceiptSchema
+>;
+export type PrepareDesignerRuntimeProviderMcpInstallResult = z.output<
+  typeof PrepareDesignerRuntimeProviderMcpInstallResponseSchema
 >;
 
 export const designerSessionsQueryKey = ["designer", "sessions"] as const;
@@ -374,6 +418,49 @@ export async function saveDesignerSelectedProviderResources(input: {
         operation: "saveDesignerSelectedProviderResources",
         error,
         fallbackMessage: "Could not save selected provider resources.",
+      }),
+    );
+  }
+}
+
+export async function prepareDesignerRuntimeProviderMcpInstall(input: {
+  sessionId: string;
+  connectionId: string;
+  toolIds: readonly string[];
+  signal?: AbortSignal;
+}): Promise<PrepareDesignerRuntimeProviderMcpInstallResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "prepareDesignerRuntimeProviderMcpInstall",
+      method: "POST",
+      pathname: `/v1/designer/sessions/${encodeURIComponent(input.sessionId)}/dashboard-actions/prepare-runtime-provider-mcp-install`,
+      body: {
+        connectionId: input.connectionId,
+        toolIds: input.toolIds,
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not prepare runtime MCP server installation.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse =
+      PrepareDesignerRuntimeProviderMcpInstallResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new DesignerApiError({
+        operation: "prepareDesignerRuntimeProviderMcpInstall",
+        status: 500,
+        body: responseBody,
+        message: "Prepare runtime MCP server installation response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new DesignerApiError(
+      normalizeHttpApiError({
+        operation: "prepareDesignerRuntimeProviderMcpInstall",
+        error,
+        fallbackMessage: "Could not prepare runtime MCP server installation.",
       }),
     );
   }

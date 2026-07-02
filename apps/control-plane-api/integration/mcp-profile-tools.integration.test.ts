@@ -150,6 +150,7 @@ describe.concurrent("MCP profile tools integration", () => {
 
     expect(tools.map((tool) => tool.name).sort()).toEqual([
       "create_trigger",
+      "designer_runtime_provider_mcp_install_prepare",
       "get_trigger",
       "integration_connection_device_authorization_start",
       "integration_connection_form_setup_prepare",

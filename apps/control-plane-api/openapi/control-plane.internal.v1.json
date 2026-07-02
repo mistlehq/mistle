@@ -4335,6 +4335,638 @@
           }
         }
       }
+    },
+    "/internal/sandbox-runtime/resolve-designer-runtime-egress-route": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sandboxInstanceId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "integrationConnectionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "providerToolIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1,
+                    "maxItems": 20
+                  },
+                  "targetUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "method": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "transport": {
+                    "type": "string",
+                    "enum": ["http", "websocket"]
+                  }
+                },
+                "required": [
+                  "organizationId",
+                  "sandboxInstanceId",
+                  "integrationConnectionId",
+                  "providerToolIds",
+                  "targetUrl",
+                  "method",
+                  "transport"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resolve a Designer runtime provider egress route for internal gateway callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "route": {
+                      "type": "object",
+                      "properties": {
+                        "egressRuleId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "bindingId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "familyId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "variantId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "match": {
+                          "type": "object",
+                          "properties": {
+                            "hosts": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "pathPrefixes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "methods": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            }
+                          },
+                          "required": ["hosts"],
+                          "additionalProperties": false
+                        },
+                        "upstream": {
+                          "type": "object",
+                          "properties": {
+                            "baseUrl": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["baseUrl"],
+                          "additionalProperties": false
+                        },
+                        "authInjection": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": ["bearer"]
+                                },
+                                "target": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["type", "target"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": ["basic"]
+                                },
+                                "target": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "username": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["type", "target"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": ["header"]
+                                },
+                                "target": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "credentialPrefix": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["type", "target"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": ["query"]
+                                },
+                                "target": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["type", "target"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": ["path_segment_prefix"]
+                                },
+                                "segmentPrefix": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["type", "segmentPrefix"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "enum": ["aws_sigv4"]
+                                },
+                                "service": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "region": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["type", "service", "region"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "additionalHeaders": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalCredentialHeaders": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "header": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "credentialResolver": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["integration_connection"]
+                                      },
+                                      "connectionId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "secretType": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "slotKey": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "resolverKey": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["kind", "connectionId", "secretType"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["linked_principal"]
+                                      },
+                                      "providerFamily": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "integrationConnectionId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "credentialKind": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "actingUserRequired": {
+                                        "type": "boolean"
+                                      },
+                                      "resolutionMode": {
+                                        "type": "string",
+                                        "enum": ["required", "preferred"]
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "providerFamily",
+                                      "actingUserRequired",
+                                      "resolutionMode"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["mistle_mcp_token"]
+                                      },
+                                      "apiKeyId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["kind", "apiKeyId"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["mistle_mcp_setup_assistant_token"]
+                                      },
+                                      "sandboxProfileId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "sandboxProfileVersion": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "sandboxProfileId",
+                                      "sandboxProfileVersion"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["mistle_mcp_designer_token"]
+                                      },
+                                      "designerSessionId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["kind", "designerSessionId"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["platform_openai_api_key"]
+                                      }
+                                    },
+                                    "required": ["kind"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              }
+                            },
+                            "required": ["header", "credentialResolver"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "credentialResolver": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["integration_connection"]
+                                },
+                                "connectionId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "secretType": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "slotKey": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "resolverKey": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["kind", "connectionId", "secretType"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["linked_principal"]
+                                },
+                                "providerFamily": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "integrationConnectionId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "credentialKind": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "actingUserRequired": {
+                                  "type": "boolean"
+                                },
+                                "resolutionMode": {
+                                  "type": "string",
+                                  "enum": ["required", "preferred"]
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "providerFamily",
+                                "actingUserRequired",
+                                "resolutionMode"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["mistle_mcp_token"]
+                                },
+                                "apiKeyId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["kind", "apiKeyId"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["mistle_mcp_setup_assistant_token"]
+                                },
+                                "sandboxProfileId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "sandboxProfileVersion": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0
+                                }
+                              },
+                              "required": ["kind", "sandboxProfileId", "sandboxProfileVersion"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["mistle_mcp_designer_token"]
+                                },
+                                "designerSessionId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["kind", "designerSessionId"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["platform_openai_api_key"]
+                                }
+                              },
+                              "required": ["kind"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "requestMiddleware": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      "required": [
+                        "egressRuleId",
+                        "bindingId",
+                        "familyId",
+                        "variantId",
+                        "match",
+                        "upstream",
+                        "authInjection",
+                        "credentialResolver"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["route"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid Designer runtime egress route resolution request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Designer runtime egress route resolution dependency was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "webhooks": {}

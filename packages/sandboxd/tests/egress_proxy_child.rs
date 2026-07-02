@@ -104,12 +104,17 @@ fn process_supervisor_restarts_child_after_the_active_proxy_exits() {
         .prefix("egress-child-supervisor-")
         .tempdir_in("/tmp")
         .expect("temp dir should be creatable");
+    let proxy_addr = reserve_loopback_address();
     let _env_guard = TestEnvVarsGuard::set([
         (
             "MISTLE_SANDBOXD_EGRESS_PROXY_CHILD_PATH",
             env!("CARGO_BIN_EXE_sandboxd").to_string(),
         ),
         ("MISTLE_SANDBOXD_ENABLE_TEST_FAULTS", "1".to_string()),
+        (
+            "MISTLE_SANDBOXD_EGRESS_PROXY_LISTENER_ADDRESS",
+            proxy_addr.to_string(),
+        ),
     ]);
     let control_socket_path = temp_dir.path().join("control.sock");
     let global_git_config_path = temp_dir.path().join(".gitconfig");
@@ -133,11 +138,12 @@ fn process_supervisor_restarts_child_after_the_active_proxy_exits() {
     .expect("activation submission should succeed");
     wait_for_activated(&server);
     let initial_component = wait_for_egress_proxy_restart_count(server.health_endpoint_addr(), 0);
-    let proxy_addr: SocketAddr = initial_component["details"]["listenAddr"]
+    let observed_proxy_addr: SocketAddr = initial_component["details"]["listenAddr"]
         .as_str()
         .expect("egress proxy listenAddr detail should exist")
         .parse()
         .expect("egress proxy listenAddr should parse");
+    assert_eq!(observed_proxy_addr, proxy_addr);
     assert_eq!(initial_component["details"]["runtimeMode"], "child_process");
     assert_eq!(
         initial_component["details"]["childBinary"],
@@ -156,6 +162,31 @@ fn process_supervisor_restarts_child_after_the_active_proxy_exits() {
         .recv_timeout(Duration::from_secs(5))
         .expect("upstream should receive the first proxied request");
 
+    control::submit_refresh_egress_routes(
+        &control_socket_path,
+        &control::ControlRefreshEgressRoutesRequest {
+            routes: vec![control::ControlEgressRouteMatcher {
+                egress_rule_id: "egr_child_route_refresh".to_string(),
+                hosts: vec!["mcp.linear.app".to_string()],
+                path_prefixes: vec!["/".to_string()],
+                methods: Some(vec!["POST".to_string()]),
+                designer_runtime_mcp: Some(control::ControlDesignerRuntimeMcpRouteMetadata {
+                    integration_connection_id: "icn_linear".to_string(),
+                    provider_tool_ids: vec!["linear-mcp".to_string()],
+                }),
+            }],
+        },
+    )
+    .expect("egress route refresh submission should succeed");
+    let refreshed_component = wait_for_egress_proxy_restart_count(server.health_endpoint_addr(), 1);
+    assert_eq!(refreshed_component["state"], "healthy");
+    assert_eq!(
+        refreshed_component["details"]["runtimeMode"],
+        "child_process"
+    );
+    let refreshed_child_pid = component_child_pid(&refreshed_component);
+    assert_ne!(refreshed_child_pid, initial_child_pid);
+
     let (fault_status, fault_body) = fetch_http_json_response(
         server.health_endpoint_addr(),
         "POST",
@@ -166,14 +197,14 @@ fn process_supervisor_restarts_child_after_the_active_proxy_exits() {
     assert_eq!(fault_body["component"], "egress_proxy");
     assert_eq!(fault_body["action"], "kill");
 
-    let restarted_component = wait_for_egress_proxy_restart_count(server.health_endpoint_addr(), 1);
+    let restarted_component = wait_for_egress_proxy_restart_count(server.health_endpoint_addr(), 2);
     assert_eq!(restarted_component["state"], "healthy");
     assert_eq!(
         restarted_component["details"]["runtimeMode"],
         "child_process"
     );
     let restarted_child_pid = component_child_pid(&restarted_component);
-    assert_ne!(restarted_child_pid, initial_child_pid);
+    assert_ne!(restarted_child_pid, refreshed_child_pid);
     let restarted_upstream = start_single_request_http_server();
     let restarted_response = send_proxy_http_request(
         proxy_addr,

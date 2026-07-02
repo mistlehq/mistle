@@ -1329,6 +1329,16 @@ export async function batchWriteCodexConfig(input: {
   };
 }
 
+export async function reloadCodexMcpServers(input: {
+  rpcClient: CodexJsonRpcClient;
+}): Promise<{ response: unknown }> {
+  const response = await input.rpcClient.call("config/mcpServer/reload", {});
+
+  return {
+    response,
+  };
+}
+
 export async function readCodexConfigRequirements(input: {
   rpcClient: CodexJsonRpcClient;
 }): Promise<{ requirements: unknown; response: unknown }> {

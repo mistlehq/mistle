@@ -17,6 +17,8 @@ import type {
 export {
   AssociatedResourceEventRoutingSchema,
   CompiledRuntimePlanSchema,
+  EgressCredentialResolverSchema,
+  EgressCredentialRouteSchema,
   SandboxProfileAssociatedResourceEventRoutingConfigSchema,
 } from "./schema.js";
 

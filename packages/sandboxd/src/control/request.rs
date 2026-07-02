@@ -13,7 +13,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use crate::control::protocol::{ControlRequest, ControlResponse, ControlSignRequest};
+use crate::control::protocol::{
+    ControlRefreshEgressRoutesRequest, ControlRequest, ControlResponse, ControlSignRequest,
+};
 use crate::control::state::{
     ActivationCompletion, SharedActivationThread, lock_activation_thread, lock_control_state,
     notify_activation_completion, wait_for_activation_completion,
@@ -63,6 +65,10 @@ pub(super) fn handle_connection(
                 activation_thread,
                 activation_completion,
             )?;
+            Ok(ControlResponse::ok(None))
+        }
+        ControlRequest::RefreshEgressRoutes { refresh_request } => {
+            begin_refresh_egress_routes(refresh_request, state)?;
             Ok(ControlResponse::ok(None))
         }
         ControlRequest::Sign { sign_request } => {
@@ -196,6 +202,19 @@ fn begin_sign(
             },
         )),
     }
+}
+
+fn begin_refresh_egress_routes(
+    refresh_request: ControlRefreshEgressRoutesRequest,
+    state: &Arc<Mutex<crate::control::state::ControlServerState>>,
+) -> Result<(), ControlError> {
+    let mut state_guard = lock_control_state(state)?;
+    let sandboxd_state = state_guard.sandboxd_state.as_mut().ok_or_else(|| {
+        ControlError::StartupRequestRejected("sandboxd is not activated".to_string())
+    })?;
+    sandboxd_state
+        .refresh_egress_routes(refresh_request.routes)
+        .map_err(|error| ControlError::StartupRequestRejected(error.to_string()))
 }
 
 fn catch_init_unwind<F>(initialize: F) -> Result<Result<SandboxdState, SandboxdStateError>, String>

@@ -1,5 +1,10 @@
 import type { Cache } from "@mistle/cache";
-import { SandboxInstanceStatuses, type SandboxInstanceStatus } from "@mistle/db/data-plane";
+import {
+  SandboxInstancePurposes,
+  SandboxInstanceStatuses,
+  type SandboxInstancePurpose,
+  type SandboxInstanceStatus,
+} from "@mistle/db/data-plane";
 import {
   CompiledRuntimePlanSchema,
   type CompiledRuntimePlan,
@@ -9,6 +14,7 @@ import { z } from "zod";
 const ActiveSandboxRuntimePlanRecordSchema = z
   .object({
     organizationId: z.string().min(1),
+    purpose: z.enum(SandboxInstancePurposes),
     providerSandboxId: z.string().min(1).nullable(),
     runtimePlan: CompiledRuntimePlanSchema,
     runtimePlanRevision: z.number().int().positive(),
@@ -18,6 +24,7 @@ const ActiveSandboxRuntimePlanRecordSchema = z
 
 export type ActiveSandboxRuntimePlan = {
   organizationId: string;
+  purpose: SandboxInstancePurpose;
   providerSandboxId: string | null;
   runtimePlan: CompiledRuntimePlan;
   runtimePlanRevision: number;

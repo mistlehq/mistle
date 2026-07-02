@@ -101,6 +101,18 @@ _Avoid_: Designer managed instructions, user project docs, ad hoc runtime notes
 A generated **Designer runtime reference** that lists static integration metadata such as provider aliases, integration target identities, setup methods, supported resource kinds, binding tools, and known provider caveats.
 _Avoid_: Integration connection state, organization integration status, hand-authored provider docs
 
+**Designer runtime access support**:
+Provider integration metadata that says whether an **Integration connection** can be installed into a **Mistle Designer session** runtime, which **Provider tools** are supported, what setup state is required, and how gateway egress is authorized.
+_Avoid_: Current connection readiness, provider resource list, target sandbox profile binding
+
+**Designer runtime connection refresh**:
+A Mistle-owned operation that installs workflow-relevant provider runtime access into a running **Mistle Designer session** by refreshing the Designer Codex MCP configuration and **Sandbox-local egress route matchers** for a selected **Integration connection** and supported **Provider tools**.
+_Avoid_: Agent runtime connection, target sandbox profile binding update, one-off tool enablement
+
+**Sandbox-local egress route matcher**:
+A non-secret per-sandbox routing hint stored by sandboxd's egress proxy so matching outbound requests from the active sandbox are forwarded to managed gateway egress. It does not authorize provider access or carry integration credentials; gateway and control plane still validate access before proxying.
+_Avoid_: Runtime plan egress grant, signed access reference, provider credential
+
 **Designer recommendation**:
 A structured setup recommendation produced by **Mistle Designer** for integrations, triggers, provider configuration resources, or sandbox profile configuration.
 _Avoid_: Chat suggestion when the recommendation has selectable product state
@@ -808,6 +820,12 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Mistle Designer resource access** is distinct from **Mistle resource access** configured on a target **Sandbox profile version**.
 - **Mistle Designer resource access** defines technical access authority; approval behavior for mutating actions is a separate **Mistle Designer** interaction policy.
 - **Mistle Designer resource access** is scoped to a **Mistle Designer session** and organization rather than one target **Sandbox profile version**.
+- **Designer runtime access support** is declared by provider integration definitions so **Mistle Designer** can determine whether a relevant **Integration connection** can be installed into its own runtime.
+- A **Designer runtime connection refresh** is scoped to the **Mistle Designer session** runtime, not to the target **Sandbox profile version** being authored.
+- A **Designer runtime connection refresh** should install all workflow-relevant provider MCP access for selected or newly setup **Integration connections** in one bulk refresh rather than escalating one **Provider tool** at a time.
+- A **Designer runtime connection refresh** must update the Codex MCP configuration and **Sandbox-local egress route matchers** used by the Designer runtime without creating a new target **Sandbox profile version** binding or a new active sandbox runtime-plan revision.
+- **Sandbox-local egress route matchers** are routing hints only; provider authorization and credentials remain owned by gateway and control plane.
+- A successful **Designer runtime connection refresh** permits provider inspection in later Designer turns, but provider-side mutations still require action-specific approval.
 - A **Mistle Designer session** may make ordinary reversible draft saves to draft **Sandbox profile versions** in the session's organization through supported typed product actions.
 - High-impact actions, such as publishing, discarding, starting a **Sandbox session**, provider-side mutations, or trigger enablement, still require separate action-specific approval.
 - A **Mistle Designer session** must not treat its designer sandbox instance's runtime profile as the target **Sandbox profile version** for authored product mutations.

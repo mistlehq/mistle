@@ -20,8 +20,38 @@ pub(super) enum ControlRequest {
     Activate {
         activation_input: Box<ActivationInput>,
     },
+    #[serde(rename = "refreshEgressRoutes")]
+    RefreshEgressRoutes {
+        refresh_request: ControlRefreshEgressRoutesRequest,
+    },
     #[serde(rename = "sign")]
     Sign { sign_request: ControlSignRequest },
+}
+
+/// Carries non-secret route matchers that should be sent through managed gateway egress.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ControlRefreshEgressRoutesRequest {
+    pub routes: Vec<ControlEgressRouteMatcher>,
+}
+
+/// Describes one sandbox-local egress matcher without credential material.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ControlEgressRouteMatcher {
+    pub egress_rule_id: String,
+    pub hosts: Vec<String>,
+    pub path_prefixes: Vec<String>,
+    pub methods: Option<Vec<String>>,
+    pub designer_runtime_mcp: Option<ControlDesignerRuntimeMcpRouteMetadata>,
+}
+
+/// Carries trusted route-bound metadata for Designer runtime MCP egress.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ControlDesignerRuntimeMcpRouteMetadata {
+    pub integration_connection_id: String,
+    pub provider_tool_ids: Vec<String>,
 }
 
 /// Carries one local signer request from the helper alias to the running daemon.

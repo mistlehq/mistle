@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   createDashboardControlUserInputResponse,
   createDashboardControlUserInputServerRequest,
+  CodexRuntimeMcpServersInstallAction,
+  CodexRuntimeMcpServersInstallDynamicToolName,
+  CodexRuntimeMcpServersInstallDynamicToolSpec,
   DashboardControlDynamicToolSpecs,
   DashboardControlDynamicToolNamespace,
   DesignerBlueprintTabUpsertAction,
@@ -190,6 +193,27 @@ describe("dashboard control actions", () => {
     );
   });
 
+  it("exposes a runtime MCP server install dynamic tool spec", () => {
+    expect(DashboardControlDynamicToolSpecs).toContain(
+      CodexRuntimeMcpServersInstallDynamicToolSpec,
+    );
+    expect(CodexRuntimeMcpServersInstallDynamicToolSpec).toMatchObject({
+      namespace: DashboardControlDynamicToolNamespace,
+      name: CodexRuntimeMcpServersInstallDynamicToolName,
+      inputSchema: {
+        properties: {
+          connectionId: {
+            type: "string",
+          },
+          toolIds: {
+            type: "array",
+          },
+        },
+        required: ["connectionId", "toolIds"],
+      },
+    });
+  });
+
   it("parses Designer canvas tab open dynamic tool calls", () => {
     const parsed = parseDashboardControlDynamicToolCall({
       namespace: DashboardControlDynamicToolNamespace,
@@ -276,6 +300,63 @@ describe("dashboard control actions", () => {
         title: "Blueprint",
         blueprint,
       },
+    });
+  });
+
+  it("parses runtime MCP server install dynamic tool calls", () => {
+    const parsed = parseDashboardControlDynamicToolCall({
+      namespace: DashboardControlDynamicToolNamespace,
+      tool: CodexRuntimeMcpServersInstallDynamicToolName,
+      arguments: {
+        connectionId: "icn_linear",
+        toolIds: ["linear-mcp"],
+      },
+    });
+
+    expect(parsed).toEqual({
+      action: CodexRuntimeMcpServersInstallAction,
+      input: {
+        connectionId: "icn_linear",
+        toolIds: ["linear-mcp"],
+      },
+    });
+  });
+
+  it("rejects runtime MCP server install calls with model-supplied runtime actions", () => {
+    const parsed = parseDashboardControlDynamicToolCall({
+      namespace: DashboardControlDynamicToolNamespace,
+      tool: CodexRuntimeMcpServersInstallDynamicToolName,
+      arguments: {
+        connectionId: "icn_linear",
+        toolIds: ["linear-mcp"],
+        runtimeAction: {
+          type: "codex_mcp_config_install_and_reload",
+          runtimeClientId: "codex-cli",
+          mcpServers: [
+            {
+              serverName: "linear_icn_linear",
+              transport: "streamable_http",
+              url: "https://mcp.linear.app/mcp",
+              httpHeaders: {
+                "x-mistle-integration-connection-id": "icn_linear",
+                "x-mistle-provider-tool-ids": "linear-mcp",
+              },
+            },
+          ],
+          egressRouteMatchers: [
+            {
+              egressRuleId: "egress_rule_designer_runtime_icn_linear_2",
+              hosts: ["mcp.linear.app"],
+              pathPrefixes: ["/"],
+            },
+          ],
+        },
+      },
+    });
+
+    expect(parsed).toEqual({
+      contentItems: [{ type: "inputText", text: "Runtime MCP install input is invalid." }],
+      success: false,
     });
   });
 

@@ -33,6 +33,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
+    "@mistle/integrations-core": "workspace:*",
     "openapi-fetch": "^0.17.0",
     "zod": "^4.4.3"
   },

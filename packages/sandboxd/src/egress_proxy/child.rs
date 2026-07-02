@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 use crate::egress_proxy::gateway::{DirectGatewayEgressClient, EgressProxyForwardingMode};
-use crate::egress_proxy::routing::EgressProxyRoute;
+use crate::egress_proxy::routing::{DesignerRuntimeMcpRouteMetadata, EgressProxyRoute};
 use crate::egress_proxy::server::run_proxy_server;
 use crate::egress_proxy::supervisor::bind_egress_proxy_listener;
 use crate::egress_proxy::token_bridge::EgressTokenBridgeClient;
@@ -44,6 +44,14 @@ pub(super) struct EgressProxyChildRoute {
     pub(super) hosts: Vec<String>,
     pub(super) path_prefixes: Vec<String>,
     pub(super) methods: Option<Vec<String>>,
+    pub(super) designer_runtime_mcp: Option<EgressProxyChildDesignerRuntimeMcpRouteMetadata>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct EgressProxyChildDesignerRuntimeMcpRouteMetadata {
+    pub(super) integration_connection_id: String,
+    pub(super) provider_tool_ids: Vec<String>,
 }
 
 pub(super) fn run_egress_proxy_child(config_path: &Path) -> Result<(), EgressProxyError> {
@@ -133,6 +141,12 @@ impl From<EgressProxyChildRoute> for EgressProxyRoute {
             hosts: route.hosts,
             path_prefixes: route.path_prefixes,
             methods: route.methods,
+            designer_runtime_mcp: route.designer_runtime_mcp.map(|metadata| {
+                DesignerRuntimeMcpRouteMetadata {
+                    integration_connection_id: metadata.integration_connection_id,
+                    provider_tool_ids: metadata.provider_tool_ids,
+                }
+            }),
         }
     }
 }
@@ -155,7 +169,11 @@ mod tests {
                     "egressRuleId": "egr_123",
                     "hosts": ["api.example.test"],
                     "pathPrefixes": ["/v1"],
-                    "methods": ["GET", "POST"]
+                    "methods": ["GET", "POST"],
+                    "designerRuntimeMcp": {
+                        "integrationConnectionId": "icn_linear",
+                        "providerToolIds": ["linear-mcp"]
+                    }
                 }
             ],
             "proxyCaCertificateFd": 8,
@@ -175,5 +193,12 @@ mod tests {
         assert_eq!(config.proxy_ca_certificate_fd, 8);
         assert_eq!(config.proxy_ca_private_key_fd, 9);
         assert_eq!(config.routes[0].egress_rule_id, "egr_123");
+        assert_eq!(
+            config.routes[0]
+                .designer_runtime_mcp
+                .as_ref()
+                .map(|metadata| metadata.integration_connection_id.as_str()),
+            Some("icn_linear")
+        );
     }
 }

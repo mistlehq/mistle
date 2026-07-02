@@ -64,6 +64,7 @@ export async function loadActiveSandboxRuntimePlan(input: {
     .select({
       id: sandboxInstances.id,
       organizationId: sandboxInstances.organizationId,
+      purpose: sandboxInstances.purpose,
       providerSandboxId: sandboxInstances.providerSandboxId,
       runtimePlan: {
         compiledRuntimePlan: sandboxInstanceRuntimePlans.compiledRuntimePlan,
@@ -93,6 +94,7 @@ export async function loadActiveSandboxRuntimePlan(input: {
   if (!runtimePlanParseResult.success) {
     throw new InvalidActiveSandboxRuntimePlanError(runtimePlanParseResult.error.message, {
       organizationId: row.organizationId,
+      purpose: row.purpose,
       providerSandboxId: row.providerSandboxId,
       runtimePlanRevision: row.runtimePlan.revision,
       sandboxInstanceStatus: row.status,
@@ -101,6 +103,7 @@ export async function loadActiveSandboxRuntimePlan(input: {
 
   const activeRuntimePlan = {
     organizationId: row.organizationId,
+    purpose: row.purpose,
     providerSandboxId: row.providerSandboxId,
     runtimePlan: runtimePlanParseResult.data,
     runtimePlanRevision: row.runtimePlan.revision,

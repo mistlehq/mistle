@@ -14,13 +14,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-#[cfg(any(test, debug_assertions))]
 use std::sync::mpsc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use serde_json::Value;
 
+use crate::control::ControlEgressRouteMatcher;
 use crate::egress_proxy::ca::{
     ProxyCaConfig, ProxyCaInstallation, cleanup_proxy_ca_installation, emit_proxy_ca_lifecycle_log,
     load_or_create_persistent_proxy_ca,
@@ -34,7 +34,9 @@ use crate::egress_proxy::gateway::{DirectGatewayRouteScheme, resolve_direct_gate
 #[cfg(test)]
 use crate::egress_proxy::logging::serialize_egress_proxy_log_line;
 use crate::egress_proxy::logging::{EgressProxyLogContext, emit_egress_proxy_log};
-use crate::egress_proxy::routing::{EgressProxyRoute, build_gateway_egress_route};
+use crate::egress_proxy::routing::{
+    DesignerRuntimeMcpRouteMetadata, EgressProxyRoute, build_gateway_egress_route,
+};
 #[cfg(test)]
 use crate::egress_proxy::routing::{
     RequestTargetOverride, build_direct_forward_uri, match_route, resolve_request_target,
@@ -48,7 +50,6 @@ use crate::egress_proxy::server::{
     filter_direct_gateway_request_headers,
 };
 use crate::egress_proxy::supervisor::EgressProxyProcessSupervisorConfig;
-#[cfg(any(test, debug_assertions))]
 use crate::egress_proxy::supervisor::EgressProxySupervisorCommand;
 use crate::egress_proxy::supervisor::{
     ActiveEgressProxyChildProcess, ActiveEgressProxyServer, bind_transparent_egress_proxy_listener,
@@ -88,6 +89,9 @@ const SYSTEM_CA_CERT_BUNDLE_PATH: &str = "/etc/ssl/certs/ca-certificates.crt";
 const UPDATE_CA_CERTIFICATES_COMMAND: &str = "update-ca-certificates";
 #[cfg(all(debug_assertions, not(test)))]
 const EGRESS_PROXY_CHILD_BINARY_PATH_ENV: &str = "MISTLE_SANDBOXD_EGRESS_PROXY_CHILD_PATH";
+#[cfg(all(debug_assertions, not(test)))]
+const EGRESS_PROXY_LOOPBACK_LISTENER_ADDRESS_ENV: &str =
+    "MISTLE_SANDBOXD_EGRESS_PROXY_LISTENER_ADDRESS";
 const DEFAULT_LOOPBACK_PROXY_PORT: u16 = 38_513;
 const DEFAULT_TRANSPARENT_PROXY_PORT: u16 = 38_514;
 #[cfg(target_os = "linux")]
@@ -105,11 +109,11 @@ pub(super) const DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH: &str = "/_mistle/egress/ws"
 #[derive(Debug)]
 pub struct EgressProxy {
     runtime_env: BTreeMap<String, String>,
+    routes: Arc<RwLock<Vec<EgressProxyRoute>>>,
     shutdown_requested: Arc<AtomicBool>,
     supervisor_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
     transparent_server: Option<ActiveEgressProxyServer>,
     transparent_packet_rules: Option<TransparentPacketRules>,
-    #[cfg(any(test, debug_assertions))]
     supervisor_command_sender: Option<mpsc::Sender<EgressProxySupervisorCommand>>,
     proxy_ca_installation: ProxyCaInstallation,
     supervisor_handle: SandboxdSupervisorHandle,
@@ -315,7 +319,7 @@ impl EgressProxy {
             forwarding_mode,
             EgressProxyStartOptions {
                 loopback_runtime,
-                listener_address: default_loopback_proxy_listener_address(),
+                listener_address: default_loopback_proxy_listener_address()?,
                 proxy_ca_config: ProxyCaConfig {
                     runtime_certificate_path: Path::new(RUNTIME_PROXY_CA_CERT_PATH),
                     runtime_certificate_bundle_path: Path::new(RUNTIME_PROXY_CA_BUNDLE_PATH),
@@ -645,9 +649,7 @@ impl EgressProxy {
         };
 
         let shutdown_requested = Arc::new(AtomicBool::new(false));
-        #[cfg(any(test, debug_assertions))]
         let (supervisor_command_sender, supervisor_command_receiver) = mpsc::channel();
-        #[cfg(any(test, debug_assertions))]
         let supervisor_command_sender_for_proxy = Some(supervisor_command_sender);
         let supervisor_thread = thread::spawn({
             let shutdown_requested = shutdown_requested.clone();
@@ -667,7 +669,6 @@ impl EgressProxy {
                         active_server,
                         shutdown_requested,
                         supervisor_handle,
-                        #[cfg(any(test, debug_assertions))]
                         supervisor_command_receiver,
                     )
                 }
@@ -692,7 +693,6 @@ impl EgressProxy {
                         active_child,
                         shutdown_requested,
                         supervisor_handle,
-                        #[cfg(any(test, debug_assertions))]
                         supervisor_command_receiver,
                     )
                 }
@@ -705,10 +705,10 @@ impl EgressProxy {
 
         Ok(Some(Self {
             runtime_env,
+            routes,
             shutdown_requested,
             supervisor_thread: Some(supervisor_thread),
             transparent_server,
-            #[cfg(any(test, debug_assertions))]
             supervisor_command_sender: supervisor_command_sender_for_proxy,
             proxy_ca_installation,
             transparent_packet_rules,
@@ -722,6 +722,59 @@ impl EgressProxy {
 
     pub fn managed_env_keys() -> &'static [&'static str] {
         &MANAGED_PROXY_ENV_KEYS
+    }
+
+    pub fn upsert_control_routes(
+        &self,
+        routes: Vec<ControlEgressRouteMatcher>,
+    ) -> Result<(), EgressProxyError> {
+        let routes = routes
+            .into_iter()
+            .map(egress_proxy_route_from_control)
+            .collect::<Result<Vec<_>, _>>()?;
+        let previous_routes = {
+            let mut route_table = self
+                .routes
+                .write()
+                .map_err(|_| EgressProxyError::new("egress proxy route table lock is poisoned"))?;
+            let previous_routes = route_table.clone();
+            for route in routes {
+                if let Some(existing_route) = route_table
+                    .iter_mut()
+                    .find(|candidate| candidate.egress_rule_id == route.egress_rule_id)
+                {
+                    *existing_route = route;
+                } else {
+                    route_table.push(route);
+                }
+            }
+            previous_routes
+        };
+        if let Err(error) = self.restart_loopback_proxy_for_route_refresh() {
+            let mut route_table = self
+                .routes
+                .write()
+                .map_err(|_| EgressProxyError::new("egress proxy route table lock is poisoned"))?;
+            *route_table = previous_routes;
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    fn restart_loopback_proxy_for_route_refresh(&self) -> Result<(), EgressProxyError> {
+        let supervisor_command_sender =
+            self.supervisor_command_sender.as_ref().ok_or_else(|| {
+                EgressProxyError::new("egress proxy supervisor command channel is unavailable")
+            })?;
+        let (response_sender, response_receiver) = mpsc::channel();
+        supervisor_command_sender
+            .send(EgressProxySupervisorCommand::RefreshRoutes { response_sender })
+            .map_err(|_| {
+                EgressProxyError::new("egress proxy supervisor command channel is unavailable")
+            })?;
+        response_receiver.recv().map_err(|_| {
+            EgressProxyError::new("egress proxy route refresh response channel is unavailable")
+        })?
     }
 
     #[cfg(any(test, debug_assertions))]
@@ -780,8 +833,133 @@ impl EgressProxy {
     }
 }
 
-fn default_loopback_proxy_listener_address() -> SocketAddr {
-    SocketAddr::from(([127, 0, 0, 1], DEFAULT_LOOPBACK_PROXY_PORT))
+fn egress_proxy_route_from_control(
+    route: ControlEgressRouteMatcher,
+) -> Result<EgressProxyRoute, EgressProxyError> {
+    let egress_rule_id = normalize_non_empty(route.egress_rule_id, "egressRuleId")?;
+    if route.hosts.is_empty() {
+        return Err(EgressProxyError::new(format!(
+            "egress route '{egress_rule_id}' must include at least one host"
+        )));
+    }
+    if route.path_prefixes.is_empty() {
+        return Err(EgressProxyError::new(format!(
+            "egress route '{egress_rule_id}' must include at least one path prefix"
+        )));
+    }
+
+    let hosts = route
+        .hosts
+        .into_iter()
+        .map(|host| normalize_non_empty(host, "host").map(|host| host.to_ascii_lowercase()))
+        .collect::<Result<Vec<_>, _>>()?;
+    let path_prefixes = route
+        .path_prefixes
+        .into_iter()
+        .map(|path_prefix| normalize_path_prefix_for_control(&egress_rule_id, path_prefix))
+        .collect::<Result<Vec<_>, _>>()?;
+    let methods = route
+        .methods
+        .map(|methods| normalize_methods_for_control(&egress_rule_id, methods))
+        .transpose()?;
+    let designer_runtime_mcp = route
+        .designer_runtime_mcp
+        .map(|metadata| {
+            if metadata.provider_tool_ids.is_empty() {
+                return Err(EgressProxyError::new(format!(
+                    "egress route '{egress_rule_id}' Designer runtime MCP metadata must include at least one provider tool id"
+                )));
+            }
+
+            Ok(DesignerRuntimeMcpRouteMetadata {
+                integration_connection_id: normalize_non_empty(
+                    metadata.integration_connection_id,
+                    "designerRuntimeMcp.integrationConnectionId",
+                )?,
+                provider_tool_ids: metadata
+                    .provider_tool_ids
+                    .into_iter()
+                    .map(|tool_id| {
+                        normalize_non_empty(tool_id, "designerRuntimeMcp.providerToolIds")
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            })
+        })
+        .transpose()?;
+
+    Ok(EgressProxyRoute {
+        egress_rule_id,
+        hosts,
+        path_prefixes,
+        methods,
+        designer_runtime_mcp,
+    })
+}
+
+fn normalize_non_empty(value: String, field_name: &str) -> Result<String, EgressProxyError> {
+    let value = value.trim().to_string();
+    if value.is_empty() {
+        return Err(EgressProxyError::new(format!(
+            "egress route {field_name} cannot be empty"
+        )));
+    }
+    Ok(value)
+}
+
+fn normalize_path_prefix_for_control(
+    egress_rule_id: &str,
+    path_prefix: String,
+) -> Result<String, EgressProxyError> {
+    let path_prefix = normalize_non_empty(path_prefix, "pathPrefix")?;
+    if !path_prefix.starts_with('/') {
+        return Err(EgressProxyError::new(format!(
+            "egress route '{egress_rule_id}' path prefix '{path_prefix}' must start with '/'"
+        )));
+    }
+    Ok(path_prefix)
+}
+
+fn normalize_methods_for_control(
+    egress_rule_id: &str,
+    methods: Vec<String>,
+) -> Result<Vec<String>, EgressProxyError> {
+    if methods.is_empty() {
+        return Err(EgressProxyError::new(format!(
+            "egress route '{egress_rule_id}' methods cannot be empty"
+        )));
+    }
+    methods
+        .into_iter()
+        .map(|method| {
+            normalize_non_empty(method, "method").map(|method| method.to_ascii_uppercase())
+        })
+        .collect()
+}
+
+fn default_loopback_proxy_listener_address() -> Result<SocketAddr, EgressProxyError> {
+    #[cfg(all(debug_assertions, not(test)))]
+    if let Some(address) = std::env::var_os(EGRESS_PROXY_LOOPBACK_LISTENER_ADDRESS_ENV) {
+        let address = address.into_string().map_err(|_| {
+            EgressProxyError::new(format!(
+                "{EGRESS_PROXY_LOOPBACK_LISTENER_ADDRESS_ENV} must be valid UTF-8"
+            ))
+        })?;
+        if address.is_empty() {
+            return Err(EgressProxyError::new(format!(
+                "{EGRESS_PROXY_LOOPBACK_LISTENER_ADDRESS_ENV} cannot be empty"
+            )));
+        }
+        return address.parse::<SocketAddr>().map_err(|error| {
+            EgressProxyError::new(format!(
+                "{EGRESS_PROXY_LOOPBACK_LISTENER_ADDRESS_ENV} must be a socket address: {error}"
+            ))
+        });
+    }
+
+    Ok(SocketAddr::from((
+        [127, 0, 0, 1],
+        DEFAULT_LOOPBACK_PROXY_PORT,
+    )))
 }
 
 fn transparent_proxy_listener_address_for_forwarding_mode(

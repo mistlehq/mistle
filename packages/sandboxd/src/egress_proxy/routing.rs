@@ -16,6 +16,13 @@ pub(super) struct EgressProxyRoute {
     pub(super) hosts: Vec<String>,
     pub(super) path_prefixes: Vec<String>,
     pub(super) methods: Option<Vec<String>>,
+    pub(super) designer_runtime_mcp: Option<DesignerRuntimeMcpRouteMetadata>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct DesignerRuntimeMcpRouteMetadata {
+    pub(super) integration_connection_id: String,
+    pub(super) provider_tool_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,6 +79,7 @@ pub(super) fn build_gateway_egress_route(
                 .map(|method| method.to_ascii_uppercase())
                 .collect()
         }),
+        designer_runtime_mcp: None,
     })
 }
 

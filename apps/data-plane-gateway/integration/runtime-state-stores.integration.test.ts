@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Cache, ValkeyCacheAdapter, closeValkeyClient, createValkeyClient } from "@mistle/cache";
-import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { SandboxInstancePurposes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import {
   createDisabledAssociatedResourceEventRouting,
   type CompiledRuntimePlan,
@@ -49,6 +49,7 @@ describe.concurrent("runtime-state store integrations", () => {
           sandboxInstanceId,
           runtimePlan: {
             organizationId: "org_runtime_plan_cache_it",
+            purpose: SandboxInstancePurposes.SESSION,
             providerSandboxId: "provider-runtime-plan-cache-it",
             runtimePlan,
             runtimePlanRevision: 1,
@@ -62,6 +63,7 @@ describe.concurrent("runtime-state store integrations", () => {
           }),
         ).resolves.toEqual({
           organizationId: "org_runtime_plan_cache_it",
+          purpose: SandboxInstancePurposes.SESSION,
           providerSandboxId: "provider-runtime-plan-cache-it",
           runtimePlan,
           runtimePlanRevision: 1,

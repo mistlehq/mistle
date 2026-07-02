@@ -193,6 +193,23 @@ export type IntegrationConnectionRepairCapability<
   ): MaybePromise<IntegrationConnectionRepairResult<TConnectionConfig>>;
 };
 
+export type DesignerRuntimeAccessInstallMode = "remote_mcp";
+
+export const DesignerRuntimeAccessInstallModes: {
+  REMOTE_MCP: DesignerRuntimeAccessInstallMode;
+} = {
+  REMOTE_MCP: "remote_mcp",
+};
+
+export type DesignerRuntimeAccessToolDefinition = {
+  toolId: string;
+  installMode: DesignerRuntimeAccessInstallMode;
+};
+
+export type DesignerRuntimeAccessDefinition = {
+  tools: ReadonlyArray<DesignerRuntimeAccessToolDefinition>;
+};
+
 export type IdentityLinkingPrincipalKey = {
   keyType: string;
   keyValue: string;
@@ -3053,6 +3070,7 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetSecretsSchema>,
     TConnectionConfig
   >;
+  designerRuntimeAccess?: DesignerRuntimeAccessDefinition;
   redirectHandler?: IntegrationRedirectHandler<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>
