@@ -515,6 +515,16 @@ function renderUpdatingDesignerCanvasWorkspace(input: {
   });
 }
 
+async function findDesignerBlueprintGraphForNode(nodeTestId: string): Promise<HTMLElement> {
+  const node = await screen.findByTestId(nodeTestId);
+  const graph = node.closest<HTMLElement>('section[aria-label="Designer blueprint graph"]');
+  if (graph === null) {
+    throw new Error(`Designer blueprint graph was not mounted for ${nodeTestId}.`);
+  }
+
+  return graph;
+}
+
 describe("DesignerCanvasWorkspace", () => {
   it("renders the empty canvas state when Designer has no tabs", () => {
     renderDesignerCanvasWorkspace({ tabs: [] });
@@ -888,7 +898,9 @@ describe("DesignerCanvasWorkspace", () => {
     expect(await screen.findByText(/Queue \(backlog-queue\): Needs backlog review/u)).toBeDefined();
     expect(screen.queryByText("2 routing rules")).toBeNull();
     expect(await screen.findByText("Triage summary")).toBeDefined();
-    expect(screen.getByRole("region", { name: "Designer blueprint graph" })).toBeDefined();
+    expect(
+      await findDesignerBlueprintGraphForNode("designer-blueprint-node-classify-issue"),
+    ).toBeDefined();
     expect(screen.queryByRole("button", { name: "Create trigger" })).toBeNull();
   });
 
@@ -1000,18 +1012,21 @@ describe("DesignerCanvasWorkspace", () => {
       element: <StatefulDesignerBlueprintCommentWorkspace />,
     });
 
+    const graph = await findDesignerBlueprintGraphForNode("designer-blueprint-node-classify-issue");
     const classifyIssueNode = await screen.findByTestId("designer-blueprint-node-classify-issue");
 
     fireEvent.click(classifyIssueNode);
-    const draftComment = screen.getByTestId("designer-blueprint-floating-comment");
-    expect(screen.getByTestId("designer-blueprint-new-comment")).toBeDefined();
+    const draftComment = await screen.findByTestId("designer-blueprint-floating-comment");
+    expect(await screen.findByTestId("designer-blueprint-new-comment")).toBeDefined();
 
     fireEvent.pointerDown(draftComment);
     expect(screen.getByTestId("designer-blueprint-new-comment")).toBeDefined();
 
-    fireEvent.pointerDown(screen.getByRole("region", { name: "Designer blueprint graph" }));
-    expect(screen.queryByTestId("designer-blueprint-new-comment")).toBeNull();
-    expect(screen.queryByTestId("designer-blueprint-floating-comment")).toBeNull();
+    fireEvent.pointerDown(graph);
+    await waitFor(() => {
+      expect(screen.queryByTestId("designer-blueprint-new-comment")).toBeNull();
+      expect(screen.queryByTestId("designer-blueprint-floating-comment")).toBeNull();
+    });
   });
 
   it("centers the blueprint graph horizontally near the top of the canvas viewport", () => {
