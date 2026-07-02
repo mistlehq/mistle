@@ -1153,7 +1153,8 @@ function directEgressManagedRouteLogFields(
 > {
   return {
     authInjectionType: route.authInjection.type,
-    ...(route.authInjection.type === "aws_sigv4"
+    ...(route.authInjection.type === "aws_sigv4" ||
+    route.authInjection.type === "path_segment_prefix"
       ? {}
       : { authInjectionTarget: route.authInjection.target }),
     bindingId: route.bindingId,

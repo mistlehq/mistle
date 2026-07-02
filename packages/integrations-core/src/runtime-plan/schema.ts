@@ -119,6 +119,12 @@ const EgressCredentialRouteSchema = z
         .strict(),
       z
         .object({
+          type: z.literal("path_segment_prefix"),
+          segmentPrefix: z.string().min(1),
+        })
+        .strict(),
+      z
+        .object({
           type: z.literal("aws_sigv4"),
           service: z.string().min(1),
           region: z.string().min(1),
@@ -666,7 +672,7 @@ function normalizeAdditionalCredentialHeaders(input: {
   }
 
   const occupiedHeaderNames = new Set<string>(Object.keys(input.additionalHeaders ?? {}));
-  if (input.authInjection.type !== "query") {
+  if (input.authInjection.type !== "query" && input.authInjection.type !== "path_segment_prefix") {
     occupiedHeaderNames.add(input.authInjection.target.trim().toLowerCase());
   }
 
@@ -925,17 +931,22 @@ function normalizeRoute(route: z.output<typeof EgressCredentialRouteSchema>): Ru
           service: route.authInjection.service,
           region: route.authInjection.region,
         }
-      : {
-          type: route.authInjection.type,
-          target: route.authInjection.target,
-          ...(route.authInjection.type !== "basic" || route.authInjection.username === undefined
-            ? {}
-            : { username: route.authInjection.username }),
-          ...(route.authInjection.type !== "header" ||
-          route.authInjection.credentialPrefix === undefined
-            ? {}
-            : { credentialPrefix: route.authInjection.credentialPrefix }),
-        };
+      : route.authInjection.type === "path_segment_prefix"
+        ? {
+            type: route.authInjection.type,
+            segmentPrefix: route.authInjection.segmentPrefix,
+          }
+        : {
+            type: route.authInjection.type,
+            target: route.authInjection.target,
+            ...(route.authInjection.type !== "basic" || route.authInjection.username === undefined
+              ? {}
+              : { username: route.authInjection.username }),
+            ...(route.authInjection.type !== "header" ||
+            route.authInjection.credentialPrefix === undefined
+              ? {}
+              : { credentialPrefix: route.authInjection.credentialPrefix }),
+          };
   const additionalCredentialHeaders = normalizeAdditionalCredentialHeaders({
     additionalCredentialHeaders: route.additionalCredentialHeaders,
     additionalHeaders,

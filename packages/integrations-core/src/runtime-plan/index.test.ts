@@ -1112,6 +1112,51 @@ describe("assembleCompiledRuntimePlan", () => {
     });
   });
 
+  it("normalizes path segment prefix egress auth injection", () => {
+    const plan = CompiledRuntimePlanSchema.parse({
+      sandboxProfileId: "sbp_123",
+      version: 7,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
+      egressRoutes: [
+        {
+          egressRuleId: "egress_rule_telegram",
+          bindingId: "bind_telegram",
+          familyId: "telegram",
+          variantId: "telegram-default",
+          match: {
+            hosts: ["api.telegram.org"],
+          },
+          upstream: {
+            baseUrl: "https://api.telegram.org",
+          },
+          authInjection: {
+            type: "path_segment_prefix",
+            segmentPrefix: "bot",
+          },
+          credentialResolver: {
+            kind: "integration_connection",
+            connectionId: "conn_telegram",
+            secretType: "api_key",
+            slotKey: "telegram.telegram-default.bot-token",
+          },
+        },
+      ],
+      artifacts: [],
+      workspaceSources: [],
+      runtimeClients: [],
+      agentRuntimes: [],
+    });
+
+    expect(plan.egressRoutes[0]?.authInjection).toEqual({
+      type: "path_segment_prefix",
+      segmentPrefix: "bot",
+    });
+  });
+
   it("rejects additional egress headers that collapse to the same normalized name", () => {
     expect(() =>
       CompiledRuntimePlanSchema.parse({
@@ -1215,6 +1260,69 @@ describe("assembleCompiledRuntimePlan", () => {
           connectionId: "conn_datadog",
           secretType: "api_key",
           slotKey: "datadog.datadog-default.api-key.application-key",
+        },
+      },
+    ]);
+  });
+
+  it("allows additional credential-backed egress headers with path segment auth injection", () => {
+    const plan = CompiledRuntimePlanSchema.parse({
+      sandboxProfileId: "sbp_123",
+      version: 7,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
+      egressRoutes: [
+        {
+          egressRuleId: "egress_rule_path_auth",
+          bindingId: "bind_path_auth",
+          familyId: "example",
+          variantId: "example-default",
+          match: {
+            hosts: ["api.example.test"],
+          },
+          upstream: {
+            baseUrl: "https://api.example.test",
+          },
+          authInjection: {
+            type: "path_segment_prefix",
+            segmentPrefix: "token-",
+          },
+          additionalCredentialHeaders: [
+            {
+              header: " X-Secondary-Token ",
+              credentialResolver: {
+                kind: "integration_connection",
+                connectionId: "conn_example",
+                secretType: "api_key",
+                slotKey: "secondary-token",
+              },
+            },
+          ],
+          credentialResolver: {
+            kind: "integration_connection",
+            connectionId: "conn_example",
+            secretType: "api_key",
+            slotKey: "primary-token",
+          },
+        },
+      ],
+      artifacts: [],
+      workspaceSources: [],
+      runtimeClients: [],
+      agentRuntimes: [],
+    });
+
+    expect(plan.egressRoutes[0]?.additionalCredentialHeaders).toEqual([
+      {
+        header: "x-secondary-token",
+        credentialResolver: {
+          kind: "integration_connection",
+          connectionId: "conn_example",
+          secretType: "api_key",
+          slotKey: "secondary-token",
         },
       },
     ]);

@@ -925,6 +925,11 @@ export interface paths {
                         type: "query";
                       }
                     | {
+                        segmentPrefix: string;
+                        /** @enum {string} */
+                        type: "path_segment_prefix";
+                      }
+                    | {
                         region: string;
                         service: string;
                         /** @enum {string} */

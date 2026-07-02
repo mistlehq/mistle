@@ -2091,6 +2091,10 @@ export type EgressCredentialRoute = {
         target: string;
       }
     | {
+        type: "path_segment_prefix";
+        segmentPrefix: string;
+      }
+    | {
         type: "aws_sigv4";
         service: string;
         region: string;
