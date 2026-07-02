@@ -152,34 +152,10 @@ const DesignerUserInputRequestDynamicToolCallSchema = z
   })
   .loose();
 
-const CodexRuntimeMcpServerInstallConfigSchema = z
-  .object({
-    serverName: z.string().min(1).max(160),
-    transport: z.literal("streamable_http"),
-    url: z.url(),
-    httpHeaders: z.record(z.string(), z.string()),
-  })
-  .strict();
-
-const CodexRuntimeMcpServerEgressRouteMatcherSchema = z
-  .object({
-    egressRuleId: z.string().min(1).max(240),
-    hosts: z.array(z.string().min(1).max(253)).min(1).max(50),
-    pathPrefixes: z.array(z.string().min(1).max(2048)).min(1).max(50),
-    methods: z.array(z.string().min(1).max(32)).min(1).max(20).optional(),
-  })
-  .strict();
-
 const CodexRuntimeMcpServersInstallInputSchema = z
   .object({
-    runtimeAction: z
-      .object({
-        type: z.literal("codex_mcp_config_install_and_reload"),
-        runtimeClientId: z.literal("codex-cli"),
-        mcpServers: z.array(CodexRuntimeMcpServerInstallConfigSchema).min(1).max(20),
-        egressRouteMatchers: z.array(CodexRuntimeMcpServerEgressRouteMatcherSchema).min(1).max(50),
-      })
-      .strict(),
+    connectionId: z.string().min(1).max(160),
+    toolIds: z.array(z.string().min(1).max(160)).min(1).max(20),
   })
   .strict();
 
@@ -252,6 +228,9 @@ export type DashboardControlActionHandler = (
 export type DashboardControlActionSupport = {
   supportedActions: readonly string[];
   handleAction: DashboardControlActionHandler;
+  runtimeMcpServersInstallAction?: {
+    designerSessionId: string;
+  };
   userInputSubmitAction?: {
     designerSessionId: string;
   };
@@ -803,109 +782,28 @@ export const CodexRuntimeMcpServersInstallDynamicToolSpec = {
   namespace: DashboardControlDynamicToolNamespace,
   name: CodexRuntimeMcpServersInstallDynamicToolName,
   description:
-    "Install prepared remote MCP server config into the active Codex runtime and reload MCP servers. Use only with a runtimeAction returned by mistle.designer_runtime_provider_mcp_install_prepare.",
+    "Install supported remote provider MCP tools into the active Designer Codex runtime for an existing organization integration connection, then reload MCP servers.",
   inputSchema: {
     type: "object",
     additionalProperties: false,
     properties: {
-      runtimeAction: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          type: {
-            type: "string",
-            enum: ["codex_mcp_config_install_and_reload"],
-          },
-          runtimeClientId: {
-            type: "string",
-            enum: ["codex-cli"],
-          },
-          mcpServers: {
-            type: "array",
-            minItems: 1,
-            maxItems: 20,
-            items: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                serverName: {
-                  type: "string",
-                  minLength: 1,
-                  maxLength: 160,
-                },
-                transport: {
-                  type: "string",
-                  enum: ["streamable_http"],
-                },
-                url: {
-                  type: "string",
-                  minLength: 1,
-                  maxLength: 2048,
-                },
-                httpHeaders: {
-                  type: "object",
-                  additionalProperties: {
-                    type: "string",
-                  },
-                },
-              },
-              required: ["serverName", "transport", "url", "httpHeaders"],
-            },
-          },
-          egressRouteMatchers: {
-            type: "array",
-            minItems: 1,
-            maxItems: 50,
-            description:
-              "Non-secret sandbox-local egress route matchers that route prepared remote MCP traffic through managed gateway egress.",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                egressRuleId: {
-                  type: "string",
-                  minLength: 1,
-                  maxLength: 240,
-                },
-                hosts: {
-                  type: "array",
-                  minItems: 1,
-                  maxItems: 50,
-                  items: {
-                    type: "string",
-                    minLength: 1,
-                    maxLength: 253,
-                  },
-                },
-                pathPrefixes: {
-                  type: "array",
-                  minItems: 1,
-                  maxItems: 50,
-                  items: {
-                    type: "string",
-                    minLength: 1,
-                    maxLength: 2048,
-                  },
-                },
-                methods: {
-                  type: "array",
-                  minItems: 1,
-                  maxItems: 20,
-                  items: {
-                    type: "string",
-                    minLength: 1,
-                    maxLength: 32,
-                  },
-                },
-              },
-              required: ["egressRuleId", "hosts", "pathPrefixes"],
-            },
-          },
+      connectionId: {
+        type: "string",
+        minLength: 1,
+        maxLength: 160,
+      },
+      toolIds: {
+        type: "array",
+        minItems: 1,
+        maxItems: 20,
+        items: {
+          type: "string",
+          minLength: 1,
+          maxLength: 160,
         },
-        required: ["type", "runtimeClientId", "mcpServers", "egressRouteMatchers"],
       },
     },
-    required: ["runtimeAction"],
+    required: ["connectionId", "toolIds"],
   },
 } satisfies CodexDynamicToolSpec;
 

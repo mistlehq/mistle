@@ -18,8 +18,6 @@ import { z } from "zod";
 import { resolveIntegrationTargetSecrets } from "../../lib/integration-target-secrets.js";
 import type { ControlPlaneApiConfig } from "../../types.js";
 
-export const DesignerRuntimeMcpIntegrationConnectionIdHeader = "x-mistle-integration-connection-id";
-export const DesignerRuntimeMcpProviderToolIdsHeader = "x-mistle-provider-tool-ids";
 const UnknownRecordSchema = z.record(z.string(), z.unknown());
 
 type DesignerRuntimeProviderMcpContext = {
@@ -40,9 +38,13 @@ type DesignerRuntimeProviderEgressRouteMatcher = {
   hosts: readonly string[];
   pathPrefixes: readonly string[];
   methods?: readonly string[];
+  designerRuntimeMcp: {
+    integrationConnectionId: string;
+    providerToolIds: readonly string[];
+  };
 };
 
-type DesignerRuntimeProviderMcpInstallPrepareResult = {
+export type DesignerRuntimeProviderMcpInstallPrepareResult = {
   status: "prepared";
   runtimeAction: {
     type: "codex_mcp_config_install_and_reload";
@@ -100,8 +102,10 @@ export async function prepareDesignerRuntimeProviderMcpInstall(
   });
   const compiledRoutes = compileDesignerRuntimeRoutes(resolvedBinding);
   const egressRouteMatchers = resolveRemoteMcpEgressRouteMatchers({
+    connectionId: input.connectionId,
     compiledRoutes,
     mcpServers,
+    toolIds: input.toolIds,
   });
   if (egressRouteMatchers.length === 0) {
     throw new BadRequestError(
@@ -119,6 +123,29 @@ export async function prepareDesignerRuntimeProviderMcpInstall(
       egressRouteMatchers,
     },
   };
+}
+
+export async function prepareDesignerRuntimeProviderMcpInstallForSession(
+  ctx: DesignerRuntimeProviderMcpContext,
+  input: {
+    organizationId: string;
+    designerSessionId: string;
+    connectionId: string;
+    toolIds: readonly string[];
+  },
+): Promise<DesignerRuntimeProviderMcpInstallPrepareResult> {
+  const designerSession = await requireDesignerSessionById(ctx, {
+    organizationId: input.organizationId,
+    designerSessionId: input.designerSessionId,
+  });
+
+  return prepareDesignerRuntimeProviderMcpInstall(ctx, {
+    organizationId: input.organizationId,
+    designerSessionId: input.designerSessionId,
+    sandboxInstanceId: designerSession.sandboxInstanceId,
+    connectionId: input.connectionId,
+    toolIds: input.toolIds,
+  });
 }
 
 export async function resolveDesignerRuntimeEgressRoute(
@@ -184,8 +211,10 @@ function compileDesignerRuntimeRoutes(
 }
 
 function resolveRemoteMcpEgressRouteMatchers(input: {
+  connectionId: string;
   compiledRoutes: ReadonlyArray<EgressCredentialRoute>;
   mcpServers: ReadonlyArray<DesignerRuntimeProviderMcpServerConfig>;
+  toolIds: readonly string[];
 }): ReadonlyArray<DesignerRuntimeProviderEgressRouteMatcher> {
   const mcpHosts = new Set(
     input.mcpServers.map((server) => new URL(server.url).host.toLowerCase()),
@@ -198,6 +227,10 @@ function resolveRemoteMcpEgressRouteMatchers(input: {
       hosts: route.match.hosts,
       pathPrefixes: route.match.pathPrefixes ?? ["/"],
       ...(route.match.methods === undefined ? {} : { methods: route.match.methods }),
+      designerRuntimeMcp: {
+        integrationConnectionId: input.connectionId,
+        providerToolIds: input.toolIds,
+      },
     }));
 }
 
@@ -227,6 +260,31 @@ async function requireDesignerSession(
       "Designer session was not found for runtime MCP installation.",
     );
   }
+}
+
+async function requireDesignerSessionById(
+  ctx: DesignerRuntimeProviderMcpContext,
+  input: {
+    organizationId: string;
+    designerSessionId: string;
+  },
+): Promise<{ sandboxInstanceId: string }> {
+  const designerSession = await ctx.db.query.designerSessions.findFirst({
+    columns: {
+      sandboxInstanceId: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.id, input.designerSessionId), eq(table.organizationId, input.organizationId)),
+  });
+
+  if (designerSession === undefined) {
+    throw new NotFoundError(
+      "DESIGNER_SESSION_NOT_FOUND",
+      "Designer session was not found for runtime MCP installation.",
+    );
+  }
+
+  return designerSession;
 }
 
 async function requireDesignerSandboxInstance(
@@ -506,8 +564,6 @@ function resolveRemoteMcpServers(input: {
       url: server.url,
       httpHeaders: {
         ...(server.httpHeaders ?? {}),
-        [DesignerRuntimeMcpIntegrationConnectionIdHeader]: input.connectionId,
-        [DesignerRuntimeMcpProviderToolIdsHeader]: input.toolIds.join(","),
       },
     };
   });

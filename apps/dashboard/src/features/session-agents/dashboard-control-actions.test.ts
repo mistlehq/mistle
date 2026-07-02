@@ -202,19 +202,14 @@ describe("dashboard control actions", () => {
       name: CodexRuntimeMcpServersInstallDynamicToolName,
       inputSchema: {
         properties: {
-          runtimeAction: {
-            properties: {
-              type: {
-                enum: ["codex_mcp_config_install_and_reload"],
-              },
-              runtimeClientId: {
-                enum: ["codex-cli"],
-              },
-            },
-            required: ["type", "runtimeClientId", "mcpServers", "egressRouteMatchers"],
+          connectionId: {
+            type: "string",
+          },
+          toolIds: {
+            type: "array",
           },
         },
-        required: ["runtimeAction"],
+        required: ["connectionId", "toolIds"],
       },
     });
   });
@@ -313,6 +308,25 @@ describe("dashboard control actions", () => {
       namespace: DashboardControlDynamicToolNamespace,
       tool: CodexRuntimeMcpServersInstallDynamicToolName,
       arguments: {
+        connectionId: "icn_linear",
+        toolIds: ["linear-mcp"],
+      },
+    });
+
+    expect(parsed).toEqual({
+      action: CodexRuntimeMcpServersInstallAction,
+      input: {
+        connectionId: "icn_linear",
+        toolIds: ["linear-mcp"],
+      },
+    });
+  });
+
+  it("rejects runtime MCP server install calls with model-supplied runtime actions", () => {
+    const parsed = parseDashboardControlDynamicToolCall({
+      namespace: DashboardControlDynamicToolNamespace,
+      tool: CodexRuntimeMcpServersInstallDynamicToolName,
+      arguments: {
         runtimeAction: {
           type: "codex_mcp_config_install_and_reload",
           runtimeClientId: "codex-cli",
@@ -339,31 +353,8 @@ describe("dashboard control actions", () => {
     });
 
     expect(parsed).toEqual({
-      action: CodexRuntimeMcpServersInstallAction,
-      input: {
-        runtimeAction: {
-          type: "codex_mcp_config_install_and_reload",
-          runtimeClientId: "codex-cli",
-          mcpServers: [
-            {
-              serverName: "linear_icn_linear",
-              transport: "streamable_http",
-              url: "https://mcp.linear.app/mcp",
-              httpHeaders: {
-                "x-mistle-integration-connection-id": "icn_linear",
-                "x-mistle-provider-tool-ids": "linear-mcp",
-              },
-            },
-          ],
-          egressRouteMatchers: [
-            {
-              egressRuleId: "egress_rule_designer_runtime_icn_linear_2",
-              hosts: ["mcp.linear.app"],
-              pathPrefixes: ["/"],
-            },
-          ],
-        },
-      },
+      contentItems: [{ type: "inputText", text: "Runtime MCP install input is invalid." }],
+      success: false,
     });
   });
 

@@ -383,6 +383,54 @@ export const saveDesignerSelectedProviderResourcesResponseSchema = z
   })
   .strict();
 
+const designerRuntimeProviderMcpServerInstallConfigSchema = z
+  .object({
+    serverName: z.string().min(1).max(160),
+    transport: z.literal("streamable_http"),
+    url: z.url(),
+    httpHeaders: z.record(z.string(), z.string()),
+  })
+  .strict();
+
+const designerRuntimeProviderEgressRouteMatcherSchema = z
+  .object({
+    egressRuleId: z.string().min(1).max(240),
+    hosts: z.array(z.string().min(1).max(253)).min(1).max(50),
+    pathPrefixes: z.array(z.string().min(1).max(2_048)).min(1).max(50),
+    methods: z.array(z.string().min(1).max(32)).min(1).max(20).optional(),
+    designerRuntimeMcp: z
+      .object({
+        integrationConnectionId: z.string().min(1).max(160),
+        providerToolIds: z.array(z.string().min(1).max(160)).min(1).max(20),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const prepareDesignerRuntimeProviderMcpInstallBodySchema = z
+  .object({
+    connectionId: z.string().min(1).max(160),
+    toolIds: z.array(z.string().min(1).max(160)).min(1).max(20),
+  })
+  .strict();
+
+export const prepareDesignerRuntimeProviderMcpInstallResponseSchema = z
+  .object({
+    status: z.literal("prepared"),
+    runtimeAction: z
+      .object({
+        type: z.literal("codex_mcp_config_install_and_reload"),
+        runtimeClientId: z.literal("codex-cli"),
+        mcpServers: z.array(designerRuntimeProviderMcpServerInstallConfigSchema).min(1).max(20),
+        egressRouteMatchers: z
+          .array(designerRuntimeProviderEgressRouteMatcherSchema)
+          .min(1)
+          .max(50),
+      })
+      .strict(),
+  })
+  .strict();
+
 export const designerSessionSchema = z
   .object({
     id: z.string().min(1),
@@ -430,4 +478,10 @@ export type SaveDesignerSelectedProviderResourcesBody = z.infer<
 >;
 export type SaveDesignerSelectedProviderResourcesResponse = z.infer<
   typeof saveDesignerSelectedProviderResourcesResponseSchema
+>;
+export type PrepareDesignerRuntimeProviderMcpInstallBody = z.infer<
+  typeof prepareDesignerRuntimeProviderMcpInstallBodySchema
+>;
+export type PrepareDesignerRuntimeProviderMcpInstallResponse = z.infer<
+  typeof prepareDesignerRuntimeProviderMcpInstallResponseSchema
 >;

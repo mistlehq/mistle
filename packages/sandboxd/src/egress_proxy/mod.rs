@@ -35,7 +35,9 @@ use crate::egress_proxy::gateway::{DirectGatewayRouteScheme, resolve_direct_gate
 #[cfg(test)]
 use crate::egress_proxy::logging::serialize_egress_proxy_log_line;
 use crate::egress_proxy::logging::{EgressProxyLogContext, emit_egress_proxy_log};
-use crate::egress_proxy::routing::{EgressProxyRoute, build_gateway_egress_route};
+use crate::egress_proxy::routing::{
+    DesignerRuntimeMcpRouteMetadata, EgressProxyRoute, build_gateway_egress_route,
+};
 #[cfg(test)]
 use crate::egress_proxy::routing::{
     RequestTargetOverride, build_direct_forward_uri, match_route, resolve_request_target,
@@ -837,12 +839,37 @@ fn egress_proxy_route_from_control(
         .methods
         .map(|methods| normalize_methods_for_control(&egress_rule_id, methods))
         .transpose()?;
+    let designer_runtime_mcp = route
+        .designer_runtime_mcp
+        .map(|metadata| {
+            if metadata.provider_tool_ids.is_empty() {
+                return Err(EgressProxyError::new(format!(
+                    "egress route '{egress_rule_id}' Designer runtime MCP metadata must include at least one provider tool id"
+                )));
+            }
+
+            Ok(DesignerRuntimeMcpRouteMetadata {
+                integration_connection_id: normalize_non_empty(
+                    metadata.integration_connection_id,
+                    "designerRuntimeMcp.integrationConnectionId",
+                )?,
+                provider_tool_ids: metadata
+                    .provider_tool_ids
+                    .into_iter()
+                    .map(|tool_id| {
+                        normalize_non_empty(tool_id, "designerRuntimeMcp.providerToolIds")
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            })
+        })
+        .transpose()?;
 
     Ok(EgressProxyRoute {
         egress_rule_id,
         hosts,
         path_prefixes,
         methods,
+        designer_runtime_mcp,
     })
 }
 

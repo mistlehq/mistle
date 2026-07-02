@@ -183,7 +183,7 @@ export function registerIntegrationTools(server: McpServer, context: MistleMcpSe
     {
       title: "Prepare Designer runtime provider MCP install",
       description:
-        "Prepare a Designer-only runtime action for installing supported remote provider MCP tools for an existing organization integration connection. After this returns status 'prepared', immediately call dashboard_control.install_runtime_mcp_servers with the returned runtimeAction.",
+        "Preview and validate the Designer-only runtime action for installing supported remote provider MCP tools for an existing organization integration connection. To perform the install, call dashboard_control.install_runtime_mcp_servers with the same connectionId and toolIds; the dashboard prepares the install through control plane before mutating the runtime.",
       inputSchema: mcpDesignerRuntimeProviderMcpInstallPrepareInputSchema,
       annotations: {
         ...MutatingToolAnnotations,

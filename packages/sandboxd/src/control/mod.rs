@@ -33,7 +33,8 @@ pub use crate::control::error::ControlError;
 use crate::control::health::run_health_server_loop;
 use crate::control::protocol::ControlResponse;
 pub use crate::control::protocol::{
-    ControlEgressRouteMatcher, ControlRefreshEgressRoutesRequest, ControlSignRequest,
+    ControlDesignerRuntimeMcpRouteMetadata, ControlEgressRouteMatcher,
+    ControlRefreshEgressRoutesRequest, ControlSignRequest,
 };
 use crate::control::request::handle_connection;
 use crate::control::state::{

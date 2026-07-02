@@ -41,7 +41,9 @@ import { z } from "zod";
 import type { ChatAttachment, ChatEntry, ChatPlanEntry } from "../../../chat/chat-types.js";
 import type { ChatComposerCommandPanel } from "../../../chat/components/chat-composer.js";
 import {
+  prepareDesignerRuntimeProviderMcpInstall,
   saveDesignerSelectedProviderResources,
+  type PrepareDesignerRuntimeProviderMcpInstallResult,
   type SaveDesignerSelectedProviderResourcesReceipt,
 } from "../../../designer/designer-service.js";
 import {
@@ -413,17 +415,27 @@ async function respondToDashboardControlAction(input: {
 
 async function respondToCodexRuntimeMcpServersInstallAction(input: {
   installInput: CodexRuntimeMcpServersInstallInput;
+  installActionSupport: DashboardControlActionSupport["runtimeMcpServersInstallAction"] | undefined;
   request: CodexJsonRpcServerRequest;
   rpcClient: CodexJsonRpcClient;
 }): Promise<void> {
   try {
+    if (input.installActionSupport === undefined) {
+      throw new Error("Runtime MCP server installation is not supported in this session.");
+    }
+
+    const preparedInstall = await prepareDesignerRuntimeProviderMcpInstall({
+      sessionId: input.installActionSupport.designerSessionId,
+      connectionId: input.installInput.connectionId,
+      toolIds: input.installInput.toolIds,
+    });
     await refreshSandboxdEgressRoutes({
       rpcClient: input.rpcClient,
-      egressRouteMatchers: input.installInput.runtimeAction.egressRouteMatchers,
+      egressRouteMatchers: preparedInstall.runtimeAction.egressRouteMatchers,
     });
     await batchWriteCodexConfig({
       rpcClient: input.rpcClient,
-      edits: input.installInput.runtimeAction.mcpServers.map((server) => ({
+      edits: preparedInstall.runtimeAction.mcpServers.map((server) => ({
         keyPath: `mcp_servers.${server.serverName}`,
         value: {
           url: server.url,
@@ -458,7 +470,7 @@ async function respondToCodexRuntimeMcpServersInstallAction(input: {
 
 async function refreshSandboxdEgressRoutes(input: {
   rpcClient: CodexJsonRpcClient;
-  egressRouteMatchers: CodexRuntimeMcpServersInstallInput["runtimeAction"]["egressRouteMatchers"];
+  egressRouteMatchers: PrepareDesignerRuntimeProviderMcpInstallResult["runtimeAction"]["egressRouteMatchers"];
 }): Promise<void> {
   const response = await input.rpcClient.call("command/exec", {
     command: [
@@ -758,6 +770,7 @@ export function useCodexSessionState(input: {
       if (parsedRequest.action === CodexRuntimeMcpServersInstallAction) {
         void respondToCodexRuntimeMcpServersInstallAction({
           installInput: parsedRequest.input,
+          installActionSupport: input.dashboardControlActions?.runtimeMcpServersInstallAction,
           request,
           rpcClient,
         });

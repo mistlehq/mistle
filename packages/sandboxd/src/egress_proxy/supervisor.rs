@@ -419,6 +419,12 @@ fn serialize_child_routes(routes: &[EgressProxyRoute]) -> Vec<serde_json::Value>
                 "hosts": route.hosts,
                 "pathPrefixes": route.path_prefixes,
                 "methods": route.methods,
+                "designerRuntimeMcp": route.designer_runtime_mcp.as_ref().map(|metadata| {
+                    serde_json::json!({
+                        "integrationConnectionId": metadata.integration_connection_id,
+                        "providerToolIds": metadata.provider_tool_ids,
+                    })
+                }),
             })
         })
         .collect()

@@ -220,6 +220,9 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
     () => ({
       supportedActions: [DesignerCanvasTabOpenAction, DesignerBlueprintTabUpsertAction],
       handleAction: handleDashboardControlAction,
+      runtimeMcpServersInstallAction: {
+        designerSessionId: designerSession.id,
+      },
       userInputSubmitAction: {
         designerSessionId: designerSession.id,
       },

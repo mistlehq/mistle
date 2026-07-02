@@ -43,6 +43,15 @@ pub struct ControlEgressRouteMatcher {
     pub hosts: Vec<String>,
     pub path_prefixes: Vec<String>,
     pub methods: Option<Vec<String>>,
+    pub designer_runtime_mcp: Option<ControlDesignerRuntimeMcpRouteMetadata>,
+}
+
+/// Carries trusted route-bound metadata for Designer runtime MCP egress.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ControlDesignerRuntimeMcpRouteMetadata {
+    pub integration_connection_id: String,
+    pub provider_tool_ids: Vec<String>,
 }
 
 /// Carries one local signer request from the helper alias to the running daemon.

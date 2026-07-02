@@ -14,7 +14,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use hyper::header::HeaderValue;
 
-use crate::control::ControlEgressRouteMatcher;
+use crate::control::{ControlDesignerRuntimeMcpRouteMetadata, ControlEgressRouteMatcher};
 use crate::egress_proxy::DirectGatewayRouteScheme;
 #[cfg(target_os = "linux")]
 use crate::egress_proxy::socket_addr_from_sockaddr_storage;
@@ -74,12 +74,14 @@ fn matches_route_by_host_path_and_method() {
             hosts: vec!["api.github.com".to_string()],
             path_prefixes: vec!["/graphql".to_string()],
             methods: Some(vec!["POST".to_string()]),
+            designer_runtime_mcp: None,
         },
         EgressProxyRoute {
             egress_rule_id: "egress-rule-b".to_string(),
             hosts: vec!["github.com".to_string()],
             path_prefixes: vec!["/mistlehq/mistle.git".to_string()],
             methods: Some(vec!["GET".to_string()]),
+            designer_runtime_mcp: None,
         },
     ];
 
@@ -114,6 +116,7 @@ fn leaves_unmatched_requests_for_direct_passthrough() {
         hosts: vec!["api.openai.com".to_string()],
         path_prefixes: vec!["/v1/responses".to_string()],
         methods: Some(vec!["POST".to_string()]),
+        designer_runtime_mcp: None,
     }];
 
     let route = match_route(
@@ -134,6 +137,7 @@ fn does_not_match_sibling_paths_that_only_share_a_string_prefix() {
         hosts: vec!["mcp.pscale.dev".to_string()],
         path_prefixes: vec!["/mcp/planetscale".to_string()],
         methods: Some(vec!["POST".to_string()]),
+        designer_runtime_mcp: None,
     }];
 
     let route = match_route(
@@ -154,6 +158,7 @@ fn matches_child_paths_under_declared_path_prefix() {
         hosts: vec!["mcp.pscale.dev".to_string()],
         path_prefixes: vec!["/mcp/planetscale".to_string()],
         methods: Some(vec!["POST".to_string()]),
+        designer_runtime_mcp: None,
     }];
 
     let route = match_route(
@@ -177,6 +182,7 @@ fn matches_exact_path_prefix_when_request_includes_query_string() {
         hosts: vec!["mcp.pscale.dev".to_string()],
         path_prefixes: vec!["/mcp/planetscale".to_string()],
         methods: Some(vec!["POST".to_string()]),
+        designer_runtime_mcp: None,
     }];
 
     let route = match_route(
@@ -830,6 +836,8 @@ fn direct_gateway_request_headers_preserve_upstream_authorization() {
             DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME,
             "Bearer gateway-token",
         )
+        .header("x-mistle-integration-connection-id", "icn_forged")
+        .header("x-mistle-provider-tool-ids", "forged-mcp")
         .header("accept", "application/json")
         .body(())
         .expect("request should build");
@@ -847,6 +855,16 @@ fn direct_gateway_request_headers_preserve_upstream_authorization() {
         headers
             .iter()
             .all(|(name, _)| name.as_str() != DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME)
+    );
+    assert!(
+        headers
+            .iter()
+            .all(|(name, _)| name.as_str() != "x-mistle-integration-connection-id")
+    );
+    assert!(
+        headers
+            .iter()
+            .all(|(name, _)| name.as_str() != "x-mistle-provider-tool-ids")
     );
     assert!(
         headers.iter().any(|(name, value)| name.as_str() == "accept"
@@ -911,6 +929,10 @@ fn upserts_control_route_matchers_into_running_proxy_route_table() {
             hosts: vec!["MCP.LINEAR.APP".to_string()],
             path_prefixes: vec!["/".to_string()],
             methods: Some(vec!["post".to_string()]),
+            designer_runtime_mcp: Some(ControlDesignerRuntimeMcpRouteMetadata {
+                integration_connection_id: "icn_linear".to_string(),
+                provider_tool_ids: vec!["linear-mcp".to_string()],
+            }),
         }])
         .expect("control route matcher should refresh");
 
@@ -924,6 +946,15 @@ fn upserts_control_route_matchers_into_running_proxy_route_table() {
     assert_eq!(route.egress_rule_id, "egress-rule-linear-mcp");
     assert_eq!(route.hosts, vec!["mcp.linear.app"]);
     assert_eq!(route.methods, Some(vec!["POST".to_string()]));
+    assert_eq!(
+        route.designer_runtime_mcp.as_ref().map(|metadata| {
+            (
+                metadata.integration_connection_id.as_str(),
+                metadata.provider_tool_ids.as_slice(),
+            )
+        }),
+        Some(("icn_linear", &["linear-mcp".to_string()][..]))
+    );
     drop(routes);
 
     proxy.close().expect("egress proxy close should succeed");
