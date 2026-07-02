@@ -87,12 +87,12 @@ export const mcpIntegrationConnectionIdParamsSchema = z
   })
   .strict();
 
-export const mcpDesignerRuntimeProviderMcpInstallPrepareInputSchema = z
-  .object({
-    connectionId: z.string().min(1),
-    toolIds: z.array(z.string().min(1)).min(1).max(20),
-  })
-  .strict();
+export const mcpDesignerRuntimeProviderMcpInstallPrepareInputSchema =
+  mcpIntegrationConnectionIdParamsSchema
+    .extend({
+      toolIds: z.array(z.string().min(1)).min(1).max(20),
+    })
+    .strict();
 
 export const mcpIntegrationConnectionFormSetupPrepareInputSchema = z
   .object({

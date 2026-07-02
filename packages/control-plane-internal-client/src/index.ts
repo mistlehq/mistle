@@ -83,6 +83,8 @@ export type ResolveDesignerRuntimeEgressRouteInput = {
   method: string;
   transport: "http" | "websocket";
 };
+type ResolveDesignerRuntimeEgressRouteRequestBody =
+  paths["/internal/sandbox-runtime/resolve-designer-runtime-egress-route"]["post"]["requestBody"]["content"]["application/json"];
 const ResolveDesignerRuntimeEgressRouteOutputSchema = z
   .object({
     route: EgressCredentialRouteSchema,
@@ -148,20 +150,25 @@ function extractErrorCode(input: unknown): string | undefined {
   return typeof code === "string" && code.length > 0 ? code : undefined;
 }
 
-async function readJsonResponseBody(response: Response): Promise<unknown> {
-  const text = await response.text();
-  if (text.length === 0) {
-    return null;
-  }
-
-  return JSON.parse(text);
-}
-
 function normalizeResolveDesignerRuntimeEgressRouteOutput(
   input: ParsedResolveDesignerRuntimeEgressRouteOutput,
 ): ResolveDesignerRuntimeEgressRouteOutput {
   return {
     route: normalizeEgressCredentialRoute(input.route),
+  };
+}
+
+function toResolveDesignerRuntimeEgressRouteRequestBody(
+  input: ResolveDesignerRuntimeEgressRouteInput,
+): ResolveDesignerRuntimeEgressRouteRequestBody {
+  return {
+    organizationId: input.organizationId,
+    sandboxInstanceId: input.sandboxInstanceId,
+    integrationConnectionId: input.integrationConnectionId,
+    providerToolIds: [...input.providerToolIds],
+    targetUrl: input.targetUrl,
+    method: input.method,
+    transport: input.transport,
   };
 }
 
@@ -225,6 +232,11 @@ function normalizeEgressAuthInjection(
       return {
         type: authInjection.type,
         target: authInjection.target,
+      };
+    case "path_segment_prefix":
+      return {
+        type: authInjection.type,
+        segmentPrefix: authInjection.segmentPrefix,
       };
     case "aws_sigv4":
       return {
@@ -308,14 +320,12 @@ export class ControlPlaneInternalClientRequestError extends Error {
 
 export class ControlPlaneInternalClient {
   readonly #client: Client<paths>;
-  readonly #baseUrl: string;
   readonly #internalAuthServiceToken: string;
   readonly #requestTimeoutMs: number;
   readonly #testEnvironmentId: string | undefined;
   readonly #testEnvironmentIdHeader: string | undefined;
 
   constructor(input: CreateControlPlaneInternalClientInput) {
-    this.#baseUrl = input.baseUrl;
     this.#client = createClient<paths>({
       baseUrl: input.baseUrl,
     });
@@ -617,32 +627,27 @@ export class ControlPlaneInternalClient {
     input: ResolveDesignerRuntimeEgressRouteInput,
     options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<ResolveDesignerRuntimeEgressRouteOutput> {
-    const response = await fetch(
-      new URL("/internal/sandbox-runtime/resolve-designer-runtime-egress-route", this.#baseUrl),
+    const result = await this.#client.POST(
+      "/internal/sandbox-runtime/resolve-designer-runtime-egress-route",
       {
-        method: "POST",
-        headers: {
-          ...this.#headers(options),
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(input),
+        body: toResolveDesignerRuntimeEgressRouteRequestBody(input),
+        headers: this.#headers(options),
         signal: AbortSignal.timeout(this.#requestTimeoutMs),
       },
     );
-    const body = await readJsonResponseBody(response);
 
-    if (response.status === 200) {
+    if (result.response.status === 200 && result.data !== undefined) {
       return normalizeResolveDesignerRuntimeEgressRouteOutput(
-        ResolveDesignerRuntimeEgressRouteOutputSchema.parse(body),
+        ResolveDesignerRuntimeEgressRouteOutputSchema.parse(result.data),
       );
     }
 
-    const detailMessage = extractErrorMessage(body);
+    const detailMessage = extractErrorMessage(result.error);
     throw new ControlPlaneInternalClientRequestError({
-      status: response.status,
-      code: extractErrorCode(body),
+      status: result.response.status,
+      code: extractErrorCode(result.error),
       detailMessage,
-      message: `Control-plane internal Designer runtime egress route resolution failed with status ${String(response.status)}: ${detailMessage}`,
+      message: `Control-plane internal Designer runtime egress route resolution failed with status ${String(result.response.status)}: ${detailMessage}`,
     });
   }
 

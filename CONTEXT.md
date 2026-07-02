@@ -106,7 +106,7 @@ Provider integration metadata that says whether an **Integration connection** ca
 _Avoid_: Current connection readiness, provider resource list, target sandbox profile binding
 
 **Designer runtime connection refresh**:
-A Mistle-owned operation that installs workflow-relevant provider runtime access into a running **Mistle Designer session** by refreshing the Designer Codex MCP configuration and **Sandbox-local egress route matchers** for a selected **Integration connection** and **Provider tool**.
+A Mistle-owned operation that installs workflow-relevant provider runtime access into a running **Mistle Designer session** by refreshing the Designer Codex MCP configuration and **Sandbox-local egress route matchers** for a selected **Integration connection** and supported **Provider tools**.
 _Avoid_: Agent runtime connection, target sandbox profile binding update, one-off tool enablement
 
 **Sandbox-local egress route matcher**:

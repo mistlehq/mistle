@@ -327,6 +327,8 @@ describe("dashboard control actions", () => {
       namespace: DashboardControlDynamicToolNamespace,
       tool: CodexRuntimeMcpServersInstallDynamicToolName,
       arguments: {
+        connectionId: "icn_linear",
+        toolIds: ["linear-mcp"],
         runtimeAction: {
           type: "codex_mcp_config_install_and_reload",
           runtimeClientId: "codex-cli",

@@ -61,7 +61,6 @@ type DesignerRuntimeResolvedBinding = {
 
 type DesignerRuntimeConnectionRecord = {
   id: string;
-  organizationId: string;
   targetKey: string;
   status: string;
   externalSubjectId: string | null;
@@ -98,7 +97,6 @@ export async function prepareDesignerRuntimeProviderMcpInstall(
     compileBindingInput: resolvedBinding.compileBindingInput,
     definition: resolvedBinding.definition,
     connectionId: input.connectionId,
-    toolIds: input.toolIds,
   });
   const compiledRoutes = compileDesignerRuntimeRoutes(resolvedBinding);
   const egressRouteMatchers = resolveRemoteMcpEgressRouteMatchers({
@@ -447,7 +445,6 @@ async function getDesignerRuntimeConnection(
   const connection = await ctx.db.query.integrationConnections.findFirst({
     columns: {
       id: true,
-      organizationId: true,
       targetKey: true,
       status: true,
       externalSubjectId: true,
@@ -526,7 +523,6 @@ function resolveRemoteMcpServers(input: {
   definition: AnyIntegrationDefinition;
   compileBindingInput: CompileBindingInput<unknown, unknown, unknown>;
   connectionId: string;
-  toolIds: readonly string[];
 }): ReadonlyArray<DesignerRuntimeProviderMcpServerConfig> {
   if (input.definition.mcp === undefined) {
     throw new BadRequestError(
@@ -563,7 +559,7 @@ function resolveRemoteMcpServers(input: {
       transport: "streamable_http",
       url: server.url,
       httpHeaders: {
-        ...(server.httpHeaders ?? {}),
+        ...server.httpHeaders,
       },
     };
   });
