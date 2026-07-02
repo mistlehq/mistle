@@ -816,6 +816,7 @@ Trigger events:
 - `telegram.edited_channel_post`: Edited channel post
 - `telegram.business_connection`: Business connection
 - `telegram.business_message`: Business message
+- `telegram.guest_message`: Guest message
 - `telegram.edited_business_message`: Edited business message
 - `telegram.deleted_business_messages`: Deleted business messages
 - `telegram.message_reaction`: Message reaction

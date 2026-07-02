@@ -40,9 +40,10 @@ function verifyTelegramWebhook(input: {
     ],
     resolveConnectionSecrets: () => ({
       botToken: "123:telegram-token",
-      webhookSecret: WebhookSecret,
     }),
-    webhookSourceSecrets: {},
+    webhookSourceSecrets: {
+      webhookSecret: WebhookSecret,
+    },
     headers: {
       "x-telegram-bot-api-secret-token": input.secretToken ?? WebhookSecret,
     },

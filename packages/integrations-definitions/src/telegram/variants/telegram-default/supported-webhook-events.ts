@@ -79,6 +79,11 @@ export const TelegramWebhookEventMetadata: readonly TelegramWebhookEventMetadata
     category: "Business",
   }),
   defineTelegramWebhookEvent({
+    providerEventType: "guest_message",
+    displayName: "Guest message",
+    category: "Business",
+  }),
+  defineTelegramWebhookEvent({
     providerEventType: "edited_business_message",
     displayName: "Edited business message",
     category: "Business",

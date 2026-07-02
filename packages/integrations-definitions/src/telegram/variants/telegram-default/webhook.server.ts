@@ -23,7 +23,7 @@ const TelegramUpdateSchema = z
   .catchall(z.unknown());
 
 type TelegramConnectionSecrets = {
-  webhookSecret?: string;
+  botToken?: string;
 };
 
 function createInvalidTelegramWebhookRequestError(message: string): IntegrationWebhookError {
@@ -179,12 +179,12 @@ export const TelegramWebhookHandler: IntegrationWebhookHandler<
     return resolvePathRoutedConnection(input.candidates);
   },
   verify(input) {
-    const webhookSecret = input.connectionSecrets.webhookSecret;
+    const webhookSecret = input.webhookSourceSecrets["webhookSecret"];
     if (webhookSecret === undefined || webhookSecret.length === 0) {
       return {
         ok: false,
         code: "invalid-body",
-        message: "Telegram webhook secret is missing for this connection.",
+        message: "Telegram webhook secret is missing for this webhook source.",
       };
     }
 
