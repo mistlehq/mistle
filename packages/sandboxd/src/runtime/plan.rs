@@ -109,6 +109,7 @@ pub struct CompiledEgressRouteAuthInjection {
     pub target: Option<String>,
     pub username: Option<String>,
     pub credential_prefix: Option<String>,
+    pub segment_prefix: Option<String>,
     pub service: Option<String>,
     pub region: Option<String>,
 }
@@ -124,6 +125,8 @@ pub enum CompiledEgressRouteAuthInjectionType {
     Header,
     #[serde(rename = "query")]
     Query,
+    #[serde(rename = "path_segment_prefix")]
+    PathSegmentPrefix,
     #[serde(rename = "aws_sigv4")]
     AwsSigv4,
 }
@@ -1278,6 +1281,40 @@ mod tests {
         ));
         assert_eq!(route.auth_injection.service.as_deref(), Some("s3"));
         assert_eq!(route.auth_injection.region.as_deref(), Some("us-east-1"));
+        assert_eq!(route.auth_injection.target, None);
+    }
+
+    #[test]
+    fn decodes_path_segment_prefix_auth_injection_shape() {
+        let route = serde_json::from_value::<CompiledEgressRoute>(serde_json::json!({
+          "egressRuleId": "egress_rule_bind_telegram",
+          "bindingId": "bind_telegram",
+          "familyId": "telegram",
+          "variantId": "telegram-default",
+          "match": {
+            "hosts": ["api.telegram.org"]
+          },
+          "upstream": {
+            "baseUrl": "https://api.telegram.org"
+          },
+          "authInjection": {
+            "type": "path_segment_prefix",
+            "segmentPrefix": "bot"
+          },
+          "credentialResolver": {
+            "kind": "integration_connection",
+            "connectionId": "icn_telegram",
+            "secretType": "api_key",
+            "slotKey": "telegram.telegram-default.bot-token"
+          }
+        }))
+        .expect("path segment prefix egress route should decode");
+
+        assert!(matches!(
+            route.auth_injection.r#type,
+            CompiledEgressRouteAuthInjectionType::PathSegmentPrefix
+        ));
+        assert_eq!(route.auth_injection.segment_prefix.as_deref(), Some("bot"));
         assert_eq!(route.auth_injection.target, None);
     }
 

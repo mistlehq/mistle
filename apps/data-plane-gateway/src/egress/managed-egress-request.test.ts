@@ -278,6 +278,81 @@ describe("buildManagedEgressRequest", () => {
     expect(result.request.headers.get("authorization")).toBe("Bot discord-bot-token");
   });
 
+  it("prepends credential-backed path segments to managed egress request URLs", async () => {
+    const controlPlaneBaseUrl = await startRecordingControlPlane((_request, response) => {
+      response.writeHead(200, {
+        "content-type": "application/json",
+      });
+      response.end(
+        JSON.stringify({
+          kind: "value",
+          value: "123:telegram-token",
+        }),
+      );
+    });
+    const route: CompiledRuntimePlan["egressRoutes"][number] = {
+      egressRuleId: "egress_rule_telegram",
+      bindingId: "bind_telegram",
+      familyId: "telegram",
+      variantId: "telegram-default",
+      match: {
+        hosts: ["api.telegram.org"],
+        methods: ["POST"],
+      },
+      upstream: {
+        baseUrl: "https://api.telegram.org",
+      },
+      authInjection: {
+        type: "path_segment_prefix",
+        segmentPrefix: "bot",
+      },
+      credentialResolver: {
+        kind: "integration_connection",
+        connectionId: "icn_telegram",
+        secretType: "api_key",
+        slotKey: "telegram.telegram-default.bot-token",
+      },
+    };
+
+    const result = await buildManagedEgressRequest({
+      body: new TextEncoder().encode(JSON.stringify({ chat_id: "123", text: "hello" })),
+      controlPlanePublicBaseUrl: "https://control-plane.test",
+      controlPlaneInternalClient: new ControlPlaneInternalClient({
+        baseUrl: controlPlaneBaseUrl,
+        internalAuthServiceToken: "service-token",
+      }),
+      credentialCache: new CredentialCache({
+        cache: new Cache({ adapter: new InMemoryCacheAdapter() }),
+        defaultTtlSeconds: 300,
+        refreshSkewSeconds: 0,
+        now: () => Date.parse("2026-01-01T00:00:00.000Z"),
+      }),
+      mcpTokenConfig: {
+        tokenSecret: "mcp-token-secret",
+        tokenIssuer: "data-plane-gateway",
+        tokenAudience: "mistle-mcp",
+      },
+      organizationId: "org_123",
+      request: {
+        authority: "api.telegram.org",
+        headers: {
+          "content-type": ["application/json"],
+        },
+        method: "POST",
+        path: "/sendMessage",
+        query: "parse_mode=MarkdownV2",
+        scheme: "https",
+      },
+      route,
+      sandboxInstanceId: "sbi_123",
+    });
+
+    expect(result.request.url.toString()).toBe(
+      "https://api.telegram.org/bot123%3Atelegram-token/sendMessage?parse_mode=MarkdownV2",
+    );
+    expect(result.request.headers.has("authorization")).toBe(false);
+  });
+
   it("replaces incoming AWS SigV4 headers with resolved AWS session credentials", async () => {
     let observedBody: unknown;
     const controlPlaneBaseUrl = await startRecordingControlPlane((request, response) => {

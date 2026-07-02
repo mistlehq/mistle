@@ -1398,6 +1398,7 @@ fn sample_runtime_plan() -> CompiledRuntimePlan {
                 target: None,
                 username: None,
                 credential_prefix: None,
+                segment_prefix: None,
                 service: None,
                 region: None,
             },

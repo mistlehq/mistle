@@ -1190,7 +1190,34 @@ function applyAuthInjection(input: {
     case "query":
       input.upstreamUrl.searchParams.set(input.authInjection.target, input.secretValue);
       return;
+    case "path_segment_prefix":
+      input.upstreamUrl.pathname = prependCredentialPathSegment({
+        pathname: input.upstreamUrl.pathname,
+        secretValue: input.secretValue,
+        segmentPrefix: input.authInjection.segmentPrefix,
+      });
+      return;
   }
+}
+
+function prependCredentialPathSegment(input: {
+  pathname: string;
+  secretValue: string;
+  segmentPrefix: string;
+}): string {
+  if (input.secretValue.length === 0) {
+    throw new GatewayManagedEgressUnsupportedRouteError(
+      "Path segment auth injection requires a non-empty credential value.",
+      "credential_injection_failed",
+    );
+  }
+
+  const credentialSegment = encodeURIComponent(`${input.segmentPrefix}${input.secretValue}`);
+  const normalizedPathname = input.pathname.startsWith("/") ? input.pathname : `/${input.pathname}`;
+
+  return normalizedPathname === "/"
+    ? `/${credentialSegment}`
+    : `/${credentialSegment}${normalizedPathname}`;
 }
 
 function toBasicAuthorizationValue(input: { secretValue: string; username?: string }): string {
