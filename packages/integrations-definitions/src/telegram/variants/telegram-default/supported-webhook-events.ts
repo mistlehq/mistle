@@ -185,6 +185,13 @@ export const TelegramSupportedWebhookEvents: readonly IntegrationWebhookEventDef
     providerEventType: metadata.providerEventType,
     displayName: metadata.displayName,
     category: metadata.category,
+    requirements: {
+      anyOf: [
+        {
+          event: metadata.providerEventType,
+        },
+      ],
+    },
     payloadReferences: metadata.payloadReferences,
     conversationKeyOptions: [
       {
