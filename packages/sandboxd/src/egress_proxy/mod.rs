@@ -89,6 +89,9 @@ const SYSTEM_CA_CERT_BUNDLE_PATH: &str = "/etc/ssl/certs/ca-certificates.crt";
 const UPDATE_CA_CERTIFICATES_COMMAND: &str = "update-ca-certificates";
 #[cfg(all(debug_assertions, not(test)))]
 const EGRESS_PROXY_CHILD_BINARY_PATH_ENV: &str = "MISTLE_SANDBOXD_EGRESS_PROXY_CHILD_PATH";
+#[cfg(all(debug_assertions, not(test)))]
+const EGRESS_PROXY_LOOPBACK_LISTENER_ADDRESS_ENV: &str =
+    "MISTLE_SANDBOXD_EGRESS_PROXY_LISTENER_ADDRESS";
 const DEFAULT_LOOPBACK_PROXY_PORT: u16 = 38_513;
 const DEFAULT_TRANSPARENT_PROXY_PORT: u16 = 38_514;
 #[cfg(target_os = "linux")]
@@ -316,7 +319,7 @@ impl EgressProxy {
             forwarding_mode,
             EgressProxyStartOptions {
                 loopback_runtime,
-                listener_address: default_loopback_proxy_listener_address(),
+                listener_address: default_loopback_proxy_listener_address()?,
                 proxy_ca_config: ProxyCaConfig {
                     runtime_certificate_path: Path::new(RUNTIME_PROXY_CA_CERT_PATH),
                     runtime_certificate_bundle_path: Path::new(RUNTIME_PROXY_CA_BUNDLE_PATH),
@@ -933,8 +936,30 @@ fn normalize_methods_for_control(
         .collect()
 }
 
-fn default_loopback_proxy_listener_address() -> SocketAddr {
-    SocketAddr::from(([127, 0, 0, 1], DEFAULT_LOOPBACK_PROXY_PORT))
+fn default_loopback_proxy_listener_address() -> Result<SocketAddr, EgressProxyError> {
+    #[cfg(all(debug_assertions, not(test)))]
+    if let Some(address) = std::env::var_os(EGRESS_PROXY_LOOPBACK_LISTENER_ADDRESS_ENV) {
+        let address = address.into_string().map_err(|_| {
+            EgressProxyError::new(format!(
+                "{EGRESS_PROXY_LOOPBACK_LISTENER_ADDRESS_ENV} must be valid UTF-8"
+            ))
+        })?;
+        if address.is_empty() {
+            return Err(EgressProxyError::new(format!(
+                "{EGRESS_PROXY_LOOPBACK_LISTENER_ADDRESS_ENV} cannot be empty"
+            )));
+        }
+        return address.parse::<SocketAddr>().map_err(|error| {
+            EgressProxyError::new(format!(
+                "{EGRESS_PROXY_LOOPBACK_LISTENER_ADDRESS_ENV} must be a socket address: {error}"
+            ))
+        });
+    }
+
+    Ok(SocketAddr::from((
+        [127, 0, 0, 1],
+        DEFAULT_LOOPBACK_PROXY_PORT,
+    )))
 }
 
 fn transparent_proxy_listener_address_for_forwarding_mode(

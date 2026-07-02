@@ -104,12 +104,17 @@ fn process_supervisor_restarts_child_after_the_active_proxy_exits() {
         .prefix("egress-child-supervisor-")
         .tempdir_in("/tmp")
         .expect("temp dir should be creatable");
+    let proxy_addr = reserve_loopback_address();
     let _env_guard = TestEnvVarsGuard::set([
         (
             "MISTLE_SANDBOXD_EGRESS_PROXY_CHILD_PATH",
             env!("CARGO_BIN_EXE_sandboxd").to_string(),
         ),
         ("MISTLE_SANDBOXD_ENABLE_TEST_FAULTS", "1".to_string()),
+        (
+            "MISTLE_SANDBOXD_EGRESS_PROXY_LISTENER_ADDRESS",
+            proxy_addr.to_string(),
+        ),
     ]);
     let control_socket_path = temp_dir.path().join("control.sock");
     let global_git_config_path = temp_dir.path().join(".gitconfig");
@@ -133,11 +138,12 @@ fn process_supervisor_restarts_child_after_the_active_proxy_exits() {
     .expect("activation submission should succeed");
     wait_for_activated(&server);
     let initial_component = wait_for_egress_proxy_restart_count(server.health_endpoint_addr(), 0);
-    let proxy_addr: SocketAddr = initial_component["details"]["listenAddr"]
+    let observed_proxy_addr: SocketAddr = initial_component["details"]["listenAddr"]
         .as_str()
         .expect("egress proxy listenAddr detail should exist")
         .parse()
         .expect("egress proxy listenAddr should parse");
+    assert_eq!(observed_proxy_addr, proxy_addr);
     assert_eq!(initial_component["details"]["runtimeMode"], "child_process");
     assert_eq!(
         initial_component["details"]["childBinary"],
