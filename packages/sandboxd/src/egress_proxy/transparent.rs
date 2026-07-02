@@ -41,9 +41,7 @@ use tokio::net::{TcpSocket, TcpStream};
 
 #[cfg(target_os = "linux")]
 use crate::egress_proxy::TRANSPARENT_PASSTHROUGH_SOCKET_MARK;
-use crate::egress_proxy::logging::EgressProxyLogContext;
-#[cfg(target_os = "linux")]
-use crate::egress_proxy::logging::emit_egress_proxy_log;
+use crate::egress_proxy::logging::{EgressProxyLogContext, emit_egress_proxy_log};
 use crate::egress_proxy::{
     EgressProxyError, STATIC_LOCAL_DESTINATION_IPV4_CIDRS, TRANSPARENT_NFTABLES_TABLE_NAME,
 };
