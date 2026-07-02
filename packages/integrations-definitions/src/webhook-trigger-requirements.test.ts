@@ -20,6 +20,7 @@ describe("webhook trigger requirements", () => {
       "linear::linear-default",
       "sentry::sentry-default",
       "slack::slack-default",
+      "telegram::telegram-default",
       "wasenderapi::wasenderapi-mcp",
       "whapi::whapi-mcp",
     ]);
@@ -195,6 +196,20 @@ describe("webhook trigger requirements", () => {
         anyOf: [
           {
             event: "issue",
+          },
+        ],
+      });
+    }
+  });
+
+  it("maps Telegram trigger requirements to allowed update names", () => {
+    const telegramDefinition = requireDefinition("telegram", "telegram-default");
+
+    for (const eventDefinition of telegramDefinition.supportedWebhookEvents ?? []) {
+      expect(eventDefinition.requirements).toEqual({
+        anyOf: [
+          {
+            event: eventDefinition.providerEventType,
           },
         ],
       });
