@@ -26,7 +26,7 @@ const ResolvedSandboxImageSchema = z.discriminatedUnion("source", [
     .strict(),
 ]);
 
-const EgressCredentialResolverSchema = z.discriminatedUnion("kind", [
+export const EgressCredentialResolverSchema = z.discriminatedUnion("kind", [
   z
     .object({
       kind: z.literal("integration_connection"),
@@ -72,7 +72,7 @@ const EgressCredentialResolverSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 
-const EgressCredentialRouteSchema = z
+export const EgressCredentialRouteSchema = z
   .object({
     egressRuleId: z.string().min(1),
     bindingId: z.string().min(1),

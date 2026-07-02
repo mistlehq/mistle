@@ -2,7 +2,7 @@ import {
   type IntegrationConnection,
   IntegrationConnectionStatuses,
 } from "@mistle/db/control-plane";
-import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
+import { BadRequestError, ForbiddenError, NotFoundError } from "@mistle/http/errors.js";
 import {
   IntegrationConnectionMethodIds,
   resolveIntegrationForm,
@@ -17,6 +17,7 @@ import type { McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
+import { prepareDesignerRuntimeProviderMcpInstall } from "../../designer/services/designer-runtime-provider-mcp.js";
 import { INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH } from "../../integration-connections/constants.js";
 import { buildIntegrationConnectionResponse } from "../../integration-connections/services/build-integration-connection-response.js";
 import { listConfiguredSecretNamesByConnectionId } from "../../integration-connections/services/list-configured-secret-names-by-connection-id.js";
@@ -32,6 +33,7 @@ import {
   mcpIntegrationConnectionFormSetupPrepareInputSchema,
   mcpIntegrationConnectionIdParamsSchema,
   mcpIntegrationConnectionDeviceAuthorizationStartInputSchema,
+  mcpDesignerRuntimeProviderMcpInstallPrepareInputSchema,
   mcpIntegrationConnectionOAuthStartInputSchema,
   mcpIntegrationConnectionResourcesListInputSchema,
   mcpIntegrationConnectionResourcesRefreshInputSchema,
@@ -173,6 +175,52 @@ export function registerIntegrationTools(server: McpServer, context: MistleMcpSe
       );
 
       return structuredResult(await getIntegrationConnectionForMcp(context, { connectionId }));
+    },
+  );
+
+  server.registerTool(
+    "designer_runtime_provider_mcp_install_prepare",
+    {
+      title: "Prepare Designer runtime provider MCP install",
+      description:
+        "Prepare a Designer-only runtime action for installing supported remote provider MCP tools for an existing organization integration connection. After this returns status 'prepared', immediately call dashboard_control.install_runtime_mcp_servers with the returned runtimeAction.",
+      inputSchema: mcpDesignerRuntimeProviderMcpInstallPrepareInputSchema,
+      annotations: {
+        ...MutatingToolAnnotations,
+        title: "Prepare Designer runtime provider MCP install",
+      },
+    },
+    async ({ connectionId, toolIds }) => {
+      requireMcpToolPermission(
+        context.organizationActor,
+        OrganizationPermissions.INTEGRATION_CONNECTION_READ,
+      );
+      if (
+        context.organizationActor.kind !== "mcp_capability" ||
+        context.organizationActor.capability.kind !== "designer"
+      ) {
+        throw new ForbiddenError(
+          "FORBIDDEN",
+          "Designer runtime provider MCP installation requires a Designer MCP capability.",
+        );
+      }
+
+      return structuredResult(
+        await prepareDesignerRuntimeProviderMcpInstall(
+          {
+            db: context.db,
+            integrationRegistry: context.integrationRegistry,
+            integrationsConfig: context.integrationsConfig,
+          },
+          {
+            organizationId: context.organizationActor.organizationId,
+            designerSessionId: context.organizationActor.capability.designerSessionId,
+            sandboxInstanceId: context.organizationActor.capability.sandboxInstanceId,
+            connectionId,
+            toolIds,
+          },
+        ),
+      );
     },
   );
 

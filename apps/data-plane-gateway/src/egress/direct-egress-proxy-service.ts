@@ -6,8 +6,15 @@ import {
 } from "node:http";
 import { request as requestHttps } from "node:https";
 
-import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
-import type { DataPlaneDatabase, DataPlaneTables } from "@mistle/db/data-plane";
+import {
+  ControlPlaneInternalClientRequestError,
+  type ControlPlaneInternalClient,
+} from "@mistle/control-plane-internal-client";
+import {
+  SandboxInstancePurposes,
+  type DataPlaneDatabase,
+  type DataPlaneTables,
+} from "@mistle/db/data-plane";
 import {
   EgressTokenError,
   verifyEgressToken,
@@ -42,6 +49,8 @@ import {
 export const DirectEgressHttpRoutePath = "/_mistle/egress/http";
 export const DirectEgressWebSocketRoutePath = "/_mistle/egress/ws";
 export const DirectEgressTokenHeaderName = "x-mistle-egress-token";
+const DesignerRuntimeMcpIntegrationConnectionIdHeader = "x-mistle-integration-connection-id";
+const DesignerRuntimeMcpProviderToolIdsHeader = "x-mistle-provider-tool-ids";
 const ProviderResourceAssociationObservationBodyLimitBytes = 1024 * 1024;
 const ObservableResponseHeaderNames = [
   "cache-control",
@@ -85,6 +94,7 @@ type DirectEgressFailureCode =
   | "organization_mismatch"
   | "managed_route_ambiguous"
   | "managed_route_unauthorized"
+  | "designer_runtime_route_resolution_failed"
   | "credential_resolution_failed"
   | "credential_injection_failed"
   | "request_middleware_failed"
@@ -241,6 +251,8 @@ export class DirectEgressProxyService {
       path: request.path,
       runtimePlan: activeRuntimePlan.runtimePlan,
     });
+    const designerRuntimeMcpMetadata = readDesignerRuntimeMcpMetadata(request.headers);
+    stripDesignerRuntimeMcpHeaders(request.headers);
     if (classification.kind === "ambiguous") {
       throw new DirectEgressProxyError(
         `Multiple managed egress routes matched ${request.method} ${request.authority}${request.path}.`,
@@ -265,6 +277,53 @@ export class DirectEgressProxyService {
         kind: "managed",
         activeRuntimePlan,
         classification,
+        request,
+        targetUrl,
+        token,
+      };
+      logDirectEgressAuthorized({
+        admission,
+        transport: input.transport,
+      });
+      return admission;
+    }
+
+    if (
+      activeRuntimePlan.purpose === SandboxInstancePurposes.DESIGNER &&
+      designerRuntimeMcpMetadata !== null
+    ) {
+      const dynamicRoute = await this.resolveDesignerRuntimeEgressRoute({
+        activeRuntimePlan,
+        metadata: designerRuntimeMcpMetadata,
+        method: request.method,
+        sandboxInstanceId: token.sub,
+        targetUrl,
+        ...(input.testEnvironmentId === undefined
+          ? {}
+          : { testEnvironmentId: input.testEnvironmentId }),
+        transport: input.transport,
+      });
+      const dynamicClassification: Extract<GatewayEgressRouteClassification, { kind: "matched" }> =
+        {
+          kind: "matched",
+          route: dynamicRoute,
+        };
+      const authorizationFailure = authorizeMatchedManagedRoute({
+        request,
+        route: dynamicClassification.route,
+      });
+      if (authorizationFailure !== undefined) {
+        throw new DirectEgressProxyError(
+          authorizationFailure.message,
+          "managed_route_unauthorized",
+          403,
+        );
+      }
+
+      const admission: DirectEgressAdmission = {
+        kind: "managed",
+        activeRuntimePlan,
+        classification: dynamicClassification,
         request,
         targetUrl,
         token,
@@ -449,7 +508,49 @@ export class DirectEgressProxyService {
       );
     }
   }
+
+  private async resolveDesignerRuntimeEgressRoute(input: {
+    activeRuntimePlan: ActiveRuntimePlan;
+    metadata: DesignerRuntimeMcpMetadata;
+    method: string;
+    sandboxInstanceId: string;
+    targetUrl: URL;
+    testEnvironmentId?: string;
+    transport: DirectEgressTransport;
+  }): Promise<Extract<GatewayEgressRouteClassification, { kind: "matched" }>["route"]> {
+    try {
+      const result = await this.controlPlaneInternalClient.resolveDesignerRuntimeEgressRoute(
+        {
+          organizationId: input.activeRuntimePlan.organizationId,
+          sandboxInstanceId: input.sandboxInstanceId,
+          integrationConnectionId: input.metadata.integrationConnectionId,
+          providerToolIds: input.metadata.providerToolIds,
+          targetUrl: input.targetUrl.toString(),
+          method: input.method,
+          transport: input.transport,
+        },
+        input.testEnvironmentId === undefined ? {} : { testEnvironmentId: input.testEnvironmentId },
+      );
+
+      return result.route;
+    } catch (error) {
+      if (error instanceof ControlPlaneInternalClientRequestError) {
+        throw new DirectEgressProxyError(
+          error.detailMessage,
+          "designer_runtime_route_resolution_failed",
+          403,
+        );
+      }
+
+      throw error;
+    }
+  }
 }
+
+type DesignerRuntimeMcpMetadata = {
+  integrationConnectionId: string;
+  providerToolIds: readonly string[];
+};
 
 function authorizeMatchedManagedRoute(input: {
   request: DirectEgressRequest;
@@ -541,6 +642,64 @@ function readBearerToken(authorizationHeader: string | undefined): string | unde
   }
 
   return token;
+}
+
+function readDesignerRuntimeMcpMetadata(
+  headers: RepeatedHeaderValues,
+): DesignerRuntimeMcpMetadata | null {
+  const integrationConnectionId = readSingleRepeatedHeaderValue(
+    headers,
+    DesignerRuntimeMcpIntegrationConnectionIdHeader,
+  );
+  const providerToolIdsHeader = readSingleRepeatedHeaderValue(
+    headers,
+    DesignerRuntimeMcpProviderToolIdsHeader,
+  );
+
+  if (integrationConnectionId === undefined && providerToolIdsHeader === undefined) {
+    return null;
+  }
+  if (integrationConnectionId === undefined || providerToolIdsHeader === undefined) {
+    throw new DirectEgressProxyError(
+      "Designer runtime MCP egress metadata headers must be provided together.",
+      "designer_runtime_route_resolution_failed",
+      403,
+    );
+  }
+
+  const providerToolIds = providerToolIdsHeader
+    .split(",")
+    .map((toolId) => toolId.trim())
+    .filter((toolId) => toolId.length > 0);
+  if (providerToolIds.length === 0) {
+    throw new DirectEgressProxyError(
+      "Designer runtime MCP egress metadata must include at least one provider tool id.",
+      "designer_runtime_route_resolution_failed",
+      403,
+    );
+  }
+
+  return {
+    integrationConnectionId,
+    providerToolIds,
+  };
+}
+
+function readSingleRepeatedHeaderValue(
+  headers: RepeatedHeaderValues,
+  headerName: string,
+): string | undefined {
+  const values = headers[headerName.toLowerCase()];
+  if (values === undefined || values.length === 0) {
+    return undefined;
+  }
+
+  return values.join(",");
+}
+
+function stripDesignerRuntimeMcpHeaders(headers: RepeatedHeaderValues): void {
+  delete headers[DesignerRuntimeMcpIntegrationConnectionIdHeader];
+  delete headers[DesignerRuntimeMcpProviderToolIdsHeader];
 }
 
 const HopByHopHeaderNames = new Set([

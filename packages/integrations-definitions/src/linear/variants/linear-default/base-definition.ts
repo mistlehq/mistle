@@ -1,4 +1,5 @@
 import {
+  DesignerRuntimeAccessInstallModes,
   IntegrationConnectionMethodIds,
   IntegrationKinds,
   IntegrationMcpTransports,
@@ -47,6 +48,14 @@ export const LinearBaseDefinition: LinearBaseIntegrationDefinition = {
   bindingConfigSchema: LinearBindingConfigSchema,
   bindingConfigForm: resolveLinearBindingConfigForm,
   validateBindingWriteContext: validateLinearBindingWriteContext,
+  designerRuntimeAccess: {
+    tools: [
+      {
+        toolId: LinearToolIds.LINEAR_MCP,
+        installMode: DesignerRuntimeAccessInstallModes.REMOTE_MCP,
+      },
+    ],
+  },
   identityLinking: {
     eligibleConnectionMethodIds: [LinearConnectionMethodIds.OAUTH_APP],
   },

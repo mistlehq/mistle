@@ -26,11 +26,15 @@ mod protocol;
 mod request;
 mod state;
 
-pub use crate::control::client::{submit_activate, submit_ready, submit_shutdown, submit_signing};
+pub use crate::control::client::{
+    submit_activate, submit_ready, submit_refresh_egress_routes, submit_shutdown, submit_signing,
+};
 pub use crate::control::error::ControlError;
 use crate::control::health::run_health_server_loop;
 use crate::control::protocol::ControlResponse;
-pub use crate::control::protocol::ControlSignRequest;
+pub use crate::control::protocol::{
+    ControlEgressRouteMatcher, ControlRefreshEgressRoutesRequest, ControlSignRequest,
+};
 use crate::control::request::handle_connection;
 use crate::control::state::{
     ActivationCompletion, ControlServerState, SharedActivationThread, close_sandboxd_state,

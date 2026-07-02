@@ -111,6 +111,7 @@ const UnknownRecordSchema = z.record(z.string(), z.unknown());
 const StringRecordSchema = z.record(z.string(), z.string());
 const ResolveIntegrationCredentialTracer = trace.getTracer("@mistle/control-plane-api");
 const OAuth2AuthorizationCodeRefreshAdvisoryLockSeed = 20_260_630;
+const DesignerRuntimeIntegrationBindingIdPrefix = "designer_runtime_";
 
 function createResolveCredentialTelemetryAttributes(input: {
   connectionId: string;
@@ -384,6 +385,15 @@ function resolveResolverContextBinding(input: {
     kind: input.binding.kind,
     config: parsedBindingConfig.data,
   };
+}
+
+function resolveDesignerRuntimeBindingConnectionId(bindingId: string): string | undefined {
+  if (!bindingId.startsWith(DesignerRuntimeIntegrationBindingIdPrefix)) {
+    return undefined;
+  }
+
+  const connectionId = bindingId.slice(DesignerRuntimeIntegrationBindingIdPrefix.length);
+  return connectionId.length === 0 ? undefined : connectionId;
 }
 
 function parsePersistedSecretType(secretType: string): IntegrationCredentialSecretKind | undefined {
@@ -1444,40 +1454,54 @@ export async function resolveIntegrationCredential(
         let bindingResolverContext: ResolverContextBinding | undefined;
         if (input.bindingId !== undefined) {
           const bindingId = input.bindingId;
-          const binding = await db.query.sandboxProfileVersionIntegrationBindings.findFirst({
-            columns: {
-              id: true,
-              kind: true,
-              connectionId: true,
-              config: true,
-            },
-            where: (table, { eq }) => eq(table.id, bindingId),
-          });
-
-          if (binding === undefined) {
-            throw new InternalIntegrationCredentialsError(
-              InternalIntegrationCredentialsErrorCodes.BINDING_NOT_FOUND,
-              404,
-              `Integration binding '${input.bindingId}' was not found.`,
-            );
-          }
-
-          if (binding.connectionId !== connection.id) {
+          const designerRuntimeConnectionId = resolveDesignerRuntimeBindingConnectionId(bindingId);
+          if (
+            designerRuntimeConnectionId !== undefined &&
+            designerRuntimeConnectionId !== connection.id
+          ) {
             throw new InternalIntegrationCredentialsError(
               InternalIntegrationCredentialsErrorCodes.BINDING_CONNECTION_MISMATCH,
               400,
-              `Integration binding '${binding.id}' does not belong to connection '${connection.id}'.`,
+              `Integration binding '${bindingId}' does not belong to connection '${connection.id}'.`,
             );
           }
 
-          bindingResolverContext = resolveResolverContextBinding({
-            binding: {
-              id: binding.id,
-              kind: binding.kind,
-              config: binding.config,
-            },
-            definition,
-          });
+          if (designerRuntimeConnectionId === undefined) {
+            const binding = await db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+              columns: {
+                id: true,
+                kind: true,
+                connectionId: true,
+                config: true,
+              },
+              where: (table, { eq }) => eq(table.id, bindingId),
+            });
+
+            if (binding === undefined) {
+              throw new InternalIntegrationCredentialsError(
+                InternalIntegrationCredentialsErrorCodes.BINDING_NOT_FOUND,
+                404,
+                `Integration binding '${input.bindingId}' was not found.`,
+              );
+            }
+
+            if (binding.connectionId !== connection.id) {
+              throw new InternalIntegrationCredentialsError(
+                InternalIntegrationCredentialsErrorCodes.BINDING_CONNECTION_MISMATCH,
+                400,
+                `Integration binding '${binding.id}' does not belong to connection '${connection.id}'.`,
+              );
+            }
+
+            bindingResolverContext = resolveResolverContextBinding({
+              binding: {
+                id: binding.id,
+                kind: binding.kind,
+                config: binding.config,
+              },
+              definition,
+            });
+          }
         }
 
         const initialConnectionResolverContext = resolveResolverContextConnection({

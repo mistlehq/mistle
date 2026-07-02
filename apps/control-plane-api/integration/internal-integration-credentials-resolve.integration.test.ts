@@ -13,7 +13,10 @@ import {
   type IntegrationCredentialSecretKind,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { SlackCredentialSlotKeys } from "@mistle/integrations-definitions";
+import {
+  LinearCredentialSlotKeys,
+  SlackCredentialSlotKeys,
+} from "@mistle/integrations-definitions";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -91,6 +94,96 @@ describe.concurrent("internal integration credential resolution", () => {
     expect(ResolveIntegrationCredentialResponseSchema.parse(await response.json())).toEqual({
       kind: "value",
       value: "sk-integration-internal-test",
+    });
+  });
+
+  it("resolves Designer runtime synthetic binding credentials without a persisted profile binding", async ({
+    env,
+  }) => {
+    await seedIntegrationTarget(env, {
+      targetKey: "linear-internal-credential-designer-runtime",
+      familyId: "linear",
+      variantId: "linear-default",
+      config: {},
+    });
+    const session = await env.auth.createSession({
+      email: "integration-internal-credential-designer-runtime@example.com",
+    });
+
+    const createResponse = await createFormConnection({
+      env,
+      targetKey: "linear-internal-credential-designer-runtime",
+      cookie: session.cookie,
+      body: {
+        displayName: "Linear Designer runtime credential test",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+        secrets: {
+          apiKey: "lin_api_designer_runtime",
+        },
+      },
+    });
+    expect(createResponse.status).toBe(201);
+    const connection = CreatedFormIntegrationConnectionSchema.parse(await createResponse.json());
+
+    const response = await resolveCredential(env, {
+      connectionId: connection.id,
+      bindingId: `designer_runtime_${connection.id}`,
+      secretType: IntegrationCredentialSecretKinds.API_KEY,
+      slotKey: LinearCredentialSlotKeys.API_KEY,
+    });
+
+    expect(response.status).toBe(200);
+    expect(ResolveIntegrationCredentialResponseSchema.parse(await response.json())).toEqual({
+      kind: "value",
+      value: "lin_api_designer_runtime",
+    });
+  });
+
+  it("rejects Designer runtime synthetic binding credentials for a different connection", async ({
+    env,
+  }) => {
+    await seedIntegrationTarget(env, {
+      targetKey: "linear-internal-credential-designer-runtime-mismatch",
+      familyId: "linear",
+      variantId: "linear-default",
+      config: {},
+    });
+    const session = await env.auth.createSession({
+      email: "integration-internal-credential-designer-runtime-mismatch@example.com",
+    });
+
+    const createResponse = await createFormConnection({
+      env,
+      targetKey: "linear-internal-credential-designer-runtime-mismatch",
+      cookie: session.cookie,
+      body: {
+        displayName: "Linear Designer runtime credential mismatch test",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+        secrets: {
+          apiKey: "lin_api_designer_runtime_mismatch",
+        },
+      },
+    });
+    expect(createResponse.status).toBe(201);
+    const connection = CreatedFormIntegrationConnectionSchema.parse(await createResponse.json());
+
+    const response = await resolveCredential(env, {
+      connectionId: connection.id,
+      bindingId: "designer_runtime_icn_other_connection",
+      secretType: IntegrationCredentialSecretKinds.API_KEY,
+      slotKey: LinearCredentialSlotKeys.API_KEY,
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      code: "BINDING_CONNECTION_MISMATCH",
+      message: `Integration binding 'designer_runtime_icn_other_connection' does not belong to connection '${connection.id}'.`,
     });
   });
 

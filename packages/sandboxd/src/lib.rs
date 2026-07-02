@@ -37,6 +37,7 @@ pub mod process;
 pub mod protocol;
 pub mod proxy_ca;
 pub mod pty;
+pub mod refresh_egress_routes;
 pub mod runtime;
 pub mod sandboxd_state;
 pub mod security;
@@ -86,6 +87,9 @@ pub enum SandboxdCommand {
     Activate {
         payload_source: StartupPayloadSource,
     },
+    RefreshEgressRoutes {
+        routes_json: String,
+    },
     Sign,
     Skills {
         args: Vec<String>,
@@ -98,6 +102,7 @@ pub enum SandboxdCommand {
 pub enum ParseSandboxdCommandError {
     InvalidStdinBytes(String),
     MissingEgressProxyConfigPath,
+    MissingRefreshEgressRoutesJson,
     MissingStdinBytesValue,
     UnexpectedArgument(String),
     UnknownCommand(String),
@@ -118,12 +123,18 @@ impl fmt::Display for ParseSandboxdCommandError {
             Self::MissingEgressProxyConfigPath => {
                 write!(f, "sandboxd egress-proxy --config requires a config path")
             }
+            Self::MissingRefreshEgressRoutesJson => {
+                write!(
+                    f,
+                    "sandboxd refresh-egress-routes --routes-json requires a JSON request"
+                )
+            }
             Self::UnexpectedArgument(argument) => {
                 write!(f, "unexpected sandboxd argument: {argument}")
             }
             Self::UnknownCommand(command) => write!(
                 f,
-                "unknown sandboxd subcommand '{command}' (expected 'ready', 'activate', 'shutdown', 'egress-proxy', 'skills', or 'version')"
+                "unknown sandboxd subcommand '{command}' (expected 'ready', 'activate', 'shutdown', 'egress-proxy', 'refresh-egress-routes', 'skills', or 'version')"
             ),
         }
     }
@@ -152,6 +163,10 @@ where
         "activate" => {
             let payload_source = parse_payload_source_args(parsed_args.by_ref())?;
             return Ok(SandboxdCommand::Activate { payload_source });
+        }
+        "refresh-egress-routes" => {
+            let routes_json = parse_refresh_egress_routes_args(parsed_args.by_ref())?;
+            return Ok(SandboxdCommand::RefreshEgressRoutes { routes_json });
         }
         "skills" => {
             return Ok(SandboxdCommand::Skills {
@@ -208,6 +223,28 @@ where
         }
     }
     Ok(payload_source)
+}
+
+fn parse_refresh_egress_routes_args<I>(
+    parsed_args: &mut I,
+) -> Result<String, ParseSandboxdCommandError>
+where
+    I: Iterator<Item = String>,
+{
+    let mut routes_json = None;
+    while let Some(argument) = parsed_args.next() {
+        match argument.as_str() {
+            "--routes-json" => {
+                routes_json = Some(
+                    parsed_args
+                        .next()
+                        .ok_or(ParseSandboxdCommandError::MissingRefreshEgressRoutesJson)?,
+                );
+            }
+            _ => return Err(ParseSandboxdCommandError::UnexpectedArgument(argument)),
+        }
+    }
+    routes_json.ok_or(ParseSandboxdCommandError::MissingRefreshEgressRoutesJson)
 }
 
 fn parse_stdin_bytes(
@@ -313,6 +350,18 @@ where
             Ok(()) => 0,
             Err(_) => 1,
         },
+        SandboxdCommand::RefreshEgressRoutes { routes_json } => {
+            match refresh_egress_routes::run_refresh_egress_routes(
+                &routes_json,
+                Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
+            ) {
+                Ok(()) => 0,
+                Err(error) => {
+                    let _ = writeln!(stderr, "{error}");
+                    1
+                }
+            }
+        }
         SandboxdCommand::Version => match writeln!(stdout, "{}", env!("CARGO_PKG_VERSION")) {
             Ok(()) => 0,
             Err(error) => {
@@ -443,6 +492,29 @@ mod tests {
         assert_eq!(
             command,
             Err(ParseSandboxdCommandError::MissingEgressProxyConfigPath)
+        );
+    }
+
+    #[test]
+    fn parses_refresh_egress_routes_with_json_request() {
+        let command =
+            parse_sandboxd_command(["refresh-egress-routes", "--routes-json", r#"{"routes":[]}"#]);
+
+        assert_eq!(
+            command,
+            Ok(SandboxdCommand::RefreshEgressRoutes {
+                routes_json: r#"{"routes":[]}"#.to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_refresh_egress_routes_without_json_request() {
+        let command = parse_sandboxd_command(["refresh-egress-routes"]);
+
+        assert_eq!(
+            command,
+            Err(ParseSandboxdCommandError::MissingRefreshEgressRoutesJson)
         );
     }
 

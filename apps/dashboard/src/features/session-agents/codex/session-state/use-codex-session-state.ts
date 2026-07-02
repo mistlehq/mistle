@@ -1,12 +1,14 @@
 import type { SkillMentionDescriptor } from "@mistle/integrations-core";
 import {
   archiveCodexThread,
+  batchWriteCodexConfig,
   clearCodexThreadGoal,
   compactCodexThread,
   CodexComposerCommandIds,
   forkCodexThread,
   getCodexThreadGoal,
   rollbackCodexThread,
+  reloadCodexMcpServers,
   resumeCodexThread,
   setCodexThreadGoal,
   startCodexReview,
@@ -34,6 +36,7 @@ import {
   useState,
   type RefObject,
 } from "react";
+import { z } from "zod";
 
 import type { ChatAttachment, ChatEntry, ChatPlanEntry } from "../../../chat/chat-types.js";
 import type { ChatComposerCommandPanel } from "../../../chat/components/chat-composer.js";
@@ -54,12 +57,14 @@ import {
   createDashboardControlUserInputResponse,
   createDashboardControlUserInputServerRequest,
   createDashboardControlDynamicToolCallResponse,
+  CodexRuntimeMcpServersInstallAction,
   DashboardControlDynamicToolSpecs,
   DesignerUserInputRequestAction,
   isDashboardControlDynamicToolCallRequest,
   parseDashboardControlDynamicToolCall,
   type DashboardControlCanvasActionRequest,
   type DashboardControlActionSupport,
+  type CodexRuntimeMcpServersInstallInput,
 } from "../../dashboard-control-actions.js";
 import type { RespondToServerRequest } from "../../server-requests/index.js";
 import {
@@ -91,6 +96,7 @@ import {
   type StartSessionStep,
 } from "./codex-session-types.js";
 import { readCodexThreadState } from "./codex-thread-read-state.js";
+import { invalidateDesignerProductMutationQueries } from "./designer-product-mutation-cache-invalidation.js";
 import {
   useCodexSessionBootstrapData,
   useSessionBootstrap,
@@ -405,6 +411,92 @@ async function respondToDashboardControlAction(input: {
   }
 }
 
+async function respondToCodexRuntimeMcpServersInstallAction(input: {
+  installInput: CodexRuntimeMcpServersInstallInput;
+  request: CodexJsonRpcServerRequest;
+  rpcClient: CodexJsonRpcClient;
+}): Promise<void> {
+  try {
+    await refreshSandboxdEgressRoutes({
+      rpcClient: input.rpcClient,
+      egressRouteMatchers: input.installInput.runtimeAction.egressRouteMatchers,
+    });
+    await batchWriteCodexConfig({
+      rpcClient: input.rpcClient,
+      edits: input.installInput.runtimeAction.mcpServers.map((server) => ({
+        keyPath: `mcp_servers.${server.serverName}`,
+        value: {
+          url: server.url,
+          http_headers: server.httpHeaders,
+        },
+        mergeStrategy: "replace",
+      })),
+    });
+    await reloadCodexMcpServers({
+      rpcClient: input.rpcClient,
+    });
+    await input.rpcClient.respond(
+      input.request.id,
+      createDashboardControlDynamicToolCallResponse({
+        success: true,
+        text: "Installed runtime MCP server config.",
+      }),
+    );
+  } catch (error) {
+    await input.rpcClient.respond(
+      input.request.id,
+      createDashboardControlDynamicToolCallResponse({
+        success: false,
+        text:
+          error instanceof Error
+            ? error.message
+            : "Runtime MCP server config installation was rejected.",
+      }),
+    );
+  }
+}
+
+async function refreshSandboxdEgressRoutes(input: {
+  rpcClient: CodexJsonRpcClient;
+  egressRouteMatchers: CodexRuntimeMcpServersInstallInput["runtimeAction"]["egressRouteMatchers"];
+}): Promise<void> {
+  const response = await input.rpcClient.call("command/exec", {
+    command: [
+      "/opt/mistle/bin/sandboxd",
+      "refresh-egress-routes",
+      "--routes-json",
+      JSON.stringify({ routes: input.egressRouteMatchers }),
+    ],
+    cwd: "/root",
+    timeoutMs: 10_000,
+    outputBytesCap: 4_096,
+  });
+  const parsedResponse = CodexCommandExecResponseSchema.safeParse(response);
+  if (!parsedResponse.success) {
+    throw new Error(
+      `sandboxd refresh-egress-routes response payload is invalid. Payload: ${JSON.stringify(response)}`,
+    );
+  }
+  if (parsedResponse.data.exitCode !== 0) {
+    const stderr = parsedResponse.data.stderr.trim();
+    const stdout = parsedResponse.data.stdout.trim();
+    const detail = stderr.length > 0 ? stderr : stdout;
+    throw new Error(
+      detail.length > 0
+        ? `sandboxd refresh-egress-routes failed: ${detail}`
+        : "sandboxd refresh-egress-routes failed.",
+    );
+  }
+}
+
+const CodexCommandExecResponseSchema = z
+  .object({
+    exitCode: z.number().int(),
+    stdout: z.string(),
+    stderr: z.string(),
+  })
+  .loose();
+
 type CodexSessionChatState = {
   chatState: CodexChatState;
   isStartingTurn: boolean;
@@ -663,6 +755,15 @@ export function useCodexSessionState(input: {
         return;
       }
 
+      if (parsedRequest.action === CodexRuntimeMcpServersInstallAction) {
+        void respondToCodexRuntimeMcpServersInstallAction({
+          installInput: parsedRequest.input,
+          request,
+          rpcClient,
+        });
+        return;
+      }
+
       if (parsedRequest.action === DesignerUserInputRequestAction) {
         dashboardControlUserInputRequestIdsRef.current.add(String(request.id));
         dispatchServerRequestsAction({
@@ -701,6 +802,11 @@ export function useCodexSessionState(input: {
 
   const handleSessionNotificationReceived = useCallback(
     (notification: CodexJsonRpcNotification): void => {
+      void invalidateDesignerProductMutationQueries({
+        notification,
+        queryClient,
+      });
+
       const tokenUsageSnapshot = parseThreadTokenUsageSnapshot(notification);
       if (tokenUsageSnapshot !== null) {
         setThreadTokenUsageSnapshot(tokenUsageSnapshot);
@@ -723,7 +829,7 @@ export function useCodexSessionState(input: {
 
       handleNotificationReceived(notification);
     },
-    [handleNotificationReceived, recordLoadedGoal, recordNoGoalForThread],
+    [handleNotificationReceived, queryClient, recordLoadedGoal, recordNoGoalForThread],
   );
 
   const dashboardControlDynamicTools = useMemo(

@@ -21,6 +21,7 @@ use std::time::Duration;
 
 use serde_json::Value;
 
+use crate::control::ControlEgressRouteMatcher;
 use crate::egress_proxy::ca::{
     ProxyCaConfig, ProxyCaInstallation, cleanup_proxy_ca_installation, emit_proxy_ca_lifecycle_log,
     load_or_create_persistent_proxy_ca,
@@ -105,6 +106,7 @@ pub(super) const DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH: &str = "/_mistle/egress/ws"
 #[derive(Debug)]
 pub struct EgressProxy {
     runtime_env: BTreeMap<String, String>,
+    routes: Arc<RwLock<Vec<EgressProxyRoute>>>,
     shutdown_requested: Arc<AtomicBool>,
     supervisor_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
     transparent_server: Option<ActiveEgressProxyServer>,
@@ -705,6 +707,7 @@ impl EgressProxy {
 
         Ok(Some(Self {
             runtime_env,
+            routes,
             shutdown_requested,
             supervisor_thread: Some(supervisor_thread),
             transparent_server,
@@ -722,6 +725,31 @@ impl EgressProxy {
 
     pub fn managed_env_keys() -> &'static [&'static str] {
         &MANAGED_PROXY_ENV_KEYS
+    }
+
+    pub fn upsert_control_routes(
+        &self,
+        routes: Vec<ControlEgressRouteMatcher>,
+    ) -> Result<(), EgressProxyError> {
+        let routes = routes
+            .into_iter()
+            .map(egress_proxy_route_from_control)
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut route_table = self
+            .routes
+            .write()
+            .map_err(|_| EgressProxyError::new("egress proxy route table lock is poisoned"))?;
+        for route in routes {
+            if let Some(existing_route) = route_table
+                .iter_mut()
+                .find(|candidate| candidate.egress_rule_id == route.egress_rule_id)
+            {
+                *existing_route = route;
+            } else {
+                route_table.push(route);
+            }
+        }
+        Ok(())
     }
 
     #[cfg(any(test, debug_assertions))]
@@ -778,6 +806,84 @@ impl EgressProxy {
 
         Ok(())
     }
+}
+
+fn egress_proxy_route_from_control(
+    route: ControlEgressRouteMatcher,
+) -> Result<EgressProxyRoute, EgressProxyError> {
+    let egress_rule_id = normalize_non_empty(route.egress_rule_id, "egressRuleId")?;
+    if route.hosts.is_empty() {
+        return Err(EgressProxyError::new(format!(
+            "egress route '{egress_rule_id}' must include at least one host"
+        )));
+    }
+    if route.path_prefixes.is_empty() {
+        return Err(EgressProxyError::new(format!(
+            "egress route '{egress_rule_id}' must include at least one path prefix"
+        )));
+    }
+
+    let hosts = route
+        .hosts
+        .into_iter()
+        .map(|host| normalize_non_empty(host, "host").map(|host| host.to_ascii_lowercase()))
+        .collect::<Result<Vec<_>, _>>()?;
+    let path_prefixes = route
+        .path_prefixes
+        .into_iter()
+        .map(|path_prefix| normalize_path_prefix_for_control(&egress_rule_id, path_prefix))
+        .collect::<Result<Vec<_>, _>>()?;
+    let methods = route
+        .methods
+        .map(|methods| normalize_methods_for_control(&egress_rule_id, methods))
+        .transpose()?;
+
+    Ok(EgressProxyRoute {
+        egress_rule_id,
+        hosts,
+        path_prefixes,
+        methods,
+    })
+}
+
+fn normalize_non_empty(value: String, field_name: &str) -> Result<String, EgressProxyError> {
+    let value = value.trim().to_string();
+    if value.is_empty() {
+        return Err(EgressProxyError::new(format!(
+            "egress route {field_name} cannot be empty"
+        )));
+    }
+    Ok(value)
+}
+
+fn normalize_path_prefix_for_control(
+    egress_rule_id: &str,
+    path_prefix: String,
+) -> Result<String, EgressProxyError> {
+    let path_prefix = normalize_non_empty(path_prefix, "pathPrefix")?;
+    if !path_prefix.starts_with('/') {
+        return Err(EgressProxyError::new(format!(
+            "egress route '{egress_rule_id}' path prefix '{path_prefix}' must start with '/'"
+        )));
+    }
+    Ok(path_prefix)
+}
+
+fn normalize_methods_for_control(
+    egress_rule_id: &str,
+    methods: Vec<String>,
+) -> Result<Vec<String>, EgressProxyError> {
+    if methods.is_empty() {
+        return Err(EgressProxyError::new(format!(
+            "egress route '{egress_rule_id}' methods cannot be empty"
+        )));
+    }
+    methods
+        .into_iter()
+        .map(|method| {
+            normalize_non_empty(method, "method").map(|method| method.to_ascii_uppercase())
+        })
+        .collect()
 }
 
 fn default_loopback_proxy_listener_address() -> SocketAddr {

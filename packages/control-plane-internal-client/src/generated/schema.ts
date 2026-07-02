@@ -1545,6 +1545,236 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/internal/sandbox-runtime/resolve-designer-runtime-egress-route": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            integrationConnectionId: string;
+            method: string;
+            organizationId: string;
+            providerToolIds: string[];
+            sandboxInstanceId: string;
+            /** Format: uri */
+            targetUrl: string;
+            /** @enum {string} */
+            transport: "http" | "websocket";
+          };
+        };
+      };
+      responses: {
+        /** @description Resolve a Designer runtime provider egress route for internal gateway callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              route: {
+                additionalCredentialHeaders?: {
+                  credentialResolver:
+                    | {
+                        connectionId: string;
+                        /** @enum {string} */
+                        kind: "integration_connection";
+                        resolverKey?: string;
+                        secretType: string;
+                        slotKey?: string;
+                      }
+                    | {
+                        actingUserRequired: boolean;
+                        credentialKind?: string;
+                        integrationConnectionId?: string;
+                        /** @enum {string} */
+                        kind: "linked_principal";
+                        providerFamily: string;
+                        /** @enum {string} */
+                        resolutionMode: "required" | "preferred";
+                      }
+                    | {
+                        apiKeyId: string;
+                        /** @enum {string} */
+                        kind: "mistle_mcp_token";
+                      }
+                    | {
+                        /** @enum {string} */
+                        kind: "mistle_mcp_setup_assistant_token";
+                        sandboxProfileId: string;
+                        sandboxProfileVersion: number;
+                      }
+                    | {
+                        designerSessionId: string;
+                        /** @enum {string} */
+                        kind: "mistle_mcp_designer_token";
+                      }
+                    | {
+                        /** @enum {string} */
+                        kind: "platform_openai_api_key";
+                      };
+                  header: string;
+                }[];
+                additionalHeaders?: {
+                  [key: string]: string;
+                };
+                authInjection:
+                  | {
+                      target: string;
+                      /** @enum {string} */
+                      type: "bearer";
+                    }
+                  | {
+                      target: string;
+                      /** @enum {string} */
+                      type: "basic";
+                      username?: string;
+                    }
+                  | {
+                      credentialPrefix?: string;
+                      target: string;
+                      /** @enum {string} */
+                      type: "header";
+                    }
+                  | {
+                      target: string;
+                      /** @enum {string} */
+                      type: "query";
+                    }
+                  | {
+                      region: string;
+                      service: string;
+                      /** @enum {string} */
+                      type: "aws_sigv4";
+                    };
+                bindingId: string;
+                credentialResolver:
+                  | {
+                      connectionId: string;
+                      /** @enum {string} */
+                      kind: "integration_connection";
+                      resolverKey?: string;
+                      secretType: string;
+                      slotKey?: string;
+                    }
+                  | {
+                      actingUserRequired: boolean;
+                      credentialKind?: string;
+                      integrationConnectionId?: string;
+                      /** @enum {string} */
+                      kind: "linked_principal";
+                      providerFamily: string;
+                      /** @enum {string} */
+                      resolutionMode: "required" | "preferred";
+                    }
+                  | {
+                      apiKeyId: string;
+                      /** @enum {string} */
+                      kind: "mistle_mcp_token";
+                    }
+                  | {
+                      /** @enum {string} */
+                      kind: "mistle_mcp_setup_assistant_token";
+                      sandboxProfileId: string;
+                      sandboxProfileVersion: number;
+                    }
+                  | {
+                      designerSessionId: string;
+                      /** @enum {string} */
+                      kind: "mistle_mcp_designer_token";
+                    }
+                  | {
+                      /** @enum {string} */
+                      kind: "platform_openai_api_key";
+                    };
+                egressRuleId: string;
+                familyId: string;
+                match: {
+                  hosts: string[];
+                  methods?: string[];
+                  pathPrefixes?: string[];
+                };
+                requestMiddleware?: string[];
+                upstream: {
+                  baseUrl: string;
+                };
+                variantId: string;
+              };
+            };
+          };
+        };
+        /** @description Invalid Designer runtime egress route resolution request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  code: string;
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Designer runtime egress route resolution dependency was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              code: string;
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/internal/sandbox-runtime/resume-sandbox-instance": {
     parameters: {
       query?: never;

@@ -1,3 +1,8 @@
+import {
+  EgressCredentialRouteSchema,
+  type EgressCredentialResolverRef,
+  type EgressCredentialRoute,
+} from "@mistle/integrations-core";
 import type { Client } from "openapi-fetch";
 import createClient from "openapi-fetch";
 import { z } from "zod";
@@ -69,6 +74,26 @@ export type ResolveSandboxRuntimeCredentialsInput =
   paths["/internal/sandbox-runtime/resolve-credentials"]["post"]["requestBody"]["content"]["application/json"];
 export type ResolveSandboxRuntimeCredentialsOutput =
   paths["/internal/sandbox-runtime/resolve-credentials"]["post"]["responses"]["200"]["content"]["application/json"];
+export type ResolveDesignerRuntimeEgressRouteInput = {
+  organizationId: string;
+  sandboxInstanceId: string;
+  integrationConnectionId: string;
+  providerToolIds: readonly string[];
+  targetUrl: string;
+  method: string;
+  transport: "http" | "websocket";
+};
+const ResolveDesignerRuntimeEgressRouteOutputSchema = z
+  .object({
+    route: EgressCredentialRouteSchema,
+  })
+  .strict();
+type ParsedResolveDesignerRuntimeEgressRouteOutput = z.output<
+  typeof ResolveDesignerRuntimeEgressRouteOutputSchema
+>;
+export type ResolveDesignerRuntimeEgressRouteOutput = {
+  route: EgressCredentialRoute;
+};
 export type RequestIntegrationConnectionResourceRefreshInput =
   paths["/internal/integration-connections/refresh-resource"]["post"]["requestBody"]["content"]["application/json"];
 export type RequestIntegrationConnectionResourceRefreshOutput =
@@ -123,6 +148,145 @@ function extractErrorCode(input: unknown): string | undefined {
   return typeof code === "string" && code.length > 0 ? code : undefined;
 }
 
+async function readJsonResponseBody(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (text.length === 0) {
+    return null;
+  }
+
+  return JSON.parse(text);
+}
+
+function normalizeResolveDesignerRuntimeEgressRouteOutput(
+  input: ParsedResolveDesignerRuntimeEgressRouteOutput,
+): ResolveDesignerRuntimeEgressRouteOutput {
+  return {
+    route: normalizeEgressCredentialRoute(input.route),
+  };
+}
+
+function normalizeEgressCredentialRoute(
+  route: ParsedResolveDesignerRuntimeEgressRouteOutput["route"],
+): EgressCredentialRoute {
+  return {
+    egressRuleId: route.egressRuleId,
+    bindingId: route.bindingId,
+    familyId: route.familyId,
+    variantId: route.variantId,
+    match: {
+      hosts: route.match.hosts,
+      ...(route.match.pathPrefixes === undefined ? {} : { pathPrefixes: route.match.pathPrefixes }),
+      ...(route.match.methods === undefined ? {} : { methods: route.match.methods }),
+    },
+    upstream: route.upstream,
+    authInjection: normalizeEgressAuthInjection(route.authInjection),
+    ...(route.additionalHeaders === undefined
+      ? {}
+      : { additionalHeaders: route.additionalHeaders }),
+    ...(route.additionalCredentialHeaders === undefined
+      ? {}
+      : {
+          additionalCredentialHeaders: route.additionalCredentialHeaders.map((header) => ({
+            header: header.header,
+            credentialResolver: normalizeEgressCredentialResolver(header.credentialResolver),
+          })),
+        }),
+    credentialResolver: normalizeEgressCredentialResolver(route.credentialResolver),
+    ...(route.requestMiddleware === undefined
+      ? {}
+      : { requestMiddleware: route.requestMiddleware }),
+  };
+}
+
+function normalizeEgressAuthInjection(
+  authInjection: ParsedResolveDesignerRuntimeEgressRouteOutput["route"]["authInjection"],
+): EgressCredentialRoute["authInjection"] {
+  switch (authInjection.type) {
+    case "bearer":
+      return {
+        type: authInjection.type,
+        target: authInjection.target,
+      };
+    case "basic":
+      return {
+        type: authInjection.type,
+        target: authInjection.target,
+        ...(authInjection.username === undefined ? {} : { username: authInjection.username }),
+      };
+    case "header":
+      return {
+        type: authInjection.type,
+        target: authInjection.target,
+        ...(authInjection.credentialPrefix === undefined
+          ? {}
+          : { credentialPrefix: authInjection.credentialPrefix }),
+      };
+    case "query":
+      return {
+        type: authInjection.type,
+        target: authInjection.target,
+      };
+    case "aws_sigv4":
+      return {
+        type: authInjection.type,
+        service: authInjection.service,
+        region: authInjection.region,
+      };
+  }
+}
+
+function normalizeEgressCredentialResolver(
+  credentialResolver: ParsedResolveDesignerRuntimeEgressRouteOutput["route"]["credentialResolver"],
+): EgressCredentialResolverRef {
+  switch (credentialResolver.kind) {
+    case "integration_connection":
+      return {
+        kind: credentialResolver.kind,
+        connectionId: credentialResolver.connectionId,
+        secretType: credentialResolver.secretType,
+        ...(credentialResolver.slotKey === undefined
+          ? {}
+          : { slotKey: credentialResolver.slotKey }),
+        ...(credentialResolver.resolverKey === undefined
+          ? {}
+          : { resolverKey: credentialResolver.resolverKey }),
+      };
+    case "linked_principal":
+      return {
+        kind: credentialResolver.kind,
+        providerFamily: credentialResolver.providerFamily,
+        ...(credentialResolver.integrationConnectionId === undefined
+          ? {}
+          : { integrationConnectionId: credentialResolver.integrationConnectionId }),
+        ...(credentialResolver.credentialKind === undefined
+          ? {}
+          : { credentialKind: credentialResolver.credentialKind }),
+        actingUserRequired: credentialResolver.actingUserRequired,
+        resolutionMode: credentialResolver.resolutionMode,
+      };
+    case "mistle_mcp_token":
+      return {
+        kind: credentialResolver.kind,
+        apiKeyId: credentialResolver.apiKeyId,
+      };
+    case "mistle_mcp_setup_assistant_token":
+      return {
+        kind: credentialResolver.kind,
+        sandboxProfileId: credentialResolver.sandboxProfileId,
+        sandboxProfileVersion: credentialResolver.sandboxProfileVersion,
+      };
+    case "mistle_mcp_designer_token":
+      return {
+        kind: credentialResolver.kind,
+        designerSessionId: credentialResolver.designerSessionId,
+      };
+    case "platform_openai_api_key":
+      return {
+        kind: credentialResolver.kind,
+      };
+  }
+}
+
 export class ControlPlaneInternalClientRequestError extends Error {
   readonly status: number;
   readonly code: string | undefined;
@@ -144,12 +308,14 @@ export class ControlPlaneInternalClientRequestError extends Error {
 
 export class ControlPlaneInternalClient {
   readonly #client: Client<paths>;
+  readonly #baseUrl: string;
   readonly #internalAuthServiceToken: string;
   readonly #requestTimeoutMs: number;
   readonly #testEnvironmentId: string | undefined;
   readonly #testEnvironmentIdHeader: string | undefined;
 
   constructor(input: CreateControlPlaneInternalClientInput) {
+    this.#baseUrl = input.baseUrl;
     this.#client = createClient<paths>({
       baseUrl: input.baseUrl,
     });
@@ -444,6 +610,39 @@ export class ControlPlaneInternalClient {
       code: extractErrorCode(result.error),
       detailMessage,
       message: `Control-plane internal sandbox runtime credential resolution failed with status ${String(result.response.status)}: ${detailMessage}`,
+    });
+  }
+
+  async resolveDesignerRuntimeEgressRoute(
+    input: ResolveDesignerRuntimeEgressRouteInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
+  ): Promise<ResolveDesignerRuntimeEgressRouteOutput> {
+    const response = await fetch(
+      new URL("/internal/sandbox-runtime/resolve-designer-runtime-egress-route", this.#baseUrl),
+      {
+        method: "POST",
+        headers: {
+          ...this.#headers(options),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(this.#requestTimeoutMs),
+      },
+    );
+    const body = await readJsonResponseBody(response);
+
+    if (response.status === 200) {
+      return normalizeResolveDesignerRuntimeEgressRouteOutput(
+        ResolveDesignerRuntimeEgressRouteOutputSchema.parse(body),
+      );
+    }
+
+    const detailMessage = extractErrorMessage(body);
+    throw new ControlPlaneInternalClientRequestError({
+      status: response.status,
+      code: extractErrorCode(body),
+      detailMessage,
+      message: `Control-plane internal Designer runtime egress route resolution failed with status ${String(response.status)}: ${detailMessage}`,
     });
   }
 

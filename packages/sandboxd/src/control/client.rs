@@ -9,7 +9,9 @@ use std::os::unix::net::UnixStream;
 use std::path::Path;
 
 use crate::control::error::ControlError;
-use crate::control::protocol::{ControlRequest, ControlResponse, ControlSignRequest};
+use crate::control::protocol::{
+    ControlRefreshEgressRoutesRequest, ControlRequest, ControlResponse, ControlSignRequest,
+};
 use crate::protocol::activation::ActivationInput;
 
 /// Checks that the daemon's local control socket is reachable.
@@ -33,6 +35,20 @@ pub fn submit_activate(
             activation_input: Box::new(activation_input.clone()),
         },
     )
+}
+
+/// Refreshes sandbox-local egress route matchers on an activated daemon.
+pub fn submit_refresh_egress_routes(
+    socket_path: &Path,
+    refresh_request: &ControlRefreshEgressRoutesRequest,
+) -> Result<(), ControlError> {
+    submit_control_request(
+        socket_path,
+        ControlRequest::RefreshEgressRoutes {
+            refresh_request: refresh_request.clone(),
+        },
+    )
+    .map(|_| ())
 }
 
 /// Submits one signing request to an activated daemon and returns the signature.

@@ -55,6 +55,7 @@ export async function authenticateMcpToken(input: {
       organizationId: verifiedToken.organizationId,
       capability: {
         kind: "designer",
+        designerSessionId: verifiedToken.designerSessionId,
         sandboxInstanceId: verifiedToken.sub,
       },
       permissions: [

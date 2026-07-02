@@ -14,6 +14,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use hyper::header::HeaderValue;
 
+use crate::control::ControlEgressRouteMatcher;
 use crate::egress_proxy::DirectGatewayRouteScheme;
 #[cfg(target_os = "linux")]
 use crate::egress_proxy::socket_addr_from_sockaddr_storage;
@@ -879,6 +880,54 @@ fn gateway_egress_routes_match_declared_hosts_not_upstream_host() {
             .expect("declared host should match")
             .is_some()
     );
+}
+
+#[test]
+fn upserts_control_route_matchers_into_running_proxy_route_table() {
+    let listener_address = reserve_test_listener_address();
+    let proxy_ca_paths = test_proxy_ca_paths();
+    let runtime_plan = sample_runtime_plan();
+    let startup_input = sample_startup_input();
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandbox-123",
+        Arc::new(SystemClock),
+        BTreeSet::from([SupervisedComponent::EgressProxy]),
+    );
+    let proxy = EgressProxy::start_with_options(
+        &runtime_plan,
+        &startup_input,
+        test_forwarding_mode(),
+        listener_address,
+        test_proxy_ca_config(&proxy_ca_paths),
+        Arc::new(SystemClock),
+        supervisor_handle,
+    )
+    .expect("egress proxy start should succeed")
+    .expect("egress proxy should be configured");
+
+    proxy
+        .upsert_control_routes(vec![ControlEgressRouteMatcher {
+            egress_rule_id: "egress-rule-linear-mcp".to_string(),
+            hosts: vec!["MCP.LINEAR.APP".to_string()],
+            path_prefixes: vec!["/".to_string()],
+            methods: Some(vec!["post".to_string()]),
+        }])
+        .expect("control route matcher should refresh");
+
+    let routes = proxy
+        .routes
+        .read()
+        .expect("egress proxy routes should be readable");
+    let route = match_route(&routes, "mcp.linear.app", "/", "POST")
+        .expect("linear MCP route match should evaluate")
+        .expect("linear MCP route should match");
+    assert_eq!(route.egress_rule_id, "egress-rule-linear-mcp");
+    assert_eq!(route.hosts, vec!["mcp.linear.app"]);
+    assert_eq!(route.methods, Some(vec!["POST".to_string()]));
+    drop(routes);
+
+    proxy.close().expect("egress proxy close should succeed");
+    let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
 }
 
 #[test]
