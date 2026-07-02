@@ -71,15 +71,7 @@ export const APP_ROUTES = createRoutesFromElements(
       <Route element={<OAuthConsentPage />} path="/auth/oauth/consent/:requestId" />
       <Route element={<PortAccessRedirectPage />} path="/p/ports/:slug" />
       <Route element={<AppShell />} errorElement={<RouteErrorBoundary />}>
-        <Route element={<SessionsPage />} handle={ROUTE_HANDLES.sessions} index />
-        <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.designer} path="designer">
-          <Route element={<DesignerPage />} index />
-          <Route
-            element={<DesignerSessionPage />}
-            handle={ROUTE_HANDLES.designerDetail}
-            path=":sessionId"
-          />
-        </Route>
+        <Route element={<DesignerPage />} handle={ROUTE_HANDLES.home} index />
         <Route
           element={<RouteOutlet />}
           handle={ROUTE_HANDLES.sandboxProfiles}
@@ -172,6 +164,11 @@ export const APP_ROUTES = createRoutesFromElements(
             path=":sandboxInstanceId"
           />
         </Route>
+        <Route
+          element={<DesignerSessionPage />}
+          handle={ROUTE_HANDLES.homeDetail}
+          path=":sessionId"
+        />
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.settings} path="settings">
           <Route element={<Navigate replace to={SETTINGS_DEFAULT_PATH} />} index />
           <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.settingsAccount} path="account">

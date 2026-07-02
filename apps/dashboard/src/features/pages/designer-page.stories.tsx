@@ -510,7 +510,7 @@ function DesignerPageStory(input: {
   const [prompt, setPrompt] = useState(input.initialDraft ?? "");
 
   return (
-    <MemoryRouter initialEntries={["/designer"]}>
+    <MemoryRouter initialEntries={["/"]}>
       <DesignerPageView
         createErrorMessage={input.createErrorMessage ?? null}
         isCreating={input.isCreating ?? false}
@@ -1017,7 +1017,7 @@ function DesignerIntegrationSetupCanvasStory(input: { activeTabHref: string }): 
  * not above the composer, and that completed setup remains visible until the user closes the tab.
  */
 const meta = {
-  title: "Dashboard/Designer/Page",
+  title: "Dashboard/Home/Page",
   component: DesignerPageView,
   args: {
     createErrorMessage: null,

@@ -232,11 +232,11 @@ describe("route breadcrumb metadata", () => {
         {
           handle: {
             sidebarEntryState: "collapsed",
-            title: "Designer",
+            title: "Home",
             description: "",
           },
           params: {},
-          pathname: "/designer/dsn_123",
+          pathname: "/dsn_123",
         },
       ]),
     ).toEqual({
@@ -244,7 +244,7 @@ describe("route breadcrumb metadata", () => {
       appShellViewportMode: "document",
       sidebarEntryState: "collapsed",
       sidebarTriggerOwner: "page-frame",
-      title: "Designer",
+      title: "Home",
       headerIcon: null,
       supportingText: "",
     });

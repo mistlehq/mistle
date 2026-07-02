@@ -123,7 +123,7 @@ describe("resolveAppShellFrame", () => {
     expect(frame.renderSidebarTrigger).toBe(false);
   });
 
-  it("hides Designer from the main app sidebar", () => {
+  it("uses Home as the root sidebar entry", () => {
     const frame = resolveAppShellFrame(
       createFrameInput({
         locationPathname: "/",
@@ -145,8 +145,8 @@ describe("resolveAppShellFrame", () => {
       </MemoryRouter>,
     );
 
-    expect(sidebarMarkup).not.toContain("Designer");
     expect(sidebarMarkup).toContain("Home");
+    expect(sidebarMarkup).not.toContain("Designer");
   });
 
   it("keeps the sidebar trigger available for non-session-detail pages", () => {
@@ -171,20 +171,20 @@ describe("resolveAppShellFrame", () => {
   it("passes explicit route sidebar entry state into the shell view frame", () => {
     const frame = resolveAppShellFrame(
       createFrameInput({
-        locationPathname: "/designer/dsn_123",
+        locationPathname: "/dsn_123",
         pageMeta: {
           appShellInsetOwner: "app-shell",
           appShellViewportMode: "workspace",
           sidebarEntryState: "collapsed",
           sidebarTriggerOwner: "workspace",
-          title: "Designer",
+          title: "Home",
           headerIcon: null,
           supportingText: "",
         },
       }),
     );
 
-    expect(frame.sidebarEntryKey).toBe("/designer/dsn_123");
+    expect(frame.sidebarEntryKey).toBe("/dsn_123");
     expect(frame.sidebarEntryState).toBe("collapsed");
   });
 });

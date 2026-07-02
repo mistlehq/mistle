@@ -33,24 +33,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Shell: Story = {};
 
-export const HomeStepStyle: Story = {
-  render: function RenderHomeStepStyle() {
-    return (
-      <div className="w-full max-w-4xl">
-        <ActionTile
-          action={<Button type="button">Add integrations</Button>}
-          actionContainerClassName="sm:items-start"
-          className="border-primary/40 bg-primary/5"
-          description="The home page keeps its responsive status mark layout while reusing the same shell."
-          leading={<div aria-hidden className="size-2.5 rounded-full bg-primary" />}
-          leadingPlacement="detached"
-          title="Add integrations"
-        />
-      </div>
-    );
-  },
-};
-
 export const IntegrationTileStyle: Story = {
   render: function RenderIntegrationTileStyle() {
     return (

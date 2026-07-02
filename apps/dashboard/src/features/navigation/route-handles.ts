@@ -125,27 +125,20 @@ function resolveTriggerDetailBreadcrumb(_input: RouteTextResolverInput): string 
 }
 
 export const ROUTE_HANDLES = {
-  dashboard: {
+  home: {
     appShellInsetOwner: "child",
     sidebarTriggerOwner: "page-frame",
     breadcrumb: "Home",
     title: "Home",
     description: "",
   },
-  designer: {
-    appShellInsetOwner: "child",
-    sidebarTriggerOwner: "page-frame",
-    breadcrumb: "Designer",
-    title: "Designer",
-    description: "",
-  },
-  designerDetail: {
+  homeDetail: {
     appShellInsetOwner: "app-shell",
     appShellViewportMode: "workspace",
     sidebarEntryState: "collapsed",
     sidebarTriggerOwner: "workspace",
     hideBreadcrumb: true,
-    title: "Designer",
+    title: "Home",
     description: "",
   },
   integrations: {
