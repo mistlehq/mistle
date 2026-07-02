@@ -32,6 +32,7 @@ import {
   SentryBrowserDefinition,
   SignozBrowserDefinition,
   SlackBrowserDefinition,
+  TelegramBrowserDefinition,
   TensorlakeSandboxRuntimeBrowserDefinition,
   WasenderApiBrowserDefinition,
   WhapiBrowserDefinition,
@@ -425,6 +426,27 @@ describe("browser definitions", () => {
     expect(WasenderApiBrowserDefinition.mcp).toBeDefined();
     expect(WasenderApiBrowserDefinition.webhookHandler).toBeUndefined();
     expect(WasenderApiBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("registers Telegram in the browser-safe definitions bundle without server-only hooks", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: TelegramBrowserDefinition.familyId,
+      variantId: TelegramBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "telegram",
+      variantId: "telegram-default",
+      kind: "connector",
+      displayName: "Telegram",
+      logoKey: "telegram",
+    });
+    expect(definition?.mcp).toBeDefined();
+    expect(definition?.webhookHandler).toBeUndefined();
+    expect(definition?.webhookSource).toBeUndefined();
+    expect(TelegramBrowserDefinition.mcp).toBeDefined();
+    expect(TelegramBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(TelegramBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("registers Whapi in the browser-safe definitions bundle without server-only hooks", () => {

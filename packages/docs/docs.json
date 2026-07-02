@@ -77,6 +77,7 @@
               "guides/slack-integration-setup",
               "guides/stripe-integration-setup",
               "guides/supabase-integration-setup",
+              "guides/telegram-integration-setup",
               "guides/tensorlake-integration-setup",
               "guides/whapi-integration-setup",
               "guides/xero-integration-setup",

@@ -54,6 +54,7 @@ import { SignozMcpBaseDefinition } from "./signoz/variants/signoz-mcp/base-defin
 import { SlackBaseDefinition } from "./slack/variants/slack-default/base-definition.js";
 import { StripeMcpBaseDefinition } from "./stripe/variants/stripe-mcp/base-definition.js";
 import { SupabaseMcpBaseDefinition } from "./supabase/variants/supabase-mcp/base-definition.js";
+import { TelegramDefinition } from "./telegram/browser.js";
 import { WasenderApiBaseDefinition } from "./wasenderapi/variants/wasenderapi-mcp/base-definition.js";
 import { WhapiMcpBaseDefinition } from "./whapi/variants/whapi-mcp/base-definition.js";
 import { XeroMcpBaseDefinition } from "./xero/variants/xero-mcp/base-definition.js";
@@ -103,6 +104,7 @@ export const SlackBrowserDefinition = SlackBaseDefinition;
 export const ShopifyBrowserDefinition = ShopifyBaseDefinition;
 export const StripeBrowserDefinition = StripeMcpBaseDefinition;
 export const SupabaseBrowserDefinition = SupabaseMcpBaseDefinition;
+export const TelegramBrowserDefinition = TelegramDefinition;
 export const WasenderApiBrowserDefinition = WasenderApiBaseDefinition;
 export const WhapiBrowserDefinition = WhapiMcpBaseDefinition;
 export const XeroBrowserDefinition = XeroMcpBaseDefinition;
@@ -155,6 +157,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   ShopifyBrowserDefinition,
   StripeBrowserDefinition,
   SupabaseBrowserDefinition,
+  TelegramBrowserDefinition,
   WasenderApiBrowserDefinition,
   WhapiBrowserDefinition,
   XeroBrowserDefinition,
@@ -219,6 +222,7 @@ export * from "./slack/browser.js";
 export * from "./shopify/browser.js";
 export * from "./stripe/browser.js";
 export * from "./supabase/browser.js";
+export * from "./telegram/browser.js";
 export * from "./wasenderapi/browser.js";
 export * from "./whapi/browser.js";
 export * from "./xero/browser.js";

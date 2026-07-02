@@ -325,6 +325,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "telegram-default",
+        familyId: "telegram",
+        variantId: "telegram-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "tensorlake-default",
         familyId: "tensorlake",
         variantId: "tensorlake-default",

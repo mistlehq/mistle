@@ -1,0 +1,55 @@
+---
+title: Telegram
+description: Connect Telegram to Mistle
+icon: /icons/integrations/telegram.svg
+---
+
+## Overview
+
+Connect Telegram to Mistle with a Telegram bot token from BotFather.
+
+The Telegram integration exposes Telegram Bot API operations through the Telegram CLI and Telegram MCP tools. Mistle stores the bot token on the connection and injects it into managed egress requests outside the sandbox.
+
+## Create A Telegram Bot
+
+1. Open [BotFather](https://t.me/BotFather) in Telegram.
+2. Create a bot with `/newbot`, then follow the prompts for the bot name and username.
+3. Copy the bot token returned by BotFather.
+
+For an existing bot, use BotFather's token management commands to retrieve or rotate the token.
+
+## Connect In Mistle
+
+Open **Integrations** in the dashboard, choose **Telegram**, then select **Telegram bot**.
+
+Enter:
+
+| Field     | Value                             |
+| --------- | --------------------------------- |
+| Bot token | Telegram bot token from BotFather |
+
+## Use With A Sandbox Profile
+
+After the connection exists:
+
+1. Open the sandbox profile that should use Telegram.
+2. Add Telegram to the profile's integration configuration.
+3. Select the Telegram CLI, Telegram MCP, or both.
+4. Save and publish the profile version.
+
+## Chats, Groups, Channels, And Topics
+
+Telegram decides which chats, groups, channels, and forum topics a bot can access. Add the bot to each Telegram space where it should operate and grant the Telegram-side permissions needed for the operations your agents will run.
+
+Forum topic operations require a forum-enabled group and Telegram permissions that allow the bot to manage topics. Message operations can target a topic by passing the Telegram `message_thread_id`.
+
+## Official References
+
+- [BotFather](https://t.me/BotFather)
+- [Telegram Bot API](https://core.telegram.org/bots/api)
+- [Telegram bot tutorial](https://core.telegram.org/bots/tutorial)
+- [sendMessage](https://core.telegram.org/bots/api#sendmessage)
+- [editMessageText](https://core.telegram.org/bots/api#editmessagetext)
+- [deleteMessage](https://core.telegram.org/bots/api#deletemessage)
+- [setMessageReaction](https://core.telegram.org/bots/api#setmessagereaction)
+- [createForumTopic](https://core.telegram.org/bots/api#createforumtopic)

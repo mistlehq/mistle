@@ -164,6 +164,10 @@ describe("integrations-definitions server", () => {
       familyId: "slack",
       variantId: "slack-default",
     });
+    const telegramDefinition = registry.getDefinition({
+      familyId: "telegram",
+      variantId: "telegram-default",
+    });
 
     expect(agentMailDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(agentMailDefinition?.webhookHandler).toBeUndefined();
@@ -675,6 +679,14 @@ describe("integrations-definitions server", () => {
       },
     ]);
     expect(typeof slackDefinition?.listConnectionResources).toBe("function");
+    expect(telegramDefinition).toMatchObject({
+      familyId: "telegram",
+      variantId: "telegram-default",
+      kind: "connector",
+      displayName: "Telegram",
+    });
+    expect(telegramDefinition?.webhookSource).toBeUndefined();
+    expect(telegramDefinition?.webhookHandler).toBeUndefined();
   });
 
   it("lists registered server definitions", () => {
@@ -710,6 +722,7 @@ describe("integrations-definitions server", () => {
         "shopify::shopify-default",
         "stripe::stripe-mcp",
         "supabase::supabase-mcp",
+        "telegram::telegram-default",
         "wasenderapi::wasenderapi-mcp",
         "whapi::whapi-mcp",
         "xero::xero-mcp",
