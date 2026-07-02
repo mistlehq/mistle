@@ -14,7 +14,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-#[cfg(any(test, debug_assertions))]
 use std::sync::mpsc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -51,7 +50,6 @@ use crate::egress_proxy::server::{
     filter_direct_gateway_request_headers,
 };
 use crate::egress_proxy::supervisor::EgressProxyProcessSupervisorConfig;
-#[cfg(any(test, debug_assertions))]
 use crate::egress_proxy::supervisor::EgressProxySupervisorCommand;
 use crate::egress_proxy::supervisor::{
     ActiveEgressProxyChildProcess, ActiveEgressProxyServer, bind_transparent_egress_proxy_listener,
@@ -113,7 +111,6 @@ pub struct EgressProxy {
     supervisor_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
     transparent_server: Option<ActiveEgressProxyServer>,
     transparent_packet_rules: Option<TransparentPacketRules>,
-    #[cfg(any(test, debug_assertions))]
     supervisor_command_sender: Option<mpsc::Sender<EgressProxySupervisorCommand>>,
     proxy_ca_installation: ProxyCaInstallation,
     supervisor_handle: SandboxdSupervisorHandle,
@@ -649,9 +646,7 @@ impl EgressProxy {
         };
 
         let shutdown_requested = Arc::new(AtomicBool::new(false));
-        #[cfg(any(test, debug_assertions))]
         let (supervisor_command_sender, supervisor_command_receiver) = mpsc::channel();
-        #[cfg(any(test, debug_assertions))]
         let supervisor_command_sender_for_proxy = Some(supervisor_command_sender);
         let supervisor_thread = thread::spawn({
             let shutdown_requested = shutdown_requested.clone();
@@ -671,7 +666,6 @@ impl EgressProxy {
                         active_server,
                         shutdown_requested,
                         supervisor_handle,
-                        #[cfg(any(test, debug_assertions))]
                         supervisor_command_receiver,
                     )
                 }
@@ -696,7 +690,6 @@ impl EgressProxy {
                         active_child,
                         shutdown_requested,
                         supervisor_handle,
-                        #[cfg(any(test, debug_assertions))]
                         supervisor_command_receiver,
                     )
                 }
@@ -713,7 +706,6 @@ impl EgressProxy {
             shutdown_requested,
             supervisor_thread: Some(supervisor_thread),
             transparent_server,
-            #[cfg(any(test, debug_assertions))]
             supervisor_command_sender: supervisor_command_sender_for_proxy,
             proxy_ca_installation,
             transparent_packet_rules,
@@ -737,21 +729,49 @@ impl EgressProxy {
             .into_iter()
             .map(egress_proxy_route_from_control)
             .collect::<Result<Vec<_>, _>>()?;
-        let mut route_table = self
-            .routes
-            .write()
-            .map_err(|_| EgressProxyError::new("egress proxy route table lock is poisoned"))?;
-        for route in routes {
-            if let Some(existing_route) = route_table
-                .iter_mut()
-                .find(|candidate| candidate.egress_rule_id == route.egress_rule_id)
-            {
-                *existing_route = route;
-            } else {
-                route_table.push(route);
+        let previous_routes = {
+            let mut route_table = self
+                .routes
+                .write()
+                .map_err(|_| EgressProxyError::new("egress proxy route table lock is poisoned"))?;
+            let previous_routes = route_table.clone();
+            for route in routes {
+                if let Some(existing_route) = route_table
+                    .iter_mut()
+                    .find(|candidate| candidate.egress_rule_id == route.egress_rule_id)
+                {
+                    *existing_route = route;
+                } else {
+                    route_table.push(route);
+                }
             }
+            previous_routes
+        };
+        if let Err(error) = self.restart_loopback_proxy_for_route_refresh() {
+            let mut route_table = self
+                .routes
+                .write()
+                .map_err(|_| EgressProxyError::new("egress proxy route table lock is poisoned"))?;
+            *route_table = previous_routes;
+            return Err(error);
         }
         Ok(())
+    }
+
+    fn restart_loopback_proxy_for_route_refresh(&self) -> Result<(), EgressProxyError> {
+        let supervisor_command_sender =
+            self.supervisor_command_sender.as_ref().ok_or_else(|| {
+                EgressProxyError::new("egress proxy supervisor command channel is unavailable")
+            })?;
+        let (response_sender, response_receiver) = mpsc::channel();
+        supervisor_command_sender
+            .send(EgressProxySupervisorCommand::RefreshRoutes { response_sender })
+            .map_err(|_| {
+                EgressProxyError::new("egress proxy supervisor command channel is unavailable")
+            })?;
+        response_receiver.recv().map_err(|_| {
+            EgressProxyError::new("egress proxy route refresh response channel is unavailable")
+        })?
     }
 
     #[cfg(any(test, debug_assertions))]

@@ -18,12 +18,18 @@ const TriggerMutationToolNames = new Set([
 
 const SandboxProfileMutationToolNames = new Set([
   "profile_create",
+  "profile_delete",
   "profile_update",
+  "profile_draft_create",
+  "profile_draft_discard",
+  "profile_draft_setup_script_put",
   "profile_draft_update",
+  "profile_maintenance_script_put",
+  "profile_maintenance_script_test_start",
+  "profile_setup_script_test_start",
   "profile_version_publish",
   "profile_version_refresh_snapshot",
   "profile_version_retry_snapshot",
-  "profile_version_discard_draft",
   "save_selected_provider_resources",
 ]);
 

@@ -89,6 +89,34 @@ describe("invalidateDesignerProductMutationQueries", () => {
     expect(readQueryInvalidation({ queryClient, queryKey: triggerListQueryKey })).toBe(false);
   });
 
+  it.each([
+    "profile_create",
+    "profile_delete",
+    "profile_update",
+    "profile_draft_create",
+    "profile_draft_discard",
+    "profile_draft_setup_script_put",
+    "profile_draft_update",
+    "profile_maintenance_script_put",
+    "profile_maintenance_script_test_start",
+    "profile_setup_script_test_start",
+    "profile_version_publish",
+    "profile_version_refresh_snapshot",
+    "profile_version_retry_snapshot",
+    "save_selected_provider_resources",
+  ])("invalidates sandbox profile queries after %s succeeds", async (tool) => {
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
+    const sandboxProfileKey = sandboxProfileDetailQueryKey("sbp_123");
+    queryClient.setQueryData(sandboxProfileKey, { id: "sbp_123" });
+
+    await invalidateDesignerProductMutationQueries({
+      notification: completedMcpToolNotification({ tool }),
+      queryClient,
+    });
+
+    expect(readQueryInvalidation({ queryClient, queryKey: sandboxProfileKey })).toBe(true);
+  });
+
   it("does not invalidate queries for failed or read-only MCP tool results", async () => {
     const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
     const triggerListQueryKey = triggersListQueryKey({

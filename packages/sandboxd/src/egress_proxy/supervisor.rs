@@ -54,9 +54,11 @@ pub(super) struct EgressProxyProcessSupervisorConfig {
     pub(super) state: EgressProxyState,
 }
 
-#[cfg(any(test, debug_assertions))]
 pub(super) enum EgressProxySupervisorCommand {
     ForceCurrentServerShutdown,
+    RefreshRoutes {
+        response_sender: mpsc::Sender<Result<(), EgressProxyError>>,
+    },
 }
 
 #[derive(Debug)]
@@ -468,9 +470,7 @@ pub(super) fn run_egress_proxy_supervisor(
     mut active_server: ActiveEgressProxyServer,
     shutdown_requested: Arc<AtomicBool>,
     supervisor_handle: SandboxdSupervisorHandle,
-    #[cfg(any(test, debug_assertions))] supervisor_command_receiver: mpsc::Receiver<
-        EgressProxySupervisorCommand,
-    >,
+    supervisor_command_receiver: mpsc::Receiver<EgressProxySupervisorCommand>,
 ) -> Result<(), EgressProxyError> {
     let mut restart_attempt_index = 0_usize;
 
@@ -480,10 +480,37 @@ pub(super) fn run_egress_proxy_supervisor(
             return active_server.join();
         }
 
-        #[cfg(any(test, debug_assertions))]
         match supervisor_command_receiver.try_recv() {
             Ok(EgressProxySupervisorCommand::ForceCurrentServerShutdown) => {
                 active_server.request_shutdown();
+            }
+            Ok(EgressProxySupervisorCommand::RefreshRoutes { response_sender }) => {
+                supervisor_handle.mark_component_restarting(
+                    SupervisedComponent::EgressProxy,
+                    "route refresh requested",
+                );
+                active_server.request_shutdown();
+                if let Err(error) = active_server.join() {
+                    let _ = response_sender.send(Err(error.clone()));
+                    return Err(error);
+                }
+                active_server = match restart_egress_proxy_after_backoff(
+                    &config,
+                    shutdown_requested.as_ref(),
+                    &supervisor_handle,
+                    &mut restart_attempt_index,
+                    "route_refresh",
+                ) {
+                    Ok(active_server) => {
+                        let _ = response_sender.send(Ok(()));
+                        active_server
+                    }
+                    Err(error) => {
+                        let _ = response_sender.send(Err(error.clone()));
+                        return Err(error);
+                    }
+                };
+                continue;
             }
             Err(TryRecvError::Empty) => {}
             Err(TryRecvError::Disconnected) => {}
@@ -506,6 +533,7 @@ pub(super) fn run_egress_proxy_supervisor(
                 shutdown_requested.as_ref(),
                 &supervisor_handle,
                 &mut restart_attempt_index,
+                "restart_after_failure",
             ) {
                 Ok(active_server) => active_server,
                 Err(_) if shutdown_requested.load(Ordering::Relaxed) => return Ok(()),
@@ -523,6 +551,7 @@ pub(super) fn run_egress_proxy_supervisor(
                 shutdown_requested.as_ref(),
                 &supervisor_handle,
                 &mut restart_attempt_index,
+                "restart_after_failure",
             ) {
                 Ok(active_server) => active_server,
                 Err(_) if shutdown_requested.load(Ordering::Relaxed) => return Ok(()),
@@ -541,9 +570,7 @@ pub(super) fn run_egress_proxy_process_supervisor(
     mut active_child: ActiveEgressProxyChildProcess,
     shutdown_requested: Arc<AtomicBool>,
     supervisor_handle: SandboxdSupervisorHandle,
-    #[cfg(any(test, debug_assertions))] supervisor_command_receiver: mpsc::Receiver<
-        EgressProxySupervisorCommand,
-    >,
+    supervisor_command_receiver: mpsc::Receiver<EgressProxySupervisorCommand>,
 ) -> Result<(), EgressProxyError> {
     let mut restart_attempt_index = 0_usize;
 
@@ -553,10 +580,38 @@ pub(super) fn run_egress_proxy_process_supervisor(
             return active_child.shutdown();
         }
 
-        #[cfg(any(test, debug_assertions))]
         match supervisor_command_receiver.try_recv() {
             Ok(EgressProxySupervisorCommand::ForceCurrentServerShutdown) => {
                 active_child.request_shutdown();
+            }
+            Ok(EgressProxySupervisorCommand::RefreshRoutes { response_sender }) => {
+                clear_egress_proxy_process_child_pid_for_restart(&supervisor_handle);
+                supervisor_handle.mark_component_restarting(
+                    SupervisedComponent::EgressProxy,
+                    "route refresh requested",
+                );
+                active_child.request_shutdown();
+                if let Err(error) = active_child.shutdown() {
+                    let _ = response_sender.send(Err(error.clone()));
+                    return Err(error);
+                }
+                active_child = match restart_egress_proxy_process_after_backoff(
+                    &config,
+                    shutdown_requested.as_ref(),
+                    &supervisor_handle,
+                    &mut restart_attempt_index,
+                    "route_refresh",
+                ) {
+                    Ok(active_child) => {
+                        let _ = response_sender.send(Ok(()));
+                        active_child
+                    }
+                    Err(error) => {
+                        let _ = response_sender.send(Err(error.clone()));
+                        return Err(error);
+                    }
+                };
+                continue;
             }
             Err(TryRecvError::Empty) => {}
             Err(TryRecvError::Disconnected) => {}
@@ -570,6 +625,7 @@ pub(super) fn run_egress_proxy_process_supervisor(
                 shutdown_requested.as_ref(),
                 &supervisor_handle,
                 &mut restart_attempt_index,
+                "restart_after_failure",
             ) {
                 Ok(active_child) => active_child,
                 Err(_) if shutdown_requested.load(Ordering::Relaxed) => return Ok(()),
@@ -587,6 +643,7 @@ pub(super) fn run_egress_proxy_process_supervisor(
                 shutdown_requested.as_ref(),
                 &supervisor_handle,
                 &mut restart_attempt_index,
+                "restart_after_failure",
             ) {
                 Ok(active_child) => active_child,
                 Err(_) if shutdown_requested.load(Ordering::Relaxed) => return Ok(()),
@@ -605,6 +662,7 @@ fn restart_egress_proxy_process_after_backoff(
     shutdown_requested: &AtomicBool,
     supervisor_handle: &SandboxdSupervisorHandle,
     restart_attempt_index: &mut usize,
+    restart_reason: &'static str,
 ) -> Result<ActiveEgressProxyChildProcess, EgressProxyError> {
     loop {
         if shutdown_requested.load(Ordering::Relaxed) {
@@ -617,7 +675,7 @@ fn restart_egress_proxy_process_after_backoff(
         clear_egress_proxy_process_child_pid_for_restart(supervisor_handle);
         supervisor_handle.emit_component_restart_scheduled(
             SupervisedComponent::EgressProxy,
-            "restart_after_failure",
+            restart_reason,
             backoff_ms,
             &[],
         );
@@ -693,6 +751,7 @@ fn restart_egress_proxy_after_backoff(
     shutdown_requested: &AtomicBool,
     supervisor_handle: &SandboxdSupervisorHandle,
     restart_attempt_index: &mut usize,
+    restart_reason: &'static str,
 ) -> Result<ActiveEgressProxyServer, EgressProxyError> {
     loop {
         if shutdown_requested.load(Ordering::Relaxed) {
@@ -704,7 +763,7 @@ fn restart_egress_proxy_after_backoff(
         let backoff_ms = egress_proxy_restart_backoff_ms(*restart_attempt_index);
         supervisor_handle.emit_component_restart_scheduled(
             SupervisedComponent::EgressProxy,
-            "restart_after_failure",
+            restart_reason,
             backoff_ms,
             &[],
         );

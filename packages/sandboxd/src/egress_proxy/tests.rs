@@ -797,7 +797,7 @@ fn unmatched_websocket_upgrades_go_direct_without_gateway() {
         listener_address,
         test_proxy_ca_config(&proxy_ca_paths),
         Arc::new(SystemClock),
-        supervisor_handle,
+        supervisor_handle.clone(),
     )
     .expect("egress proxy start should succeed")
     .expect("egress proxy should be configured");
@@ -918,7 +918,7 @@ fn upserts_control_route_matchers_into_running_proxy_route_table() {
         listener_address,
         test_proxy_ca_config(&proxy_ca_paths),
         Arc::new(SystemClock),
-        supervisor_handle,
+        supervisor_handle.clone(),
     )
     .expect("egress proxy start should succeed")
     .expect("egress proxy should be configured");
@@ -935,6 +935,12 @@ fn upserts_control_route_matchers_into_running_proxy_route_table() {
             }),
         }])
         .expect("control route matcher should refresh");
+    wait_for_egress_snapshot(
+        &supervisor_handle,
+        ComponentHealthState::Healthy,
+        1,
+        Duration::from_secs(5),
+    );
 
     let routes = proxy
         .routes

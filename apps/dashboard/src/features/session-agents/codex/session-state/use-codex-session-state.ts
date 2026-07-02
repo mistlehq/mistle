@@ -429,10 +429,6 @@ async function respondToCodexRuntimeMcpServersInstallAction(input: {
       connectionId: input.installInput.connectionId,
       toolIds: input.installInput.toolIds,
     });
-    await refreshSandboxdEgressRoutes({
-      rpcClient: input.rpcClient,
-      egressRouteMatchers: preparedInstall.runtimeAction.egressRouteMatchers,
-    });
     await batchWriteCodexConfig({
       rpcClient: input.rpcClient,
       edits: preparedInstall.runtimeAction.mcpServers.map((server) => ({
@@ -446,6 +442,10 @@ async function respondToCodexRuntimeMcpServersInstallAction(input: {
     });
     await reloadCodexMcpServers({
       rpcClient: input.rpcClient,
+    });
+    await refreshSandboxdEgressRoutes({
+      rpcClient: input.rpcClient,
+      egressRouteMatchers: preparedInstall.runtimeAction.egressRouteMatchers,
     });
     await input.rpcClient.respond(
       input.request.id,
