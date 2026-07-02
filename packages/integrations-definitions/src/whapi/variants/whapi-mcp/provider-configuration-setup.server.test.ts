@@ -3,11 +3,13 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "@mistle/integrations-core";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { expectProviderMetadataSatisfiesWebhookTriggerRequirements } from "../../../shared/webhook-trigger-capability-contract.test-utils.js";
 import { buildWhapiWebhookTriggerCapabilitiesProviderMetadata } from "./channel-settings.server.js";
 import {
   buildWhapiWebhookSettingsRequestBody,
   configureWhapiChannelWebhook,
 } from "./provider-configuration-setup.server.js";
+import { WhapiSupportedWebhookEvents } from "./supported-webhook-events.js";
 
 type SimulatedWhapiRequest = {
   body: unknown;
@@ -150,26 +152,34 @@ describe("Whapi provider configuration setup", () => {
   });
 
   it("builds trigger capability metadata from WHAPI channel settings", () => {
-    expect(
-      buildWhapiWebhookTriggerCapabilitiesProviderMetadata({
-        settingsJson: {
-          webhooks: [
-            {
-              events: [
-                { method: "post", type: "messages" },
-                { method: "put", type: "messages" },
-              ],
-              mode: "body",
-              url: WhapiWebhookCallbackUrl,
-            },
-          ],
-        },
-        webhookCallbackUrl: WhapiWebhookCallbackUrl,
-      }),
-    ).toEqual({
+    const providerMetadata = buildWhapiWebhookTriggerCapabilitiesProviderMetadata({
+      settingsJson: {
+        webhooks: [
+          {
+            events: [
+              { method: "post", type: "messages" },
+              { method: "put", type: "messages" },
+            ],
+            mode: "body",
+            url: WhapiWebhookCallbackUrl,
+          },
+        ],
+      },
+      webhookCallbackUrl: WhapiWebhookCallbackUrl,
+    });
+
+    expect(providerMetadata).toEqual({
       [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
         events: ["messages.post", "messages.put"],
       },
+    });
+    expectProviderMetadataSatisfiesWebhookTriggerRequirements({
+      providerMetadata,
+      supportedWebhookEvents: WhapiSupportedWebhookEvents.filter(
+        (eventDefinition) =>
+          eventDefinition.providerEventType === "messages.post" ||
+          eventDefinition.providerEventType === "messages.put",
+      ),
     });
   });
 

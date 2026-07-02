@@ -1,10 +1,17 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
-import type { IntegrationWebhookSourceRegistrationInput } from "@mistle/integrations-core";
+import {
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
+  type IntegrationWebhookSourceRegistrationInput,
+} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
+import { expectProviderMetadataSatisfiesWebhookTriggerRequirements } from "../../../shared/webhook-trigger-capability-contract.test-utils.js";
 import type { TelegramConnectionConfig } from "./auth.js";
-import { TelegramAllowedUpdates } from "./supported-webhook-events.js";
+import {
+  TelegramAllowedUpdates,
+  TelegramSupportedWebhookEvents,
+} from "./supported-webhook-events.js";
 import type { TelegramTargetConfig } from "./target-config-schema.js";
 import {
   TelegramWebhookSourceCapability,
@@ -192,7 +199,17 @@ describe("TelegramWebhookSourceCapability", () => {
           "https://control-plane.example/p/integration/webhooks/telegram-default/telegram-endpoint-key",
         providerMetadata: {
           allowedUpdates: [...TelegramAllowedUpdates],
+          [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+            events: [...TelegramAllowedUpdates],
+          },
         },
+      });
+      if (result.providerMetadata === undefined) {
+        throw new Error("Expected Telegram registration to return provider metadata.");
+      }
+      expectProviderMetadataSatisfiesWebhookTriggerRequirements({
+        providerMetadata: result.providerMetadata,
+        supportedWebhookEvents: TelegramSupportedWebhookEvents,
       });
       expect(simulatedTelegram.requests).toEqual([
         {

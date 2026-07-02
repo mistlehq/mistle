@@ -1,11 +1,10 @@
 import {
   IntegrationWebhookSourceLifecycles,
   IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
-  isWebhookTriggerSupportedByCapabilities,
-  parseWebhookTriggerCapabilitiesProviderMetadata,
 } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
+import { expectProviderMetadataSatisfiesWebhookTriggerRequirements } from "../../../shared/webhook-trigger-capability-contract.test-utils.js";
 import { SentrySupportedWebhookEvents } from "./supported-webhook-events.js";
 import { SentryWebhookSourceCapability } from "./webhook-source.server.js";
 import {
@@ -194,17 +193,10 @@ describe("Sentry webhook support", () => {
         },
       },
     });
-    const capabilities = parseWebhookTriggerCapabilitiesProviderMetadata(
-      describedSource.providerMetadata,
-    );
-    expect(
-      SentrySupportedWebhookEvents.every((eventDefinition) =>
-        isWebhookTriggerSupportedByCapabilities({
-          capabilities,
-          requirements: eventDefinition.requirements,
-        }),
-      ),
-    ).toBe(true);
+    expectProviderMetadataSatisfiesWebhookTriggerRequirements({
+      providerMetadata: describedSource.providerMetadata,
+      supportedWebhookEvents: SentrySupportedWebhookEvents,
+    });
   });
 
   it("normalizes a signed Sentry issue webhook into a trigger event", async () => {

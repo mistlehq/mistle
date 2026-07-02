@@ -6,6 +6,49 @@ import { describe, expect, it } from "vitest";
 
 import { listIntegrationDefinitions } from "./index.js";
 
+const WebhookTriggerCapabilityContractCoverage = [
+  {
+    definition: "discord::discord-default",
+    metadataProducer: "provider-configuration-setup.server.ts",
+  },
+  {
+    definition: "jira::jira-default",
+    metadataProducer: "webhook-source.server.ts createRegistration",
+  },
+  {
+    definition: "github::github-cloud",
+    metadataProducer: "shared/app-manifest.ts and shared/webhook-source.server.ts",
+  },
+  {
+    definition: "github::github-enterprise-server",
+    metadataProducer: "shared/app-manifest.ts and shared/webhook-source.server.ts",
+  },
+  {
+    definition: "linear::linear-default",
+    metadataProducer: "webhook-source.server.ts createRegistration and refreshTriggerCapabilities",
+  },
+  {
+    definition: "sentry::sentry-default",
+    metadataProducer: "webhook-source.server.ts initialSourceProviderMetadata",
+  },
+  {
+    definition: "slack::slack-default",
+    metadataProducer: "app-manifest.ts and provider-app-setup.server.ts",
+  },
+  {
+    definition: "telegram::telegram-default",
+    metadataProducer: "webhook-source.server.ts createRegistration",
+  },
+  {
+    definition: "wasenderapi::wasenderapi-mcp",
+    metadataProducer: "provider-configuration-setup.server.ts",
+  },
+  {
+    definition: "whapi::whapi-mcp",
+    metadataProducer: "channel-settings.server.ts refreshTriggerCapabilities",
+  },
+];
+
 describe("webhook trigger requirements", () => {
   it("declares requirements for every built-in webhook trigger", () => {
     const triggerCapableDefinitions = listIntegrationDefinitions().filter(
@@ -38,6 +81,16 @@ describe("webhook trigger requirements", () => {
         ).toBe(true);
       }
     }
+  });
+
+  it("tracks trigger capability contract coverage for every built-in webhook trigger", () => {
+    const triggerCapableDefinitionKeys = listIntegrationDefinitions()
+      .filter((definition) => (definition.supportedWebhookEvents?.length ?? 0) > 0)
+      .map(toDefinitionKey);
+
+    expect(WebhookTriggerCapabilityContractCoverage.map((coverage) => coverage.definition)).toEqual(
+      triggerCapableDefinitionKeys,
+    );
   });
 
   it("maps GitHub trigger requirements to GitHub App event subscriptions and permissions", () => {

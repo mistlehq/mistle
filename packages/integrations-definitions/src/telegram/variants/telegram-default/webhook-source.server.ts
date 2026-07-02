@@ -1,5 +1,6 @@
 import {
   IntegrationWebhookSourceLifecycles,
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
   type IntegrationFormConnectionMethodCreateValidationInput,
   type IntegrationWebhookSourceCapability,
 } from "@mistle/integrations-core";
@@ -201,6 +202,17 @@ async function assertTelegramWebhookIsAvailable(input: {
   );
 }
 
+function buildTelegramWebhookProviderMetadata(input: {
+  allowedUpdates: readonly string[];
+}): Record<string, unknown> {
+  return {
+    allowedUpdates: [...input.allowedUpdates],
+    [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+      events: [...input.allowedUpdates],
+    },
+  };
+}
+
 export async function validateTelegramFormConnectionCreate(
   input: IntegrationFormConnectionMethodCreateValidationInput<
     TelegramTargetConfig,
@@ -273,9 +285,9 @@ export const TelegramWebhookSourceCapability: IntegrationWebhookSourceCapability
 
     return {
       remoteRegistrationId: callbackUrl,
-      providerMetadata: {
-        allowedUpdates: [...TelegramAllowedUpdates],
-      },
+      providerMetadata: buildTelegramWebhookProviderMetadata({
+        allowedUpdates: TelegramAllowedUpdates,
+      }),
     };
   },
   async deleteRegistration(input) {

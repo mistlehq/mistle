@@ -1,8 +1,11 @@
 import type { IntegrationProviderConfigurationSetupCompleteInput } from "@mistle/integrations-core";
+import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
+import { expectProviderMetadataSatisfiesWebhookTriggerRequirements } from "../../../shared/webhook-trigger-capability-contract.test-utils.js";
 import type { WasenderApiConnectionConfig } from "./auth.js";
 import { WasenderApiProviderConfigurationSetupCapability } from "./provider-configuration-setup.server.js";
+import { WasenderApiSupportedWebhookEvents } from "./supported-webhook-events.js";
 import type { WasenderApiTargetConfig } from "./target-config-schema.js";
 
 function resolveWasenderApiSetupFlow() {
@@ -46,8 +49,28 @@ const CompleteInput: IntegrationProviderConfigurationSetupCompleteInput<
 };
 
 describe("WasenderAPI provider configuration setup", () => {
-  it("completes manual setup when the callback URL and required secrets are present", () => {
-    expect(() => resolveWasenderApiSetupFlow().complete(CompleteInput)).not.toThrow();
+  it("completes manual setup when the callback URL and required secrets are present", async () => {
+    const result = await resolveWasenderApiSetupFlow().complete(CompleteInput);
+
+    expect(result).toEqual({
+      webhookSource: {
+        providerMetadata: {
+          [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+            events: WasenderApiSupportedWebhookEvents.map((event) => event.providerEventType),
+          },
+        },
+      },
+    });
+    if (result?.webhookSource === undefined) {
+      throw new Error("Expected WasenderAPI setup to return webhook source metadata.");
+    }
+    if (result.webhookSource.providerMetadata === undefined) {
+      throw new Error("Expected WasenderAPI setup to return webhook source provider metadata.");
+    }
+    expectProviderMetadataSatisfiesWebhookTriggerRequirements({
+      providerMetadata: result.webhookSource.providerMetadata,
+      supportedWebhookEvents: WasenderApiSupportedWebhookEvents,
+    });
   });
 
   it("requires a webhook callback URL", () => {

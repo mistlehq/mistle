@@ -1,9 +1,11 @@
 import {
   IntegrationConnectionMethodIds,
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
   type IntegrationProviderConfigurationSetupCapability,
 } from "@mistle/integrations-core";
 
 import type { WasenderApiConnectionConfig } from "./auth.js";
+import { WasenderApiSupportedWebhookEvents } from "./supported-webhook-events.js";
 import type { WasenderApiTargetConfig } from "./target-config-schema.js";
 
 function assertWasenderApiSetupSecretPresent(input: {
@@ -44,6 +46,16 @@ export const WasenderApiProviderConfigurationSetupCapability: IntegrationProvide
           fieldName: "webhookSecret",
           label: "a webhook secret",
         });
+
+        return {
+          webhookSource: {
+            providerMetadata: {
+              [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+                events: WasenderApiSupportedWebhookEvents.map((event) => event.providerEventType),
+              },
+            },
+          },
+        };
       },
     },
   ],
