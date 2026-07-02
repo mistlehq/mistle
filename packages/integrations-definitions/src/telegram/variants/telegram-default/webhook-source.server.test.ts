@@ -12,6 +12,7 @@ import {
 } from "./webhook-source.server.js";
 
 type SimulatedTelegramBotApiRequest = {
+  path: string;
   method: string;
   body: unknown;
 };
@@ -94,6 +95,42 @@ describe("TelegramWebhookSourceCapability", () => {
       expect(simulatedTelegram.requests.map((request) => request.method)).toEqual([
         "getWebhookInfo",
       ]);
+      expect(simulatedTelegram.requests.map((request) => request.path)).toEqual([
+        "/bot123:telegram-token/getWebhookInfo",
+      ]);
+    } finally {
+      await simulatedTelegram.close();
+    }
+  });
+
+  it("validates connection creation with a trailing slash Telegram API base URL", async () => {
+    const simulatedTelegram = await startSimulatedTelegramBotApi({ webhookUrl: "" });
+    try {
+      await expect(
+        validateTelegramFormConnectionCreate({
+          organizationId: "telegram-test-organization",
+          targetKey: "telegram-default",
+          controlPlaneBaseUrl: "https://control-plane.example",
+          target: {
+            familyId: "telegram",
+            variantId: "telegram-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: `${simulatedTelegram.baseUrl}/`,
+            },
+            secrets: {},
+          },
+          config: {
+            connection_method: "telegram-bot",
+          },
+          secrets: {
+            botToken: "123:telegram-token",
+          },
+        }),
+      ).resolves.toBeUndefined();
+      expect(simulatedTelegram.requests.map((request) => request.path)).toEqual([
+        "/bot123:telegram-token/getWebhookInfo",
+      ]);
     } finally {
       await simulatedTelegram.close();
     }
@@ -159,10 +196,12 @@ describe("TelegramWebhookSourceCapability", () => {
       });
       expect(simulatedTelegram.requests).toEqual([
         {
+          path: "/bot123:telegram-token/getWebhookInfo",
           method: "getWebhookInfo",
           body: "",
         },
         {
+          path: "/bot123:telegram-token/setWebhook",
           method: "setWebhook",
           body: {
             url: "https://control-plane.example/p/integration/webhooks/telegram-default/telegram-endpoint-key",
@@ -195,6 +234,10 @@ describe("TelegramWebhookSourceCapability", () => {
       expect(simulatedTelegram.requests.map((request) => request.method)).toEqual([
         "getWebhookInfo",
         "deleteWebhook",
+      ]);
+      expect(simulatedTelegram.requests.map((request) => request.path)).toEqual([
+        "/bot123:telegram-token/getWebhookInfo",
+        "/bot123:telegram-token/deleteWebhook",
       ]);
     } finally {
       await simulatedTelegram.close();
@@ -234,6 +277,7 @@ async function startSimulatedTelegramBotApi(input: {
     const method = requestUrl.pathname.split("/").at(-1) ?? "";
     const body = await readRequestBody(request);
     requests.push({
+      path: requestUrl.pathname,
       method,
       body: body.length === 0 ? "" : JSON.parse(body),
     });

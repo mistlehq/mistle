@@ -64,7 +64,11 @@ function buildTelegramMethodUrl(input: {
   botToken: string;
   method: string;
 }): string {
-  return `${input.apiBaseUrl}/bot${input.botToken}/${input.method}`;
+  const apiBaseUrl = input.apiBaseUrl.endsWith("/")
+    ? input.apiBaseUrl.slice(0, -1)
+    : input.apiBaseUrl;
+
+  return `${apiBaseUrl}/bot${input.botToken}/${input.method}`;
 }
 
 function formatTelegramApiError(input: z.output<typeof TelegramApiErrorSchema>): string {
