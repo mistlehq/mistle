@@ -112,12 +112,16 @@ describe("DesignerPageView", () => {
     );
   });
 
-  it("omits the implied sandbox profile column from past sessions", () => {
+  it("shows the compact past sessions table without redundant columns or row actions", () => {
     render(<ControlledDesignerPageView sessions={[SampleDesignerSession]} />);
 
     expect(screen.getByRole("columnheader", { name: "Sessions" })).toBeDefined();
     expect(screen.getByRole("columnheader", { name: "Started by" })).toBeDefined();
+    expect(screen.getByRole("columnheader", { name: "Updated" })).toBeDefined();
     expect(screen.queryByRole("columnheader", { name: "Sandbox profile" })).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "Created" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Past sessions" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Designer session actions/ })).toBeNull();
     expect(screen.getByRole("link", { name: "Design triage agent" }).getAttribute("href")).toBe(
       "/dsn_triage",
     );
