@@ -13,7 +13,7 @@ import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-intern
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig, PtyTransportTokenConfig } from "@mistle/gateway-tunnel-auth";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
-import { systemClock, systemScheduler } from "@mistle/time";
+import { systemClock, systemScheduler, systemSleeper } from "@mistle/time";
 import { connect, type NatsConnection, type Status } from "@nats-io/transport-node";
 import { typeid } from "typeid-js";
 import WebSocket, { type WebSocketServer } from "ws";
@@ -108,6 +108,8 @@ import { GatewayWebSocketCloseReasons } from "./gateway-websocket-close.js";
 const DefaultMaxActiveBindingsPerSandbox = 32;
 const ServiceRestartConnectionDrainTimeoutMs = 25_000;
 const ShutdownTunnelTaskDrainTimeoutMs = 5_000;
+const NatsReconnectForwardingReadinessRetryIntervalMs = 250;
+const NatsReconnectForwardingReadinessRetryTimeoutMs = 10_000;
 
 type GatewayRelayRuntimeResources = {
   forceNatsReconnect?: () => Promise<void>;
@@ -227,6 +229,27 @@ function createGatewayRelayRuntimeResources(input: {
   let natsPeerResolver: NatsRelayPeerResolver | undefined;
   let natsGatewayForwarding: NatsGatewayForwardingAdapter | undefined;
 
+  const runNatsForwardingReconnectCheck = async (input: {
+    selfCheckConnection: NatsConnection;
+  }): Promise<void> => {
+    if (natsGatewayForwarding === undefined) {
+      return;
+    }
+
+    const deadlineMs = systemClock.nowMs() + NatsReconnectForwardingReadinessRetryTimeoutMs;
+    while (natsForwardingSelfCheckConnection === input.selfCheckConnection) {
+      const isReady = await natsGatewayForwarding.checkLocalForwardingReadiness(
+        input.selfCheckConnection,
+        () => natsForwardingSelfCheckConnection !== input.selfCheckConnection,
+      );
+      if (isReady || systemClock.nowMs() >= deadlineMs) {
+        return;
+      }
+
+      await systemSleeper.sleep(NatsReconnectForwardingReadinessRetryIntervalMs);
+    }
+  };
+
   const stopNatsResources = async (): Promise<void> => {
     natsForwardingSelfCheckStop?.();
     natsForwardingSelfCheckStop = undefined;
@@ -337,14 +360,9 @@ function createGatewayRelayRuntimeResources(input: {
               return;
             }
             natsForwardingReconnectCheckInFlight = true;
-            void natsGatewayForwarding
-              .checkLocalForwardingReadiness(
-                selfCheckConnection,
-                () => natsForwardingSelfCheckConnection !== selfCheckConnection,
-              )
-              .finally(() => {
-                natsForwardingReconnectCheckInFlight = false;
-              });
+            void runNatsForwardingReconnectCheck({ selfCheckConnection }).finally(() => {
+              natsForwardingReconnectCheckInFlight = false;
+            });
           },
           role: "relay",
         });
