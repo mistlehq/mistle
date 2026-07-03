@@ -5,6 +5,7 @@ export type IntegrationResourceListViewState =
   | {
       mode: "error";
       message: string;
+      suppressAlert?: boolean | undefined;
     }
   | {
       mode: "ready";
@@ -94,6 +95,13 @@ function resolveSyncFailureState(input: {
   detail: string | null;
 } {
   if (input.listState.mode !== "error") {
+    return {
+      message: null,
+      detail: null,
+    };
+  }
+
+  if (input.listState.suppressAlert === true) {
     return {
       message: null,
       detail: null,

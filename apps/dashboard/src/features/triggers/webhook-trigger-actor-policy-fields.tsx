@@ -25,6 +25,7 @@ import {
 import type { IntegrationResourceListViewState } from "../forms/integration-resource-picker-view-model.js";
 import {
   listIntegrationConnectionResources,
+  IntegrationsApiError,
   type IntegrationConnection,
   type IntegrationConnectionResource,
 } from "../integrations/integrations-service.js";
@@ -656,6 +657,7 @@ function SpecificActorPolicyFields(input: {
           isRefreshing={isFetching}
           label="actor"
           listState={resolveResourceListViewState({
+            error: resourceQueries.find((query) => query.isError)?.error,
             errorMessage: "Could not load actors.",
             isError,
             isPending,
@@ -710,7 +712,6 @@ function SpecificActorPolicyFields(input: {
           visibleItems={resourceItems}
         />
       )}
-      {isError ? <Notice variant="alert">Could not load actors.</Notice> : null}
     </div>
   );
 }
@@ -757,6 +758,7 @@ function resolveResourceListViewState(input: {
   isPending: boolean;
   isError: boolean;
   errorMessage: string;
+  error?: unknown;
 }): IntegrationResourceListViewState {
   if (input.isPending) {
     return { mode: "loading" };
@@ -766,10 +768,15 @@ function resolveResourceListViewState(input: {
     return {
       mode: "error",
       message: input.errorMessage,
+      suppressAlert: isResourceSyncRequiredError(input.error),
     };
   }
 
   return { mode: "ready" };
+}
+
+function isResourceSyncRequiredError(error: unknown): boolean {
+  return error instanceof IntegrationsApiError && error.code === "RESOURCE_SYNC_REQUIRED";
 }
 
 function toResourcePickerItems(input: {
@@ -1145,6 +1152,7 @@ function RelationshipActorPolicyFields(input: {
           isRefreshing={resourcesQuery.isFetching}
           label="group or set"
           listState={resolveResourceListViewState({
+            error: resourcesQuery.error,
             errorMessage: "Could not load groups.",
             isError: resourcesQuery.isError,
             isPending: resourcesQuery.isPending,
@@ -1205,7 +1213,6 @@ function RelationshipActorPolicyFields(input: {
           visibleItems={resourceItems}
         />
       )}
-      {resourcesQuery.isError ? <Notice variant="alert">Could not load groups.</Notice> : null}
     </div>
   );
 }

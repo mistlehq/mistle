@@ -214,6 +214,41 @@ describe("IntegrationConnectionResourcePickerView", () => {
     expect(fieldError.className).toContain("whitespace-nowrap");
   });
 
+  it("keeps suppressed list errors from rendering sync failure alerts", () => {
+    render(
+      <IntegrationConnectionResourcePickerView
+        emptyMessage="No repositories available for this connection."
+        id="resource-picker"
+        isRefreshing={false}
+        label="Repositories"
+        listState={{
+          mode: "error",
+          message: "Resource sync is required before resources can be listed.",
+          suppressAlert: true,
+        }}
+        onBlur={() => {}}
+        onFocus={() => {}}
+        onRefresh={() => {}}
+        onSearchChange={() => {}}
+        onSelectionChange={() => {}}
+        refreshErrorMessage={null}
+        refreshLabel="Refresh repositories"
+        refreshTooltip="Refresh repositories"
+        search=""
+        searchPlaceholder="No synced repositories"
+        selectedValues={[]}
+        unavailableSelectedValues={[]}
+        visibleItems={[]}
+      />,
+    );
+
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText("Sync failed.")).toBeNull();
+    expect(
+      screen.queryByText("Resource sync is required before resources can be listed."),
+    ).toBeNull();
+  });
+
   it("selects only visible values and appends them after existing selected values", () => {
     let selectedValues: readonly string[] = ["mistle/private-internal-tools"];
 
