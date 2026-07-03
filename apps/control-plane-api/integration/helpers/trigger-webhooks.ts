@@ -182,8 +182,9 @@ export async function seedPersistedWebhookTrigger(
     ],
     inputTemplate: "Handle payload",
     instructions: "Prefer deterministic reproduction steps.",
-    conversationKeyTemplate: "{{payload.issue.node_id}}",
-    idempotencyKeyTemplate: "{{payload.comment.node_id}}",
+    conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
+    idempotencyKeyTemplate:
+      "{{payload.repository.full_name}}:issue:{{payload.issue.number}}:comment:{{payload.comment.body}}",
     createdAt,
     updatedAt: createdAt,
   });
@@ -223,8 +224,9 @@ export function createWebhookTriggerRequestBody(input: {
     ],
     inputTemplate: "Handle {{payload.comment.body}}",
     instructions: "Prefer concise triage summaries.",
-    conversationKeyTemplate: "{{payload.issue.node_id}}",
-    idempotencyKeyTemplate: "{{payload.comment.node_id}}",
+    conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
+    idempotencyKeyTemplate:
+      "{{payload.repository.full_name}}:issue:{{payload.issue.number}}:comment:{{payload.comment.body}}",
     target: {
       sandboxProfileId: input.sandboxProfileId,
       ...(input.sandboxProfileVersion === undefined

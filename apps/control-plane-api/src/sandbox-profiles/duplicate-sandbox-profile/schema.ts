@@ -21,6 +21,7 @@ export const badRequestResponseSchema = z.union([
       TriggerWebhooksBadRequestCodes.INVALID_WEBHOOK_SOURCE_REFERENCE,
       TriggerWebhooksBadRequestCodes.INVALID_WEBHOOK_TRIGGER_REQUIREMENTS,
       TriggerWebhooksBadRequestCodes.WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE,
+      TriggerWebhooksBadRequestCodes.INVALID_WEBHOOK_TRIGGER_TEMPLATE_REFERENCES,
       TriggerWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
       TriggerWebhooksBadRequestCodes.INVALID_PRIMARY_REPOSITORY,
     ]),
