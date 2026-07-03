@@ -42,12 +42,29 @@ describe("Designer managed instruction files", () => {
       "Alignment means Designer has enough shared understanding of the Workflow or Workflow change",
     );
     expect(behaviorInstructions).toContain(
-      "Ask only for decisions that affect Workflow behavior, configuration changes, provider setup, trigger behavior, selected resources, or Run actions.",
+      "Ask only for decisions that affect Workflow behavior, configuration changes, approval boundaries, provider setup, trigger behavior, selected resources, or Run actions.",
     );
     expect(behaviorInstructions).toContain(
       "When updating an existing Agent, trigger, or setup, infer the current Workflow from the current setup",
     );
     expect(behaviorInstructions).not.toContain("directionally clear");
+  });
+
+  it("defines approval boundaries separately from Designer configuration approval", () => {
+    const contextInstructions = loadDesignerInstructionContent("designer-context.md");
+    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
+
+    expect(contextInstructions).toContain("**Approval boundary**:");
+    expect(contextInstructions).toContain(
+      "It is part of Workflow behavior, not permission for Designer to perform aligned configuration changes.",
+    );
+    expect(behaviorInstructions).toContain(
+      "Do not use approval as a generic gate for aligned configuration changes.",
+    );
+    expect(behaviorInstructions).toContain(
+      "Use approval boundary for Workflow behavior and Run action approval for starting or testing the Workflow.",
+    );
+    expect(behaviorInstructions).not.toContain("runtime approval boundary");
   });
 
   it("treats aligned configuration changes as approved by alignment", () => {

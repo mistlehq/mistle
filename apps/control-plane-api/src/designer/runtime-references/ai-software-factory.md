@@ -105,7 +105,7 @@ Review role:
 - asks for rework or approves human handoff
 - records recurring review failures for future improvement
 
-For simple early trials, a single implementation agent plus human review can be acceptable. For stronger factories, recommend separate sandbox profiles, triggers, instructions, approval policies, or sessions for implementation and review roles when product capabilities support them.
+For simple early trials, a single implementation agent plus human review can be acceptable. For stronger factories, recommend separate sandbox profiles, triggers, instructions, approval boundaries, or sessions for implementation and review roles when product capabilities support them.
 
 ## Feedback And Improvement Loop
 
@@ -179,7 +179,7 @@ Do not claim the factory is ready if provider setup, labels, statuses, trigger c
 
 If the current sandbox profile draft already has required provider tools such as `linear-mcp` or `github-cli`, do not describe those tools as missing or still needing to be bound. Instead, distinguish configured draft capabilities from remaining setup such as instructions, labels, statuses, publishing, and triggers.
 
-When the selected runtime approval boundary requires approval before provider writes, describe the workflow outputs as a PR proposal and Linear update proposal until runtime approval is granted. Do not say the factory will create PRs or post Linear updates directly in that mode.
+When the selected approval boundary requires human approval before provider writes, describe the workflow outputs as a PR proposal and Linear update proposal until human approval is granted. Do not say the factory will create PRs or post Linear updates directly in that mode.
 
 If Designer cannot edit profile instructions or publish in the current session, do not narrate internal tool checks. Say the user-relevant blocker directly: profile instructions, publishing, or trigger creation must be completed in the opened dashboard/profile UI or in a session with product mutation tools.
 

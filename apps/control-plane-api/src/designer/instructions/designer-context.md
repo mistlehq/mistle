@@ -84,6 +84,11 @@ A category of work an Agent is configured to perform, such as PR review, bug fix
 _Avoid_: Workflow, Workflow blueprint, Sandbox profile, Trigger
 _Maps to_: Agent instructions; Sandbox profile version configuration; selected tools and resources
 
+**Approval boundary**:
+A Workflow rule that decides when the configured Agent can act directly and when it must ask a human for approval or produce a proposal. It is part of Workflow behavior, not permission for Designer to perform aligned configuration changes.
+_Avoid_: Designer configuration approval, Run action approval
+_Maps to_: Agent instructions; approval policy; provider write behavior
+
 **Sandbox profile**:
 A durable product object that stores and versions an Agent's configuration, including instructions, tools, Connected apps, selected resources, setup/runtime environment, and publishing state.
 _Avoid_: Agent when selecting, reviewing, or editing the product object directly; Designer runtime, sandbox session

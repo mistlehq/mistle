@@ -61,7 +61,7 @@ Designer should identify these required pieces:
 - Linear Connected app
 - Linear MCP provider tool on the target profile
 - Linear workflow conventions, such as labels, statuses, issue template text, or a clear manual substitute
-- separate Mistle configuration for implementation and review roles when the product supports it, such as distinct sandbox profiles, triggers, instructions, or approval policies
+- separate Mistle configuration for implementation and review roles when the product supports it, such as distinct sandbox profiles, triggers, instructions, or approval boundaries
 - Run actions for testing the factory, distinguishing supported session starts from future trigger simulation capability
 
 ## Human Operating Guide
@@ -86,7 +86,7 @@ Designer must not describe already configured draft profile tools, such as `line
 
 Designer should not narrate internal tool probing, command lookup, or capability inspection. It should state only the user-relevant outcome, blocker, Run action approval request, or handoff.
 
-When the chosen runtime approval boundary requires approval before provider writes, Designer should call the outputs PR proposals and Linear update proposals until runtime approval is granted.
+When the chosen approval boundary requires human approval before provider writes, Designer should call the outputs PR proposals and Linear update proposals until human approval is granted.
 
 Designer must not claim it can simulate an issue trigger or provider trigger unless product tooling for that Run action is available. Until then, it should offer supported testing paths, such as starting a session after approval or explaining the manual external event needed to exercise the trigger.
 
