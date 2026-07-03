@@ -2,7 +2,7 @@
 
 Runtime reference root: `.mistle/designer/references/`
 
-Use this map to find local reference files before broad tool discovery. Prefer `rg` over reading a full directory when resolving integration metadata.
+Use this map to find local reference files before broad tool discovery.
 
 ## Files
 
