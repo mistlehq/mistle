@@ -48,6 +48,16 @@ Reference docs may include provider-specific sections when setup differs by syst
 
 Reference docs should describe reusable domain concepts, configuration awareness, provider-specific mappings, completion criteria, and examples. Avoid session choreography such as exact question order, exact headings, or response templates unless the format is itself the domain artifact being referenced.
 
+Recommended reference doc shape:
+
+- When To Use
+- Core Concepts
+- Workflow Shape
+- Configuration Awareness
+- Provider-Specific Notes
+- Completion Criteria
+- Example Outputs
+
 ### Skills
 
 Use a skill when Designer needs a repeatable procedure, not just passive knowledge.
