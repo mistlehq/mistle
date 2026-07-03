@@ -7,6 +7,8 @@ import {
   TriggerConversationCreatedByKinds,
   TriggerConversationOwnerKinds,
   IntegrationBindingKinds,
+  SandboxProfileVersionStates,
+  type SandboxProfileVersionState,
   ScheduleTargetTypes,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
@@ -66,6 +68,8 @@ export const TriggerRunFailureCodes = {
   AGENT_BINDING_TARGET_NOT_FOUND: "agent_binding_target_not_found",
   WEBHOOK_EVENT_SOURCE_ORDER_KEY_MISSING: "webhook_event_source_order_key_missing",
   TEMPLATE_RENDER_FAILED: "template_render_failed",
+  SANDBOX_PROFILE_VERSION_NOT_FOUND: "sandbox_profile_version_not_found",
+  SANDBOX_PROFILE_VERSION_NOT_USABLE: "sandbox_profile_version_not_usable",
   TRIGGER_RUN_EXECUTION_FAILED: "trigger_run_execution_failed",
 } as const;
 
@@ -138,6 +142,58 @@ export function resolveTriggerRunFailure(input: unknown): {
     message: "Trigger run execution failed with a non-error exception.",
     metadata: {},
   };
+}
+
+function isTriggerSandboxProfileVersionUsable(input: {
+  state: SandboxProfileVersionState;
+  snapshotImageProvider: string | null;
+  snapshotImageId: string | null;
+}): boolean {
+  return (
+    input.state === SandboxProfileVersionStates.PUBLISHED &&
+    input.snapshotImageProvider !== null &&
+    input.snapshotImageId !== null
+  );
+}
+
+async function assertTriggerSandboxProfileVersionUsableOrThrow(
+  db: ControlPlaneDatabase,
+  input: {
+    triggerRunId: string;
+    sandboxProfileId: string;
+    sandboxProfileVersion: number;
+  },
+): Promise<void> {
+  const sandboxProfileVersion = await db.query.sandboxProfileVersions.findFirst({
+    columns: {
+      state: true,
+      snapshotImageProvider: true,
+      snapshotImageId: true,
+    },
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.sandboxProfileId, input.sandboxProfileId),
+        whereEq(table.version, input.sandboxProfileVersion),
+      ),
+  });
+
+  if (sandboxProfileVersion === undefined) {
+    throw new TriggerRunExecutionError({
+      code: TriggerRunFailureCodes.SANDBOX_PROFILE_VERSION_NOT_FOUND,
+      message: `Trigger run '${input.triggerRunId}' references missing sandbox profile '${input.sandboxProfileId}' version '${String(input.sandboxProfileVersion)}'.`,
+    });
+  }
+
+  if (isTriggerSandboxProfileVersionUsable(sandboxProfileVersion)) {
+    return;
+  }
+
+  // Enabled triggers may be configured before the profile version is usable, but fired runs must
+  // reject that version instead of launching from a draft/base image or waiting for readiness.
+  throw new TriggerRunExecutionError({
+    code: TriggerRunFailureCodes.SANDBOX_PROFILE_VERSION_NOT_USABLE,
+    message: `Trigger run '${input.triggerRunId}' references sandbox profile '${input.sandboxProfileId}' version '${String(input.sandboxProfileVersion)}', but that version is not usable yet.`,
+  });
 }
 
 function resolveTriggerRunExecutionFailure(input: unknown): {
@@ -591,6 +647,11 @@ export async function prepareTriggerRun(
       message: `Trigger target '${triggerTarget.id}' does not define a sandbox profile version.`,
     });
   }
+  await assertTriggerSandboxProfileVersionUsableOrThrow(ctx.db, {
+    triggerRunId: triggerRun.id,
+    sandboxProfileId: triggerTarget.sandboxProfileId,
+    sandboxProfileVersion,
+  });
 
   const sourceWebhookEventId = triggerRun.sourceWebhookEventId;
   const sourceScheduledActionId = triggerRun.sourceScheduledActionId;

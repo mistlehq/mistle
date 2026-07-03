@@ -10,9 +10,20 @@ export type SelectedSandboxProfileVersion = {
   version: number;
 };
 
-function resolveActiveVersion(versions: readonly SandboxProfileVersion[]): number | null {
+const InitialTriggerTargetSandboxProfileVersion = 1;
+
+function resolveTriggerTargetProfileVersion(
+  versions: readonly SandboxProfileVersion[],
+): number | null {
   const activeVersion = versions.find((version) => version.isActive);
-  return activeVersion?.version ?? null;
+  if (activeVersion !== undefined) {
+    return activeVersion.version;
+  }
+
+  const initialVersion = versions.find(
+    (version) => version.version === InitialTriggerTargetSandboxProfileVersion,
+  );
+  return initialVersion?.version ?? null;
 }
 
 export function useSelectedSandboxProfileVersion(input: {
@@ -20,7 +31,7 @@ export function useSelectedSandboxProfileVersion(input: {
   initialSandboxProfileVersion?: number | undefined;
 }): {
   effectiveSelectedProfileVersion: number | null;
-  hasActiveProfileVersion: boolean | null;
+  hasSelectableProfileVersion: boolean | null;
   isUsingPinnedSelectedProfileVersion: boolean;
   selectedProfileVersionsQuery: ReturnType<typeof useQuery<{ versions: SandboxProfileVersion[] }>>;
   setSelectedSandboxProfileVersion: (version: SelectedSandboxProfileVersion | null) => void;
@@ -46,25 +57,25 @@ export function useSelectedSandboxProfileVersion(input: {
     enabled: input.selectedProfileId.length > 0 && !isUsingPinnedSelectedProfileVersion,
     retry: false,
   });
-  const activeSelectedProfileVersion = useMemo(
-    () => resolveActiveVersion(selectedProfileVersionsQuery.data?.versions ?? []),
+  const selectableSelectedProfileVersion = useMemo(
+    () => resolveTriggerTargetProfileVersion(selectedProfileVersionsQuery.data?.versions ?? []),
     [selectedProfileVersionsQuery.data],
   );
   const effectiveSelectedProfileVersion = isUsingPinnedSelectedProfileVersion
     ? selectedSandboxProfileVersion.version
-    : activeSelectedProfileVersion;
-  const hasActiveProfileVersion =
+    : selectableSelectedProfileVersion;
+  const hasSelectableProfileVersion =
     input.selectedProfileId.length === 0
       ? null
       : isUsingPinnedSelectedProfileVersion
         ? true
         : selectedProfileVersionsQuery.data === undefined
           ? null
-          : activeSelectedProfileVersion !== null;
+          : selectableSelectedProfileVersion !== null;
 
   return {
     effectiveSelectedProfileVersion,
-    hasActiveProfileVersion,
+    hasSelectableProfileVersion,
     isUsingPinnedSelectedProfileVersion,
     selectedProfileVersionsQuery,
     setSelectedSandboxProfileVersion,

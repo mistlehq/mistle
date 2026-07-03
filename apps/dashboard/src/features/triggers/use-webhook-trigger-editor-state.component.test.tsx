@@ -215,7 +215,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
       resolveSelectedProfileTriggerState({
         selectedProfileId: "sbp_123",
         selectedProfileName: "Repo Maintainer",
-        hasActiveProfileVersion: true,
+        hasSelectableProfileVersion: true,
         hasBindingData: true,
         isBindingDataPending: false,
         bindingErrorMessage: null,
@@ -287,7 +287,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
     expect(
       resolveSelectedProfileTriggerState({
         selectedProfileId: "sbp_123",
-        hasActiveProfileVersion: null,
+        hasSelectableProfileVersion: null,
         hasBindingData: false,
         isBindingDataPending: false,
         bindingErrorMessage: "Could not load profile bindings.",
@@ -300,12 +300,12 @@ describe("useLoadedWebhookTriggerEditorState", () => {
     });
   });
 
-  it("marks profiles without an active version as unavailable for triggers", () => {
+  it("marks profiles without any target version as unavailable for triggers", () => {
     expect(
       resolveSelectedProfileTriggerState({
         selectedProfileId: "sbp_123",
         selectedProfileName: "Repo Maintainer",
-        hasActiveProfileVersion: false,
+        hasSelectableProfileVersion: false,
         hasBindingData: false,
         isBindingDataPending: false,
         bindingErrorMessage: null,
@@ -313,12 +313,12 @@ describe("useLoadedWebhookTriggerEditorState", () => {
         directoryData: createDirectoryData(),
       }).disabledState,
     ).toEqual({
-      reason: "Select a sandbox profile with an active version to choose events.",
+      reason: "Select a sandbox profile with a version to choose events.",
       variant: "default",
     });
   });
 
-  it("shows the sandbox profile status message when the selected profile has no active version", () => {
+  it("uses version 1 when the selected profile has no active version", () => {
     const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
     queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_123"), {
       versions: [
@@ -330,6 +330,15 @@ describe("useLoadedWebhookTriggerEditorState", () => {
         }),
       ],
     });
+    queryClient.setQueryData(
+      sandboxProfileVersionTriggerConfigQueryKey({
+        profileId: "sbp_123",
+        version: 1,
+      }),
+      createTriggerConfig({
+        bindings: [createBinding()],
+      }),
+    );
 
     const { result } = renderHook(
       () =>
@@ -353,6 +362,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             {
               value: "sbp_123",
               label: "Repo Maintainer",
+              sandboxProfileDisplayName: "Repo Maintainer",
             },
           ],
           directoryData: {
@@ -368,13 +378,11 @@ describe("useLoadedWebhookTriggerEditorState", () => {
       },
     );
 
-    expect(result.current.sandboxProfileStatusMessage).toEqual({
-      message:
-        "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating triggers.",
-      variant: "alert",
-    });
+    expect(result.current.sandboxProfileStatusMessage).toBeUndefined();
+    expect(result.current.sandboxProfileOptions[0]?.label).toBe("Repo Maintainer v1");
     expect(result.current.triggerPickerDisabledState).toEqual({
-      reason: "Select a sandbox profile with an active version to choose events.",
+      reason:
+        "The sandbox profile Repo Maintainer v1 has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
       variant: "default",
     });
 
@@ -382,9 +390,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
       result.current.onSubmit();
     });
 
-    expect(result.current.fieldErrors.sandboxProfileId).toBe(
-      "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating triggers.",
-    );
+    expect(result.current.fieldErrors.sandboxProfileId).toBeUndefined();
   });
 
   it("preserves selected triggers when the sandbox profile changes", () => {

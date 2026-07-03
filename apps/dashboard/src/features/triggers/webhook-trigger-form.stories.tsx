@@ -48,6 +48,8 @@ const StoryPushDeletedConditionId = conditionId(StoryPushDeletedTriggerId);
 const StorySlackAppMentionConditionId = conditionId(StorySlackAppMentionTriggerId);
 const StorySlackMessageConditionId = conditionId(StorySlackMessageTriggerId);
 const StorySlackReactionAddedConditionId = conditionId(StorySlackReactionAddedTriggerId);
+const NoEventCapableIntegrationsMessage =
+  "The sandbox profile Repo Maintainer v1 has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.";
 
 function conditionId(eventOptionId: string, index = 0): string {
   return createWebhookTriggerEventConditionId({ eventOptionId, index });
@@ -693,12 +695,31 @@ export const NoEventCapableIntegrations: Story = {
   args: {
     mode: "create",
     triggerPickerDisabledState: {
-      reason:
-        "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
+      reason: NoEventCapableIntegrationsMessage,
       variant: "default",
     },
     values: {
       ...EmptyCreateValues,
+      sandboxProfileId: "sbp_repo_maintainer",
+    },
+    webhookEventOptions: [],
+  },
+};
+
+export const NoEventCapableIntegrationsAfterSubmit: Story = {
+  args: {
+    mode: "create",
+    fieldErrors: {
+      eventIds: "Please add an event",
+    },
+    triggerPickerDisabledState: {
+      reason: NoEventCapableIntegrationsMessage,
+      variant: "alert",
+    },
+    validationSummaryError: "Please address the fields highlighted in red.",
+    values: {
+      ...EmptyCreateValues,
+      name: "Slack mention triage",
       sandboxProfileId: "sbp_repo_maintainer",
     },
     webhookEventOptions: [],
@@ -710,11 +731,11 @@ export const NoActiveProfileVersion: Story = {
     mode: "create",
     sandboxProfileStatusMessage: {
       message:
-        "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating triggers.",
+        "The sandbox profile Repo Maintainer does not have a version available for triggers.",
       variant: "alert",
     },
     triggerPickerDisabledState: {
-      reason: "Select a sandbox profile with an active version to choose events.",
+      reason: "Select a sandbox profile with a version to choose events.",
       variant: "default",
     },
     values: {

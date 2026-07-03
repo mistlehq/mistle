@@ -135,4 +135,42 @@ describe("trigger run failure resolution", () => {
       },
     });
   });
+
+  it.each([
+    {
+      code: TriggerRunFailureCodes.SANDBOX_PROFILE_VERSION_NOT_FOUND,
+      message: "Referenced sandbox profile version was deleted.",
+    },
+    {
+      code: TriggerRunFailureCodes.SANDBOX_PROFILE_VERSION_NOT_USABLE,
+      message: "Referenced sandbox profile version is not usable yet.",
+    },
+  ])("treats $code as a terminal configuration failure", ({ code, message }) => {
+    const stepError = new Error("durable step failed");
+    stepError.name = "StepError";
+    Object.defineProperties(stepError, {
+      originalError: {
+        value: createTriggerRunExecutionError({
+          code,
+          message,
+        }),
+      },
+      retryPolicy: {
+        value: {
+          maximumAttempts: 10,
+        },
+      },
+      stepFailedAttempts: {
+        value: 1,
+      },
+    });
+
+    expect(isTriggerRunExecutionFailure(stepError)).toBe(true);
+    expect(isPermanentTriggerRunExecutionFailure(stepError)).toBe(true);
+    expect(resolveTriggerRunFailure(stepError)).toEqual({
+      code,
+      message,
+      metadata: {},
+    });
+  });
 });
