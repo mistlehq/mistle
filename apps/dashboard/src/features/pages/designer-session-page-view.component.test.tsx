@@ -9,7 +9,10 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { ResolvedAppearanceProvider } from "../appearance/appearance-provider.js";
-import { DesignerBlueprintCurrentTabHref } from "../designer/designer-blueprint-schema.js";
+import {
+  DesignerBlueprintCurrentTabHref,
+  type DesignerBlueprintDocument,
+} from "../designer/designer-blueprint-schema.js";
 import type {
   IntegrationConnection,
   IntegrationTarget,
@@ -18,6 +21,7 @@ import type {
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import {
+  buildDesignerBlueprintGraph,
   DesignerCanvasWorkspace,
   resolveDesignerBlueprintProcessLaneSlotHeight,
   resolveDesignerBlueprintInitialFocusViewportForNodes,
@@ -529,6 +533,52 @@ async function findDesignerBlueprintGraphForNode(nodeTestId: string): Promise<HT
   return graph;
 }
 
+function getRequiredDesignerBlueprintGraphNode(
+  graph: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>,
+  nodeId: string,
+): Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number] {
+  const node = graph.nodes.find((candidate) => candidate.id === nodeId);
+  if (node === undefined) {
+    throw new Error(`Expected Designer blueprint graph node '${nodeId}'.`);
+  }
+
+  return node;
+}
+
+function getDesignerBlueprintGraphNodeCenterX(
+  node: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number],
+): number {
+  return node.position.x + resolveDesignerBlueprintGraphNodeWidth(node) / 2;
+}
+
+function getDesignerBlueprintGraphNodeGroupCenterX(
+  nodes: readonly Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number][],
+): number {
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+
+  for (const node of nodes) {
+    minX = Math.min(minX, node.position.x);
+    maxX = Math.max(maxX, node.position.x + resolveDesignerBlueprintGraphNodeWidth(node));
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
+    throw new Error("Expected at least one Designer blueprint graph node.");
+  }
+
+  return minX + (maxX - minX) / 2;
+}
+
+function resolveDesignerBlueprintGraphNodeWidth(
+  node: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number],
+): number {
+  return node.data.kind === "outcome" ||
+    node.data.routingSummaryRows !== undefined ||
+    node.data.triggerConditionRows !== undefined
+    ? 440
+    : 280;
+}
+
 describe("DesignerCanvasWorkspace", () => {
   it("renders the empty canvas state when Designer has no tabs", () => {
     renderDesignerCanvasWorkspace({ tabs: [] });
@@ -960,10 +1010,10 @@ describe("DesignerCanvasWorkspace", () => {
     expect(routingRows[3]?.textContent).toContain("Needs backlog review");
     expect(routingRows[3]?.textContent).toContain("Queue (backlog-queue)");
     expect(screen.queryByText("2 routing rules")).toBeNull();
-    expect(screen.getAllByText("Triage summary")).toHaveLength(3);
     expect(
       await findDesignerBlueprintGraphForNode("designer-blueprint-node-classify-issue"),
     ).toBeDefined();
+    expect(screen.getAllByText("Triage summary")).toHaveLength(3);
     expect(screen.queryByRole("button", { name: "Create trigger" })).toBeNull();
   });
 
@@ -972,16 +1022,23 @@ describe("DesignerCanvasWorkspace", () => {
       element: <StatefulDesignerBlueprintCommentWorkspace />,
     });
 
-    expect(await screen.findByText("Classify issue")).toBeDefined();
+    expect(
+      await findDesignerBlueprintGraphForNode("designer-blueprint-node-classify-issue"),
+    ).toBeDefined();
+    await waitFor(() => {
+      expect(screen.queryByText("Laying out blueprint.")).toBeNull();
+    });
     const addCommentNode = await screen.findByTestId("designer-blueprint-node-classify-issue");
     const addCommentHint = await screen.findByTestId(
       "designer-blueprint-add-comment-hint-classify-issue",
     );
     expect(addCommentHint.textContent).toContain("Click to add comment");
     fireEvent.click(addCommentNode);
-    expect(addCommentNode.contains(screen.getByTestId("designer-blueprint-floating-comment"))).toBe(
-      false,
-    );
+    await waitFor(() => {
+      expect(
+        addCommentNode.contains(screen.getByTestId("designer-blueprint-floating-comment")),
+      ).toBe(false);
+    });
     fireEvent.change(screen.getByTestId("designer-blueprint-new-comment"), {
       target: { value: "Ask for missing severity before assigning an owner." },
     });
@@ -1038,16 +1095,24 @@ describe("DesignerCanvasWorkspace", () => {
       element: <StatefulDesignerBlueprintCommentWorkspace />,
     });
 
+    expect(
+      await findDesignerBlueprintGraphForNode("designer-blueprint-node-classify-issue"),
+    ).toBeDefined();
+    await waitFor(() => {
+      expect(screen.queryByText("Laying out blueprint.")).toBeNull();
+    });
     const classifyIssueNode = await screen.findByTestId("designer-blueprint-node-classify-issue");
     const triageSummaryNode = await screen.findByTestId("designer-blueprint-node-triage-summary");
 
     fireEvent.click(classifyIssueNode);
-    expect(screen.getAllByTestId("designer-blueprint-floating-comment")).toHaveLength(1);
-    expect(screen.getByTestId("designer-blueprint-new-comment")).toBeDefined();
+    expect(await screen.findByTestId("designer-blueprint-new-comment")).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getAllByTestId("designer-blueprint-floating-comment")).toHaveLength(1);
+    });
 
     fireEvent.click(triageSummaryNode);
+    expect(await screen.findByTestId("designer-blueprint-new-comment")).toBeDefined();
     expect(screen.getAllByTestId("designer-blueprint-floating-comment")).toHaveLength(1);
-    expect(screen.getByTestId("designer-blueprint-new-comment")).toBeDefined();
 
     fireEvent.change(screen.getByTestId("designer-blueprint-new-comment"), {
       target: { value: "Include the final routing reason." },
@@ -1066,8 +1131,8 @@ describe("DesignerCanvasWorkspace", () => {
     );
 
     fireEvent.click(classifyIssueNode);
+    expect(await screen.findByTestId("designer-blueprint-new-comment")).toBeDefined();
     expect(screen.getAllByTestId("designer-blueprint-floating-comment")).toHaveLength(1);
-    expect(screen.getByTestId("designer-blueprint-new-comment")).toBeDefined();
   });
 
   it("closes an open blueprint comment when the pointer starts outside the comment box", async () => {
@@ -1180,6 +1245,434 @@ describe("DesignerCanvasWorkspace", () => {
         ],
       }),
     ).toBe(144);
+  });
+
+  it("lays multiple triggers as sibling sources into the first workflow node", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Multi-trigger blueprint",
+        outcome: {
+          label: "Start from either intake source",
+        },
+        items: [
+          {
+            id: "slack-trigger",
+            kind: "trigger",
+            state: "proposed",
+            when: [{ label: "Slack message received" }],
+          },
+          {
+            id: "linear-trigger",
+            kind: "trigger",
+            state: "proposed",
+            when: [{ label: "Linear issue ready" }],
+          },
+          {
+            id: "normalize-context",
+            kind: "agent_step",
+            label: "Normalize context",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "slack-trigger",
+            to: "normalize-context",
+            kind: "triggers",
+          },
+          {
+            from: "linear-trigger",
+            to: "normalize-context",
+            kind: "triggers",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const slackTrigger = getRequiredDesignerBlueprintGraphNode(graph, "slack-trigger");
+    const linearTrigger = getRequiredDesignerBlueprintGraphNode(graph, "linear-trigger");
+    const normalizeContext = getRequiredDesignerBlueprintGraphNode(graph, "normalize-context");
+    const outcome = getRequiredDesignerBlueprintGraphNode(graph, "__designer_blueprint_outcome");
+    const triggerEdges = graph.edges.filter((edge) => edge.target === "normalize-context");
+
+    expect(slackTrigger.position.y).toBe(linearTrigger.position.y);
+    expect(slackTrigger.position.x).not.toBe(linearTrigger.position.x);
+    expect(normalizeContext.position.y).toBeGreaterThan(slackTrigger.position.y);
+    expect(getDesignerBlueprintGraphNodeCenterX(normalizeContext)).toBe(
+      getDesignerBlueprintGraphNodeCenterX(outcome),
+    );
+    expect(triggerEdges).toHaveLength(2);
+    expect(triggerEdges.every((edge) => edge.type === "curved")).toBe(true);
+  });
+
+  it("lays routing destinations as sibling branches that converge downstream", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Routing blueprint",
+        outcome: {
+          label: "Route inbound work",
+        },
+        items: [
+          {
+            id: "incoming-item",
+            kind: "trigger",
+            state: "proposed",
+            when: [{ label: "Inbound item received" }],
+          },
+          {
+            id: "classify",
+            kind: "agent_step",
+            label: "Classify item",
+            state: "proposed",
+          },
+          {
+            id: "route-triage",
+            kind: "routing_policy",
+            state: "proposed",
+            rules: [
+              {
+                conditionLabel: "Urgent",
+                when: [{ field: "severity", operator: "equals", value: "urgent" }],
+                routeTo: "escalate",
+              },
+              {
+                conditionLabel: "Missing context",
+                when: [{ field: "required_context", operator: "empty" }],
+                routeTo: "request-info",
+              },
+              {
+                conditionLabel: "Ready",
+                when: [{ field: "routing_ready", operator: "equals", value: true }],
+                routeTo: "route-owner",
+              },
+            ],
+          },
+          {
+            id: "escalate",
+            kind: "agent_step",
+            label: "Escalate priority work",
+            state: "proposed",
+          },
+          {
+            id: "request-info",
+            kind: "agent_step",
+            label: "Ask for missing context",
+            state: "proposed",
+          },
+          {
+            id: "route-owner",
+            kind: "agent_step",
+            label: "Route to owner or queue",
+            state: "proposed",
+          },
+          {
+            id: "triage-update",
+            kind: "workflow_output",
+            label: "Triage update",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "incoming-item",
+            to: "classify",
+            kind: "triggers",
+          },
+          {
+            from: "classify",
+            to: "route-triage",
+            kind: "requires",
+          },
+          {
+            from: "route-triage",
+            to: "escalate",
+            kind: "routes_to",
+          },
+          {
+            from: "route-triage",
+            to: "request-info",
+            kind: "routes_to",
+          },
+          {
+            from: "route-triage",
+            to: "route-owner",
+            kind: "routes_to",
+          },
+          {
+            from: "escalate",
+            to: "triage-update",
+            kind: "produces",
+          },
+          {
+            from: "request-info",
+            to: "triage-update",
+            kind: "produces",
+          },
+          {
+            from: "route-owner",
+            to: "triage-update",
+            kind: "produces",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const routeTriage = getRequiredDesignerBlueprintGraphNode(graph, "route-triage");
+    const escalate = getRequiredDesignerBlueprintGraphNode(graph, "escalate");
+    const requestInfo = getRequiredDesignerBlueprintGraphNode(graph, "request-info");
+    const routeOwner = getRequiredDesignerBlueprintGraphNode(graph, "route-owner");
+    const triageUpdate = getRequiredDesignerBlueprintGraphNode(graph, "triage-update");
+    const outcome = getRequiredDesignerBlueprintGraphNode(graph, "__designer_blueprint_outcome");
+    const routingEdges = graph.edges.filter((edge) => edge.source === "route-triage");
+    const convergenceEdges = graph.edges.filter((edge) => edge.target === "triage-update");
+
+    expect(escalate.position.y).toBe(requestInfo.position.y);
+    expect(requestInfo.position.y).toBe(routeOwner.position.y);
+    expect(new Set([escalate.position.x, requestInfo.position.x, routeOwner.position.x]).size).toBe(
+      3,
+    );
+    expect(escalate.position.y).toBeGreaterThan(routeTriage.position.y);
+    expect(triageUpdate.position.y).toBeGreaterThan(escalate.position.y);
+    expect(getDesignerBlueprintGraphNodeCenterX(routeTriage)).toBe(
+      getDesignerBlueprintGraphNodeCenterX(outcome),
+    );
+    expect(getDesignerBlueprintGraphNodeGroupCenterX([escalate, requestInfo, routeOwner])).toBe(
+      getDesignerBlueprintGraphNodeCenterX(outcome),
+    );
+    expect(getDesignerBlueprintGraphNodeCenterX(triageUpdate)).toBe(
+      getDesignerBlueprintGraphNodeCenterX(outcome),
+    );
+    expect(routingEdges).toHaveLength(3);
+    expect(routingEdges.every((edge) => edge.type === "curved")).toBe(true);
+    expect(convergenceEdges).toHaveLength(3);
+    expect(convergenceEdges.every((edge) => edge.type === "curved")).toBe(true);
+  });
+
+  it("keeps return-to-earlier-node routes out of the top-down layout rank", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Issue-to-PR factory",
+        outcome: {
+          label: "Issue-to-PR software factory",
+        },
+        items: [
+          {
+            id: "issue-ready",
+            kind: "trigger",
+            state: "proposed",
+            when: [{ label: "Readiness signal received" }],
+          },
+          {
+            id: "readiness-check",
+            kind: "agent_step",
+            label: "Check readiness and scope",
+            state: "proposed",
+          },
+          {
+            id: "implement-change",
+            kind: "agent_step",
+            label: "Plan, edit, and test",
+            state: "proposed",
+          },
+          {
+            id: "pr-output",
+            kind: "workflow_output",
+            label: "Pull request opened or updated",
+            state: "proposed",
+          },
+          {
+            id: "review-step",
+            kind: "agent_step",
+            label: "Review change quality",
+            state: "proposed",
+          },
+          {
+            id: "review-route",
+            kind: "routing_policy",
+            state: "proposed",
+            rules: [
+              {
+                conditionLabel: "Changes requested",
+                when: [{ field: "review_outcome", operator: "equals", value: "changes_requested" }],
+                routeTo: "implement-change",
+              },
+              {
+                conditionLabel: "Accepted",
+                when: [{ field: "review_outcome", operator: "equals", value: "accepted" }],
+                routeTo: "issue-update",
+              },
+            ],
+          },
+          {
+            id: "issue-update",
+            kind: "agent_step",
+            label: "Update issue status",
+            state: "proposed",
+          },
+          {
+            id: "improvement-output",
+            kind: "workflow_output",
+            label: "Factory improvement notes",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "issue-ready",
+            to: "readiness-check",
+            kind: "triggers",
+          },
+          {
+            from: "readiness-check",
+            to: "implement-change",
+            kind: "hands_off_to",
+          },
+          {
+            from: "implement-change",
+            to: "pr-output",
+            kind: "produces",
+          },
+          {
+            from: "pr-output",
+            to: "review-step",
+            kind: "triggers",
+          },
+          {
+            from: "review-step",
+            to: "review-route",
+            kind: "routes_to",
+          },
+          {
+            from: "review-route",
+            to: "implement-change",
+            kind: "routes_to",
+          },
+          {
+            from: "review-route",
+            to: "issue-update",
+            kind: "routes_to",
+          },
+          {
+            from: "issue-update",
+            to: "improvement-output",
+            kind: "produces",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const issueReady = getRequiredDesignerBlueprintGraphNode(graph, "issue-ready");
+    const readinessCheck = getRequiredDesignerBlueprintGraphNode(graph, "readiness-check");
+    const implementChange = getRequiredDesignerBlueprintGraphNode(graph, "implement-change");
+    const prOutput = getRequiredDesignerBlueprintGraphNode(graph, "pr-output");
+    const reviewStep = getRequiredDesignerBlueprintGraphNode(graph, "review-step");
+    const reviewRoute = getRequiredDesignerBlueprintGraphNode(graph, "review-route");
+    const issueUpdate = getRequiredDesignerBlueprintGraphNode(graph, "issue-update");
+    const improvementOutput = getRequiredDesignerBlueprintGraphNode(graph, "improvement-output");
+    const changesRequestedEdge = graph.edges.find(
+      (edge) => edge.source === "review-route" && edge.target === "implement-change",
+    );
+
+    expect(readinessCheck.position.y).toBeGreaterThan(issueReady.position.y);
+    expect(implementChange.position.y).toBeGreaterThan(readinessCheck.position.y);
+    expect(prOutput.position.y).toBeGreaterThan(implementChange.position.y);
+    expect(reviewStep.position.y).toBeGreaterThan(prOutput.position.y);
+    expect(reviewRoute.position.y).toBeGreaterThan(reviewStep.position.y);
+    expect(issueUpdate.position.y).toBeGreaterThan(reviewRoute.position.y);
+    expect(improvementOutput.position.y).toBeGreaterThan(issueUpdate.position.y);
+    expect(changesRequestedEdge?.type).toBe("loopback");
+  });
+
+  it("fails when a routing rule target is missing its routes_to link", async () => {
+    await expect(
+      buildDesignerBlueprintGraph({
+        blueprint: {
+          version: 1,
+          title: "Invalid routing blueprint",
+          outcome: {
+            label: "Route inbound work",
+          },
+          items: [
+            {
+              id: "route-triage",
+              kind: "routing_policy",
+              state: "proposed",
+              rules: [
+                {
+                  conditionLabel: "Urgent",
+                  when: [{ field: "severity", operator: "equals", value: "urgent" }],
+                  routeTo: "escalate",
+                },
+              ],
+            },
+            {
+              id: "escalate",
+              kind: "agent_step",
+              label: "Escalate priority work",
+              state: "proposed",
+            },
+          ],
+          links: [],
+          actions: [],
+        } satisfies DesignerBlueprintDocument,
+        integrationMetadataByTargetKey: new Map<string, never>(),
+      }),
+    ).rejects.toThrow(
+      "Designer blueprint routing rule 'route-triage' routes to 'escalate' but the matching routes_to link is missing.",
+    );
+  });
+
+  it("fails when a routes_to link from a routing node is missing its routing rule target", async () => {
+    await expect(
+      buildDesignerBlueprintGraph({
+        blueprint: {
+          version: 1,
+          title: "Invalid routing link blueprint",
+          outcome: {
+            label: "Route inbound work",
+          },
+          items: [
+            {
+              id: "route-triage",
+              kind: "routing_policy",
+              state: "proposed",
+              rules: [
+                {
+                  conditionLabel: "Urgent",
+                  when: [{ field: "severity", operator: "equals", value: "urgent" }],
+                },
+              ],
+            },
+            {
+              id: "escalate",
+              kind: "agent_step",
+              label: "Escalate priority work",
+              state: "proposed",
+            },
+          ],
+          links: [
+            {
+              from: "route-triage",
+              to: "escalate",
+              kind: "routes_to",
+            },
+          ],
+          actions: [],
+        } satisfies DesignerBlueprintDocument,
+        integrationMetadataByTargetKey: new Map<string, never>(),
+      }),
+    ).rejects.toThrow(
+      "Designer blueprint routes_to link 'route-triage' to 'escalate' is missing a matching routing rule target.",
+    );
   });
 
   it("returns no blueprint viewport before the canvas has a measured width", () => {

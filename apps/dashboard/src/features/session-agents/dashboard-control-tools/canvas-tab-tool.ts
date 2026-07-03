@@ -179,7 +179,7 @@ const DesignerBlueprintStandardItemJsonSchema = {
       type: "string",
       minLength: 1,
       maxLength: 160,
-      description: "Visible item title shown in the blueprint note.",
+      description: "Visible item title shown in the blueprint node.",
     },
     description: {
       type: "string",
@@ -263,7 +263,7 @@ const DesignerBlueprintDocumentJsonSchema = {
       type: "object",
       additionalProperties: false,
       description:
-        "Goal the workflow should accomplish. The dashboard shows this as an unconnected note at the top of the blueprint canvas; do not duplicate it as a workflow_output item.",
+        "Goal the workflow should accomplish. The dashboard shows this as an unconnected node at the top of the blueprint canvas; do not duplicate it as a workflow_output item.",
       properties: {
         label: {
           type: "string",

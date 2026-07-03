@@ -55,7 +55,7 @@ describe("dashboard control actions", () => {
                       },
                       outcome: {
                         description:
-                          "Goal the workflow should accomplish. The dashboard shows this as an unconnected note at the top of the blueprint canvas; do not duplicate it as a workflow_output item.",
+                          "Goal the workflow should accomplish. The dashboard shows this as an unconnected node at the top of the blueprint canvas; do not duplicate it as a workflow_output item.",
                       },
                       items: {
                         items: {

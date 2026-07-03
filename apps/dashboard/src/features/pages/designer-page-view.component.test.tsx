@@ -1,13 +1,17 @@
 // @vitest-environment jsdom
 
 import { EditorView } from "@codemirror/view";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import type { DesignerSession } from "../designer/designer-service.js";
-import { DesignerPageView } from "./designer-page-view.js";
+import {
+  DesignerPageComposerContainerClassName,
+  DesignerPageSessionsContainerClassName,
+  DesignerPageView,
+} from "./designer-page-view.js";
 
 const SampleDesignerSession = {
   id: "dsn_triage",
@@ -86,8 +90,15 @@ describe("DesignerPageView", () => {
     const composer = screen.getByRole("textbox");
     const startButton = screen.getByRole("button", { name: "Start Designer session" });
 
+    const heading = screen.getByRole("heading", { name: "Build an agent workflow" });
+
+    expect(heading).toBeDefined();
+    expect(heading.parentElement).toHaveProperty(
+      "className",
+      DesignerPageComposerContainerClassName,
+    );
     expect(composer.getAttribute("aria-placeholder")).toBe(
-      "Build a triaging agent for incoming GitHub issues and Linear bugs.",
+      "Ask Mistle to build an engineering agent that...",
     );
     expect(startButton).toHaveProperty("disabled", true);
     expect(screen.queryByText("What do you want to build?")).toBeNull();
@@ -105,12 +116,70 @@ describe("DesignerPageView", () => {
     );
   });
 
-  it("omits the implied sandbox profile column from past sessions", () => {
+  it("fills the composer from a starter prompt without starting the session", () => {
+    render(<ControlledDesignerPageView />);
+
+    const starterPrompts = screen.getByTestId("designer-starter-prompts");
+    const startButton = screen.getByRole("button", { name: "Start Designer session" });
+    const composer = screen.getByRole("textbox");
+
+    expect(starterPrompts).toBeDefined();
+    expect(starterPrompts.compareDocumentPosition(composer)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    const visibleStarterPromptButtons = within(starterPrompts).getAllByRole("button");
+    expect(visibleStarterPromptButtons).toHaveLength(6);
+    const visibleStarterPromptCategories = visibleStarterPromptButtons.map((button) => {
+      const ariaLabel = button.getAttribute("aria-label");
+      if (ariaLabel === null) {
+        throw new Error("Expected visible Designer starter prompt to expose an aria label.");
+      }
+
+      const [category] = ariaLabel.split(":");
+      if (category === undefined) {
+        throw new Error(
+          "Expected visible Designer starter prompt aria label to include a category.",
+        );
+      }
+
+      return category;
+    });
+    visibleStarterPromptCategories.sort((leftCategory, rightCategory) =>
+      leftCategory.localeCompare(rightCategory),
+    );
+    expect(new Set(visibleStarterPromptCategories).size).toBe(
+      visibleStarterPromptCategories.length,
+    );
+    const firstStarterPromptButton = visibleStarterPromptButtons[0];
+    if (firstStarterPromptButton === undefined) {
+      throw new Error("Expected at least one visible Designer starter prompt.");
+    }
+
+    const starterPrompt = firstStarterPromptButton.getAttribute("title");
+    if (starterPrompt === null) {
+      throw new Error("Expected visible Designer starter prompt to expose full prompt text.");
+    }
+
+    expect(startButton).toHaveProperty("disabled", true);
+
+    fireEvent.click(firstStarterPromptButton);
+
+    expect(getDesignerComposerEditorView().state.doc.toString()).toBe(starterPrompt);
+    expect(startButton).toHaveProperty("disabled", false);
+  });
+
+  it("shows the compact past sessions table without redundant columns or row actions", () => {
     render(<ControlledDesignerPageView sessions={[SampleDesignerSession]} />);
 
     expect(screen.getByRole("columnheader", { name: "Sessions" })).toBeDefined();
     expect(screen.getByRole("columnheader", { name: "Started by" })).toBeDefined();
+    expect(screen.getByRole("columnheader", { name: "Updated" })).toBeDefined();
+    expect(screen.getByRole("table").parentElement?.parentElement).toHaveProperty(
+      "className",
+      DesignerPageSessionsContainerClassName,
+    );
     expect(screen.queryByRole("columnheader", { name: "Sandbox profile" })).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "Created" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Past sessions" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Designer session actions/ })).toBeNull();
     expect(screen.getByRole("link", { name: "Design triage agent" }).getAttribute("href")).toBe(
       "/dsn_triage",
     );
