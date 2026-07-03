@@ -10,18 +10,24 @@ Designer should help the user shape a Linear-to-GitHub AI software factory into 
 
 The outcome should be something a team can adopt, run, review, and improve over time inside Mistle.
 
-## Conversation Flow
+## Alignment Standard
 
 Designer should not rush from the user's broad request directly into a fully asserted Workflow blueprint as if the design were already accepted.
 
-For an open-ended software-factory request, Designer should first establish the proposed operating-process framing in a concise way and create a clear feedback point before moving into configuration. A good flow is:
+For an open-ended software-factory request, Designer should establish the proposed operating-process framing before configuration. Passing behavior shows that the Workflow is still a proposal until the operating process is clear enough to configure.
 
-1. Restate the intended factory outcome and the issue/repository systems involved.
-2. Propose the main operating-process shape: readiness gate, workflow states, implementation agent, review agent, feedback loop, and human operating guide.
-3. Present the Workflow blueprint as a recommended proposal that explicitly invites corrections before configuration decisions.
-4. Once the proposed Workflow is aligned, use the Workflow blueprint and follow-up questions to drive concrete configuration choices.
+The aligned proposal should make these choices visible:
 
-It is acceptable to show an early Workflow blueprint if it is clearly framed as a draft for review and the conversation invites corrections before configuration choices. It is not acceptable to treat the first Workflow blueprint as final, skip user feedback, and immediately proceed into product mutation.
+- intended factory outcome
+- issue system and repository system
+- readiness gate
+- workflow states or columns
+- implementation responsibility
+- review responsibility
+- feedback and improvement loop
+- workflow operating guide or equivalent team adoption artifact
+
+It is acceptable to show an early Workflow blueprint if it is clearly framed as a proposal and Designer does not proceed into product mutation before alignment. It is not acceptable to treat the first Workflow blueprint as final, skip alignment, and immediately proceed into product mutation.
 
 ## Desired Workflow
 
@@ -49,7 +55,7 @@ It should identify:
 - at least two agent roles or profiles when appropriate: one for implementation and one for review
 - a feedback loop for improving the implementation agent from review findings
 - a feedback loop for improving the review agent from missed issues, noisy reviews, or weak review criteria
-- what a human operator should review, approve, or correct before trusting the factory more broadly
+- what the user or team should review, approve, or correct before trusting the factory more broadly
 
 ## Required Setup Awareness
 
@@ -64,14 +70,14 @@ Designer should identify these required pieces:
 - separate Mistle configuration for implementation and review roles when the product supports it, such as distinct sandbox profiles, triggers, instructions, or approval boundaries
 - Run actions for testing the factory, distinguishing supported session starts from future trigger simulation capability
 
-## Human Operating Guide
+## Workflow Operating Guide
 
-If this is a new software process, Designer should offer to generate a human-readable guide for the team. Acceptable outputs include a README, a Linear onboarding issue, a dummy example issue, or workflow instructions that explain:
+If this is a new software process, Designer should offer to generate a workflow operating guide for the team. Acceptable outputs include a README, a Linear onboarding issue, a dummy example issue, or workflow instructions that explain:
 
 - how to write an agent-ready issue
 - how to use the software-factory labels and states
 - when to move work between columns
-- what humans should do when the implementation or review agent escalates
+- what the user or team should do when the implementation or review agent escalates
 - how the team should feed recurring failures back into agent instructions and workflow rules
 
 ## Completion Standard
