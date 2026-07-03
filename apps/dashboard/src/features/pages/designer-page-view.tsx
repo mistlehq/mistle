@@ -1,5 +1,5 @@
 import { systemScheduler } from "@mistle/time";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mistle/ui";
+import { Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mistle/ui";
 import { useEffect, useState } from "react";
 
 import { ErrorNotice } from "../auth/error-notice.js";
@@ -23,9 +23,147 @@ const DefaultDesignerPromptPlaceholder = `${DesignerPromptPlaceholderPrefix}${De
 const DesignerPromptPlaceholderPauseMs = 1800;
 const DesignerPromptPlaceholderDeleteMs = 28;
 const DesignerPromptPlaceholderTypeMs = 42;
+const DesignerStarterPromptCategories: readonly string[] = [
+  "Engineering",
+  "Product",
+  "Marketing",
+  "Sales",
+  "Admin",
+  "HR",
+  "Finance",
+  "Support",
+];
+const DesignerStarterPromptVisibleCount = 6;
 export const DesignerPageComposerContainerClassName =
-  "mx-auto grid w-full max-w-3xl gap-4 pt-8 md:pt-16";
-export const DesignerPageSessionsContainerClassName = "mx-auto grid w-full max-w-3xl gap-3";
+  "mx-auto grid w-full max-w-3xl gap-5 pt-8 md:pt-16";
+export const DesignerPageSessionsContainerClassName = "mx-auto mt-4 grid w-full max-w-3xl gap-3";
+
+const DesignerStarterPrompts: readonly {
+  category: string;
+  label: string;
+  prompt: string;
+}[] = [
+  {
+    category: "Engineering",
+    label: "Review pull requests",
+    prompt:
+      "Create an agent that reviews GitHub pull requests for regressions, missing tests, and risky changes.",
+  },
+  {
+    category: "Engineering",
+    label: "Ship Linear issues",
+    prompt:
+      "Build an agent workflow that turns Linear issues marked ready into GitHub pull requests with review follow-through.",
+  },
+  {
+    category: "Engineering",
+    label: "Investigate errors",
+    prompt:
+      "Create an agent that investigates production errors from Sentry, summarizes likely causes, and proposes next actions.",
+  },
+  {
+    category: "Engineering",
+    label: "Maintain dependencies",
+    prompt:
+      "Create an agent that reviews dependency update pull requests, checks changelogs, and flags risky upgrades.",
+  },
+  {
+    category: "Product",
+    label: "Analyze funnel changes",
+    prompt:
+      "Create an agent that analyzes product funnel changes in PostHog and opens Linear follow-up issues for regressions.",
+  },
+  {
+    category: "Product",
+    label: "Summarize feedback",
+    prompt:
+      "Create an agent that summarizes customer feedback from Slack, Notion, and Linear into product themes.",
+  },
+  {
+    category: "Marketing",
+    label: "Review campaigns",
+    prompt:
+      "Create an agent that reviews campaign performance across Google Ads, Meta Ads, and Google Analytics.",
+  },
+  {
+    category: "Marketing",
+    label: "Track SEO",
+    prompt:
+      "Create an agent that monitors Google Search Console and DataForSEO, then drafts weekly SEO opportunities.",
+  },
+  {
+    category: "Marketing",
+    label: "Draft briefs",
+    prompt:
+      "Create an agent that turns product launch notes into campaign briefs, audience angles, and channel tasks.",
+  },
+  {
+    category: "Sales",
+    label: "Prepare accounts",
+    prompt:
+      "Create an agent that prepares sales account briefs from inbound demo requests, company research, and recent workspace context.",
+  },
+  {
+    category: "Sales",
+    label: "Follow up with leads",
+    prompt:
+      "Build an agent workflow that tracks inbound leads, drafts follow-up emails, and updates the sales handoff.",
+  },
+  {
+    category: "Admin",
+    label: "Summarize follow-ups",
+    prompt:
+      "Create an agent that summarizes Gmail follow-ups and prepares a weekly action list from Google Workspace.",
+  },
+  {
+    category: "Admin",
+    label: "Prep meetings",
+    prompt:
+      "Create an agent that prepares meeting agendas from Calendar, Gmail, Docs, and recent follow-up notes.",
+  },
+  {
+    category: "HR",
+    label: "Route feedback",
+    prompt:
+      "Build an agent workflow that routes candidate feedback, interview notes, and hiring follow-ups.",
+  },
+  {
+    category: "HR",
+    label: "Onboard hires",
+    prompt:
+      "Build an agent workflow that coordinates onboarding tasks, manager reminders, and new-hire document follow-ups.",
+  },
+  {
+    category: "Finance",
+    label: "Reconcile billing",
+    prompt:
+      "Create an agent that reconciles Stripe billing events with customer records and reports exceptions.",
+  },
+  {
+    category: "Finance",
+    label: "Report revenue",
+    prompt:
+      "Create an agent that reviews Stripe revenue changes and prepares a finance reporting summary.",
+  },
+  {
+    category: "Finance",
+    label: "Audit invoices",
+    prompt:
+      "Create an agent that audits unpaid invoices, identifies overdue accounts, and drafts follow-up actions.",
+  },
+  {
+    category: "Support",
+    label: "Triage messages",
+    prompt:
+      "Build an agent workflow that triages Slack or WhatsApp support messages and escalates bugs into Linear.",
+  },
+  {
+    category: "Support",
+    label: "Handle email",
+    prompt:
+      "Build an agent workflow that triages AgentMail or Gmail support threads and drafts customer replies.",
+  },
+];
 
 type DesignerPromptPlaceholderAnimationState = {
   phase: "deleting" | "typing" | "waiting";
@@ -48,6 +186,117 @@ function formatDesignerSessionTitle(session: DesignerSessionListItem): string {
 }
 
 function ignoreDesignerComposerAction(): void {}
+
+function shuffleDesignerStarterPrompts(
+  prompts: readonly (typeof DesignerStarterPrompts)[number][],
+): readonly (typeof DesignerStarterPrompts)[number][] {
+  const shuffledPrompts: (typeof DesignerStarterPrompts)[number][] = [...prompts];
+
+  for (let index = shuffledPrompts.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const currentPrompt = shuffledPrompts[index];
+    const swapPrompt = shuffledPrompts[swapIndex];
+    if (currentPrompt === undefined || swapPrompt === undefined) {
+      throw new Error("Designer starter prompt shuffle produced an invalid index.");
+    }
+
+    shuffledPrompts[index] = swapPrompt;
+    shuffledPrompts[swapIndex] = currentPrompt;
+  }
+
+  return shuffledPrompts;
+}
+
+function shuffleDesignerStarterPromptCategories(categories: readonly string[]): readonly string[] {
+  const shuffledCategories = [...categories];
+
+  for (let index = shuffledCategories.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const currentCategory = shuffledCategories[index];
+    const swapCategory = shuffledCategories[swapIndex];
+    if (currentCategory === undefined || swapCategory === undefined) {
+      throw new Error("Designer starter prompt category shuffle produced an invalid index.");
+    }
+
+    shuffledCategories[index] = swapCategory;
+    shuffledCategories[swapIndex] = currentCategory;
+  }
+
+  return shuffledCategories;
+}
+
+function pickDesignerStarterPromptForCategory(
+  category: string,
+): (typeof DesignerStarterPrompts)[number] {
+  const categoryPrompts = DesignerStarterPrompts.filter(
+    (starterPrompt) => starterPrompt.category === category,
+  );
+  if (categoryPrompts.length === 0) {
+    throw new Error(`Designer starter prompt category '${category}' has no prompts.`);
+  }
+
+  const promptIndex = Math.floor(Math.random() * categoryPrompts.length);
+  const starterPrompt = categoryPrompts[promptIndex];
+  if (starterPrompt === undefined) {
+    throw new Error(`Designer starter prompt category '${category}' produced an invalid index.`);
+  }
+
+  return starterPrompt;
+}
+
+function randomizeDesignerStarterPrompts(): readonly (typeof DesignerStarterPrompts)[number][] {
+  const selectedCategories = shuffleDesignerStarterPromptCategories(
+    DesignerStarterPromptCategories,
+  ).slice(0, DesignerStarterPromptVisibleCount);
+  const selectedPrompts = selectedCategories.map((category) => {
+    const starterPrompt = pickDesignerStarterPromptForCategory(category);
+    if (starterPrompt.category !== category) {
+      throw new Error(
+        `Designer starter prompt category '${category}' selected a mismatched prompt.`,
+      );
+    }
+
+    return starterPrompt;
+  });
+
+  if (selectedPrompts.length !== DesignerStarterPromptVisibleCount) {
+    throw new Error(
+      "Designer starter prompt selection does not match the visible starter prompt count.",
+    );
+  }
+
+  return shuffleDesignerStarterPrompts(selectedPrompts);
+}
+
+function DesignerStarterPromptChips(input: {
+  onPromptSelect: (prompt: string) => void;
+}): React.JSX.Element {
+  const [starterPrompts] = useState(() => randomizeDesignerStarterPrompts());
+
+  return (
+    <div
+      className="mx-auto flex max-w-4xl flex-wrap justify-center gap-2"
+      data-testid="designer-starter-prompts"
+    >
+      {starterPrompts.map((starterPrompt) => (
+        <Button
+          aria-label={`${starterPrompt.category}: ${starterPrompt.label}`}
+          className="h-8 max-w-full justify-start gap-1.5 rounded-full border-border/80 bg-background px-3 text-left text-xs font-medium whitespace-nowrap text-foreground shadow-none hover:bg-muted"
+          key={`${starterPrompt.category}:${starterPrompt.label}`}
+          onClick={() => {
+            input.onPromptSelect(starterPrompt.prompt);
+          }}
+          title={starterPrompt.prompt}
+          type="button"
+          variant="outline"
+        >
+          <span className="shrink-0 text-muted-foreground">{starterPrompt.category}</span>
+          <span className="min-w-0">{starterPrompt.label}</span>
+        </Button>
+      ))}
+    </div>
+  );
+}
 
 function useDesignerPromptPlaceholder(prompt: string): string {
   const [animationState, setAnimationState] = useState<DesignerPromptPlaceholderAnimationState>({
@@ -144,6 +393,7 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
           <h1 className="text-center text-3xl leading-tight font-semibold tracking-normal text-foreground md:text-4xl">
             {DesignerPromptTitle}
           </h1>
+          <DesignerStarterPromptChips onPromptSelect={input.onPromptChange} />
           <ChatComposer
             canUploadAttachments={false}
             composerCapabilities={[]}
