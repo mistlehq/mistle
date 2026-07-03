@@ -424,6 +424,8 @@ function LoadedDesignerSessionPage(input: {
   const openCanvasTabId = input.searchParams.get("openCanvasTabId");
 
   // Synchronize one-shot browser history return params from integration setup into canvas tab state.
+  // Render logic, event handlers, React Query, and remounting cannot consume then replace URL params
+  // after cross-route navigation without repeating the open request or leaving stale history state.
   useEffect(() => {
     const returnTabRequest = resolveDesignerCanvasReturnTabRequest({
       openCanvasHref: openCanvasHrefParam,
