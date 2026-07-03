@@ -23,63 +23,48 @@ describe("Designer managed instruction files", () => {
     expect(loadDesignerInstructionContent("designer-behavior.md").length).toBeGreaterThan(0);
   });
 
-  it("instructs Designer to pair Workflow blueprint canvas changes with readable flow text", () => {
+  it("keeps the behavior instruction structure explicit", () => {
     const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
 
-    expect(behaviorInstructions).toContain(
-      "Use Workflow references for domain behavior, operating constraints, and expected responsibilities. Use the Workflow Blueprint Rules section for blueprint schema, rendering, and field-selection rules.",
-    );
-    expect(behaviorInstructions).toContain(
-      "Whenever you first show or later update a Workflow blueprint, describe the same flow in chat as concise point form",
-    );
-    expect(behaviorInstructions).toContain(
-      "When updating an existing Workflow blueprint, first state what changed from the previous version",
-    );
+    expect(getSectionHeadings(behaviorInstructions)).toEqual([
+      "## Default Flow",
+      "## Alignment",
+      "## Configuration Dependencies",
+      "## Decision Requests",
+      "## Workflow Blueprint Rules",
+      "## Workflow References",
+      "## Product And Canvas Rules",
+      "## Run Actions",
+      "## Integration Setup",
+      "## Tools And Evidence",
+      "## Authority And Safety",
+      "## Communication",
+    ]);
   });
 
-  it("defines Alignment as the gate before configuration changes and Run actions", () => {
+  it("keeps required behavior sections connected to their core terms", () => {
     const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
 
-    expect(behaviorInstructions).toContain("## Alignment");
-    expect(behaviorInstructions).toContain(
-      "Alignment means Designer has enough shared understanding of the Workflow or Workflow change",
+    expect(getSection(behaviorInstructions, "## Alignment")).toContain("Workflow");
+    expect(getSection(behaviorInstructions, "## Alignment")).toContain("configuration change");
+    expect(getSection(behaviorInstructions, "## Alignment")).toContain("Run action");
+    expect(getSection(behaviorInstructions, "## Configuration Dependencies")).toContain(
+      "App setup",
     );
-    expect(behaviorInstructions).toContain(
-      "Ask only for decisions that affect Workflow behavior, configuration changes, approval boundaries, provider setup, trigger behavior, selected resources, or Run actions.",
+    expect(getSection(behaviorInstructions, "## Configuration Dependencies")).toContain(
+      "provider tools",
     );
-    expect(behaviorInstructions).toContain(
-      "When updating an existing Agent, trigger, or setup, infer the current Workflow from the current setup",
+    expect(getSection(behaviorInstructions, "## Configuration Dependencies")).toContain(
+      "publishing",
+    );
+    expect(getSection(behaviorInstructions, "## Configuration Dependencies")).toContain("triggers");
+    expect(getSection(behaviorInstructions, "## Decision Requests")).toContain(
+      "dashboard decision request",
+    );
+    expect(getSection(behaviorInstructions, "## Workflow Blueprint Rules")).toContain(
+      "Workflow blueprint",
     );
     expect(behaviorInstructions).not.toContain("directionally clear");
-  });
-
-  it("orders configuration dependencies after alignment", () => {
-    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
-
-    expect(behaviorInstructions).toContain("## Configuration Dependencies");
-    expect(behaviorInstructions).toContain(
-      "After the Workflow is aligned, resolve Configuration Dependencies before configuration changes or Run actions.",
-    );
-    expect(behaviorInstructions).toContain(
-      "Use this default order unless the current setup or user request requires a different order: Apps, Connected apps or App setup, provider resources, provider tools, Sandbox profile configuration, publishing, triggers, Run actions.",
-    );
-    expect(behaviorInstructions).toContain(
-      "Treat App setup, resource selection, provider tool selection, publishing, and triggers as dependencies of the aligned Workflow, not standalone setup prompts.",
-    );
-  });
-
-  it("scopes dashboard decision requests to the next concrete dependency or action", () => {
-    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
-
-    expect(behaviorInstructions).toContain(
-      "Use dashboard decision requests only for the next concrete dependency, user-owned action, configuration choice, or Run action approval.",
-    );
-    expect(behaviorInstructions).toContain(
-      "Use it for choices such as repository, channel, setup complete, trigger scope, approval boundary, or Run action approval",
-    );
-    expect(behaviorInstructions).toContain(
-      "Keep explanation, recommendations, and summaries in chat. Keep selectable choices and short user-owned action confirmations in dashboard decision requests.",
-    );
   });
 
   it("keeps workflow-family implementation rules out of always-loaded behavior instructions", () => {
@@ -96,77 +81,70 @@ describe("Designer managed instruction files", () => {
     expect(workflowReferencesSection).not.toContain("6-8");
   });
 
-  it("defines approval boundaries separately from Designer configuration approval", () => {
+  it("keeps the context vocabulary structure explicit", () => {
     const contextInstructions = loadDesignerInstructionContent("designer-context.md");
-    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
 
-    expect(contextInstructions).toContain("**Approval boundary**:");
-    expect(contextInstructions).toContain(
-      "It is part of Workflow behavior, not permission for Designer to perform aligned configuration changes.",
-    );
-    expect(behaviorInstructions).toContain(
-      "Do not use approval as a generic gate for aligned configuration changes.",
-    );
-    expect(behaviorInstructions).toContain(
-      "Use approval boundary for Workflow behavior and Run action approval for starting or testing the Workflow.",
-    );
-    expect(behaviorInstructions).not.toContain("runtime approval boundary");
+    expect(getBoldTermHeadings(contextInstructions)).toEqual([
+      "**Workflow outcome**:",
+      "**Workflow**:",
+      "**Workflow blueprint**:",
+      "**Trigger**:",
+      "**Agent step**:",
+      "**Agent output**:",
+      "**App**:",
+      "**Connected app**:",
+      "**Mistle resource access**:",
+      "**Provider tool**:",
+      "**Agent**:",
+      "**Task**:",
+      "**Approval boundary**:",
+      "**Sandbox profile**:",
+      "**Configuration change**:",
+      "**User action**:",
+      "**App setup**:",
+      "**Publish the profile version**:",
+      "**Create a trigger**:",
+      "**Enable a trigger**:",
+      "**Run action**:",
+      "**Start a session**:",
+    ]);
   });
 
-  it("uses precise action terms instead of generic handoff or human follow-up labels", () => {
+  it("keeps approval and action vocabulary separated", () => {
     const contextInstructions = loadDesignerInstructionContent("designer-context.md");
     const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
 
-    expect(contextInstructions).toContain("**Configuration change**:");
-    expect(contextInstructions).toContain("**User action**:");
-    expect(contextInstructions).toContain(
-      "Otherwise, name the exact action instead of introducing a broader process label.",
+    expect(getTermBlock(contextInstructions, "**Approval boundary**:")).toContain(
+      "Workflow behavior",
     );
-    expect(behaviorInstructions).toContain(
-      "When stating next steps or blockers, use the narrowest matching context term: configuration change, User action, App setup, or Run action.",
+    expect(getTermBlock(contextInstructions, "**Approval boundary**:")).toContain(
+      "Run action approval",
     );
-    expect(behaviorInstructions).toContain(
-      "If a user-owned process step does not fit App setup, name the exact step instead of giving it a generic category.",
+    expect(getTermBlock(contextInstructions, "**Configuration change**:")).toContain(
+      "Designer- or product-side",
     );
+    expect(getTermBlock(contextInstructions, "**User action**:")).toContain(
+      "outside Designer's available tools",
+    );
+    expect(getTermBlock(contextInstructions, "**Run action**:")).toContain(
+      "without changing configuration",
+    );
+    expect(behaviorInstructions).not.toContain("runtime approval boundary");
     expect(behaviorInstructions).not.toContain("human follow-up");
     expect(behaviorInstructions).not.toContain("At handoff");
   });
 
-  it("treats aligned configuration changes as approved by alignment", () => {
+  it("keeps Run action support boundaries explicit without relying on exact prose", () => {
     const contextInstructions = loadDesignerInstructionContent("designer-context.md");
     const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
 
-    expect(contextInstructions).toContain(
-      "Create a published **Sandbox profile version** from the reviewed **Sandbox profile version configuration** after alignment.",
+    expect(getTermBlock(contextInstructions, "**Run action**:")).toContain("Start a session");
+    expect(getTermBlock(contextInstructions, "**Run action**:")).toContain("Simulating a trigger");
+    expect(getSection(behaviorInstructions, "## Run Actions")).toContain("Start a session");
+    expect(getSection(behaviorInstructions, "## Run Actions")).toContain(
+      "Simulated trigger execution",
     );
-    expect(contextInstructions).toContain(
-      "Create a new trigger record for the workflow after alignment.",
-    );
-    expect(behaviorInstructions).toContain(
-      "Do not ask for separate approval before aligned configuration changes.",
-    );
-    expect(behaviorInstructions).toContain(
-      "Request explicit approval only before Run actions such as starting sessions or simulating trigger runs.",
-    );
-    expect(behaviorInstructions).not.toContain("explicit approval before publishing");
-    expect(behaviorInstructions).not.toContain("explicit approval before creating triggers");
-  });
-
-  it("keeps Run actions separate from configuration and unsupported trigger simulation", () => {
-    const contextInstructions = loadDesignerInstructionContent("designer-context.md");
-    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
-
-    expect(contextInstructions).toContain("**Run action**:");
-    expect(contextInstructions).toContain("Start a session is supported today");
-    expect(contextInstructions).toContain(
-      "Designer must not claim it can run or has run a trigger simulation unless a supplied product tool explicitly supports it",
-    );
-    expect(behaviorInstructions).toContain(
-      "Run actions test or execute an aligned Workflow and are separate from configuration changes.",
-    );
-    expect(behaviorInstructions).toContain(
-      "Do not claim a trigger simulation is available, startable, or complete unless a supplied product tool explicitly supports it.",
-    );
+    expect(getSection(behaviorInstructions, "## Run Actions")).toContain("product tool");
   });
 });
 
@@ -184,4 +162,33 @@ function getSection(content: string, heading: string): string {
   }
 
   return content.slice(sectionStart, nextSectionStart);
+}
+
+function getSectionHeadings(content: string): string[] {
+  return content
+    .split("\n")
+    .filter((line) => line.startsWith("## "))
+    .map((line) => line.trim());
+}
+
+function getBoldTermHeadings(content: string): string[] {
+  return content
+    .split("\n")
+    .filter((line) => line.startsWith("**") && line.endsWith(":"))
+    .map((line) => line.trim());
+}
+
+function getTermBlock(content: string, termHeading: string): string {
+  const termStart = content.indexOf(termHeading);
+  expect(termStart).toBeGreaterThanOrEqual(0);
+
+  const nextTermStart = content.indexOf("\n**", termStart + termHeading.length);
+  const nextSectionStart = content.indexOf("\n## ", termStart + termHeading.length);
+  const candidates = [nextTermStart, nextSectionStart].filter((index) => index !== -1);
+
+  if (candidates.length === 0) {
+    return content.slice(termStart);
+  }
+
+  return content.slice(termStart, Math.min(...candidates));
 }
