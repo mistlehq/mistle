@@ -1382,6 +1382,144 @@ describe("DesignerCanvasWorkspace", () => {
     expect(triageUpdate.position.y).toBeGreaterThan(escalate.position.y);
   });
 
+  it("keeps return-to-earlier-node routes out of the top-down layout rank", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Issue-to-PR factory",
+        outcome: {
+          label: "Issue-to-PR software factory",
+        },
+        items: [
+          {
+            id: "issue-ready",
+            kind: "trigger",
+            state: "proposed",
+            when: [{ label: "Readiness signal received" }],
+          },
+          {
+            id: "readiness-check",
+            kind: "agent_step",
+            label: "Check readiness and scope",
+            state: "proposed",
+          },
+          {
+            id: "implement-change",
+            kind: "agent_step",
+            label: "Plan, edit, and test",
+            state: "proposed",
+          },
+          {
+            id: "pr-output",
+            kind: "workflow_output",
+            label: "Pull request opened or updated",
+            state: "proposed",
+          },
+          {
+            id: "review-step",
+            kind: "agent_step",
+            label: "Review change quality",
+            state: "proposed",
+          },
+          {
+            id: "review-route",
+            kind: "routing_policy",
+            state: "proposed",
+            rules: [
+              {
+                conditionLabel: "Changes requested",
+                when: [{ field: "review_outcome", operator: "equals", value: "changes_requested" }],
+                routeTo: "implement-change",
+              },
+              {
+                conditionLabel: "Accepted",
+                when: [{ field: "review_outcome", operator: "equals", value: "accepted" }],
+                routeTo: "issue-update",
+              },
+            ],
+          },
+          {
+            id: "issue-update",
+            kind: "agent_step",
+            label: "Update issue status",
+            state: "proposed",
+          },
+          {
+            id: "improvement-output",
+            kind: "workflow_output",
+            label: "Factory improvement notes",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "issue-ready",
+            to: "readiness-check",
+            kind: "triggers",
+          },
+          {
+            from: "readiness-check",
+            to: "implement-change",
+            kind: "hands_off_to",
+          },
+          {
+            from: "implement-change",
+            to: "pr-output",
+            kind: "produces",
+          },
+          {
+            from: "pr-output",
+            to: "review-step",
+            kind: "triggers",
+          },
+          {
+            from: "review-step",
+            to: "review-route",
+            kind: "routes_to",
+          },
+          {
+            from: "review-route",
+            to: "implement-change",
+            kind: "routes_to",
+          },
+          {
+            from: "review-route",
+            to: "issue-update",
+            kind: "routes_to",
+          },
+          {
+            from: "issue-update",
+            to: "improvement-output",
+            kind: "produces",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const issueReady = getRequiredDesignerBlueprintGraphNode(graph, "issue-ready");
+    const readinessCheck = getRequiredDesignerBlueprintGraphNode(graph, "readiness-check");
+    const implementChange = getRequiredDesignerBlueprintGraphNode(graph, "implement-change");
+    const prOutput = getRequiredDesignerBlueprintGraphNode(graph, "pr-output");
+    const reviewStep = getRequiredDesignerBlueprintGraphNode(graph, "review-step");
+    const reviewRoute = getRequiredDesignerBlueprintGraphNode(graph, "review-route");
+    const issueUpdate = getRequiredDesignerBlueprintGraphNode(graph, "issue-update");
+    const improvementOutput = getRequiredDesignerBlueprintGraphNode(graph, "improvement-output");
+    const changesRequestedEdge = graph.edges.find(
+      (edge) => edge.source === "review-route" && edge.target === "implement-change",
+    );
+
+    expect(readinessCheck.position.y).toBeGreaterThan(issueReady.position.y);
+    expect(implementChange.position.y).toBeGreaterThan(readinessCheck.position.y);
+    expect(prOutput.position.y).toBeGreaterThan(implementChange.position.y);
+    expect(reviewStep.position.y).toBeGreaterThan(prOutput.position.y);
+    expect(reviewRoute.position.y).toBeGreaterThan(reviewStep.position.y);
+    expect(issueUpdate.position.y).toBeGreaterThan(reviewRoute.position.y);
+    expect(improvementOutput.position.y).toBeGreaterThan(issueUpdate.position.y);
+    expect(changesRequestedEdge?.type).toBe("loopback");
+  });
+
   it("fails when a routing rule target is missing its routes_to link", async () => {
     await expect(
       buildDesignerBlueprintGraph({
