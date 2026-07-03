@@ -110,6 +110,89 @@ describe("Designer eval evaluator", () => {
     expect(result.checks[0]?.detail).toContain("before showing a blueprint");
   });
 
+  it("passes when product mutation waits for the aligned follow-up turn", () => {
+    const result = evaluateDesignerEvalRun({
+      caseId: "github-pr-review-basic",
+      assertions: [
+        {
+          kind: "product-mutation-not-before-turn",
+          minTurnIndex: 1,
+        },
+      ],
+      dashboardControlActions: [
+        {
+          sequence: 1,
+          turnIndex: 0,
+          kind: "show_designer_canvas_tab",
+          tabKind: "blueprint",
+          input: {},
+          response: {},
+        },
+        {
+          sequence: 2,
+          turnIndex: 1,
+          kind: "request_user_input",
+          inputId: "select_repository",
+          input: {},
+          response: {
+            success: true,
+            contentItems: [
+              {
+                type: "inputText",
+                text: '{"kind":"sandbox-profile-draft-provider-resources-saved"}',
+              },
+            ],
+          },
+        },
+      ],
+      productStateAfter: createGithubProductState({ integrationBindings: [] }),
+    });
+
+    expect(result.passed).toBe(true);
+  });
+
+  it("fails when product mutation happens during the initial proposal turn", () => {
+    const result = evaluateDesignerEvalRun({
+      caseId: "github-pr-review-basic",
+      assertions: [
+        {
+          kind: "product-mutation-not-before-turn",
+          minTurnIndex: 1,
+        },
+      ],
+      dashboardControlActions: [
+        {
+          sequence: 1,
+          turnIndex: 0,
+          kind: "show_designer_canvas_tab",
+          tabKind: "blueprint",
+          input: {},
+          response: {},
+        },
+        {
+          sequence: 2,
+          turnIndex: 0,
+          kind: "request_user_input",
+          inputId: "select_repository",
+          input: {},
+          response: {
+            success: true,
+            contentItems: [
+              {
+                type: "inputText",
+                text: '{"kind":"sandbox-profile-draft-provider-resources-saved"}',
+              },
+            ],
+          },
+        },
+      ],
+      productStateAfter: createGithubProductState({ integrationBindings: [] }),
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.checks[0]?.detail).toContain("before required turn 1");
+  });
+
   it("fails when saved selected provider resources include unselected repositories", () => {
     const result = evaluateDesignerEvalRun({
       caseId: "github-pr-review-basic",
@@ -158,6 +241,11 @@ describe("Designer eval evaluator", () => {
           kind: "required-binding-tools-present",
           connectionId: "icn_github",
           tools: ["github-cli"],
+        },
+        {
+          kind: "required-agent-model-provider-binding",
+          connectionId: "icn_openai",
+          compatibleTargetKeys: ["openai-default"],
         },
         {
           kind: "setup-incompleteness-disclosed",
@@ -210,6 +298,12 @@ describe("Designer eval evaluator", () => {
             providerFamilyId: "github",
             targetKey: "github-cloud",
           },
+          {
+            id: "icn_openai",
+            label: "OpenAI",
+            providerFamilyId: "openai",
+            targetKey: "openai-default",
+          },
         ],
         availableProviderResources: [],
         targetDraft: {
@@ -225,6 +319,12 @@ describe("Designer eval evaluator", () => {
                 tools: ["github-cli"],
               },
             },
+            {
+              id: "ibd_openai",
+              connectionId: "icn_openai",
+              kind: "agent",
+              config: {},
+            },
           ],
         },
       },
@@ -233,6 +333,79 @@ describe("Designer eval evaluator", () => {
     });
 
     expect(result.passed).toBe(true);
+  });
+
+  it("fails when the required agent model provider binding is missing", () => {
+    const result = evaluateDesignerEvalRun({
+      caseId: "ai-software-factory-linear-github",
+      assertions: [
+        {
+          kind: "required-agent-model-provider-binding",
+          connectionId: "icn_openai",
+          compatibleTargetKeys: ["openai-default"],
+        },
+      ],
+      dashboardControlActions: [],
+      productStateAfter: {
+        providerConnections: [
+          {
+            id: "icn_openai",
+            label: "OpenAI",
+            providerFamilyId: "openai",
+            targetKey: "openai-default",
+          },
+        ],
+        availableProviderResources: [],
+        targetDraft: {
+          profileId: "sbp_eval",
+          version: 1,
+          integrationBindings: [],
+        },
+      },
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.checks[0]?.detail).toContain("No agent binding");
+  });
+
+  it("fails when the agent model provider binding uses an incompatible target", () => {
+    const result = evaluateDesignerEvalRun({
+      caseId: "ai-software-factory-linear-github",
+      assertions: [
+        {
+          kind: "required-agent-model-provider-binding",
+          connectionId: "icn_anthropic",
+          compatibleTargetKeys: ["openai-default"],
+        },
+      ],
+      dashboardControlActions: [],
+      productStateAfter: {
+        providerConnections: [
+          {
+            id: "icn_anthropic",
+            label: "Anthropic",
+            providerFamilyId: "anthropic",
+            targetKey: "anthropic-default",
+          },
+        ],
+        availableProviderResources: [],
+        targetDraft: {
+          profileId: "sbp_eval",
+          version: 1,
+          integrationBindings: [
+            {
+              id: "ibd_anthropic",
+              connectionId: "icn_anthropic",
+              kind: "agent",
+              config: {},
+            },
+          ],
+        },
+      },
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.checks[0]?.detail).toContain("expected one of openai-default");
   });
 
   it("fails when the transcript claims configured provider tools are still missing", () => {
@@ -502,6 +675,12 @@ function createAiFactoryProductState(input: {
         providerFamilyId: "github",
         targetKey: "github-cloud",
       },
+      {
+        id: "icn_openai",
+        label: "OpenAI",
+        providerFamilyId: "openai",
+        targetKey: "openai-default",
+      },
     ],
     availableProviderResources: [],
     targetDraft: {
@@ -523,6 +702,12 @@ function createAiFactoryProductState(input: {
           config: {
             tools: [...input.githubTools],
           },
+        },
+        {
+          id: "ibd_openai",
+          connectionId: "icn_openai",
+          kind: "agent",
+          config: {},
         },
       ],
     },
