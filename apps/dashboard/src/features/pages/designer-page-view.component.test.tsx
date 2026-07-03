@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { EditorView } from "@codemirror/view";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
@@ -114,6 +114,41 @@ describe("DesignerPageView", () => {
       "disabled",
       false,
     );
+  });
+
+  it("fills the composer from a starter prompt without starting the session", () => {
+    render(<ControlledDesignerPageView />);
+
+    const starterPrompts = screen.getByTestId("designer-starter-prompts");
+    const startButton = screen.getByRole("button", { name: "Start Designer session" });
+    const composer = screen.getByRole("textbox");
+
+    expect(starterPrompts).toBeDefined();
+    expect(starterPrompts.compareDocumentPosition(composer)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    const visibleStarterPromptButtons = within(starterPrompts).getAllByRole("button");
+    expect(visibleStarterPromptButtons).toHaveLength(6);
+    const visibleStarterPromptCategories = visibleStarterPromptButtons
+      .map((button) => button.getAttribute("aria-label")?.split(":")[0])
+      .sort();
+    expect(new Set(visibleStarterPromptCategories).size).toBe(
+      visibleStarterPromptCategories.length,
+    );
+    const firstStarterPromptButton = visibleStarterPromptButtons[0];
+    if (firstStarterPromptButton === undefined) {
+      throw new Error("Expected at least one visible Designer starter prompt.");
+    }
+
+    const starterPrompt = firstStarterPromptButton.getAttribute("title");
+    if (starterPrompt === null) {
+      throw new Error("Expected visible Designer starter prompt to expose full prompt text.");
+    }
+
+    expect(startButton).toHaveProperty("disabled", true);
+
+    fireEvent.click(firstStarterPromptButton);
+
+    expect(getDesignerComposerEditorView().state.doc.toString()).toBe(starterPrompt);
+    expect(startButton).toHaveProperty("disabled", false);
   });
 
   it("shows the compact past sessions table without redundant columns or row actions", () => {
