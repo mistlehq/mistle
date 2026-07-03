@@ -1981,7 +1981,7 @@ async function buildDesignerBlueprintLayoutGraph(input: {
   const hasWorkflowNodes = Number.isFinite(workflowMinX) && Number.isFinite(workflowMaxX);
   const workflowCenterX = hasWorkflowNodes ? workflowMinX + (workflowMaxX - workflowMinX) / 2 : 0;
   if (hasWorkflowNodes) {
-    centerDesignerBlueprintSingletonLayers({
+    centerDesignerBlueprintLayers({
       centerX: workflowCenterX,
       nodes: workflowNodes,
       positionByNodeId,
@@ -2067,11 +2067,12 @@ async function buildDesignerBlueprintLayoutGraph(input: {
   };
 }
 
-function centerDesignerBlueprintSingletonLayers(input: {
+function centerDesignerBlueprintLayers(input: {
   centerX: number;
   nodes: readonly DesignerBlueprintLayoutNode[];
   positionByNodeId: Map<string, { x: number; y: number }>;
 }): void {
+  const nodeById = new Map(input.nodes.map((node) => [node.id, node]));
   const nodeIdsByY = new Map<number, string[]>();
   for (const node of input.nodes) {
     const position = input.positionByNodeId.get(node.id);
@@ -2085,21 +2086,38 @@ function centerDesignerBlueprintSingletonLayers(input: {
   }
 
   for (const nodeIds of nodeIdsByY.values()) {
-    const [nodeId] = nodeIds;
-    if (nodeId === undefined || nodeIds.length !== 1) {
+    let layerMinX = Number.POSITIVE_INFINITY;
+    let layerMaxX = Number.NEGATIVE_INFINITY;
+
+    for (const nodeId of nodeIds) {
+      const node = nodeById.get(nodeId);
+      const position = input.positionByNodeId.get(nodeId);
+      if (node === undefined || position === undefined) {
+        continue;
+      }
+
+      layerMinX = Math.min(layerMinX, position.x);
+      layerMaxX = Math.max(layerMaxX, position.x + getDesignerBlueprintPositionedNodeWidth(node));
+    }
+
+    if (!Number.isFinite(layerMinX) || !Number.isFinite(layerMaxX)) {
       continue;
     }
 
-    const node = input.nodes.find((candidate) => candidate.id === nodeId);
-    const position = input.positionByNodeId.get(nodeId);
-    if (node === undefined || position === undefined) {
-      continue;
-    }
+    const layerCenterX = layerMinX + (layerMaxX - layerMinX) / 2;
+    const offsetX = input.centerX - layerCenterX;
 
-    input.positionByNodeId.set(nodeId, {
-      x: input.centerX - getDesignerBlueprintPositionedNodeWidth(node) / 2,
-      y: position.y,
-    });
+    for (const nodeId of nodeIds) {
+      const position = input.positionByNodeId.get(nodeId);
+      if (position === undefined) {
+        continue;
+      }
+
+      input.positionByNodeId.set(nodeId, {
+        x: position.x + offsetX,
+        y: position.y,
+      });
+    }
   }
 }
 
