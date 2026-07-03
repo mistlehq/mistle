@@ -28,7 +28,7 @@ Good instruction updates are generic and reusable:
 - when to show a blueprint before product mutation
 - how to ask one concrete decision at a time
 - how to distinguish implementation agents from review agents
-- how to disclose incomplete provider setup honestly
+- how to disclose incomplete provider setup accurately
 
 Avoid narrow case scripts in managed instructions. If the guidance only applies to one workflow family, prefer a discoverable reference or skill.
 
@@ -58,7 +58,7 @@ An AI software factory skill could guide Designer through:
 - drafting the readiness contract
 - mapping issue states and columns
 - deciding whether implementation and review need separate sandbox profiles
-- defining feedback loops and human review gates
+- defining feedback loops and review gates
 - producing a workflow operating guide or starter issue
 
 Skills should stay generic by default and route into provider-specific references only when system setup details matter.

@@ -22,7 +22,7 @@ Use an LLM judge for semantic quality:
 - whether implementation and review responsibilities are separated when the process calls for distinct agent roles
 - whether setup work is separated from workflow behavior
 - whether the feedback loop can improve both coding and review behavior over time
-- whether the handoff is honest about incomplete setup or missing capability
+- whether Designer discloses incomplete setup, missing capability, and exact user actions without overclaiming readiness
 - whether the transcript overclaims readiness
 
 The judge must not override deterministic evidence. If product state lacks a required provider tool, the run fails even if the transcript sounds plausible.

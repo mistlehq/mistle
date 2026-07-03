@@ -127,7 +127,7 @@ function renderJudgeResultTemplate(): string {
         factoryProcessClarity: 1,
         agentRoleSeparation: 1,
         feedbackLoopQuality: 1,
-        honestHandoff: 1,
+        readinessDisclosure: 1,
       },
       findings: [
         {

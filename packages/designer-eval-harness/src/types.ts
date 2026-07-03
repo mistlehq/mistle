@@ -188,7 +188,7 @@ export type DesignerEvalJudgeResult = {
     factoryProcessClarity: number;
     agentRoleSeparation: number;
     feedbackLoopQuality: number;
-    honestHandoff: number;
+    readinessDisclosure: number;
   };
   findings: readonly {
     severity: "low" | "medium" | "high";
