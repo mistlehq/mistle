@@ -338,6 +338,7 @@ export const GitHubBranchSyncRequired: Story = {
   play: async ({ canvasElement }): Promise<void> => {
     const body = within(canvasElement.ownerDocument.body);
 
+    await expect(await body.findByText("main")).toBeVisible();
     await expect(
       body.queryByText("Resource sync is required before resources can be listed."),
     ).toBe(null);

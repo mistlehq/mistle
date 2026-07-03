@@ -25,7 +25,7 @@ import {
 import type { IntegrationResourceListViewState } from "../forms/integration-resource-picker-view-model.js";
 import {
   listIntegrationConnectionResources,
-  IntegrationsApiError,
+  isIntegrationResourceSyncRequiredError,
   type IntegrationConnection,
   type IntegrationConnectionResource,
 } from "../integrations/integrations-service.js";
@@ -758,8 +758,7 @@ export function resolveResourceListViewState(input: {
   isPending: boolean;
   isError: boolean;
   errorMessage: string;
-  error?: unknown;
-  errors?: readonly unknown[] | undefined;
+  errors: readonly unknown[];
 }): IntegrationResourceListViewState {
   if (input.isPending) {
     return { mode: "loading" };
@@ -769,23 +768,15 @@ export function resolveResourceListViewState(input: {
     return {
       mode: "error",
       message: input.errorMessage,
-      suppressAlert: shouldSuppressResourceListError(input),
+      suppressSyncFailureAlert: shouldSuppressResourceListError(input.errors),
     };
   }
 
   return { mode: "ready" };
 }
 
-function shouldSuppressResourceListError(input: {
-  error?: unknown;
-  errors?: readonly unknown[] | undefined;
-}): boolean {
-  const errors = input.errors ?? (input.error === undefined ? [] : [input.error]);
-  return errors.length > 0 && errors.every(isResourceSyncRequiredError);
-}
-
-function isResourceSyncRequiredError(error: unknown): boolean {
-  return error instanceof IntegrationsApiError && error.code === "RESOURCE_SYNC_REQUIRED";
+function shouldSuppressResourceListError(errors: readonly unknown[]): boolean {
+  return errors.length > 0 && errors.every(isIntegrationResourceSyncRequiredError);
 }
 
 function toResourcePickerItems(input: {
@@ -1161,7 +1152,7 @@ function RelationshipActorPolicyFields(input: {
           isRefreshing={resourcesQuery.isFetching}
           label="group or set"
           listState={resolveResourceListViewState({
-            error: resourcesQuery.error,
+            errors: resourcesQuery.isError ? [resourcesQuery.error] : [],
             errorMessage: "Could not load groups.",
             isError: resourcesQuery.isError,
             isPending: resourcesQuery.isPending,

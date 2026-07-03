@@ -224,7 +224,7 @@ describe("IntegrationConnectionResourcePickerView", () => {
         listState={{
           mode: "error",
           message: "Resource sync is required before resources can be listed.",
-          suppressAlert: true,
+          suppressSyncFailureAlert: true,
         }}
         onBlur={() => {}}
         onFocus={() => {}}

@@ -38,7 +38,7 @@ import {
 } from "../forms/string-combobox-options.js";
 import { IntegrationLogo } from "../integrations/integration-logo.js";
 import {
-  IntegrationsApiError,
+  isIntegrationResourceSyncRequiredError,
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
@@ -632,7 +632,7 @@ function useTriggerParameterResources(input: {
     lastErrorMessage: resourceQuery.data?.lastErrorMessage,
   });
   const resourceErrorSuppressed =
-    resourceQuery.isError && isResourceSyncRequiredError(resourceQuery.error);
+    resourceQuery.isError && isIntegrationResourceSyncRequiredError(resourceQuery.error);
 
   return {
     availableResourceOptions,
@@ -953,7 +953,7 @@ function resolveResourceParameterErrorMessage(input: {
   lastErrorMessage: string | undefined;
 }): string | null {
   if (input.isError) {
-    if (isResourceSyncRequiredError(input.error)) {
+    if (isIntegrationResourceSyncRequiredError(input.error)) {
       return null;
     }
 
@@ -968,10 +968,6 @@ function resolveResourceParameterErrorMessage(input: {
   }
 
   return null;
-}
-
-function isResourceSyncRequiredError(error: unknown): boolean {
-  return error instanceof IntegrationsApiError && error.code === "RESOURCE_SYNC_REQUIRED";
 }
 
 function EventParameterField(input: {
@@ -1210,7 +1206,7 @@ function ResourceMultiSelectParameterField(input: {
       ? {
           mode: "error",
           message: input.resourceErrorMessage ?? `Could not load ${resourceLabel}.`,
-          suppressAlert: input.resourceErrorSuppressed,
+          suppressSyncFailureAlert: input.resourceErrorSuppressed,
         }
       : {
           mode: "ready",

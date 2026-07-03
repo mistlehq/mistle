@@ -31,6 +31,7 @@ export {
 export { listIntegrationDirectory } from "./integrations-directory-service.js";
 export {
   IntegrationsApiError,
+  isIntegrationResourceSyncRequiredError,
   type CreatedIntegrationConnection,
   type DeletedIntegrationConnection,
   type DeviceAuthorizationAttemptResponse,

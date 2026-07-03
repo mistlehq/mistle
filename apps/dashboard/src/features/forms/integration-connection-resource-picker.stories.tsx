@@ -186,7 +186,7 @@ export const StateGallery: Story = {
             listState={{
               mode: "error",
               message: "Resource sync is required before resources can be listed.",
-              suppressAlert: true,
+              suppressSyncFailureAlert: true,
             }}
             searchPlaceholder="No synced repositories"
             visibleItems={[]}

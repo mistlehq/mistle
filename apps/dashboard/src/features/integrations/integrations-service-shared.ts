@@ -788,6 +788,10 @@ export class IntegrationsApiError extends Error {
   }
 }
 
+export function isIntegrationResourceSyncRequiredError(error: unknown): boolean {
+  return error instanceof IntegrationsApiError && error.code === "RESOURCE_SYNC_REQUIRED";
+}
+
 export async function readJsonWithSchema<T>(input: {
   response: Response;
   schema: z.ZodType<T>;

@@ -27,7 +27,7 @@ describe("resolveResourceListViewState", () => {
     expect(state).toEqual({
       mode: "error",
       message: "Could not load actors.",
-      suppressAlert: false,
+      suppressSyncFailureAlert: false,
     });
   });
 });
