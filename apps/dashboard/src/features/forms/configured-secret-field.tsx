@@ -40,7 +40,7 @@ type SavingTextFieldProps = {
   description?: string;
   placeholder?: string;
   rows?: number;
-  type?: React.ComponentProps<typeof Input>["type"];
+  type?: React.ComponentProps<"input">["type"];
   multiline?: boolean;
   inputClassName?: string;
   autoComplete?: string;
@@ -310,7 +310,7 @@ export function ConfiguredSecretField(input: ConfiguredSecretFieldProps): React.
 }
 
 function resolveConfiguredSecretPlaceholder(
-  type: React.ComponentProps<typeof Input>["type"] | undefined,
+  type: React.ComponentProps<"input">["type"] | undefined,
 ): string {
   return type === "password" ? PasswordConfiguredSecretPlaceholder : ConfiguredSecretPlaceholder;
 }

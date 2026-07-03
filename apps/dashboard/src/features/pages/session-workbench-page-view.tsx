@@ -1,6 +1,5 @@
 import {
   cn,
-  type PanelImperativeHandle,
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
@@ -30,6 +29,11 @@ const ResizablePanelStorageKeyPrefix = "react-resizable-panels:";
 type SessionWorkbenchSecondaryPanelMountMode = "visible-only" | "persistent-collapsible";
 type SessionWorkbenchSecondaryPanelTransitionMode = "standard" | "slow";
 type PanelDefaultLayout = Record<string, number>;
+type ResizablePanelHandle = {
+  collapse: () => void;
+  expand: () => void;
+  resize: (size: string) => void;
+};
 
 type SessionWorkbenchAlert = {
   title: string;
@@ -99,8 +103,8 @@ export function SessionWorkbenchPageView({
 }: SessionWorkbenchPageViewProps): React.JSX.Element {
   const [secondaryPanelTransitionMode, setSecondaryPanelTransitionMode] =
     useState<SessionWorkbenchSecondaryPanelTransitionMode | null>(null);
-  const bottomPanelRef = useRef<PanelImperativeHandle | null>(null);
-  const secondaryPanelRef = useRef<PanelImperativeHandle | null>(null);
+  const bottomPanelRef = useRef<ResizablePanelHandle | null>(null);
+  const secondaryPanelRef = useRef<ResizablePanelHandle | null>(null);
   const hasAppliedBottomPanelVisibilityRef = useRef(false);
   const hasAppliedSecondaryPanelVisibilityRef = useRef(false);
   const initialStoredLayoutByGroupRef = useRef(new Map<string, boolean>());
@@ -614,7 +618,7 @@ function readInitialStoredPanelLayout(input: {
 }
 
 function resizePanelToPercentageOnNextFrame(input: {
-  panel: PanelImperativeHandle;
+  panel: ResizablePanelHandle;
   percentage: number;
 }): number {
   return window.requestAnimationFrame(() => {
