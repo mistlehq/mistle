@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { Socket } from "node:net";
 
+import { IntegrationResourceSyncFailureCodes } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { listGitHubConnectionResources } from "./list-connection-resources.server.js";
@@ -645,7 +646,9 @@ describe("listGitHubConnectionResources", () => {
             value: "github-installation-token",
           },
         }),
-      ).rejects.toThrow("Resource not accessible by integration");
+      ).rejects.toMatchObject({
+        code: IntegrationResourceSyncFailureCodes.PERMISSION_DENIED,
+      });
     } finally {
       await server.stop();
     }
@@ -879,7 +882,9 @@ describe("listGitHubConnectionResources", () => {
             value: "github-installation-token",
           },
         }),
-      ).rejects.toThrow("Resource not accessible by integration");
+      ).rejects.toMatchObject({
+        code: IntegrationResourceSyncFailureCodes.PERMISSION_DENIED,
+      });
     } finally {
       await server.stop();
     }

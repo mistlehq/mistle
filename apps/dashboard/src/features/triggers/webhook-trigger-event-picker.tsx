@@ -41,6 +41,9 @@ import {
   isIntegrationResourceSyncRequiredError,
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
+  resolveIntegrationResourceSyncFailureReasonFromCode,
+  resolveIntegrationResourceSyncFailureReasonFromError,
+  type IntegrationResourceSyncFailureReason,
 } from "../integrations/integrations-service.js";
 import { TriggerFormFieldError } from "./trigger-form-shell.js";
 import { isWebhookTriggerEventOptionUnavailable } from "./webhook-trigger-event-option-availability.js";
@@ -631,11 +634,18 @@ function useTriggerParameterResources(input: {
     syncState: resourceQuery.data?.syncState,
     lastErrorMessage: resourceQuery.data?.lastErrorMessage,
   });
+  const resourceFailureReason = resolveResourceParameterFailureReason({
+    isError: resourceQuery.isError,
+    error: resourceQuery.error,
+    syncState: resourceQuery.data?.syncState,
+    lastErrorCode: resourceQuery.data?.lastErrorCode,
+  });
 
   return {
     availableResourceOptions,
     normalizedResourceOptions,
     resourceErrorMessage,
+    resourceFailureReason,
     resourceQuery,
     resourceQueryKey,
     unavailableSelectedValues,
@@ -869,6 +879,7 @@ function OneOfParameterGroupField(input: {
               rule={selectedRule}
               resourceQueryKey={selectedResources.resourceQueryKey}
               resourceErrorMessage={selectedResources.resourceErrorMessage}
+              resourceFailureReason={selectedResources.resourceFailureReason}
               resourceOptions={selectedResources.availableResourceOptions}
               resourceQueryIsError={selectedResources.resourceQuery.isError}
               resourceQueryIsPending={selectedResources.resourceQuery.isPending}
@@ -911,7 +922,12 @@ function OneOfParameterGroupField(input: {
             />
           )}
           {selectedResources.resourceErrorMessage === null ? null : (
-            <Notice variant="alert">{selectedResources.resourceErrorMessage}</Notice>
+            <Notice variant="alert">
+              {formatResourceParameterFailureNotice(
+                selectedResources.resourceFailureReason,
+                selectedResources.resourceErrorMessage,
+              )}
+            </Notice>
           )}
         </div>
       ) : selectedParameter.kind === "string" ? (
@@ -964,6 +980,54 @@ function resolveResourceParameterErrorMessage(input: {
   }
 
   return null;
+}
+
+function resolveResourceParameterFailureReason(input: {
+  isError: boolean;
+  error: unknown;
+  syncState: string | undefined;
+  lastErrorCode: string | undefined;
+}): IntegrationResourceSyncFailureReason | null {
+  if (input.isError) {
+    if (isIntegrationResourceSyncRequiredError(input.error)) {
+      return null;
+    }
+
+    return resolveIntegrationResourceSyncFailureReasonFromError(input.error) ?? "sync-failed";
+  }
+
+  if (input.syncState === "error") {
+    return resolveIntegrationResourceSyncFailureReasonFromCode(input.lastErrorCode);
+  }
+
+  return null;
+}
+
+function formatResourceParameterFailureHeading(
+  reason: IntegrationResourceSyncFailureReason | null,
+): string | null {
+  if (reason === "permission-denied") {
+    return "Provider access needs repair.";
+  }
+
+  if (reason === "credential-failed") {
+    return "Connection credentials need repair.";
+  }
+
+  return null;
+}
+
+function formatResourceParameterFailureNotice(
+  reason: IntegrationResourceSyncFailureReason | null,
+  message: string,
+): string {
+  const heading = formatResourceParameterFailureHeading(reason);
+
+  if (heading === null) {
+    return message;
+  }
+
+  return `${heading} ${message}`;
 }
 
 function EventParameterField(input: {
@@ -1115,6 +1179,7 @@ function EventParameterField(input: {
         rule={input.rule}
         resourceQueryKey={resources.resourceQueryKey}
         resourceErrorMessage={resources.resourceErrorMessage}
+        resourceFailureReason={resources.resourceFailureReason}
         resourceOptions={resources.availableResourceOptions}
         resourceQueryIsError={resources.resourceQuery.isError}
         resourceQueryIsPending={resources.resourceQuery.isPending}
@@ -1156,6 +1221,7 @@ function ResourceMultiSelectParameterField(input: {
     displayName: string;
   }>;
   resourceErrorMessage: string | null;
+  resourceFailureReason: IntegrationResourceSyncFailureReason | null;
   resourceQueryKey: TriggerParameterResourceQueryKey;
   resourceQueryIsError: boolean;
   resourceQueryIsPending: boolean;
@@ -1196,9 +1262,10 @@ function ResourceMultiSelectParameterField(input: {
     ? {
         mode: "loading",
       }
-    : input.resourceQueryIsError && input.resourceErrorMessage !== null
+    : input.resourceErrorMessage !== null
       ? {
           mode: "error",
+          ...(input.resourceFailureReason === null ? {} : { reason: input.resourceFailureReason }),
           message: input.resourceErrorMessage,
         }
       : {

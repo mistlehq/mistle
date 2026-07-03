@@ -1,4 +1,5 @@
 import { formatDateTime } from "../shared/date-formatters.js";
+import { resolveIntegrationResourceSyncFailureReasonFromCode } from "./integrations-service.js";
 
 export function formatConnectionStatusLabel(status: "active" | "error" | "revoked"): string {
   if (status === "active") {
@@ -33,6 +34,21 @@ export function formatSyncStateLabel(
     return "Sync failed";
   }
   return "Ready";
+}
+
+export function formatResourceSyncFailureLabel(input: {
+  lastErrorCode?: string | undefined;
+}): string {
+  const reason = resolveIntegrationResourceSyncFailureReasonFromCode(input.lastErrorCode);
+  if (reason === "permission-denied") {
+    return "Access needs repair";
+  }
+
+  if (reason === "credential-failed") {
+    return "Credentials need repair";
+  }
+
+  return "Sync failed";
 }
 
 export function formatResourceMetadata(input: {

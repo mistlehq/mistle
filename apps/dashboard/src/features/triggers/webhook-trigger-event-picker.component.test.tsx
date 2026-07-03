@@ -971,6 +971,7 @@ describe("WebhookTriggerEventPicker", () => {
         familyId: "github",
         kind: "team",
         syncState: "error",
+        lastErrorCode: "resource_sync_permission_denied",
         lastErrorMessage:
           "GitHub returned 403 while listing teams. Reapprove Members read permission.",
         items: [],
@@ -981,11 +982,8 @@ describe("WebhookTriggerEventPicker", () => {
     await waitFor(() => {
       expect(screen.getAllByText("platform").length).toBeGreaterThan(0);
     });
-    expect(
-      screen.getByText(
-        "GitHub returned 403 while listing teams. Reapprove Members read permission.",
-      ),
-    ).toBeDefined();
+    expect(screen.getByText(/Provider access needs repair/)).toBeDefined();
+    expect(screen.getByText(/GitHub returned 403 while listing teams/)).toBeDefined();
     expect(screen.queryByPlaceholderText("No teams available")).toBeNull();
   });
 

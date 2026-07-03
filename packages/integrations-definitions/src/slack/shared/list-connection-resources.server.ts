@@ -1,10 +1,12 @@
 import { buildUrlWithPath } from "@mistle/http";
-import type {
-  DiscoveredIntegrationResourceAttribute,
-  DiscoveredIntegrationResource,
-  DiscoveredIntegrationResourceRelationship,
-  ListConnectionResourcesInput,
-  ListConnectionResourcesResult,
+import {
+  IntegrationResourceSyncFailure,
+  IntegrationResourceSyncFailureCodes,
+  type DiscoveredIntegrationResourceAttribute,
+  type DiscoveredIntegrationResource,
+  type DiscoveredIntegrationResourceRelationship,
+  type ListConnectionResourcesInput,
+  type ListConnectionResourcesResult,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
@@ -163,6 +165,98 @@ function buildSlackUserGroupUsersListUrl(input: { apiBaseUrl: string; userGroupI
   apiUrl.searchParams.set("usergroup", input.userGroupId);
   apiUrl.searchParams.set("include_disabled", "false");
   return apiUrl;
+}
+
+function createSlackResourceSyncFailureForStatus(input: {
+  method: string;
+  status: number;
+}): IntegrationResourceSyncFailure | null {
+  if (input.status === 403) {
+    return new IntegrationResourceSyncFailure({
+      code: IntegrationResourceSyncFailureCodes.PERMISSION_DENIED,
+      message: `Slack denied access while syncing resources with ${input.method}. Review the Slack app scopes for this connection.`,
+      providerCode: "slack_403",
+    });
+  }
+
+  if (input.status === 401) {
+    return new IntegrationResourceSyncFailure({
+      code: IntegrationResourceSyncFailureCodes.CREDENTIAL_FAILED,
+      message: `Slack rejected the credential while syncing resources with ${input.method}. Reconnect this Slack integration.`,
+      providerCode: "slack_401",
+    });
+  }
+
+  return null;
+}
+
+function createSlackResourceSyncFailureForError(input: {
+  method: string;
+  error: string;
+}): IntegrationResourceSyncFailure | null {
+  if (input.error === "missing_scope") {
+    return new IntegrationResourceSyncFailure({
+      code: IntegrationResourceSyncFailureCodes.PERMISSION_DENIED,
+      message: `Slack is missing a required scope for ${input.method}. Review the Slack app scopes for this connection.`,
+      providerCode: input.error,
+    });
+  }
+
+  if (
+    input.error === "invalid_auth" ||
+    input.error === "not_authed" ||
+    input.error === "token_revoked"
+  ) {
+    return new IntegrationResourceSyncFailure({
+      code: IntegrationResourceSyncFailureCodes.CREDENTIAL_FAILED,
+      message: `Slack rejected the credential for ${input.method}. Reconnect this Slack integration.`,
+      providerCode: input.error,
+    });
+  }
+
+  return null;
+}
+
+function assertSlackHttpResponseOk(input: { method: string; response: Response }): void {
+  if (input.response.ok) {
+    return;
+  }
+
+  const failure = createSlackResourceSyncFailureForStatus({
+    method: input.method,
+    status: input.response.status,
+  });
+  if (failure !== null) {
+    throw failure;
+  }
+
+  throw new Error(
+    `Slack ${input.method} request failed with status ${String(input.response.status)}.`,
+  );
+}
+
+function assertSlackPayloadOk(input: {
+  method: string;
+  ok: boolean;
+  error: string | undefined;
+}): void {
+  if (input.ok) {
+    return;
+  }
+
+  if (input.error !== undefined) {
+    const failure = createSlackResourceSyncFailureForError({
+      method: input.method,
+      error: input.error,
+    });
+    if (failure !== null) {
+      throw failure;
+    }
+  }
+
+  throw new Error(
+    `Slack ${input.method} returned an error${input.error === undefined ? "." : `: ${input.error}.`}`,
+  );
 }
 
 function isSelectableChannel(conversation: SlackConversation): boolean {
@@ -386,18 +480,14 @@ async function listSlackChannels(input: {
       },
     );
 
-    if (!response.ok) {
-      throw new Error(
-        `Slack conversations.list request failed with status ${String(response.status)}.`,
-      );
-    }
+    assertSlackHttpResponseOk({ method: "conversations.list", response });
 
     const parsedPayload = SlackConversationsListResponseSchema.parse(await response.json());
-    if (!parsedPayload.ok) {
-      throw new Error(
-        `Slack conversations.list returned an error${parsedPayload.error === undefined ? "." : `: ${parsedPayload.error}.`}`,
-      );
-    }
+    assertSlackPayloadOk({
+      method: "conversations.list",
+      ok: parsedPayload.ok,
+      error: parsedPayload.error,
+    });
 
     for (const conversation of parsedPayload.channels ?? []) {
       if (!isSelectableChannel(conversation)) {
@@ -437,16 +527,14 @@ async function listSlackWorkspace(input: {
     },
   );
 
-  if (!response.ok) {
-    throw new Error(`Slack auth.test request failed with status ${String(response.status)}.`);
-  }
+  assertSlackHttpResponseOk({ method: "auth.test", response });
 
   const parsedPayload = SlackAuthTestResponseSchema.parse(await response.json());
-  if (!parsedPayload.ok) {
-    throw new Error(
-      `Slack auth.test returned an error${parsedPayload.error === undefined ? "." : `: ${parsedPayload.error}.`}`,
-    );
-  }
+  assertSlackPayloadOk({
+    method: "auth.test",
+    ok: parsedPayload.ok,
+    error: parsedPayload.error,
+  });
 
   if (parsedPayload.team_id === undefined) {
     throw new Error("Slack auth.test response is missing required `team_id`.");
@@ -479,16 +567,14 @@ async function listSlackUsers(input: {
       },
     );
 
-    if (!response.ok) {
-      throw new Error(`Slack users.list request failed with status ${String(response.status)}.`);
-    }
+    assertSlackHttpResponseOk({ method: "users.list", response });
 
     const parsedPayload = SlackUsersListResponseSchema.parse(await response.json());
-    if (!parsedPayload.ok) {
-      throw new Error(
-        `Slack users.list returned an error${parsedPayload.error === undefined ? "." : `: ${parsedPayload.error}.`}`,
-      );
-    }
+    assertSlackPayloadOk({
+      method: "users.list",
+      ok: parsedPayload.ok,
+      error: parsedPayload.error,
+    });
 
     for (const user of parsedPayload.members ?? []) {
       if (user.deleted === true) {
@@ -573,18 +659,14 @@ async function listSlackUserGroupMembershipRelationships(input: {
     },
   );
 
-  if (!response.ok) {
-    throw new Error(
-      `Slack usergroups.users.list request failed with status ${String(response.status)}.`,
-    );
-  }
+  assertSlackHttpResponseOk({ method: "usergroups.users.list", response });
 
   const parsedPayload = SlackUserGroupUsersListResponseSchema.parse(await response.json());
-  if (!parsedPayload.ok) {
-    throw new Error(
-      `Slack usergroups.users.list returned an error${parsedPayload.error === undefined ? "." : `: ${parsedPayload.error}.`}`,
-    );
-  }
+  assertSlackPayloadOk({
+    method: "usergroups.users.list",
+    ok: parsedPayload.ok,
+    error: parsedPayload.error,
+  });
   if (parsedPayload.users === undefined) {
     throw new Error("Slack usergroups.users.list response is missing users.");
   }
@@ -617,16 +699,14 @@ async function listSlackUserGroups(input: {
     },
   );
 
-  if (!response.ok) {
-    throw new Error(`Slack usergroups.list request failed with status ${String(response.status)}.`);
-  }
+  assertSlackHttpResponseOk({ method: "usergroups.list", response });
 
   const parsedPayload = SlackUserGroupsListResponseSchema.parse(await response.json());
-  if (!parsedPayload.ok) {
-    throw new Error(
-      `Slack usergroups.list returned an error${parsedPayload.error === undefined ? "." : `: ${parsedPayload.error}.`}`,
-    );
-  }
+  assertSlackPayloadOk({
+    method: "usergroups.list",
+    ok: parsedPayload.ok,
+    error: parsedPayload.error,
+  });
 
   const userGroups = (parsedPayload.usergroups ?? [])
     .filter((userGroup) => (userGroup.date_delete ?? 0) === 0)

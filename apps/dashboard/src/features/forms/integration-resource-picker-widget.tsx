@@ -9,6 +9,8 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
+  resolveIntegrationResourceSyncFailureReasonFromCode,
+  resolveIntegrationResourceSyncFailureReasonFromError,
 } from "../integrations/integrations-service.js";
 import { sandboxProfileIntegrationDirectoryQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { formatDateTime } from "../shared/date-formatters.js";
@@ -193,6 +195,17 @@ export function IntegrationResourcePickerWidget(
         error: resourceQuery.error,
         fallbackMessage: "Could not load resources for this connection.",
       });
+  const resourceListFailureReason = resourceQuery.isError
+    ? resolveIntegrationResourceSyncFailureReasonFromError(resourceQuery.error)
+    : null;
+  const resourceDataFailureReason =
+    resourceQuery.data?.syncState === "error"
+      ? resolveIntegrationResourceSyncFailureReasonFromCode(resourceQuery.data.lastErrorCode)
+      : null;
+  const resourceDataErrorMessage =
+    resourceQuery.data?.syncState === "error"
+      ? (resourceQuery.data.lastErrorMessage ?? "Could not sync resources for this connection.")
+      : null;
   const availableCount = resourceQuery.data?.items.length ?? options.resourceSummary?.count;
   const listState: IntegrationResourceListViewState = resourceQuery.isPending
     ? {
@@ -201,11 +214,18 @@ export function IntegrationResourcePickerWidget(
     : resourceQuery.isError
       ? {
           mode: "error",
+          ...(resourceListFailureReason === null ? {} : { reason: resourceListFailureReason }),
           message: resourceListErrorMessage ?? "Could not load resources for this connection.",
         }
-      : {
-          mode: "ready",
-        };
+      : resourceDataErrorMessage !== null
+        ? {
+            mode: "error",
+            ...(resourceDataFailureReason === null ? {} : { reason: resourceDataFailureReason }),
+            message: resourceDataErrorMessage,
+          }
+        : {
+            mode: "ready",
+          };
   const widgetViewModel = buildIntegrationResourcePickerViewModel({
     title: options.title,
     availableCount,

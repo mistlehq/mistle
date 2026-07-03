@@ -26,8 +26,10 @@ import type { IntegrationResourceListViewState } from "../forms/integration-reso
 import {
   listIntegrationConnectionResources,
   isIntegrationResourceSyncRequiredError,
+  resolveIntegrationResourceSyncFailureReasonFromError,
   type IntegrationConnection,
   type IntegrationConnectionResource,
+  type IntegrationResourceSyncFailureReason,
 } from "../integrations/integrations-service.js";
 import { FormPageSection } from "../shared/form-page.js";
 import type {
@@ -769,8 +771,10 @@ export function resolveResourceListViewState(input: {
       return { mode: "ready" };
     }
 
+    const reason = resolveResourceListFailureReason(input.errors);
     return {
       mode: "error",
+      ...(reason === null ? {} : { reason }),
       message: input.errorMessage,
     };
   }
@@ -780,6 +784,32 @@ export function resolveResourceListViewState(input: {
 
 function isResourceSyncRequiredOnlyError(errors: readonly unknown[]): boolean {
   return errors.length > 0 && errors.every(isIntegrationResourceSyncRequiredError);
+}
+
+function resolveResourceListFailureReason(
+  errors: readonly unknown[],
+): IntegrationResourceSyncFailureReason | null {
+  const reasons = errors.flatMap((error) => {
+    if (isIntegrationResourceSyncRequiredError(error)) {
+      return [];
+    }
+
+    return [resolveIntegrationResourceSyncFailureReasonFromError(error) ?? "sync-failed"];
+  });
+
+  if (reasons.length === 0) {
+    return null;
+  }
+
+  if (reasons.includes("sync-failed")) {
+    return "sync-failed";
+  }
+
+  if (reasons.includes("credential-failed")) {
+    return "credential-failed";
+  }
+
+  return "permission-denied";
 }
 
 function toResourcePickerItems(input: {

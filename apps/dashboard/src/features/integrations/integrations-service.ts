@@ -32,6 +32,8 @@ export { listIntegrationDirectory } from "./integrations-directory-service.js";
 export {
   IntegrationsApiError,
   isIntegrationResourceSyncRequiredError,
+  resolveIntegrationResourceSyncFailureReasonFromCode,
+  resolveIntegrationResourceSyncFailureReasonFromError,
   type CreatedIntegrationConnection,
   type DeletedIntegrationConnection,
   type DeviceAuthorizationAttemptResponse,
@@ -39,6 +41,7 @@ export {
   type IntegrationConnectionResource,
   type IntegrationConnectionResources,
   type IntegrationConnectionResourceSummary,
+  type IntegrationResourceSyncFailureReason,
   type IntegrationRedirectReturnContext,
   type IntegrationWebhookSource,
   type IntegrationTarget,

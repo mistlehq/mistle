@@ -26,6 +26,7 @@ describe("resolveResourceListViewState", () => {
 
     expect(state).toEqual({
       mode: "error",
+      reason: "sync-failed",
       message: "Could not load actors.",
     });
   });
@@ -51,6 +52,34 @@ describe("resolveResourceListViewState", () => {
 
     expect(state).toEqual({
       mode: "ready",
+    });
+  });
+
+  it("preserves classified resource load failure reasons for actor resources", () => {
+    const state = resolveResourceListViewState({
+      errorMessage: "Could not load actors.",
+      errors: [
+        new IntegrationsApiError({
+          operation: "listIntegrationConnectionResources",
+          status: 409,
+          body: {
+            code: "RESOURCE_SYNC_FAILED",
+            message: "Resource sync failed before any usable snapshot was stored.",
+            lastErrorCode: "resource_sync_permission_denied",
+            lastErrorMessage: "GitHub denied access while listing teams.",
+          },
+          code: "RESOURCE_SYNC_FAILED",
+          message: "Resource sync failed before any usable snapshot was stored.",
+        }),
+      ],
+      isError: true,
+      isPending: false,
+    });
+
+    expect(state).toEqual({
+      mode: "error",
+      reason: "permission-denied",
+      message: "Could not load actors.",
     });
   });
 });

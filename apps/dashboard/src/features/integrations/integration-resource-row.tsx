@@ -8,7 +8,7 @@ import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import {
   formatResourceLabel,
   formatResourceMetadata,
-  formatSyncStateLabel,
+  formatResourceSyncFailureLabel,
 } from "./integration-connection-detail-formatters.js";
 import {
   listIntegrationConnectionResources,
@@ -19,6 +19,7 @@ export type IntegrationResourceListItemResourceSummary = {
   count: number;
   isRefreshing?: boolean;
   kind: string;
+  lastErrorCode?: string;
   lastErrorMessage?: string;
   lastSyncedAt?: string;
   syncState: "never-synced" | "syncing" | "ready" | "error";
@@ -62,7 +63,9 @@ export function IntegrationResourceListItem(
     statusContent = (
       <div className="flex items-center justify-end gap-1">
         <span className="text-destructive text-xs">
-          {formatSyncStateLabel(input.resource.syncState)}
+          {formatResourceSyncFailureLabel({
+            lastErrorCode: input.resource.lastErrorCode,
+          })}
         </span>
         {errorTooltipMessage === null ? null : (
           <Tooltip delay={0}>

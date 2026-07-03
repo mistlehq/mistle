@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { Socket } from "node:net";
 
+import { IntegrationResourceSyncFailureCodes } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { listSlackConnectionResources } from "./list-connection-resources.server.js";
@@ -372,6 +373,124 @@ describe("listSlackConnectionResources", () => {
             },
           },
         ],
+      });
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("classifies Slack missing_scope responses as resource permission denials", async () => {
+    const server = await startTestServer({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        response.setHeader("content-type", "application/json");
+
+        // Slack Web API error responses commonly use HTTP 200 with ok: false.
+        // Slack documents missing_scope as the error when the token lacks a required scope.
+        if (requestUrl.pathname === "/api/conversations.list") {
+          response.end(JSON.stringify({ ok: false, error: "missing_scope" }));
+          return;
+        }
+
+        response.writeHead(404);
+        response.end("Unexpected Slack API method.");
+      },
+    });
+
+    try {
+      await expect(
+        listSlackConnectionResources({
+          organizationId: "org_test",
+          targetKey: "slack-default-test",
+          target: {
+            familyId: "slack",
+            variantId: "slack-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: `${server.baseUrl}/api`,
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "icn_slack",
+            status: "active",
+            config: {
+              connection_method: "slack-bot-token",
+            },
+          },
+          kind: "channel",
+          credential: {
+            kind: "value",
+            value: "xoxb-test-token",
+          },
+        }),
+      ).rejects.toMatchObject({
+        code: IntegrationResourceSyncFailureCodes.PERMISSION_DENIED,
+        providerCode: "missing_scope",
+      });
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("classifies Slack invalid_auth responses as resource credential failures", async () => {
+    const server = await startTestServer({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        response.setHeader("content-type", "application/json");
+
+        if (requestUrl.pathname === "/api/auth.test") {
+          response.end(JSON.stringify({ ok: false, error: "invalid_auth" }));
+          return;
+        }
+
+        response.writeHead(404);
+        response.end("Unexpected Slack API method.");
+      },
+    });
+
+    try {
+      await expect(
+        listSlackConnectionResources({
+          organizationId: "org_test",
+          targetKey: "slack-default-test",
+          target: {
+            familyId: "slack",
+            variantId: "slack-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: `${server.baseUrl}/api`,
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "icn_slack",
+            status: "active",
+            config: {
+              connection_method: "slack-bot-token",
+            },
+          },
+          kind: "workspace",
+          credential: {
+            kind: "value",
+            value: "xoxb-test-token",
+          },
+        }),
+      ).rejects.toMatchObject({
+        code: IntegrationResourceSyncFailureCodes.CREDENTIAL_FAILED,
+        providerCode: "invalid_auth",
       });
     } finally {
       await server.stop();
