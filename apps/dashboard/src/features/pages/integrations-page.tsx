@@ -22,6 +22,7 @@ import {
   type IntegrationConnection as IntegrationDirectoryConnection,
   type IntegrationConnectionMethod,
   type IntegrationManagedWebhookSourcePostCreate,
+  type IntegrationRedirectReturnContext,
   type IntegrationTarget,
   type ManagedWebhookSetupResult,
 } from "../integrations/integrations-service-shared.js";
@@ -63,6 +64,7 @@ export type EmbeddedIntegrationsRoute = {
   detailTargetKey: string | null;
   locationState?: unknown;
   navigate: (href: string, options?: EmbeddedIntegrationsNavigateOptions) => void;
+  redirectReturnContext?: IntegrationRedirectReturnContext;
   searchParams: URLSearchParams;
   setSearchParams: (searchParams: URLSearchParams, options?: { replace?: boolean }) => void;
 };
@@ -307,6 +309,9 @@ export function IntegrationsPage(input?: {
     connections: directoryState.selectedDetailConnections,
     connectionMethods: selectedDetailConnectionMethods,
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
+    ...(input?.embeddedRoute?.redirectReturnContext === undefined
+      ? {}
+      : { redirectReturnContext: input.embeddedRoute.redirectReturnContext }),
   });
   const webhookSourceState = useIntegrationWebhookSourceState({
     detailConnections: directoryState.selectedDetailConnections,
@@ -551,6 +556,9 @@ export function IntegrationsPage(input?: {
           organizationName: organizationSummary.query.isSuccess
             ? organizationSummary.query.data.name
             : null,
+          ...(input?.embeddedRoute?.redirectReturnContext === undefined
+            ? {}
+            : { redirectReturnContext: input.embeddedRoute.redirectReturnContext }),
           setupFlow: selectedDetailConnectionSetupFlow,
         })}
         selectedConnectionNotice={renderSelectedConnectionNotice({
@@ -615,6 +623,7 @@ export function renderSelectedConnectionSetupBody(input: {
   connection: IntegrationConnection | undefined;
   navigate: (href: string) => void | Promise<void>;
   organizationName: string | null;
+  redirectReturnContext?: IntegrationRedirectReturnContext;
   setupFlow: IntegrationConnectionSetupRoute | null;
 }): React.JSX.Element | undefined {
   if (input.connection === undefined || input.setupFlow === null) {
@@ -625,6 +634,9 @@ export function renderSelectedConnectionSetupBody(input: {
     connection: input.connection,
     navigate: input.navigate,
     organizationName: input.organizationName ?? undefined,
+    ...(input.redirectReturnContext === undefined
+      ? {}
+      : { redirectReturnContext: input.redirectReturnContext }),
     setupRoute: input.setupFlow,
   });
 }

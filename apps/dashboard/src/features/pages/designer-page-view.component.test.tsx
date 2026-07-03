@@ -166,7 +166,7 @@ describe("DesignerPageView", () => {
     expect(screen.queryByRole("heading", { name: "Past sessions" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Designer session actions/ })).toBeNull();
     expect(screen.getByRole("link", { name: "Design triage agent" }).getAttribute("href")).toBe(
-      "/dsn_triage",
+      "/designer/dsn_triage",
     );
   });
 });

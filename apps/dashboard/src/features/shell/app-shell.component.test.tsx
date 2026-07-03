@@ -171,7 +171,7 @@ describe("resolveAppShellFrame", () => {
   it("passes explicit route sidebar entry state into the shell view frame", () => {
     const frame = resolveAppShellFrame(
       createFrameInput({
-        locationPathname: "/dsn_123",
+        locationPathname: "/designer/dsn_123",
         pageMeta: {
           appShellInsetOwner: "app-shell",
           appShellViewportMode: "workspace",
@@ -184,7 +184,7 @@ describe("resolveAppShellFrame", () => {
       }),
     );
 
-    expect(frame.sidebarEntryKey).toBe("/dsn_123");
+    expect(frame.sidebarEntryKey).toBe("/designer/dsn_123");
     expect(frame.sidebarEntryState).toBe("collapsed");
   });
 });

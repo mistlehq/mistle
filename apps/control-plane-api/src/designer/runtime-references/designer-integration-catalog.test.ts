@@ -2,77 +2,125 @@ import { createIntegrationRegistry } from "@mistle/integrations-definitions/serv
 import { describe, expect, it } from "vitest";
 
 import {
-  assertDesignerIntegrationCatalogWithinBudget,
-  renderDesignerIntegrationCatalogMarkdown,
+  assertDesignerIntegrationCatalogFilesWithinBudget,
+  renderDesignerIntegrationCatalogFiles,
 } from "./designer-integration-catalog.js";
 
 describe("Designer integration catalog", () => {
-  it("renders compact static metadata for Linear lookup", () => {
-    const markdown = renderDesignerIntegrationCatalogMarkdown(
+  it("renders compact static metadata for Linear lookup in the index", () => {
+    const files = renderDesignerIntegrationCatalogFiles(
       createIntegrationRegistry().listDefinitions(),
     );
+    const indexMarkdown = readCatalogFile(files, "index.md").markdown;
 
-    assertDesignerIntegrationCatalogWithinBudget(markdown);
-    expect(markdown).toContain("<!-- Generated from the Mistle integration registry.");
-    expect(markdown).toContain("## Linear");
-    expect(markdown).toContain("Provider family ID: `linear`");
-    expect(markdown).toContain("Integration target key: `linear-default`");
-    expect(markdown).toContain("- `linear-oauth-app` (form): Linear OAuth app");
-    expect(markdown).toContain("Binding tools:");
-    expect(markdown).toContain("- `linear-mcp`: Linear MCP");
-    expect(markdown).toContain("- `linear.issue.created`: Issue created");
+    assertDesignerIntegrationCatalogFilesWithinBudget(files);
+    expect(indexMarkdown).toContain("<!-- Generated from the Mistle integration registry.");
+    expect(indexMarkdown).toContain("- Linear");
+    expect(indexMarkdown).toContain("Provider family ID: `linear`");
+    expect(indexMarkdown).toContain("Integration target key: `linear-default`");
+    expect(indexMarkdown).toContain("Binding kind: `connector`");
+    expect(indexMarkdown).toContain("Detail file: `linear-default.md`");
+    expect(indexMarkdown).not.toContain("Binding tool ids:");
   });
 
-  it("renders binding tool defaults for GitHub sandbox capability selection", () => {
-    const markdown = renderDesignerIntegrationCatalogMarkdown(
+  it("renders binding tool defaults in GitHub detail reference", () => {
+    const files = renderDesignerIntegrationCatalogFiles(
       createIntegrationRegistry().listDefinitions(),
     );
 
-    assertDesignerIntegrationCatalogWithinBudget(markdown);
-    expect(markdown).toContain("## GitHub");
-    expect(markdown).toContain("Integration target key: `github-cloud`");
-    expect(markdown).toContain("- `github-cli`: GitHub CLI (default)");
+    const githubMarkdown = readCatalogFile(files, "github-cloud.md").markdown;
+
+    assertDesignerIntegrationCatalogFilesWithinBudget(files);
+    expect(githubMarkdown).toContain("# GitHub");
+    expect(githubMarkdown).toContain("Integration target key: `github-cloud`");
+    expect(githubMarkdown).toContain("Binding kind: `git`");
+    expect(githubMarkdown).toContain("- `github-cli`: GitHub CLI (default)");
+  });
+
+  it("renders webhook template fields from trigger payload references", () => {
+    const files = renderDesignerIntegrationCatalogFiles(
+      createIntegrationRegistry().listDefinitions(),
+    );
+
+    const pullRequestOpenedEvent = readCatalogListItem(
+      readCatalogFile(files, "github-cloud.md").markdown,
+      "`github.pull_request.opened`",
+    );
+
+    assertDesignerIntegrationCatalogFilesWithinBudget(files);
+    expect(pullRequestOpenedEvent).toContain("Template fields:");
+    expect(pullRequestOpenedEvent).toContain("`{{webhookEvent.eventType}}`");
+    expect(pullRequestOpenedEvent).toContain("`{{payload.repository.full_name}}`");
+    expect(pullRequestOpenedEvent).toContain("`{{payload.pull_request.number}}`");
+    expect(pullRequestOpenedEvent).toContain("`{{payload.pull_request.base.ref}}`");
+    expect(pullRequestOpenedEvent).not.toContain("{{event.");
+  });
+
+  it("renders OpenAI as an agent model-provider binding", () => {
+    const files = renderDesignerIntegrationCatalogFiles(
+      createIntegrationRegistry().listDefinitions(),
+    );
+
+    const openAiMarkdown = readCatalogFile(files, "openai-default.md").markdown;
+
+    expect(openAiMarkdown).toContain("Binding kind: `agent`");
+    expect(openAiMarkdown).toContain("- `api-key` (form): API key");
+    expect(openAiMarkdown).toContain(
+      "- `chatgpt-device-code` (device-authorization): ChatGPT subscription",
+    );
+    expect(openAiMarkdown).not.toContain("Binding tools:");
   });
 
   it("renders Google Workspace MCP server choices as binding tools", () => {
-    const markdown = renderDesignerIntegrationCatalogMarkdown(
+    const files = renderDesignerIntegrationCatalogFiles(
       createIntegrationRegistry().listDefinitions(),
     );
 
-    const googleWorkspaceSection = readCatalogSection(markdown, "Google Workspace");
+    const googleWorkspaceMarkdown = readCatalogFile(files, "google-workspace-mcp.md").markdown;
 
-    expect(googleWorkspaceSection).toContain("Binding tools:");
-    expect(googleWorkspaceSection).toContain("- `gmail`: Gmail (default)");
-    expect(googleWorkspaceSection).toContain("- `drive`: Google Drive (default)");
-    expect(googleWorkspaceSection).toContain("- `sheets`: Google Sheets (default)");
+    expect(googleWorkspaceMarkdown).toContain("Binding tools:");
+    expect(googleWorkspaceMarkdown).toContain("- `gmail`: Gmail (default)");
+    expect(googleWorkspaceMarkdown).toContain("- `drive`: Google Drive (default)");
+    expect(googleWorkspaceMarkdown).toContain("- `sheets`: Google Sheets (default)");
   });
 
   it("omits optional catalog sections when the integration has no values", () => {
-    const markdown = renderDesignerIntegrationCatalogMarkdown(
+    const files = renderDesignerIntegrationCatalogFiles(
       createIntegrationRegistry().listDefinitions(),
     );
 
-    const anthropicSection = readCatalogSection(markdown, "Anthropic");
+    const anthropicMarkdown = readCatalogFile(files, "anthropic-default.md").markdown;
 
-    expect(anthropicSection).toContain("Setup methods:");
-    expect(anthropicSection).not.toContain("Resource kinds:");
-    expect(anthropicSection).not.toContain("Binding tools:");
-    expect(anthropicSection).not.toContain("Trigger events:");
-    expect(anthropicSection).not.toContain("- None");
+    expect(anthropicMarkdown).toContain("Setup methods:");
+    expect(anthropicMarkdown).not.toContain("Resource kinds:");
+    expect(anthropicMarkdown).not.toContain("Binding tools:");
+    expect(anthropicMarkdown).not.toContain("Trigger events:");
+    expect(anthropicMarkdown).not.toContain("- None");
   });
 });
 
-function readCatalogSection(markdown: string, displayName: string): string {
-  const sectionHeading = `## ${displayName}`;
-  const sectionStart = markdown.indexOf(sectionHeading);
-  if (sectionStart === -1) {
-    throw new Error(`Catalog section '${displayName}' was not rendered.`);
+function readCatalogFile(
+  files: ReturnType<typeof renderDesignerIntegrationCatalogFiles>,
+  fileName: string,
+): { markdown: string } {
+  const file = files.find((entry) => entry.fileName === fileName);
+  if (file === undefined) {
+    throw new Error(`Catalog file '${fileName}' was not rendered.`);
   }
 
-  const nextSectionStart = markdown.indexOf("\n## ", sectionStart + sectionHeading.length);
-  if (nextSectionStart === -1) {
-    return markdown.slice(sectionStart);
+  return file;
+}
+
+function readCatalogListItem(section: string, listItemMarker: string): string {
+  const listItemStart = section.indexOf(`- ${listItemMarker}`);
+  if (listItemStart === -1) {
+    throw new Error(`Catalog list item '${listItemMarker}' was not rendered.`);
   }
 
-  return markdown.slice(sectionStart, nextSectionStart);
+  const nextListItemStart = section.indexOf("\n- ", listItemStart + listItemMarker.length);
+  if (nextListItemStart === -1) {
+    return section.slice(listItemStart);
+  }
+
+  return section.slice(listItemStart, nextListItemStart);
 }
