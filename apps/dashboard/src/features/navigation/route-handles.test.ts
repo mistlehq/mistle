@@ -48,8 +48,8 @@ describe("route handles", () => {
   });
 
   it("documents non-PageFrame sidebar trigger ownership exceptions", () => {
-    expect(ROUTE_HANDLES.designerDetail.sidebarTriggerOwner).toBe("workspace");
-    expect(ROUTE_HANDLES.designerDetail.sidebarEntryState).toBe("collapsed");
+    expect(ROUTE_HANDLES.homeDetail.sidebarTriggerOwner).toBe("workspace");
+    expect(ROUTE_HANDLES.homeDetail.sidebarEntryState).toBe("collapsed");
     expect(ROUTE_HANDLES.sessionsDetail.sidebarTriggerOwner).toBe("workspace");
     expect(ROUTE_HANDLES.experimentalTerminal.sidebarTriggerOwner).toBe("none");
     expect(ROUTE_HANDLES.settings.sidebarTriggerOwner).toBe("none");
@@ -58,9 +58,9 @@ describe("route handles", () => {
   });
 
   it("defines titles and descriptions for settings leaf pages", () => {
-    expect(ROUTE_HANDLES.dashboard.title).toBe("Home");
-    expect(ROUTE_HANDLES.dashboard.description).toBe("");
-    expect(ROUTE_HANDLES.dashboard.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.home.title).toBe("Home");
+    expect(ROUTE_HANDLES.home.description).toBe("");
+    expect(ROUTE_HANDLES.home.appShellInsetOwner).toBe("child");
     expect(ROUTE_HANDLES.integrations.title).toBe("Integrations");
     expect(ROUTE_HANDLES.integrations.description).toBe("");
     expect(typeof ROUTE_HANDLES.integrationCreate.title).toBe("function");
@@ -264,7 +264,7 @@ type DurableAppShellLeafRoute = {
 };
 
 const DurableAppShellLeafRoutes: DurableAppShellLeafRoute[] = [
-  { path: "/", handleName: "dashboard", handle: ROUTE_HANDLES.dashboard },
+  { path: "/", handleName: "home", handle: ROUTE_HANDLES.home },
   {
     path: "/sandbox-profiles",
     handleName: "sandboxProfiles",
@@ -335,11 +335,10 @@ const DurableAppShellLeafRoutes: DurableAppShellLeafRoute[] = [
     handleName: "sessionsDetail",
     handle: ROUTE_HANDLES.sessionsDetail,
   },
-  { path: "/designer", handleName: "designer", handle: ROUTE_HANDLES.designer },
   {
-    path: "/designer/:sessionId",
-    handleName: "designerDetail",
-    handle: ROUTE_HANDLES.designerDetail,
+    path: "/:sessionId",
+    handleName: "homeDetail",
+    handle: ROUTE_HANDLES.homeDetail,
   },
   {
     path: "/settings/account/profile",

@@ -278,12 +278,12 @@ function renderDesignerCanvasRoute(input: {
   const router = createMemoryRouter(
     [
       {
-        path: "/designer/session_story",
+        path: "/session_story",
         element: input.element,
       },
     ],
     {
-      initialEntries: ["/designer/session_story"],
+      initialEntries: ["/session_story"],
     },
   );
 

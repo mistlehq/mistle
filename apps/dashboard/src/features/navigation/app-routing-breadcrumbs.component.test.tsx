@@ -167,7 +167,7 @@ describe("app routing breadcrumb integration", () => {
 
   const dashboardRoutes = createRoutesFromElements(
     <Route element={<Outlet />} path="/">
-      <Route element={<PageHarness />} handle={ROUTE_HANDLES.dashboard} index />
+      <Route element={<PageHarness />} handle={ROUTE_HANDLES.home} index />
       <Route element={<Outlet />} handle={ROUTE_HANDLES.sessions} path="sessions">
         <Route element={<PageHarness />} index />
         <Route element={<PageHarness />} handle={ROUTE_HANDLES.sessionsNew} path="new" />
@@ -313,7 +313,7 @@ describe("app routing breadcrumb integration", () => {
     expectMarkupToContainMetaDescription(markup, "Manage sandbox profile snapshots.");
   });
 
-  it("does not render page breadcrumbs for home and sessions routes", async () => {
+  it("does not render page breadcrumbs for designer home and sessions routes", async () => {
     const router = createMemoryRouter(dashboardRoutes, {
       initialEntries: ["/"],
     });

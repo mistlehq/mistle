@@ -25,7 +25,7 @@ export function DesignerPage(): React.JSX.Element {
       }),
     onSuccess: (session) => {
       void queryClient.invalidateQueries({ queryKey: designerSessionsQueryKey });
-      void navigate(`/designer/${encodeURIComponent(session.id)}`);
+      void navigate(`/${encodeURIComponent(session.id)}`);
     },
   });
 

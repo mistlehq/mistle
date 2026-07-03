@@ -5,6 +5,7 @@ import {
   Outlet,
   Route,
   RouterProvider,
+  useParams,
 } from "react-router";
 
 import { SystemAppearanceProvider } from "./features/appearance/appearance-provider.js";
@@ -22,7 +23,6 @@ import { OAuthConsentPage } from "./features/auth/oauth-consent/oauth-consent-pa
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
 import { DesignerPage } from "./features/pages/designer-page.js";
 import { DesignerSessionPage } from "./features/pages/designer-session-page.js";
-import { HomePage } from "./features/pages/home-page.js";
 import { IntegrationConnectionCreatePage } from "./features/pages/integration-connection-create-page.js";
 import { IntegrationConnectionEditPage } from "./features/pages/integration-connection-edit-page.js";
 import { IntegrationConnectionSetupPage } from "./features/pages/integration-connection-setup-page.js";
@@ -72,15 +72,7 @@ export const APP_ROUTES = createRoutesFromElements(
       <Route element={<OAuthConsentPage />} path="/auth/oauth/consent/:requestId" />
       <Route element={<PortAccessRedirectPage />} path="/p/ports/:slug" />
       <Route element={<AppShell />} errorElement={<RouteErrorBoundary />}>
-        <Route element={<HomePage />} handle={ROUTE_HANDLES.dashboard} index />
-        <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.designer} path="designer">
-          <Route element={<DesignerPage />} index />
-          <Route
-            element={<DesignerSessionPage />}
-            handle={ROUTE_HANDLES.designerDetail}
-            path=":sessionId"
-          />
-        </Route>
+        <Route element={<DesignerPage />} handle={ROUTE_HANDLES.home} index />
         <Route
           element={<RouteOutlet />}
           handle={ROUTE_HANDLES.sandboxProfiles}
@@ -173,6 +165,11 @@ export const APP_ROUTES = createRoutesFromElements(
             path=":sandboxInstanceId"
           />
         </Route>
+        <Route
+          element={<HomeDesignerSessionRoute />}
+          handle={ROUTE_HANDLES.homeDetail}
+          path=":sessionId"
+        />
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.settings} path="settings">
           <Route element={<Navigate replace to={SETTINGS_DEFAULT_PATH} />} index />
           <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.settingsAccount} path="account">
@@ -243,6 +240,24 @@ function getAppRouter(): ReturnType<typeof createBrowserRouter> {
 
 function RouteOutlet(): React.JSX.Element {
   return <Outlet />;
+}
+
+function HomeDesignerSessionRoute(): React.JSX.Element {
+  const params = useParams();
+  const sessionId = params["sessionId"];
+  if (sessionId === undefined) {
+    throw new Error("Home Designer session route is missing sessionId.");
+  }
+
+  if (!isDesignerSessionPathSegment(sessionId)) {
+    return <Navigate replace to="/" />;
+  }
+
+  return <DesignerSessionPage />;
+}
+
+function isDesignerSessionPathSegment(pathSegment: string): boolean {
+  return /^dsn_[a-zA-Z0-9_-]+$/.test(pathSegment);
 }
 
 function SystemAppearanceRoute(): React.JSX.Element {

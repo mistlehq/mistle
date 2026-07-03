@@ -128,7 +128,7 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
                 <TableBody>
                   {input.sessions.map((session) => {
                     const sessionTitle = formatDesignerSessionTitle(session);
-                    const sessionHref = `/designer/${encodeURIComponent(session.id)}`;
+                    const sessionHref = `/${encodeURIComponent(session.id)}`;
 
                     return (
                       <TableRow
