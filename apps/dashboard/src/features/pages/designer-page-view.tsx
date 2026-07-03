@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { ErrorNotice } from "../auth/error-notice.js";
 import { ChatComposer } from "../chat/components/chat-composer.js";
 import type { DesignerSessionListItem } from "../designer/designer-service.js";
-import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import { resolveSessionUpdatedLabel, SessionTitleCell } from "./sessions-page.js";
