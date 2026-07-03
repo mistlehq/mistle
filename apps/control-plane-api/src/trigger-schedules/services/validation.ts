@@ -3,6 +3,7 @@ import { BadRequestError } from "@mistle/http/errors.js";
 import { findNextScheduleOccurrence } from "@mistle/time";
 
 import { listProfileVersionRepositoryOptions } from "../../sandbox-profiles/services/repository-options.js";
+import { resolveTriggerTargetSandboxProfileVersion } from "../../triggers/services/trigger-target-profile-version.js";
 import { TriggerSchedulesBadRequestCodes } from "../constants.js";
 
 export function resolveNextScheduledAtOrThrow(input: {
@@ -35,6 +36,9 @@ export async function resolveSandboxProfileVersionOrThrow(
   },
 ): Promise<number> {
   const profile = await ctx.db.query.sandboxProfiles.findFirst({
+    columns: {
+      activeVersion: true,
+    },
     where: (table, { and: whereAnd, eq: whereEq }) =>
       whereAnd(
         whereEq(table.id, input.sandboxProfileId),
@@ -49,13 +53,10 @@ export async function resolveSandboxProfileVersionOrThrow(
     );
   }
 
-  const resolvedVersion = input.sandboxProfileVersion ?? profile.activeVersion;
-  if (resolvedVersion === null) {
-    throw new BadRequestError(
-      TriggerSchedulesBadRequestCodes.INVALID_SANDBOX_PROFILE_VERSION_REFERENCE,
-      `Sandbox profile '${input.sandboxProfileId}' does not have an active version.`,
-    );
-  }
+  const resolvedVersion = resolveTriggerTargetSandboxProfileVersion({
+    requestedVersion: input.sandboxProfileVersion,
+    activeVersion: profile.activeVersion,
+  });
 
   const version = await ctx.db.query.sandboxProfileVersions.findFirst({
     columns: {

@@ -8,6 +8,33 @@ import {
   resolveTriggerRunFailure,
 } from "./trigger-run.js";
 
+function createDurableStepError(input: {
+  message?: string | undefined;
+  originalError?: unknown;
+}): Error {
+  const stepError = new Error(input.message ?? "durable step failed");
+  stepError.name = "StepError";
+  Object.defineProperties(stepError, {
+    ...(input.originalError === undefined
+      ? {}
+      : {
+          originalError: {
+            value: input.originalError,
+          },
+        }),
+    retryPolicy: {
+      value: {
+        maximumAttempts: 10,
+      },
+    },
+    stepFailedAttempts: {
+      value: 1,
+    },
+  });
+
+  return stepError;
+}
+
 describe("trigger run failure resolution", () => {
   it("treats generic trigger execution failures wrapped by durable step errors as retryable", () => {
     const originalError = createTriggerRunExecutionError({
@@ -18,20 +45,8 @@ describe("trigger run failure resolution", () => {
         "mistle.sandbox.failure_code": "sandbox_init_failed",
       },
     });
-    const stepError = new Error("durable step failed");
-    stepError.name = "StepError";
-    Object.defineProperties(stepError, {
-      originalError: {
-        value: originalError,
-      },
-      retryPolicy: {
-        value: {
-          maximumAttempts: 10,
-        },
-      },
-      stepFailedAttempts: {
-        value: 1,
-      },
+    const stepError = createDurableStepError({
+      originalError,
     });
 
     expect(isTriggerRunExecutionFailure(stepError)).toBe(true);
@@ -47,17 +62,8 @@ describe("trigger run failure resolution", () => {
   });
 
   it("keeps ordinary durable step failures as generic trigger execution failures", () => {
-    const stepError = new Error("provider connection dropped");
-    stepError.name = "StepError";
-    Object.defineProperties(stepError, {
-      retryPolicy: {
-        value: {
-          maximumAttempts: 10,
-        },
-      },
-      stepFailedAttempts: {
-        value: 1,
-      },
+    const stepError = createDurableStepError({
+      message: "provider connection dropped",
     });
 
     expect(isTriggerRunExecutionFailure(stepError)).toBe(false);
@@ -70,22 +76,10 @@ describe("trigger run failure resolution", () => {
   });
 
   it("treats permanent trigger failures wrapped by durable step errors as terminal", () => {
-    const stepError = new Error("durable step failed");
-    stepError.name = "StepError";
-    Object.defineProperties(stepError, {
+    const stepError = createDurableStepError({
       originalError: {
-        value: {
-          code: TriggerRunFailureCodes.TEMPLATE_RENDER_FAILED,
-          message: "Rendered trigger input template must not be empty.",
-        },
-      },
-      retryPolicy: {
-        value: {
-          maximumAttempts: 10,
-        },
-      },
-      stepFailedAttempts: {
-        value: 1,
+        code: TriggerRunFailureCodes.TEMPLATE_RENDER_FAILED,
+        message: "Rendered trigger input template must not be empty.",
       },
     });
 
@@ -99,27 +93,15 @@ describe("trigger run failure resolution", () => {
   });
 
   it("preserves serialized retry metadata from durable step errors", () => {
-    const stepError = new Error("durable step failed");
-    stepError.name = "StepError";
-    Object.defineProperties(stepError, {
+    const stepError = createDurableStepError({
       originalError: {
-        value: {
-          code: TriggerRunFailureCodes.TRIGGER_RUN_EXECUTION_FAILED,
-          message: "Sandbox bootstrap tunnel did not recover before disconnect grace expired.",
-          metadata: {
-            "mistle.sandbox.instance_id": "sbi_serialized_retry_metadata",
-            "mistle.sandbox.status": "failed",
-            "mistle.sandbox.failure_code": "sandbox_init_failed",
-          },
+        code: TriggerRunFailureCodes.TRIGGER_RUN_EXECUTION_FAILED,
+        message: "Sandbox bootstrap tunnel did not recover before disconnect grace expired.",
+        metadata: {
+          "mistle.sandbox.instance_id": "sbi_serialized_retry_metadata",
+          "mistle.sandbox.status": "failed",
+          "mistle.sandbox.failure_code": "sandbox_init_failed",
         },
-      },
-      retryPolicy: {
-        value: {
-          maximumAttempts: 10,
-        },
-      },
-      stepFailedAttempts: {
-        value: 1,
       },
     });
 
@@ -133,6 +115,32 @@ describe("trigger run failure resolution", () => {
         "mistle.sandbox.status": "failed",
         "mistle.sandbox.failure_code": "sandbox_init_failed",
       },
+    });
+  });
+
+  it.each([
+    {
+      code: TriggerRunFailureCodes.SANDBOX_PROFILE_VERSION_NOT_FOUND,
+      message: "Referenced sandbox profile version was deleted.",
+    },
+    {
+      code: TriggerRunFailureCodes.SANDBOX_PROFILE_VERSION_NOT_USABLE,
+      message: "Referenced sandbox profile version is not usable yet.",
+    },
+  ])("treats $code as a terminal configuration failure", ({ code, message }) => {
+    const stepError = createDurableStepError({
+      originalError: createTriggerRunExecutionError({
+        code,
+        message,
+      }),
+    });
+
+    expect(isTriggerRunExecutionFailure(stepError)).toBe(true);
+    expect(isPermanentTriggerRunExecutionFailure(stepError)).toBe(true);
+    expect(resolveTriggerRunFailure(stepError)).toEqual({
+      code,
+      message,
+      metadata: {},
     });
   });
 });

@@ -29,7 +29,7 @@ import { TRIGGERS_QUERY_KEY_PREFIX } from "./triggers-query-keys.js";
 import { useSelectedSandboxProfileVersion } from "./use-selected-sandbox-profile-version.js";
 import { useTriggerSandboxProfileOptions } from "./use-trigger-sandbox-profile-options.js";
 import {
-  resolveNoActiveProfileVersionMessage,
+  resolveNoTriggerTargetProfileVersionMessage,
   resolveSelectedProfileTriggerState,
 } from "./use-webhook-trigger-editor-state.js";
 import { useWebhookTriggerEventPrerequisites } from "./use-webhook-trigger-prerequisites.js";
@@ -229,6 +229,25 @@ function resolvePrimaryRepositorySelectionNormalization(input: {
     : WebhookTriggerWorkspaceRootRepositoryOptionValue;
 }
 
+function resolveCreateTriggerPickerDisabledState(input: {
+  kind: TriggerTypeValue | null;
+  fieldErrors: CreateTriggerFormFieldErrors;
+  disabledState: ReturnType<typeof resolveSelectedProfileTriggerState>["disabledState"];
+}): ReturnType<typeof resolveSelectedProfileTriggerState>["disabledState"] {
+  if (input.disabledState === null) {
+    return null;
+  }
+
+  if (input.kind === "trigger" && input.fieldErrors.eventIds === RequiredTriggerSelectionMessage) {
+    return {
+      ...input.disabledState,
+      variant: "alert",
+    };
+  }
+
+  return input.disabledState;
+}
+
 function resolveNormalizedConversationKeyTemplate(input: {
   values: CreateTriggerFormValues;
   eventOptions: readonly WebhookTriggerEventOption[];
@@ -348,7 +367,7 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
   const selectedProfileId = formValues.sandboxProfileId.trim();
   const {
     effectiveSelectedProfileVersion,
-    hasActiveProfileVersion,
+    hasSelectableProfileVersion,
     isUsingPinnedSelectedProfileVersion,
     selectedProfileVersionsQuery,
     setSelectedSandboxProfileVersion,
@@ -415,7 +434,7 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
       resolveSelectedProfileTriggerState({
         selectedProfileId,
         selectedProfileName,
-        hasActiveProfileVersion,
+        hasSelectableProfileVersion,
         hasBindingData: hasLoadedSelectedProfileTriggerConfig,
         isBindingDataPending:
           selectedProfileId.length > 0 &&
@@ -432,7 +451,7 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
       }),
     [
       effectiveSelectedProfileVersion,
-      hasActiveProfileVersion,
+      hasSelectableProfileVersion,
       hasLoadedSelectedProfileTriggerConfig,
       isUsingPinnedSelectedProfileVersion,
       eventPrerequisites.directoryData,
@@ -445,9 +464,9 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
     ],
   );
   const sandboxProfileStatusMessage =
-    hasActiveProfileVersion === false
+    hasSelectableProfileVersion === false
       ? {
-          message: resolveNoActiveProfileVersionMessage({
+          message: resolveNoTriggerTargetProfileVersionMessage({
             selectedProfileId,
             selectedProfileName,
           }),
@@ -862,8 +881,8 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
         : kind === "scheduled"
           ? validateScheduledTriggerFormValues(toScheduledValues(formValues))
           : validateWebhookTriggerFormValues(toWebhookValues(formValues), webhookEventOptions);
-    if (hasActiveProfileVersion === false) {
-      nextFieldErrors.sandboxProfileId = resolveNoActiveProfileVersionMessage({
+    if (hasSelectableProfileVersion === false) {
+      nextFieldErrors.sandboxProfileId = resolveNoTriggerTargetProfileVersionMessage({
         selectedProfileId,
         selectedProfileName,
       });
@@ -908,7 +927,11 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
     connectionOptions: eventPrerequisites.connectionOptions,
     connections: eventPrerequisites.directoryData?.connections ?? [],
     webhookEventOptions,
-    triggerPickerDisabledState: selectedProfileTriggerState.disabledState,
+    triggerPickerDisabledState: resolveCreateTriggerPickerDisabledState({
+      kind,
+      fieldErrors,
+      disabledState: selectedProfileTriggerState.disabledState,
+    }),
     onKindChange,
     onCommonValueChange,
     onWebhookValueChange,

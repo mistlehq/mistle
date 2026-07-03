@@ -2027,11 +2027,11 @@ describe("WebhookTriggerForm", () => {
       mode: "create",
       sandboxProfileStatusMessage: {
         message:
-          "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating triggers.",
+          "The sandbox profile Repo Maintainer does not have a version available for triggers.",
         variant: "alert",
       },
       triggerPickerDisabledState: {
-        reason: "Select a sandbox profile with an active version to choose events.",
+        reason: "Select a sandbox profile with a version to choose events.",
         variant: "default",
       },
       webhookEventOptions: [],
@@ -2042,11 +2042,11 @@ describe("WebhookTriggerForm", () => {
     });
 
     const profileMessage = screen.getByText(
-      "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating triggers.",
+      "The sandbox profile Repo Maintainer does not have a version available for triggers.",
     );
     const sandboxProfileLabel = screen.getByText("Sandbox profile");
     const eventsMessage = screen.getByText(
-      "Select a sandbox profile with an active version to choose events.",
+      "Select a sandbox profile with a version to choose events.",
     );
 
     expect(profileMessage.compareDocumentPosition(sandboxProfileLabel)).toBe(

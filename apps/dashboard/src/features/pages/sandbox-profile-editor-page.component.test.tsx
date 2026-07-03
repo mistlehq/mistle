@@ -151,6 +151,7 @@ function createSandboxProfileVersionFixture(input: {
 
 type SandboxProfileEditorTestVersionState =
   | "draft"
+  | "draft-with-initial-published-no-active"
   | "draft-with-published"
   | "draft-with-published-no-active"
   | "published"
@@ -455,6 +456,16 @@ function createSandboxProfileVersionsForTest(input: {
           state: "draft",
         }),
       ];
+    case "draft-with-initial-published-no-active":
+      return [
+        createVersion({
+          version: 1,
+          state: "published",
+        }),
+        createVersion({
+          state: "draft",
+        }),
+      ];
     case "published-with-draft":
       return [
         createVersion({
@@ -594,6 +605,7 @@ function resolveSandboxProfileEditorTestRouteView(input: {
     case "published-failed":
       return "published";
     case "draft":
+    case "draft-with-initial-published-no-active":
       return "draft";
   }
 }
@@ -654,6 +666,8 @@ function renderSandboxProfileEditor(input?: {
   });
   const profileId = "sbp_test";
   const version = 3;
+  const triggerTemplateVersion =
+    input?.versionState === "draft-with-initial-published-no-active" ? 1 : version;
 
   const activeVersion =
     input?.versionState === "published" || input?.versionState === "published-with-draft"
@@ -875,7 +889,7 @@ function renderSandboxProfileEditor(input?: {
   queryClient.setQueryData(
     sandboxProfileVersionTriggerConfigQueryKey({
       profileId,
-      version,
+      version: triggerTemplateVersion,
     }),
     {
       bindings: input?.bindings ?? [],
@@ -2436,6 +2450,28 @@ describe("SandboxProfileEditorPage", () => {
     ).toBeDefined();
     expect(screen.queryByText("GitHub connection required.")).toBeNull();
     expect(screen.getAllByRole("button", { name: "Select" }).length).toBeGreaterThan(0);
+  });
+
+  it("shows trigger templates from version 1 when no sandbox profile version is active", () => {
+    renderSandboxProfileEditor({
+      triggerConnections: [createSlackTriggerConnection()],
+      triggerTargets: [createSlackTriggerTarget()],
+      triggerWebhookSources: [createSlackTriggerWebhookSource()],
+      bindings: [
+        {
+          id: "binding-slack",
+          connectionId: SlackTriggerConnectionId,
+          kind: "connector",
+          config: {},
+        },
+      ],
+      routeSection: "triggers",
+      versionState: "draft-with-initial-published-no-active",
+    });
+
+    expect(screen.getByRole("heading", { name: "Create from template" })).toBeDefined();
+    expect(screen.getByText("Slack Mention")).toBeDefined();
+    expect(screen.queryByText("Slack connection required.")).toBeNull();
   });
 
   it("opens a profile trigger activity route from the route segment", async () => {

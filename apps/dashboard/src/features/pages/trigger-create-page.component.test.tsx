@@ -44,8 +44,10 @@ function getGitHubPrReviewTemplateEventTypes(): readonly string[] {
 
 function renderCreatePage(input: {
   initialEntry: string;
+  seedTriggerProfile?: boolean;
   seedGitHubProfile?: boolean;
   seedSlackProfile?: boolean;
+  seededProfileVersionIsActive?: boolean;
   shouldSeedIntegrationDirectory?: boolean;
 }): ReturnType<typeof createMemoryRouter> {
   const queryClient = createTestQueryClient({
@@ -181,16 +183,27 @@ function renderCreatePage(input: {
 
   queryClient.setQueryData(
     TRIGGER_SANDBOX_PROFILES_QUERY_KEY,
-    input.seedSlackProfile === true || input.seedGitHubProfile === true
+    input.seedTriggerProfile === true ||
+      input.seedSlackProfile === true ||
+      input.seedGitHubProfile === true
       ? [
           {
-            value: TriggerSandboxProfileId,
-            label: "Trigger profile",
+            id: TriggerSandboxProfileId,
+            organizationId: "org_trigger_test",
+            displayName: "Trigger profile",
+            activeVersion: input.seededProfileVersionIsActive === false ? null : 1,
+            status: "active",
+            createdAt: "2026-05-01T00:00:00.000Z",
+            updatedAt: "2026-05-08T00:00:00.000Z",
           },
         ]
       : [],
   );
-  if (input.seedSlackProfile === true || input.seedGitHubProfile === true) {
+  if (
+    input.seedTriggerProfile === true ||
+    input.seedSlackProfile === true ||
+    input.seedGitHubProfile === true
+  ) {
     const bindings = [
       ...(input.seedSlackProfile === true
         ? [
@@ -228,7 +241,7 @@ function renderCreatePage(input: {
           sandboxProfileId: TriggerSandboxProfileId,
           version: 1,
           state: "published",
-          isActive: true,
+          isActive: input.seededProfileVersionIsActive ?? true,
           publishedAt: "2026-05-01T00:00:00.000Z",
           sandboxProvider: null,
           sandboxConnectionId: null,
@@ -364,6 +377,18 @@ describe("TriggerCreatePage", () => {
     });
   });
 
+  it("allows creating against version 1 before the selected profile has an active version", async () => {
+    renderCreatePage({
+      initialEntry: `/triggers/new?sandboxProfileId=${TriggerSandboxProfileId}&template=slack-app-mention`,
+      seedSlackProfile: true,
+      seededProfileVersionIsActive: false,
+    });
+
+    expect(screen.queryByText(/has no active version/i)).toBeNull();
+    expect(screen.queryByText(/Publish the profile before creating triggers/i)).toBeNull();
+    expect(await screen.findByText("App mention")).toBeDefined();
+  });
+
   it("selects the GitHub PR review template events and comment filters after profile bindings are available", async () => {
     renderCreatePage({
       initialEntry: `/triggers/new?sandboxProfileId=${TriggerSandboxProfileId}&template=github-pr-review`,
@@ -387,5 +412,40 @@ describe("TriggerCreatePage", () => {
     expect(screen.getByText("Please address the fields highlighted in red.")).toBeDefined();
     expect(screen.queryByRole("heading", { name: "When this happens" })).toBeNull();
     expect(screen.queryByRole("textbox", { name: "User message" })).toBeNull();
+  });
+
+  it("highlights the trigger setup reason when no event-capable integration is bound", async () => {
+    renderCreatePage({
+      initialEntry: `/triggers/new?sandboxProfileId=${TriggerSandboxProfileId}&template=slack-app-mention`,
+      seedTriggerProfile: true,
+    });
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Trigger name" }), {
+      target: {
+        value: "No integration trigger",
+      },
+    });
+
+    await screen.findByText(
+      "The sandbox profile Trigger profile v1 has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    expect(
+      screen.getAllByText(
+        "The sandbox profile Trigger profile v1 has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText("Please address the fields highlighted in red.")).toBeDefined();
+
+    const setupMessage = screen.getByText(
+      "The sandbox profile Trigger profile v1 has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
+    );
+    const setupNotice = setupMessage.closest('[data-slot="notice"]');
+    if (setupNotice === null) {
+      throw new Error("Expected no-integration setup message to render in a notice.");
+    }
+    expect(setupNotice.className).toContain("text-destructive");
   });
 });
