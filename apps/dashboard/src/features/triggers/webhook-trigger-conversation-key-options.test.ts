@@ -2,7 +2,7 @@ import { SlackBrowserDefinition } from "@mistle/integrations-definitions/browser
 import { describe, expect, it } from "vitest";
 
 import {
-  GitHubPullRequestReviewConversationKeyTemplate,
+  GitHubPullRequestConversationKeyTemplate,
   resolveCommonWebhookTriggerConversationKeyOptions,
 } from "./webhook-trigger-conversation-key-options.js";
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
@@ -13,7 +13,6 @@ import {
 import {
   createGithubIssueCommentCreatedEventOption,
   createGithubPullRequestOpenedEventOption,
-  createGithubPullRequestReviewRequestedEventOption,
   GitHubWebhookSourceId,
 } from "./webhook-trigger-test-fixtures.js";
 
@@ -96,7 +95,7 @@ describe("resolveCommonWebhookTriggerConversationKeyOptions", () => {
         id: "pull-request",
         label: "Pull request",
         description: "Events from the same pull request go to the same conversation.",
-        template: GitHubPullRequestReviewConversationKeyTemplate,
+        template: GitHubPullRequestConversationKeyTemplate,
       },
       {
         id: "repository",
@@ -141,30 +140,6 @@ describe("resolveCommonWebhookTriggerConversationKeyOptions", () => {
         }),
       ],
       eventParameterRules: {},
-    });
-
-    expect(options.map((option) => option.id)).toEqual(["repository"]);
-  });
-
-  it("does not add mixed pull request grouping when another selected event cannot render it", () => {
-    const options = resolveCommonWebhookTriggerConversationKeyOptions({
-      selectedEventOptions: [
-        createGithubPullRequestOpenedEventOption({
-          id: GitHubPullRequestOpenedTriggerId,
-        }),
-        createGithubIssueCommentCreatedEventOption({
-          id: GitHubIssueCommentCreatedTriggerId,
-        }),
-        createGithubPullRequestReviewRequestedEventOption(),
-      ],
-      eventParameterRules: {
-        [GitHubIssueCommentCreatedTriggerId]: {
-          target: {
-            operator: WebhookTriggerEventParameterRuleOperators.EXISTS,
-            value: "exists",
-          },
-        },
-      },
     });
 
     expect(options.map((option) => option.id)).toEqual(["repository"]);

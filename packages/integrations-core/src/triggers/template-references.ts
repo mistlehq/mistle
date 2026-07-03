@@ -51,13 +51,6 @@ const ConditionalTemplateAllowedTagNames = new Set([
   "endunless",
 ]);
 const KeyTemplateAllowedTagNames = new Set(["if", "else", "endif"]);
-const LiquidTokenPattern = /({{[\s\S]*?}}|{%[\s\S]*?%})/g;
-const LiquidTagPattern = /{%-?\s*([A-Za-z][A-Za-z0-9_-]*)\b/g;
-const SimpleKeyTemplateConditionPattern =
-  /^{%-?\s*if\s+webhookEvent\.eventType\s*==\s*"([^"]+)"\s*-?%}$/;
-const SimpleReferencePathPattern = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*$/;
-const ConditionReferencePathPattern = /\b[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)*\b/g;
-const QuotedStringPattern = /"[^"]*"|'[^']*'/g;
 const NonReferenceConditionWords = new Set([
   "and",
   "blank",
@@ -133,6 +126,17 @@ function validateTemplate(input: {
     issues,
   });
 
+  if (input.kind === WebhookTriggerTemplateKinds.INPUT && containsTags) {
+    issues.push(
+      ...validateConditionalInputTemplateReferences({
+        field: input.field,
+        template: input.template,
+        selectedEventReferences: input.selectedEventReferences,
+      }),
+    );
+    return issues;
+  }
+
   if (input.kind === WebhookTriggerTemplateKinds.KEY && containsTags) {
     issues.push(
       ...validateConditionalKeyTemplateReferences({
@@ -144,21 +148,66 @@ function validateTemplate(input: {
     return issues;
   }
 
-  const allowedReferences =
-    input.kind === WebhookTriggerTemplateKinds.KEY
-      ? input.selectedEventReferences.common
-      : input.selectedEventReferences.all;
-
   for (const referencePath of outputReferences) {
-    if (!allowedReferences.has(referencePath)) {
-      issues.push({
-        field: input.field,
-        message: `Unsupported trigger event field reference '{{${referencePath}}}'.`,
-      });
-    }
+    validateReferencePathForReachableEvents({
+      field: input.field,
+      referencePath,
+      reachableEventIndexes: input.selectedEventReferences.eventReferences.map(
+        (_referenceSet, index) => index,
+      ),
+      selectedEventReferences: input.selectedEventReferences,
+      issues,
+    });
   }
 
   return issues;
+}
+
+function forEachLiquidToken(template: string, callback: (token: string) => void): void {
+  let cursor = 0;
+  while (cursor < template.length) {
+    const outputStart = template.indexOf("{{", cursor);
+    const tagStart = template.indexOf("{%", cursor);
+    const tokenStart = earliestNonNegativeIndex(outputStart, tagStart);
+    if (tokenStart === null) {
+      return;
+    }
+
+    const endMarker = template.startsWith("{{", tokenStart) ? "}}" : "%}";
+    const tokenEnd = template.indexOf(endMarker, tokenStart + 2);
+    if (tokenEnd === -1) {
+      return;
+    }
+
+    callback(template.slice(tokenStart, tokenEnd + 2));
+    cursor = tokenEnd + 2;
+  }
+}
+
+function earliestNonNegativeIndex(left: number, right: number): number | null {
+  if (left === -1) {
+    return right === -1 ? null : right;
+  }
+
+  if (right === -1) {
+    return left;
+  }
+
+  return Math.min(left, right);
+}
+
+function validateReferencePathForSelectedEventCommon(input: {
+  field: WebhookTriggerTemplateFieldName;
+  referencePath: string;
+  selectedEventReferences: SelectedEventReferencePaths;
+  issues: WebhookTriggerTemplateValidationIssue[];
+}): void {
+  if (!input.selectedEventReferences.common.has(input.referencePath)) {
+    input.issues.push({
+      field: input.field,
+      message: `Unsupported trigger event field reference '{{${input.referencePath}}}'.`,
+    });
+  }
 }
 
 function collectTemplateReferencesAndTagIssues(input: {
@@ -171,14 +220,7 @@ function collectTemplateReferencesAndTagIssues(input: {
 }): boolean {
   let containsTags = false;
 
-  LiquidTokenPattern.lastIndex = 0;
-  let match: RegExpExecArray | null = LiquidTokenPattern.exec(input.template);
-  while (match !== null) {
-    const token = match[1];
-    if (token === undefined) {
-      throw new Error("Expected Liquid token pattern to capture a token.");
-    }
-
+  forEachLiquidToken(input.template, (token) => {
     if (token.startsWith("{{")) {
       collectOutputReferences({
         field: input.field,
@@ -196,9 +238,7 @@ function collectTemplateReferencesAndTagIssues(input: {
         issues: input.issues,
       });
     }
-
-    match = LiquidTokenPattern.exec(input.template);
-  }
+  });
 
   return containsTags;
 }
@@ -229,7 +269,7 @@ function extractOutputReferencePath(token: string): string | null {
   }
 
   const referencePath = referenceExpression.trim();
-  return SimpleReferencePathPattern.test(referencePath) ? referencePath : null;
+  return isSimpleReferencePath(referencePath) ? referencePath : null;
 }
 
 function validateTemplateTag(input: {
@@ -309,26 +349,217 @@ function validateInputTemplateConditionReferences(input: {
 }
 
 function extractTagExpression(input: { token: string; tagName: string }): string {
-  const expressionWithTag = input.token.replace(/^{%-?\s*/, "").replace(/\s*-?%}$/, "");
+  const expressionWithTag = trimLiquidInner(input.token);
   return expressionWithTag.slice(input.tagName.length).trim();
 }
 
 function extractConditionReferencePaths(expression: string): readonly string[] {
-  const expressionWithoutStrings = expression.replace(QuotedStringPattern, " ");
   const referencePaths: string[] = [];
-
-  ConditionReferencePathPattern.lastIndex = 0;
-  let match: RegExpExecArray | null = ConditionReferencePathPattern.exec(expressionWithoutStrings);
-  while (match !== null) {
-    const referencePath = match[0];
-    if (!NonReferenceConditionWords.has(referencePath)) {
-      referencePaths.push(referencePath);
+  let cursor = 0;
+  while (cursor < expression.length) {
+    const char = expression[cursor];
+    if (char === undefined) {
+      return referencePaths;
     }
 
-    match = ConditionReferencePathPattern.exec(expressionWithoutStrings);
+    if (char === '"' || char === "'") {
+      cursor = findQuotedStringEnd(expression, cursor, char);
+      continue;
+    }
+
+    if (!isReferenceStartCharacter(char)) {
+      cursor += 1;
+      continue;
+    }
+
+    const referenceStart = cursor;
+    cursor += 1;
+    while (cursor < expression.length) {
+      const nextChar = expression[cursor];
+      if (nextChar === undefined || !isReferencePathCharacter(nextChar)) {
+        break;
+      }
+
+      cursor += 1;
+    }
+
+    const referencePath = expression.slice(referenceStart, cursor);
+    if (!NonReferenceConditionWords.has(referencePath) && isSimpleReferencePath(referencePath)) {
+      referencePaths.push(referencePath);
+    }
   }
 
   return referencePaths;
+}
+
+function findQuotedStringEnd(expression: string, start: number, quote: string): number {
+  let cursor = start + 1;
+  while (cursor < expression.length) {
+    if (expression[cursor] === quote) {
+      return cursor + 1;
+    }
+
+    cursor += 1;
+  }
+
+  return expression.length;
+}
+
+function validateConditionalInputTemplateReferences(input: {
+  field: WebhookTriggerTemplateFieldName;
+  template: string;
+  selectedEventReferences: SelectedEventReferencePaths;
+}): readonly WebhookTriggerTemplateValidationIssue[] {
+  const issues: WebhookTriggerTemplateValidationIssue[] = [];
+  const allEventIndexes = input.selectedEventReferences.eventReferences.map(
+    (_referenceSet, index) => index,
+  );
+  const stack: {
+    parentReachableEventIndexes: readonly number[];
+    consumedBranchReachableEventIndexes: readonly number[];
+    unmodeledBranchFallbackReachableEventIndexes: readonly number[] | null;
+  }[] = [];
+  let reachableEventIndexes: readonly number[] = allEventIndexes;
+
+  forEachLiquidToken(input.template, (token) => {
+    if (token.startsWith("{{")) {
+      const referencePath = extractOutputReferencePath(token);
+      if (referencePath === null) {
+        issues.push({
+          field: input.field,
+          message: "Dynamic template references are not supported.",
+        });
+      } else {
+        validateReferencePathForReachableEvents({
+          field: input.field,
+          referencePath,
+          reachableEventIndexes,
+          selectedEventReferences: input.selectedEventReferences,
+          issues,
+        });
+      }
+      return;
+    }
+
+    const tagName = extractLiquidTagName(token);
+    if (tagName === "if" || tagName === "unless") {
+      const matchingEventIndexes = filterReachableEventsByModeledInputCondition({
+        selectedEventReferences: input.selectedEventReferences,
+        reachableEventIndexes,
+        expression: extractTagExpression({ token, tagName }),
+      });
+      const branchReachableEventIndexes =
+        matchingEventIndexes === null
+          ? reachableEventIndexes
+          : tagName === "if"
+            ? matchingEventIndexes
+            : subtractEventIndexes(reachableEventIndexes, matchingEventIndexes);
+      const consumedBranchReachableEventIndexes =
+        matchingEventIndexes === null ? [] : branchReachableEventIndexes;
+      stack.push({
+        parentReachableEventIndexes: reachableEventIndexes,
+        consumedBranchReachableEventIndexes,
+        unmodeledBranchFallbackReachableEventIndexes:
+          matchingEventIndexes === null ? reachableEventIndexes : null,
+      });
+      reachableEventIndexes = branchReachableEventIndexes;
+      return;
+    }
+
+    if (tagName === "elsif") {
+      const currentFrame = stack.at(-1);
+      if (currentFrame === undefined) {
+        return;
+      }
+
+      const elseReachableEventIndexes =
+        currentFrame.unmodeledBranchFallbackReachableEventIndexes ??
+        subtractEventIndexes(
+          currentFrame.parentReachableEventIndexes,
+          currentFrame.consumedBranchReachableEventIndexes,
+        );
+      const modeledBranchReachableEventIndexes = filterReachableEventsByModeledInputCondition({
+        selectedEventReferences: input.selectedEventReferences,
+        reachableEventIndexes: elseReachableEventIndexes,
+        expression: extractTagExpression({ token, tagName }),
+      });
+      const branchReachableEventIndexes =
+        modeledBranchReachableEventIndexes ?? elseReachableEventIndexes;
+      const unmodeledBranchFallbackReachableEventIndexes =
+        currentFrame.unmodeledBranchFallbackReachableEventIndexes ??
+        (modeledBranchReachableEventIndexes === null ? elseReachableEventIndexes : null);
+      stack[stack.length - 1] = {
+        parentReachableEventIndexes: currentFrame.parentReachableEventIndexes,
+        consumedBranchReachableEventIndexes:
+          unmodeledBranchFallbackReachableEventIndexes === null
+            ? unionEventIndexes(
+                currentFrame.consumedBranchReachableEventIndexes,
+                branchReachableEventIndexes,
+              )
+            : currentFrame.consumedBranchReachableEventIndexes,
+        unmodeledBranchFallbackReachableEventIndexes,
+      };
+      reachableEventIndexes = branchReachableEventIndexes;
+      return;
+    }
+
+    if (tagName === "else") {
+      const currentFrame = stack.at(-1);
+      if (currentFrame !== undefined) {
+        reachableEventIndexes =
+          currentFrame.unmodeledBranchFallbackReachableEventIndexes ??
+          subtractEventIndexes(
+            currentFrame.parentReachableEventIndexes,
+            currentFrame.consumedBranchReachableEventIndexes,
+          );
+      }
+      return;
+    }
+
+    if (tagName === "endif" || tagName === "endunless") {
+      const currentFrame = stack.pop();
+      if (currentFrame !== undefined) {
+        reachableEventIndexes = currentFrame.parentReachableEventIndexes;
+      }
+    }
+  });
+
+  return issues;
+}
+
+function filterReachableEventsByModeledInputCondition(input: {
+  selectedEventReferences: SelectedEventReferencePaths;
+  reachableEventIndexes: readonly number[];
+  expression: string;
+}): readonly number[] | null {
+  const eventType = extractWebhookEventTypeEqualityValue(input.expression);
+  if (eventType !== null) {
+    return filterReachableEventsByEventType({
+      selectedEventReferences: input.selectedEventReferences,
+      reachableEventIndexes: input.reachableEventIndexes,
+      eventType,
+    });
+  }
+
+  const referencePath = extractSimplePositiveConditionReferencePath(input.expression);
+  if (referencePath === null) {
+    return null;
+  }
+
+  return filterReachableEventsByReferencePaths({
+    selectedEventReferences: input.selectedEventReferences,
+    reachableEventIndexes: input.reachableEventIndexes,
+    referencePaths: [referencePath],
+  });
+}
+
+function extractSimplePositiveConditionReferencePath(expression: string): string | null {
+  const trimmedExpression = expression.trim();
+  if (!isSimpleReferencePath(trimmedExpression)) {
+    return null;
+  }
+
+  return NonReferenceConditionWords.has(trimmedExpression) ? null : trimmedExpression;
 }
 
 function validateConditionalKeyTemplateReferences(input: {
@@ -346,14 +577,7 @@ function validateConditionalKeyTemplateReferences(input: {
   }[] = [];
   let reachableEventIndexes: readonly number[] = allEventIndexes;
 
-  LiquidTokenPattern.lastIndex = 0;
-  let match: RegExpExecArray | null = LiquidTokenPattern.exec(input.template);
-  while (match !== null) {
-    const token = match[1];
-    if (token === undefined) {
-      throw new Error("Expected Liquid token pattern to capture a token.");
-    }
-
+  forEachLiquidToken(input.template, (token) => {
     if (token.startsWith("{{")) {
       const referencePath = extractOutputReferencePath(token);
       if (referencePath === null) {
@@ -373,19 +597,13 @@ function validateConditionalKeyTemplateReferences(input: {
     } else {
       const tagName = extractLiquidTagName(token);
       if (tagName === "if") {
-        const conditionEventType = extractSimpleKeyTemplateConditionEventType(
-          input.field,
-          token,
+        const ifBranchReachableEventIndexes = filterReachableEventsByModeledKeyCondition({
+          field: input.field,
+          selectedEventReferences: input.selectedEventReferences,
+          reachableEventIndexes,
+          expression: extractTagExpression({ token, tagName }),
           issues,
-        );
-        const ifBranchReachableEventIndexes =
-          conditionEventType === null
-            ? []
-            : filterReachableEventsByEventType({
-                selectedEventReferences: input.selectedEventReferences,
-                reachableEventIndexes,
-                eventType: conditionEventType,
-              });
+        });
         stack.push({
           parentReachableEventIndexes: reachableEventIndexes,
           ifBranchReachableEventIndexes,
@@ -405,40 +623,94 @@ function validateConditionalKeyTemplateReferences(input: {
         }
       }
     }
-
-    match = LiquidTokenPattern.exec(input.template);
-  }
+  });
 
   return issues;
 }
 
 function extractLiquidTagName(token: string): string | null {
-  LiquidTagPattern.lastIndex = 0;
-  const match = LiquidTagPattern.exec(token);
-  return match?.[1] ?? null;
-}
-
-function extractSimpleKeyTemplateConditionEventType(
-  field: WebhookTriggerTemplateFieldName,
-  token: string,
-  issues: WebhookTriggerTemplateValidationIssue[],
-): string | null {
-  const match = SimpleKeyTemplateConditionPattern.exec(token);
-  if (match === null) {
-    issues.push({
-      field,
-      message:
-        'Only webhookEvent.eventType equality conditions are supported in key templates, for example {% if webhookEvent.eventType == "provider.event" %}.',
-    });
+  const inner = trimLiquidInner(token);
+  const firstChar = inner[0];
+  if (firstChar === undefined || !isReferenceStartCharacter(firstChar)) {
     return null;
   }
 
-  const eventType = match[1];
-  if (eventType === undefined) {
-    throw new Error("Expected key template condition pattern to capture an event type.");
+  let cursor = 1;
+  while (cursor < inner.length) {
+    const char = inner[cursor];
+    if (char === undefined || (!isReferencePathCharacter(char) && char !== "-")) {
+      break;
+    }
+
+    cursor += 1;
   }
 
-  return eventType;
+  return inner.slice(0, cursor);
+}
+
+function filterReachableEventsByModeledKeyCondition(input: {
+  field: WebhookTriggerTemplateFieldName;
+  selectedEventReferences: SelectedEventReferencePaths;
+  reachableEventIndexes: readonly number[];
+  expression: string;
+  issues: WebhookTriggerTemplateValidationIssue[];
+}): readonly number[] {
+  const eventType = extractWebhookEventTypeEqualityValue(input.expression);
+  if (eventType !== null) {
+    return filterReachableEventsByEventType({
+      selectedEventReferences: input.selectedEventReferences,
+      reachableEventIndexes: input.reachableEventIndexes,
+      eventType,
+    });
+  }
+
+  const referencePath = extractSimplePositiveConditionReferencePath(input.expression);
+  if (referencePath !== null) {
+    return filterReachableEventsByReferencePaths({
+      selectedEventReferences: input.selectedEventReferences,
+      reachableEventIndexes: input.reachableEventIndexes,
+      referencePaths: [referencePath],
+    });
+  }
+
+  input.issues.push({
+    field: input.field,
+    message:
+      'Only webhookEvent.eventType equality or simple payload presence conditions are supported in key templates, for example {% if webhookEvent.eventType == "provider.event" %} or {% if payload.resource %}.',
+  });
+  return [];
+}
+
+function extractWebhookEventTypeEqualityValue(expression: string): string | null {
+  const leftHandSide = "webhookEvent.eventType";
+  const trimmedExpression = expression.trim();
+  if (!trimmedExpression.startsWith(leftHandSide)) {
+    return null;
+  }
+
+  let cursor = leftHandSide.length;
+  cursor = skipWhitespace(trimmedExpression, cursor);
+  if (!trimmedExpression.startsWith("==", cursor)) {
+    return null;
+  }
+
+  cursor = skipWhitespace(trimmedExpression, cursor + 2);
+  if (trimmedExpression[cursor] !== '"') {
+    return null;
+  }
+
+  const eventTypeStart = cursor + 1;
+  const eventTypeEnd = trimmedExpression.indexOf('"', eventTypeStart);
+  if (eventTypeEnd === -1) {
+    return null;
+  }
+
+  const trailingCursor = skipWhitespace(trimmedExpression, eventTypeEnd + 1);
+  if (trailingCursor !== trimmedExpression.length) {
+    return null;
+  }
+
+  return trimmedExpression.slice(eventTypeStart, eventTypeEnd);
 }
 
 function filterReachableEventsByEventType(input: {
@@ -456,6 +728,42 @@ function filterReachableEventsByEventType(input: {
   });
 }
 
+function filterReachableEventsByReferencePaths(input: {
+  selectedEventReferences: SelectedEventReferencePaths;
+  reachableEventIndexes: readonly number[];
+  referencePaths: readonly string[];
+}): readonly number[] {
+  return input.reachableEventIndexes.filter((eventIndex) => {
+    const eventReferences = input.selectedEventReferences.eventReferences[eventIndex];
+    if (eventReferences === undefined) {
+      throw new Error(`Missing selected event reference set for index ${eventIndex}.`);
+    }
+
+    return input.referencePaths.every((referencePath) => eventReferences.has(referencePath));
+  });
+}
+
+function subtractEventIndexes(
+  sourceEventIndexes: readonly number[],
+  removedEventIndexes: readonly number[],
+): readonly number[] {
+  return sourceEventIndexes.filter((eventIndex) => !removedEventIndexes.includes(eventIndex));
+}
+
+function unionEventIndexes(
+  leftEventIndexes: readonly number[],
+  rightEventIndexes: readonly number[],
+): readonly number[] {
+  const union = [...leftEventIndexes];
+  for (const eventIndex of rightEventIndexes) {
+    if (!union.includes(eventIndex)) {
+      union.push(eventIndex);
+    }
+  }
+
+  return union;
+}
+
 function validateReferencePathForReachableEvents(input: {
   field: WebhookTriggerTemplateFieldName;
   referencePath: string;
@@ -464,12 +772,7 @@ function validateReferencePathForReachableEvents(input: {
   issues: WebhookTriggerTemplateValidationIssue[];
 }): void {
   if (input.selectedEventReferences.eventReferences.length === 0) {
-    if (!input.selectedEventReferences.common.has(input.referencePath)) {
-      input.issues.push({
-        field: input.field,
-        message: `Unsupported trigger event field reference '{{${input.referencePath}}}'.`,
-      });
-    }
+    validateReferencePathForSelectedEventCommon(input);
     return;
   }
 
@@ -487,6 +790,110 @@ function validateReferencePathForReachableEvents(input: {
       return;
     }
   }
+}
+
+function trimLiquidInner(token: string): string {
+  let inner = token.slice(2, -2).trim();
+  if (inner.startsWith("-")) {
+    inner = inner.slice(1).trimStart();
+  }
+
+  if (inner.endsWith("-")) {
+    inner = inner.slice(0, -1).trimEnd();
+  }
+
+  return inner;
+}
+
+function skipWhitespace(value: string, start: number): number {
+  let cursor = start;
+  while (cursor < value.length) {
+    const char = value[cursor];
+    if (char === undefined || !isWhitespace(char)) {
+      return cursor;
+    }
+
+    cursor += 1;
+  }
+
+  return cursor;
+}
+
+function isSimpleReferencePath(referencePath: string): boolean {
+  if (referencePath.length === 0) {
+    return false;
+  }
+
+  const segments = referencePath.split(".");
+  return segments.every((segment, index) =>
+    index === 0 ? isReferenceRootSegment(segment) : isReferenceChildSegment(segment),
+  );
+}
+
+function isReferenceRootSegment(segment: string): boolean {
+  const firstChar = segment[0];
+  if (firstChar === undefined || !isReferenceStartCharacter(firstChar)) {
+    return false;
+  }
+
+  return everyCharacterAfterFirstMatches(segment, isReferenceChildCharacter);
+}
+
+function isReferenceChildSegment(segment: string): boolean {
+  if (segment.length === 0) {
+    return false;
+  }
+
+  return everyCharacterMatches(segment, isReferenceChildCharacter);
+}
+
+function everyCharacterAfterFirstMatches(
+  value: string,
+  predicate: (char: string) => boolean,
+): boolean {
+  for (let index = 1; index < value.length; index += 1) {
+    const char = value[index];
+    if (char === undefined || !predicate(char)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function everyCharacterMatches(value: string, predicate: (char: string) => boolean): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    if (char === undefined || !predicate(char)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function isReferencePathCharacter(char: string): boolean {
+  return char === "." || isReferenceChildCharacter(char);
+}
+
+function isReferenceStartCharacter(char: string): boolean {
+  return isAsciiLetter(char) || char === "_";
+}
+
+function isReferenceChildCharacter(char: string): boolean {
+  return isAsciiLetter(char) || isAsciiDigit(char) || char === "_";
+}
+
+function isAsciiLetter(char: string): boolean {
+  return (char >= "A" && char <= "Z") || (char >= "a" && char <= "z");
+}
+
+function isAsciiDigit(char: string): boolean {
+  return char >= "0" && char <= "9";
+}
+
+function isWhitespace(char: string): boolean {
+  return char === " " || char === "\n" || char === "\r" || char === "\t";
 }
 
 function buildSelectedEventReferencePaths(

@@ -156,9 +156,7 @@ describe.concurrent("trigger webhooks update and delete integration", () => {
     expect(persistedWebhook.inputTemplate).toBe("Handle payload");
     expect(persistedWebhook.eventConditions[0]?.actorPolicy).toEqual(SlackWorkspaceActorPolicy);
     expect(persistedWebhook.instructions).toBeNull();
-    expect(persistedWebhook.conversationKeyTemplate).toBe(
-      "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
-    );
+    expect(persistedWebhook.conversationKeyTemplate).toBe("{{payload.issue.node_id}}");
     expect(persistedWebhook.idempotencyKeyTemplate).toBeNull();
 
     const policyPatchResponse = await env.controlPlaneApi.http.fetch(

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  GitHubPullRequestConversationKeyTemplate,
-  GitHubPullRequestReviewConversationKeyTemplate,
-} from "./webhook-trigger-conversation-key-options.js";
+import { GitHubPullRequestConversationKeyTemplate } from "./webhook-trigger-conversation-key-options.js";
 import type { WebhookTriggerEventOption } from "./webhook-trigger-event-types.js";
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import {
@@ -1461,7 +1458,7 @@ describe("validateWebhookTriggerFormValues", () => {
       validateWebhookTriggerFormValues(
         {
           ...BaseFormValues,
-          conversationKeyTemplate: GitHubPullRequestReviewConversationKeyTemplate,
+          conversationKeyTemplate: GitHubPullRequestConversationKeyTemplate,
           eventIds: [PullRequestConditionId0, IssueCommentConditionId1],
           eventParameterRules: {
             [IssueCommentConditionId1]: {

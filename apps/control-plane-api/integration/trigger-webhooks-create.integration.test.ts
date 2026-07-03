@@ -182,12 +182,8 @@ describe.concurrent("trigger webhooks create integration", () => {
     ]);
     expect(body.inputTemplate).toBe("Handle payload");
     expect(body.instructions).toBe("Prefer deterministic reproduction steps.");
-    expect(body.conversationKeyTemplate).toBe(
-      "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
-    );
-    expect(body.idempotencyKeyTemplate).toBe(
-      "{{payload.repository.full_name}}:issue:{{payload.issue.number}}:comment:{{payload.comment.body}}",
-    );
+    expect(body.conversationKeyTemplate).toBe("{{payload.issue.node_id}}");
+    expect(body.idempotencyKeyTemplate).toBe("{{payload.comment.node_id}}");
     expect(body.target.sandboxProfileId).toBe("sbp_trigger_webhook_duplicate");
     expect(body.target.sandboxProfileVersion).toBe(3);
     expect(body.target.primaryRepositoryId).toBe("mistlehq/platform");
@@ -264,8 +260,9 @@ describe.concurrent("trigger webhooks create integration", () => {
           sandboxProfileVersion: 3,
         }),
         inputTemplate: "Handle {{webhook.eventypepe}} and {{payload.pull_request.title}}",
-        conversationKeyTemplate: "{% if payload.issue %}{{payload.issue.number}}{% endif %}",
-        idempotencyKeyTemplate: "{{payload.comment.node_id}}",
+        conversationKeyTemplate:
+          "{% if payload.pull_request or payload.issue %}{{payload.pull_request.number}}{% endif %}",
+        idempotencyKeyTemplate: "{{payload.comment.missing_node_id}}",
       }),
     });
 
@@ -278,9 +275,11 @@ describe.concurrent("trigger webhooks create integration", () => {
     expect(JSON.stringify(body)).toContain("{{webhook.eventypepe}}");
     expect(JSON.stringify(body)).toContain("{{payload.pull_request.title}}");
     expect(JSON.stringify(body)).toContain("conversationKeyTemplate");
-    expect(JSON.stringify(body)).toContain("Only webhookEvent.eventType equality conditions");
+    expect(JSON.stringify(body)).toContain(
+      "Only webhookEvent.eventType equality or simple payload presence conditions",
+    );
     expect(JSON.stringify(body)).toContain("idempotencyKeyTemplate");
-    expect(JSON.stringify(body)).toContain("{{payload.comment.node_id}}");
+    expect(JSON.stringify(body)).toContain("{{payload.comment.missing_node_id}}");
   });
 
   it("persists the selected primary repository when the profile binding exposes it", async ({

@@ -612,9 +612,8 @@ describe.concurrent("MCP trigger tools integration", () => {
         ],
         inputTemplate: "Triage {{payload.comment.body}}",
         instructions: "Prefer concise triage summaries.",
-        conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
-        idempotencyKeyTemplate:
-          "{{payload.repository.full_name}}:issue:{{payload.issue.number}}:comment:{{payload.comment.body}}",
+        conversationKeyTemplate: "{{payload.issue.node_id}}",
+        idempotencyKeyTemplate: "{{payload.comment.node_id}}",
         target: {
           sandboxProfileId: "sbp_mcp_trigger_webhook_create",
         },
@@ -656,9 +655,8 @@ describe.concurrent("MCP trigger tools integration", () => {
       eventConditions: [{ eventType: GitHubIssueCommentCreatedEventType }],
       inputTemplate: "Triage {{payload.comment.body}}",
       instructions: "Prefer concise triage summaries.",
-      conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
-      idempotencyKeyTemplate:
-        "{{payload.repository.full_name}}:issue:{{payload.issue.number}}:comment:{{payload.comment.body}}",
+      conversationKeyTemplate: "{{payload.issue.node_id}}",
+      idempotencyKeyTemplate: "{{payload.comment.node_id}}",
     });
   });
 
@@ -836,6 +834,16 @@ describe.concurrent("MCP trigger tools integration", () => {
       targetId: "atg_mcp_trigger_webhook_events_set",
       name: "MCP webhook event update",
     });
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.webhookTriggers)
+      .set({
+        conversationKeyTemplate:
+          "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
+        idempotencyKeyTemplate: null,
+      })
+      .where(
+        eq(env.controlPlaneTables.webhookTriggers.triggerId, "atm_mcp_trigger_webhook_events_set"),
+      );
 
     const result = await callMcpTool({
       env,
@@ -854,9 +862,6 @@ describe.concurrent("MCP trigger tools integration", () => {
             },
           },
         ],
-        conversationKeyTemplate:
-          "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
-        idempotencyKeyTemplate: null,
       },
     });
 
@@ -1259,9 +1264,8 @@ describe.concurrent("MCP trigger tools integration", () => {
         ],
         inputTemplate: "Triage {{payload.issue.title}}",
         instructions: "Classify issue severity and propose owner/component.",
-        conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
-        idempotencyKeyTemplate:
-          "{{payload.repository.full_name}}:issue:{{payload.issue.number}}:comment:{{payload.comment.body}}",
+        conversationKeyTemplate: "{{payload.issue.node_id}}",
+        idempotencyKeyTemplate: "{{payload.comment.node_id}}",
         target: {
           sandboxProfileId: "sbp_mcp_designer_trigger_mutation",
         },
