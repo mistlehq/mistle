@@ -7,7 +7,11 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import type { DesignerSession } from "../designer/designer-service.js";
-import { DesignerPageComposerContainerClassName, DesignerPageView } from "./designer-page-view.js";
+import {
+  DesignerPageComposerContainerClassName,
+  DesignerPageSessionsContainerClassName,
+  DesignerPageView,
+} from "./designer-page-view.js";
 
 const SampleDesignerSession = {
   id: "dsn_triage",
@@ -118,6 +122,10 @@ describe("DesignerPageView", () => {
     expect(screen.getByRole("columnheader", { name: "Sessions" })).toBeDefined();
     expect(screen.getByRole("columnheader", { name: "Started by" })).toBeDefined();
     expect(screen.getByRole("columnheader", { name: "Updated" })).toBeDefined();
+    expect(screen.getByRole("table").parentElement?.parentElement).toHaveProperty(
+      "className",
+      DesignerPageSessionsContainerClassName,
+    );
     expect(screen.queryByRole("columnheader", { name: "Sandbox profile" })).toBeNull();
     expect(screen.queryByRole("columnheader", { name: "Created" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Past sessions" })).toBeNull();
