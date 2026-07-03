@@ -631,13 +631,10 @@ function useTriggerParameterResources(input: {
     syncState: resourceQuery.data?.syncState,
     lastErrorMessage: resourceQuery.data?.lastErrorMessage,
   });
-  const resourceErrorSuppressed =
-    resourceQuery.isError && isIntegrationResourceSyncRequiredError(resourceQuery.error);
 
   return {
     availableResourceOptions,
     normalizedResourceOptions,
-    resourceErrorSuppressed,
     resourceErrorMessage,
     resourceQuery,
     resourceQueryKey,
@@ -871,7 +868,6 @@ function OneOfParameterGroupField(input: {
               }
               rule={selectedRule}
               resourceQueryKey={selectedResources.resourceQueryKey}
-              resourceErrorSuppressed={selectedResources.resourceErrorSuppressed}
               resourceErrorMessage={selectedResources.resourceErrorMessage}
               resourceOptions={selectedResources.availableResourceOptions}
               resourceQueryIsError={selectedResources.resourceQuery.isError}
@@ -1118,7 +1114,6 @@ function EventParameterField(input: {
         placeholder={placeholder}
         rule={input.rule}
         resourceQueryKey={resources.resourceQueryKey}
-        resourceErrorSuppressed={resources.resourceErrorSuppressed}
         resourceErrorMessage={resources.resourceErrorMessage}
         resourceOptions={resources.availableResourceOptions}
         resourceQueryIsError={resources.resourceQuery.isError}
@@ -1161,7 +1156,6 @@ function ResourceMultiSelectParameterField(input: {
     displayName: string;
   }>;
   resourceErrorMessage: string | null;
-  resourceErrorSuppressed: boolean;
   resourceQueryKey: TriggerParameterResourceQueryKey;
   resourceQueryIsError: boolean;
   resourceQueryIsPending: boolean;
@@ -1202,11 +1196,10 @@ function ResourceMultiSelectParameterField(input: {
     ? {
         mode: "loading",
       }
-    : input.resourceQueryIsError
+    : input.resourceQueryIsError && input.resourceErrorMessage !== null
       ? {
           mode: "error",
-          message: input.resourceErrorMessage ?? `Could not load ${resourceLabel}.`,
-          suppressSyncFailureAlert: input.resourceErrorSuppressed,
+          message: input.resourceErrorMessage,
         }
       : {
           mode: "ready",

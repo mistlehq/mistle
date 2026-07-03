@@ -214,7 +214,7 @@ describe("IntegrationConnectionResourcePickerView", () => {
     expect(fieldError.className).toContain("whitespace-nowrap");
   });
 
-  it("keeps suppressed list errors from rendering sync failure alerts", () => {
+  it("keeps ready empty lists from rendering sync failure alerts", () => {
     render(
       <IntegrationConnectionResourcePickerView
         emptyMessage="No repositories available for this connection."
@@ -222,9 +222,7 @@ describe("IntegrationConnectionResourcePickerView", () => {
         isRefreshing={false}
         label="Repositories"
         listState={{
-          mode: "error",
-          message: "Resource sync is required before resources can be listed.",
-          suppressSyncFailureAlert: true,
+          mode: "ready",
         }}
         onBlur={() => {}}
         onFocus={() => {}}

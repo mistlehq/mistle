@@ -765,17 +765,20 @@ export function resolveResourceListViewState(input: {
   }
 
   if (input.isError) {
+    if (isResourceSyncRequiredOnlyError(input.errors)) {
+      return { mode: "ready" };
+    }
+
     return {
       mode: "error",
       message: input.errorMessage,
-      suppressSyncFailureAlert: shouldSuppressResourceListError(input.errors),
     };
   }
 
   return { mode: "ready" };
 }
 
-function shouldSuppressResourceListError(errors: readonly unknown[]): boolean {
+function isResourceSyncRequiredOnlyError(errors: readonly unknown[]): boolean {
   return errors.length > 0 && errors.every(isIntegrationResourceSyncRequiredError);
 }
 

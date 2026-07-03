@@ -27,7 +27,30 @@ describe("resolveResourceListViewState", () => {
     expect(state).toEqual({
       mode: "error",
       message: "Could not load actors.",
-      suppressSyncFailureAlert: false,
+    });
+  });
+
+  it("treats resource sync prerequisite errors as a ready empty resource list state", () => {
+    const state = resolveResourceListViewState({
+      errorMessage: "Could not load actors.",
+      errors: [
+        new IntegrationsApiError({
+          operation: "listIntegrationConnectionResources",
+          status: 409,
+          body: {
+            code: "RESOURCE_SYNC_REQUIRED",
+            message: "Resource sync is required before resources can be listed.",
+          },
+          code: "RESOURCE_SYNC_REQUIRED",
+          message: "Resource sync is required before resources can be listed.",
+        }),
+      ],
+      isError: true,
+      isPending: false,
+    });
+
+    expect(state).toEqual({
+      mode: "ready",
     });
   });
 });

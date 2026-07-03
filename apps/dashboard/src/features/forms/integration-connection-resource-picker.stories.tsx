@@ -178,15 +178,13 @@ export const StateGallery: Story = {
         </StorySection>
 
         <StorySection
-          description="Resource sync prerequisite errors do not render an alert below the field."
+          description="Resource sync prerequisites render as an empty field, not an alert."
           title="Sync Required"
         >
           <IntegrationConnectionResourcePickerView
             {...args}
             listState={{
-              mode: "error",
-              message: "Resource sync is required before resources can be listed.",
-              suppressSyncFailureAlert: true,
+              mode: "ready",
             }}
             searchPlaceholder="No synced repositories"
             visibleItems={[]}
