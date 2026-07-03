@@ -1978,6 +1978,16 @@ async function buildDesignerBlueprintLayoutGraph(input: {
     });
   }
 
+  const hasWorkflowNodes = Number.isFinite(workflowMinX) && Number.isFinite(workflowMaxX);
+  const workflowCenterX = hasWorkflowNodes ? workflowMinX + (workflowMaxX - workflowMinX) / 2 : 0;
+  if (hasWorkflowNodes) {
+    centerDesignerBlueprintSingletonLayers({
+      centerX: workflowCenterX,
+      nodes: workflowNodes,
+      positionByNodeId,
+    });
+  }
+
   if (outcomeNode !== undefined) {
     const outcomeWidth = getDesignerBlueprintPositionedNodeWidth(outcomeNode);
     const outcomeHeight =
@@ -1987,8 +1997,6 @@ async function buildDesignerBlueprintLayoutGraph(input: {
         routingSummaryRows: outcomeNode.data.routingSummaryRows,
         triggerConditionRows: outcomeNode.data.triggerConditionRows,
       });
-    const hasWorkflowNodes = Number.isFinite(workflowMinX) && Number.isFinite(workflowMaxX);
-    const workflowCenterX = hasWorkflowNodes ? workflowMinX + (workflowMaxX - workflowMinX) / 2 : 0;
     positionByNodeId.set(outcomeNode.id, {
       x: workflowCenterX - outcomeWidth / 2,
       y: 0,
@@ -2057,6 +2065,42 @@ async function buildDesignerBlueprintLayoutGraph(input: {
     }),
     nodes: positionedNodes,
   };
+}
+
+function centerDesignerBlueprintSingletonLayers(input: {
+  centerX: number;
+  nodes: readonly DesignerBlueprintLayoutNode[];
+  positionByNodeId: Map<string, { x: number; y: number }>;
+}): void {
+  const nodeIdsByY = new Map<number, string[]>();
+  for (const node of input.nodes) {
+    const position = input.positionByNodeId.get(node.id);
+    if (position === undefined) {
+      continue;
+    }
+
+    const nodeIds = nodeIdsByY.get(position.y) ?? [];
+    nodeIds.push(node.id);
+    nodeIdsByY.set(position.y, nodeIds);
+  }
+
+  for (const nodeIds of nodeIdsByY.values()) {
+    const [nodeId] = nodeIds;
+    if (nodeId === undefined || nodeIds.length !== 1) {
+      continue;
+    }
+
+    const node = input.nodes.find((candidate) => candidate.id === nodeId);
+    const position = input.positionByNodeId.get(nodeId);
+    if (node === undefined || position === undefined) {
+      continue;
+    }
+
+    input.positionByNodeId.set(nodeId, {
+      x: input.centerX - getDesignerBlueprintPositionedNodeWidth(node) / 2,
+      y: position.y,
+    });
+  }
 }
 
 function createDesignerBlueprintFanCountByNodeId(input: {

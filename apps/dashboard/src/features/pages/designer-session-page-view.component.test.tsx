@@ -545,6 +545,22 @@ function getRequiredDesignerBlueprintGraphNode(
   return node;
 }
 
+function getDesignerBlueprintGraphNodeCenterX(
+  node: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number],
+): number {
+  return node.position.x + resolveDesignerBlueprintGraphNodeWidth(node) / 2;
+}
+
+function resolveDesignerBlueprintGraphNodeWidth(
+  node: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number],
+): number {
+  return node.data.kind === "outcome" ||
+    node.data.routingSummaryRows !== undefined ||
+    node.data.triggerConditionRows !== undefined
+    ? 440
+    : 280;
+}
+
 describe("DesignerCanvasWorkspace", () => {
   it("renders the empty canvas state when Designer has no tabs", () => {
     renderDesignerCanvasWorkspace({ tabs: [] });
@@ -1246,11 +1262,15 @@ describe("DesignerCanvasWorkspace", () => {
     const slackTrigger = getRequiredDesignerBlueprintGraphNode(graph, "slack-trigger");
     const linearTrigger = getRequiredDesignerBlueprintGraphNode(graph, "linear-trigger");
     const normalizeContext = getRequiredDesignerBlueprintGraphNode(graph, "normalize-context");
+    const outcome = getRequiredDesignerBlueprintGraphNode(graph, "__designer_blueprint_outcome");
     const triggerEdges = graph.edges.filter((edge) => edge.target === "normalize-context");
 
     expect(slackTrigger.position.y).toBe(linearTrigger.position.y);
     expect(slackTrigger.position.x).not.toBe(linearTrigger.position.x);
     expect(normalizeContext.position.y).toBeGreaterThan(slackTrigger.position.y);
+    expect(getDesignerBlueprintGraphNodeCenterX(normalizeContext)).toBe(
+      getDesignerBlueprintGraphNodeCenterX(outcome),
+    );
     expect(triggerEdges).toHaveLength(2);
     expect(triggerEdges.every((edge) => edge.type === "curved")).toBe(true);
   });
@@ -1375,6 +1395,7 @@ describe("DesignerCanvasWorkspace", () => {
     const requestInfo = getRequiredDesignerBlueprintGraphNode(graph, "request-info");
     const routeOwner = getRequiredDesignerBlueprintGraphNode(graph, "route-owner");
     const triageUpdate = getRequiredDesignerBlueprintGraphNode(graph, "triage-update");
+    const outcome = getRequiredDesignerBlueprintGraphNode(graph, "__designer_blueprint_outcome");
     const routingEdges = graph.edges.filter((edge) => edge.source === "route-triage");
     const convergenceEdges = graph.edges.filter((edge) => edge.target === "triage-update");
 
@@ -1385,6 +1406,12 @@ describe("DesignerCanvasWorkspace", () => {
     );
     expect(escalate.position.y).toBeGreaterThan(routeTriage.position.y);
     expect(triageUpdate.position.y).toBeGreaterThan(escalate.position.y);
+    expect(getDesignerBlueprintGraphNodeCenterX(routeTriage)).toBe(
+      getDesignerBlueprintGraphNodeCenterX(outcome),
+    );
+    expect(getDesignerBlueprintGraphNodeCenterX(triageUpdate)).toBe(
+      getDesignerBlueprintGraphNodeCenterX(outcome),
+    );
     expect(routingEdges).toHaveLength(3);
     expect(routingEdges.every((edge) => edge.type === "curved")).toBe(true);
     expect(convergenceEdges).toHaveLength(3);
