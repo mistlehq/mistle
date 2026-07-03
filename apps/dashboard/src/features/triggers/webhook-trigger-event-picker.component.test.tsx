@@ -6,7 +6,10 @@ import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
-import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
+import {
+  IntegrationsApiError,
+  type IntegrationConnectionResources,
+} from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import type { WebhookTriggerEventPickerDisabledState } from "./webhook-trigger-event-picker-state.js";
 import {
@@ -152,6 +155,7 @@ function renderTriggerPicker(input: {
   disabledState?: WebhookTriggerEventPickerDisabledState | null;
   eventOptions?: readonly WebhookTriggerEventOption[];
   teamResources?: IntegrationConnectionResources;
+  branchResourcesError?: IntegrationsApiError;
   useStatefulSelection?: boolean;
 }): ReturnType<typeof render> {
   TestQueryClient.setQueryData(
@@ -283,6 +287,23 @@ function renderTriggerPicker(input: {
       },
     },
   );
+  if (input.branchResourcesError !== undefined) {
+    const branchQuery = TestQueryClient.getQueryCache().find({
+      queryKey: createTriggerParameterResourceQueryKey({
+        connectionId: input.selectedConnectionId,
+        resourceKind: "branch",
+      }),
+    });
+    if (branchQuery === undefined) {
+      throw new Error("Expected branch resource query to be seeded.");
+    }
+    branchQuery.setState({
+      ...branchQuery.state,
+      data: undefined,
+      error: input.branchResourcesError,
+      status: "error",
+    });
+  }
 
   function StatefulTriggerPicker(): React.JSX.Element {
     const [selectedEventIds, setSelectedEventIds] = useState([...input.selectedEventIds]);
@@ -855,6 +876,45 @@ describe("WebhookTriggerEventPicker", () => {
 
     expect(await screen.findByRole("button", { name: "Refresh base branches" })).toBeDefined();
     expect(screen.queryByRole("button", { name: malformedBranchPlural })).toBeNull();
+  });
+
+  it("does not render resource sync prerequisite errors for branch trigger parameters", async () => {
+    const triggerId = createWebhookTriggerEventId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.pull_request.opened",
+    });
+    const selectedConditionId = conditionId(triggerId);
+
+    renderTriggerPicker({
+      branchResourcesError: new IntegrationsApiError({
+        operation: "listIntegrationConnectionResources",
+        status: 409,
+        body: {
+          code: "RESOURCE_SYNC_REQUIRED",
+          message: "Resource sync is required before resources can be listed.",
+        },
+        code: "RESOURCE_SYNC_REQUIRED",
+        message: "Resource sync is required before resources can be listed.",
+      }),
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedEventIds: [selectedConditionId],
+      eventParameterRules: {
+        [selectedConditionId]: {
+          baseBranch: isRule("main"),
+        },
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText("main").length).toBeGreaterThan(0);
+    });
+
+    expect(
+      screen.queryByText("Resource sync is required before resources can be listed."),
+    ).toBeNull();
+    expect(screen.queryByText("Could not load base branches")).toBeNull();
+    expect(screen.queryByText("Sync failed.")).toBeNull();
   });
 
   it("renders GitHub review request bot targets from synced bot resources", async () => {

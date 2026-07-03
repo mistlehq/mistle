@@ -38,6 +38,7 @@ import {
 } from "../forms/string-combobox-options.js";
 import { IntegrationLogo } from "../integrations/integration-logo.js";
 import {
+  IntegrationsApiError,
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
@@ -630,10 +631,13 @@ function useTriggerParameterResources(input: {
     syncState: resourceQuery.data?.syncState,
     lastErrorMessage: resourceQuery.data?.lastErrorMessage,
   });
+  const resourceErrorSuppressed =
+    resourceQuery.isError && isResourceSyncRequiredError(resourceQuery.error);
 
   return {
     availableResourceOptions,
     normalizedResourceOptions,
+    resourceErrorSuppressed,
     resourceErrorMessage,
     resourceQuery,
     resourceQueryKey,
@@ -867,6 +871,7 @@ function OneOfParameterGroupField(input: {
               }
               rule={selectedRule}
               resourceQueryKey={selectedResources.resourceQueryKey}
+              resourceErrorSuppressed={selectedResources.resourceErrorSuppressed}
               resourceErrorMessage={selectedResources.resourceErrorMessage}
               resourceOptions={selectedResources.availableResourceOptions}
               resourceQueryIsError={selectedResources.resourceQuery.isError}
@@ -948,6 +953,10 @@ function resolveResourceParameterErrorMessage(input: {
   lastErrorMessage: string | undefined;
 }): string | null {
   if (input.isError) {
+    if (isResourceSyncRequiredError(input.error)) {
+      return null;
+    }
+
     return resolveApiErrorMessage({
       error: input.error,
       fallbackMessage: "Could not load resources for this connection.",
@@ -959,6 +968,10 @@ function resolveResourceParameterErrorMessage(input: {
   }
 
   return null;
+}
+
+function isResourceSyncRequiredError(error: unknown): boolean {
+  return error instanceof IntegrationsApiError && error.code === "RESOURCE_SYNC_REQUIRED";
 }
 
 function EventParameterField(input: {
@@ -1109,6 +1122,7 @@ function EventParameterField(input: {
         placeholder={placeholder}
         rule={input.rule}
         resourceQueryKey={resources.resourceQueryKey}
+        resourceErrorSuppressed={resources.resourceErrorSuppressed}
         resourceErrorMessage={resources.resourceErrorMessage}
         resourceOptions={resources.availableResourceOptions}
         resourceQueryIsError={resources.resourceQuery.isError}
@@ -1151,6 +1165,7 @@ function ResourceMultiSelectParameterField(input: {
     displayName: string;
   }>;
   resourceErrorMessage: string | null;
+  resourceErrorSuppressed: boolean;
   resourceQueryKey: TriggerParameterResourceQueryKey;
   resourceQueryIsError: boolean;
   resourceQueryIsPending: boolean;
@@ -1195,6 +1210,7 @@ function ResourceMultiSelectParameterField(input: {
       ? {
           mode: "error",
           message: input.resourceErrorMessage ?? `Could not load ${resourceLabel}.`,
+          suppressAlert: input.resourceErrorSuppressed,
         }
       : {
           mode: "ready",
