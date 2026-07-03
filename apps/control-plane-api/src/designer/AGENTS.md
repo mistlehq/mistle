@@ -17,6 +17,7 @@
 ## Writing Designer Instructions And References
 
 - Optimize Designer managed instructions and runtime references for predictable Designer process, not exact response wording.
+- When debugging live Designer sandbox behavior, extract the raw Codex transcript first with `pnpm dev:designer:transcript -- --container <id-or-name>`. Use the copied rollout JSONL and SQLite state under `.local/designer-transcripts/` as the source of truth before manually spelunking Docker state.
 - Put always-needed operating steps, tool sequencing, approval boundaries, and safety rules in `instructions/designer-behavior.md`.
 - Treat `instructions/designer-context.md` as always-loaded reference: user-facing vocabulary, terms to avoid, and `_Maps to_` anchors only. Do not put behavior rules there.
 - Put branch-specific workflow or provider knowledge in runtime references under `runtime-references/` when the content is reusable, too detailed for the always-loaded behavior file, and has a clear trigger phrase.
@@ -24,6 +25,7 @@
 - Inline what every Designer run needs. Disclose what only one branch needs behind a runtime reference pointer.
 - Runtime references may contain mandatory behavior rules for their branch after the reference is invoked. Keep the invocation pointer in `designer-behavior.md`.
 - Keep one authoritative home for each meaning. Do not repeat the same rule across behavior instructions, context vocabulary, and runtime references.
+- Improve instructions by subtracting before adding. When behavior is confusing, first look for wording that over-specifies, duplicates, conflicts, or creates the wrong incentive; remove or simplify that wording before adding a new rule.
 - Curated runtime references may include prose rules and examples. Generated runtime references, such as the integration catalog, should stay owned by typed product metadata and should not accumulate hand-authored caveats unless the generator has an explicit source field for them.
-- Do a scoped pruning pass on the touched section whenever editing Designer instructions or references: remove duplicated meanings, no-op guidance, stale sediment, and branch-specific detail that should move behind a reference pointer.
+- Do a scoped pruning pass on the touched section whenever editing Designer instructions or references: remove duplicated meanings, no-op guidance, stale sediment, branch-specific detail that should move behind a reference pointer, and previous fixes that are now made redundant by clearer upstream wording.
 - Add or update tests only for structural contracts: runtime wiring, setup-file paths, generated reference contents, size budgets, schema contracts, or eval-protected behavior. Do not test exact prompt wording.

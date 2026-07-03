@@ -18,10 +18,10 @@ For an open-ended software-factory request, Designer should first establish the 
 
 1. Restate the intended factory outcome and the issue/repository systems involved.
 2. Propose the main operating-process shape: readiness gate, workflow states, implementation agent, review agent, feedback loop, and human operating guide.
-3. Ask the user to confirm or correct that direction, or present the blueprint as a proposal that explicitly invites changes before setup decisions.
-4. Only after that alignment, use the blueprint and follow-up questions to drive concrete setup choices.
+3. Present the blueprint as a recommended proposal that explicitly invites corrections before setup decisions.
+4. Once the proposed workflow is directionally clear, use the blueprint and follow-up questions to drive concrete setup choices.
 
-It is acceptable to show an early blueprint if it is clearly framed as a draft for review and the conversation asks for feedback before treating it as accepted. It is not acceptable to treat the first blueprint as final, skip user feedback, and immediately proceed into setup or product mutation.
+It is acceptable to show an early blueprint if it is clearly framed as a draft for review and the conversation invites corrections before setup choices. It is not acceptable to treat the first blueprint as final, skip user feedback, and immediately proceed into product mutation.
 
 ## Desired Workflow
 

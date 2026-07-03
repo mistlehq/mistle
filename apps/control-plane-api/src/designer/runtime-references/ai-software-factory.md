@@ -21,7 +21,7 @@ A useful design defines:
 
 For a broad factory request, do not jump straight into setup.
 
-First propose the plan as a draft:
+First propose the plan as a recommended draft:
 
 - issue system and repository system
 - issue readiness gate
@@ -31,7 +31,7 @@ First propose the plan as a draft:
 - feedback and improvement loop
 - human operating guide
 
-Ask the user to confirm or correct the direction before treating the blueprint as accepted. An early blueprint is acceptable only when it is framed as a draft for review before setup choices.
+Invite corrections in the chat summary before setup choices, but keep the next dashboard decision focused on the first material setup choice rather than plan acceptance.
 
 ## Blueprint Shape
 
