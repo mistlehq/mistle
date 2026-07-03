@@ -34,6 +34,7 @@ const CreateTriggerWebhookBadRequestCodeSchema = z.enum([
   TriggerWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_REFERENCE,
   TriggerWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
   TriggerWebhooksBadRequestCodes.INVALID_PRIMARY_REPOSITORY,
+  TriggerWebhooksBadRequestCodes.INVALID_WEBHOOK_TRIGGER_TEMPLATE_REFERENCES,
 ]);
 
 export const CreateTriggerWebhookBadRequestResponseSchema = z.union([

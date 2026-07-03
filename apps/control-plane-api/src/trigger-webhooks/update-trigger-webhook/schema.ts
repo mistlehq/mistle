@@ -61,6 +61,7 @@ export const UpdateTriggerWebhookBadRequestResponseSchema = z.union([
       TriggerWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_REFERENCE,
       TriggerWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
       TriggerWebhooksBadRequestCodes.INVALID_PRIMARY_REPOSITORY,
+      TriggerWebhooksBadRequestCodes.INVALID_WEBHOOK_TRIGGER_TEMPLATE_REFERENCES,
     ]),
   ),
   ValidationErrorResponseSchema,

@@ -5,6 +5,8 @@ import type { TriggerFilter, TriggerRule } from "../types/index.js";
 import { evaluateFilterNode, type SharedFilter } from "./evaluate.js";
 import { getValueAtPath, splitDotPath } from "./path.js";
 
+export * from "./template-references.js";
+
 type ValidationIssue = {
   path: ReadonlyArray<PropertyKey>;
   message: string;

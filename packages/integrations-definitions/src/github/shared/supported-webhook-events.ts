@@ -27,8 +27,7 @@ const GitHubPullRequestConversationKeyOption = {
   id: "pull-request",
   label: "Pull request",
   description: "Events from the same pull request go to the same conversation.",
-  template:
-    "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
+  template: "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
 } as const;
 
 const GitHubPushBranchConversationKeyOption = {
