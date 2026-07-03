@@ -51,6 +51,7 @@
     "@xyflow/react": "^12.11.0",
     "better-auth": "1.6.20",
     "dockview-react": "^7.0.2",
+    "elkjs": "^0.11.1",
     "openapi-fetch": "^0.17.0",
     "posthog-js": "^1.393.4",
     "react": "^19.2.7",

@@ -9,7 +9,10 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { ResolvedAppearanceProvider } from "../appearance/appearance-provider.js";
-import { DesignerBlueprintCurrentTabHref } from "../designer/designer-blueprint-schema.js";
+import {
+  DesignerBlueprintCurrentTabHref,
+  type DesignerBlueprintDocument,
+} from "../designer/designer-blueprint-schema.js";
 import type {
   IntegrationConnection,
   IntegrationTarget,
@@ -18,6 +21,7 @@ import type {
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import {
+  buildDesignerBlueprintGraph,
   DesignerCanvasWorkspace,
   resolveDesignerBlueprintProcessLaneSlotHeight,
   resolveDesignerBlueprintInitialFocusViewportForNodes,
@@ -527,6 +531,18 @@ async function findDesignerBlueprintGraphForNode(nodeTestId: string): Promise<HT
   }
 
   return graph;
+}
+
+function getRequiredDesignerBlueprintGraphNode(
+  graph: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>,
+  nodeId: string,
+): Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number] {
+  const node = graph.nodes.find((candidate) => candidate.id === nodeId);
+  if (node === undefined) {
+    throw new Error(`Expected Designer blueprint graph node '${nodeId}'.`);
+  }
+
+  return node;
 }
 
 describe("DesignerCanvasWorkspace", () => {
@@ -1180,6 +1196,273 @@ describe("DesignerCanvasWorkspace", () => {
         ],
       }),
     ).toBe(144);
+  });
+
+  it("lays multiple triggers as sibling sources into the first workflow node", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Multi-trigger blueprint",
+        outcome: {
+          label: "Start from either intake source",
+        },
+        items: [
+          {
+            id: "slack-trigger",
+            kind: "trigger",
+            state: "proposed",
+            when: [{ label: "Slack message received" }],
+          },
+          {
+            id: "linear-trigger",
+            kind: "trigger",
+            state: "proposed",
+            when: [{ label: "Linear issue ready" }],
+          },
+          {
+            id: "normalize-context",
+            kind: "agent_step",
+            label: "Normalize context",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "slack-trigger",
+            to: "normalize-context",
+            kind: "triggers",
+          },
+          {
+            from: "linear-trigger",
+            to: "normalize-context",
+            kind: "triggers",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const slackTrigger = getRequiredDesignerBlueprintGraphNode(graph, "slack-trigger");
+    const linearTrigger = getRequiredDesignerBlueprintGraphNode(graph, "linear-trigger");
+    const normalizeContext = getRequiredDesignerBlueprintGraphNode(graph, "normalize-context");
+
+    expect(slackTrigger.position.y).toBe(linearTrigger.position.y);
+    expect(slackTrigger.position.x).not.toBe(linearTrigger.position.x);
+    expect(normalizeContext.position.y).toBeGreaterThan(slackTrigger.position.y);
+  });
+
+  it("lays routing destinations as sibling branches that converge downstream", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Routing blueprint",
+        outcome: {
+          label: "Route inbound work",
+        },
+        items: [
+          {
+            id: "incoming-item",
+            kind: "trigger",
+            state: "proposed",
+            when: [{ label: "Inbound item received" }],
+          },
+          {
+            id: "classify",
+            kind: "agent_step",
+            label: "Classify item",
+            state: "proposed",
+          },
+          {
+            id: "route-triage",
+            kind: "routing_policy",
+            state: "proposed",
+            rules: [
+              {
+                conditionLabel: "Urgent",
+                when: [{ field: "severity", operator: "equals", value: "urgent" }],
+                routeTo: "escalate",
+              },
+              {
+                conditionLabel: "Missing context",
+                when: [{ field: "required_context", operator: "empty" }],
+                routeTo: "request-info",
+              },
+              {
+                conditionLabel: "Ready",
+                when: [{ field: "routing_ready", operator: "equals", value: true }],
+                routeTo: "route-owner",
+              },
+            ],
+          },
+          {
+            id: "escalate",
+            kind: "agent_step",
+            label: "Escalate priority work",
+            state: "proposed",
+          },
+          {
+            id: "request-info",
+            kind: "agent_step",
+            label: "Ask for missing context",
+            state: "proposed",
+          },
+          {
+            id: "route-owner",
+            kind: "agent_step",
+            label: "Route to owner or queue",
+            state: "proposed",
+          },
+          {
+            id: "triage-update",
+            kind: "workflow_output",
+            label: "Triage update",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "incoming-item",
+            to: "classify",
+            kind: "triggers",
+          },
+          {
+            from: "classify",
+            to: "route-triage",
+            kind: "requires",
+          },
+          {
+            from: "route-triage",
+            to: "escalate",
+            kind: "routes_to",
+          },
+          {
+            from: "route-triage",
+            to: "request-info",
+            kind: "routes_to",
+          },
+          {
+            from: "route-triage",
+            to: "route-owner",
+            kind: "routes_to",
+          },
+          {
+            from: "escalate",
+            to: "triage-update",
+            kind: "produces",
+          },
+          {
+            from: "request-info",
+            to: "triage-update",
+            kind: "produces",
+          },
+          {
+            from: "route-owner",
+            to: "triage-update",
+            kind: "produces",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const routeTriage = getRequiredDesignerBlueprintGraphNode(graph, "route-triage");
+    const escalate = getRequiredDesignerBlueprintGraphNode(graph, "escalate");
+    const requestInfo = getRequiredDesignerBlueprintGraphNode(graph, "request-info");
+    const routeOwner = getRequiredDesignerBlueprintGraphNode(graph, "route-owner");
+    const triageUpdate = getRequiredDesignerBlueprintGraphNode(graph, "triage-update");
+
+    expect(escalate.position.y).toBe(requestInfo.position.y);
+    expect(requestInfo.position.y).toBe(routeOwner.position.y);
+    expect(new Set([escalate.position.x, requestInfo.position.x, routeOwner.position.x]).size).toBe(
+      3,
+    );
+    expect(escalate.position.y).toBeGreaterThan(routeTriage.position.y);
+    expect(triageUpdate.position.y).toBeGreaterThan(escalate.position.y);
+  });
+
+  it("fails when a routing rule target is missing its routes_to link", async () => {
+    await expect(
+      buildDesignerBlueprintGraph({
+        blueprint: {
+          version: 1,
+          title: "Invalid routing blueprint",
+          outcome: {
+            label: "Route inbound work",
+          },
+          items: [
+            {
+              id: "route-triage",
+              kind: "routing_policy",
+              state: "proposed",
+              rules: [
+                {
+                  conditionLabel: "Urgent",
+                  when: [{ field: "severity", operator: "equals", value: "urgent" }],
+                  routeTo: "escalate",
+                },
+              ],
+            },
+            {
+              id: "escalate",
+              kind: "agent_step",
+              label: "Escalate priority work",
+              state: "proposed",
+            },
+          ],
+          links: [],
+          actions: [],
+        } satisfies DesignerBlueprintDocument,
+        integrationMetadataByTargetKey: new Map<string, never>(),
+      }),
+    ).rejects.toThrow(
+      "Designer blueprint routing rule 'route-triage' routes to 'escalate' but the matching routes_to link is missing.",
+    );
+  });
+
+  it("fails when a routes_to link from a routing node is missing its routing rule target", async () => {
+    await expect(
+      buildDesignerBlueprintGraph({
+        blueprint: {
+          version: 1,
+          title: "Invalid routing link blueprint",
+          outcome: {
+            label: "Route inbound work",
+          },
+          items: [
+            {
+              id: "route-triage",
+              kind: "routing_policy",
+              state: "proposed",
+              rules: [
+                {
+                  conditionLabel: "Urgent",
+                  when: [{ field: "severity", operator: "equals", value: "urgent" }],
+                },
+              ],
+            },
+            {
+              id: "escalate",
+              kind: "agent_step",
+              label: "Escalate priority work",
+              state: "proposed",
+            },
+          ],
+          links: [
+            {
+              from: "route-triage",
+              to: "escalate",
+              kind: "routes_to",
+            },
+          ],
+          actions: [],
+        } satisfies DesignerBlueprintDocument,
+        integrationMetadataByTargetKey: new Map<string, never>(),
+      }),
+    ).rejects.toThrow(
+      "Designer blueprint routes_to link 'route-triage' to 'escalate' is missing a matching routing rule target.",
+    );
   });
 
   it("returns no blueprint viewport before the canvas has a measured width", () => {
