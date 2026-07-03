@@ -22,6 +22,7 @@ import {
   NodeToolbar,
   Position,
   ReactFlow,
+  getBezierPath,
   type Edge,
   type EdgeMarker,
   type EdgeProps,
@@ -1092,9 +1093,29 @@ const DesignerBlueprintNodeTypes = {
 } satisfies NodeTypes;
 
 const DesignerBlueprintEdgeTypes = {
+  curved: DesignerBlueprintCurvedEdgeComponent,
   straight: DesignerBlueprintStraightEdgeComponent,
   loopback: DesignerBlueprintLoopbackEdgeComponent,
 } satisfies EdgeTypes;
+
+function DesignerBlueprintCurvedEdgeComponent(input: EdgeProps): React.JSX.Element {
+  const [path] = getBezierPath({
+    sourceX: input.sourceX,
+    sourceY: input.sourceY,
+    sourcePosition: input.sourcePosition,
+    targetX: input.targetX,
+    targetY: input.targetY,
+    targetPosition: input.targetPosition,
+  });
+
+  return (
+    <BaseEdge
+      path={path}
+      {...(input.markerEnd === undefined ? {} : { markerEnd: input.markerEnd })}
+      {...(input.style === undefined ? {} : { style: input.style })}
+    />
+  );
+}
 
 function DesignerBlueprintStraightEdgeComponent(input: EdgeProps): React.JSX.Element {
   const path = [`M ${input.sourceX} ${input.sourceY}`, `L ${input.targetX} ${input.targetY}`].join(
@@ -1992,28 +2013,63 @@ async function buildDesignerBlueprintLayoutGraph(input: {
   const positionByPositionedNodeId = new Map(
     positionedNodes.map((node) => [node.id, node.position]),
   );
+  const fanOutCountByNodeId = createDesignerBlueprintFanCountByNodeId({
+    edges: input.edges,
+    field: "source",
+  });
+  const fanInCountByNodeId = createDesignerBlueprintFanCountByNodeId({
+    edges: input.edges,
+    field: "target",
+  });
 
   return {
-    edges: input.edges.map((edge) =>
-      isDesignerBlueprintFeedbackEdge({
-        edge,
-        positionByNodeId: positionByPositionedNodeId,
-      })
-        ? {
-            ...edge,
-            animated: true,
-            sourceHandle: DesignerBlueprintRightSourceHandle,
-            style: {
-              ...edge.style,
-              strokeDasharray: "6 4",
-            },
-            targetHandle: DesignerBlueprintRightTargetHandle,
-            type: "loopback",
-          }
-        : edge,
-    ),
+    edges: input.edges.map((edge) => {
+      if (
+        isDesignerBlueprintFeedbackEdge({
+          edge,
+          positionByNodeId: positionByPositionedNodeId,
+        })
+      ) {
+        return {
+          ...edge,
+          animated: true,
+          sourceHandle: DesignerBlueprintRightSourceHandle,
+          style: {
+            ...edge.style,
+            strokeDasharray: "6 4",
+          },
+          targetHandle: DesignerBlueprintRightTargetHandle,
+          type: "loopback",
+        };
+      }
+
+      if (
+        (fanOutCountByNodeId.get(edge.source) ?? 0) > 1 ||
+        (fanInCountByNodeId.get(edge.target) ?? 0) > 1
+      ) {
+        return {
+          ...edge,
+          type: "curved",
+        };
+      }
+
+      return edge;
+    }),
     nodes: positionedNodes,
   };
+}
+
+function createDesignerBlueprintFanCountByNodeId(input: {
+  edges: readonly DesignerBlueprintGraphEdge[];
+  field: "source" | "target";
+}): ReadonlyMap<string, number> {
+  const countByNodeId = new Map<string, number>();
+  for (const edge of input.edges) {
+    const nodeId = edge[input.field];
+    countByNodeId.set(nodeId, (countByNodeId.get(nodeId) ?? 0) + 1);
+  }
+
+  return countByNodeId;
 }
 
 function isDesignerBlueprintEarlierNodeReturnEdge(input: {
