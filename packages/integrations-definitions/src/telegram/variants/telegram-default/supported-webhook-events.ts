@@ -84,10 +84,6 @@ function resolveTelegramChatPayloadPath(providerEventType: string): readonly str
     return [providerEventType, "user_chat_id"];
   }
 
-  if (providerEventType === "callback_query") {
-    return [providerEventType, "message", "chat", "id"];
-  }
-
   return undefined;
 }
 

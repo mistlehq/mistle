@@ -63,13 +63,12 @@ describe("Telegram supported webhook event metadata", () => {
       requireConversationKeyOption({ providerEventType: "business_connection", optionId: "chat" })
         .template,
     ).toBe("{{ payload.business_connection.user_chat_id }}");
-    expect(
-      requireConversationKeyOption({ providerEventType: "callback_query", optionId: "chat" })
-        .template,
-    ).toBe("{{ payload.callback_query.message.chat.id }}");
   });
 
   it("does not offer chat grouping for update types without a chat payload path", () => {
+    expect(
+      requireTelegramEvent("callback_query").conversationKeyOptions?.map((option) => option.id),
+    ).toEqual(["update"]);
     expect(
       requireTelegramEvent("inline_query").conversationKeyOptions?.map((option) => option.id),
     ).toEqual(["update"]);
