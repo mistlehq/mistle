@@ -10,11 +10,11 @@ const AiFactoryInternalProgressForbiddenPhrases = [
   "I’ll save the reversible profile configuration",
 ];
 
-const AiFactoryRequiredHandoffSections = [
+const AiFactoryRequiredNextStepSections = [
   "Implementation agent instructions",
   "Review agent instructions",
   "Linear status mapping",
-  "Human operating guide",
+  "Workflow operating guide",
   "Configuration shape",
   "Next action",
 ];
@@ -270,8 +270,8 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
         "workflow_approval_boundary",
         DesignerEvalDecisionIds.APPROVAL_BOUNDARY,
         "pr_approval_boundary",
-        "pr_handoff_boundary",
-        "handoff_boundary",
+        "pr_readiness_boundary",
+        "readiness_boundary",
         "human_review_boundary",
       ],
       "Ask before creating pull requests or posting Linear updates",
@@ -382,7 +382,7 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     },
     {
       kind: "transcript-includes-required-phrases",
-      label: "Factory configuration handoff",
+      label: "Factory configuration next steps",
       requiredPhrases: [
         "Implementation agent instructions",
         "Review agent instructions",
@@ -396,22 +396,22 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     },
     {
       kind: "transcript-includes-sections",
-      label: "Factory handoff sections",
-      requiredSections: AiFactoryRequiredHandoffSections,
+      label: "Factory next-step sections",
+      requiredSections: AiFactoryRequiredNextStepSections,
     },
   ],
 };
 
-const AiSoftwareFactoryHandoffQualityCase: DesignerEvalCase = {
+const AiSoftwareFactoryNextStepQualityCase: DesignerEvalCase = {
   ...AiSoftwareFactoryLinearGithubCase,
-  id: "ai-software-factory-handoff-quality",
+  id: "ai-software-factory-next-step-quality",
   prompt:
-    "Build an AI software factory with Linear and GitHub. Stop once the blueprint, repository choice, approval boundary, and profile configuration handoff are ready.",
+    "Build an AI software factory with Linear and GitHub. Stop once the blueprint, repository choice, approval boundary, and profile configuration next steps are ready.",
   assertions: [
     {
       kind: "transcript-includes-sections",
-      label: "Factory handoff sections",
-      requiredSections: AiFactoryRequiredHandoffSections,
+      label: "Factory next-step sections",
+      requiredSections: AiFactoryRequiredNextStepSections,
     },
     {
       kind: "transcript-excludes-internal-progress",
@@ -423,7 +423,7 @@ const AiSoftwareFactoryHandoffQualityCase: DesignerEvalCase = {
 const Cases = [
   GithubPrReviewBasicCase,
   AiSoftwareFactoryLinearGithubCase,
-  AiSoftwareFactoryHandoffQualityCase,
+  AiSoftwareFactoryNextStepQualityCase,
 ];
 
 export function listDesignerEvalCases(): readonly DesignerEvalCase[] {

@@ -319,13 +319,13 @@ describe("Designer eval evaluator", () => {
     expect(result.checks[0]?.detail).toContain("internal tool-probing");
   });
 
-  it("checks required handoff phrases in the transcript", () => {
+  it("checks required next-step phrases in the transcript", () => {
     const result = evaluateDesignerEvalRun({
       caseId: "ai-software-factory-linear-github",
       assertions: [
         {
           kind: "transcript-includes-required-phrases",
-          label: "Factory handoff",
+          label: "Factory next steps",
           requiredPhrases: [
             "Implementation agent instructions",
             "Review agent instructions",
@@ -346,18 +346,18 @@ describe("Designer eval evaluator", () => {
     expect(result.passed).toBe(true);
   });
 
-  it("checks required handoff sections in the transcript", () => {
+  it("checks required next-step sections in the transcript", () => {
     const result = evaluateDesignerEvalRun({
-      caseId: "ai-software-factory-handoff-quality",
+      caseId: "ai-software-factory-next-step-quality",
       assertions: [
         {
           kind: "transcript-includes-sections",
-          label: "Factory handoff sections",
+          label: "Factory next-step sections",
           requiredSections: [
             "Implementation agent instructions",
             "Review agent instructions",
             "Linear status mapping",
-            "Human operating guide",
+            "Workflow operating guide",
             "Configuration shape",
             "Next action",
           ],
@@ -372,7 +372,7 @@ describe("Designer eval evaluator", () => {
         "**Implementation agent instructions**",
         "**Review agent instructions**",
         "**Linear status mapping**",
-        "**Human operating guide**",
+        "**Workflow operating guide**",
         "**Configuration shape**",
         "**Next action:** review the draft.",
       ].join("\n\n"),
@@ -381,18 +381,18 @@ describe("Designer eval evaluator", () => {
     expect(result.passed).toBe(true);
   });
 
-  it("checks exact plain handoff section headings in the transcript", () => {
+  it("checks exact plain next-step section headings in the transcript", () => {
     const result = evaluateDesignerEvalRun({
-      caseId: "ai-software-factory-handoff-quality",
+      caseId: "ai-software-factory-next-step-quality",
       assertions: [
         {
           kind: "transcript-includes-sections",
-          label: "Factory handoff sections",
+          label: "Factory next-step sections",
           requiredSections: [
             "Implementation agent instructions",
             "Review agent instructions",
             "Linear status mapping",
-            "Human operating guide",
+            "Workflow operating guide",
             "Configuration shape",
             "Next action",
           ],
@@ -410,7 +410,7 @@ describe("Designer eval evaluator", () => {
         "Review acceptance criteria, tests, and rework routing.",
         "Linear status mapping:",
         "Ready -> Agent In Progress -> Ready for Review.",
-        "Human operating guide:",
+        "Workflow operating guide:",
         "Paste these instructions into the profile UI.",
         "Configuration shape:",
         "One sandbox profile with role-separated instructions.",
@@ -421,18 +421,18 @@ describe("Designer eval evaluator", () => {
     expect(result.passed).toBe(true);
   });
 
-  it("checks Markdown handoff section headings in the transcript", () => {
+  it("checks Markdown next-step section headings in the transcript", () => {
     const result = evaluateDesignerEvalRun({
-      caseId: "ai-software-factory-handoff-quality",
+      caseId: "ai-software-factory-next-step-quality",
       assertions: [
         {
           kind: "transcript-includes-sections",
-          label: "Factory handoff sections",
+          label: "Factory next-step sections",
           requiredSections: [
             "Implementation agent instructions",
             "Review agent instructions",
             "Linear status mapping",
-            "Human operating guide",
+            "Workflow operating guide",
             "Configuration shape",
             "Next action",
           ],
@@ -447,7 +447,7 @@ describe("Designer eval evaluator", () => {
         "## Implementation agent instructions",
         "## Review agent instructions",
         "## Linear status mapping",
-        "## Human operating guide",
+        "## Workflow operating guide",
         "## Configuration shape",
         "## Next action: Review the profile draft.",
       ].join("\n\n"),
