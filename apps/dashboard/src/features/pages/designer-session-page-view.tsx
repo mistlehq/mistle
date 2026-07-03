@@ -1165,6 +1165,10 @@ export function DesignerBlueprintCanvasPanel(input: {
     () => buildDesignerBlueprintIntegrationMetadataByTargetKey(integrationsQuery.data?.targets),
     [integrationsQuery.data?.targets],
   );
+  const blueprintLayoutInputKey = createDesignerBlueprintLayoutInputKey({
+    blueprint: input.blueprint,
+    integrationMetadataByTargetKey,
+  });
   const [graph, setGraph] = useState<DesignerBlueprintGraph | null>(null);
   const [layoutError, setLayoutError] = useState<string | null>(null);
   const [suppressedAddCommentItemIds, setSuppressedAddCommentItemIds] = useState<
@@ -1212,6 +1216,7 @@ export function DesignerBlueprintCanvasPanel(input: {
   useEffect(() => {
     let cancelled = false;
     setLayoutError(null);
+    setGraph(null);
 
     try {
       void buildDesignerBlueprintGraph({
@@ -1243,7 +1248,7 @@ export function DesignerBlueprintCanvasPanel(input: {
     return () => {
       cancelled = true;
     };
-  }, [input.blueprint, integrationMetadataByTargetKey]);
+  }, [blueprintLayoutInputKey]);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
@@ -1360,6 +1365,7 @@ function DesignerBlueprintMeasuredGraphLayout(input: {
   );
 
   useEffect(() => {
+    let cancelled = false;
     const measuredHeightByNodeId = new Map<string, number>();
     for (const measuredNode of measuredNodeHeights) {
       if (measuredNode.height === undefined || measuredNode.height <= 0) {
@@ -1375,6 +1381,10 @@ function DesignerBlueprintMeasuredGraphLayout(input: {
       nodes: graph.nodes,
     })
       .then((measuredGraph) => {
+        if (cancelled) {
+          return;
+        }
+
         if (areDesignerBlueprintGraphNodePositionsEqual(graph, measuredGraph)) {
           return;
         }
@@ -1382,10 +1392,18 @@ function DesignerBlueprintMeasuredGraphLayout(input: {
         onGraphChange(measuredGraph);
       })
       .catch((error: unknown) => {
+        if (cancelled) {
+          return;
+        }
+
         onLayoutError(
           error instanceof Error ? error.message : "Designer blueprint graph layout failed.",
         );
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [graph, measuredNodeHeights, onGraphChange, onLayoutError]);
 
   return null;
@@ -2618,6 +2636,18 @@ function buildDesignerBlueprintIntegrationMetadataByTargetKey(
       },
     ]),
   );
+}
+
+function createDesignerBlueprintLayoutInputKey(input: {
+  blueprint: DesignerBlueprintDocument;
+  integrationMetadataByTargetKey: ReadonlyMap<string, DesignerBlueprintIntegrationMetadata>;
+}): string {
+  return JSON.stringify({
+    blueprint: input.blueprint,
+    integrationMetadata: [...input.integrationMetadataByTargetKey.entries()].sort(
+      ([leftTargetKey], [rightTargetKey]) => leftTargetKey.localeCompare(rightTargetKey),
+    ),
+  });
 }
 
 function createDesignerBlueprintIntegrationLogoData(input: {

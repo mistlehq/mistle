@@ -1010,10 +1010,10 @@ describe("DesignerCanvasWorkspace", () => {
     expect(routingRows[3]?.textContent).toContain("Needs backlog review");
     expect(routingRows[3]?.textContent).toContain("Queue (backlog-queue)");
     expect(screen.queryByText("2 routing rules")).toBeNull();
-    expect(screen.getAllByText("Triage summary")).toHaveLength(3);
     expect(
       await findDesignerBlueprintGraphForNode("designer-blueprint-node-classify-issue"),
     ).toBeDefined();
+    expect(screen.getAllByText("Triage summary")).toHaveLength(3);
     expect(screen.queryByRole("button", { name: "Create trigger" })).toBeNull();
   });
 
@@ -1022,16 +1022,23 @@ describe("DesignerCanvasWorkspace", () => {
       element: <StatefulDesignerBlueprintCommentWorkspace />,
     });
 
-    expect(await screen.findByText("Classify issue")).toBeDefined();
+    expect(
+      await findDesignerBlueprintGraphForNode("designer-blueprint-node-classify-issue"),
+    ).toBeDefined();
+    await waitFor(() => {
+      expect(screen.queryByText("Laying out blueprint.")).toBeNull();
+    });
     const addCommentNode = await screen.findByTestId("designer-blueprint-node-classify-issue");
     const addCommentHint = await screen.findByTestId(
       "designer-blueprint-add-comment-hint-classify-issue",
     );
     expect(addCommentHint.textContent).toContain("Click to add comment");
     fireEvent.click(addCommentNode);
-    expect(addCommentNode.contains(screen.getByTestId("designer-blueprint-floating-comment"))).toBe(
-      false,
-    );
+    await waitFor(() => {
+      expect(
+        addCommentNode.contains(screen.getByTestId("designer-blueprint-floating-comment")),
+      ).toBe(false);
+    });
     fireEvent.change(screen.getByTestId("designer-blueprint-new-comment"), {
       target: { value: "Ask for missing severity before assigning an owner." },
     });
@@ -1088,16 +1095,24 @@ describe("DesignerCanvasWorkspace", () => {
       element: <StatefulDesignerBlueprintCommentWorkspace />,
     });
 
+    expect(
+      await findDesignerBlueprintGraphForNode("designer-blueprint-node-classify-issue"),
+    ).toBeDefined();
+    await waitFor(() => {
+      expect(screen.queryByText("Laying out blueprint.")).toBeNull();
+    });
     const classifyIssueNode = await screen.findByTestId("designer-blueprint-node-classify-issue");
     const triageSummaryNode = await screen.findByTestId("designer-blueprint-node-triage-summary");
 
     fireEvent.click(classifyIssueNode);
-    expect(screen.getAllByTestId("designer-blueprint-floating-comment")).toHaveLength(1);
-    expect(screen.getByTestId("designer-blueprint-new-comment")).toBeDefined();
+    expect(await screen.findByTestId("designer-blueprint-new-comment")).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getAllByTestId("designer-blueprint-floating-comment")).toHaveLength(1);
+    });
 
     fireEvent.click(triageSummaryNode);
+    expect(await screen.findByTestId("designer-blueprint-new-comment")).toBeDefined();
     expect(screen.getAllByTestId("designer-blueprint-floating-comment")).toHaveLength(1);
-    expect(screen.getByTestId("designer-blueprint-new-comment")).toBeDefined();
 
     fireEvent.change(screen.getByTestId("designer-blueprint-new-comment"), {
       target: { value: "Include the final routing reason." },
@@ -1116,8 +1131,8 @@ describe("DesignerCanvasWorkspace", () => {
     );
 
     fireEvent.click(classifyIssueNode);
+    expect(await screen.findByTestId("designer-blueprint-new-comment")).toBeDefined();
     expect(screen.getAllByTestId("designer-blueprint-floating-comment")).toHaveLength(1);
-    expect(screen.getByTestId("designer-blueprint-new-comment")).toBeDefined();
   });
 
   it("closes an open blueprint comment when the pointer starts outside the comment box", async () => {

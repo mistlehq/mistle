@@ -358,6 +358,7 @@ function useDesignerPromptPlaceholder(prompt: string): string {
     visibleText: DefaultDesignerPromptPlaceholder,
   });
 
+  // Synchronizes placeholder typewriter text with scheduled timer ticks.
   useEffect(() => {
     if (prompt.trim().length > 0) {
       return;
