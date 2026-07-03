@@ -348,8 +348,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/test-harness
       '@opentelemetry/context-async-hooks':
-        specifier: ^2.7.1
-        version: 2.7.1(@opentelemetry/api@1.9.1)
+        specifier: ^2.8.0
+        version: 2.8.0(@opentelemetry/api@1.9.1)
       '@types/pg':
         specifier: ^8.20.0
         version: 8.20.0
@@ -1316,8 +1316,8 @@ importers:
         version: 2.8.0(@opentelemetry/api@1.9.1)
     devDependencies:
       '@opentelemetry/context-async-hooks':
-        specifier: ^2.7.1
-        version: 2.7.1(@opentelemetry/api@1.9.1)
+        specifier: ^2.8.0
+        version: 2.8.0(@opentelemetry/api@1.9.1)
       vitest:
         specifier: ^4.1.8
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.4)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.4)(esbuild@0.25.0)(jiti@2.7.0)(tsx@4.22.4)(yaml@2.8.3))
