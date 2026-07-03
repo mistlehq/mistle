@@ -1901,6 +1901,7 @@ async function buildDesignerBlueprintLayoutGraph(input: {
   const outcomeNode = input.nodes.find((node) => node.id === DesignerBlueprintOutcomeNodeId);
   const workflowNodes = input.nodes.filter((node) => node.id !== DesignerBlueprintOutcomeNodeId);
   const workflowNodeIds = new Set(workflowNodes.map((node) => node.id));
+  const workflowNodeIndexById = new Map(workflowNodes.map((node, index) => [node.id, index]));
   const elkGraph: ElkNode = {
     id: "designer-blueprint-layout",
     children: workflowNodes.map((node) => ({
@@ -1915,7 +1916,15 @@ async function buildDesignerBlueprintLayoutGraph(input: {
         }),
     })),
     edges: input.edges
-      .filter((edge) => workflowNodeIds.has(edge.source) && workflowNodeIds.has(edge.target))
+      .filter(
+        (edge) =>
+          workflowNodeIds.has(edge.source) &&
+          workflowNodeIds.has(edge.target) &&
+          !isDesignerBlueprintEarlierNodeReturnEdge({
+            edge,
+            indexByNodeId: workflowNodeIndexById,
+          }),
+      )
       .map(
         (edge): ElkExtendedEdge => ({
           id: edge.id,
@@ -2005,6 +2014,15 @@ async function buildDesignerBlueprintLayoutGraph(input: {
     ),
     nodes: positionedNodes,
   };
+}
+
+function isDesignerBlueprintEarlierNodeReturnEdge(input: {
+  edge: DesignerBlueprintGraphEdge;
+  indexByNodeId: ReadonlyMap<string, number>;
+}): boolean {
+  const sourceIndex = input.indexByNodeId.get(input.edge.source);
+  const targetIndex = input.indexByNodeId.get(input.edge.target);
+  return sourceIndex !== undefined && targetIndex !== undefined && targetIndex < sourceIndex;
 }
 
 function getDesignerBlueprintElk(): ElkInstance {
