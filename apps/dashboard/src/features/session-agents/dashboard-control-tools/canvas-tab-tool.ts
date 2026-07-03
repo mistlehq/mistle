@@ -5,6 +5,7 @@ import {
   DesignerBlueprintCurrentTabHref,
   DesignerBlueprintCurrentTabId,
   DesignerBlueprintDocumentSchema,
+  isDashboardInternalAbsolutePath,
 } from "../../designer/designer-blueprint-schema.js";
 import {
   DashboardControlDynamicToolNamespace,
@@ -442,19 +443,3 @@ export const DesignerCanvasTabShowDynamicToolSpec = {
     required: ["tab"],
   },
 } satisfies CodexDynamicToolSpec;
-
-function isDashboardInternalAbsolutePath(href: string): boolean {
-  if (!href.startsWith("/") || href.startsWith("//")) {
-    return false;
-  }
-
-  try {
-    const parsedUrl = new URL(href, "https://dashboard.mistle.local");
-    return (
-      parsedUrl.origin === "https://dashboard.mistle.local" &&
-      `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}` === href
-    );
-  } catch {
-    return false;
-  }
-}

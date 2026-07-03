@@ -20,7 +20,7 @@ export type DesignerBlueprintRoutingCondition = {
 };
 
 export type DesignerBlueprintRoutingRule = {
-  label?: string | undefined;
+  conditionLabel: string;
   when: DesignerBlueprintRoutingCondition[];
   routeTo?: string | undefined;
 };
@@ -37,20 +37,17 @@ export type DesignerBlueprintStandardItem = {
 export type DesignerBlueprintTriggerItem = {
   id: string;
   kind: "trigger";
-  label: string;
-  description?: string | undefined;
   parentId?: string | undefined;
   state: DesignerBlueprintItemState;
   integrationTargetKey?: string | undefined;
-  integrationLabel?: string | undefined;
-  eventLabel?: string | undefined;
+  when: {
+    label: string;
+  }[];
 };
 
 export type DesignerBlueprintRoutingPolicyItem = {
   id: string;
   kind: "routing_policy";
-  label: string;
-  description?: string | undefined;
   parentId?: string | undefined;
   state: DesignerBlueprintItemState;
   rules: DesignerBlueprintRoutingRule[];
