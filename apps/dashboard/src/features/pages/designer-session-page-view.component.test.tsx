@@ -551,6 +551,24 @@ function getDesignerBlueprintGraphNodeCenterX(
   return node.position.x + resolveDesignerBlueprintGraphNodeWidth(node) / 2;
 }
 
+function getDesignerBlueprintGraphNodeGroupCenterX(
+  nodes: readonly Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number][],
+): number {
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+
+  for (const node of nodes) {
+    minX = Math.min(minX, node.position.x);
+    maxX = Math.max(maxX, node.position.x + resolveDesignerBlueprintGraphNodeWidth(node));
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
+    throw new Error("Expected at least one Designer blueprint graph node.");
+  }
+
+  return minX + (maxX - minX) / 2;
+}
+
 function resolveDesignerBlueprintGraphNodeWidth(
   node: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number],
 ): number {
@@ -1407,6 +1425,9 @@ describe("DesignerCanvasWorkspace", () => {
     expect(escalate.position.y).toBeGreaterThan(routeTriage.position.y);
     expect(triageUpdate.position.y).toBeGreaterThan(escalate.position.y);
     expect(getDesignerBlueprintGraphNodeCenterX(routeTriage)).toBe(
+      getDesignerBlueprintGraphNodeCenterX(outcome),
+    );
+    expect(getDesignerBlueprintGraphNodeGroupCenterX([escalate, requestInfo, routeOwner])).toBe(
       getDesignerBlueprintGraphNodeCenterX(outcome),
     );
     expect(getDesignerBlueprintGraphNodeCenterX(triageUpdate)).toBe(
