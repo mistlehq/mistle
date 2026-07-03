@@ -36,6 +36,9 @@ export async function resolveSandboxProfileVersionOrThrow(
   },
 ): Promise<number> {
   const profile = await ctx.db.query.sandboxProfiles.findFirst({
+    columns: {
+      activeVersion: true,
+    },
     where: (table, { and: whereAnd, eq: whereEq }) =>
       whereAnd(
         whereEq(table.id, input.sandboxProfileId),

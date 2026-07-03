@@ -27,10 +27,7 @@ import {
   getSandboxProfileVersionTriggerConfig,
   listSandboxProfileVersions,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
-import type {
-  SandboxProfileVersion,
-  SandboxProfileVersionTriggerConfig,
-} from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { SandboxProfileVersionTriggerConfig } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { ActionTile } from "../shared/action-tile.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 import { TablePagination } from "../shared/table-pagination.js";
@@ -42,6 +39,7 @@ import {
 import { TriggerIssueIndicator } from "../triggers/trigger-list-indicators.js";
 import type { TriggerListItemViewModel } from "../triggers/trigger-list-types.js";
 import { toTriggerListItemViewModel } from "../triggers/trigger-list-view-model.js";
+import { resolveTriggerTargetSandboxProfileVersion } from "../triggers/trigger-target-sandbox-profile-version.js";
 import {
   resolveTriggerTemplateEventOptionIds,
   TriggerTemplates,
@@ -59,8 +57,6 @@ import { TriggerActivityContent } from "./trigger-activity-page.js";
 import { TriggerEditorContent } from "./trigger-editor-content.js";
 
 const ProfileTriggersListLimit = 25;
-const InitialTriggerTargetSandboxProfileVersion = 1;
-
 type TriggerTemplateAvailability =
   | {
       kind: "available";
@@ -147,20 +143,6 @@ function TriggerTemplateList(input: {
         </div>
       ) : null}
     </div>
-  );
-}
-
-function resolveTriggerTargetSandboxProfileVersion(
-  versions: readonly SandboxProfileVersion[],
-): number | null {
-  const activeVersion = versions.find((version) => version.isActive);
-  if (activeVersion !== undefined) {
-    return activeVersion.version;
-  }
-
-  return (
-    versions.find((version) => version.version === InitialTriggerTargetSandboxProfileVersion)
-      ?.version ?? null
   );
 }
 

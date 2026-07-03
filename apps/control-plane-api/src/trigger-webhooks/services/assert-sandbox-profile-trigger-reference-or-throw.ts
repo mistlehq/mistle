@@ -14,23 +14,11 @@ export async function resolveSandboxProfileTriggerReferenceOrThrow(
     integrationConnectionId: string;
   },
 ): Promise<number> {
-  const profile = await ctx.db.query.sandboxProfiles.findFirst({
-    columns: {
-      activeVersion: true,
-    },
-    where: (table, { eq }) => eq(table.id, input.sandboxProfileId),
-  });
-
-  if (profile === undefined) {
-    throw new BadRequestError(
-      TriggerWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
-      "Sandbox profile must bind the selected integration connection to use its webhook triggers.",
-    );
-  }
-  const sandboxProfileVersion = resolveTriggerTargetSandboxProfileVersion({
-    requestedVersion: input.sandboxProfileVersion,
-    activeVersion: profile.activeVersion,
-  });
+  const sandboxProfileVersion =
+    input.sandboxProfileVersion ??
+    (await resolveDefaultSandboxProfileTriggerVersionOrThrow(ctx, {
+      sandboxProfileId: input.sandboxProfileId,
+    }));
 
   const binding = await ctx.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
     columns: {
@@ -52,4 +40,31 @@ export async function resolveSandboxProfileTriggerReferenceOrThrow(
   }
 
   return sandboxProfileVersion;
+}
+
+async function resolveDefaultSandboxProfileTriggerVersionOrThrow(
+  ctx: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
+  input: {
+    sandboxProfileId: string;
+  },
+): Promise<number> {
+  const profile = await ctx.db.query.sandboxProfiles.findFirst({
+    columns: {
+      activeVersion: true,
+    },
+    where: (table, { eq }) => eq(table.id, input.sandboxProfileId),
+  });
+
+  if (profile === undefined) {
+    throw new BadRequestError(
+      TriggerWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
+      "Sandbox profile must bind the selected integration connection to use its webhook triggers.",
+    );
+  }
+
+  return resolveTriggerTargetSandboxProfileVersion({
+    activeVersion: profile.activeVersion,
+  });
 }

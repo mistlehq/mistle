@@ -418,8 +418,6 @@ describe("TriggerCreatePage", () => {
     renderCreatePage({
       initialEntry: `/triggers/new?sandboxProfileId=${TriggerSandboxProfileId}&template=slack-app-mention`,
       seedTriggerProfile: true,
-      seedSlackProfile: false,
-      shouldSeedIntegrationDirectory: true,
     });
 
     fireEvent.change(screen.getByRole("textbox", { name: "Trigger name" }), {

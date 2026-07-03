@@ -4,27 +4,12 @@ import { useMemo, useState } from "react";
 import { sandboxProfileVersionsQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { listSandboxProfileVersions } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { resolveTriggerTargetSandboxProfileVersion } from "./trigger-target-sandbox-profile-version.js";
 
 export type SelectedSandboxProfileVersion = {
   profileId: string;
   version: number;
 };
-
-const InitialTriggerTargetSandboxProfileVersion = 1;
-
-function resolveTriggerTargetProfileVersion(
-  versions: readonly SandboxProfileVersion[],
-): number | null {
-  const activeVersion = versions.find((version) => version.isActive);
-  if (activeVersion !== undefined) {
-    return activeVersion.version;
-  }
-
-  const initialVersion = versions.find(
-    (version) => version.version === InitialTriggerTargetSandboxProfileVersion,
-  );
-  return initialVersion?.version ?? null;
-}
 
 export function useSelectedSandboxProfileVersion(input: {
   selectedProfileId: string;
@@ -58,7 +43,8 @@ export function useSelectedSandboxProfileVersion(input: {
     retry: false,
   });
   const selectableSelectedProfileVersion = useMemo(
-    () => resolveTriggerTargetProfileVersion(selectedProfileVersionsQuery.data?.versions ?? []),
+    () =>
+      resolveTriggerTargetSandboxProfileVersion(selectedProfileVersionsQuery.data?.versions ?? []),
     [selectedProfileVersionsQuery.data],
   );
   const effectiveSelectedProfileVersion = isUsingPinnedSelectedProfileVersion

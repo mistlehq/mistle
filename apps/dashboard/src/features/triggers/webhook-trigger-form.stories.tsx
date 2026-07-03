@@ -726,7 +726,7 @@ export const NoEventCapableIntegrationsAfterSubmit: Story = {
   },
 };
 
-export const NoActiveProfileVersion: Story = {
+export const NoTriggerTargetProfileVersion: Story = {
   args: {
     mode: "create",
     sandboxProfileStatusMessage: {
