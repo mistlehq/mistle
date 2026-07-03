@@ -51,6 +51,10 @@ describe("dashboard control actions", () => {
                       version: {
                         enum: [1],
                       },
+                      outcome: {
+                        description:
+                          "Goal the workflow should accomplish. The dashboard shows this as an unconnected note at the top of the blueprint canvas; do not duplicate it as a workflow_output item.",
+                      },
                       items: {
                         items: {
                           oneOf: [
@@ -70,27 +74,39 @@ describe("dashboard control actions", () => {
                                   description:
                                     "Stable Mistle integration target key, such as slack-default or github-cloud. Use only when the trigger source maps to a selected or known integration target.",
                                 },
-                                integrationLabel: {
+                                when: {
                                   description:
-                                    "Provider or integration label shown on the trigger, such as GitHub or Slack.",
-                                },
-                                eventLabel: {
-                                  description:
-                                    "Specific event shown on the trigger, such as PR opened or message received.",
+                                    'Visible trigger condition rows. The dashboard displays each condition as "When {label}". Prefer these rows over prose descriptions for trigger criteria.',
+                                  items: {
+                                    properties: {
+                                      label: {
+                                        description:
+                                          'Short visible trigger condition, shown after "When" in the trigger note. Use a generic condition such as "Readiness signal received" when the exact provider condition is not known.',
+                                      },
+                                    },
+                                  },
                                 },
                               },
                             },
                             {
+                              description:
+                                "Routing table item. The dashboard emphasizes rules as condition-to-next-step rows and does not use the item label as the primary visible title.",
                               properties: {
                                 kind: {
                                   enum: ["routing_policy"],
                                 },
                                 rules: {
+                                  description:
+                                    'Visible route table rows. The dashboard displays each rule as "If {conditionLabel} -> {routeTo item label}".',
                                   items: {
                                     properties: {
+                                      conditionLabel: {
+                                        description:
+                                          'Short visible branch outcome or condition, shown after "If" in the routing row. Use concise labels such as "Changes requested"; do not include an "If" prefix.',
+                                      },
                                       routeTo: {
                                         description:
-                                          "Optional item id to route to. Must reference an item in blueprint.items.",
+                                          "Optional destination item id for the visible next step in the routing row. Must reference an item in blueprint.items.",
                                       },
                                     },
                                   },
@@ -250,11 +266,13 @@ describe("dashboard control actions", () => {
         {
           id: "issue-opened",
           kind: "trigger",
-          label: "GitHub issue trigger",
           integrationTargetKey: "github-cloud",
-          integrationLabel: "GitHub",
-          eventLabel: "Issue opened",
           state: "proposed",
+          when: [
+            {
+              label: "GitHub issue opened",
+            },
+          ],
         },
         {
           id: "classify-issue",

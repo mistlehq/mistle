@@ -104,10 +104,12 @@ const DesignerBlueprintRoutingRuleJsonSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
-    label: {
+    conditionLabel: {
       type: "string",
       minLength: 1,
       maxLength: 160,
+      description:
+        'Short visible branch outcome or condition, shown after "If" in the routing row. Use concise labels such as "Changes requested"; do not include an "If" prefix.',
     },
     when: {
       type: "array",
@@ -120,10 +122,26 @@ const DesignerBlueprintRoutingRuleJsonSchema = {
       type: "string",
       minLength: 1,
       maxLength: 128,
-      description: "Optional item id to route to. Must reference an item in blueprint.items.",
+      description:
+        "Optional destination item id for the visible next step in the routing row. Must reference an item in blueprint.items.",
     },
   },
-  required: ["when"],
+  required: ["conditionLabel", "when"],
+};
+
+const DesignerBlueprintTriggerWhenJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    label: {
+      type: "string",
+      minLength: 1,
+      maxLength: 160,
+      description:
+        'Short visible trigger condition, shown after "When" in the trigger note. Use a generic condition such as "Readiness signal received" when the exact provider condition is not known.',
+    },
+  },
+  required: ["label"],
 };
 
 const DesignerBlueprintCommonItemJsonSchemaProperties = {
@@ -132,16 +150,6 @@ const DesignerBlueprintCommonItemJsonSchemaProperties = {
     minLength: 1,
     maxLength: 128,
     description: "Stable item id. Must be unique within blueprint.items.",
-  },
-  label: {
-    type: "string",
-    minLength: 1,
-    maxLength: 160,
-  },
-  description: {
-    type: "string",
-    minLength: 1,
-    maxLength: 2000,
   },
   parentId: {
     type: "string",
@@ -166,6 +174,18 @@ const DesignerBlueprintStandardItemJsonSchema = {
       type: "string",
       enum: ["agent_step", "workflow_output"],
     },
+    label: {
+      type: "string",
+      minLength: 1,
+      maxLength: 160,
+      description: "Visible item title shown in the blueprint note.",
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+      maxLength: 2000,
+      description: "Optional visible body text shown below the item title.",
+    },
   },
   required: ["id", "kind", "label", "state"],
 };
@@ -174,7 +194,7 @@ const DesignerBlueprintTriggerItemJsonSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Workflow-start trigger item. Use this for provider, schedule, or system events that start or advance the workflow; include integrationTargetKey when a real Mistle integration target is selected or known, and include integrationLabel and eventLabel when known.",
+    "Workflow-start trigger item. Use this for provider, schedule, or system events that start or advance the workflow; use when rows for the visible trigger conditions, and include integrationTargetKey when a real Mistle integration target is selected or known.",
   properties: {
     ...DesignerBlueprintCommonItemJsonSchemaProperties,
     kind: {
@@ -188,25 +208,23 @@ const DesignerBlueprintTriggerItemJsonSchema = {
       description:
         "Stable Mistle integration target key, such as slack-default or github-cloud. Use only when the trigger source maps to a selected or known integration target.",
     },
-    integrationLabel: {
-      type: "string",
-      minLength: 1,
-      maxLength: 80,
-      description: "Provider or integration label shown on the trigger, such as GitHub or Slack.",
-    },
-    eventLabel: {
-      type: "string",
-      minLength: 1,
-      maxLength: 160,
-      description: "Specific event shown on the trigger, such as PR opened or message received.",
+    when: {
+      type: "array",
+      items: DesignerBlueprintTriggerWhenJsonSchema,
+      minItems: 1,
+      maxItems: 20,
+      description:
+        'Visible trigger condition rows. The dashboard displays each condition as "When {label}". Prefer these rows over prose descriptions for trigger criteria.',
     },
   },
-  required: ["id", "kind", "label", "state"],
+  required: ["id", "kind", "state", "when"],
 };
 
 const DesignerBlueprintRoutingPolicyItemJsonSchema = {
   type: "object",
   additionalProperties: false,
+  description:
+    "Routing table item. The dashboard emphasizes rules as condition-to-next-step rows and does not use the item label as the primary visible title.",
   properties: {
     ...DesignerBlueprintCommonItemJsonSchemaProperties,
     kind: {
@@ -218,9 +236,11 @@ const DesignerBlueprintRoutingPolicyItemJsonSchema = {
       items: DesignerBlueprintRoutingRuleJsonSchema,
       minItems: 1,
       maxItems: 20,
+      description:
+        'Visible route table rows. The dashboard displays each rule as "If {conditionLabel} -> {routeTo item label}".',
     },
   },
-  required: ["id", "kind", "label", "state", "rules"],
+  required: ["id", "kind", "state", "rules"],
 };
 
 const DesignerBlueprintDocumentJsonSchema = {
@@ -241,6 +261,8 @@ const DesignerBlueprintDocumentJsonSchema = {
     outcome: {
       type: "object",
       additionalProperties: false,
+      description:
+        "Goal the workflow should accomplish. The dashboard shows this as an unconnected note at the top of the blueprint canvas; do not duplicate it as a workflow_output item.",
       properties: {
         label: {
           type: "string",

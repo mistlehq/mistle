@@ -3,6 +3,7 @@ import "@xyflow/react/dist/style.css";
 import "./session-terminal-workspace.css";
 import { Button, cn, DialogShortcut, Textarea } from "@mistle/ui";
 import {
+  ArrowRightIcon,
   ArrowsSplitIcon,
   AtomIcon,
   ChatCircleTextIcon,
@@ -17,6 +18,7 @@ import {
   Background,
   Controls,
   Handle,
+  MarkerType,
   NodeToolbar,
   Position,
   ReactFlow,
@@ -919,6 +921,21 @@ function resolveDesignerCanvasEmbeddedRoute(href: string): DesignerCanvasEmbedde
     };
   }
 
+  if (targetKey !== null && pathSegments.length === 3) {
+    const connectionId = decodeDesignerCanvasPathSegment(pathSegments[2] ?? "");
+    if (connectionId === null || connectionId.length === 0) {
+      return { kind: "unsupported" };
+    }
+
+    const searchParams = new URLSearchParams(url.searchParams);
+    searchParams.set("connectionId", connectionId);
+    return {
+      kind: "integrations",
+      searchParams,
+      targetKey,
+    };
+  }
+
   if (pathSegments.length > 2) {
     return { kind: "unsupported" };
   }
@@ -953,36 +970,80 @@ function buildDesignerCanvasTabFromNavigation(input: {
 }
 
 const DesignerBlueprintNodeWidth = 280;
-const DesignerBlueprintNodeBaseHeight = 126;
-const DesignerBlueprintNodeDescriptionLineHeight = 16;
-const DesignerBlueprintNodeDescriptionCharsPerLine = 34;
-const DesignerBlueprintNodeRoutingSummaryLineHeight = 18;
-const DesignerBlueprintNodeRoutingSummaryCharsPerLine = 32;
+const DesignerBlueprintRoutingNodeWidth = 440;
+const DesignerBlueprintNodeVerticalPadding = 20;
+const DesignerBlueprintNodeRowOnlyVerticalPadding = 12;
+const DesignerBlueprintNodeIconHeight = 28;
+const DesignerBlueprintNodeTitleLineHeight = 20;
+const DesignerBlueprintNodeDescriptionMarginTop = 2;
+const DesignerBlueprintNodeDescriptionLineHeight = 20;
+const DesignerBlueprintNodeDescriptionCharsPerLine = 31;
+const DesignerBlueprintNodeRoutingSummaryGap = 6;
+const DesignerBlueprintNodeRoutingSummaryRowBaseHeight = 36;
+const DesignerBlueprintNodeRoutingSummaryTextLineHeight = 20;
+const DesignerBlueprintNodeRoutingSummaryNextStepCharsPerLine = 28;
+const DesignerBlueprintNodeRoutingSummaryOutcomeCharsPerLine = 28;
+const DesignerBlueprintNodeTriggerConditionGap = 6;
+const DesignerBlueprintNodeTriggerConditionRowBaseHeight = 32;
+const DesignerBlueprintNodeTriggerConditionTextLineHeight = 20;
+const DesignerBlueprintNodeTriggerConditionCharsPerLine = 31;
 const DesignerBlueprintInitialViewport = { x: 48, y: 32, zoom: 0.95 };
-const DesignerBlueprintInitialFocusTopPadding = 56;
-const DesignerBlueprintProcessLaneGap = 32;
-const DesignerBlueprintProcessLaneMinSlotHeight = 128;
-const DesignerBlueprintProcessLaneInitialZoom = 0.82;
-const DesignerBlueprintLoopbackEdgeOffset = 180;
+const DesignerBlueprintInitialFocusTopPadding = 24;
+const DesignerBlueprintProcessLaneGap = 40;
+const DesignerBlueprintProcessLaneInitialZoom = DesignerBlueprintInitialViewport.zoom;
+const DesignerBlueprintLoopbackEdgeOffset = 96;
 const DesignerBlueprintProcessLaneInitialFocusRightPadding =
-  DesignerBlueprintLoopbackEdgeOffset + 80;
+  DesignerBlueprintLoopbackEdgeOffset + 48;
 const DesignerBlueprintRightSourceHandle = "right-source";
 const DesignerBlueprintRightTargetHandle = "right-target";
+const DesignerBlueprintOutcomeNodeId = "__designer_blueprint_outcome";
+const DesignerBlueprintEdgeMarker = {
+  height: 16,
+  type: MarkerType.ArrowClosed,
+  width: 16,
+} as const;
+
+export type DesignerBlueprintRoutingSummaryRow = {
+  nextStepLabel: string | undefined;
+  outcomeLabel: string;
+};
+
+export type DesignerBlueprintTriggerConditionRow = {
+  integrationLogo?: {
+    displayName: string;
+    logoKey: string;
+  };
+  label: string;
+};
 
 type DesignerBlueprintLayoutNodeData = {
   description?: string;
+  kind: DesignerBlueprintItem["kind"] | "outcome";
+  kindLabel: string;
+  label: string;
+  routingSummaryRows?: readonly DesignerBlueprintRoutingSummaryRow[];
+  triggerConditionRows?: readonly DesignerBlueprintTriggerConditionRow[];
+};
+
+type DesignerBlueprintItemLayoutNodeData = DesignerBlueprintLayoutNodeData & {
   integrationLogo?: {
     displayName: string;
     logoKey: string;
   };
   item: DesignerBlueprintItem;
-  kind: DesignerBlueprintItem["kind"];
-  kindLabel: string;
-  label: string;
-  routingSummary?: string;
+  routingSummaryRows?: readonly DesignerBlueprintRoutingSummaryRow[];
 };
 
-type DesignerBlueprintVisualNodeData = DesignerBlueprintLayoutNodeData & {
+type DesignerBlueprintOutcomeLayoutNodeData = DesignerBlueprintLayoutNodeData & {
+  kind: "outcome";
+  kindLabel: "Outcome";
+};
+
+type DesignerBlueprintNodeData =
+  | DesignerBlueprintItemLayoutNodeData
+  | DesignerBlueprintOutcomeLayoutNodeData;
+
+type DesignerBlueprintItemVisualNodeCommentData = {
   isAddCommentSuppressed: boolean;
   onAddComment: (comment: PendingSessionBlueprintCommentInput) => void;
   onClearAddCommentSuppression: (itemId: string) => void;
@@ -994,13 +1055,22 @@ type DesignerBlueprintVisualNodeData = DesignerBlueprintLayoutNodeData & {
   pendingComment?: PendingSessionBlueprintComment | undefined;
 };
 
+type DesignerBlueprintItemVisualNodeData = DesignerBlueprintItemLayoutNodeData &
+  DesignerBlueprintItemVisualNodeCommentData;
+
+type DesignerBlueprintOutcomeVisualNodeData = DesignerBlueprintOutcomeLayoutNodeData;
+
+type DesignerBlueprintNodeVisualData =
+  | DesignerBlueprintItemVisualNodeData
+  | DesignerBlueprintOutcomeVisualNodeData;
+
 type DesignerBlueprintOpenComment = {
   itemId: string;
   kind: "draft" | "pending";
 } | null;
 
-type DesignerBlueprintLayoutNode = Node<DesignerBlueprintLayoutNodeData, "blueprint">;
-type DesignerBlueprintVisualNode = Node<DesignerBlueprintVisualNodeData, "blueprint">;
+type DesignerBlueprintLayoutNode = Node<DesignerBlueprintNodeData, "blueprint">;
+type DesignerBlueprintVisualNode = Node<DesignerBlueprintNodeVisualData, "blueprint">;
 type DesignerBlueprintGraphEdge = Edge;
 
 type DesignerBlueprintGraph = {
@@ -1013,8 +1083,23 @@ const DesignerBlueprintNodeTypes = {
 } satisfies NodeTypes;
 
 const DesignerBlueprintEdgeTypes = {
+  straight: DesignerBlueprintStraightEdgeComponent,
   loopback: DesignerBlueprintLoopbackEdgeComponent,
 } satisfies EdgeTypes;
+
+function DesignerBlueprintStraightEdgeComponent(input: EdgeProps): React.JSX.Element {
+  const path = [`M ${input.sourceX} ${input.sourceY}`, `L ${input.targetX} ${input.targetY}`].join(
+    " ",
+  );
+
+  return (
+    <BaseEdge
+      path={path}
+      {...(input.markerEnd === undefined ? {} : { markerEnd: input.markerEnd })}
+      {...(input.style === undefined ? {} : { style: input.style })}
+    />
+  );
+}
 
 function DesignerBlueprintLoopbackEdgeComponent(input: EdgeProps): React.JSX.Element {
   const loopbackX = Math.max(input.sourceX, input.targetX) + DesignerBlueprintLoopbackEdgeOffset;
@@ -1167,6 +1252,7 @@ export function DesignerBlueprintCanvasPanel(input: {
               rightPadding={DesignerBlueprintProcessLaneInitialFocusRightPadding}
               zoom={DesignerBlueprintProcessLaneInitialZoom}
             />
+            <DesignerBlueprintMeasuredProcessLaneLayout graph={graph} onGraphChange={setGraph} />
             <Background gap={24} size={1} />
             <Controls showInteractive={false} />
           </ReactFlow>
@@ -1212,58 +1298,130 @@ function DesignerBlueprintInitialFocus(input: {
   return null;
 }
 
+function DesignerBlueprintMeasuredProcessLaneLayout(input: {
+  graph: DesignerBlueprintGraph;
+  onGraphChange: (graph: DesignerBlueprintGraph) => void;
+}): React.JSX.Element | null {
+  const { graph, onGraphChange } = input;
+  const measuredNodeHeights = useStore(
+    useCallback(
+      (state) =>
+        graph.nodes.map((node) => ({
+          height: state.nodeLookup.get(node.id)?.measured?.height,
+          id: node.id,
+        })),
+      [graph.nodes],
+    ),
+  );
+
+  useEffect(() => {
+    const measuredHeightByNodeId = new Map<string, number>();
+    for (const measuredNode of measuredNodeHeights) {
+      if (measuredNode.height === undefined || measuredNode.height <= 0) {
+        return;
+      }
+
+      measuredHeightByNodeId.set(measuredNode.id, measuredNode.height);
+    }
+
+    const measuredGraph = buildDesignerBlueprintProcessLaneGraph({
+      edges: graph.edges,
+      measuredHeightByNodeId,
+      nodes: graph.nodes,
+    });
+
+    if (areDesignerBlueprintGraphNodePositionsEqual(graph, measuredGraph)) {
+      return;
+    }
+
+    onGraphChange(measuredGraph);
+  }, [graph, measuredNodeHeights, onGraphChange]);
+
+  return null;
+}
+
 function DesignerBlueprintVisualNodeComponent(
   input: NodeProps<DesignerBlueprintVisualNode>,
 ): React.JSX.Element {
   const [draftBody, setDraftBody] = useState("");
-  const pendingComment = input.data.pendingComment;
+  const itemData = isDesignerBlueprintItemNodeData(input.data) ? input.data : null;
+  const pendingComment = itemData?.pendingComment;
   const isDraftingComment =
-    input.data.openComment?.itemId === input.data.item.id &&
-    input.data.openComment.kind === "draft";
+    itemData !== null &&
+    itemData.openComment?.itemId === itemData.item.id &&
+    itemData.openComment.kind === "draft";
   const isPendingCommentExpanded =
+    itemData !== null &&
     pendingComment !== undefined &&
-    input.data.openComment?.itemId === input.data.item.id &&
-    input.data.openComment.kind === "pending";
+    itemData.openComment?.itemId === itemData.item.id &&
+    itemData.openComment.kind === "pending";
   const canStartDraftingComment =
-    pendingComment === undefined && !isDraftingComment && !input.data.isAddCommentSuppressed;
+    itemData !== null &&
+    pendingComment === undefined &&
+    !isDraftingComment &&
+    !itemData.isAddCommentSuppressed;
+  const isRoutingSummaryNode = input.data.routingSummaryRows !== undefined;
+  const isTriggerConditionNode = input.data.triggerConditionRows !== undefined;
+  const isOutcomeNode = input.data.kind === "outcome";
+  const shouldRenderTitle =
+    input.data.routingSummaryRows === undefined && input.data.triggerConditionRows === undefined;
+  const shouldRenderDescription =
+    input.data.description !== undefined &&
+    input.data.routingSummaryRows === undefined &&
+    input.data.triggerConditionRows === undefined;
 
   function cancelDraft(): void {
     setDraftBody("");
-    input.data.onOpenComment(null);
+    if (itemData === null) {
+      return;
+    }
+    itemData.onOpenComment(null);
   }
 
   function startDraftingComment(): void {
-    input.data.onClearAddCommentSuppression(input.data.item.id);
+    if (itemData === null) {
+      return;
+    }
+    itemData.onClearAddCommentSuppression(itemData.item.id);
     setDraftBody("");
-    input.data.onOpenComment({
-      itemId: input.data.item.id,
+    itemData.onOpenComment({
+      itemId: itemData.item.id,
       kind: "draft",
     });
   }
 
   function submitDraft(): void {
+    if (itemData === null) {
+      return;
+    }
+
     const trimmedDraftBody = draftBody.trim();
     if (trimmedDraftBody.length === 0) {
       return;
     }
 
-    input.data.onAddComment(
+    itemData.onAddComment(
       createPendingSessionBlueprintCommentInput({
         body: trimmedDraftBody,
-        item: input.data.item,
-        itemKindLabel: input.data.kindLabel,
-        itemLabel: input.data.label,
+        item: itemData.item,
+        itemKindLabel: itemData.kindLabel,
+        itemLabel: itemData.label,
       }),
     );
     setDraftBody("");
-    input.data.onOpenComment(null);
+    itemData.onOpenComment(null);
   }
 
   return (
     <div
       aria-label={canStartDraftingComment ? `Add comment to ${input.data.label}` : undefined}
-      className="group relative w-[280px] text-foreground"
-      data-testid={`designer-blueprint-node-${input.data.item.id}`}
+      className={cn(
+        "group relative text-foreground",
+        input.data.routingSummaryRows === undefined && !isOutcomeNode && !isTriggerConditionNode
+          ? "w-[280px]"
+          : "w-[440px]",
+      )}
+      data-testid={`designer-blueprint-node-${itemData?.item.id ?? DesignerBlueprintOutcomeNodeId}`}
       onClick={canStartDraftingComment ? startDraftingComment : undefined}
       onKeyDown={
         canStartDraftingComment
@@ -1278,38 +1436,68 @@ function DesignerBlueprintVisualNodeComponent(
           : undefined
       }
       onPointerLeave={() => {
-        input.data.onClearAddCommentSuppression(input.data.item.id);
+        if (itemData === null) {
+          return;
+        }
+        itemData.onClearAddCommentSuppression(itemData.item.id);
       }}
       role={canStartDraftingComment ? "button" : undefined}
       tabIndex={canStartDraftingComment ? 0 : undefined}
     >
-      <Handle className="opacity-0" isConnectable={false} position={Position.Top} type="target" />
-      <Handle
-        className="opacity-0"
-        id={DesignerBlueprintRightTargetHandle}
-        isConnectable={false}
-        position={Position.Right}
-        type="target"
-      />
-      <div className="relative rounded-md border border-border bg-background p-2.5 shadow-sm transition-[border-color,box-shadow] group-hover:border-blue-500/70 group-hover:ring-2 group-hover:ring-blue-500/15 group-focus-within:border-blue-500/70 group-focus-within:ring-2 group-focus-within:ring-blue-500/15">
+      {isOutcomeNode ? null : (
+        <>
+          <Handle
+            className="opacity-0"
+            isConnectable={false}
+            position={Position.Top}
+            type="target"
+          />
+          <Handle
+            className="opacity-0"
+            id={DesignerBlueprintRightTargetHandle}
+            isConnectable={false}
+            position={Position.Right}
+            type="target"
+          />
+        </>
+      )}
+      <div
+        className={cn(
+          "relative rounded-md border shadow-sm transition-[border-color,box-shadow]",
+          isRoutingSummaryNode || isTriggerConditionNode ? "p-1.5" : "p-2.5",
+          isOutcomeNode
+            ? "border-blue-200/70 border-l-4 border-l-blue-500/70 bg-blue-50/55 dark:border-blue-900/60 dark:border-l-blue-400/70 dark:bg-blue-950/25"
+            : "border-border bg-background group-hover:border-blue-500/70 group-hover:ring-2 group-hover:ring-blue-500/15 group-focus-within:border-blue-500/70 group-focus-within:ring-2 group-focus-within:ring-blue-500/15",
+        )}
+      >
         <div className="flex items-start gap-2.5">
-          <span
-            aria-label={input.data.kindLabel}
-            className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-sm border border-border bg-muted text-muted-foreground"
-          >
-            <DesignerBlueprintNodeKindIcon data={input.data} />
-          </span>
+          {isRoutingSummaryNode || isOutcomeNode || isTriggerConditionNode ? null : (
+            <span
+              aria-label={input.data.kindLabel}
+              className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-sm border border-border bg-muted text-muted-foreground"
+            >
+              {itemData === null ? null : <DesignerBlueprintNodeKindIcon data={itemData} />}
+            </span>
+          )}
           <div className="min-w-0 flex-1">
-            <h3 className="break-words text-sm font-medium leading-snug">{input.data.label}</h3>
-            {input.data.description === undefined ? null : (
-              <p className="mt-1 break-words text-xs leading-snug text-muted-foreground">
+            {!isOutcomeNode ? null : (
+              <div className="mb-1.5 text-xs font-medium uppercase text-muted-foreground">
+                Outcome
+              </div>
+            )}
+            {!shouldRenderTitle ? null : (
+              <h3 className="break-words text-sm font-medium leading-snug">{input.data.label}</h3>
+            )}
+            {!shouldRenderDescription ? null : (
+              <p className="mt-0.5 break-words text-sm leading-snug text-muted-foreground">
                 {input.data.description}
               </p>
             )}
-            {input.data.routingSummary === undefined ? null : (
-              <p className="mt-2 whitespace-pre-line rounded-sm bg-muted px-2 py-1 text-xs leading-relaxed text-muted-foreground">
-                {input.data.routingSummary}
-              </p>
+            {input.data.routingSummaryRows === undefined ? null : (
+              <DesignerBlueprintRoutingSummaryRows rows={input.data.routingSummaryRows} />
+            )}
+            {input.data.triggerConditionRows === undefined ? null : (
+              <DesignerBlueprintTriggerConditionRows rows={input.data.triggerConditionRows} />
             )}
           </div>
         </div>
@@ -1317,7 +1505,7 @@ function DesignerBlueprintVisualNodeComponent(
       {canStartDraftingComment ? (
         <div
           className="pointer-events-none absolute right-0 top-0 z-20 flex -translate-y-[calc(100%+0.5rem)] items-center gap-1.5 text-xs font-medium text-blue-700 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 dark:text-blue-300"
-          data-testid={`designer-blueprint-add-comment-hint-${input.data.item.id}`}
+          data-testid={`designer-blueprint-add-comment-hint-${itemData?.item.id ?? DesignerBlueprintOutcomeNodeId}`}
         >
           <ChatCircleTextIcon aria-hidden="true" className="size-3.5" />
           Click to add comment
@@ -1327,12 +1515,15 @@ function DesignerBlueprintVisualNodeComponent(
         <DesignerBlueprintCollapsedCommentButton
           label={`Open blueprint comment for ${input.data.label}`}
           onOpen={() => {
-            input.data.onOpenComment({
-              itemId: input.data.item.id,
+            if (itemData === null) {
+              return;
+            }
+            itemData.onOpenComment({
+              itemId: itemData.item.id,
               kind: "pending",
             });
           }}
-          testId={`designer-blueprint-collapsed-comment-${input.data.item.id}`}
+          testId={`designer-blueprint-collapsed-comment-${itemData?.item.id ?? DesignerBlueprintOutcomeNodeId}`}
         />
       )}
       {pendingComment === undefined || !isPendingCommentExpanded ? null : (
@@ -1341,15 +1532,18 @@ function DesignerBlueprintVisualNodeComponent(
             body={pendingComment.body}
             title="Pending comment"
             onCollapse={() => {
-              input.data.onOpenComment(null);
+              itemData?.onOpenComment(null);
             }}
             onBodyChange={(body) => {
-              input.data.onUpdateComment(pendingComment.id, body);
+              itemData?.onUpdateComment(pendingComment.id, body);
             }}
             onDelete={() => {
-              input.data.onSuppressAddComment(input.data.item.id);
-              input.data.onDeleteComment(pendingComment.id);
-              input.data.onOpenComment(null);
+              if (itemData === null) {
+                return;
+              }
+              itemData.onSuppressAddComment(itemData.item.id);
+              itemData.onDeleteComment(pendingComment.id);
+              itemData.onOpenComment(null);
             }}
           />
         </DesignerBlueprintFloatingNodeComment>
@@ -1364,19 +1558,83 @@ function DesignerBlueprintVisualNodeComponent(
           />
         </DesignerBlueprintFloatingNodeComment>
       )}
-      <Handle
-        className="opacity-0"
-        isConnectable={false}
-        position={Position.Bottom}
-        type="source"
-      />
-      <Handle
-        className="opacity-0"
-        id={DesignerBlueprintRightSourceHandle}
-        isConnectable={false}
-        position={Position.Right}
-        type="source"
-      />
+      {isOutcomeNode ? null : (
+        <Handle
+          className="opacity-0"
+          isConnectable={false}
+          position={Position.Bottom}
+          type="source"
+        />
+      )}
+      {isOutcomeNode ? null : (
+        <Handle
+          className="opacity-0"
+          id={DesignerBlueprintRightSourceHandle}
+          isConnectable={false}
+          position={Position.Right}
+          type="source"
+        />
+      )}
+    </div>
+  );
+}
+
+function DesignerBlueprintTriggerConditionRows(input: {
+  rows: readonly DesignerBlueprintTriggerConditionRow[];
+}): React.JSX.Element {
+  return (
+    <div className="space-y-1.5 text-sm" data-testid="designer-blueprint-trigger-conditions">
+      {input.rows.map((row, rowIndex) => (
+        <div
+          className="grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-2.5 rounded-sm bg-muted/45 px-2.5 py-1.5"
+          data-testid="designer-blueprint-trigger-condition-row"
+          key={`${row.label}-${rowIndex}`}
+        >
+          <span className="shrink-0 rounded-sm border border-border/70 bg-background/70 px-1.5 py-0.5 text-xs font-medium uppercase text-muted-foreground">
+            When
+          </span>
+          <span
+            aria-label={row.integrationLogo?.displayName ?? "Trigger"}
+            className="flex size-5 shrink-0 items-center justify-center rounded-sm border border-border/70 bg-background/70 text-muted-foreground"
+          >
+            {row.integrationLogo === undefined ? (
+              <LightningIcon aria-hidden="true" className="size-3.5" weight="fill" />
+            ) : (
+              <IntegrationLogo alt="" className="size-3.5" logoKey={row.integrationLogo.logoKey} />
+            )}
+          </span>
+          <div className="min-w-0 break-words font-medium leading-snug text-foreground">
+            {row.label}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DesignerBlueprintRoutingSummaryRows(input: {
+  rows: readonly DesignerBlueprintRoutingSummaryRow[];
+}): React.JSX.Element {
+  return (
+    <div className="space-y-1.5 text-sm" data-testid="designer-blueprint-routing-summary">
+      {input.rows.map((row, rowIndex) => (
+        <div
+          className="grid grid-cols-[auto_minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-sm bg-muted/45 px-2.5 py-1.5"
+          data-testid="designer-blueprint-routing-summary-row"
+          key={`${row.outcomeLabel}-${row.nextStepLabel ?? "untargeted"}-${rowIndex}`}
+        >
+          <span className="shrink-0 rounded-sm border border-border/70 bg-background/70 px-1.5 py-0.5 text-xs font-medium uppercase text-muted-foreground">
+            If
+          </span>
+          <div className="min-w-0 break-words font-medium leading-snug text-foreground">
+            {row.outcomeLabel}
+          </div>
+          <ArrowRightIcon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 break-words leading-snug text-muted-foreground">
+            {row.nextStepLabel ?? "No route"}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -1569,7 +1827,7 @@ function DesignerBlueprintCommentTextarea(
 }
 
 function DesignerBlueprintNodeKindIcon(input: {
-  data: DesignerBlueprintVisualNodeData;
+  data: DesignerBlueprintItemVisualNodeData;
 }): React.JSX.Element {
   const className = "size-4";
 
@@ -1588,6 +1846,8 @@ function DesignerBlueprintNodeKindIcon(input: {
       return <ArrowsSplitIcon aria-hidden="true" className={className} />;
     case "workflow_output":
       return <AtomIcon aria-hidden="true" className={className} />;
+    case "outcome":
+      return <AtomIcon aria-hidden="true" className={className} />;
   }
 }
 
@@ -1605,6 +1865,7 @@ function buildDesignerBlueprintGraph(input: {
 
 function buildDesignerBlueprintProcessLaneGraph(input: {
   edges: DesignerBlueprintGraphEdge[];
+  measuredHeightByNodeId?: ReadonlyMap<string, number> | undefined;
   nodes: readonly DesignerBlueprintLayoutNode[];
 }): DesignerBlueprintGraph {
   const indexByNodeId = new Map(input.nodes.map((node, index) => [node.id, index]));
@@ -1612,15 +1873,19 @@ function buildDesignerBlueprintProcessLaneGraph(input: {
   let nextY = 0;
 
   for (const node of input.nodes) {
+    const nodeWidth = getDesignerBlueprintPositionedNodeWidth(node);
     positionByNodeId.set(node.id, {
-      x: 0,
+      x: (DesignerBlueprintRoutingNodeWidth - nodeWidth) / 2,
       y: nextY,
     });
-    nextY +=
+    const nodeHeight =
+      input.measuredHeightByNodeId?.get(node.id) ??
       resolveDesignerBlueprintProcessLaneSlotHeight({
         description: node.data.description,
-        routingSummary: node.data.routingSummary,
-      }) + DesignerBlueprintProcessLaneGap;
+        routingSummaryRows: node.data.routingSummaryRows,
+        triggerConditionRows: node.data.triggerConditionRows,
+      });
+    nextY += nodeHeight + DesignerBlueprintProcessLaneGap;
   }
 
   return {
@@ -1653,14 +1918,31 @@ function buildDesignerBlueprintProcessLaneGraph(input: {
   };
 }
 
+function areDesignerBlueprintGraphNodePositionsEqual(
+  currentGraph: DesignerBlueprintGraph,
+  nextGraph: DesignerBlueprintGraph,
+): boolean {
+  if (currentGraph.nodes.length !== nextGraph.nodes.length) {
+    return false;
+  }
+
+  return currentGraph.nodes.every((currentNode, index) => {
+    const nextNode = nextGraph.nodes[index];
+    return (
+      nextNode !== undefined &&
+      currentNode.id === nextNode.id &&
+      currentNode.position.x === nextNode.position.x &&
+      currentNode.position.y === nextNode.position.y
+    );
+  });
+}
+
 export function resolveDesignerBlueprintProcessLaneSlotHeight(input: {
   description?: string | undefined;
-  routingSummary?: string | undefined;
+  routingSummaryRows?: readonly DesignerBlueprintRoutingSummaryRow[] | undefined;
+  triggerConditionRows?: readonly DesignerBlueprintTriggerConditionRow[] | undefined;
 }): number {
-  return Math.max(
-    DesignerBlueprintProcessLaneMinSlotHeight,
-    getDesignerBlueprintNodeContentHeight(input),
-  );
+  return getDesignerBlueprintNodeContentHeight(input);
 }
 
 function isDesignerBlueprintFeedbackEdge(input: {
@@ -1717,6 +1999,13 @@ type DesignerBlueprintGraphBounds = {
 };
 
 type DesignerBlueprintPositionedNode = {
+  data?:
+    | {
+        kind?: DesignerBlueprintNodeData["kind"] | undefined;
+        routingSummaryRows?: readonly DesignerBlueprintRoutingSummaryRow[] | undefined;
+        triggerConditionRows?: readonly DesignerBlueprintTriggerConditionRow[] | undefined;
+      }
+    | undefined;
   position: {
     x: number;
     y: number;
@@ -1733,7 +2022,7 @@ function getDesignerBlueprintGraphBounds(
   for (const node of nodes) {
     minX = Math.min(minX, node.position.x);
     minY = Math.min(minY, node.position.y);
-    maxX = Math.max(maxX, node.position.x + DesignerBlueprintNodeWidth);
+    maxX = Math.max(node.position.x + getDesignerBlueprintPositionedNodeWidth(node), maxX);
   }
 
   if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
@@ -1747,6 +2036,26 @@ function getDesignerBlueprintGraphBounds(
   };
 }
 
+function getDesignerBlueprintPositionedNodeWidth(node: DesignerBlueprintPositionedNode): number {
+  return node.data?.kind === "outcome" ||
+    node.data?.routingSummaryRows !== undefined ||
+    node.data?.triggerConditionRows !== undefined
+    ? DesignerBlueprintRoutingNodeWidth
+    : DesignerBlueprintNodeWidth;
+}
+
+function isDesignerBlueprintItemNodeData(
+  data: DesignerBlueprintNodeData,
+): data is DesignerBlueprintItemLayoutNodeData;
+function isDesignerBlueprintItemNodeData(
+  data: DesignerBlueprintNodeVisualData,
+): data is DesignerBlueprintItemVisualNodeData;
+function isDesignerBlueprintItemNodeData(
+  data: DesignerBlueprintNodeData | DesignerBlueprintNodeVisualData,
+): data is DesignerBlueprintItemLayoutNodeData | DesignerBlueprintItemVisualNodeData {
+  return data.kind !== "outcome";
+}
+
 function buildDesignerBlueprintUnresolvedNodes(input: {
   blueprint: DesignerBlueprintDocument;
   integrationMetadataByTargetKey: ReadonlyMap<string, DesignerBlueprintIntegrationMetadata>;
@@ -1755,33 +2064,56 @@ function buildDesignerBlueprintUnresolvedNodes(input: {
     input.blueprint.items.map((item) => [item.id, formatDesignerBlueprintNodeLabel(item)]),
   );
 
-  return input.blueprint.items.map((item) =>
-    createDesignerBlueprintLayoutNode({
-      id: item.id,
-      data: {
-        ...(item.description === undefined ? {} : { description: item.description }),
-        ...createDesignerBlueprintIntegrationLogoData({
+  return [
+    createDesignerBlueprintOutcomeLayoutNode(input.blueprint),
+    ...input.blueprint.items.map((item) =>
+      createDesignerBlueprintLayoutNode({
+        id: item.id,
+        data: {
+          ...createDesignerBlueprintItemDescriptionData(item),
+          ...createDesignerBlueprintIntegrationLogoData({
+            item,
+            integrationMetadataByTargetKey: input.integrationMetadataByTargetKey,
+          }),
+          kind: item.kind,
+          kindLabel: formatDesignerBlueprintKindLabel({
+            item,
+            integrationMetadataByTargetKey: input.integrationMetadataByTargetKey,
+          }),
           item,
-          integrationMetadataByTargetKey: input.integrationMetadataByTargetKey,
-        }),
-        kind: item.kind,
-        kindLabel: formatDesignerBlueprintKindLabel({
-          item,
-          integrationMetadataByTargetKey: input.integrationMetadataByTargetKey,
-        }),
-        item,
-        label: formatDesignerBlueprintNodeLabel(item),
-        ...createDesignerBlueprintRoutingSummaryData({
-          item,
-          itemLabelById,
-        }),
-      },
-    }),
-  );
+          label: formatDesignerBlueprintNodeLabel(item),
+          ...createDesignerBlueprintTriggerConditionData({
+            item,
+            integrationMetadataByTargetKey: input.integrationMetadataByTargetKey,
+          }),
+          ...createDesignerBlueprintRoutingSummaryData({
+            item,
+            itemLabelById,
+          }),
+        },
+      }),
+    ),
+  ];
+}
+
+function createDesignerBlueprintOutcomeLayoutNode(
+  blueprint: DesignerBlueprintDocument,
+): DesignerBlueprintLayoutNode {
+  return createDesignerBlueprintLayoutNode({
+    id: DesignerBlueprintOutcomeNodeId,
+    data: {
+      ...(blueprint.outcome.description === undefined
+        ? {}
+        : { description: blueprint.outcome.description }),
+      kind: "outcome",
+      kindLabel: "Outcome",
+      label: blueprint.outcome.label,
+    },
+  });
 }
 
 function createDesignerBlueprintLayoutNode(input: {
-  data: DesignerBlueprintLayoutNodeData;
+  data: DesignerBlueprintNodeData;
   id: string;
 }): DesignerBlueprintLayoutNode {
   return {
@@ -1792,10 +2124,20 @@ function createDesignerBlueprintLayoutNode(input: {
   };
 }
 
+function createDesignerBlueprintItemDescriptionData(
+  item: DesignerBlueprintItem,
+): Pick<DesignerBlueprintLayoutNodeData, "description"> | Record<string, never> {
+  if (item.kind === "trigger" || item.kind === "routing_policy" || item.description === undefined) {
+    return {};
+  }
+
+  return { description: item.description };
+}
+
 function createDesignerBlueprintPendingCommentData(input: {
   item: DesignerBlueprintItem;
   pendingComments: readonly PendingSessionBlueprintComment[];
-}): Pick<DesignerBlueprintVisualNodeData, "pendingComment"> | Record<string, never> {
+}): Pick<DesignerBlueprintItemVisualNodeData, "pendingComment"> | Record<string, never> {
   const pendingComment = input.pendingComments.find((comment) => comment.itemId === input.item.id);
   return pendingComment === undefined ? {} : { pendingComment };
 }
@@ -1812,28 +2154,41 @@ function mapDesignerBlueprintGraphNodesForComments(input: {
   pendingComments: readonly PendingSessionBlueprintComment[];
   suppressedAddCommentItemIds: ReadonlySet<string>;
 }): DesignerBlueprintVisualNode[] {
-  return input.graph.nodes.map((node) => ({
-    ...node,
-    style: {
-      ...node.style,
-      pointerEvents: "all",
-    },
-    data: {
-      ...node.data,
-      isAddCommentSuppressed: input.suppressedAddCommentItemIds.has(node.data.item.id),
-      onAddComment: input.onAddComment,
-      onClearAddCommentSuppression: input.onClearAddCommentSuppression,
-      onDeleteComment: input.onDeleteComment,
-      onOpenComment: input.onOpenComment,
-      onSuppressAddComment: input.onSuppressAddComment,
-      onUpdateComment: input.onUpdateComment,
-      openComment: input.openComment,
-      ...createDesignerBlueprintPendingCommentData({
-        item: node.data.item,
-        pendingComments: input.pendingComments,
-      }),
-    },
-  }));
+  return input.graph.nodes.map((node) => {
+    if (!isDesignerBlueprintItemNodeData(node.data)) {
+      return {
+        ...node,
+        style: {
+          ...node.style,
+          pointerEvents: "all",
+        },
+        data: node.data,
+      };
+    }
+
+    return {
+      ...node,
+      style: {
+        ...node.style,
+        pointerEvents: "all",
+      },
+      data: {
+        ...node.data,
+        isAddCommentSuppressed: input.suppressedAddCommentItemIds.has(node.data.item.id),
+        onAddComment: input.onAddComment,
+        onClearAddCommentSuppression: input.onClearAddCommentSuppression,
+        onDeleteComment: input.onDeleteComment,
+        onOpenComment: input.onOpenComment,
+        onSuppressAddComment: input.onSuppressAddComment,
+        onUpdateComment: input.onUpdateComment,
+        openComment: input.openComment,
+        ...createDesignerBlueprintPendingCommentData({
+          item: node.data.item,
+          pendingComments: input.pendingComments,
+        }),
+      },
+    };
+  });
 }
 
 function buildDesignerBlueprintDisplayEdges(
@@ -1845,18 +2200,35 @@ function buildDesignerBlueprintDisplayEdges(
       source: link.from,
       target: link.to,
       animated: false,
+      markerEnd: DesignerBlueprintEdgeMarker,
+      type: "straight",
     })),
   ];
 }
 
 function getDesignerBlueprintNodeContentHeight(input: {
   description?: string | undefined;
-  routingSummary?: string | undefined;
+  routingSummaryRows?: readonly DesignerBlueprintRoutingSummaryRow[] | undefined;
+  triggerConditionRows?: readonly DesignerBlueprintTriggerConditionRow[] | undefined;
 }): number {
+  if (input.routingSummaryRows !== undefined) {
+    return (
+      DesignerBlueprintNodeRowOnlyVerticalPadding +
+      getDesignerBlueprintRoutingSummaryHeight(input.routingSummaryRows)
+    );
+  }
+
+  if (input.triggerConditionRows !== undefined) {
+    return (
+      DesignerBlueprintNodeRowOnlyVerticalPadding +
+      getDesignerBlueprintTriggerConditionHeight(input.triggerConditionRows)
+    );
+  }
+
+  const textHeight =
+    DesignerBlueprintNodeTitleLineHeight + getDesignerBlueprintDescriptionHeight(input.description);
   return (
-    DesignerBlueprintNodeBaseHeight +
-    getDesignerBlueprintDescriptionHeight(input.description) +
-    getDesignerBlueprintRoutingSummaryHeight(input.routingSummary)
+    DesignerBlueprintNodeVerticalPadding + Math.max(DesignerBlueprintNodeIconHeight, textHeight)
   );
 }
 
@@ -1866,23 +2238,67 @@ function getDesignerBlueprintDescriptionHeight(description: string | undefined):
   }
 
   const lineCount = Math.ceil(description.length / DesignerBlueprintNodeDescriptionCharsPerLine);
-  return Math.max(lineCount, 1) * DesignerBlueprintNodeDescriptionLineHeight;
+  return (
+    DesignerBlueprintNodeDescriptionMarginTop +
+    Math.max(lineCount, 1) * DesignerBlueprintNodeDescriptionLineHeight
+  );
 }
 
-function getDesignerBlueprintRoutingSummaryHeight(routingSummary: string | undefined): number {
-  if (routingSummary === undefined) {
+function getDesignerBlueprintRoutingSummaryHeight(
+  routingSummaryRows: readonly DesignerBlueprintRoutingSummaryRow[] | undefined,
+): number {
+  if (routingSummaryRows === undefined) {
     return 0;
   }
 
-  const lineCount = routingSummary
-    .split("\n")
-    .reduce(
-      (count, line) =>
-        count +
-        Math.max(Math.ceil(line.length / DesignerBlueprintNodeRoutingSummaryCharsPerLine), 1),
+  return (
+    routingSummaryRows.reduce(
+      (height, row) =>
+        height +
+        Math.max(
+          DesignerBlueprintNodeRoutingSummaryRowBaseHeight,
+          (getDesignerBlueprintTextLineCount({
+            charsPerLine: DesignerBlueprintNodeRoutingSummaryOutcomeCharsPerLine,
+            text: row.outcomeLabel,
+          }) +
+            getDesignerBlueprintTextLineCount({
+              charsPerLine: DesignerBlueprintNodeRoutingSummaryNextStepCharsPerLine,
+              text: row.nextStepLabel ?? "No route",
+            })) *
+            DesignerBlueprintNodeRoutingSummaryTextLineHeight,
+        ) +
+        DesignerBlueprintNodeRoutingSummaryGap,
       0,
-    );
-  return lineCount * DesignerBlueprintNodeRoutingSummaryLineHeight;
+    ) - DesignerBlueprintNodeRoutingSummaryGap
+  );
+}
+
+function getDesignerBlueprintTriggerConditionHeight(
+  triggerConditionRows: readonly DesignerBlueprintTriggerConditionRow[] | undefined,
+): number {
+  if (triggerConditionRows === undefined) {
+    return 0;
+  }
+
+  return (
+    triggerConditionRows.reduce(
+      (height, row) =>
+        height +
+        Math.max(
+          DesignerBlueprintNodeTriggerConditionRowBaseHeight,
+          getDesignerBlueprintTextLineCount({
+            charsPerLine: DesignerBlueprintNodeTriggerConditionCharsPerLine,
+            text: row.label,
+          }) * DesignerBlueprintNodeTriggerConditionTextLineHeight,
+        ) +
+        DesignerBlueprintNodeTriggerConditionGap,
+      0,
+    ) - DesignerBlueprintNodeTriggerConditionGap
+  );
+}
+
+function getDesignerBlueprintTextLineCount(input: { charsPerLine: number; text: string }): number {
+  return Math.max(Math.ceil(input.text.length / input.charsPerLine), 1);
 }
 
 type DesignerBlueprintIntegrationMetadata = {
@@ -1916,7 +2332,7 @@ function buildDesignerBlueprintIntegrationMetadataByTargetKey(
 function createDesignerBlueprintIntegrationLogoData(input: {
   item: DesignerBlueprintItem;
   integrationMetadataByTargetKey: ReadonlyMap<string, DesignerBlueprintIntegrationMetadata>;
-}): Pick<DesignerBlueprintLayoutNodeData, "integrationLogo"> | Record<string, never> {
+}): Pick<DesignerBlueprintItemLayoutNodeData, "integrationLogo"> | Record<string, never> {
   if (input.item.kind !== "trigger" || input.item.integrationTargetKey === undefined) {
     return {};
   }
@@ -1943,10 +2359,9 @@ function formatDesignerBlueprintKindLabel(input: {
   const item = input.item;
   if (item.kind === "trigger") {
     const integrationLabel =
-      item.integrationLabel ??
-      (item.integrationTargetKey === undefined
+      item.integrationTargetKey === undefined
         ? undefined
-        : input.integrationMetadataByTargetKey.get(item.integrationTargetKey)?.displayName);
+        : input.integrationMetadataByTargetKey.get(item.integrationTargetKey)?.displayName;
     return integrationLabel === undefined ? "Trigger" : `${integrationLabel} · Trigger`;
   }
 
@@ -1961,30 +2376,47 @@ function formatDesignerBlueprintKind(kind: DesignerBlueprintItem["kind"]): strin
 }
 
 function formatDesignerBlueprintNodeLabel(item: DesignerBlueprintItem): string {
-  if (item.kind !== "trigger") {
-    return item.label;
+  if (item.kind === "trigger") {
+    const firstCondition = getRequiredDesignerBlueprintFirstTriggerCondition(item);
+    return item.when.length === 1 ? firstCondition.label : "Trigger";
   }
 
-  return item.eventLabel ?? "Trigger";
+  if (item.kind === "routing_policy") {
+    const firstRule = getRequiredDesignerBlueprintFirstRoutingRule(item);
+    return item.rules.length === 1 ? `Route: ${firstRule.conditionLabel}` : "Routing policy";
+  }
+
+  return item.label;
+}
+
+function getRequiredDesignerBlueprintFirstTriggerCondition(
+  item: Extract<DesignerBlueprintItem, { kind: "trigger" }>,
+): Extract<DesignerBlueprintItem, { kind: "trigger" }>["when"][number] {
+  const [condition] = item.when;
+  if (condition === undefined) {
+    throw new Error(`Designer blueprint trigger '${item.id}' must include at least one when row.`);
+  }
+
+  return condition;
+}
+
+function getRequiredDesignerBlueprintFirstRoutingRule(
+  item: Extract<DesignerBlueprintItem, { kind: "routing_policy" }>,
+): Extract<DesignerBlueprintItem, { kind: "routing_policy" }>["rules"][number] {
+  const [rule] = item.rules;
+  if (rule === undefined) {
+    throw new Error(
+      `Designer blueprint routing policy '${item.id}' must include at least one rule.`,
+    );
+  }
+
+  return rule;
 }
 
 function formatDesignerBlueprintRoutingRuleBranch(
   rule: Extract<DesignerBlueprintItem, { kind: "routing_policy" }>["rules"][number],
 ): string {
-  if (rule.label !== undefined) {
-    return rule.label;
-  }
-
-  const conditions = rule.when
-    .map((condition) => {
-      const value = condition.value;
-      const formattedValue =
-        value === undefined ? "" : ` ${Array.isArray(value) ? value.join(", ") : String(value)}`;
-      return `${condition.field} ${condition.operator.replaceAll("_", " ")}${formattedValue}`;
-    })
-    .join("; ");
-
-  return `When ${conditions}`;
+  return rule.conditionLabel;
 }
 
 function createDesignerBlueprintItemLabelCounts(
@@ -2015,53 +2447,57 @@ function formatDesignerBlueprintRoutingDestination(
   };
 }
 
-function formatDesignerBlueprintRoutingSummary(input: {
+function formatDesignerBlueprintRoutingSummaryRows(input: {
   item: DesignerBlueprintItem;
   itemLabelById: ReadonlyMap<string, string>;
-}): string | undefined {
+}): readonly DesignerBlueprintRoutingSummaryRow[] | undefined {
   const item = input.item;
   if (item.kind !== "routing_policy") {
     return undefined;
   }
 
-  const branchLabelsByDestinationId = new Map<string, { label: string; branchLabels: string[] }>();
-  const untargetedBranchLabels: string[] = [];
   const itemLabelCounts = createDesignerBlueprintItemLabelCounts(input.itemLabelById);
 
-  for (const rule of item.rules) {
-    const branchLabel = formatDesignerBlueprintRoutingRuleBranch(rule);
-    const destination = formatDesignerBlueprintRoutingDestination(
+  return item.rules.map((rule) => ({
+    nextStepLabel: formatDesignerBlueprintRoutingDestination(
       rule,
       input.itemLabelById,
       itemLabelCounts,
-    );
-    if (destination === undefined) {
-      untargetedBranchLabels.push(branchLabel);
-      continue;
-    }
+    )?.label,
+    outcomeLabel: formatDesignerBlueprintRoutingRuleBranch(rule),
+  }));
+}
 
-    const destinationSummary = branchLabelsByDestinationId.get(destination.id) ?? {
-      label: destination.label,
-      branchLabels: [],
-    };
-    destinationSummary.branchLabels.push(branchLabel);
-    branchLabelsByDestinationId.set(destination.id, destinationSummary);
+function createDesignerBlueprintTriggerConditionData(input: {
+  item: DesignerBlueprintItem;
+  integrationMetadataByTargetKey: ReadonlyMap<string, DesignerBlueprintIntegrationMetadata>;
+}): Pick<DesignerBlueprintLayoutNodeData, "triggerConditionRows"> | Record<string, never> {
+  const item = input.item;
+  if (item.kind !== "trigger") {
+    return {};
   }
 
-  return [
-    ...[...branchLabelsByDestinationId.values()].map(
-      (destination) => `${destination.label}: ${destination.branchLabels.join("; ")}`,
-    ),
-    ...untargetedBranchLabels,
-  ].join("\n");
+  const integrationLogoData = createDesignerBlueprintIntegrationLogoData({
+    item,
+    integrationMetadataByTargetKey: input.integrationMetadataByTargetKey,
+  });
+  const integrationLogo =
+    "integrationLogo" in integrationLogoData ? integrationLogoData.integrationLogo : undefined;
+
+  return {
+    triggerConditionRows: item.when.map((condition) => ({
+      ...(integrationLogo === undefined ? {} : { integrationLogo }),
+      label: condition.label,
+    })),
+  };
 }
 
 function createDesignerBlueprintRoutingSummaryData(input: {
   item: DesignerBlueprintItem;
   itemLabelById: ReadonlyMap<string, string>;
-}): Pick<DesignerBlueprintLayoutNodeData, "routingSummary"> | Record<string, never> {
-  const routingSummary = formatDesignerBlueprintRoutingSummary(input);
-  return routingSummary === undefined ? {} : { routingSummary };
+}): Pick<DesignerBlueprintLayoutNodeData, "routingSummaryRows"> | Record<string, never> {
+  const routingSummaryRows = formatDesignerBlueprintRoutingSummaryRows(input);
+  return routingSummaryRows === undefined ? {} : { routingSummaryRows };
 }
 
 function UnsupportedDesignerCanvasRoute(): React.JSX.Element {

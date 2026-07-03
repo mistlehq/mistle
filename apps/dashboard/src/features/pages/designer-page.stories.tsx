@@ -94,20 +94,24 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
             {
               id: "linear-trigger",
               kind: "trigger",
-              label: "Linear work trigger",
               integrationTargetKey: "linear-default",
-              integrationLabel: "Linear",
-              eventLabel: "Issue label or state changed",
               state: "proposed",
+              when: [
+                {
+                  label: "Linear issue label or state changed",
+                },
+              ],
             },
             {
               id: "github-trigger",
               kind: "trigger",
-              label: "GitHub work trigger",
               integrationTargetKey: "github-cloud",
-              integrationLabel: "GitHub",
-              eventLabel: "PR or issue activity",
               state: "proposed",
+              when: [
+                {
+                  label: "GitHub pull request or issue activity",
+                },
+              ],
             },
             {
               id: "normalize-context",
@@ -119,11 +123,10 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
             {
               id: "routing",
               kind: "routing_policy",
-              label: "Routing policy",
               state: "proposed",
               rules: [
                 {
-                  label: "Escalations",
+                  conditionLabel: "Escalations",
                   when: [
                     {
                       field: "severity",
@@ -261,11 +264,15 @@ const AiSoftwareFactoryBlueprint = {
     {
       id: "issue-ready",
       kind: "trigger",
-      label: "Issue marked ready for agent",
-      description:
-        "Work enters the factory only after a readiness signal such as a status, label, or manual start confirms acceptance criteria are present.",
       state: "proposed",
-      eventLabel: "Issue ready",
+      when: [
+        {
+          label: "Readiness signal received",
+        },
+        {
+          label: "Acceptance criteria are present",
+        },
+      ],
     },
     {
       id: "readiness-check",
@@ -302,13 +309,10 @@ const AiSoftwareFactoryBlueprint = {
     {
       id: "review-route",
       kind: "routing_policy",
-      label: "Route review outcome",
-      description:
-        "Send accepted work toward human merge; send requested changes back to implementation; mark unclear or blocked work appropriately.",
       state: "proposed",
       rules: [
         {
-          label: "Changes requested",
+          conditionLabel: "Changes requested",
           when: [
             {
               field: "review_outcome",
@@ -319,7 +323,7 @@ const AiSoftwareFactoryBlueprint = {
           routeTo: "implement-change",
         },
         {
-          label: "Accepted",
+          conditionLabel: "Accepted",
           when: [
             {
               field: "review_outcome",
@@ -330,7 +334,7 @@ const AiSoftwareFactoryBlueprint = {
           routeTo: "issue-update",
         },
         {
-          label: "Blocked or unclear",
+          conditionLabel: "Blocked or unclear",
           when: [
             {
               field: "review_outcome",

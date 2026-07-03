@@ -15,8 +15,6 @@ const DesignerBlueprintItemStateSchema = z.enum([
 const DesignerBlueprintCommonItemSchema = z
   .object({
     id: z.string().min(1).max(128),
-    label: z.string().min(1).max(160),
-    description: z.string().min(1).max(2_000).optional(),
     parentId: z.string().min(1).max(128).optional(),
     state: DesignerBlueprintItemStateSchema,
   })
@@ -39,7 +37,7 @@ const DesignerBlueprintRoutingConditionSchema = z
 
 const DesignerBlueprintRoutingRuleSchema = z
   .object({
-    label: z.string().min(1).max(160).optional(),
+    conditionLabel: z.string().min(1).max(160),
     when: z.array(DesignerBlueprintRoutingConditionSchema).min(1).max(20),
     routeTo: z.string().min(1).max(128).optional(),
   })
@@ -50,15 +48,22 @@ const DesignerBlueprintRoutingPolicyItemSchema = DesignerBlueprintCommonItemSche
   rules: z.array(DesignerBlueprintRoutingRuleSchema).min(1).max(20),
 }).strict();
 
+const DesignerBlueprintTriggerWhenSchema = z
+  .object({
+    label: z.string().min(1).max(160),
+  })
+  .strict();
+
 const DesignerBlueprintTriggerItemSchema = DesignerBlueprintCommonItemSchema.extend({
   kind: z.literal("trigger"),
   integrationTargetKey: z.string().min(1).max(128).optional(),
-  integrationLabel: z.string().min(1).max(80).optional(),
-  eventLabel: z.string().min(1).max(160).optional(),
+  when: z.array(DesignerBlueprintTriggerWhenSchema).min(1).max(20),
 }).strict();
 
 const DesignerBlueprintStandardItemSchema = DesignerBlueprintCommonItemSchema.extend({
   kind: z.enum(["agent_step", "workflow_output"]),
+  label: z.string().min(1).max(160),
+  description: z.string().min(1).max(2_000).optional(),
 }).strict();
 
 const DesignerBlueprintItemSchema = z.discriminatedUnion("kind", [
