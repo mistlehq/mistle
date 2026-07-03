@@ -226,10 +226,6 @@ describe("Designer eval evaluator", () => {
       caseId: "ai-software-factory-linear-github",
       assertions: [
         {
-          kind: "blueprint-core-node-count-at-most",
-          maxItems: 5,
-        },
-        {
           kind: "blueprint-has-provider-lifecycle",
           requiredConcepts: ["linear", "github", "ready", "review", "feedback", "status"],
         },
