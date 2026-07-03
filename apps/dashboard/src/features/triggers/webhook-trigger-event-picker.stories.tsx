@@ -4,7 +4,10 @@ import { useState } from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
-import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
+import {
+  IntegrationsApiError,
+  type IntegrationConnectionResources,
+} from "../integrations/integrations-service.js";
 import {
   createSlackUserGroupResource,
   createSlackUserGroupResources,
@@ -121,12 +124,27 @@ function StoryHarness(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
   error?: string;
   showGitHubTeamSyncError?: boolean;
+  showGitHubBranchSyncRequired?: boolean;
   showSlackChannelSyncing?: boolean;
   slackChannelResources?: IntegrationConnectionResources;
   slackUserGroupResources?: IntegrationConnectionResources;
 }): React.JSX.Element {
   const [queryClient] = useState(() =>
     createWebhookTriggerStoryQueryClient({
+      ...(input.showGitHubBranchSyncRequired === true
+        ? {
+            githubBranchResourcesError: new IntegrationsApiError({
+              operation: "listIntegrationConnectionResources",
+              status: 409,
+              body: {
+                code: "RESOURCE_SYNC_REQUIRED",
+                message: "Resource sync is required before resources can be listed.",
+              },
+              code: "RESOURCE_SYNC_REQUIRED",
+              message: "Resource sync is required before resources can be listed.",
+            }),
+          }
+        : {}),
       ...(input.showGitHubTeamSyncError === true
         ? { githubTeamResources: StoryGitHubTeamResourcesSyncFailed }
         : {}),
@@ -299,6 +317,32 @@ export const GitHubMultipleResourceParameters: Story = {
       },
     },
     eventOptions: StoryGitHubEventOptions,
+  },
+};
+
+export const GitHubBranchSyncRequired: Story = {
+  name: "GitHub branch sync required",
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: StoryGitHubConnectionId,
+    selectedEventIds: [StoryPullRequestOpenedConditionId],
+    eventParameterRules: {
+      [StoryPullRequestOpenedConditionId]: {
+        repository: isAnyOfRule(["mistlehq/platform"]),
+        baseBranch: isAnyOfRule(["main"]),
+      },
+    },
+    eventOptions: StoryGitHubEventOptions,
+    showGitHubBranchSyncRequired: true,
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const body = within(canvasElement.ownerDocument.body);
+
+    await expect(
+      body.queryByText("Resource sync is required before resources can be listed."),
+    ).toBe(null);
+    await expect(body.queryByText("Could not load base branches")).toBe(null);
+    await expect(body.queryByText("Sync failed.")).toBe(null);
   },
 };
 
