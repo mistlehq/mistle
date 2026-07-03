@@ -371,7 +371,7 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     },
     {
       kind: "setup-incompleteness-disclosed",
-      requiredPhrases: ["linear", "setup", "label", "statuses"],
+      requiredPhrases: ["linear", "Ready for Agent", "trigger"],
     },
     {
       kind: "configured-tools-not-claimed-missing",
@@ -403,7 +403,7 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
       requiredPhrases: [
         "Implementation agent instructions",
         "Review agent instructions",
-        "Ready -> Agent In Progress -> Ready for Review",
+        "Ready for Agent -> Agent In Progress -> Ready for Review",
         "operating guide",
         "Configuration shape",
         "one sandbox profile",
@@ -426,7 +426,7 @@ const AiSoftwareFactoryNextStepQualityCase: DesignerEvalCase = {
       requiredPhrases: [
         "Implementation agent instructions",
         "Review agent instructions",
-        "Ready -> Agent In Progress -> Ready for Review",
+        "Ready for Agent -> Agent In Progress -> Ready for Review",
         "operating guide",
         "Configuration shape",
         "one sandbox profile",
