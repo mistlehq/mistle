@@ -13,6 +13,27 @@ export type TelegramWebhookEventMetadata = {
 
 const TelegramBotApiDocsUrl = "https://core.telegram.org/bots/api#update";
 
+const TelegramMessageChatProviderEventTypes = new Set<string>([
+  "message",
+  "edited_message",
+  "channel_post",
+  "edited_channel_post",
+  "business_message",
+  "guest_message",
+  "edited_business_message",
+]);
+
+const TelegramDirectChatProviderEventTypes = new Set<string>([
+  "deleted_business_messages",
+  "message_reaction",
+  "message_reaction_count",
+  "my_chat_member",
+  "chat_member",
+  "chat_join_request",
+  "chat_boost",
+  "removed_chat_boost",
+]);
+
 const TelegramBasePayloadReferences: readonly IntegrationWebhookPayloadReference[] = [
   {
     path: ["update_id"],
@@ -44,6 +65,51 @@ function defineTelegramWebhookEvent(input: {
     category: input.category,
     payloadReferences: createTelegramPayloadReferences(input.providerEventType),
   };
+}
+
+function buildTelegramPayloadTemplate(path: readonly string[]): string {
+  return `{{ payload.${path.join(".")} }}`;
+}
+
+function resolveTelegramChatPayloadPath(providerEventType: string): readonly string[] | undefined {
+  if (TelegramMessageChatProviderEventTypes.has(providerEventType)) {
+    return [providerEventType, "chat", "id"];
+  }
+
+  if (TelegramDirectChatProviderEventTypes.has(providerEventType)) {
+    return [providerEventType, "chat", "id"];
+  }
+
+  if (providerEventType === "business_connection") {
+    return [providerEventType, "user_chat_id"];
+  }
+
+  return undefined;
+}
+
+function createTelegramConversationKeyOptions(
+  providerEventType: string,
+): NonNullable<IntegrationWebhookEventDefinition["conversationKeyOptions"]> {
+  const chatPayloadPath = resolveTelegramChatPayloadPath(providerEventType);
+
+  return [
+    {
+      id: "update",
+      label: "Update",
+      description: "Use the Telegram update id.",
+      template: buildTelegramPayloadTemplate(["update_id"]),
+    },
+    ...(chatPayloadPath === undefined
+      ? []
+      : [
+          {
+            id: "chat",
+            label: "Chat",
+            description: "Use the Telegram chat id associated with the update.",
+            template: buildTelegramPayloadTemplate(chatPayloadPath),
+          },
+        ]),
+  ];
 }
 
 // Source: Telegram Bot API Update object, https://core.telegram.org/bots/api#update
@@ -193,20 +259,7 @@ export const TelegramSupportedWebhookEvents: readonly IntegrationWebhookEventDef
       ],
     },
     payloadReferences: metadata.payloadReferences,
-    conversationKeyOptions: [
-      {
-        id: "update",
-        label: "Update",
-        description: "Use the Telegram update id.",
-        template: "{{ update_id }}",
-      },
-      {
-        id: "chat",
-        label: "Chat",
-        description: "Use the Telegram chat id when the update payload contains a chat.",
-        template: "{{ message.chat.id }}{{ channel_post.chat.id }}{{ business_message.chat.id }}",
-      },
-    ],
+    conversationKeyOptions: createTelegramConversationKeyOptions(metadata.providerEventType),
   }));
 
 export const TelegramBotApiUpdateDocsUrl = TelegramBotApiDocsUrl;
