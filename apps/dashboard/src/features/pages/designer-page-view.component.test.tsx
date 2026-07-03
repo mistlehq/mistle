@@ -127,9 +127,24 @@ describe("DesignerPageView", () => {
     expect(starterPrompts.compareDocumentPosition(composer)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     const visibleStarterPromptButtons = within(starterPrompts).getAllByRole("button");
     expect(visibleStarterPromptButtons).toHaveLength(6);
-    const visibleStarterPromptCategories = visibleStarterPromptButtons
-      .map((button) => button.getAttribute("aria-label")?.split(":")[0])
-      .sort();
+    const visibleStarterPromptCategories = visibleStarterPromptButtons.map((button) => {
+      const ariaLabel = button.getAttribute("aria-label");
+      if (ariaLabel === null) {
+        throw new Error("Expected visible Designer starter prompt to expose an aria label.");
+      }
+
+      const [category] = ariaLabel.split(":");
+      if (category === undefined) {
+        throw new Error(
+          "Expected visible Designer starter prompt aria label to include a category.",
+        );
+      }
+
+      return category;
+    });
+    visibleStarterPromptCategories.sort((leftCategory, rightCategory) =>
+      leftCategory.localeCompare(rightCategory),
+    );
     expect(new Set(visibleStarterPromptCategories).size).toBe(
       visibleStarterPromptCategories.length,
     );
