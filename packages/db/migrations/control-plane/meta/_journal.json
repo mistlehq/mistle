@@ -337,6 +337,13 @@
       "when": 1782545653841,
       "tag": "0047_add-integration-connection-resource-sync-foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1783045819343,
+      "tag": "0048_add-designer-redirect-return-context",
+      "breakpoints": true
     }
   ]
 }

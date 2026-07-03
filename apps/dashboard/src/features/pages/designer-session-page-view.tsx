@@ -79,6 +79,7 @@ import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-st
 type DesignerCanvasTab = DesignerSession["canvasTabs"][number];
 
 type DesignerCanvasDockviewParams = {
+  designerSessionId: string;
   id: string;
   href: string;
   title: string;
@@ -446,6 +447,11 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
           embeddedRoute={{
             targetKey: route.targetKey,
             navigate: navigateEmbeddedCanvasRoute,
+            redirectReturnContext: {
+              kind: "designer-canvas",
+              designerSessionId: params.designerSessionId,
+              canvasTabId: params.id,
+            },
             ...(route.returnPath === undefined ? {} : { returnPath: route.returnPath }),
           }}
         />
@@ -459,6 +465,11 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
         <EmbeddedIntegrationConnectionSetupPage
           embeddedRoute={{
             connectionId: route.connectionId,
+            redirectReturnContext: {
+              kind: "designer-canvas",
+              designerSessionId: params.designerSessionId,
+              canvasTabId: params.id,
+            },
             searchParams: route.searchParams,
             setupRouteSegment: route.setupRouteSegment,
             targetKey: route.targetKey,
@@ -540,6 +551,7 @@ function readRequiredDesignerCanvasParams(parameters: unknown): DesignerCanvasDo
   }
 
   const id = Reflect.get(parameters, "id");
+  const designerSessionId = Reflect.get(parameters, "designerSessionId");
   const href = Reflect.get(parameters, "href");
   const title = Reflect.get(parameters, "title");
   const blueprint = Reflect.get(parameters, "blueprint");
@@ -547,6 +559,8 @@ function readRequiredDesignerCanvasParams(parameters: unknown): DesignerCanvasDo
   if (
     typeof id !== "string" ||
     id.length === 0 ||
+    typeof designerSessionId !== "string" ||
+    designerSessionId.length === 0 ||
     typeof href !== "string" ||
     href.length === 0 ||
     typeof title !== "string" ||
@@ -557,6 +571,7 @@ function readRequiredDesignerCanvasParams(parameters: unknown): DesignerCanvasDo
   }
 
   return {
+    designerSessionId,
     id,
     href,
     title,
@@ -589,6 +604,7 @@ function preventDesignerCanvasLayoutOverlay(event: DockviewWillShowOverlayLocati
 
 export function DesignerCanvasWorkspace(input: {
   activeTabHref: string | null;
+  designerSessionId: string;
   mountDockviewWhenEmpty?: boolean;
   onAddBlueprintComment: (comment: PendingSessionBlueprintCommentInput) => void;
   onApiReady?: (api: DockviewApi) => void;
@@ -602,6 +618,7 @@ export function DesignerCanvasWorkspace(input: {
 }): React.JSX.Element {
   const {
     activeTabHref,
+    designerSessionId,
     mountDockviewWhenEmpty = false,
     onAddBlueprintComment,
     onActiveTabHrefChange,
@@ -666,10 +683,11 @@ export function DesignerCanvasWorkspace(input: {
     syncDesignerCanvasPanels({
       activeTabHref,
       dockviewApi,
+      designerSessionId,
       onNavigate: handleNavigate,
       tabs,
     });
-  }, [activeTabHref, dockviewApi, handleNavigate, tabs]);
+  }, [activeTabHref, designerSessionId, dockviewApi, handleNavigate, tabs]);
 
   useEffect(() => {
     if (dockviewApi === null) {
@@ -737,6 +755,7 @@ export function DesignerCanvasWorkspace(input: {
             syncDesignerCanvasPanels({
               activeTabHref,
               dockviewApi: event.api,
+              designerSessionId,
               onNavigate: handleNavigate,
               tabs,
             });
@@ -751,6 +770,7 @@ export function DesignerCanvasWorkspace(input: {
 function syncDesignerCanvasPanels(input: {
   activeTabHref: string | null;
   dockviewApi: DockviewApi;
+  designerSessionId: string;
   onNavigate: (navigation: { id: string; href: string; title: string }) => void;
   tabs: readonly DesignerCanvasTab[];
 }): void {
@@ -769,6 +789,7 @@ function syncDesignerCanvasPanels(input: {
         title: tab.title,
         component: "canvas",
         params: {
+          designerSessionId: input.designerSessionId,
           id: tab.id,
           href: tab.href,
           title: tab.title,
@@ -782,6 +803,7 @@ function syncDesignerCanvasPanels(input: {
 
     existingPanel.api.setTitle(tab.title);
     existingPanel.api.updateParameters({
+      designerSessionId: input.designerSessionId,
       id: tab.id,
       href: tab.href,
       title: tab.title,

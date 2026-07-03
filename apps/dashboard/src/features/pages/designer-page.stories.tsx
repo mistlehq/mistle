@@ -689,6 +689,7 @@ function DesignerSessionCanvasFirstOpenStory(): React.JSX.Element {
               <main className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
                 <DesignerCanvasWorkspace
                   activeTabHref={activeTabHref}
+                  designerSessionId="designer_session_canvas_first_open_story"
                   mountDockviewWhenEmpty
                   onAddBlueprintComment={function onAddBlueprintComment() {}}
                   onActiveTabHrefChange={setActiveTabHref}
@@ -873,6 +874,7 @@ function DesignerCanvasWorkspaceStory(input: {
     <DesignerCanvasStoryRuntime>
       <DesignerCanvasWorkspace
         activeTabHref={activeTabHref}
+        designerSessionId="designer_session_canvas_story"
         onAddBlueprintComment={function onAddBlueprintComment() {}}
         onActiveTabHrefChange={setActiveTabHref}
         onDeleteBlueprintComment={function onDeleteBlueprintComment() {}}

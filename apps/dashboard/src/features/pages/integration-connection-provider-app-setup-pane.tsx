@@ -17,6 +17,7 @@ import {
 } from "../integrations/integrations-service.js";
 import type {
   IntegrationConnection,
+  IntegrationRedirectReturnContext,
   StartedProviderAppSetup,
 } from "../integrations/integrations-service.js";
 import {
@@ -353,6 +354,7 @@ export function ProviderAppSetupPane(input: {
   navigate: (nextHref: string) => void | Promise<void>;
   organizationName?: string | undefined;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
+  redirectReturnContext?: IntegrationRedirectReturnContext;
   routeSegment: string;
   searchParams?: URLSearchParams | undefined;
   setupStartForm: IntegrationFormConnectionMethodSetupStartForm;
@@ -418,6 +420,9 @@ export function ProviderAppSetupPane(input: {
           setupStartFormFields: input.setupStartForm.fields,
           setupStartFormState,
         }),
+        ...(input.redirectReturnContext === undefined
+          ? {}
+          : { returnContext: input.redirectReturnContext }),
         fallbackMessage: input.providerAppSetup.manifest.createErrorMessage,
       }),
   });
@@ -432,6 +437,9 @@ export function ProviderAppSetupPane(input: {
         connectionId: input.connection.id,
         routeSegment: startAction.routeSegment,
         body: {},
+        ...(input.redirectReturnContext === undefined
+          ? {}
+          : { returnContext: input.redirectReturnContext }),
         fallbackMessage: startAction.startErrorMessage,
       });
     },

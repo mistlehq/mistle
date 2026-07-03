@@ -4,6 +4,7 @@ import { withHttpErrorHandler } from "@mistle/http/errors.js";
 import { buildDashboardUrl } from "../../lib/dashboard-url.js";
 import type { AppContextBindings } from "../../types.js";
 import { completeOAuth2AuthorizationCodeConnection } from "../services/complete-oauth2-authorization-code-connection.js";
+import { buildIntegrationCallbackDashboardPath } from "../services/redirect-return-context.js";
 import { route } from "./route.js";
 
 const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0]) => {
@@ -30,6 +31,11 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
     },
   );
 
+  const detailDashboardPath = `/integrations/${encodeURIComponent(targetKey)}?${new URLSearchParams(
+    {
+      connectionId: completedConnection.id,
+    },
+  ).toString()}`;
   const dashboardPath =
     completedConnection.authorizationIntent === "reauthorize"
       ? `/integrations/${encodeURIComponent(targetKey)}?${new URLSearchParams({
@@ -38,7 +44,22 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
         }).toString()}`
       : `/integrations/${encodeURIComponent(targetKey)}`;
 
-  return ctx.redirect(buildDashboardUrl(config.dashboard.baseUrl, dashboardPath), 302);
+  return ctx.redirect(
+    buildDashboardUrl(
+      config.dashboard.baseUrl,
+      buildIntegrationCallbackDashboardPath({
+        defaultDashboardPath: dashboardPath,
+        designerCanvasHref:
+          completedConnection.authorizationIntent === "reauthorize"
+            ? dashboardPath
+            : detailDashboardPath,
+        ...(completedConnection.returnContext === undefined
+          ? {}
+          : { returnContext: completedConnection.returnContext }),
+      }),
+    ),
+    302,
+  );
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> =

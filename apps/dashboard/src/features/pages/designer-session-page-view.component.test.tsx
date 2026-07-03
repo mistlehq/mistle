@@ -301,6 +301,7 @@ function renderDesignerCanvasWorkspace(input: RenderDesignerCanvasWorkspaceInput
     element: (
       <DesignerCanvasWorkspace
         activeTabHref={input.activeTabHref ?? null}
+        designerSessionId={input.designerSessionId ?? "designer_session_test"}
         {...(input.mountDockviewWhenEmpty === undefined
           ? {}
           : { mountDockviewWhenEmpty: input.mountDockviewWhenEmpty })}
@@ -335,6 +336,7 @@ function StatefulDesignerCanvasWorkspace(input: {
   return (
     <DesignerCanvasWorkspace
       activeTabHref={activeTabHref}
+      designerSessionId="designer_session_test"
       onAddBlueprintComment={function onAddBlueprintComment() {}}
       onActiveTabHrefChange={setActiveTabHref}
       onDeleteBlueprintComment={function onDeleteBlueprintComment() {}}
@@ -380,6 +382,7 @@ function UpdatingDesignerCanvasWorkspace(input: {
       </button>
       <DesignerCanvasWorkspace
         activeTabHref="/integrations/slack"
+        designerSessionId="designer_session_test"
         onAddBlueprintComment={function onAddBlueprintComment() {}}
         onActiveTabHrefChange={() => {}}
         onDeleteBlueprintComment={function onDeleteBlueprintComment() {}}
@@ -428,6 +431,7 @@ function StatefulDesignerBlueprintCommentWorkspace(): React.JSX.Element {
   return (
     <DesignerCanvasWorkspace
       activeTabHref={DesignerBlueprintCurrentTabHref}
+      designerSessionId="designer_session_test"
       onAddBlueprintComment={addComment}
       onActiveTabHrefChange={() => {}}
       onDeleteBlueprintComment={(commentId) => {

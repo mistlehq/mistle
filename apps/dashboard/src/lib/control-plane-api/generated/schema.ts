@@ -3843,7 +3843,18 @@ export interface paths {
         };
         cookie?: never;
       };
-      requestBody?: never;
+      requestBody?: {
+        content: {
+          "application/json": {
+            returnContext?: {
+              canvasTabId: string;
+              designerSessionId: string;
+              /** @enum {string} */
+              kind: "designer-canvas";
+            };
+          };
+        };
+      };
       responses: {
         /** @description Create an OAuth 2.0 (Authorization Code) reauthorization URL for an integration connection. */
         200: {
@@ -5985,6 +5996,12 @@ export interface paths {
               [key: string]: unknown;
             };
             displayName?: string;
+            returnContext?: {
+              canvasTabId: string;
+              designerSessionId: string;
+              /** @enum {string} */
+              kind: "designer-canvas";
+            };
           };
         };
       };

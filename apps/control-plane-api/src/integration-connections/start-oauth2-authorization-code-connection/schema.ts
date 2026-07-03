@@ -8,6 +8,7 @@ import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
+import { IntegrationRedirectReturnContextSchema } from "../services/redirect-return-context.js";
 
 export const StartOAuth2AuthorizationCodeConnectionParamsSchema = z
   .object({
@@ -19,6 +20,7 @@ export const StartOAuth2AuthorizationCodeConnectionBodySchema = z
   .object({
     displayName: z.string().min(1).optional(),
     config: z.record(z.string(), z.unknown()).optional(),
+    returnContext: IntegrationRedirectReturnContextSchema.optional(),
   })
   .strict();
 

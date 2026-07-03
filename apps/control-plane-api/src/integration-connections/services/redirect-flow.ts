@@ -11,6 +11,7 @@ import { BadRequestError } from "@mistle/http/errors.js";
 import { z } from "zod";
 
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
+import type { IntegrationRedirectReturnContext } from "./redirect-return-context.js";
 
 const REDIRECT_STATE_BYTE_LENGTH = 32;
 const REDIRECT_SESSION_TTL_MS = 10 * 60 * 1000;
@@ -43,6 +44,7 @@ export async function persistRedirectSessionOrThrow(input: {
   failureMessage: string;
   pkceVerifierEncrypted?: string;
   providerStateEncrypted?: string;
+  returnContext?: IntegrationRedirectReturnContext;
 }): Promise<void> {
   const tables = getControlPlaneDatabaseSchema(input.db);
 
@@ -54,6 +56,12 @@ export async function persistRedirectSessionOrThrow(input: {
       intent: input.intent ?? IntegrationConnectionRedirectSessionIntents.CREATE,
       ...(input.connectionId === undefined ? {} : { connectionId: input.connectionId }),
       state: input.state,
+      ...(input.returnContext === undefined
+        ? {}
+        : {
+            designerReturnSessionId: input.returnContext.designerSessionId,
+            designerReturnCanvasTabId: input.returnContext.canvasTabId,
+          }),
       expiresAt: input.expiresAt,
       ...(input.pkceVerifierEncrypted === undefined
         ? {}

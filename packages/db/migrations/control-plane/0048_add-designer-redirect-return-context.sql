@@ -1,0 +1,2 @@
+ALTER TABLE "control_plane"."integration_connection_redirect_sessions" ADD COLUMN "designer_return_session_id" text;--> statement-breakpoint
+ALTER TABLE "control_plane"."integration_connection_redirect_sessions" ADD COLUMN "designer_return_canvas_tab_id" text;

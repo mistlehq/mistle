@@ -761,6 +761,12 @@ export type RefreshedAllIntegrationConnectionResources = z.infer<
   typeof RefreshedAllIntegrationConnectionResourcesSchema
 >;
 
+export type IntegrationRedirectReturnContext = {
+  kind: "designer-canvas";
+  designerSessionId: string;
+  canvasTabId: string;
+};
+
 export class IntegrationsApiError extends Error {
   readonly operation: string;
   readonly status: number;

@@ -18856,6 +18856,25 @@
                   "config": {
                     "type": "object",
                     "additionalProperties": {}
+                  },
+                  "returnContext": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": ["designer-canvas"]
+                      },
+                      "designerSessionId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "canvasTabId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["kind", "designerSessionId", "canvasTabId"],
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false
@@ -19010,6 +19029,38 @@
             "in": "path"
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "returnContext": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": ["designer-canvas"]
+                      },
+                      "designerSessionId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "canvasTabId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["kind", "designerSessionId", "canvasTabId"],
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Create an OAuth 2.0 (Authorization Code) reauthorization URL for an integration connection.",

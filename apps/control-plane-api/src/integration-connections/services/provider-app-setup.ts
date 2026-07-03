@@ -37,6 +37,12 @@ import {
   resolveActiveRedirectSessionOrThrow,
   resolveConnectionRedirectStateMetadata,
 } from "./redirect-flow.js";
+import {
+  IntegrationRedirectReturnContextSchema,
+  removeIntegrationRedirectReturnContextFromBody,
+  resolveRedirectSessionReturnContext,
+  type IntegrationRedirectReturnContext,
+} from "./redirect-return-context.js";
 import { persistProviderAppSetupResult } from "./setup-result-persistence.js";
 import {
   ensureImplicitConnectionWebhookSource,
@@ -51,6 +57,7 @@ const StringRecordSchema = z.record(z.string(), z.string());
 type CompletedProviderAppSetup = {
   completionRedirect: IntegrationProviderAppSetupCompletionRedirect;
   id: string;
+  returnContext?: IntegrationRedirectReturnContext;
   targetKey: string;
   routeSegment: string;
 };
@@ -78,6 +85,25 @@ function hasResolvedProviderAppSetupResult(
   input: ResolvedProviderAppSetupCompletionContext,
 ): input is ResolvedProviderAppSetupCompletionContextWithResult {
   return "setupResult" in input;
+}
+
+function parseProviderAppSetupReturnContext(
+  body: Record<string, unknown>,
+): IntegrationRedirectReturnContext | undefined {
+  const rawReturnContext = body["returnContext"];
+  if (rawReturnContext === undefined) {
+    return undefined;
+  }
+
+  const parsedReturnContext = IntegrationRedirectReturnContextSchema.safeParse(rawReturnContext);
+  if (!parsedReturnContext.success) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_START_INPUT,
+      "Provider app setup return context is invalid.",
+    );
+  }
+
+  return parsedReturnContext.data;
 }
 
 function resolveSetupFlowOrThrow(input: {
@@ -666,6 +692,8 @@ export async function startProviderAppSetup(
       }),
     ),
   );
+  const returnContext = parseProviderAppSetupReturnContext(input.body);
+  const providerBody = removeIntegrationRedirectReturnContextFromBody(input.body);
   const redirectState = encodeConnectionSetupRedirectStateMetadata({
     state: createRedirectState(),
     connectionId: connection.id,
@@ -685,7 +713,7 @@ export async function startProviderAppSetup(
   let startedSetup;
   try {
     startedSetup = await flow.start({
-      body: input.body,
+      body: providerBody,
       connection: {
         id: connection.id,
         status: connection.status,
@@ -752,6 +780,7 @@ export async function startProviderAppSetup(
       state: redirectState,
       expiresAt: createRedirectSessionExpiryTimestamp(),
       failureMessage: "Failed to persist provider app setup redirect session state.",
+      ...(returnContext === undefined ? {} : { returnContext }),
     });
   }
 
@@ -1028,9 +1057,18 @@ export async function completeProviderAppSetup(
     ...(redirectSession === undefined ? {} : { redirectSession }),
   });
 
+  const returnContext =
+    redirectSession === undefined
+      ? undefined
+      : resolveRedirectSessionReturnContext({
+          designerReturnSessionId: redirectSession.designerReturnSessionId,
+          designerReturnCanvasTabId: redirectSession.designerReturnCanvasTabId,
+        });
+
   return {
     ...completedConnection,
     completionRedirect,
+    ...(returnContext === undefined ? {} : { returnContext }),
     routeSegment,
   };
 }

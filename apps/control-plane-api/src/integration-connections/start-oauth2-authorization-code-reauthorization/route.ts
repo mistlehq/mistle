@@ -2,6 +2,7 @@ import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
 import {
+  StartOAuth2AuthorizationCodeConnectionReauthorizationBodySchema,
   StartOAuth2AuthorizationCodeConnectionReauthorizationBadRequestResponseSchema,
   StartOAuth2AuthorizationCodeConnectionReauthorizationConflictResponseSchema,
   StartOAuth2AuthorizationCodeConnectionReauthorizationNotFoundResponseSchema,
@@ -15,6 +16,14 @@ export const route = createRoute({
   tags: ["Integrations"],
   request: {
     params: StartOAuth2AuthorizationCodeConnectionReauthorizationParamsSchema,
+    body: {
+      required: false,
+      content: {
+        "application/json": {
+          schema: StartOAuth2AuthorizationCodeConnectionReauthorizationBodySchema,
+        },
+      },
+    },
   },
   responses: {
     200: {

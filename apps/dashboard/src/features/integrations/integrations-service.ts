@@ -38,6 +38,7 @@ export {
   type IntegrationConnectionResource,
   type IntegrationConnectionResources,
   type IntegrationConnectionResourceSummary,
+  type IntegrationRedirectReturnContext,
   type IntegrationWebhookSource,
   type IntegrationTarget,
   type RefreshedAllIntegrationConnectionResources,

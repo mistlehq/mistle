@@ -7,6 +7,10 @@ import {
   completeProviderAppSetup,
   resolveProviderAppSetupStatelessErrorRedirectTarget,
 } from "../../integration-connections/services/provider-app-setup.js";
+import {
+  buildIntegrationCallbackDashboardPath,
+  type IntegrationRedirectReturnContext,
+} from "../../integration-connections/services/redirect-return-context.js";
 import { buildDashboardUrl } from "../../lib/dashboard-url.js";
 import type { AppContextBindings } from "../../types.js";
 import { route } from "./route.js";
@@ -17,16 +21,23 @@ function buildProviderAppSetupCallbackRedirectUrl(input: {
   connectionId: string;
   completionRedirect: IntegrationProviderAppSetupCompletionRedirect;
   dashboardBaseUrl: string;
+  returnContext?: IntegrationRedirectReturnContext | undefined;
   routeSegment: string;
   targetKey: string;
 }): string {
+  let dashboardPath: string;
   if (input.completionRedirect.kind === "setup-route") {
     const queryParams = new URLSearchParams(input.completionRedirect.query);
     const query = queryParams.size === 0 ? "" : `?${queryParams.toString()}`;
 
+    dashboardPath = `/integrations/${encodeURIComponent(input.targetKey)}/${encodeURIComponent(input.connectionId)}/${encodeURIComponent(input.routeSegment)}/setup${query}`;
     return buildDashboardUrl(
       input.dashboardBaseUrl,
-      `/integrations/${encodeURIComponent(input.targetKey)}/${encodeURIComponent(input.connectionId)}/${encodeURIComponent(input.routeSegment)}/setup${query}`,
+      buildIntegrationCallbackDashboardPath({
+        defaultDashboardPath: dashboardPath,
+        designerCanvasHref: dashboardPath,
+        ...(input.returnContext === undefined ? {} : { returnContext: input.returnContext }),
+      }),
     );
   }
 
@@ -35,10 +46,15 @@ function buildProviderAppSetupCallbackRedirectUrl(input: {
   if (input.completionRedirect.notice !== undefined) {
     queryParams.set("connectionNotice", input.completionRedirect.notice);
   }
+  dashboardPath = `/integrations/${encodeURIComponent(input.targetKey)}?${queryParams.toString()}`;
 
   return buildDashboardUrl(
     input.dashboardBaseUrl,
-    `/integrations/${encodeURIComponent(input.targetKey)}?${queryParams.toString()}`,
+    buildIntegrationCallbackDashboardPath({
+      defaultDashboardPath: dashboardPath,
+      designerCanvasHref: dashboardPath,
+      ...(input.returnContext === undefined ? {} : { returnContext: input.returnContext }),
+    }),
   );
 }
 
@@ -118,6 +134,9 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
       connectionId: completedConnection.id,
       completionRedirect: completedConnection.completionRedirect,
       dashboardBaseUrl: config.dashboard.baseUrl,
+      ...(completedConnection.returnContext === undefined
+        ? {}
+        : { returnContext: completedConnection.returnContext }),
       routeSegment: completedConnection.routeSegment,
       targetKey: completedConnection.targetKey,
     }),

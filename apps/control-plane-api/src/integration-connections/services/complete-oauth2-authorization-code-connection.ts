@@ -34,6 +34,10 @@ import {
   resolveRequiredRedirectQueryParamOrThrow,
   resolveRedirectDisplayName,
 } from "./redirect-flow.js";
+import {
+  resolveRedirectSessionReturnContext,
+  type IntegrationRedirectReturnContext,
+} from "./redirect-return-context.js";
 import { resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow } from "./resolve-oauth2-authorization-code-capability-target.js";
 
 type CompleteOAuth2AuthorizationCodeConnectionInput = {
@@ -45,6 +49,7 @@ type CompleteOAuth2AuthorizationCodeConnectionInput = {
 type CompletedConnection = {
   id: string;
   authorizationIntent: "create" | "reauthorize";
+  returnContext?: IntegrationRedirectReturnContext;
   targetKey: string;
   displayName: string;
   status: "active" | "error" | "revoked";
@@ -791,5 +796,13 @@ export async function completeOAuth2AuthorizationCodeConnection(
     });
   }
 
-  return completedConnection;
+  const returnContext = resolveRedirectSessionReturnContext({
+    designerReturnSessionId: redirectSession.designerReturnSessionId,
+    designerReturnCanvasTabId: redirectSession.designerReturnCanvasTabId,
+  });
+
+  return {
+    ...completedConnection,
+    ...(returnContext === undefined ? {} : { returnContext }),
+  };
 }
