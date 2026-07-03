@@ -23,6 +23,7 @@ import {
   Position,
   ReactFlow,
   type Edge,
+  type EdgeMarker,
   type EdgeProps,
   type EdgeTypes,
   type Node,
@@ -997,11 +998,11 @@ const DesignerBlueprintProcessLaneInitialFocusRightPadding =
 const DesignerBlueprintRightSourceHandle = "right-source";
 const DesignerBlueprintRightTargetHandle = "right-target";
 const DesignerBlueprintOutcomeNodeId = "__designer_blueprint_outcome";
-const DesignerBlueprintEdgeMarker = {
+const DesignerBlueprintEdgeMarker: EdgeMarker = {
   height: 16,
   type: MarkerType.ArrowClosed,
   width: 16,
-} as const;
+};
 
 export type DesignerBlueprintRoutingSummaryRow = {
   nextStepLabel: string | undefined;

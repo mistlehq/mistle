@@ -10,15 +10,6 @@ const AiFactoryInternalProgressForbiddenPhrases = [
   "I’ll save the reversible profile configuration",
 ];
 
-const AiFactoryRequiredNextStepSections = [
-  "Implementation agent instructions",
-  "Review agent instructions",
-  "Linear status mapping",
-  "Workflow operating guide",
-  "Configuration shape",
-  "Next action",
-];
-
 function scriptedAnswerAliases(
   ids: readonly string[],
   value: ScriptedAnswerValue,
@@ -394,11 +385,6 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
         "Next action",
       ],
     },
-    {
-      kind: "transcript-includes-sections",
-      label: "Factory next-step sections",
-      requiredSections: AiFactoryRequiredNextStepSections,
-    },
   ],
 };
 
@@ -409,9 +395,18 @@ const AiSoftwareFactoryNextStepQualityCase: DesignerEvalCase = {
     "Build an AI software factory with Linear and GitHub. Stop once the blueprint, repository choice, approval boundary, and profile configuration next steps are ready.",
   assertions: [
     {
-      kind: "transcript-includes-sections",
-      label: "Factory next-step sections",
-      requiredSections: AiFactoryRequiredNextStepSections,
+      kind: "transcript-includes-required-phrases",
+      label: "Factory configuration next steps",
+      requiredPhrases: [
+        "Implementation agent instructions",
+        "Review agent instructions",
+        "Ready -> Agent In Progress -> Ready for Review",
+        "operating guide",
+        "Configuration shape",
+        "one sandbox profile",
+        "role-separated",
+        "Next action",
+      ],
     },
     {
       kind: "transcript-excludes-internal-progress",

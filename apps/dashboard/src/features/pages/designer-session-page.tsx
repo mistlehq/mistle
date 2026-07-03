@@ -423,6 +423,7 @@ function LoadedDesignerSessionPage(input: {
   const openCanvasHrefParam = input.searchParams.get("openCanvasHref");
   const openCanvasTabId = input.searchParams.get("openCanvasTabId");
 
+  // Synchronize one-shot browser history return params from integration setup into canvas tab state.
   useEffect(() => {
     const returnTabRequest = resolveDesignerCanvasReturnTabRequest({
       openCanvasHref: openCanvasHrefParam,
