@@ -115,6 +115,65 @@ function readGitHubErrorStatus(error: unknown): number | null {
   return typeof error.status === "number" ? error.status : null;
 }
 
+function readGitHubErrorMessage(error: unknown): string | null {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = error.response;
+    if (typeof response === "object" && response !== null && "data" in response) {
+      const data = response.data;
+      if (typeof data === "object" && data !== null && "message" in data) {
+        return typeof data.message === "string" ? data.message : null;
+      }
+    }
+  }
+
+  if (typeof error === "object" && error !== null && "message" in error) {
+    return typeof error.message === "string" ? error.message : null;
+  }
+
+  return null;
+}
+
+function readGitHubRateLimitRemainingHeader(error: unknown): string | null {
+  if (typeof error !== "object" || error === null || !("response" in error)) {
+    return null;
+  }
+
+  const response = error.response;
+  if (typeof response !== "object" || response === null || !("headers" in response)) {
+    return null;
+  }
+
+  const headers = response.headers;
+  if (typeof headers !== "object" || headers === null || !("x-ratelimit-remaining" in headers)) {
+    return null;
+  }
+
+  const value = headers["x-ratelimit-remaining"];
+  return typeof value === "string" ? value : null;
+}
+
+function isGitHubRateLimitFailure(error: unknown): boolean {
+  const remainingRequests = readGitHubRateLimitRemainingHeader(error);
+  if (remainingRequests === "0") {
+    return true;
+  }
+
+  const message = readGitHubErrorMessage(error)?.toLowerCase() ?? "";
+  return message.includes("rate limit");
+}
+
+function isGitHubPermissionFailure(error: unknown): boolean {
+  if (isGitHubRateLimitFailure(error)) {
+    return false;
+  }
+
+  const message = readGitHubErrorMessage(error);
+  return (
+    message === "Resource not accessible by integration" ||
+    message === "Resource not accessible by personal access token"
+  );
+}
+
 async function runGitHubResourceRequest<T>(input: {
   operation: string;
   request: () => Promise<T>;
@@ -123,7 +182,7 @@ async function runGitHubResourceRequest<T>(input: {
     return await input.request();
   } catch (error) {
     const status = readGitHubErrorStatus(error);
-    if (status === 403) {
+    if (status === 403 && isGitHubPermissionFailure(error)) {
       throw new IntegrationResourceSyncFailure(
         {
           code: IntegrationResourceSyncFailureCodes.PERMISSION_DENIED,
