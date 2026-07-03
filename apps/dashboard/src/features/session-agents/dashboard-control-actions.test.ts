@@ -149,12 +149,12 @@ describe("dashboard control actions", () => {
       namespace: DashboardControlDynamicToolNamespace,
       name: DesignerUserInputRequestDynamicToolName,
       description:
-        "Ask the user for exactly one actionable decision in the dashboard and wait for the response. Use this when Designer needs the user to choose a next action, confirm setup completion, answer a configuration question, or select integration resources.",
+        "Present exactly one dashboard decision request and wait for the user's response. Use this for a concrete next action, setup-completion check, configuration answer, or integration resource selection.",
       inputSchema: {
         properties: {
           options: {
             description:
-              "Selectable options. Include the recommended option first when there is a recommendation. Keep option labels short and clear.",
+              "Short selectable answer labels for an option question. Put the recommended option first when there is one.",
             maxItems: 6,
           },
         },
