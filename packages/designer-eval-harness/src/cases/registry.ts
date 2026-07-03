@@ -82,12 +82,12 @@ const GithubPrReviewBasicCase: DesignerEvalCase = {
     },
   },
   scriptedInputs: {
-    [DesignerEvalDecisionIds.CONFIRM_OPERATING_MODEL]: {
+    [DesignerEvalDecisionIds.CONFIRM_PLAN]: {
       kind: "answers",
       answers: [
         {
-          id: DesignerEvalDecisionIds.CONFIRM_OPERATING_MODEL,
-          value: "Use this model",
+          id: DesignerEvalDecisionIds.CONFIRM_PLAN,
+          value: "Use this plan",
         },
       ],
     },
@@ -255,14 +255,13 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     ),
     ...scriptedAnswerAliases(
       [
-        DesignerEvalDecisionIds.CONFIRM_OPERATING_MODEL,
-        "confirm_ai_factory_model",
-        "operating_model",
-        "ai_factory_operating_model",
-        "ai_software_factory_operating_model",
-        "software_factory_operating_model",
-        "confirm_factory_model",
-        "factory_operating_model",
+        DesignerEvalDecisionIds.CONFIRM_PLAN,
+        "confirm_ai_factory_plan",
+        "ai_factory_plan",
+        "ai_software_factory_plan",
+        "software_factory_plan",
+        "confirm_factory_plan",
+        "factory_plan",
       ],
       "Add review agent",
     ),

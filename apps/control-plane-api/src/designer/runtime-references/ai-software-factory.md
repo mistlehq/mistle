@@ -21,7 +21,7 @@ A useful design defines:
 
 For a broad factory request, do not jump straight into setup.
 
-First propose the operating model as a draft:
+First propose the plan as a draft:
 
 - issue system and repository system
 - issue readiness gate

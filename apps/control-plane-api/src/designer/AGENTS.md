@@ -20,7 +20,7 @@
 - Put always-needed operating steps, tool sequencing, approval boundaries, and safety rules in `instructions/designer-behavior.md`.
 - Treat `instructions/designer-context.md` as always-loaded reference: user-facing vocabulary, terms to avoid, and `_Maps to_` anchors only. Do not put behavior rules there.
 - Put branch-specific workflow or provider knowledge in runtime references under `runtime-references/` when the content is reusable, too detailed for the always-loaded behavior file, and has a clear trigger phrase.
-- Add a sharp context pointer in `designer-behavior.md` for each runtime reference. The pointer must say when to read the reference and end on a checkable completion criterion, such as reading it before proposing an operating model.
+- Add a sharp context pointer in `designer-behavior.md` for each runtime reference. The pointer must say when to read the reference and end on a checkable completion criterion, such as reading it before proposing a plan.
 - Inline what every Designer run needs. Disclose what only one branch needs behind a runtime reference pointer.
 - Runtime references may contain mandatory behavior rules for their branch after the reference is invoked. Keep the invocation pointer in `designer-behavior.md`.
 - Keep one authoritative home for each meaning. Do not repeat the same rule across behavior instructions, context vocabulary, and runtime references.
