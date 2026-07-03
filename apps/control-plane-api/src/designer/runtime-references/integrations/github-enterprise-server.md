@@ -1,5 +1,3 @@
-<!-- Generated from the Mistle integration registry. Do not edit by hand. Run pnpm --filter @mistle/control-plane-api designer:integration-catalog:generate. -->
-
 # GitHub Enterprise Server
 
 Provider family ID: `github`

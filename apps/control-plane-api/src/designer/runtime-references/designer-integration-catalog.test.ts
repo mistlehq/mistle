@@ -14,7 +14,7 @@ describe("Designer integration catalog", () => {
     const indexMarkdown = readCatalogFile(files, "index.md").markdown;
 
     assertDesignerIntegrationCatalogFilesWithinBudget(files);
-    expect(indexMarkdown).toContain("<!-- Generated from the Mistle integration registry.");
+    expect(indexMarkdown).toMatch(/^# Designer Integration Reference Index\n/);
     expect(indexMarkdown).toContain("- Linear");
     expect(indexMarkdown).toContain("Provider family ID: `linear`");
     expect(indexMarkdown).toContain("Integration target key: `linear-default`");

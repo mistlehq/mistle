@@ -1,5 +1,3 @@
-<!-- Generated from the Mistle integration registry. Do not edit by hand. Run pnpm --filter @mistle/control-plane-api designer:integration-catalog:generate. -->
-
 # Designer Integration Reference Index
 
 Search this directory with `rg` to resolve user-facing provider names, provider family ids, integration target keys, setup method ids, binding kinds, supported resource kinds, trigger events, and binding tool ids. Read only the matching detail file before configuring that integration.

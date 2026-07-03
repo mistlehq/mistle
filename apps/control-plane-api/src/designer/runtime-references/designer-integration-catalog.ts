@@ -20,8 +20,6 @@ export const DesignerIntegrationCatalogFileId = "designer_integration_catalog_in
 export const DesignerIntegrationCatalogIndexMaxBytes = 16_384;
 export const DesignerIntegrationCatalogDetailMaxBytes = 16_384;
 
-const GeneratedHeader = `<!-- Generated from the Mistle integration registry. Do not edit by hand. Run pnpm --filter @mistle/control-plane-api designer:integration-catalog:generate. -->`;
-
 type BindingToolReference = {
   id: string;
   label?: string | undefined;
@@ -70,8 +68,6 @@ export function renderDesignerIntegrationCatalogIndexMarkdown(
   definitions: ReadonlyArray<AnyIntegrationDefinition>,
 ): string {
   const lines = [
-    GeneratedHeader,
-    "",
     "# Designer Integration Reference Index",
     "",
     "Search this directory with `rg` to resolve user-facing provider names, provider family ids, integration target keys, setup method ids, binding kinds, supported resource kinds, trigger events, and binding tool ids. Read only the matching detail file before configuring that integration.",
@@ -92,9 +88,7 @@ export function renderDesignerIntegrationCatalogIndexMarkdown(
 export function renderDesignerIntegrationDetailMarkdown(
   definition: AnyIntegrationDefinition,
 ): string {
-  return `${[GeneratedHeader, "", ...renderDefinitionSection({ definition, headingLevel: 1 })]
-    .join("\n")
-    .trimEnd()}\n`;
+  return `${renderDefinitionSection({ definition, headingLevel: 1 }).join("\n").trimEnd()}\n`;
 }
 
 export function assertDesignerIntegrationCatalogFilesWithinBudget(
