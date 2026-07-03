@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { GitHubPullRequestConversationKeyTemplate } from "./webhook-trigger-conversation-key-options.js";
+import { GitHubPullRequestReviewConversationKeyTemplate } from "./webhook-trigger-conversation-key-options.js";
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import {
   resolveWebhookTriggerFormPresentation,
@@ -226,7 +226,7 @@ describe("resolveWebhookTriggerFormState", () => {
         createGithubIssueCommentCreatedEventOption(),
       ],
       selectedEventIds: [pullRequestTriggerId, issueCommentTriggerId],
-      conversationKeyTemplate: GitHubPullRequestConversationKeyTemplate,
+      conversationKeyTemplate: GitHubPullRequestReviewConversationKeyTemplate,
       eventParameterRules: {
         [issueCommentTriggerId]: {
           target: {
@@ -239,7 +239,7 @@ describe("resolveWebhookTriggerFormState", () => {
     });
 
     expect(state.conversationKeySelectionState.selectedTemplate).toBe(
-      GitHubPullRequestConversationKeyTemplate,
+      GitHubPullRequestReviewConversationKeyTemplate,
     );
     expect(state.selectedConversationGroupingLabel).toBe("Pull request");
   });

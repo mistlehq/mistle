@@ -11,6 +11,7 @@ import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-r
 import { resolveSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
 import { assertWebhookSourceReferenceOrThrow } from "./assert-webhook-source-reference-or-throw.js";
 import { assertWebhookTriggerRequirementsOrThrow } from "./assert-webhook-trigger-requirements-or-throw.js";
+import { assertWebhookTriggerTemplatesOrThrow } from "./assert-webhook-trigger-templates-or-throw.js";
 import { loadWebhookTriggerAggregateOrThrow } from "./load-webhook-trigger-aggregate-or-throw.js";
 import {
   normalizeWebhookTriggerEventConditions,
@@ -66,6 +67,13 @@ export async function updateTriggerWebhook(
   const eventConditions =
     inputEventConditions ?? normalizeWebhookTriggerEventConditions(existingTrigger.eventConditions);
   const eventTypes = eventConditions.map((condition) => condition.eventType);
+  const inputTemplate = input.inputTemplate ?? existingTrigger.inputTemplate;
+  const conversationKeyTemplate =
+    input.conversationKeyTemplate ?? existingTrigger.conversationKeyTemplate;
+  const idempotencyKeyTemplate =
+    input.idempotencyKeyTemplate === undefined
+      ? existingTrigger.idempotencyKeyTemplate
+      : input.idempotencyKeyTemplate;
   const sandboxProfileId =
     input.target?.sandboxProfileId ?? existingTrigger.target.sandboxProfileId;
   const sandboxProfileVersion =
@@ -87,6 +95,13 @@ export async function updateTriggerWebhook(
   assertWebhookTriggerRequirementsOrThrow({
     eventTypes,
     providerMetadata: resolvedWebhookSource.providerMetadata,
+    supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
+  });
+  assertWebhookTriggerTemplatesOrThrow({
+    eventTypes,
+    inputTemplate,
+    conversationKeyTemplate,
+    idempotencyKeyTemplate,
     supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
   });
   await assertSandboxProfileReferenceOrThrow(

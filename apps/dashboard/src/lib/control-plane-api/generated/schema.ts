@@ -17146,7 +17146,8 @@ export interface paths {
                     | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
                     | "INVALID_SANDBOX_PROFILE_REFERENCE"
                     | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
-                    | "INVALID_PRIMARY_REPOSITORY";
+                    | "INVALID_PRIMARY_REPOSITORY"
+                    | "INVALID_WEBHOOK_TRIGGER_TEMPLATE_REFERENCES";
                   message: string;
                 }
               | {
@@ -18074,7 +18075,8 @@ export interface paths {
                     | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
                     | "INVALID_SANDBOX_PROFILE_REFERENCE"
                     | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
-                    | "INVALID_PRIMARY_REPOSITORY";
+                    | "INVALID_PRIMARY_REPOSITORY"
+                    | "INVALID_WEBHOOK_TRIGGER_TEMPLATE_REFERENCES";
                   message: string;
                 }
               | {
