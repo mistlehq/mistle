@@ -1,5 +1,14 @@
 import { systemScheduler } from "@mistle/time";
-import { Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mistle/ui";
+import {
+  Button,
+  cn,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@mistle/ui";
 import { useEffect, useState } from "react";
 
 import { ErrorNotice } from "../auth/error-notice.js";
@@ -35,8 +44,20 @@ const DesignerStarterPromptCategories: readonly string[] = [
 ];
 const DesignerStarterPromptVisibleCount = 6;
 export const DesignerPageComposerContainerClassName =
-  "mx-auto grid w-full max-w-3xl gap-5 pt-8 md:pt-16";
-export const DesignerPageSessionsContainerClassName = "mx-auto mt-4 grid w-full max-w-3xl gap-3";
+  "mx-auto grid w-full max-w-3xl gap-5 pt-16 md:pt-32";
+export const DesignerPageSessionsContainerClassName = "mx-auto mt-8 grid w-full max-w-3xl gap-3";
+const DesignerPageGlowAccent = "oklch(0.82 0.12 62)";
+const DesignerPageGlowMutedAccent = "oklch(0.9 0.045 62)";
+const DesignerPageGlowRootClassName = "relative overflow-hidden bg-background";
+const DesignerPageGlowClassName =
+  "pointer-events-none absolute inset-x-0 top-0 h-[24rem] bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--designer-page-glow-accent)_28%,transparent),color-mix(in_oklch,var(--designer-page-glow-muted-accent)_12%,transparent)_36%,transparent_66%)]";
+const DesignerPageGlowStyle: React.CSSProperties & {
+  "--designer-page-glow-accent": string;
+  "--designer-page-glow-muted-accent": string;
+} = {
+  "--designer-page-glow-accent": DesignerPageGlowAccent,
+  "--designer-page-glow-muted-accent": DesignerPageGlowMutedAccent,
+};
 
 const DesignerStarterPrompts: readonly {
   category: string;
@@ -165,6 +186,24 @@ const DesignerStarterPrompts: readonly {
   },
 ];
 
+const DesignerStarterPromptCategoryStyles: Record<string, string> = {
+  Admin:
+    "border-slate-200 bg-slate-50 text-slate-950 hover:bg-slate-100 [&_[data-category]]:text-slate-500",
+  Engineering:
+    "border-sky-200 bg-sky-50 text-sky-950 hover:bg-sky-100 [&_[data-category]]:text-sky-600",
+  Finance:
+    "border-emerald-200 bg-emerald-50 text-emerald-950 hover:bg-emerald-100 [&_[data-category]]:text-emerald-700",
+  HR: "border-rose-200 bg-rose-50 text-rose-950 hover:bg-rose-100 [&_[data-category]]:text-rose-600",
+  Marketing:
+    "border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-100 [&_[data-category]]:text-amber-700",
+  Product:
+    "border-violet-200 bg-violet-50 text-violet-950 hover:bg-violet-100 [&_[data-category]]:text-violet-600",
+  Sales:
+    "border-cyan-200 bg-cyan-50 text-cyan-950 hover:bg-cyan-100 [&_[data-category]]:text-cyan-700",
+  Support:
+    "border-lime-200 bg-lime-50 text-lime-950 hover:bg-lime-100 [&_[data-category]]:text-lime-700",
+};
+
 type DesignerPromptPlaceholderAnimationState = {
   phase: "deleting" | "typing" | "waiting";
   suffixIndex: number;
@@ -186,6 +225,15 @@ function formatDesignerSessionTitle(session: DesignerSessionListItem): string {
 }
 
 function ignoreDesignerComposerAction(): void {}
+
+function resolveDesignerStarterPromptCategoryStyle(category: string): string {
+  const categoryStyle = DesignerStarterPromptCategoryStyles[category];
+  if (categoryStyle === undefined) {
+    throw new Error(`Designer starter prompt category '${category}' is missing styles.`);
+  }
+
+  return categoryStyle;
+}
 
 function shuffleDesignerStarterPrompts(
   prompts: readonly (typeof DesignerStarterPrompts)[number][],
@@ -281,7 +329,10 @@ function DesignerStarterPromptChips(input: {
       {starterPrompts.map((starterPrompt) => (
         <Button
           aria-label={`${starterPrompt.category}: ${starterPrompt.label}`}
-          className="h-8 max-w-full justify-start gap-1.5 rounded-full border-border/80 bg-background px-3 text-left text-xs font-medium whitespace-nowrap text-foreground shadow-none hover:bg-muted"
+          className={cn(
+            "h-8 max-w-full justify-start gap-1.5 rounded-full px-3 text-left text-xs font-medium whitespace-nowrap shadow-none",
+            resolveDesignerStarterPromptCategoryStyle(starterPrompt.category),
+          )}
           key={`${starterPrompt.category}:${starterPrompt.label}`}
           onClick={() => {
             input.onPromptSelect(starterPrompt.prompt);
@@ -290,7 +341,9 @@ function DesignerStarterPromptChips(input: {
           type="button"
           variant="outline"
         >
-          <span className="shrink-0 text-muted-foreground">{starterPrompt.category}</span>
+          <span className="shrink-0" data-category="">
+            {starterPrompt.category}
+          </span>
           <span className="min-w-0">{starterPrompt.label}</span>
         </Button>
       ))}
@@ -387,8 +440,11 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
   const placeholderText = useDesignerPromptPlaceholder(input.prompt);
 
   return (
-    <PageFrame width="normal">
-      <div className="grid gap-6">
+    <PageFrame className={DesignerPageGlowRootClassName} width="normal">
+      <div aria-hidden="true" className="absolute inset-0" style={DesignerPageGlowStyle}>
+        <div className={DesignerPageGlowClassName} />
+      </div>
+      <div className="relative z-10 grid gap-6">
         <section className={DesignerPageComposerContainerClassName}>
           <h1 className="text-center text-3xl leading-tight font-semibold tracking-normal text-foreground md:text-4xl">
             {DesignerPromptTitle}
