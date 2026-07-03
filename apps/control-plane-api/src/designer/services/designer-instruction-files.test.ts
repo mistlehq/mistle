@@ -34,6 +34,22 @@ describe("Designer managed instruction files", () => {
     );
   });
 
+  it("defines Alignment as the gate before configuration changes and Run actions", () => {
+    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
+
+    expect(behaviorInstructions).toContain("## Alignment");
+    expect(behaviorInstructions).toContain(
+      "Alignment means Designer has enough shared understanding of the Workflow or Workflow change",
+    );
+    expect(behaviorInstructions).toContain(
+      "Ask only for decisions that affect Workflow behavior, configuration changes, approval boundaries, trigger behavior, selected resources, or Run actions.",
+    );
+    expect(behaviorInstructions).toContain(
+      "When updating an existing Agent, trigger, or setup, infer the current Workflow from the current setup",
+    );
+    expect(behaviorInstructions).not.toContain("directionally clear");
+  });
+
   it("keeps Run actions separate from configuration and unsupported trigger simulation", () => {
     const contextInstructions = loadDesignerInstructionContent("designer-context.md");
     const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");

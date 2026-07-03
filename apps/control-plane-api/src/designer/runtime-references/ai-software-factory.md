@@ -31,7 +31,7 @@ First propose the plan as a recommended draft:
 - feedback and improvement loop
 - human operating guide
 
-Invite corrections in the chat summary before setup choices, but keep the next dashboard decision focused on the first material setup choice rather than plan acceptance.
+Invite corrections in the chat summary before configuration choices, but keep the next dashboard decision focused on the first material configuration choice rather than plan acceptance.
 
 ## Workflow Blueprint Shape
 
@@ -52,7 +52,7 @@ Good Workflow blueprint items usually include:
 - issue-system status update, including blocked or unclear work
 - improvement output for recurring process or instruction gaps
 
-Do not make setup steps into workflow nodes. Repository selection, app setup, profile selection, publishing, and trigger creation belong in chat or setup-focused canvas tabs. Do not attach setup actions to AI software factory Workflow blueprint items; use dashboard requests or setup-focused tabs for those actions after the workflow is aligned.
+Do not make setup steps into workflow nodes. Repository selection, app setup, profile selection, publishing, and trigger creation belong in chat or setup-focused canvas tabs. Do not attach setup actions to AI software factory Workflow blueprint items; use dashboard requests or setup-focused tabs for those actions after alignment.
 
 ## Issue Readiness Contract
 
