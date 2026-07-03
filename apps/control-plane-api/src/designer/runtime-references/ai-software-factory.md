@@ -23,9 +23,13 @@ A useful design defines:
 
 Keep the factory workflow focused on operating behavior, not setup tasks. For an AI software factory, prefer 6-8 core responsibilities. Combine related concerns instead of expanding every trigger, route, and output into a separate responsibility.
 
+For review routing, prefer one routing policy plus one issue-system update output that describes accepted, needs-rework, and blocked outcomes. Do not create separate workflow outputs for every possible status unless the user specifically needs those as distinct deliverables.
+
 When using a separate review agent, do not treat "PR ready for review" as a separate workflow entry point unless the workflow truly has multiple independent entry points. Keep the PR output and review responsibility adjacent so the core factory stays within 6-8 responsibilities.
 
 Review feedback must loop back into implementation before the workflow reaches completion. The factory should make rework, accepted work, and blocked or unclear outcomes easy to distinguish.
+
+Keep the word feedback visible in the blueprint when modeling review rework or factory improvement. A useful factory blueprint should be searchable for feedback because review feedback is the core learning loop.
 
 Good factory workflows usually include:
 
@@ -35,8 +39,8 @@ Good factory workflows usually include:
 - pull request output
 - review step or review-agent step
 - feedback or rework path from review back to implementation
-- issue-system status update, including blocked or unclear work
-- improvement output for recurring process or instruction gaps
+- issue-system status update, including accepted, needs-rework, blocked, or unclear work
+- feedback improvement output for recurring process or instruction gaps
 
 Do not make setup steps part of the factory workflow. Repository selection, App setup, profile selection, publishing, and trigger creation belong in chat or setup-focused canvas tabs after alignment.
 
@@ -134,6 +138,15 @@ When the selected approval boundary requires human approval before provider writ
 
 If Designer cannot edit profile instructions or publish in the current session, name the blocker directly: profile instructions, publishing, or trigger creation must be completed in the opened dashboard/profile UI or in a session with product mutation tools.
 
+When Designer cannot save the profile instructions directly, do not stop at a remaining-configuration checklist. Provide a concrete handoff the user can apply. Include concise sections with these headings:
+
+- Implementation agent instructions
+- Review agent instructions
+- Linear status mapping, such as `Ready for Agent -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done`
+- Workflow operating guide
+- Configuration shape, such as one sandbox profile with role-separated implementation and review instructions
+- Next action, naming the single recommended configuration step to do first
+
 ## Provider-Specific Notes
 
 Linear:
@@ -179,7 +192,7 @@ Useful output artifacts can include:
 
 - implementation-agent instruction draft
 - review-agent instruction draft
-- issue status mapping, such as `Ready -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done`
+- issue status mapping, such as `Ready for Agent -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done`
 - workflow operating guide for the team
 - example issue or onboarding issue
 - configuration shape summary, such as one sandbox profile with role-separated instructions or separate implementation and review profiles

@@ -50,7 +50,7 @@ Designer should help define the software factory operating process for the selec
 
 It should identify:
 
-- the Linear readiness contract, such as required labels, issue fields, acceptance criteria, priority, ownership, and blocked/needs-clarification markers
+- the Linear readiness contract, such as a Ready for Agent status, required labels, issue fields, acceptance criteria, priority, ownership, and blocked/needs-clarification markers
 - the Linear workflow states or columns, such as `Backlog`, `Ready for Agent`, `Agent In Progress`, `Ready for Review`, `Needs Rework`, `Blocked`, and `Done`
 - how and when Linear issues should be updated as the factory moves work forward
 - the distinction between implementation work and review work
@@ -69,7 +69,7 @@ Designer should identify these required pieces:
 - Linear Connected app
 - Linear MCP provider tool on the target profile
 - compatible Agent model-provider binding for the target Codex runtime, such as OpenAI
-- Linear workflow conventions, such as labels, statuses, issue template text, or a clear manual substitute
+- Linear workflow conventions, such as the Ready for Agent pickup status, labels, issue template text, or a clear manual substitute
 - separate Mistle configuration for implementation and review roles when the product supports it, such as distinct sandbox profiles, triggers, instructions, or approval boundaries
 - Run actions for testing the factory, distinguishing supported session starts from future trigger simulation capability
 
@@ -101,7 +101,7 @@ When the chosen approval boundary requires human approval before provider writes
 
 Designer must not claim it can simulate an issue trigger or provider trigger unless product tooling for that Run action is available. Until then, it should offer supported testing paths, such as starting a session after approval or explaining the manual external event needed to exercise the trigger.
 
-If Designer cannot save profile instructions directly, it should still produce concrete next-step instructions with draft implementation-agent instructions, draft review-agent instructions, a Linear status mapping such as `Ready -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done`, and an offer to create a workflow operating guide.
+If Designer cannot save profile instructions directly, it should still produce concrete next-step instructions with draft implementation-agent instructions, draft review-agent instructions, a Linear status mapping such as `Ready for Agent -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done`, and an offer to create a workflow operating guide.
 
 The next-step instructions should explicitly state the configuration shape: either one sandbox profile with role-separated implementation/review instructions, or separate implementation and review profiles. It should end with one recommended next action rather than a flat list of equal-priority setup tasks.
 
