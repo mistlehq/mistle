@@ -25,6 +25,7 @@ const DesignerPromptPlaceholderDeleteMs = 28;
 const DesignerPromptPlaceholderTypeMs = 42;
 export const DesignerPageComposerContainerClassName =
   "mx-auto grid w-full max-w-3xl gap-4 pt-8 md:pt-16";
+export const DesignerPageSessionsContainerClassName = "mx-auto grid w-full max-w-3xl gap-3";
 
 type DesignerPromptPlaceholderAnimationState = {
   phase: "deleting" | "typing" | "waiting";
@@ -182,7 +183,7 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
         </section>
 
         {showPastSessions ? (
-          <section className="grid gap-3">
+          <section className={DesignerPageSessionsContainerClassName}>
             <ErrorNotice message={input.sessionsErrorMessage} />
             {input.sessions.length > 0 ? (
               <Table className="min-w-[36rem] table-fixed">
