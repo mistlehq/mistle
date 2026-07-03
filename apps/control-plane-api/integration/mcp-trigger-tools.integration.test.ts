@@ -612,8 +612,9 @@ describe.concurrent("MCP trigger tools integration", () => {
         ],
         inputTemplate: "Triage {{payload.comment.body}}",
         instructions: "Prefer concise triage summaries.",
-        conversationKeyTemplate: "{{payload.issue.node_id}}",
-        idempotencyKeyTemplate: "{{payload.comment.node_id}}",
+        conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
+        idempotencyKeyTemplate:
+          "{{payload.repository.full_name}}:issue:{{payload.issue.number}}:comment:{{payload.comment.body}}",
         target: {
           sandboxProfileId: "sbp_mcp_trigger_webhook_create",
         },
@@ -655,8 +656,9 @@ describe.concurrent("MCP trigger tools integration", () => {
       eventConditions: [{ eventType: GitHubIssueCommentCreatedEventType }],
       inputTemplate: "Triage {{payload.comment.body}}",
       instructions: "Prefer concise triage summaries.",
-      conversationKeyTemplate: "{{payload.issue.node_id}}",
-      idempotencyKeyTemplate: "{{payload.comment.node_id}}",
+      conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
+      idempotencyKeyTemplate:
+        "{{payload.repository.full_name}}:issue:{{payload.issue.number}}:comment:{{payload.comment.body}}",
     });
   });
 
@@ -852,6 +854,9 @@ describe.concurrent("MCP trigger tools integration", () => {
             },
           },
         ],
+        conversationKeyTemplate:
+          "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
+        idempotencyKeyTemplate: null,
       },
     });
 
@@ -1254,8 +1259,9 @@ describe.concurrent("MCP trigger tools integration", () => {
         ],
         inputTemplate: "Triage {{payload.issue.title}}",
         instructions: "Classify issue severity and propose owner/component.",
-        conversationKeyTemplate: "{{payload.issue.node_id}}",
-        idempotencyKeyTemplate: "{{payload.comment.node_id}}",
+        conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
+        idempotencyKeyTemplate:
+          "{{payload.repository.full_name}}:issue:{{payload.issue.number}}:comment:{{payload.comment.body}}",
         target: {
           sandboxProfileId: "sbp_mcp_designer_trigger_mutation",
         },

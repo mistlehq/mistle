@@ -6,6 +6,7 @@ import { TriggerKinds, type WebhookTriggerActorPolicy } from "@mistle/db/control
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
+import { TriggerWebhooksBadRequestCodes } from "../src/trigger-webhooks/constants.js";
 import { TriggerWebhookSchema } from "../src/trigger-webhooks/schemas.js";
 import {
   createWebhookTriggerRequestBody,
@@ -181,8 +182,12 @@ describe.concurrent("trigger webhooks create integration", () => {
     ]);
     expect(body.inputTemplate).toBe("Handle payload");
     expect(body.instructions).toBe("Prefer deterministic reproduction steps.");
-    expect(body.conversationKeyTemplate).toBe("{{payload.issue.node_id}}");
-    expect(body.idempotencyKeyTemplate).toBe("{{payload.comment.node_id}}");
+    expect(body.conversationKeyTemplate).toBe(
+      "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
+    );
+    expect(body.idempotencyKeyTemplate).toBe(
+      "{{payload.repository.full_name}}:issue:{{payload.issue.number}}:comment:{{payload.comment.body}}",
+    );
     expect(body.target.sandboxProfileId).toBe("sbp_trigger_webhook_duplicate");
     expect(body.target.sandboxProfileVersion).toBe(3);
     expect(body.target.primaryRepositoryId).toBe("mistlehq/platform");
@@ -228,6 +233,54 @@ describe.concurrent("trigger webhooks create integration", () => {
     expect(response.status).toBe(201);
     const body = TriggerWebhookSchema.parse(await response.json());
     expect(body.target.sandboxProfileVersion).toBe(2);
+  });
+
+  it("rejects invalid trigger event field references across webhook trigger templates", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-trigger-webhooks-create-invalid-template@example.com",
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_trigger_webhook_create_invalid_template",
+      webhookSourceId: "iws_trigger_webhook_create_invalid_template",
+      profileId: "sbp_trigger_webhook_create_invalid_template",
+      profileVersion: 3,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/triggers/webhooks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        ...createWebhookTriggerRequestBody({
+          name: "Invalid template",
+          integrationWebhookSourceId: "iws_trigger_webhook_create_invalid_template",
+          sandboxProfileId: "sbp_trigger_webhook_create_invalid_template",
+          sandboxProfileVersion: 3,
+        }),
+        inputTemplate: "Handle {{webhook.eventypepe}} and {{payload.pull_request.title}}",
+        conversationKeyTemplate: "{% if payload.issue %}{{payload.issue.number}}{% endif %}",
+        idempotencyKeyTemplate: "{{payload.comment.node_id}}",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      code: TriggerWebhooksBadRequestCodes.INVALID_WEBHOOK_TRIGGER_TEMPLATE_REFERENCES,
+    });
+    expect(JSON.stringify(body)).toContain("inputTemplate");
+    expect(JSON.stringify(body)).toContain("{{webhook.eventypepe}}");
+    expect(JSON.stringify(body)).toContain("{{payload.pull_request.title}}");
+    expect(JSON.stringify(body)).toContain("conversationKeyTemplate");
+    expect(JSON.stringify(body)).toContain("Only webhookEvent.eventType equality conditions");
+    expect(JSON.stringify(body)).toContain("idempotencyKeyTemplate");
+    expect(JSON.stringify(body)).toContain("{{payload.comment.node_id}}");
   });
 
   it("persists the selected primary repository when the profile binding exposes it", async ({

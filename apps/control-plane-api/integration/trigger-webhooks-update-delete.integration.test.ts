@@ -5,8 +5,10 @@
 import { IntegrationBindingKinds, type WebhookTriggerActorPolicy } from "@mistle/db/control-plane";
 import { NotFoundResponseSchema } from "@mistle/http/errors.js";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
+import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
+import { TriggerWebhooksBadRequestCodes } from "../src/trigger-webhooks/constants.js";
 import { DeleteTriggerWebhookResponseSchema } from "../src/trigger-webhooks/delete-trigger-webhook/index.js";
 import { TriggerWebhookSchema } from "../src/trigger-webhooks/schemas.js";
 import {
@@ -154,7 +156,9 @@ describe.concurrent("trigger webhooks update and delete integration", () => {
     expect(persistedWebhook.inputTemplate).toBe("Handle payload");
     expect(persistedWebhook.eventConditions[0]?.actorPolicy).toEqual(SlackWorkspaceActorPolicy);
     expect(persistedWebhook.instructions).toBeNull();
-    expect(persistedWebhook.conversationKeyTemplate).toBe("{{payload.issue.node_id}}");
+    expect(persistedWebhook.conversationKeyTemplate).toBe(
+      "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
+    );
     expect(persistedWebhook.idempotencyKeyTemplate).toBeNull();
 
     const policyPatchResponse = await env.controlPlaneApi.http.fetch(
@@ -246,6 +250,64 @@ describe.concurrent("trigger webhooks update and delete integration", () => {
     expect(clearResponse.status).toBe(200);
     const clearBody = TriggerWebhookSchema.parse(await clearResponse.json());
     expect(clearBody.target.primaryRepositoryId).toBeNull();
+  });
+
+  it("rejects unrelated updates when an existing webhook trigger template is invalid", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-trigger-webhooks-update-stale-invalid-template@example.com",
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_trigger_webhook_update_stale_invalid_template",
+      webhookSourceId: "iws_trigger_webhook_update_stale_invalid_template",
+      profileId: "sbp_trigger_webhook_update_stale_invalid_template",
+      profileVersion: 4,
+    });
+    await seedPersistedWebhookTrigger(env, {
+      triggerId: "trg_trigger_webhook_update_stale_invalid_template",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_trigger_webhook_update_stale_invalid_template",
+      profileId: "sbp_trigger_webhook_update_stale_invalid_template",
+      profileVersion: 4,
+      targetId: "tgt_trigger_webhook_update_stale_invalid_template",
+      name: "Stale invalid template",
+    });
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.webhookTriggers)
+      .set({
+        inputTemplate: "Handle {{payload.not_real}}",
+      })
+      .where(
+        eq(
+          env.controlPlaneTables.webhookTriggers.triggerId,
+          "trg_trigger_webhook_update_stale_invalid_template",
+        ),
+      );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/triggers/webhooks/trg_trigger_webhook_update_stale_invalid_template",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          name: "Unrelated rename",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      code: TriggerWebhooksBadRequestCodes.INVALID_WEBHOOK_TRIGGER_TEMPLATE_REFERENCES,
+    });
+    expect(JSON.stringify(body)).toContain("inputTemplate");
+    expect(JSON.stringify(body)).toContain("{{payload.not_real}}");
   });
 
   it("deletes the webhook trigger aggregate and cascades child rows", async ({ env }) => {

@@ -12255,6 +12255,7 @@ export interface paths {
                     | "INVALID_WEBHOOK_SOURCE_REFERENCE"
                     | "INVALID_WEBHOOK_TRIGGER_REQUIREMENTS"
                     | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
+                    | "INVALID_WEBHOOK_TRIGGER_TEMPLATE_REFERENCES"
                     | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE";
                   message: string;
                 }
