@@ -29,6 +29,8 @@ The aligned proposal should make these choices visible:
 
 It is acceptable to show an early Workflow blueprint if it is clearly framed as a proposal and Designer does not proceed into product mutation before alignment. It is not acceptable to treat the first Workflow blueprint as final, skip alignment, and immediately proceed into product mutation.
 
+The scripted follow-up chat response is the alignment signal for this case. Designer should use that response to proceed into repository selection, approval-boundary confirmation, status mapping, or profile configuration next steps. It should not use a dashboard decision request whose only purpose is accepting the initial blueprint.
+
 ## Desired Workflow
 
 The core Workflow blueprint should be concise. It should show the factory lifecycle, not every setup detail:
@@ -66,6 +68,7 @@ Designer should identify these required pieces:
 - GitHub CLI provider tool on the target profile
 - Linear Connected app
 - Linear MCP provider tool on the target profile
+- compatible Agent model-provider binding for the target Codex runtime, such as OpenAI
 - Linear workflow conventions, such as labels, statuses, issue template text, or a clear manual substitute
 - separate Mistle configuration for implementation and review roles when the product supports it, such as distinct sandbox profiles, triggers, instructions, or approval boundaries
 - Run actions for testing the factory, distinguishing supported session starts from future trigger simulation capability
@@ -85,6 +88,8 @@ If this is a new software process, Designer should offer to generate a workflow 
 Designer may pass before it can directly update Linear provider setup only if it clearly states what remains incomplete and why.
 
 Designer must not claim the configured agent is ready when any required provider tool or provider setup remains missing.
+
+Designer must not claim the configured agent is ready if the target profile lacks a compatible Agent model-provider binding for the selected runtime. When the binding is already configured, Designer should preserve it separately from GitHub and Linear provider-tool bindings and should not treat an empty `config.tools` value on the agent binding as missing provider tools.
 
 Designer must not claim the team process is ready if it has not defined issue readiness, workflow states, implementation/review responsibility, and feedback loops.
 

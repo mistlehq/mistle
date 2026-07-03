@@ -107,6 +107,7 @@ async function main(): Promise<void> {
       connectTimeoutMs: options.connectTimeoutMs,
     });
     const dashboardActions: DesignerEvalDashboardControlAction[] = [];
+    let activeTurnIndex = 0;
     let transcriptMarkdown = "";
     let serverRequestFailed = false;
     let rejectServerRequestFailure: (error: Error) => void = () => {};
@@ -151,8 +152,12 @@ async function main(): Promise<void> {
             request,
           });
           const handled = await adapter.handleServerRequest(request);
-          dashboardActions.push(handled.action);
-          await artifacts.writeDashboardAction(handled.action);
+          const action = {
+            ...handled.action,
+            turnIndex: activeTurnIndex,
+          };
+          dashboardActions.push(action);
+          await artifacts.writeDashboardAction(action);
           await rpcClient.respond(request.id, handled.response);
         } catch (error) {
           const failure = error instanceof Error ? error : new Error(String(error));
@@ -178,14 +183,22 @@ async function main(): Promise<void> {
         rpcClient,
         dynamicTools: DashboardControlDynamicToolSpecs,
       });
-      const completedTurn = await Promise.race([
-        waitForDesignerTurnCompletion({
-          rpcClient,
-          threadId: thread.threadId,
-          prompt: evalCase.prompt,
-        }),
-        serverRequestFailure,
-      ]);
+      const turnPrompts = [evalCase.prompt, ...(evalCase.followUpPrompts ?? [])];
+      let completedTurn: { threadId: string; turnId: string } | undefined;
+      for (const [turnIndex, prompt] of turnPrompts.entries()) {
+        activeTurnIndex = turnIndex;
+        completedTurn = await Promise.race([
+          waitForDesignerTurnCompletion({
+            rpcClient,
+            threadId: thread.threadId,
+            prompt,
+          }),
+          serverRequestFailure,
+        ]);
+      }
+      if (completedTurn === undefined) {
+        throw new Error("Designer eval case did not provide a prompt.");
+      }
       const threadRead = await readDesignerEvalCodexThread({
         rpcClient,
         threadId: completedTurn.threadId,

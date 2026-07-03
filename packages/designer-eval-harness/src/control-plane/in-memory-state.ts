@@ -27,7 +27,10 @@ export function createDesignerEvalSessionState(input: {
     runKey: input.runKey,
     seed: input.evalCase.seed,
   });
-  const availableProviderResources = createSeededProviderResources(input.evalCase.seed);
+  const availableProviderResources = createSeededProviderResources({
+    runKey: input.runKey,
+    seed: input.evalCase.seed,
+  });
   const now = new Date().toISOString();
 
   return {
@@ -111,6 +114,12 @@ function createSeededProviderConnections(input: {
 
   return [
     {
+      id: `icn_eval_${input.runKey}_agent`,
+      label: "OpenAI",
+      providerFamilyId: "openai",
+      targetKey: "openai-default",
+    },
+    {
       id: `icn_eval_${input.runKey}_repo`,
       label: "GitHub",
       providerFamilyId: "github",
@@ -119,16 +128,18 @@ function createSeededProviderConnections(input: {
   ];
 }
 
-function createSeededProviderResources(
-  seed: DesignerEvalSeed,
-): readonly DesignerEvalSeedProviderResource[] {
-  if (seed.providerResources !== undefined) {
-    return [...seed.providerResources];
+function createSeededProviderResources(input: {
+  runKey: string;
+  seed: DesignerEvalSeed;
+}): readonly DesignerEvalSeedProviderResource[] {
+  if (input.seed.providerResources !== undefined) {
+    return [...input.seed.providerResources];
   }
 
-  const githubConnection = seed.providerConnections?.find(
-    (connection) => connection.providerFamilyId === "github",
-  );
+  const githubConnection = createSeededProviderConnections({
+    runKey: input.runKey,
+    seed: input.seed,
+  }).find((connection) => connection.providerFamilyId === "github");
   if (githubConnection === undefined) {
     return [];
   }

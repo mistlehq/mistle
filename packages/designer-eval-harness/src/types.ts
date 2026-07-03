@@ -2,6 +2,7 @@ export type DesignerEvalCase = {
   id: string;
   expectedOutcomePath: string;
   prompt: string;
+  followUpPrompts?: readonly string[] | undefined;
   seed: DesignerEvalSeed;
   scriptedInputs: Record<string, DesignerEvalInputResponse>;
   assertions: readonly DesignerEvalAssertion[];
@@ -61,6 +62,10 @@ export type DesignerEvalAssertion =
       kind: "blueprint-before-product-mutation";
     }
   | {
+      kind: "product-mutation-not-before-turn";
+      minTurnIndex: number;
+    }
+  | {
       kind: "blueprint-core-node-count-at-most";
       maxItems: number;
     }
@@ -76,6 +81,11 @@ export type DesignerEvalAssertion =
       kind: "required-binding-tools-present";
       connectionId: string;
       tools: readonly string[];
+    }
+  | {
+      kind: "required-agent-model-provider-binding";
+      connectionId: string;
+      compatibleTargetKeys: readonly string[];
     }
   | {
       kind: "setup-incompleteness-disclosed";
@@ -117,6 +127,7 @@ export type DesignerEvalDashboardControlAction =
   | {
       sequence: number;
       kind: "show_designer_canvas_tab";
+      turnIndex?: number | undefined;
       tabKind: "route" | "blueprint";
       input: unknown;
       response: unknown;
@@ -124,6 +135,7 @@ export type DesignerEvalDashboardControlAction =
   | {
       sequence: number;
       kind: "request_user_input";
+      turnIndex?: number | undefined;
       inputId: string;
       input: unknown;
       response: unknown;
@@ -131,6 +143,7 @@ export type DesignerEvalDashboardControlAction =
   | {
       sequence: number;
       kind: "unsupported";
+      turnIndex?: number | undefined;
       method: string;
       input: unknown;
       response: unknown;

@@ -9,6 +9,7 @@ For AI software factory cases, the expected outcome is an operable team process,
 Use deterministic checks for facts the harness can inspect directly:
 
 - whether a blueprint appeared before product mutation
+- whether dashboard-mediated product mutation waited until the required follow-up turn
 - which dashboard-control actions ran
 - which provider resources were saved
 - which integration bindings and provider tools are present
@@ -42,10 +43,18 @@ The judge must not override deterministic evidence. If product state lacks a req
 Each case should define:
 
 - a user prompt
+- optional follow-up user prompts for chat-based alignment after an initial proposal
 - seeded product state
 - scripted user inputs
 - expected outcome document
 - deterministic assertions
+
+Use follow-up prompts when the user response is alignment in chat. Use scripted
+user inputs only for concrete dashboard decision requests such as repository
+selection, status mapping, approval boundary, setup completion, or Run action
+approval. Do not script dashboard requests whose only purpose is accepting a
+broad blueprint; Designer should ask the user to respond in chat or comment on
+the blueprint instead.
 
 The expected outcome document is the contract. It should describe what the user would consider complete and which missing capabilities must be disclosed rather than hidden.
 
