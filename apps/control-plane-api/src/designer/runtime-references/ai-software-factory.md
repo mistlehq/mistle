@@ -172,14 +172,14 @@ For Linear and GitHub, Designer should identify these pieces:
 - GitHub CLI provider tool when the agent must branch, commit, or open pull requests
 - implementation profile or instructions
 - review profile or instructions when a separate review role is recommended
-- trigger and publishing steps that still require explicit approval
+- trigger and publishing configuration that still needs to be completed
 - Run actions for testing the factory, such as starting a session today or simulating a trigger only when product tooling supports it
 
 Do not claim the factory is ready if provider setup, labels, statuses, trigger creation, publishing, or profile capability remains incomplete. When Linear setup is incomplete, explicitly say in the final handoff that Linear labels and statuses still need setup or confirmation, even if the chosen pickup rule uses only one `Ready` status.
 
 If the current sandbox profile draft already has required provider tools such as `linear-mcp` or `github-cli`, do not describe those tools as missing or still needing to be bound. Instead, distinguish configured draft capabilities from remaining setup such as instructions, labels, statuses, publishing, and triggers.
 
-When the selected approval boundary requires approval before provider writes, describe the workflow outputs as a PR proposal and Linear update proposal until approval is granted. Do not say the factory will create PRs or post Linear updates directly in that mode.
+When the selected runtime approval boundary requires approval before provider writes, describe the workflow outputs as a PR proposal and Linear update proposal until runtime approval is granted. Do not say the factory will create PRs or post Linear updates directly in that mode.
 
 If Designer cannot edit profile instructions or publish in the current session, do not narrate internal tool checks. Say the user-relevant blocker directly: profile instructions, publishing, or trigger creation must be completed in the opened dashboard/profile UI or in a session with product mutation tools.
 

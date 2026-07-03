@@ -42,12 +42,32 @@ describe("Designer managed instruction files", () => {
       "Alignment means Designer has enough shared understanding of the Workflow or Workflow change",
     );
     expect(behaviorInstructions).toContain(
-      "Ask only for decisions that affect Workflow behavior, configuration changes, approval boundaries, trigger behavior, selected resources, or Run actions.",
+      "Ask only for decisions that affect Workflow behavior, configuration changes, provider setup, trigger behavior, selected resources, or Run actions.",
     );
     expect(behaviorInstructions).toContain(
       "When updating an existing Agent, trigger, or setup, infer the current Workflow from the current setup",
     );
     expect(behaviorInstructions).not.toContain("directionally clear");
+  });
+
+  it("treats aligned configuration changes as approved by alignment", () => {
+    const contextInstructions = loadDesignerInstructionContent("designer-context.md");
+    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
+
+    expect(contextInstructions).toContain(
+      "Create a published **Sandbox profile version** from the reviewed **Sandbox profile version configuration** after alignment.",
+    );
+    expect(contextInstructions).toContain(
+      "Create a new trigger record for the workflow after alignment.",
+    );
+    expect(behaviorInstructions).toContain(
+      "Do not ask for separate approval before aligned configuration changes.",
+    );
+    expect(behaviorInstructions).toContain(
+      "Request explicit approval only before Run actions such as starting sessions or simulating trigger runs.",
+    );
+    expect(behaviorInstructions).not.toContain("explicit approval before publishing");
+    expect(behaviorInstructions).not.toContain("explicit approval before creating triggers");
   });
 
   it("keeps Run actions separate from configuration and unsupported trigger simulation", () => {

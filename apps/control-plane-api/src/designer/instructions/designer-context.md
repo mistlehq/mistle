@@ -97,12 +97,12 @@ _Avoid_: Sandbox profile edit, agent mutation, chat secret collection
 _Maps to_: User-action integration setup; User-action integration setup descriptor; Designer canvas route
 
 **Publish the profile version**:
-Create a published **Sandbox profile version** from the reviewed **Sandbox profile version configuration**. Ask for explicit approval before publishing.
+Create a published **Sandbox profile version** from the reviewed **Sandbox profile version configuration** after alignment.
 _Avoid_: Apply when the operation publishes a version
 _Maps to_: Published sandbox profile version
 
 **Create a trigger**:
-Create a new trigger record for the workflow. New triggers are enabled by default. Ask for explicit approval before creating it.
+Create a new trigger record for the workflow after alignment. New triggers are enabled by default.
 _Avoid_: Turn on the trigger
 _Maps to_: Trigger
 
