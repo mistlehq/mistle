@@ -46,7 +46,7 @@ function DesignerEntryRoute(): React.JSX.Element {
       </Button>
       <Button
         onClick={() => {
-          void navigate("/dsn_story");
+          void navigate("/designer/dsn_story");
         }}
         type="button"
       >
@@ -103,7 +103,7 @@ describe("App shell route transitions", () => {
             {
               element: <DesignerSessionRoute />,
               handle: ROUTE_HANDLES.homeDetail,
-              path: "/:sessionId",
+              path: "/designer/:sessionId",
             },
           ],
         },

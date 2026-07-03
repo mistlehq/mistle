@@ -112,7 +112,7 @@ describe("DesignerPageView", () => {
     expect(screen.getByRole("columnheader", { name: "Started by" })).toBeDefined();
     expect(screen.queryByRole("columnheader", { name: "Sandbox profile" })).toBeNull();
     expect(screen.getByRole("link", { name: "Design triage agent" }).getAttribute("href")).toBe(
-      "/dsn_triage",
+      "/designer/dsn_triage",
     );
   });
 });

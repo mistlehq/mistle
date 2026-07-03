@@ -19,11 +19,18 @@ describe("app routes", () => {
     expect(leafRoute?.path).toBe("/p/ports/:slug");
   });
 
-  it("routes root Designer session ids through the home detail route", () => {
-    const matches = matchRoutes(APP_ROUTES, "/dsn_test");
+  it("routes Designer session ids through the Designer detail route", () => {
+    const matches = matchRoutes(APP_ROUTES, "/designer/dsn_test");
     const leafRoute = matches?.at(-1)?.route;
 
     expect(leafRoute?.path).toBe(":sessionId");
+  });
+
+  it("does not route root Designer session ids", () => {
+    const matches = matchRoutes(APP_ROUTES, "/dsn_test");
+    const leafRoute = matches?.at(-1)?.route;
+
+    expect(leafRoute?.path).toBe("*");
   });
 
   it("keeps explicit sessions routes ahead of the root Designer session route", () => {

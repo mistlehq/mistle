@@ -426,6 +426,11 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
             detailTargetKey: route.targetKey,
             locationState: embeddedLocationState,
             navigate: navigateEmbeddedCanvasRoute,
+            redirectReturnContext: {
+              kind: "designer-canvas",
+              designerSessionId: params.designerSessionId,
+              canvasTabId: params.id,
+            },
             searchParams: route.searchParams,
             setSearchParams: (nextSearchParams) => {
               const nextHref = buildDesignerCanvasHref({

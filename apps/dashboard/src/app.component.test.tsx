@@ -23,16 +23,20 @@ const AuthenticatedSession = {
 } satisfies AuthenticatedSessionData;
 
 describe("app routes", () => {
-  it.each(["/designer", "/not-a-designer-session", "/dsn_", "/dsn_!"])(
-    "redirects invalid single-segment path %s to home",
-    async (initialPath) => {
-      const router = renderAuthenticatedAppRoute(initialPath);
+  it.each([
+    "/designer",
+    "/designer/blueprints/current",
+    "/not-a-designer-session",
+    "/dsn_test",
+    "/dsn_",
+    "/dsn_!",
+  ])("redirects invalid app path %s to home", async (initialPath) => {
+    const router = renderAuthenticatedAppRoute(initialPath);
 
-      await waitFor(() => {
-        expect(router.state.location.pathname).toBe("/");
-      });
-    },
-  );
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/");
+    });
+  });
 });
 
 function renderAuthenticatedAppRoute(initialPath: string): ReturnType<typeof createMemoryRouter> {

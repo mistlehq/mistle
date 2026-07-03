@@ -4,7 +4,10 @@ import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { resolveFormConnectionMethodProviderAppSetupStartAction } from "../integrations/integration-connection-method-metadata.js";
-import type { IntegrationConnectionMethod } from "../integrations/integrations-service-shared.js";
+import type {
+  IntegrationConnectionMethod,
+  IntegrationRedirectReturnContext,
+} from "../integrations/integrations-service-shared.js";
 import {
   deleteIntegrationConnection,
   startRedirectProviderAppSetup,
@@ -53,6 +56,7 @@ export function useIntegrationConnectionEditors(input: {
   connections: readonly IntegrationConnection[];
   connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
   queryKey: readonly ["settings", "integrations", "directory"];
+  redirectReturnContext?: IntegrationRedirectReturnContext;
 }) {
   const queryClient = useQueryClient();
   const [connectionNameErrorMessageById, setConnectionNameErrorMessageById] = useState<
@@ -129,6 +133,7 @@ export function useIntegrationConnectionEditors(input: {
   const startProviderAppSetupMutation = useMutation({
     mutationFn: async (payload: {
       connectionId: string;
+      returnContext?: IntegrationRedirectReturnContext;
       routeSegment: string;
       startErrorMessage: string;
       unexpectedResultMessage: string;
@@ -247,6 +252,9 @@ export function useIntegrationConnectionEditors(input: {
         try {
           const startedInstallation = await startProviderAppSetupMutation.mutateAsync({
             connectionId,
+            ...(input.redirectReturnContext === undefined
+              ? {}
+              : { returnContext: input.redirectReturnContext }),
             routeSegment: startAction.routeSegment,
             startErrorMessage: startAction.startErrorMessage,
             unexpectedResultMessage: startAction.unexpectedResultMessage,
