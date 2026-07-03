@@ -7,7 +7,7 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import type { DesignerSession } from "../designer/designer-service.js";
-import { DesignerPageView } from "./designer-page-view.js";
+import { DesignerPageComposerContainerClassName, DesignerPageView } from "./designer-page-view.js";
 
 const SampleDesignerSession = {
   id: "dsn_triage",
@@ -86,8 +86,15 @@ describe("DesignerPageView", () => {
     const composer = screen.getByRole("textbox");
     const startButton = screen.getByRole("button", { name: "Start Designer session" });
 
+    const heading = screen.getByRole("heading", { name: "Build an agent workflow" });
+
+    expect(heading).toBeDefined();
+    expect(heading.parentElement).toHaveProperty(
+      "className",
+      DesignerPageComposerContainerClassName,
+    );
     expect(composer.getAttribute("aria-placeholder")).toBe(
-      "Build a triaging agent for incoming GitHub issues and Linear bugs.",
+      "Ask Mistle to build an engineering agent that...",
     );
     expect(startButton).toHaveProperty("disabled", true);
     expect(screen.queryByText("What do you want to build?")).toBeNull();
