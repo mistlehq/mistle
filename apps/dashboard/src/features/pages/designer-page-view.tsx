@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 
 import { ErrorNotice } from "../auth/error-notice.js";
 import { ChatComposer } from "../chat/components/chat-composer.js";
+import { createDesignerSessionPath } from "../designer/designer-routes.js";
 import type { DesignerSessionListItem } from "../designer/designer-service.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
@@ -510,7 +511,7 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
                 <TableBody>
                   {input.sessions.map((session) => {
                     const sessionTitle = formatDesignerSessionTitle(session);
-                    const sessionHref = `/${encodeURIComponent(session.id)}`;
+                    const sessionHref = createDesignerSessionPath(session.id);
 
                     return (
                       <TableRow

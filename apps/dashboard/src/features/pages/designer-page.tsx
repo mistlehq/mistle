@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
+import { createDesignerSessionPath } from "../designer/designer-routes.js";
 import {
   createDesignerSession,
   designerSessionsQueryKey,
@@ -25,7 +26,7 @@ export function DesignerPage(): React.JSX.Element {
       }),
     onSuccess: (session) => {
       void queryClient.invalidateQueries({ queryKey: designerSessionsQueryKey });
-      void navigate(`/${encodeURIComponent(session.id)}`);
+      void navigate(createDesignerSessionPath(session.id));
     },
   });
 

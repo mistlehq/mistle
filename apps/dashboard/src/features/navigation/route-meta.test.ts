@@ -236,7 +236,7 @@ describe("route breadcrumb metadata", () => {
             description: "",
           },
           params: {},
-          pathname: "/dsn_123",
+          pathname: "/designer/dsn_123",
         },
       ]),
     ).toEqual({
