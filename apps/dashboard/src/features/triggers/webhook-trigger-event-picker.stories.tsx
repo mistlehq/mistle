@@ -70,6 +70,8 @@ const StorySlackReactionAddedConditionId = conditionId(StorySlackReactionAddedTr
 const StorySlackReactionRemovedConditionId = conditionId(StorySlackReactionRemovedTriggerId);
 const SlackUserGroupAccessErrorMessage =
   "Slack returned missing_scope while listing user groups. Reinstall the Slack app with usergroups:read.";
+const SlackUserGroupCredentialErrorMessage =
+  "Slack returned invalid_auth while listing user groups. Reconnect this Slack connection.";
 
 const StorySlackUserGroupResourcesEmptyReady = createSlackUserGroupResources({
   connectionId: StorySlackConnectionId,
@@ -84,7 +86,15 @@ const StorySlackUserGroupResourcesSyncingEmpty: IntegrationConnectionResources =
 const StorySlackUserGroupResourcesSyncFailedEmpty: IntegrationConnectionResources = {
   ...StorySlackUserGroupResourcesEmptyReady,
   syncState: "error",
+  lastErrorCode: "resource_sync_permission_denied",
   lastErrorMessage: SlackUserGroupAccessErrorMessage,
+};
+
+const StorySlackUserGroupResourcesCredentialFailedEmpty: IntegrationConnectionResources = {
+  ...StorySlackUserGroupResourcesEmptyReady,
+  syncState: "error",
+  lastErrorCode: "resource_sync_credential_failed",
+  lastErrorMessage: SlackUserGroupCredentialErrorMessage,
 };
 
 const StorySlackUserGroupResourcesSyncFailedWithSnapshot: IntegrationConnectionResources = {
@@ -101,6 +111,7 @@ const StorySlackUserGroupResourcesSyncFailedWithSnapshot: IntegrationConnectionR
     ],
   }),
   syncState: "error",
+  lastErrorCode: "resource_sync_permission_denied",
   lastErrorMessage: SlackUserGroupAccessErrorMessage,
 };
 
@@ -610,19 +621,33 @@ export const SlackUserGroupMentionSyncingEmpty: Story = {
 };
 
 export const SlackUserGroupMentionSyncFailedEmpty: Story = {
-  name: "Slack user group mention - sync failed empty",
+  name: "Slack user group mention - provider access failed empty",
   args: createSlackUserGroupMentionArgs({
     slackUserGroupResources: StorySlackUserGroupResourcesSyncFailedEmpty,
   }),
   play: async ({ canvasElement }): Promise<void> => {
     const body = await openSlackUserGroupMentionPicker(canvasElement);
 
+    await expect(body.getByText("Provider access needs repair.")).toBeVisible();
     await expect(body.getByText(SlackUserGroupAccessErrorMessage)).toBeVisible();
   },
 };
 
+export const SlackUserGroupMentionCredentialFailedEmpty: Story = {
+  name: "Slack user group mention - credentials failed empty",
+  args: createSlackUserGroupMentionArgs({
+    slackUserGroupResources: StorySlackUserGroupResourcesCredentialFailedEmpty,
+  }),
+  play: async ({ canvasElement }): Promise<void> => {
+    const body = await openSlackUserGroupMentionPicker(canvasElement);
+
+    await expect(body.getByText("Connection credentials need repair.")).toBeVisible();
+    await expect(body.getByText(SlackUserGroupCredentialErrorMessage)).toBeVisible();
+  },
+};
+
 export const SlackUserGroupMentionSyncFailedWithSnapshot: Story = {
-  name: "Slack user group mention - sync failed with snapshot",
+  name: "Slack user group mention - provider access failed with snapshot",
   args: createSlackUserGroupMentionArgs({
     eventParameterRules: {
       [StorySlackAppMentionConditionId]: {
@@ -636,6 +661,7 @@ export const SlackUserGroupMentionSyncFailedWithSnapshot: Story = {
     const body = await openSlackUserGroupMentionPicker(canvasElement);
 
     await expect(body.getByText("@eng-oncall")).toBeVisible();
+    await expect(body.getByText("Provider access needs repair.")).toBeVisible();
     await expect(body.getByText(SlackUserGroupAccessErrorMessage)).toBeVisible();
   },
 };

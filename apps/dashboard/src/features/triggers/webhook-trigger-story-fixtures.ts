@@ -337,6 +337,7 @@ export const StoryGitHubTeamResourcesSyncFailed: IntegrationConnectionResources 
   familyId: "github",
   kind: "team",
   syncState: "error",
+  lastErrorCode: "resource_sync_permission_denied",
   lastErrorMessage:
     "GitHub returned 403 while listing teams. Reapprove Members read permission for this installation.",
   items: [],
