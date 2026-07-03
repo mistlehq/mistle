@@ -1,5 +1,7 @@
 # AI Software Factory Workflow Reference
 
+## When To Use
+
 Use this reference when a user asks for an AI software factory, issue-to-PR factory, engineering agent workflow, autonomous coding workflow, or similar process that turns issue-system work into code changes and review.
 
 There is no single correct AI software factory. Design the operating process that fits the user's issue system, repository system, review standards, and trust level.
