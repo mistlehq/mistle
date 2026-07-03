@@ -48,6 +48,10 @@ describe("Designer managed instruction files", () => {
     expect(getSection(behaviorInstructions, "## Alignment")).toContain("Workflow");
     expect(getSection(behaviorInstructions, "## Alignment")).toContain("configuration change");
     expect(getSection(behaviorInstructions, "## Alignment")).toContain("Run action");
+    expect(getSection(behaviorInstructions, "## Alignment")).toContain(
+      "not as alignment by itself",
+    );
+    expect(getSection(behaviorInstructions, "## Alignment")).toContain("comments on the blueprint");
     expect(getSection(behaviorInstructions, "## Configuration Dependencies")).toContain(
       "App setup",
     );
@@ -60,6 +64,9 @@ describe("Designer managed instruction files", () => {
     expect(getSection(behaviorInstructions, "## Configuration Dependencies")).toContain("triggers");
     expect(getSection(behaviorInstructions, "## Decision Requests")).toContain(
       "dashboard decision request",
+    );
+    expect(getSection(behaviorInstructions, "## Decision Requests")).toContain(
+      "Do not use a dashboard decision request just to ask whether the blueprint is accepted",
     );
     expect(getSection(behaviorInstructions, "## Workflow Blueprint Rules")).toContain(
       "Workflow blueprint",
