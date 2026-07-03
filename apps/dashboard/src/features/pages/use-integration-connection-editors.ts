@@ -52,6 +52,21 @@ function resolveProviderAppSetupStartActionOrThrow(input: {
   return startAction;
 }
 
+export function buildIntegrationConnectionReauthorizationStartPayload(input: {
+  connectionId: string;
+  redirectReturnContext?: IntegrationRedirectReturnContext;
+}): {
+  connectionId: string;
+  returnContext?: IntegrationRedirectReturnContext;
+} {
+  return {
+    connectionId: input.connectionId,
+    ...(input.redirectReturnContext === undefined
+      ? {}
+      : { returnContext: input.redirectReturnContext }),
+  };
+}
+
 export function useIntegrationConnectionEditors(input: {
   connections: readonly IntegrationConnection[];
   connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
@@ -141,8 +156,10 @@ export function useIntegrationConnectionEditors(input: {
   });
 
   const startReauthorizationMutation = useMutation({
-    mutationFn: async (payload: { connectionId: string }) =>
-      startRedirectIntegrationConnectionReauthorization(payload),
+    mutationFn: async (payload: {
+      connectionId: string;
+      returnContext?: IntegrationRedirectReturnContext;
+    }) => startRedirectIntegrationConnectionReauthorization(payload),
   });
 
   const editingApiKeyConnection =
@@ -286,9 +303,14 @@ export function useIntegrationConnectionEditors(input: {
         }));
 
         try {
-          const startedReauthorization = await startReauthorizationMutation.mutateAsync({
-            connectionId,
-          });
+          const startedReauthorization = await startReauthorizationMutation.mutateAsync(
+            buildIntegrationConnectionReauthorizationStartPayload({
+              connectionId,
+              ...(input.redirectReturnContext === undefined
+                ? {}
+                : { redirectReturnContext: input.redirectReturnContext }),
+            }),
+          );
           globalThis.location.assign(startedReauthorization.authorizationUrl);
         } catch (error) {
           const errorMessage = resolveApiErrorMessage({
