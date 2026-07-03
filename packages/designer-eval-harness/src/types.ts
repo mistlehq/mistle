@@ -66,10 +66,6 @@ export type DesignerEvalAssertion =
       minTurnIndex: number;
     }
   | {
-      kind: "blueprint-core-node-count-at-most";
-      maxItems: number;
-    }
-  | {
       kind: "blueprint-has-provider-lifecycle";
       requiredConcepts: readonly string[];
     }

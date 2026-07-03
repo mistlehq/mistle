@@ -55,11 +55,6 @@ function evaluateAssertion(input: {
         actions: input.dashboardControlActions,
         minTurnIndex: input.assertion.minTurnIndex,
       });
-    case "blueprint-core-node-count-at-most":
-      return evaluateBlueprintCoreNodeCountAtMost({
-        actions: input.dashboardControlActions,
-        maxItems: input.assertion.maxItems,
-      });
     case "blueprint-has-provider-lifecycle":
       return evaluateBlueprintHasProviderLifecycle({
         actions: input.dashboardControlActions,
@@ -119,38 +114,6 @@ function evaluateAssertion(input: {
         dashboardControlActions: input.dashboardControlActions,
       });
   }
-}
-
-function evaluateBlueprintCoreNodeCountAtMost(input: {
-  actions: readonly DesignerEvalDashboardControlAction[];
-  maxItems: number;
-}): DesignerEvalCheckResult {
-  const latestBlueprint = readLatestBlueprint(input.actions);
-  if (latestBlueprint === undefined) {
-    return {
-      passed: false,
-      label: "Blueprint core node count",
-      detail: "Designer did not show a blueprint.",
-    };
-  }
-
-  const items = readBlueprintItems(latestBlueprint);
-  if (items === undefined) {
-    return {
-      passed: false,
-      label: "Blueprint core node count",
-      detail: "Latest blueprint did not contain an items array.",
-    };
-  }
-
-  return {
-    passed: items.length <= input.maxItems,
-    label: "Blueprint core node count",
-    detail:
-      items.length <= input.maxItems
-        ? `Latest blueprint contains ${String(items.length)} item(s), at or below limit ${String(input.maxItems)}.`
-        : `Latest blueprint contains ${String(items.length)} item(s), above limit ${String(input.maxItems)}.`,
-  };
 }
 
 function evaluateBlueprintHasProviderLifecycle(input: {

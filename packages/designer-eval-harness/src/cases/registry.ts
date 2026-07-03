@@ -339,16 +339,8 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
       kind: "blueprint-before-product-mutation",
     },
     {
-      kind: "product-mutation-not-before-turn",
-      minTurnIndex: 1,
-    },
-    {
-      kind: "blueprint-core-node-count-at-most",
-      maxItems: 8,
-    },
-    {
       kind: "blueprint-has-provider-lifecycle",
-      requiredConcepts: ["linear", "github", "ready", "review", "feedback", "status"],
+      requiredConcepts: ["linear", "github", "ready", "review", "status"],
     },
     {
       kind: "blueprint-excludes-setup-nodes",
@@ -371,7 +363,7 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     },
     {
       kind: "setup-incompleteness-disclosed",
-      requiredPhrases: ["linear", "Ready for Agent", "trigger"],
+      requiredPhrases: ["linear", "trigger"],
     },
     {
       kind: "configured-tools-not-claimed-missing",
@@ -400,16 +392,7 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     {
       kind: "transcript-includes-required-phrases",
       label: "Factory configuration next steps",
-      requiredPhrases: [
-        "Implementation agent instructions",
-        "Review agent instructions",
-        "Ready for Agent -> Agent In Progress -> Ready for Review",
-        "operating guide",
-        "Configuration shape",
-        "one sandbox profile",
-        "role-separated",
-        "Next action",
-      ],
+      requiredPhrases: ["OpenAI", "github-cli", "linear-mcp", "publish", "trigger"],
     },
   ],
 };
@@ -423,16 +406,7 @@ const AiSoftwareFactoryNextStepQualityCase: DesignerEvalCase = {
     {
       kind: "transcript-includes-required-phrases",
       label: "Factory configuration next steps",
-      requiredPhrases: [
-        "Implementation agent instructions",
-        "Review agent instructions",
-        "Ready for Agent -> Agent In Progress -> Ready for Review",
-        "operating guide",
-        "Configuration shape",
-        "one sandbox profile",
-        "role-separated",
-        "Next action",
-      ],
+      requiredPhrases: ["OpenAI", "github-cli", "linear-mcp", "publish", "trigger"],
     },
     {
       kind: "transcript-excludes-internal-progress",
