@@ -43,7 +43,7 @@ describe("Designer runtime reference files", () => {
     expect(setupFile?.content).toContain("Implementation agent instructions");
     expect(setupFile?.content).toContain("Review agent instructions");
     expect(setupFile?.content).toContain("Linear status mapping");
-    expect(setupFile?.content).toContain("Human operating guide");
+    expect(setupFile?.content).toContain("Workflow operating guide");
     expect(setupFile?.content).toContain("Configuration shape");
     expect(setupFile?.content).toContain("Next action");
     expect(setupFile?.content).toContain("Run actions for testing the factory");

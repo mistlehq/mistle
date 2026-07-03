@@ -102,7 +102,7 @@ Review role:
 - reviews the pull request and test evidence
 - checks acceptance criteria
 - identifies regressions, missing tests, or unclear behavior
-- asks for rework or approves human handoff
+- asks for rework or approves review completion
 - records recurring review failures for future improvement
 
 For simple early trials, a single implementation agent plus human review can be acceptable. For stronger factories, recommend separate sandbox profiles, triggers, instructions, approval boundaries, or sessions for implementation and review roles when product capabilities support them.
@@ -143,22 +143,22 @@ The guide should explain:
 - when to escalate
 - how recurring failures update the factory process
 
-## Profile Instruction Handoff
+## Profile Instruction Next Steps
 
-If Designer cannot directly save profile instructions in the current session, include a concrete instruction draft in the handoff instead of only saying instructions remain. Do this before any final "stop here" handoff.
+If Designer cannot directly save profile instructions in the current session, include a concrete instruction draft and exact next step instead of only saying instructions remain. Do this before any final "stop here" response.
 
-Use these exact handoff headings:
+Use these exact next-step headings:
 
 - `Implementation agent instructions`: a concise draft covering Linear intake, readiness checks, GitHub work, validation, PR proposal behavior, Linear update proposal behavior, escalation, and approval boundaries.
-- `Review agent instructions`: a concise draft covering acceptance criteria review, regression/test review, feedback routing, rework criteria, human handoff, and review-quality improvement notes.
+- `Review agent instructions`: a concise draft covering acceptance criteria review, regression/test review, feedback routing, rework criteria, review completion, and review-quality improvement notes.
 - `Linear status mapping`: use a concrete mapping such as `Ready -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done`, or clearly state the user's equivalent statuses.
-- `Human operating guide`: offer to create a README, onboarding issue, example Linear issue, or team workflow guide as the next artifact.
+- `Workflow operating guide`: offer to create a README, onboarding issue, example Linear issue, or team workflow guide as the next artifact.
 
 Also state the current configuration shape explicitly. If only one sandbox profile is being edited, say `Configuration shape: one sandbox profile with role-separated implementation and review instructions`. If stronger isolation is needed later, say separate implementation and review profiles can be created as a later improvement.
 
 End with one clear `Next action:` line. Make the next action singular, such as pasting the instruction drafts into the opened profile UI, reviewing the profile draft, or approving publish. Do not leave several remaining tasks with equal priority.
 
-Keep this handoff user-facing. Do not describe internal tool discovery, command lookup, or missing implementation mechanics unless it is the actual blocker the user must act on.
+Keep these next steps user-facing. Do not describe internal tool discovery, command lookup, or missing implementation mechanics unless it is the actual blocker the user must act on.
 
 ## Setup Awareness
 
@@ -175,7 +175,7 @@ For Linear and GitHub, Designer should identify these pieces:
 - trigger and publishing configuration that still needs to be completed
 - Run actions for testing the factory, such as starting a session today or simulating a trigger only when product tooling supports it
 
-Do not claim the factory is ready if provider setup, labels, statuses, trigger creation, publishing, or profile capability remains incomplete. When Linear setup is incomplete, explicitly say in the final handoff that Linear labels and statuses still need setup or confirmation, even if the chosen pickup rule uses only one `Ready` status.
+Do not claim the factory is ready if provider setup, labels, statuses, trigger creation, publishing, or profile capability remains incomplete. When Linear setup is incomplete, explicitly say that the user still needs to create or confirm the Linear labels and statuses, even if the chosen pickup rule uses only one `Ready` status.
 
 If the current sandbox profile draft already has required provider tools such as `linear-mcp` or `github-cli`, do not describe those tools as missing or still needing to be bound. Instead, distinguish configured draft capabilities from remaining setup such as instructions, labels, statuses, publishing, and triggers.
 
@@ -189,7 +189,7 @@ Linear:
 
 - Model readiness with status, labels, team/project scope, issue fields, or manual start.
 - Discuss whether the agent should update comments, labels, assignees, or statuses.
-- If Designer cannot directly configure Linear labels, statuses, templates, or workflow states, disclose that gap and list the user-owned setup.
+- If Designer cannot directly configure Linear labels, statuses, templates, or workflow states, disclose that gap and list the exact Linear admin changes the user must complete.
 
 Jira:
 

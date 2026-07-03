@@ -4,6 +4,7 @@
 
 import { IntegrationConnectionStatuses } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import { SlackConnectionMethodIds } from "@mistle/integrations-definitions";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 import { z } from "zod";
@@ -20,6 +21,8 @@ import { callMcpTool, listMcpTools } from "./helpers/mcp-json-rpc.js";
 const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
+
+const SlackAppId = "A0123456789";
 
 const FormSetupDescriptorSchema = z
   .object({
@@ -101,6 +104,16 @@ const SetupStatusSchema = z
                 setupComplete: z.boolean(),
                 methodId: z.string().min(1).optional(),
                 configuredSecretNames: z.array(z.string().min(1)),
+                repairAction: z
+                  .object({
+                    id: z.string().min(1),
+                    title: z.string().min(1),
+                    description: z.string().min(1).optional(),
+                    actionLabel: z.string().min(1),
+                    pendingLabel: z.string().min(1),
+                  })
+                  .strict()
+                  .optional(),
                 createdAt: z.string().min(1),
                 updatedAt: z.string().min(1),
               })
@@ -536,6 +549,95 @@ describe.concurrent("MCP integration tools", () => {
     ]);
   });
 
+  it("reports Slack bot identity repair in compact setup status", async ({ env }) => {
+    await seedSlackTarget(env, {
+      targetKey: "slack-default-mcp-setup-status-repair",
+    });
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-integration-slack-setup-status-repair@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP Slack setup status reader",
+      permissions: [
+        OrganizationPermissions.INTEGRATION_CONNECTION_READ,
+        OrganizationPermissions.INTEGRATION_CONNECTION_UPDATE,
+      ],
+    });
+    const createResponse = await createFormConnection({
+      env,
+      targetKey: "slack-default-mcp-setup-status-repair",
+      cookie: session.cookie,
+      body: CreateFormConnectionBodySchema.parse({
+        displayName: "Slack bot token",
+        methodId: SlackConnectionMethodIds.SLACK_APP,
+        config: {
+          connection_method: SlackConnectionMethodIds.SLACK_APP,
+          app_id: SlackAppId,
+        },
+        secrets: {
+          botToken: "xoxb-test-bot-token",
+          signingSecret: "slack-signing-secret",
+        },
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await createResponse.json(),
+    );
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "integration_setup_status_get",
+      arguments: {
+        targetKey: "slack-default-mcp-setup-status-repair",
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const status = SetupStatusSchema.parse(result.structuredContent);
+    expect(status.items[0]?.setup.requiresSetup).toBe(false);
+    expect(status.items[0]?.connections).toEqual([
+      expect.objectContaining({
+        connectionId: createdConnection.id,
+        status: IntegrationConnectionStatuses.ACTIVE,
+        setupComplete: false,
+        methodId: SlackConnectionMethodIds.SLACK_APP,
+        repairAction: {
+          id: "slack-bot-identity",
+          title: "Slack bot identity missing",
+          description:
+            "This connection needs its Slack bot identity before Slack thread routing can be enabled.",
+          actionLabel: "Fix Slack bot identity",
+          pendingLabel: "Fixing...",
+        },
+      }),
+    ]);
+
+    const getResult = await callMcpTool({
+      env,
+      token,
+      name: "integration_connection_get",
+      arguments: {
+        connectionId: createdConnection.id,
+      },
+    });
+    expect(getResult.isError).toBeUndefined();
+    expect(getResult.structuredContent).toMatchObject({
+      id: createdConnection.id,
+      repairAction: {
+        id: "slack-bot-identity",
+        title: "Slack bot identity missing",
+        description:
+          "This connection needs its Slack bot identity before Slack thread routing can be enabled.",
+        actionLabel: "Fix Slack bot identity",
+        pendingLabel: "Fixing...",
+      },
+    });
+  });
+
   it("strips declared secret field names from MCP connection config projections", async ({
     env,
   }) => {
@@ -708,6 +810,22 @@ async function seedGitHubTarget(env: Parameters<typeof seedIntegrationTarget>[0]
     config: {
       api_base_url: "https://api.github.com",
       web_base_url: "https://github.com",
+    },
+  });
+}
+
+async function seedSlackTarget(
+  env: Parameters<typeof seedIntegrationTarget>[0],
+  input: {
+    targetKey: string;
+  },
+): Promise<void> {
+  await seedIntegrationTarget(env, {
+    targetKey: input.targetKey,
+    familyId: "slack",
+    variantId: "slack-default",
+    config: {
+      api_base_url: "https://slack.com/api",
     },
   });
 }

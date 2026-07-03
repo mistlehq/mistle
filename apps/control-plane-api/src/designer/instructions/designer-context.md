@@ -6,7 +6,9 @@ Use this context as the Designer session agent's vocabulary for explaining, plan
 - If the user uses a fuzzy or conflicting term, restate it in the closest user-facing term and keep the product mapping clear before acting.
 - Treat `_Maps to_` anchors as internal grounding hints, not words to expose by default.
 - If a product term and a UI label differ, keep the user-facing label stable and use the product term only when precise confirmation matters.
+- Use each term only for its defined product or workflow responsibility. Do not use broader operational words such as "setup", "configure", "run", or "approve" when a narrower term applies.
 - Do not hide multiple product actions behind umbrella verbs such as "launch" or "continue building"; name the concrete next step.
+- When summarizing next steps, name the concrete term or exact user-owned step: App setup, configuration change, Run action, or User action.
 - For reversible sandbox profile edits, describe the concrete edit, such as updating instructions or adding an app, instead of using generic phrases like "draft changes" or "sandbox profile edits".
 
 ## Agent and Workflow Terms
@@ -95,6 +97,16 @@ _Avoid_: Agent when selecting, reviewing, or editing the product object directly
 _Maps to_: Sandbox profile; Sandbox profile version; Sandbox profile version configuration
 
 ## Action Terms
+
+**Configuration change**:
+A Designer- or product-side change to aligned Workflow configuration, such as saving Sandbox profile instructions, selecting Connected apps, selecting resources, selecting provider tools, publishing, or creating/editing triggers.
+_Avoid_: App setup, Run action, approval
+_Maps to_: Sandbox profile version configuration; integration bindings; provider resources; triggers; published profile versions
+
+**User action**:
+A concrete next step the user must complete outside Designer's available tools. Use App setup when the user action is provider connection, credential, consent, installation, or external app configuration work. Otherwise, name the exact action instead of introducing a broader process label.
+_Avoid_: Handoff, App setup when the action is not provider connection work, configuration change when Designer can perform it
+_Maps to_: Dashboard route; profile UI; provider admin UI; missing product tool capability
 
 **App setup**:
 A user-owned dashboard step for credentials, provider consent, provider installation, or external app configuration. Preparing or opening it does not need separate approval; completing it stays user-owned in the dashboard. Provider-side changes for app setup happen through that dashboard step, not chat.

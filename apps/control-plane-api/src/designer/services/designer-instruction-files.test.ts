@@ -68,6 +68,34 @@ describe("Designer managed instruction files", () => {
     );
   });
 
+  it("scopes dashboard decision requests to the next concrete dependency or action", () => {
+    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
+
+    expect(behaviorInstructions).toContain(
+      "Use dashboard decision requests only for the next concrete dependency, user-owned action, configuration choice, or Run action approval.",
+    );
+    expect(behaviorInstructions).toContain(
+      "Use it for choices such as repository, channel, setup complete, trigger scope, approval boundary, or Run action approval",
+    );
+    expect(behaviorInstructions).toContain(
+      "Keep explanation, recommendations, and summaries in chat. Keep selectable choices and short user-owned action confirmations in dashboard decision requests.",
+    );
+  });
+
+  it("keeps workflow-family implementation rules out of always-loaded behavior instructions", () => {
+    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
+    const workflowReferencesSection = getSection(behaviorInstructions, "## Workflow References");
+
+    expect(workflowReferencesSection).toContain(
+      ".mistle/designer/references/workflow-patterns/ai-software-factory.md",
+    );
+    expect(workflowReferencesSection).not.toContain("Linear-backed");
+    expect(workflowReferencesSection).not.toContain("Implementation agent instructions");
+    expect(workflowReferencesSection).not.toContain("Review agent instructions");
+    expect(workflowReferencesSection).not.toContain("PR proposal");
+    expect(workflowReferencesSection).not.toContain("6-8");
+  });
+
   it("defines approval boundaries separately from Designer configuration approval", () => {
     const contextInstructions = loadDesignerInstructionContent("designer-context.md");
     const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
@@ -83,6 +111,25 @@ describe("Designer managed instruction files", () => {
       "Use approval boundary for Workflow behavior and Run action approval for starting or testing the Workflow.",
     );
     expect(behaviorInstructions).not.toContain("runtime approval boundary");
+  });
+
+  it("uses precise action terms instead of generic handoff or human follow-up labels", () => {
+    const contextInstructions = loadDesignerInstructionContent("designer-context.md");
+    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
+
+    expect(contextInstructions).toContain("**Configuration change**:");
+    expect(contextInstructions).toContain("**User action**:");
+    expect(contextInstructions).toContain(
+      "Otherwise, name the exact action instead of introducing a broader process label.",
+    );
+    expect(behaviorInstructions).toContain(
+      "When stating next steps or blockers, use the narrowest matching context term: configuration change, User action, App setup, or Run action.",
+    );
+    expect(behaviorInstructions).toContain(
+      "If a user-owned process step does not fit App setup, name the exact step instead of giving it a generic category.",
+    );
+    expect(behaviorInstructions).not.toContain("human follow-up");
+    expect(behaviorInstructions).not.toContain("At handoff");
   });
 
   it("treats aligned configuration changes as approved by alignment", () => {
@@ -125,4 +172,16 @@ describe("Designer managed instruction files", () => {
 
 function loadCanonicalDesignerInstructionFile(fileName: string): string {
   return readFileSync(new URL(`../instructions/${fileName}`, import.meta.url), "utf8").trim();
+}
+
+function getSection(content: string, heading: string): string {
+  const sectionStart = content.indexOf(heading);
+  expect(sectionStart).toBeGreaterThanOrEqual(0);
+
+  const nextSectionStart = content.indexOf("\n## ", sectionStart + heading.length);
+  if (nextSectionStart === -1) {
+    return content.slice(sectionStart);
+  }
+
+  return content.slice(sectionStart, nextSectionStart);
 }

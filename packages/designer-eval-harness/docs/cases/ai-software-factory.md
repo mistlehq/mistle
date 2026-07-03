@@ -30,7 +30,7 @@ The core Workflow blueprint should be concise. It should show the factory lifecy
 1. Linear intake captures the work request and checks whether it is ready for agent work.
 2. An implementation agent classifies, plans, and works on ready issues.
 3. GitHub implementation work happens in the selected repository.
-4. A separate review agent reviews the pull request and asks for rework or handoff.
+4. A separate review agent reviews the pull request and asks for rework or marks review complete.
 5. Review feedback routes back into the implementation loop.
 6. Linear is updated with status, completion, or escalation.
 
@@ -84,18 +84,18 @@ Designer must not claim the team process is ready if it has not defined issue re
 
 Designer must not describe already configured draft profile tools, such as `linear-mcp` or `github-cli`, as still missing. It should distinguish configured draft capabilities from remaining setup such as instructions, labels, statuses, publishing, and triggers.
 
-Designer should not narrate internal tool probing, command lookup, or capability inspection. It should state only the user-relevant outcome, blocker, Run action approval request, or handoff.
+Designer should not narrate internal tool probing, command lookup, or capability inspection. It should state only the user-relevant outcome, blocker, User action, or Run action approval request.
 
 When the chosen approval boundary requires human approval before provider writes, Designer should call the outputs PR proposals and Linear update proposals until human approval is granted.
 
 Designer must not claim it can simulate an issue trigger or provider trigger unless product tooling for that Run action is available. Until then, it should offer supported testing paths, such as starting a session after approval or explaining the manual external event needed to exercise the trigger.
 
-If Designer cannot save profile instructions directly, it should still produce a concrete handoff with draft implementation-agent instructions, draft review-agent instructions, a Linear status mapping such as `Ready -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done`, and an offer to create a human operating guide.
+If Designer cannot save profile instructions directly, it should still produce concrete next-step instructions with draft implementation-agent instructions, draft review-agent instructions, a Linear status mapping such as `Ready -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done`, and an offer to create a workflow operating guide.
 
-The handoff should explicitly state the configuration shape: either one sandbox profile with role-separated implementation/review instructions, or separate implementation and review profiles. It should end with one recommended next action rather than a flat list of equal-priority setup tasks.
+The next-step instructions should explicitly state the configuration shape: either one sandbox profile with role-separated implementation/review instructions, or separate implementation and review profiles. It should end with one recommended next action rather than a flat list of equal-priority setup tasks.
 
 ## Capability Gap To Surface
 
-If Designer cannot directly update Linear labels, statuses, issue templates, or related provider-side configuration, it should say that Designer currently lacks direct Linear setup capability and list the required user or product follow-up.
+If Designer cannot directly update Linear labels, statuses, issue templates, or related provider-side configuration, it should say that Designer currently lacks direct Linear setup capability and list the exact Linear admin changes the user must complete.
 
-If Designer cannot create separate implementation and review profiles or wire the complete feedback loop through product configuration, it should say which parts remain as recommended process, manual setup, or future product work.
+If Designer cannot create separate implementation and review profiles or wire the complete feedback loop through product configuration, it should say which parts remain as recommended process, exact user actions, or future product work.
