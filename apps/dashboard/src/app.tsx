@@ -5,6 +5,7 @@ import {
   Outlet,
   Route,
   RouterProvider,
+  useParams,
 } from "react-router";
 
 import { SystemAppearanceProvider } from "./features/appearance/appearance-provider.js";
@@ -165,7 +166,7 @@ export const APP_ROUTES = createRoutesFromElements(
           />
         </Route>
         <Route
-          element={<DesignerSessionPage />}
+          element={<HomeDesignerSessionRoute />}
           handle={ROUTE_HANDLES.homeDetail}
           path=":sessionId"
         />
@@ -239,6 +240,24 @@ function getAppRouter(): ReturnType<typeof createBrowserRouter> {
 
 function RouteOutlet(): React.JSX.Element {
   return <Outlet />;
+}
+
+function HomeDesignerSessionRoute(): React.JSX.Element {
+  const params = useParams();
+  const sessionId = params["sessionId"];
+  if (sessionId === undefined) {
+    throw new Error("Home Designer session route is missing sessionId.");
+  }
+
+  if (!isDesignerSessionPathSegment(sessionId)) {
+    return <Navigate replace to="/" />;
+  }
+
+  return <DesignerSessionPage />;
+}
+
+function isDesignerSessionPathSegment(pathSegment: string): boolean {
+  return pathSegment.startsWith("dsn_");
 }
 
 function SystemAppearanceRoute(): React.JSX.Element {

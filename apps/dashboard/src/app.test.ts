@@ -19,6 +19,21 @@ describe("app routes", () => {
     expect(leafRoute?.path).toBe("/p/ports/:slug");
   });
 
+  it("routes root Designer session ids through the home detail route", () => {
+    const matches = matchRoutes(APP_ROUTES, "/dsn_test");
+    const leafRoute = matches?.at(-1)?.route;
+
+    expect(leafRoute?.path).toBe(":sessionId");
+  });
+
+  it("keeps explicit sessions routes ahead of the root Designer session route", () => {
+    const matches = matchRoutes(APP_ROUTES, "/sessions");
+    const matchedPaths = matches?.map((match) => match.route.path ?? "[index]");
+
+    expect(matchedPaths).toContain("sessions");
+    expect(matches?.at(-1)?.route.index).toBe(true);
+  });
+
   it("does not expose the temporarily hidden organization sandbox settings route", () => {
     const matches = matchRoutes(APP_ROUTES, "/settings/organization/sandboxes");
     const leafRoute = matches?.at(-1)?.route;
