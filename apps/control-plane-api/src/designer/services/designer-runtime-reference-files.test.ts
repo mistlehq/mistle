@@ -36,7 +36,7 @@ describe("Designer runtime reference files", () => {
       mode: 420,
       writeMode: "overwrite",
     });
-    expect(setupFile?.content).toContain("# AI Software Factory Workflow Pattern");
+    expect(setupFile?.content).toContain("# AI Software Factory Workflow Reference");
     expect(setupFile?.content).toContain("implementation and review");
     expect(setupFile?.content).toContain("Linear MCP provider tool");
     expect(setupFile?.content).toContain("Implementation agent instructions");
@@ -45,5 +45,6 @@ describe("Designer runtime reference files", () => {
     expect(setupFile?.content).toContain("Human operating guide");
     expect(setupFile?.content).toContain("Configuration shape");
     expect(setupFile?.content).toContain("Next action");
+    expect(setupFile?.content).toContain("Run actions for testing the factory");
   });
 });

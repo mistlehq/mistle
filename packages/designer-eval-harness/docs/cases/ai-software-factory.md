@@ -12,20 +12,20 @@ The outcome should be something a team can adopt, run, review, and improve over 
 
 ## Conversation Flow
 
-Designer should not rush from the user's broad request directly into a fully asserted blueprint as if the design were already accepted.
+Designer should not rush from the user's broad request directly into a fully asserted Workflow blueprint as if the design were already accepted.
 
 For an open-ended software-factory request, Designer should first establish the proposed operating-process framing in a concise way and create a clear feedback point before moving into configuration. A good flow is:
 
 1. Restate the intended factory outcome and the issue/repository systems involved.
 2. Propose the main operating-process shape: readiness gate, workflow states, implementation agent, review agent, feedback loop, and human operating guide.
-3. Present the blueprint as a recommended proposal that explicitly invites corrections before setup decisions.
-4. Once the proposed workflow is directionally clear, use the blueprint and follow-up questions to drive concrete setup choices.
+3. Present the Workflow blueprint as a recommended proposal that explicitly invites corrections before setup decisions.
+4. Once the proposed workflow is directionally clear, use the Workflow blueprint and follow-up questions to drive concrete setup choices.
 
-It is acceptable to show an early blueprint if it is clearly framed as a draft for review and the conversation invites corrections before setup choices. It is not acceptable to treat the first blueprint as final, skip user feedback, and immediately proceed into product mutation.
+It is acceptable to show an early Workflow blueprint if it is clearly framed as a draft for review and the conversation invites corrections before setup choices. It is not acceptable to treat the first Workflow blueprint as final, skip user feedback, and immediately proceed into product mutation.
 
 ## Desired Workflow
 
-The core blueprint should be concise. It should show the factory lifecycle, not every setup detail:
+The core Workflow blueprint should be concise. It should show the factory lifecycle, not every setup detail:
 
 1. Linear intake captures the work request and checks whether it is ready for agent work.
 2. An implementation agent classifies, plans, and works on ready issues.
@@ -62,6 +62,7 @@ Designer should identify these required pieces:
 - Linear MCP provider tool on the target profile
 - Linear workflow conventions, such as labels, statuses, issue template text, or a clear manual substitute
 - separate Mistle configuration for implementation and review roles when the product supports it, such as distinct sandbox profiles, triggers, instructions, or approval policies
+- Run actions for testing the factory, distinguishing supported session starts from future trigger simulation capability
 
 ## Human Operating Guide
 
@@ -86,6 +87,8 @@ Designer must not describe already configured draft profile tools, such as `line
 Designer should not narrate internal tool probing, command lookup, or capability inspection. It should state only the user-relevant outcome, blocker, approval request, or handoff.
 
 When the chosen approval boundary requires approval before provider writes, Designer should call the outputs PR proposals and Linear update proposals until approval is granted.
+
+Designer must not claim it can simulate an issue trigger or provider trigger unless product tooling for that Run action is available. Until then, it should offer supported testing paths, such as starting a session after approval or explaining the manual external event needed to exercise the trigger.
 
 If Designer cannot save profile instructions directly, it should still produce a concrete handoff with draft implementation-agent instructions, draft review-agent instructions, a Linear status mapping such as `Ready -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done`, and an offer to create a human operating guide.
 

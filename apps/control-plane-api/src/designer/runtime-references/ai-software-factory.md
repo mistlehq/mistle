@@ -1,4 +1,4 @@
-# AI Software Factory Workflow Pattern
+# AI Software Factory Workflow Reference
 
 Use this reference when a user asks for an AI software factory, issue-to-PR factory, engineering agent workflow, autonomous coding workflow, or similar process that turns issue-system work into code changes and review.
 
@@ -33,15 +33,15 @@ First propose the plan as a recommended draft:
 
 Invite corrections in the chat summary before setup choices, but keep the next dashboard decision focused on the first material setup choice rather than plan acceptance.
 
-## Blueprint Shape
+## Workflow Blueprint Shape
 
-Keep the blueprint focused on factory behavior, not setup tasks. For an AI software factory, prefer 6-8 core workflow items. Combine related concerns instead of expanding every trigger, route, and output into a separate node.
+Keep the Workflow blueprint focused on factory behavior, not setup tasks. For an AI software factory, prefer 6-8 core workflow items. Combine related concerns instead of expanding every trigger, route, and output into a separate node.
 
 When using a separate review agent, do not add a separate "PR ready for review" trigger node unless the workflow has multiple independent entry points. Keep the PR output and the review-agent step adjacent so the core factory stays within 6-8 items.
 
-Name the review routing item as a feedback route or otherwise use the word `feedback` in the latest blueprint. The factory must visibly route review feedback back to implementation.
+Name the review routing item as a feedback route or otherwise use the word `feedback` in the latest Workflow blueprint. The factory must visibly route review feedback back to implementation.
 
-Good blueprint items usually include:
+Good Workflow blueprint items usually include:
 
 - issue intake trigger or manual start with the readiness rule
 - readiness check or triage step
@@ -52,7 +52,7 @@ Good blueprint items usually include:
 - issue-system status update, including blocked or unclear work
 - improvement output for recurring process or instruction gaps
 
-Do not make setup steps into workflow nodes. Repository selection, app setup, profile selection, publishing, and trigger creation belong in chat or setup-focused canvas tabs. Do not attach setup actions to AI software factory blueprint items; use dashboard requests or setup-focused tabs for those actions after the workflow is aligned.
+Do not make setup steps into workflow nodes. Repository selection, app setup, profile selection, publishing, and trigger creation belong in chat or setup-focused canvas tabs. Do not attach setup actions to AI software factory Workflow blueprint items; use dashboard requests or setup-focused tabs for those actions after the workflow is aligned.
 
 ## Issue Readiness Contract
 
@@ -173,6 +173,7 @@ For Linear and GitHub, Designer should identify these pieces:
 - implementation profile or instructions
 - review profile or instructions when a separate review role is recommended
 - trigger and publishing steps that still require explicit approval
+- Run actions for testing the factory, such as starting a session today or simulating a trigger only when product tooling supports it
 
 Do not claim the factory is ready if provider setup, labels, statuses, trigger creation, publishing, or profile capability remains incomplete. When Linear setup is incomplete, explicitly say in the final handoff that Linear labels and statuses still need setup or confirmation, even if the chosen pickup rule uses only one `Ready` status.
 
