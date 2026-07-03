@@ -27,6 +27,9 @@ describe("Designer managed instruction files", () => {
     const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
 
     expect(behaviorInstructions).toContain(
+      "Use Workflow references for domain behavior, operating constraints, and expected responsibilities. Use the Workflow Blueprint Rules section for blueprint schema, rendering, and field-selection rules.",
+    );
+    expect(behaviorInstructions).toContain(
       "Whenever you first show or later update a Workflow blueprint, describe the same flow in chat as concise point form",
     );
     expect(behaviorInstructions).toContain(
@@ -48,6 +51,21 @@ describe("Designer managed instruction files", () => {
       "When updating an existing Agent, trigger, or setup, infer the current Workflow from the current setup",
     );
     expect(behaviorInstructions).not.toContain("directionally clear");
+  });
+
+  it("orders configuration dependencies after alignment", () => {
+    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
+
+    expect(behaviorInstructions).toContain("## Configuration Dependencies");
+    expect(behaviorInstructions).toContain(
+      "After the Workflow is aligned, resolve Configuration Dependencies before configuration changes or Run actions.",
+    );
+    expect(behaviorInstructions).toContain(
+      "Use this default order unless the current setup or user request requires a different order: Apps, Connected apps or App setup, provider resources, provider tools, Sandbox profile configuration, publishing, triggers, Run actions.",
+    );
+    expect(behaviorInstructions).toContain(
+      "Treat App setup, resource selection, provider tool selection, publishing, and triggers as dependencies of the aligned Workflow, not standalone setup prompts.",
+    );
   });
 
   it("defines approval boundaries separately from Designer configuration approval", () => {

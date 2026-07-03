@@ -7,6 +7,7 @@ import {
 import {
   createDesignerIntegrationCatalogSetupFile,
   createDesignerRuntimeReferenceSetupFiles,
+  loadDesignerRuntimeReferenceContent,
 } from "./designer-runtime-reference-files.js";
 
 describe("Designer runtime reference files", () => {
@@ -46,5 +47,15 @@ describe("Designer runtime reference files", () => {
     expect(setupFile?.content).toContain("Configuration shape");
     expect(setupFile?.content).toContain("Next action");
     expect(setupFile?.content).toContain("Run actions for testing the factory");
+  });
+
+  it("keeps workflow references focused on domain behavior instead of blueprint fields", () => {
+    const referenceContent = loadDesignerRuntimeReferenceContent("ai-software-factory.md");
+
+    expect(referenceContent).toContain("Review feedback must loop back into implementation");
+    expect(referenceContent).not.toContain("conditionLabel");
+    expect(referenceContent).not.toContain("routeTo");
+    expect(referenceContent).not.toContain("routing item");
+    expect(referenceContent).not.toContain("trigger node");
   });
 });

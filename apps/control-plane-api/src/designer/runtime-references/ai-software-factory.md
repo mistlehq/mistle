@@ -33,26 +33,26 @@ First propose the plan as a recommended draft:
 
 Invite corrections in the chat summary before configuration choices, but keep the next dashboard decision focused on the first material configuration choice rather than plan acceptance.
 
-## Workflow Blueprint Shape
+## Factory Workflow Shape
 
-Keep the Workflow blueprint focused on factory behavior, not setup tasks. For an AI software factory, prefer 6-8 core workflow items. Combine related concerns instead of expanding every trigger, route, and output into a separate node.
+Keep the factory workflow focused on operating behavior, not setup tasks. For an AI software factory, prefer 6-8 core responsibilities. Combine related concerns instead of expanding every trigger, route, and output into a separate responsibility.
 
-When using a separate review agent, do not add a separate "PR ready for review" trigger node unless the workflow has multiple independent entry points. Keep the PR output and the review-agent step adjacent so the core factory stays within 6-8 items.
+When using a separate review agent, do not treat "PR ready for review" as a separate workflow entry point unless the workflow truly has multiple independent entry points. Keep the PR output and review responsibility adjacent so the core factory stays within 6-8 responsibilities.
 
-Use a review routing rule with a visible feedback condition, such as `Feedback requested`, that routes back to implementation. The factory must visibly route review feedback back to implementation.
+Review feedback must loop back into implementation before the workflow reaches completion. The factory should make rework, accepted work, and blocked or unclear outcomes easy to distinguish.
 
-Good Workflow blueprint items usually include:
+Good factory workflows usually include:
 
 - issue intake trigger or manual start with the readiness rule
 - readiness check or triage step
 - implementation planning, code change, and test step
 - pull request output
 - review step or review-agent step
-- feedback route from review back to implementation
+- feedback or rework path from review back to implementation
 - issue-system status update, including blocked or unclear work
 - improvement output for recurring process or instruction gaps
 
-Do not make setup steps into workflow nodes. Repository selection, app setup, profile selection, publishing, and trigger creation belong in chat or setup-focused canvas tabs. Do not attach setup actions to AI software factory Workflow blueprint items; use dashboard requests or setup-focused tabs for those actions after alignment.
+Do not make setup steps part of the factory workflow. Repository selection, app setup, profile selection, publishing, and trigger creation belong in chat or setup-focused canvas tabs. Use dashboard requests or setup-focused tabs for those actions after alignment.
 
 ## Issue Readiness Contract
 
