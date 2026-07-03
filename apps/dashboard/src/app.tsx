@@ -257,7 +257,7 @@ function HomeDesignerSessionRoute(): React.JSX.Element {
 }
 
 function isDesignerSessionPathSegment(pathSegment: string): boolean {
-  return pathSegment.startsWith("dsn_");
+  return /^dsn_[a-zA-Z0-9_-]+$/.test(pathSegment);
 }
 
 function SystemAppearanceRoute(): React.JSX.Element {

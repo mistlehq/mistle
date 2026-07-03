@@ -23,7 +23,7 @@ const AuthenticatedSession = {
 } satisfies AuthenticatedSessionData;
 
 describe("app routes", () => {
-  it.each(["/designer", "/not-a-designer-session"])(
+  it.each(["/designer", "/not-a-designer-session", "/dsn_", "/dsn_!"])(
     "redirects invalid single-segment path %s to home",
     async (initialPath) => {
       const router = renderAuthenticatedAppRoute(initialPath);
