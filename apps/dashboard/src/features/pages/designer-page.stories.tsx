@@ -136,6 +136,17 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
                   ],
                   routeTo: "escalate",
                 },
+                {
+                  conditionLabel: "Normal triage",
+                  when: [
+                    {
+                      field: "severity",
+                      operator: "excludes",
+                      value: "urgent",
+                    },
+                  ],
+                  routeTo: "triage-update",
+                },
               ],
             },
             {
