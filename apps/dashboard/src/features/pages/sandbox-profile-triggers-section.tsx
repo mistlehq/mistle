@@ -59,6 +59,7 @@ import { TriggerActivityContent } from "./trigger-activity-page.js";
 import { TriggerEditorContent } from "./trigger-editor-content.js";
 
 const ProfileTriggersListLimit = 25;
+const InitialTriggerTargetSandboxProfileVersion = 1;
 
 type TriggerTemplateAvailability =
   | {
@@ -149,10 +150,18 @@ function TriggerTemplateList(input: {
   );
 }
 
-function resolveActiveSandboxProfileVersion(
+function resolveTriggerTargetSandboxProfileVersion(
   versions: readonly SandboxProfileVersion[],
 ): number | null {
-  return versions.find((version) => version.isActive)?.version ?? null;
+  const activeVersion = versions.find((version) => version.isActive);
+  if (activeVersion !== undefined) {
+    return activeVersion.version;
+  }
+
+  return (
+    versions.find((version) => version.version === InitialTriggerTargetSandboxProfileVersion)
+      ?.version ?? null
+  );
 }
 
 function isTriggerTemplateAvailable(input: {
@@ -425,31 +434,31 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
     enabled: shouldLoadTemplates,
     retry: false,
   });
-  const activeSandboxProfileVersion = useMemo(
-    () => resolveActiveSandboxProfileVersion(profileVersionsQuery.data?.versions ?? []),
+  const triggerTargetSandboxProfileVersion = useMemo(
+    () => resolveTriggerTargetSandboxProfileVersion(profileVersionsQuery.data?.versions ?? []),
     [profileVersionsQuery.data?.versions],
   );
   const triggerConfigQuery = useQuery({
     queryKey: sandboxProfileVersionTriggerConfigQueryKey({
       profileId: input.profileId,
-      version: activeSandboxProfileVersion ?? 0,
+      version: triggerTargetSandboxProfileVersion ?? 0,
     }),
     queryFn: async ({ signal }) => {
-      if (activeSandboxProfileVersion === null) {
-        throw new Error("An active sandbox profile version is required.");
+      if (triggerTargetSandboxProfileVersion === null) {
+        throw new Error("A sandbox profile version is required.");
       }
 
       return getSandboxProfileVersionTriggerConfig({
         profileId: input.profileId,
-        version: activeSandboxProfileVersion,
+        version: triggerTargetSandboxProfileVersion,
         signal,
       });
     },
-    enabled: shouldLoadTemplates && activeSandboxProfileVersion !== null,
+    enabled: shouldLoadTemplates && triggerTargetSandboxProfileVersion !== null,
     retry: false,
   });
   const eventPrerequisites = useWebhookTriggerEventPrerequisites({
-    enabled: shouldLoadTemplates && activeSandboxProfileVersion !== null,
+    enabled: shouldLoadTemplates && triggerTargetSandboxProfileVersion !== null,
   });
 
   const items = triggersQuery.data?.items.map(toTriggerListItemViewModel) ?? [];
@@ -502,7 +511,7 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
       : eventPrerequisites.errorMessage;
   const templatesPending =
     profileVersionsQuery.isPending ||
-    (activeSandboxProfileVersion !== null &&
+    (triggerTargetSandboxProfileVersion !== null &&
       (triggerConfigQuery.isPending || eventPrerequisites.isPending));
 
   function updatePagination(inputValue: {
