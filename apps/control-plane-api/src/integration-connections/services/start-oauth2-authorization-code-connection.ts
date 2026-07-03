@@ -27,6 +27,7 @@ import {
   encodeRedirectStateMetadata,
   persistRedirectSessionOrThrow,
 } from "./redirect-flow.js";
+import type { IntegrationRedirectReturnContext } from "./redirect-return-context.js";
 import { resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow } from "./resolve-oauth2-authorization-code-capability-target.js";
 
 const PKCE_CHALLENGE_METHOD = "S256" as const;
@@ -37,12 +38,14 @@ export type StartOAuth2AuthorizationCodeConnectionInput = {
   displayName?: string;
   connectionConfig?: Record<string, unknown>;
   controlPlaneBaseUrl: string;
+  returnContext?: IntegrationRedirectReturnContext;
 };
 
 export type StartOAuth2AuthorizationCodeConnectionReauthorizationInput = {
   organizationId: string;
   connectionId: string;
   controlPlaneBaseUrl: string;
+  returnContext?: IntegrationRedirectReturnContext;
 };
 
 type StartedOAuth2AuthorizationCodeConnection = {
@@ -239,6 +242,7 @@ async function startOAuth2AuthorizationCodeRedirect(
     state: string;
     intent?: "create" | "reauthorize";
     connectionId?: string;
+    returnContext?: IntegrationRedirectReturnContext;
   },
 ): Promise<StartedOAuth2AuthorizationCodeConnection> {
   const { db, integrationRegistry, integrationsConfig } = ctx;
@@ -309,6 +313,7 @@ async function startOAuth2AuthorizationCodeRedirect(
     state: input.state,
     pkceVerifierEncrypted,
     ...(providerStateEncrypted === undefined ? {} : { providerStateEncrypted }),
+    ...(input.returnContext === undefined ? {} : { returnContext: input.returnContext }),
     expiresAt: createRedirectSessionExpiryTimestamp(),
     failureMessage: "Failed to persist OAuth 2.0 (Authorization Code) redirect session state.",
   });
@@ -340,6 +345,7 @@ export async function startOAuth2AuthorizationCodeConnection(
     connectionConfig: input.connectionConfig ?? {},
     controlPlaneBaseUrl: input.controlPlaneBaseUrl,
     state,
+    ...(input.returnContext === undefined ? {} : { returnContext: input.returnContext }),
   });
 }
 
@@ -431,5 +437,6 @@ export async function startOAuth2AuthorizationCodeConnectionReauthorization(
     state: createRedirectState(),
     intent: "reauthorize",
     connectionId: existingConnection.id,
+    ...(input.returnContext === undefined ? {} : { returnContext: input.returnContext }),
   });
 }

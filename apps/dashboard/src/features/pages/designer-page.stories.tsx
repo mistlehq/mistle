@@ -94,20 +94,24 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
             {
               id: "linear-trigger",
               kind: "trigger",
-              label: "Linear work trigger",
               integrationTargetKey: "linear-default",
-              integrationLabel: "Linear",
-              eventLabel: "Issue label or state changed",
               state: "proposed",
+              when: [
+                {
+                  label: "Linear issue label or state changed",
+                },
+              ],
             },
             {
               id: "github-trigger",
               kind: "trigger",
-              label: "GitHub work trigger",
               integrationTargetKey: "github-cloud",
-              integrationLabel: "GitHub",
-              eventLabel: "PR or issue activity",
               state: "proposed",
+              when: [
+                {
+                  label: "GitHub pull request or issue activity",
+                },
+              ],
             },
             {
               id: "normalize-context",
@@ -119,11 +123,10 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
             {
               id: "routing",
               kind: "routing_policy",
-              label: "Routing policy",
               state: "proposed",
               rules: [
                 {
-                  label: "Escalations",
+                  conditionLabel: "Escalations",
                   when: [
                     {
                       field: "severity",
@@ -261,11 +264,15 @@ const AiSoftwareFactoryBlueprint = {
     {
       id: "issue-ready",
       kind: "trigger",
-      label: "Issue marked ready for agent",
-      description:
-        "Work enters the factory only after a readiness signal such as a status, label, or manual start confirms acceptance criteria are present.",
       state: "proposed",
-      eventLabel: "Issue ready",
+      when: [
+        {
+          label: "Readiness signal received",
+        },
+        {
+          label: "Acceptance criteria are present",
+        },
+      ],
     },
     {
       id: "readiness-check",
@@ -302,13 +309,10 @@ const AiSoftwareFactoryBlueprint = {
     {
       id: "review-route",
       kind: "routing_policy",
-      label: "Route review outcome",
-      description:
-        "Send accepted work toward human merge; send requested changes back to implementation; mark unclear or blocked work appropriately.",
       state: "proposed",
       rules: [
         {
-          label: "Changes requested",
+          conditionLabel: "Changes requested",
           when: [
             {
               field: "review_outcome",
@@ -319,7 +323,7 @@ const AiSoftwareFactoryBlueprint = {
           routeTo: "implement-change",
         },
         {
-          label: "Accepted",
+          conditionLabel: "Accepted",
           when: [
             {
               field: "review_outcome",
@@ -330,7 +334,7 @@ const AiSoftwareFactoryBlueprint = {
           routeTo: "issue-update",
         },
         {
-          label: "Blocked or unclear",
+          conditionLabel: "Blocked or unclear",
           when: [
             {
               field: "review_outcome",
@@ -447,7 +451,7 @@ const StoryDesignerSessionPendingBlueprintComments = [
     body: "Split urgent customer escalations from ordinary severity labels so the routing policy does not over-escalate noisy issues.",
     itemId: "routing",
     itemKindLabel: "Routing policy",
-    itemLabel: "Routing policy",
+    itemLabel: "Routing: Escalations",
   },
 ] satisfies readonly PendingSessionBlueprintComment[];
 
@@ -460,7 +464,7 @@ const StoryDesignerSessionLongPendingBlueprintComments = [
     ].join("\n\n"),
     itemId: "routing",
     itemKindLabel: "Routing policy",
-    itemLabel: "Routing policy",
+    itemLabel: "Routing: Escalations",
   },
 ] satisfies readonly PendingSessionBlueprintComment[];
 
@@ -689,6 +693,7 @@ function DesignerSessionCanvasFirstOpenStory(): React.JSX.Element {
               <main className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
                 <DesignerCanvasWorkspace
                   activeTabHref={activeTabHref}
+                  designerSessionId="designer_session_canvas_first_open_story"
                   mountDockviewWhenEmpty
                   onAddBlueprintComment={function onAddBlueprintComment() {}}
                   onActiveTabHrefChange={setActiveTabHref}
@@ -780,7 +785,7 @@ function BlueprintCommentStateGalleryStory(): React.JSX.Element {
         <div className="grid gap-8 lg:grid-cols-2">
           <BlueprintCommentStatePreview floating={false} title="Collapsed pending comment">
             <DesignerBlueprintCollapsedCommentButton
-              label="Open blueprint comment for Routing policy"
+              label="Open blueprint comment for Routing: Escalations"
               onOpen={function onOpen() {}}
             />
           </BlueprintCommentStatePreview>
@@ -840,10 +845,12 @@ function BlueprintCommentStatePreview(input: {
                 <span className="size-3 rounded-full bg-muted-foreground/50" />
               </span>
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-medium leading-snug">Routing policy</h3>
-                <p className="mt-2 rounded-sm bg-muted px-2 py-1 text-xs leading-relaxed text-muted-foreground">
-                  Escalations: severity includes urgent -&gt; escalate
-                </p>
+                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 rounded-sm bg-muted/45 px-2.5 py-1.5 text-sm">
+                  <span className="rounded-sm border border-border bg-background px-1.5 py-0.5 text-xs font-medium uppercase text-muted-foreground">
+                    If
+                  </span>
+                  <span className="truncate font-medium">Escalations</span>
+                </div>
               </div>
             </div>
           </div>
@@ -873,6 +880,7 @@ function DesignerCanvasWorkspaceStory(input: {
     <DesignerCanvasStoryRuntime>
       <DesignerCanvasWorkspace
         activeTabHref={activeTabHref}
+        designerSessionId="designer_session_canvas_story"
         onAddBlueprintComment={function onAddBlueprintComment() {}}
         onActiveTabHrefChange={setActiveTabHref}
         onDeleteBlueprintComment={function onDeleteBlueprintComment() {}}

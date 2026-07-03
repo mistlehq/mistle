@@ -301,6 +301,7 @@ function renderDesignerCanvasWorkspace(input: RenderDesignerCanvasWorkspaceInput
     element: (
       <DesignerCanvasWorkspace
         activeTabHref={input.activeTabHref ?? null}
+        designerSessionId={input.designerSessionId ?? "designer_session_test"}
         {...(input.mountDockviewWhenEmpty === undefined
           ? {}
           : { mountDockviewWhenEmpty: input.mountDockviewWhenEmpty })}
@@ -335,6 +336,7 @@ function StatefulDesignerCanvasWorkspace(input: {
   return (
     <DesignerCanvasWorkspace
       activeTabHref={activeTabHref}
+      designerSessionId="designer_session_test"
       onAddBlueprintComment={function onAddBlueprintComment() {}}
       onActiveTabHrefChange={setActiveTabHref}
       onDeleteBlueprintComment={function onDeleteBlueprintComment() {}}
@@ -380,6 +382,7 @@ function UpdatingDesignerCanvasWorkspace(input: {
       </button>
       <DesignerCanvasWorkspace
         activeTabHref="/integrations/slack"
+        designerSessionId="designer_session_test"
         onAddBlueprintComment={function onAddBlueprintComment() {}}
         onActiveTabHrefChange={() => {}}
         onDeleteBlueprintComment={function onDeleteBlueprintComment() {}}
@@ -428,6 +431,7 @@ function StatefulDesignerBlueprintCommentWorkspace(): React.JSX.Element {
   return (
     <DesignerCanvasWorkspace
       activeTabHref={DesignerBlueprintCurrentTabHref}
+      designerSessionId="designer_session_test"
       onAddBlueprintComment={addComment}
       onActiveTabHrefChange={() => {}}
       onDeleteBlueprintComment={(commentId) => {
@@ -642,6 +646,35 @@ describe("DesignerCanvasWorkspace", () => {
     expect(screen.queryByText("Integrations")).toBeNull();
   });
 
+  it("renders an integration connection detail route inside the Designer canvas", async () => {
+    const connectionHref = "/integrations/wasenderapi-mcp/icn_wasenderapi_complete";
+
+    renderDesignerCanvasWorkspace({
+      activeTabHref: connectionHref,
+      configureQueryClient: (queryClient) => {
+        queryClient.setQueryDefaults(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+          staleTime: Infinity,
+        });
+        queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+          targets: [ProviderSetupIntegrationTarget],
+          connections: [CompletedProviderSetupConnection],
+        });
+      },
+      tabs: [
+        {
+          kind: "route",
+          id: "wasenderapi-connection",
+          title: "WasenderAPI connection",
+          href: connectionHref,
+        },
+      ],
+    });
+
+    expect(await screen.findAllByText("WasenderAPI production")).not.toHaveLength(0);
+    expect(screen.getAllByText("Personal access token")).not.toHaveLength(0);
+    expect(screen.queryByText("This route is not available in the Designer canvas.")).toBeNull();
+  });
+
   it("renders embedded provider app setup in a Designer canvas tab", async () => {
     const setupHref =
       "/integrations/github-cloud/icn_github_provider_app_setup/github-app/setup?githubAppManifest=created";
@@ -753,11 +786,16 @@ describe("DesignerCanvasWorkspace", () => {
               {
                 id: "issue-opened",
                 kind: "trigger",
-                label: "GitHub issue trigger",
                 integrationTargetKey: "github-cloud",
-                integrationLabel: "GitHub",
-                eventLabel: "Issue opened",
                 state: "proposed",
+                when: [
+                  {
+                    label: "GitHub issue opened",
+                  },
+                  {
+                    label: "Ready label is present",
+                  },
+                ],
               },
               {
                 id: "classify-issue",
@@ -769,13 +807,10 @@ describe("DesignerCanvasWorkspace", () => {
               {
                 id: "readiness-route",
                 kind: "routing_policy",
-                label: "Route readiness outcome",
-                description:
-                  "Send ready work to implementation and unclear work back for clarification.",
                 state: "proposed",
                 rules: [
                   {
-                    label: "Ready to implement",
+                    conditionLabel: "Ready to implement",
                     when: [
                       {
                         field: "issue.ready",
@@ -786,7 +821,7 @@ describe("DesignerCanvasWorkspace", () => {
                     routeTo: "triage-summary",
                   },
                   {
-                    label: "Needs manual escalation",
+                    conditionLabel: "Needs manual escalation",
                     when: [
                       {
                         field: "issue.priority",
@@ -797,7 +832,7 @@ describe("DesignerCanvasWorkspace", () => {
                     routeTo: "urgent-queue",
                   },
                   {
-                    label: "Needs clarification",
+                    conditionLabel: "Needs clarification",
                     when: [
                       {
                         field: "issue.ready",
@@ -808,7 +843,7 @@ describe("DesignerCanvasWorkspace", () => {
                     routeTo: "triage-summary",
                   },
                   {
-                    label: "Needs backlog review",
+                    conditionLabel: "Needs backlog review",
                     when: [
                       {
                         field: "issue.priority",
@@ -880,24 +915,52 @@ describe("DesignerCanvasWorkspace", () => {
       ],
     });
 
-    expect(await screen.findByText("Issue opened")).toBeDefined();
-    expect(await screen.findByLabelText("GitHub · Trigger")).toBeDefined();
+    expect(await screen.findByText("Route incoming issues into the right queue")).toBeDefined();
+    expect(screen.getByText("Outcome")).toBeDefined();
+    expect(
+      screen.getByTestId("designer-blueprint-node-__designer_blueprint_outcome"),
+    ).toBeDefined();
+    expect(
+      screen.queryByRole("button", {
+        name: "Add comment to Route incoming issues into the right queue",
+      }),
+    ).toBeNull();
+    const triggerRows = await screen.findAllByTestId("designer-blueprint-trigger-condition-row");
+    expect(triggerRows).toHaveLength(2);
+    expect(triggerRows.every((row) => row.textContent?.startsWith("When") ?? false)).toBe(true);
+    expect(triggerRows[0]?.textContent).toContain("GitHub issue opened");
+    expect(triggerRows[1]?.textContent).toContain("Ready label is present");
+    expect(screen.queryByText("Issue opened")).toBeNull();
+    expect(screen.queryByLabelText("GitHub · Trigger")).toBeNull();
     await waitFor(() => {
       expect(
-        document.querySelector(`img[src="${resolveIntegrationLogoPath({ logoKey: "github" })}"]`),
+        triggerRows[0]?.querySelector(
+          `img[src="${resolveIntegrationLogoPath({ logoKey: "github" })}"]`,
+        ),
       ).toBeDefined();
     });
     expect(await screen.findByText("Classify issue")).toBeDefined();
-    expect(await screen.findByText("Route readiness outcome")).toBeDefined();
+    expect(screen.queryByText("Route readiness outcome")).toBeNull();
+    expect(screen.queryByLabelText("Routing Policy")).toBeNull();
     expect(
-      await screen.findByText(/Triage summary: Ready to implement; Needs clarification/u),
-    ).toBeDefined();
-    expect(
-      await screen.findByText(/Queue \(urgent-queue\): Needs manual escalation/u),
-    ).toBeDefined();
-    expect(await screen.findByText(/Queue \(backlog-queue\): Needs backlog review/u)).toBeDefined();
+      screen.queryByText(
+        "Send ready work to implementation and unclear work back for clarification.",
+      ),
+    ).toBeNull();
+    const routingRows = await screen.findAllByTestId("designer-blueprint-routing-summary-row");
+    expect(routingRows).toHaveLength(4);
+    expect(routingRows.every((row) => row.textContent?.startsWith("If") ?? false)).toBe(true);
+    expect(routingRows[0]?.textContent).toContain("Ready to implement");
+    expect(routingRows[0]?.textContent).toContain("Triage summary");
+    expect(routingRows[0]?.textContent).not.toContain("Triage summary:");
+    expect(routingRows[1]?.textContent).toContain("Needs manual escalation");
+    expect(routingRows[1]?.textContent).toContain("Queue (urgent-queue)");
+    expect(routingRows[2]?.textContent).toContain("Needs clarification");
+    expect(routingRows[2]?.textContent).toContain("Triage summary");
+    expect(routingRows[3]?.textContent).toContain("Needs backlog review");
+    expect(routingRows[3]?.textContent).toContain("Queue (backlog-queue)");
     expect(screen.queryByText("2 routing rules")).toBeNull();
-    expect(await screen.findByText("Triage summary")).toBeDefined();
+    expect(screen.getAllByText("Triage summary")).toHaveLength(3);
     expect(
       await findDesignerBlueprintGraphForNode("designer-blueprint-node-classify-issue"),
     ).toBeDefined();
@@ -1030,23 +1093,20 @@ describe("DesignerCanvasWorkspace", () => {
   });
 
   it("centers the blueprint graph horizontally near the top of the canvas viewport", () => {
-    expect(
-      resolveDesignerBlueprintInitialFocusViewportForNodes({
-        nodes: [
-          {
-            position: { x: 120, y: 24 },
-          },
-          {
-            position: { x: 600, y: 180 },
-          },
-        ],
-        width: 1000,
-      }),
-    ).toEqual({
-      x: 25,
-      y: 33.2,
-      zoom: 0.95,
+    const viewport = resolveDesignerBlueprintInitialFocusViewportForNodes({
+      nodes: [
+        {
+          position: { x: 120, y: 24 },
+        },
+        {
+          position: { x: 600, y: 180 },
+        },
+      ],
+      width: 1000,
     });
+    expect(viewport?.x).toBe(25);
+    expect(viewport?.y).toBeCloseTo(1.2);
+    expect(viewport?.zoom).toBe(0.95);
   });
 
   it("reserves right-side viewport room for blueprint loopback edges", () => {
@@ -1066,22 +1126,60 @@ describe("DesignerCanvasWorkspace", () => {
       }),
     ).toEqual({
       x: 172,
-      y: 56,
+      y: 24,
       zoom: 0.82,
     });
   });
 
-  it("reserves process-lane space for tall blueprint routing summaries", () => {
+  it("accounts for wider routing nodes when centering the blueprint graph", () => {
+    expect(
+      resolveDesignerBlueprintInitialFocusViewportForNodes({
+        nodes: [
+          {
+            data: {
+              routingSummaryRows: [
+                {
+                  nextStepLabel: "Plan, edit, and test",
+                  outcomeLabel: "Changes requested",
+                },
+              ],
+            },
+            position: { x: 0, y: 0 },
+          },
+          {
+            position: { x: 600, y: 180 },
+          },
+        ],
+        width: 1000,
+      }),
+    ).toEqual({
+      x: 82,
+      y: 24,
+      zoom: 0.95,
+    });
+  });
+
+  it("reserves process-lane space for compact blueprint routing summaries", () => {
     expect(
       resolveDesignerBlueprintProcessLaneSlotHeight({
         description:
           "Send accepted work toward human merge; send requested changes back to implementation; mark unclear or blocked work appropriately.",
-        routingSummary: [
-          "Plan, edit, and test: Changes requested",
-          "Update issue status: Accepted; Blocked or unclear",
-        ].join("\n"),
+        routingSummaryRows: [
+          {
+            nextStepLabel: "Plan, edit, and test",
+            outcomeLabel: "Changes requested",
+          },
+          {
+            nextStepLabel: "Update issue status",
+            outcomeLabel: "Accepted",
+          },
+          {
+            nextStepLabel: "Update issue status",
+            outcomeLabel: "Blocked or unclear",
+          },
+        ],
       }),
-    ).toBeGreaterThan(150);
+    ).toBe(144);
   });
 
   it("returns no blueprint viewport before the canvas has a measured width", () => {

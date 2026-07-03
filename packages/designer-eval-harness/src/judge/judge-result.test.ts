@@ -12,7 +12,7 @@ describe("Designer eval judge result", () => {
         factoryProcessClarity: 2,
         agentRoleSeparation: 1,
         feedbackLoopQuality: 1,
-        honestHandoff: 2,
+        readinessDisclosure: 2,
       },
       findings: [
         {
@@ -27,6 +27,7 @@ describe("Designer eval judge result", () => {
 
     expect(renderJudgeResultMarkdown(result)).toContain("Verdict: fail");
     expect(renderJudgeResultMarkdown(result)).toContain("Conversation flow: 1/4");
+    expect(renderJudgeResultMarkdown(result)).toContain("Readiness disclosure: 2/4");
     expect(renderJudgeResultMarkdown(result)).toContain("designer_behavior_issue");
   });
 });

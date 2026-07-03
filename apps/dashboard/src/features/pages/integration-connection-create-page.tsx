@@ -5,6 +5,7 @@ import { type NavigateOptions, useNavigate, useParams, useSearchParams } from "r
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import { IntegrationConnectionEditorPage } from "../integrations/integration-connection-editor.js";
+import type { IntegrationRedirectReturnContext } from "../integrations/integrations-service-shared.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
@@ -26,6 +27,7 @@ import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-st
 export type EmbeddedIntegrationConnectionCreateRoute = {
   targetKey: string;
   returnPath?: string;
+  redirectReturnContext?: IntegrationRedirectReturnContext;
   navigate: (nextHref: string, options?: NavigateOptions) => void | Promise<void>;
 };
 
@@ -63,6 +65,9 @@ export function EmbeddedIntegrationConnectionCreatePage(input: {
     <IntegrationConnectionCreatePageContent
       breadcrumbs={null}
       navigate={input.embeddedRoute.navigate}
+      {...(input.embeddedRoute.redirectReturnContext === undefined
+        ? {}
+        : { redirectReturnContext: input.embeddedRoute.redirectReturnContext })}
       returnPath={input.embeddedRoute.returnPath}
       targetKey={input.embeddedRoute.targetKey}
       title="Add connection"
@@ -75,6 +80,7 @@ function IntegrationConnectionCreatePageContent(input: {
   description?: string | undefined;
   headerIcon?: React.ReactNode | undefined;
   navigate: (nextHref: string, options?: NavigateOptions) => void | Promise<void>;
+  redirectReturnContext?: IntegrationRedirectReturnContext;
   returnPath?: string | undefined;
   targetKey: string;
   title: string;
@@ -154,6 +160,9 @@ function IntegrationConnectionCreatePageContent(input: {
         key={targetKey}
         initialEditorInput={buildOpenCreateIntegrationConnectionInput(card)}
         navigate={navigate}
+        {...(input.redirectReturnContext === undefined
+          ? {}
+          : { redirectReturnContext: input.redirectReturnContext })}
         {...(returnPath === undefined ? {} : { returnPath })}
       />
     </PageFrame>
@@ -163,11 +172,15 @@ function IntegrationConnectionCreatePageContent(input: {
 function LoadedIntegrationConnectionCreatePage(input: {
   initialEditorInput: OpenIntegrationConnectionEditorInput;
   navigate: (nextHref: string, options?: NavigateOptions) => void | Promise<void>;
+  redirectReturnContext?: IntegrationRedirectReturnContext;
   returnPath?: string;
 }): React.JSX.Element {
   const connectionState = useIntegrationConnectionEditorState({
     initialEditorInput: input.initialEditorInput,
     onClose: () => input.navigate(input.returnPath ?? "/integrations"),
+    ...(input.redirectReturnContext === undefined
+      ? {}
+      : { redirectReturnContext: input.redirectReturnContext }),
     onSubmitSuccess: async ({ connectionId, editor, managedWebhookSetup, methodId }) => {
       const draftSetupPath = resolveDraftThenSetupConnectionPath({
         connectionId,

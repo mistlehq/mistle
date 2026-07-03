@@ -13,6 +13,7 @@ import { resolveFormConnectionMethodManagedWebhookSourcePostCreate } from "../in
 import { resolveSelectedConnectionMethod } from "../integrations/integration-connection-method-selection.js";
 import type {
   IntegrationConnectionMethod,
+  IntegrationRedirectReturnContext,
   IntegrationManagedWebhookSourcePostCreate,
   ManagedWebhookSetupResult,
   StartedDeviceAuthorizationConnection,
@@ -52,6 +53,7 @@ type UseIntegrationConnectionEditorStateInput = {
   onClose?: () => void | Promise<void>;
   onSubmitSuccess?: (input: IntegrationConnectionSubmitSuccessInput) => void | Promise<void>;
   queryKey: readonly unknown[];
+  redirectReturnContext?: IntegrationRedirectReturnContext;
   scheduler?: Scheduler;
 };
 
@@ -169,6 +171,7 @@ export function useIntegrationConnectionEditorState(
       targetKey: string;
       displayName?: string;
       config?: Record<string, unknown>;
+      returnContext?: IntegrationRedirectReturnContext;
     }) => startRedirectIntegrationConnection(mutationInput),
   });
 
@@ -614,6 +617,9 @@ export function useIntegrationConnectionEditorState(
       ...(normalizedConnectionDisplayName.length === 0
         ? {}
         : { displayName: normalizedConnectionDisplayName }),
+      ...(input.redirectReturnContext === undefined
+        ? {}
+        : { returnContext: input.redirectReturnContext }),
     });
     globalThis.location.assign(started.authorizationUrl);
   }

@@ -23,18 +23,172 @@ describe("Designer managed instruction files", () => {
     expect(loadDesignerInstructionContent("designer-behavior.md").length).toBeGreaterThan(0);
   });
 
-  it("instructs Designer to pair blueprint canvas changes with readable flow text", () => {
+  it("keeps the behavior instruction structure explicit", () => {
     const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
 
-    expect(behaviorInstructions).toContain(
-      "Whenever you first show or later update a blueprint, describe the same flow in chat as concise point form",
+    expect(getSectionHeadings(behaviorInstructions)).toEqual([
+      "## Default Flow",
+      "## Alignment",
+      "## Configuration Dependencies",
+      "## Decision Requests",
+      "## Workflow Blueprint Rules",
+      "## Workflow References",
+      "## Product And Canvas Rules",
+      "## Run Actions",
+      "## Integration Setup",
+      "## Tools And Evidence",
+      "## Authority And Safety",
+      "## Communication",
+    ]);
+  });
+
+  it("keeps required behavior sections connected to their core terms", () => {
+    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
+
+    expect(getSection(behaviorInstructions, "## Alignment")).toContain("Workflow");
+    expect(getSection(behaviorInstructions, "## Alignment")).toContain("configuration change");
+    expect(getSection(behaviorInstructions, "## Alignment")).toContain("Run action");
+    expect(getSection(behaviorInstructions, "## Configuration Dependencies")).toContain(
+      "App setup",
     );
-    expect(behaviorInstructions).toContain(
-      "When updating an existing blueprint, first state what changed from the previous version",
+    expect(getSection(behaviorInstructions, "## Configuration Dependencies")).toContain(
+      "provider tools",
     );
+    expect(getSection(behaviorInstructions, "## Configuration Dependencies")).toContain(
+      "publishing",
+    );
+    expect(getSection(behaviorInstructions, "## Configuration Dependencies")).toContain("triggers");
+    expect(getSection(behaviorInstructions, "## Decision Requests")).toContain(
+      "dashboard decision request",
+    );
+    expect(getSection(behaviorInstructions, "## Workflow Blueprint Rules")).toContain(
+      "Workflow blueprint",
+    );
+    expect(behaviorInstructions).not.toContain("directionally clear");
+  });
+
+  it("keeps workflow-family implementation rules out of always-loaded behavior instructions", () => {
+    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
+    const workflowReferencesSection = getSection(behaviorInstructions, "## Workflow References");
+
+    expect(workflowReferencesSection).toContain(
+      ".mistle/designer/references/workflow-patterns/ai-software-factory.md",
+    );
+    expect(workflowReferencesSection).not.toContain("Linear-backed");
+    expect(workflowReferencesSection).not.toContain("Implementation agent instructions");
+    expect(workflowReferencesSection).not.toContain("Review agent instructions");
+    expect(workflowReferencesSection).not.toContain("PR proposal");
+    expect(workflowReferencesSection).not.toContain("6-8");
+  });
+
+  it("keeps the context vocabulary structure explicit", () => {
+    const contextInstructions = loadDesignerInstructionContent("designer-context.md");
+
+    expect(getBoldTermHeadings(contextInstructions)).toEqual([
+      "**Workflow outcome**:",
+      "**Workflow**:",
+      "**Workflow blueprint**:",
+      "**Trigger**:",
+      "**Agent step**:",
+      "**Agent output**:",
+      "**App**:",
+      "**Connected app**:",
+      "**Mistle resource access**:",
+      "**Provider tool**:",
+      "**Agent**:",
+      "**Task**:",
+      "**Approval boundary**:",
+      "**Sandbox profile**:",
+      "**Configuration change**:",
+      "**User action**:",
+      "**App setup**:",
+      "**Publish the profile version**:",
+      "**Create a trigger**:",
+      "**Enable a trigger**:",
+      "**Run action**:",
+      "**Start a session**:",
+    ]);
+  });
+
+  it("keeps approval and action vocabulary separated", () => {
+    const contextInstructions = loadDesignerInstructionContent("designer-context.md");
+    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
+
+    expect(getTermBlock(contextInstructions, "**Approval boundary**:")).toContain(
+      "Workflow behavior",
+    );
+    expect(getTermBlock(contextInstructions, "**Approval boundary**:")).toContain(
+      "Run action approval",
+    );
+    expect(getTermBlock(contextInstructions, "**Configuration change**:")).toContain(
+      "Designer- or product-side",
+    );
+    expect(getTermBlock(contextInstructions, "**User action**:")).toContain(
+      "outside Designer's available tools",
+    );
+    expect(getTermBlock(contextInstructions, "**Run action**:")).toContain(
+      "without changing configuration",
+    );
+    expect(behaviorInstructions).not.toContain("runtime approval boundary");
+    expect(behaviorInstructions).not.toContain("human follow-up");
+    expect(behaviorInstructions).not.toContain("At handoff");
+  });
+
+  it("keeps Run action support boundaries explicit without relying on exact prose", () => {
+    const contextInstructions = loadDesignerInstructionContent("designer-context.md");
+    const behaviorInstructions = loadDesignerInstructionContent("designer-behavior.md");
+
+    expect(getTermBlock(contextInstructions, "**Run action**:")).toContain("Start a session");
+    expect(getTermBlock(contextInstructions, "**Run action**:")).toContain("Simulating a trigger");
+    expect(getSection(behaviorInstructions, "## Run Actions")).toContain("Start a session");
+    expect(getSection(behaviorInstructions, "## Run Actions")).toContain(
+      "Simulated trigger execution",
+    );
+    expect(getSection(behaviorInstructions, "## Run Actions")).toContain("product tool");
   });
 });
 
 function loadCanonicalDesignerInstructionFile(fileName: string): string {
   return readFileSync(new URL(`../instructions/${fileName}`, import.meta.url), "utf8").trim();
+}
+
+function getSection(content: string, heading: string): string {
+  const sectionStart = content.indexOf(heading);
+  expect(sectionStart).toBeGreaterThanOrEqual(0);
+
+  const nextSectionStart = content.indexOf("\n## ", sectionStart + heading.length);
+  if (nextSectionStart === -1) {
+    return content.slice(sectionStart);
+  }
+
+  return content.slice(sectionStart, nextSectionStart);
+}
+
+function getSectionHeadings(content: string): string[] {
+  return content
+    .split("\n")
+    .filter((line) => line.startsWith("## "))
+    .map((line) => line.trim());
+}
+
+function getBoldTermHeadings(content: string): string[] {
+  return content
+    .split("\n")
+    .filter((line) => line.startsWith("**") && line.endsWith(":"))
+    .map((line) => line.trim());
+}
+
+function getTermBlock(content: string, termHeading: string): string {
+  const termStart = content.indexOf(termHeading);
+  expect(termStart).toBeGreaterThanOrEqual(0);
+
+  const nextTermStart = content.indexOf("\n**", termStart + termHeading.length);
+  const nextSectionStart = content.indexOf("\n## ", termStart + termHeading.length);
+  const candidates = [nextTermStart, nextSectionStart].filter((index) => index !== -1);
+
+  if (candidates.length === 0) {
+    return content.slice(termStart);
+  }
+
+  return content.slice(termStart, Math.min(...candidates));
 }

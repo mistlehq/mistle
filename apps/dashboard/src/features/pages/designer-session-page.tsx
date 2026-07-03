@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import {
@@ -31,6 +31,7 @@ import {
   removeDesignerCanvasTabFromLatestTabs,
 } from "./designer-canvas-tabs.js";
 import { DesignerCanvasWorkspace } from "./designer-session-page-view.js";
+import { resolveIntegrationConnectionReturnPath } from "./integration-connection-return-path.js";
 import { SessionWorkbenchFullPage } from "./session-workbench-full-page.js";
 
 function useDesignerSessionId(): string {
@@ -120,10 +121,32 @@ function mapDesignerSessionToSandboxStatus(
   };
 }
 
+export function resolveDesignerCanvasReturnTabRequest(input: {
+  openCanvasHref: string | null;
+  openCanvasTabId: string | null;
+}): DesignerCanvasRouteTabShowInput | null {
+  const openCanvasHref = resolveIntegrationConnectionReturnPath(input.openCanvasHref);
+  if (
+    openCanvasHref === null ||
+    input.openCanvasTabId === null ||
+    input.openCanvasTabId.length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    kind: "route",
+    id: input.openCanvasTabId,
+    title: "Integrations",
+    href: openCanvasHref,
+  };
+}
+
 function useDesignerCanvasTabs(designerSession: DesignerSession): {
   activeTabHref: string | null;
   canvasTabs: readonly DesignerSessionCanvasTab[];
   dashboardControlActions: DashboardControlActionSupport;
+  openCanvasRouteTab: (requestedTab: DesignerCanvasRouteTabShowInput) => void;
   removeCanvasTab: (tabId: string) => void;
   setActiveTabHref: (href: string) => void;
   updateCanvasTabs: (tabs: readonly DesignerSessionCanvasTab[]) => void;
@@ -216,6 +239,26 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
     [persistCanvasTabs],
   );
 
+  const openCanvasRouteTab = useCallback(
+    (requestedTab: DesignerCanvasRouteTabShowInput): void => {
+      const nextSave = canvasTabSaveQueueRef.current
+        .catch(() => {})
+        .then(async () => {
+          const nextTabs = upsertDesignerCanvasTab({
+            currentTabs: latestPersistedCanvasTabsRef.current,
+            requestedTab,
+          });
+          await persistCanvasTabs(nextTabs);
+          latestPersistedCanvasTabsRef.current = nextTabs;
+          setCanvasTabs(nextTabs);
+          setActiveTabHref(requestedTab.href);
+        });
+      canvasTabSaveQueueRef.current = nextSave;
+      void nextSave.catch(() => {});
+    },
+    [persistCanvasTabs],
+  );
+
   const dashboardControlActions = useMemo<DashboardControlActionSupport>(
     () => ({
       supportedActions: [DesignerCanvasTabOpenAction, DesignerBlueprintTabUpsertAction],
@@ -234,6 +277,7 @@ function useDesignerCanvasTabs(designerSession: DesignerSession): {
     activeTabHref,
     canvasTabs,
     dashboardControlActions,
+    openCanvasRouteTab,
     removeCanvasTab,
     setActiveTabHref,
     updateCanvasTabs,
@@ -303,6 +347,7 @@ function LoadedDesignerSessionPageStateBoundary(input: {
     activeTabHref,
     canvasTabs,
     dashboardControlActions,
+    openCanvasRouteTab,
     removeCanvasTab,
     setActiveTabHref,
     updateCanvasTabs,
@@ -314,6 +359,7 @@ function LoadedDesignerSessionPageStateBoundary(input: {
       canvasTabs={canvasTabs}
       dashboardControlActions={dashboardControlActions}
       designerSession={input.designerSession}
+      openCanvasRouteTab={openCanvasRouteTab}
       removeCanvasTab={removeCanvasTab}
       requestedRuntimeConversationId={input.requestedRuntimeConversationId}
       searchParams={input.searchParams}
@@ -329,6 +375,7 @@ function LoadedDesignerSessionPage(input: {
   canvasTabs: readonly DesignerSessionCanvasTab[];
   dashboardControlActions: DashboardControlActionSupport;
   designerSession: DesignerSession;
+  openCanvasRouteTab: (requestedTab: DesignerCanvasRouteTabShowInput) => void;
   removeCanvasTab: (tabId: string) => void;
   requestedRuntimeConversationId: string | null;
   searchParams: URLSearchParams;
@@ -373,6 +420,33 @@ function LoadedDesignerSessionPage(input: {
           },
     [input.designerSession.id, input.designerSession.initialPrompt],
   );
+  const openCanvasHrefParam = input.searchParams.get("openCanvasHref");
+  const openCanvasTabId = input.searchParams.get("openCanvasTabId");
+
+  // Synchronize one-shot browser history return params from integration setup into canvas tab state.
+  // Render logic, event handlers, React Query, and remounting cannot consume then replace URL params
+  // after cross-route navigation without repeating the open request or leaving stale history state.
+  useEffect(() => {
+    const returnTabRequest = resolveDesignerCanvasReturnTabRequest({
+      openCanvasHref: openCanvasHrefParam,
+      openCanvasTabId,
+    });
+    if (returnTabRequest === null) {
+      return;
+    }
+
+    input.openCanvasRouteTab(returnTabRequest);
+
+    input.setSearchParams(
+      (currentSearchParams) => {
+        const nextSearchParams = new URLSearchParams(currentSearchParams);
+        nextSearchParams.delete("openCanvasHref");
+        nextSearchParams.delete("openCanvasTabId");
+        return nextSearchParams;
+      },
+      { replace: true },
+    );
+  }, [input.openCanvasRouteTab, input.setSearchParams, openCanvasHrefParam, openCanvasTabId]);
 
   return (
     <SessionWorkbenchFullPage
@@ -413,6 +487,7 @@ function LoadedDesignerSessionPage(input: {
             <main className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
               <DesignerCanvasWorkspace
                 activeTabHref={input.activeTabHref}
+                designerSessionId={input.designerSession.id}
                 mountDockviewWhenEmpty
                 onAddBlueprintComment={onAddBlueprintComment}
                 onActiveTabHrefChange={input.setActiveTabHref}

@@ -7,6 +7,7 @@ import {
   type CreatedIntegrationConnection,
   type DeletedIntegrationConnection,
   type IntegrationConnectionMethod,
+  type IntegrationRedirectReturnContext,
   type SelectedProviderAppSetupInstallation,
   type StartedProviderAppSetup,
   type StartedRedirectConnection,
@@ -247,18 +248,22 @@ export async function startRedirectIntegrationConnection(input: {
   targetKey: string;
   displayName?: string;
   config?: Record<string, unknown>;
+  returnContext?: IntegrationRedirectReturnContext;
 }): Promise<StartedRedirectConnection> {
   try {
     const response = await requestControlPlane({
       operation: "startRedirectIntegrationConnection",
       method: "POST",
       pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth2-authorization-code/start`,
-      ...(input.displayName === undefined && input.config === undefined
+      ...(input.displayName === undefined &&
+      input.config === undefined &&
+      input.returnContext === undefined
         ? {}
         : {
             body: {
               ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
               ...(input.config === undefined ? {} : { config: input.config }),
+              ...(input.returnContext === undefined ? {} : { returnContext: input.returnContext }),
             },
           }),
       fallbackMessage: "Could not start integration connection.",
@@ -280,12 +285,16 @@ export async function startRedirectIntegrationConnection(input: {
 
 export async function startRedirectIntegrationConnectionReauthorization(input: {
   connectionId: string;
+  returnContext?: IntegrationRedirectReturnContext;
 }): Promise<StartedRedirectConnection> {
   try {
     const response = await requestControlPlane({
       operation: "startRedirectIntegrationConnectionReauthorization",
       method: "POST",
       pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/oauth2-authorization-code/reauthorize/start`,
+      ...(input.returnContext === undefined
+        ? {}
+        : { body: { returnContext: input.returnContext } }),
       fallbackMessage: "Could not start integration connection reauthorization.",
     });
 
@@ -414,6 +423,7 @@ export async function cancelDeviceAuthorizationAttempt(input: {
 export async function startRedirectProviderAppSetup(input: {
   connectionId: string;
   routeSegment: string;
+  returnContext?: IntegrationRedirectReturnContext;
   startErrorMessage: string;
   unexpectedResultMessage: string;
 }): Promise<StartedRedirectConnection> {
@@ -421,6 +431,7 @@ export async function startRedirectProviderAppSetup(input: {
     connectionId: input.connectionId,
     routeSegment: input.routeSegment,
     body: {},
+    ...(input.returnContext === undefined ? {} : { returnContext: input.returnContext }),
     fallbackMessage: input.startErrorMessage,
   });
   if (startedSetup.kind !== "redirect") {
@@ -436,6 +447,7 @@ export async function startProviderAppSetup(input: {
   connectionId: string;
   routeSegment: string;
   body: Record<string, unknown>;
+  returnContext?: IntegrationRedirectReturnContext;
   fallbackMessage: string;
 }): Promise<StartedProviderAppSetup> {
   try {
@@ -443,7 +455,13 @@ export async function startProviderAppSetup(input: {
       operation: "startProviderAppSetup",
       method: "POST",
       pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/setup/${encodeURIComponent(input.routeSegment)}/start`,
-      body: input.body,
+      body:
+        input.returnContext === undefined
+          ? input.body
+          : {
+              ...input.body,
+              returnContext: input.returnContext,
+            },
       fallbackMessage: input.fallbackMessage,
     });
 

@@ -4,6 +4,7 @@ import { Navigate, useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
+import type { IntegrationRedirectReturnContext } from "../integrations/integrations-service-shared.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
@@ -17,6 +18,7 @@ import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-st
 export type EmbeddedIntegrationConnectionSetupRoute = {
   targetKey: string;
   connectionId: string;
+  redirectReturnContext?: IntegrationRedirectReturnContext;
   searchParams: URLSearchParams;
   setupRouteSegment: string;
   navigate: (nextHref: string) => void | Promise<void>;
@@ -68,6 +70,9 @@ export function EmbeddedIntegrationConnectionSetupPage(input: {
       connectionId={input.embeddedRoute.connectionId}
       navigate={input.embeddedRoute.navigate}
       redirectWhenComplete={false}
+      {...(input.embeddedRoute.redirectReturnContext === undefined
+        ? {}
+        : { redirectReturnContext: input.embeddedRoute.redirectReturnContext })}
       searchParams={input.embeddedRoute.searchParams}
       setupRouteSegment={input.embeddedRoute.setupRouteSegment}
       targetKey={input.embeddedRoute.targetKey}
@@ -82,6 +87,7 @@ type IntegrationConnectionSetupPageContentInput = {
   description?: string | undefined;
   headerIcon?: React.ReactNode | undefined;
   navigate: (nextHref: string) => void | Promise<void>;
+  redirectReturnContext?: IntegrationRedirectReturnContext;
   redirectWhenComplete: boolean;
   searchParams?: URLSearchParams | undefined;
   setupRouteSegment: string;
@@ -98,6 +104,7 @@ function IntegrationConnectionSetupPageContent(
     description,
     headerIcon,
     navigate,
+    redirectReturnContext,
     redirectWhenComplete,
     searchParams,
     setupRouteSegment,
@@ -239,6 +246,7 @@ function IntegrationConnectionSetupPageContent(
         connection,
         navigate,
         organizationName,
+        ...(redirectReturnContext === undefined ? {} : { redirectReturnContext }),
         searchParams,
         setupRoute,
       })}

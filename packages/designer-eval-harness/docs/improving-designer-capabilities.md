@@ -28,7 +28,7 @@ Good instruction updates are generic and reusable:
 - when to show a blueprint before product mutation
 - how to ask one concrete decision at a time
 - how to distinguish implementation agents from review agents
-- how to disclose incomplete provider setup honestly
+- how to disclose incomplete provider setup accurately
 
 Avoid narrow case scripts in managed instructions. If the guidance only applies to one workflow family, prefer a discoverable reference or skill.
 
@@ -42,9 +42,21 @@ For AI software factories, the reference should be generic across issue systems.
 - workflow states and transition rules
 - implementation and review agent roles
 - feedback loops for improving coding and review quality
-- human operating guides, dummy issues, or README-style rollout docs
+- workflow operating guides, dummy issues, or README-style rollout docs
 
 Reference docs may include provider-specific sections when setup differs by system. For example, Linear and Jira can share the same factory concepts but need separate notes for labels, statuses, fields, issue types, workflows, boards, or JQL/Linear query conventions.
+
+Reference docs should describe reusable domain concepts, configuration awareness, provider-specific mappings, completion criteria, and examples. Avoid session choreography such as exact question order, exact headings, or response templates unless the format is itself the domain artifact being referenced.
+
+Recommended reference doc shape:
+
+- When To Use
+- Core Concepts
+- Workflow Shape
+- Configuration Awareness
+- Provider-Specific Notes
+- Completion Criteria
+- Example Outputs
 
 ### Skills
 
@@ -56,8 +68,8 @@ An AI software factory skill could guide Designer through:
 - drafting the readiness contract
 - mapping issue states and columns
 - deciding whether implementation and review need separate sandbox profiles
-- defining feedback loops and human review gates
-- producing a human operating guide or starter issue
+- defining feedback loops and review gates
+- producing a workflow operating guide or starter issue
 
 Skills should stay generic by default and route into provider-specific references only when system setup details matter.
 

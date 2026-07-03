@@ -1,4 +1,7 @@
-import type { IntegrationConnection } from "../integrations/integrations-service.js";
+import type {
+  IntegrationConnection,
+  IntegrationRedirectReturnContext,
+} from "../integrations/integrations-service.js";
 import { ProviderAppSetupPane } from "./integration-connection-provider-app-setup-pane.js";
 import { ProviderConfigurationSetupPane } from "./integration-connection-provider-configuration-setup-pane.js";
 import {
@@ -14,6 +17,7 @@ function renderProviderAppSetupPane(input: {
   connection: IntegrationConnection;
   navigate: (nextHref: string) => void | Promise<void>;
   organizationName?: string | undefined;
+  redirectReturnContext?: IntegrationRedirectReturnContext;
   searchParams?: URLSearchParams | undefined;
   setupRoute: IntegrationConnectionSetupRoute;
 }): React.JSX.Element {
@@ -28,6 +32,9 @@ function renderProviderAppSetupPane(input: {
       methodId={input.setupRoute.methodId}
       navigate={input.navigate}
       organizationName={input.organizationName}
+      {...(input.redirectReturnContext === undefined
+        ? {}
+        : { redirectReturnContext: input.redirectReturnContext })}
       searchParams={input.searchParams}
       routeSegment={input.setupRoute.routeSegment}
       setupStartForm={resolveIntegrationSetupStartFormOrThrow({
@@ -68,6 +75,7 @@ export function renderIntegrationConnectionSetupPane(input: {
   connection: IntegrationConnection;
   navigate: (nextHref: string) => void | Promise<void>;
   organizationName?: string | undefined;
+  redirectReturnContext?: IntegrationRedirectReturnContext;
   searchParams?: URLSearchParams | undefined;
   setupRoute: IntegrationConnectionSetupRoute;
 }): React.JSX.Element {

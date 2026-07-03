@@ -55,9 +55,19 @@ export function createPendingSessionBlueprintCommentInput(input: {
 }): PendingSessionBlueprintCommentInput {
   return {
     body: input.body,
-    ...(input.item.description === undefined ? {} : { itemDescription: input.item.description }),
+    ...createPendingSessionBlueprintCommentDescriptionData(input.item),
     itemId: input.item.id,
     itemKindLabel: input.itemKindLabel,
     itemLabel: input.itemLabel,
   };
+}
+
+function createPendingSessionBlueprintCommentDescriptionData(
+  item: DesignerBlueprintItem,
+): Pick<PendingSessionBlueprintCommentInput, "itemDescription"> | Record<string, never> {
+  if (item.kind === "trigger" || item.kind === "routing_policy" || item.description === undefined) {
+    return {};
+  }
+
+  return { itemDescription: item.description };
 }

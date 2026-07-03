@@ -406,6 +406,18 @@ export function IntegrationsPage(input?: {
           connectionMethods: selectedDetailConnectionMethods,
         });
 
+  function updateSelectedDetailConnection(nextConnectionId: string | null): void {
+    directoryState.setActiveDetailConnectionId(nextConnectionId);
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (nextConnectionId === null) {
+      nextSearchParams.delete("connectionId");
+    } else {
+      nextSearchParams.set("connectionId", nextConnectionId);
+    }
+
+    setSearchParams(nextSearchParams);
+  }
+
   useEffect(() => {
     const providerAppSetupErrorNotice = resolveProviderAppSetupErrorNotice({
       searchParams,
@@ -479,7 +491,7 @@ export function IntegrationsPage(input?: {
                 targetVariantId: directoryState.selectedDetailCard.target.variantId,
               }),
         })}
-        onSelectedConnectionChange={directoryState.setActiveDetailConnectionId}
+        onSelectedConnectionChange={updateSelectedDetailConnection}
         onDeleteConnection={connectionEditors.onDeleteConnection}
         onEditAuthentication={(connectionId) => {
           const editingConnection =

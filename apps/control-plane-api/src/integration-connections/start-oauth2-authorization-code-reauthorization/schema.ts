@@ -9,6 +9,7 @@ import {
   IntegrationConnectionsConflictCodes,
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
+import { IntegrationRedirectReturnContextSchema } from "../services/redirect-return-context.js";
 import { StartOAuth2AuthorizationCodeConnectionResponseSchema } from "../start-oauth2-authorization-code-connection/schema.js";
 
 export const StartOAuth2AuthorizationCodeConnectionReauthorizationParamsSchema = z
@@ -19,6 +20,12 @@ export const StartOAuth2AuthorizationCodeConnectionReauthorizationParamsSchema =
 
 export const StartOAuth2AuthorizationCodeConnectionReauthorizationResponseSchema =
   StartOAuth2AuthorizationCodeConnectionResponseSchema;
+
+export const StartOAuth2AuthorizationCodeConnectionReauthorizationBodySchema = z
+  .object({
+    returnContext: IntegrationRedirectReturnContextSchema.optional(),
+  })
+  .strict();
 
 export const StartOAuth2AuthorizationCodeConnectionReauthorizationBadRequestResponseSchema =
   z.union([

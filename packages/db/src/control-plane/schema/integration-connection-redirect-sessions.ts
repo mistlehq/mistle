@@ -35,6 +35,8 @@ export function defineIntegrationConnectionRedirectSessions(schema: PgSchema) {
         onDelete: "cascade",
       }),
       state: text("state").notNull(),
+      designerReturnSessionId: text("designer_return_session_id"),
+      designerReturnCanvasTabId: text("designer_return_canvas_tab_id"),
       pkceVerifierEncrypted: text("pkce_verifier_encrypted"),
       providerStateEncrypted: text("provider_state_encrypted"),
       expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),

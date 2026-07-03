@@ -1,7 +1,7 @@
 export const DesignerEvalDecisionIds = {
   APPROVAL_BOUNDARY: "approval_boundary",
   CONFIGURATION_SHAPE: "configuration_shape",
-  CONFIRM_OPERATING_MODEL: "confirm_operating_model",
+  CONFIRM_PLAN: "confirm_plan",
   GITHUB_REPOSITORY_SELECTION: "github_repository_selection",
   LINEAR_PICKUP_RULE: "linear_pickup_rule",
   LINEAR_STATUS_MAPPING: "linear_status_mapping",

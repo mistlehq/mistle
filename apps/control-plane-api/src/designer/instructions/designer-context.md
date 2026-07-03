@@ -6,19 +6,26 @@ Use this context as the Designer session agent's vocabulary for explaining, plan
 - If the user uses a fuzzy or conflicting term, restate it in the closest user-facing term and keep the product mapping clear before acting.
 - Treat `_Maps to_` anchors as internal grounding hints, not words to expose by default.
 - If a product term and a UI label differ, keep the user-facing label stable and use the product term only when precise confirmation matters.
+- Use each term only for its defined product or workflow responsibility. Do not use broader operational words such as "setup", "configure", "run", or "approve" when a narrower term applies.
 - Do not hide multiple product actions behind umbrella verbs such as "launch" or "continue building"; name the concrete next step.
+- When summarizing next steps, name the concrete term or exact user-owned step: App setup, configuration change, Run action, or User action.
 - For reversible sandbox profile edits, describe the concrete edit, such as updating instructions or adding an app, instead of using generic phrases like "draft changes" or "sandbox profile edits".
 
 ## Agent and Workflow Terms
 
-**Blueprint outcome**:
-What the blueprint is organized around: the intended behavior the agent should perform or support.
+**Workflow outcome**:
+What the Workflow is organized around: the intended behavior the Agent should perform or support.
 _Avoid_: Goal, automation, bot logic
 _Maps to_: Designer blueprint outcome; `blueprint.outcome`
 
-**Blueprint**:
-The visual plan shown before configuration changes are made.
-_Avoid_: Workflow map, artifact, draft configuration, graph
+**Workflow**:
+A repeatable operating process that coordinates triggers, Agents, Tasks, runs, product state, approvals, humans, and feedback loops.
+_Avoid_: Workflow blueprint, Sandbox profile, draft configuration
+_Maps to_: Trigger; Sandbox profile; Designer blueprint
+
+**Workflow blueprint**:
+The visual plan Designer shows to align on a proposed Workflow before configuration changes are made. A Workflow blueprint represents workflow behavior; it is not saved product configuration and does not mean the Workflow has been configured.
+_Avoid_: Workflow, configured workflow, sandbox profile edit, setup task, artifact, graph
 _Maps to_: Designer blueprint; `tab.kind: "blueprint"`; `/designer/blueprints/current`
 
 **Trigger**:
@@ -64,35 +71,55 @@ Leave off for ordinary provider workflows where the agent only uses external Con
 
 **Provider tool**:
 A CLI, MCP server, or provider-specific runtime capability selected on an external Connected app binding. Provider tools are what let the configured agent actually use that Connected app inside its sandbox session.
-_Avoid_: Mistle resource access, trigger event, selected repository, App setup step
+_Avoid_: Mistle resource access, trigger event, selected repository, App setup
 _Maps to_: Sandbox profile version integration binding `config.tools`; compiled runtime tool artifacts, MCP servers, and egress routes
 
 Use when the agent workflow needs to read or write provider data, inspect repositories, create branches or pull requests, comment on issues, or use provider APIs from inside the target sandbox profile.
 
 **Agent**:
-The background worker the user is building or changing.
+A configured worker that can perform one or more Tasks. In Mistle, an Agent is backed by a Sandbox profile.
 _Avoid_: Sandbox profile when not selecting or editing the product object directly, Designer runtime
 _Maps to_: Sandbox profile; Sandbox profile version configuration; Trigger; Integration connection
 
+**Task**:
+A category of work an Agent is configured to perform, such as PR review, bug fixing, incident investigation, test generation, documentation updates, or dependency maintenance. A Task describes what the Agent can do; each concrete execution happens through a trigger, user request, run, or sandbox session.
+_Avoid_: Workflow, Workflow blueprint, Sandbox profile, Trigger
+_Maps to_: Agent instructions; Sandbox profile version configuration; selected tools and resources
+
+**Approval boundary**:
+A Workflow rule that decides when the configured Agent can act directly and when it must ask a human for approval or produce a proposal. It is part of Workflow behavior, not permission for Designer to perform aligned configuration changes.
+_Avoid_: Designer configuration approval, Run action approval
+_Maps to_: Agent instructions; approval policy; provider write behavior
+
 **Sandbox profile**:
-The product object that stores and versions the agent's configuration.
+A durable product object that stores and versions an Agent's configuration, including instructions, tools, Connected apps, selected resources, setup/runtime environment, and publishing state.
 _Avoid_: Agent when selecting, reviewing, or editing the product object directly; Designer runtime, sandbox session
 _Maps to_: Sandbox profile; Sandbox profile version; Sandbox profile version configuration
 
 ## Action Terms
 
-**App setup step**:
+**Configuration change**:
+A Designer- or product-side change to aligned Workflow configuration, such as saving Sandbox profile instructions, selecting Connected apps, selecting resources, selecting provider tools, publishing, or creating/editing triggers.
+_Avoid_: App setup, Run action, approval
+_Maps to_: Sandbox profile version configuration; integration bindings; provider resources; triggers; published profile versions
+
+**User action**:
+A concrete next step the user must complete outside Designer's available tools. Use App setup when the user action is provider connection, credential, consent, installation, or external app configuration work. Otherwise, name the exact action instead of introducing a broader process label.
+_Avoid_: Handoff, App setup when the action is not provider connection work, configuration change when Designer can perform it
+_Maps to_: Dashboard route; profile UI; provider admin UI; missing product tool capability
+
+**App setup**:
 A user-owned dashboard step for credentials, provider consent, provider installation, or external app configuration. Preparing or opening it does not need separate approval; completing it stays user-owned in the dashboard. Provider-side changes for app setup happen through that dashboard step, not chat.
 _Avoid_: Sandbox profile edit, agent mutation, chat secret collection
 _Maps to_: User-action integration setup; User-action integration setup descriptor; Designer canvas route
 
 **Publish the profile version**:
-Create a published **Sandbox profile version** from the reviewed **Sandbox profile version configuration**. Ask for explicit approval before publishing.
+Create a published **Sandbox profile version** from the reviewed **Sandbox profile version configuration** after alignment.
 _Avoid_: Apply when the operation publishes a version
 _Maps to_: Published sandbox profile version
 
 **Create a trigger**:
-Create a new trigger record for the workflow. New triggers are enabled by default. Ask for explicit approval before creating it.
+Create a new trigger record for the workflow after alignment. New triggers are enabled by default.
 _Avoid_: Turn on the trigger
 _Maps to_: Trigger
 
@@ -101,7 +128,12 @@ Enable an existing disabled trigger so it can take effect. When this is the alig
 _Avoid_: Create a trigger when the trigger already exists
 _Maps to_: Trigger
 
+**Run action**:
+A user-approved action that tests or executes an aligned Workflow without changing configuration. Start a session is supported today. Simulating a trigger is a desired Run action, but Designer must not claim it can run or has run a trigger simulation unless a supplied product tool explicitly supports it.
+_Avoid_: Configuration change, App setup, trigger creation
+_Maps to_: Sandbox session; future trigger simulation or workflow test tooling
+
 **Start a session**:
-Start a sandbox session so the user can try or run the configured agent directly. Ask for explicit approval before starting it.
+The currently supported Run action. Start a sandbox session so the user can try or run the configured agent directly. Ask for explicit approval before starting it.
 _Avoid_: Publish the profile version
 _Maps to_: Sandbox session

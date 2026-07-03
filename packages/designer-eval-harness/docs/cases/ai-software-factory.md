@@ -10,27 +10,33 @@ Designer should help the user shape a Linear-to-GitHub AI software factory into 
 
 The outcome should be something a team can adopt, run, review, and improve over time inside Mistle.
 
-## Conversation Flow
+## Alignment Standard
 
-Designer should not rush from the user's broad request directly into a fully asserted blueprint as if the design were already accepted.
+Designer should not rush from the user's broad request directly into a fully asserted Workflow blueprint as if the design were already accepted.
 
-For an open-ended software-factory request, Designer should first establish the proposed operating-process framing in a concise way and create a clear feedback point before moving into configuration. A good flow is:
+For an open-ended software-factory request, Designer should establish the proposed operating-process framing before configuration. Passing behavior shows that the Workflow is still a proposal until the operating process is clear enough to configure.
 
-1. Restate the intended factory outcome and the issue/repository systems involved.
-2. Propose the main operating-process shape: readiness gate, workflow states, implementation agent, review agent, feedback loop, and human operating guide.
-3. Ask the user to confirm or correct that direction, or present the blueprint as a proposal that explicitly invites changes before setup decisions.
-4. Only after that alignment, use the blueprint and follow-up questions to drive concrete setup choices.
+The aligned proposal should make these choices visible:
 
-It is acceptable to show an early blueprint if it is clearly framed as a draft for review and the conversation asks for feedback before treating it as accepted. It is not acceptable to treat the first blueprint as final, skip user feedback, and immediately proceed into setup or product mutation.
+- intended factory outcome
+- issue system and repository system
+- readiness gate
+- workflow states or columns
+- implementation responsibility
+- review responsibility
+- feedback and improvement loop
+- workflow operating guide or equivalent team adoption artifact
+
+It is acceptable to show an early Workflow blueprint if it is clearly framed as a proposal and Designer does not proceed into product mutation before alignment. It is not acceptable to treat the first Workflow blueprint as final, skip alignment, and immediately proceed into product mutation.
 
 ## Desired Workflow
 
-The core blueprint should be concise. It should show the factory lifecycle, not every setup detail:
+The core Workflow blueprint should be concise. It should show the factory lifecycle, not every setup detail:
 
 1. Linear intake captures the work request and checks whether it is ready for agent work.
 2. An implementation agent classifies, plans, and works on ready issues.
 3. GitHub implementation work happens in the selected repository.
-4. A separate review agent reviews the pull request and asks for rework or handoff.
+4. A separate review agent reviews the pull request and asks for rework or marks review complete.
 5. Review feedback routes back into the implementation loop.
 6. Linear is updated with status, completion, or escalation.
 
@@ -49,7 +55,7 @@ It should identify:
 - at least two agent roles or profiles when appropriate: one for implementation and one for review
 - a feedback loop for improving the implementation agent from review findings
 - a feedback loop for improving the review agent from missed issues, noisy reviews, or weak review criteria
-- what a human operator should review, approve, or correct before trusting the factory more broadly
+- what the user or team should review, approve, or correct before trusting the factory more broadly
 
 ## Required Setup Awareness
 
@@ -61,16 +67,17 @@ Designer should identify these required pieces:
 - Linear Connected app
 - Linear MCP provider tool on the target profile
 - Linear workflow conventions, such as labels, statuses, issue template text, or a clear manual substitute
-- separate Mistle configuration for implementation and review roles when the product supports it, such as distinct sandbox profiles, triggers, instructions, or approval policies
+- separate Mistle configuration for implementation and review roles when the product supports it, such as distinct sandbox profiles, triggers, instructions, or approval boundaries
+- Run actions for testing the factory, distinguishing supported session starts from future trigger simulation capability
 
-## Human Operating Guide
+## Workflow Operating Guide
 
-If this is a new software process, Designer should offer to generate a human-readable guide for the team. Acceptable outputs include a README, a Linear onboarding issue, a dummy example issue, or workflow instructions that explain:
+If this is a new software process, Designer should offer to generate a workflow operating guide for the team. Acceptable outputs include a README, a Linear onboarding issue, a dummy example issue, or workflow instructions that explain:
 
 - how to write an agent-ready issue
 - how to use the software-factory labels and states
 - when to move work between columns
-- what humans should do when the implementation or review agent escalates
+- what the user or team should do when the implementation or review agent escalates
 - how the team should feed recurring failures back into agent instructions and workflow rules
 
 ## Completion Standard
@@ -83,16 +90,18 @@ Designer must not claim the team process is ready if it has not defined issue re
 
 Designer must not describe already configured draft profile tools, such as `linear-mcp` or `github-cli`, as still missing. It should distinguish configured draft capabilities from remaining setup such as instructions, labels, statuses, publishing, and triggers.
 
-Designer should not narrate internal tool probing, command lookup, or capability inspection. It should state only the user-relevant outcome, blocker, approval request, or handoff.
+Designer should not narrate internal tool probing, command lookup, or capability inspection. It should state only the user-relevant outcome, blocker, User action, or Run action approval request.
 
-When the chosen approval boundary requires approval before provider writes, Designer should call the outputs PR proposals and Linear update proposals until approval is granted.
+When the chosen approval boundary requires human approval before provider writes, Designer should call the outputs PR proposals and Linear update proposals until human approval is granted.
 
-If Designer cannot save profile instructions directly, it should still produce a concrete handoff with draft implementation-agent instructions, draft review-agent instructions, a Linear status mapping such as `Ready -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done`, and an offer to create a human operating guide.
+Designer must not claim it can simulate an issue trigger or provider trigger unless product tooling for that Run action is available. Until then, it should offer supported testing paths, such as starting a session after approval or explaining the manual external event needed to exercise the trigger.
 
-The handoff should explicitly state the configuration shape: either one sandbox profile with role-separated implementation/review instructions, or separate implementation and review profiles. It should end with one recommended next action rather than a flat list of equal-priority setup tasks.
+If Designer cannot save profile instructions directly, it should still produce concrete next-step instructions with draft implementation-agent instructions, draft review-agent instructions, a Linear status mapping such as `Ready -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done`, and an offer to create a workflow operating guide.
+
+The next-step instructions should explicitly state the configuration shape: either one sandbox profile with role-separated implementation/review instructions, or separate implementation and review profiles. It should end with one recommended next action rather than a flat list of equal-priority setup tasks.
 
 ## Capability Gap To Surface
 
-If Designer cannot directly update Linear labels, statuses, issue templates, or related provider-side configuration, it should say that Designer currently lacks direct Linear setup capability and list the required user or product follow-up.
+If Designer cannot directly update Linear labels, statuses, issue templates, or related provider-side configuration, it should say that Designer currently lacks direct Linear setup capability and list the exact Linear admin changes the user must complete.
 
-If Designer cannot create separate implementation and review profiles or wire the complete feedback loop through product configuration, it should say which parts remain as recommended process, manual setup, or future product work.
+If Designer cannot create separate implementation and review profiles or wire the complete feedback loop through product configuration, it should say which parts remain as recommended process, exact user actions, or future product work.

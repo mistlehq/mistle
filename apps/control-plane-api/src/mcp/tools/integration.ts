@@ -547,13 +547,21 @@ async function getIntegrationConnectionForMcp(
           familyId: connection.target.familyId,
           variantId: connection.target.variantId,
         });
+  const repairAction = await describeMcpIntegrationConnectionRepairAction({
+    connection,
+    definition,
+  });
+  const response = buildIntegrationConnectionResponse({
+    connection,
+    ...(definition === undefined ? {} : { connectionMethods: definition.connectionMethods }),
+    configuredSecretNames: configuredSecretNamesByConnectionId.get(connection.id),
+  });
 
   return sanitizeMcpIntegrationConnectionResponse({
-    response: buildIntegrationConnectionResponse({
-      connection,
-      ...(definition === undefined ? {} : { connectionMethods: definition.connectionMethods }),
-      configuredSecretNames: configuredSecretNamesByConnectionId.get(connection.id),
-    }),
+    response: {
+      ...response,
+      ...(repairAction === null ? {} : { repairAction }),
+    },
     definition,
   });
 }
@@ -663,55 +671,89 @@ async function getIntegrationSetupStatusForMcp(
   }
 
   return {
-    items: targets.map((target) => {
-      const definition = getDefinitionOrThrow({
-        integrationRegistry: context.integrationRegistry,
-        target,
-      });
-      const targetConnections = connectionsByTargetKey.get(target.targetKey) ?? [];
-      const activeConnectionCount = targetConnections.filter(
-        (connection) => connection.status === IntegrationConnectionStatuses.ACTIVE,
-      ).length;
+    items: await Promise.all(
+      targets.map(async (target) => {
+        const definition = getDefinitionOrThrow({
+          integrationRegistry: context.integrationRegistry,
+          target,
+        });
+        const targetConnections = connectionsByTargetKey.get(target.targetKey) ?? [];
+        const activeConnectionCount = targetConnections.filter(
+          (connection) => connection.status === IntegrationConnectionStatuses.ACTIVE,
+        ).length;
 
-      return {
-        target: {
-          targetKey: target.targetKey,
-          providerFamilyId: target.familyId,
-          variantId: target.variantId,
-          displayName: definition.displayName,
-        },
-        setup: {
-          setupSupported: definition.connectionMethods.length > 0,
-          requiresSetup: activeConnectionCount === 0,
-          availableMethods: definition.connectionMethods.map((method) => ({
-            methodId: method.id,
-            kind: method.kind,
-            label: method.label,
-            ...(method.kind === "form"
-              ? { secretFieldNames: method.secretFields.map((field) => field.name) }
-              : {}),
-          })),
-        },
-        connections: targetConnections.map((connection) => {
-          const config = readConnectionConfig(connection);
-          const connectionMethod = config["connection_method"];
+        return {
+          target: {
+            targetKey: target.targetKey,
+            providerFamilyId: target.familyId,
+            variantId: target.variantId,
+            displayName: definition.displayName,
+          },
+          setup: {
+            setupSupported: definition.connectionMethods.length > 0,
+            requiresSetup: activeConnectionCount === 0,
+            availableMethods: definition.connectionMethods.map((method) => ({
+              methodId: method.id,
+              kind: method.kind,
+              label: method.label,
+              ...(method.kind === "form"
+                ? { secretFieldNames: method.secretFields.map((field) => field.name) }
+                : {}),
+            })),
+          },
+          connections: await Promise.all(
+            targetConnections.map(async (connection) => {
+              const config = readConnectionConfig(connection);
+              const connectionMethod = config["connection_method"];
+              const repairAction = await describeMcpIntegrationConnectionRepairAction({
+                connection,
+                definition,
+              });
 
-          return {
-            connectionId: connection.id,
-            displayName: connection.displayName,
-            status: connection.status,
-            setupComplete: connection.status === IntegrationConnectionStatuses.ACTIVE,
-            ...(typeof connectionMethod === "string" && connectionMethod.length > 0
-              ? { methodId: connectionMethod }
-              : {}),
-            configuredSecretNames: configuredSecretNamesByConnectionId.get(connection.id) ?? [],
-            createdAt: normalizeDateString(connection.createdAt),
-            updatedAt: normalizeDateString(connection.updatedAt),
-          };
-        }),
-      };
-    }),
+              return {
+                connectionId: connection.id,
+                displayName: connection.displayName,
+                status: connection.status,
+                setupComplete:
+                  connection.status === IntegrationConnectionStatuses.ACTIVE &&
+                  repairAction === null,
+                ...(typeof connectionMethod === "string" && connectionMethod.length > 0
+                  ? { methodId: connectionMethod }
+                  : {}),
+                configuredSecretNames: configuredSecretNamesByConnectionId.get(connection.id) ?? [],
+                ...(repairAction === null ? {} : { repairAction }),
+                createdAt: normalizeDateString(connection.createdAt),
+                updatedAt: normalizeDateString(connection.updatedAt),
+              };
+            }),
+          ),
+        };
+      }),
+    ),
   };
+}
+
+async function describeMcpIntegrationConnectionRepairAction(input: {
+  connection: Pick<
+    PersistedIntegrationConnection,
+    "config" | "externalSubjectId" | "id" | "status"
+  >;
+  definition: AnyIntegrationDefinition | undefined;
+}) {
+  if (input.connection.config === null || input.definition?.connectionRepair === undefined) {
+    return null;
+  }
+
+  return input.definition.connectionRepair.describeRepair({
+    connection: {
+      id: input.connection.id,
+      status: input.connection.status,
+      config: input.connection.config,
+      ...(input.connection.externalSubjectId === null
+        ? {}
+        : { externalSubjectId: input.connection.externalSubjectId }),
+    },
+  });
 }
 
 async function listSetupStatusTargets(

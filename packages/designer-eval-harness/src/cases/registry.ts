@@ -10,15 +10,6 @@ const AiFactoryInternalProgressForbiddenPhrases = [
   "I’ll save the reversible profile configuration",
 ];
 
-const AiFactoryRequiredHandoffSections = [
-  "Implementation agent instructions",
-  "Review agent instructions",
-  "Linear status mapping",
-  "Human operating guide",
-  "Configuration shape",
-  "Next action",
-];
-
 function scriptedAnswerAliases(
   ids: readonly string[],
   value: ScriptedAnswerValue,
@@ -82,12 +73,12 @@ const GithubPrReviewBasicCase: DesignerEvalCase = {
     },
   },
   scriptedInputs: {
-    [DesignerEvalDecisionIds.CONFIRM_OPERATING_MODEL]: {
+    [DesignerEvalDecisionIds.CONFIRM_PLAN]: {
       kind: "answers",
       answers: [
         {
-          id: DesignerEvalDecisionIds.CONFIRM_OPERATING_MODEL,
-          value: "Use this model",
+          id: DesignerEvalDecisionIds.CONFIRM_PLAN,
+          value: "Use this plan",
         },
       ],
     },
@@ -255,14 +246,13 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     ),
     ...scriptedAnswerAliases(
       [
-        DesignerEvalDecisionIds.CONFIRM_OPERATING_MODEL,
-        "confirm_ai_factory_model",
-        "operating_model",
-        "ai_factory_operating_model",
-        "ai_software_factory_operating_model",
-        "software_factory_operating_model",
-        "confirm_factory_model",
-        "factory_operating_model",
+        DesignerEvalDecisionIds.CONFIRM_PLAN,
+        "confirm_ai_factory_plan",
+        "ai_factory_plan",
+        "ai_software_factory_plan",
+        "software_factory_plan",
+        "confirm_factory_plan",
+        "factory_plan",
       ],
       "Add review agent",
     ),
@@ -271,8 +261,8 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
         "workflow_approval_boundary",
         DesignerEvalDecisionIds.APPROVAL_BOUNDARY,
         "pr_approval_boundary",
-        "pr_handoff_boundary",
-        "handoff_boundary",
+        "pr_readiness_boundary",
+        "readiness_boundary",
         "human_review_boundary",
       ],
       "Ask before creating pull requests or posting Linear updates",
@@ -383,7 +373,30 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     },
     {
       kind: "transcript-includes-required-phrases",
-      label: "Factory configuration handoff",
+      label: "Factory configuration next steps",
+      requiredPhrases: [
+        "Implementation agent instructions",
+        "Review agent instructions",
+        "Ready -> Agent In Progress -> Ready for Review",
+        "operating guide",
+        "Configuration shape",
+        "one sandbox profile",
+        "role-separated",
+        "Next action",
+      ],
+    },
+  ],
+};
+
+const AiSoftwareFactoryNextStepQualityCase: DesignerEvalCase = {
+  ...AiSoftwareFactoryLinearGithubCase,
+  id: "ai-software-factory-next-step-quality",
+  prompt:
+    "Build an AI software factory with Linear and GitHub. Stop once the blueprint, repository choice, approval boundary, and profile configuration next steps are ready.",
+  assertions: [
+    {
+      kind: "transcript-includes-required-phrases",
+      label: "Factory configuration next steps",
       requiredPhrases: [
         "Implementation agent instructions",
         "Review agent instructions",
@@ -396,25 +409,6 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
       ],
     },
     {
-      kind: "transcript-includes-sections",
-      label: "Factory handoff sections",
-      requiredSections: AiFactoryRequiredHandoffSections,
-    },
-  ],
-};
-
-const AiSoftwareFactoryHandoffQualityCase: DesignerEvalCase = {
-  ...AiSoftwareFactoryLinearGithubCase,
-  id: "ai-software-factory-handoff-quality",
-  prompt:
-    "Build an AI software factory with Linear and GitHub. Stop once the blueprint, repository choice, approval boundary, and profile configuration handoff are ready.",
-  assertions: [
-    {
-      kind: "transcript-includes-sections",
-      label: "Factory handoff sections",
-      requiredSections: AiFactoryRequiredHandoffSections,
-    },
-    {
       kind: "transcript-excludes-internal-progress",
       forbiddenPhrases: AiFactoryInternalProgressForbiddenPhrases,
     },
@@ -424,7 +418,7 @@ const AiSoftwareFactoryHandoffQualityCase: DesignerEvalCase = {
 const Cases = [
   GithubPrReviewBasicCase,
   AiSoftwareFactoryLinearGithubCase,
-  AiSoftwareFactoryHandoffQualityCase,
+  AiSoftwareFactoryNextStepQualityCase,
 ];
 
 export function listDesignerEvalCases(): readonly DesignerEvalCase[] {
