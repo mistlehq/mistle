@@ -451,7 +451,7 @@ const StoryDesignerSessionPendingBlueprintComments = [
     body: "Split urgent customer escalations from ordinary severity labels so the routing policy does not over-escalate noisy issues.",
     itemId: "routing",
     itemKindLabel: "Routing policy",
-    itemLabel: "Routing policy",
+    itemLabel: "Routing: Escalations",
   },
 ] satisfies readonly PendingSessionBlueprintComment[];
 
@@ -464,7 +464,7 @@ const StoryDesignerSessionLongPendingBlueprintComments = [
     ].join("\n\n"),
     itemId: "routing",
     itemKindLabel: "Routing policy",
-    itemLabel: "Routing policy",
+    itemLabel: "Routing: Escalations",
   },
 ] satisfies readonly PendingSessionBlueprintComment[];
 
@@ -785,7 +785,7 @@ function BlueprintCommentStateGalleryStory(): React.JSX.Element {
         <div className="grid gap-8 lg:grid-cols-2">
           <BlueprintCommentStatePreview floating={false} title="Collapsed pending comment">
             <DesignerBlueprintCollapsedCommentButton
-              label="Open blueprint comment for Routing policy"
+              label="Open blueprint comment for Routing: Escalations"
               onOpen={function onOpen() {}}
             />
           </BlueprintCommentStatePreview>
@@ -845,10 +845,12 @@ function BlueprintCommentStatePreview(input: {
                 <span className="size-3 rounded-full bg-muted-foreground/50" />
               </span>
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-medium leading-snug">Routing policy</h3>
-                <p className="mt-2 rounded-sm bg-muted px-2 py-1 text-xs leading-relaxed text-muted-foreground">
-                  Escalations: severity includes urgent -&gt; escalate
-                </p>
+                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 rounded-sm bg-muted/45 px-2.5 py-1.5 text-sm">
+                  <span className="rounded-sm border border-border bg-background px-1.5 py-0.5 text-xs font-medium uppercase text-muted-foreground">
+                    If
+                  </span>
+                  <span className="truncate font-medium">Escalations</span>
+                </div>
               </div>
             </div>
           </div>

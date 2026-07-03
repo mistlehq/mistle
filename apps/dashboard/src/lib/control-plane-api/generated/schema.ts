@@ -1080,14 +1080,10 @@ export interface paths {
                               | "blocked";
                           }
                         | {
-                            description?: string;
-                            eventLabel?: string;
                             id: string;
-                            integrationLabel?: string;
                             integrationTargetKey?: string;
                             /** @enum {string} */
                             kind: "trigger";
-                            label: string;
                             parentId?: string;
                             /** @enum {string} */
                             state:
@@ -1096,16 +1092,17 @@ export interface paths {
                               | "ready_to_confirm"
                               | "applied"
                               | "blocked";
+                            when: {
+                              label: string;
+                            }[];
                           }
                         | {
-                            description?: string;
                             id: string;
                             /** @enum {string} */
                             kind: "routing_policy";
-                            label: string;
                             parentId?: string;
                             rules: {
-                              label?: string;
+                              conditionLabel: string;
                               routeTo?: string;
                               when: {
                                 field: string;
@@ -1318,14 +1315,10 @@ export interface paths {
                             | "blocked";
                         }
                       | {
-                          description?: string;
-                          eventLabel?: string;
                           id: string;
-                          integrationLabel?: string;
                           integrationTargetKey?: string;
                           /** @enum {string} */
                           kind: "trigger";
-                          label: string;
                           parentId?: string;
                           /** @enum {string} */
                           state:
@@ -1334,16 +1327,17 @@ export interface paths {
                             | "ready_to_confirm"
                             | "applied"
                             | "blocked";
+                          when: {
+                            label: string;
+                          }[];
                         }
                       | {
-                          description?: string;
                           id: string;
                           /** @enum {string} */
                           kind: "routing_policy";
-                          label: string;
                           parentId?: string;
                           rules: {
-                            label?: string;
+                            conditionLabel: string;
                             routeTo?: string;
                             when: {
                               field: string;
@@ -1450,14 +1444,10 @@ export interface paths {
                               | "blocked";
                           }
                         | {
-                            description?: string;
-                            eventLabel?: string;
                             id: string;
-                            integrationLabel?: string;
                             integrationTargetKey?: string;
                             /** @enum {string} */
                             kind: "trigger";
-                            label: string;
                             parentId?: string;
                             /** @enum {string} */
                             state:
@@ -1466,16 +1456,17 @@ export interface paths {
                               | "ready_to_confirm"
                               | "applied"
                               | "blocked";
+                            when: {
+                              label: string;
+                            }[];
                           }
                         | {
-                            description?: string;
                             id: string;
                             /** @enum {string} */
                             kind: "routing_policy";
-                            label: string;
                             parentId?: string;
                             rules: {
-                              label?: string;
+                              conditionLabel: string;
                               routeTo?: string;
                               when: {
                                 field: string;
@@ -1794,14 +1785,10 @@ export interface paths {
                               | "blocked";
                           }
                         | {
-                            description?: string;
-                            eventLabel?: string;
                             id: string;
-                            integrationLabel?: string;
                             integrationTargetKey?: string;
                             /** @enum {string} */
                             kind: "trigger";
-                            label: string;
                             parentId?: string;
                             /** @enum {string} */
                             state:
@@ -1810,16 +1797,17 @@ export interface paths {
                               | "ready_to_confirm"
                               | "applied"
                               | "blocked";
+                            when: {
+                              label: string;
+                            }[];
                           }
                         | {
-                            description?: string;
                             id: string;
                             /** @enum {string} */
                             kind: "routing_policy";
-                            label: string;
                             parentId?: string;
                             rules: {
-                              label?: string;
+                              conditionLabel: string;
                               routeTo?: string;
                               when: {
                                 field: string;
@@ -2041,14 +2029,10 @@ export interface paths {
                               | "blocked";
                           }
                         | {
-                            description?: string;
-                            eventLabel?: string;
                             id: string;
-                            integrationLabel?: string;
                             integrationTargetKey?: string;
                             /** @enum {string} */
                             kind: "trigger";
-                            label: string;
                             parentId?: string;
                             /** @enum {string} */
                             state:
@@ -2057,16 +2041,17 @@ export interface paths {
                               | "ready_to_confirm"
                               | "applied"
                               | "blocked";
+                            when: {
+                              label: string;
+                            }[];
                           }
                         | {
-                            description?: string;
                             id: string;
                             /** @enum {string} */
                             kind: "routing_policy";
-                            label: string;
                             parentId?: string;
                             rules: {
-                              label?: string;
+                              conditionLabel: string;
                               routeTo?: string;
                               when: {
                                 field: string;
@@ -2279,14 +2264,10 @@ export interface paths {
                             | "blocked";
                         }
                       | {
-                          description?: string;
-                          eventLabel?: string;
                           id: string;
-                          integrationLabel?: string;
                           integrationTargetKey?: string;
                           /** @enum {string} */
                           kind: "trigger";
-                          label: string;
                           parentId?: string;
                           /** @enum {string} */
                           state:
@@ -2295,16 +2276,17 @@ export interface paths {
                             | "ready_to_confirm"
                             | "applied"
                             | "blocked";
+                          when: {
+                            label: string;
+                          }[];
                         }
                       | {
-                          description?: string;
                           id: string;
                           /** @enum {string} */
                           kind: "routing_policy";
-                          label: string;
                           parentId?: string;
                           rules: {
-                            label?: string;
+                            conditionLabel: string;
                             routeTo?: string;
                             when: {
                               field: string;
@@ -2411,14 +2393,10 @@ export interface paths {
                               | "blocked";
                           }
                         | {
-                            description?: string;
-                            eventLabel?: string;
                             id: string;
-                            integrationLabel?: string;
                             integrationTargetKey?: string;
                             /** @enum {string} */
                             kind: "trigger";
-                            label: string;
                             parentId?: string;
                             /** @enum {string} */
                             state:
@@ -2427,16 +2405,17 @@ export interface paths {
                               | "ready_to_confirm"
                               | "applied"
                               | "blocked";
+                            when: {
+                              label: string;
+                            }[];
                           }
                         | {
-                            description?: string;
                             id: string;
                             /** @enum {string} */
                             kind: "routing_policy";
-                            label: string;
                             parentId?: string;
                             rules: {
-                              label?: string;
+                              conditionLabel: string;
                               routeTo?: string;
                               when: {
                                 field: string;

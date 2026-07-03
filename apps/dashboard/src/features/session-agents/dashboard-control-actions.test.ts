@@ -20,6 +20,8 @@ import {
 
 describe("dashboard control actions", () => {
   it("exposes a Designer canvas tab show dynamic tool spec", () => {
+    const serializedToolSpec = JSON.stringify(DesignerCanvasTabShowDynamicToolSpec);
+
     expect(DesignerCanvasTabShowDynamicToolSpec).toMatchObject({
       namespace: DashboardControlDynamicToolNamespace,
       name: DesignerCanvasTabShowDynamicToolName,
@@ -157,6 +159,9 @@ describe("dashboard control actions", () => {
         },
       },
     });
+    expect(serializedToolSpec).toContain("conditionLabel");
+    expect(serializedToolSpec).not.toContain("eventLabel");
+    expect(serializedToolSpec).not.toContain("integrationLabel");
   });
 
   it("exposes a Designer user input dynamic tool spec", () => {

@@ -39,7 +39,7 @@ Keep the Workflow blueprint focused on factory behavior, not setup tasks. For an
 
 When using a separate review agent, do not add a separate "PR ready for review" trigger node unless the workflow has multiple independent entry points. Keep the PR output and the review-agent step adjacent so the core factory stays within 6-8 items.
 
-Name the review routing item as a feedback route or otherwise use the word `feedback` in the latest Workflow blueprint. The factory must visibly route review feedback back to implementation.
+Use a review routing rule with a visible feedback condition, such as `Feedback requested`, that routes back to implementation. The factory must visibly route review feedback back to implementation.
 
 Good Workflow blueprint items usually include:
 

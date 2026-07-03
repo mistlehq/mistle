@@ -2358,11 +2358,11 @@ function formatDesignerBlueprintKindLabel(input: {
 }): string {
   const item = input.item;
   if (item.kind === "trigger") {
-    const integrationLabel =
+    const triggerSourceLabel =
       item.integrationTargetKey === undefined
         ? undefined
         : input.integrationMetadataByTargetKey.get(item.integrationTargetKey)?.displayName;
-    return integrationLabel === undefined ? "Trigger" : `${integrationLabel} · Trigger`;
+    return triggerSourceLabel === undefined ? "Trigger" : `${triggerSourceLabel} · Trigger`;
   }
 
   return formatDesignerBlueprintKind(item.kind);
@@ -2378,12 +2378,16 @@ function formatDesignerBlueprintKind(kind: DesignerBlueprintItem["kind"]): strin
 function formatDesignerBlueprintNodeLabel(item: DesignerBlueprintItem): string {
   if (item.kind === "trigger") {
     const firstCondition = getRequiredDesignerBlueprintFirstTriggerCondition(item);
-    return item.when.length === 1 ? firstCondition.label : "Trigger";
+    return item.when.length === 1
+      ? `Trigger: ${firstCondition.label}`
+      : `Trigger: ${firstCondition.label} + ${String(item.when.length - 1)}`;
   }
 
   if (item.kind === "routing_policy") {
     const firstRule = getRequiredDesignerBlueprintFirstRoutingRule(item);
-    return item.rules.length === 1 ? `Route: ${firstRule.conditionLabel}` : "Routing policy";
+    return item.rules.length === 1
+      ? `Routing: ${firstRule.conditionLabel}`
+      : `Routing: ${firstRule.conditionLabel} + ${String(item.rules.length - 1)}`;
   }
 
   return item.label;

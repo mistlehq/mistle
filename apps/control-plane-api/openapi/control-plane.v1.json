@@ -883,16 +883,6 @@
                                               "minLength": 1,
                                               "maxLength": 128
                                             },
-                                            "label": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
-                                            },
-                                            "description": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 2000
-                                            },
                                             "parentId": {
                                               "type": "string",
                                               "minLength": 1,
@@ -911,18 +901,6 @@
                                             "kind": {
                                               "type": "string",
                                               "enum": ["agent_step", "workflow_output"]
-                                            }
-                                          },
-                                          "required": ["id", "label", "state", "kind"],
-                                          "additionalProperties": false
-                                        },
-                                        {
-                                          "type": "object",
-                                          "properties": {
-                                            "id": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 128
                                             },
                                             "label": {
                                               "type": "string",
@@ -933,6 +911,18 @@
                                               "type": "string",
                                               "minLength": 1,
                                               "maxLength": 2000
+                                            }
+                                          },
+                                          "required": ["id", "state", "kind", "label"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
                                             },
                                             "parentId": {
                                               "type": "string",
@@ -958,18 +948,25 @@
                                               "minLength": 1,
                                               "maxLength": 128
                                             },
-                                            "integrationLabel": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 80
-                                            },
-                                            "eventLabel": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
+                                            "when": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 160
+                                                  }
+                                                },
+                                                "required": ["label"],
+                                                "additionalProperties": false
+                                              },
+                                              "minItems": 1,
+                                              "maxItems": 20
                                             }
                                           },
-                                          "required": ["id", "label", "state", "kind"],
+                                          "required": ["id", "state", "kind", "when"],
                                           "additionalProperties": false
                                         },
                                         {
@@ -979,16 +976,6 @@
                                               "type": "string",
                                               "minLength": 1,
                                               "maxLength": 128
-                                            },
-                                            "label": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
-                                            },
-                                            "description": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 2000
                                             },
                                             "parentId": {
                                               "type": "string",
@@ -1014,7 +1001,7 @@
                                               "items": {
                                                 "type": "object",
                                                 "properties": {
-                                                  "label": {
+                                                  "conditionLabel": {
                                                     "type": "string",
                                                     "minLength": 1,
                                                     "maxLength": 160
@@ -1076,14 +1063,14 @@
                                                     "maxLength": 128
                                                   }
                                                 },
-                                                "required": ["when"],
+                                                "required": ["conditionLabel", "when"],
                                                 "additionalProperties": false
                                               },
                                               "minItems": 1,
                                               "maxItems": 20
                                             }
                                           },
-                                          "required": ["id", "label", "state", "kind", "rules"],
+                                          "required": ["id", "state", "kind", "rules"],
                                           "additionalProperties": false
                                         }
                                       ]
@@ -1913,16 +1900,6 @@
                                               "minLength": 1,
                                               "maxLength": 128
                                             },
-                                            "label": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
-                                            },
-                                            "description": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 2000
-                                            },
                                             "parentId": {
                                               "type": "string",
                                               "minLength": 1,
@@ -1941,18 +1918,6 @@
                                             "kind": {
                                               "type": "string",
                                               "enum": ["agent_step", "workflow_output"]
-                                            }
-                                          },
-                                          "required": ["id", "label", "state", "kind"],
-                                          "additionalProperties": false
-                                        },
-                                        {
-                                          "type": "object",
-                                          "properties": {
-                                            "id": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 128
                                             },
                                             "label": {
                                               "type": "string",
@@ -1963,6 +1928,18 @@
                                               "type": "string",
                                               "minLength": 1,
                                               "maxLength": 2000
+                                            }
+                                          },
+                                          "required": ["id", "state", "kind", "label"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
                                             },
                                             "parentId": {
                                               "type": "string",
@@ -1988,18 +1965,25 @@
                                               "minLength": 1,
                                               "maxLength": 128
                                             },
-                                            "integrationLabel": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 80
-                                            },
-                                            "eventLabel": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
+                                            "when": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 160
+                                                  }
+                                                },
+                                                "required": ["label"],
+                                                "additionalProperties": false
+                                              },
+                                              "minItems": 1,
+                                              "maxItems": 20
                                             }
                                           },
-                                          "required": ["id", "label", "state", "kind"],
+                                          "required": ["id", "state", "kind", "when"],
                                           "additionalProperties": false
                                         },
                                         {
@@ -2009,16 +1993,6 @@
                                               "type": "string",
                                               "minLength": 1,
                                               "maxLength": 128
-                                            },
-                                            "label": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
-                                            },
-                                            "description": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 2000
                                             },
                                             "parentId": {
                                               "type": "string",
@@ -2044,7 +2018,7 @@
                                               "items": {
                                                 "type": "object",
                                                 "properties": {
-                                                  "label": {
+                                                  "conditionLabel": {
                                                     "type": "string",
                                                     "minLength": 1,
                                                     "maxLength": 160
@@ -2106,14 +2080,14 @@
                                                     "maxLength": 128
                                                   }
                                                 },
-                                                "required": ["when"],
+                                                "required": ["conditionLabel", "when"],
                                                 "additionalProperties": false
                                               },
                                               "minItems": 1,
                                               "maxItems": 20
                                             }
                                           },
-                                          "required": ["id", "label", "state", "kind", "rules"],
+                                          "required": ["id", "state", "kind", "rules"],
                                           "additionalProperties": false
                                         }
                                       ]
@@ -2438,16 +2412,6 @@
                                             "minLength": 1,
                                             "maxLength": 128
                                           },
-                                          "label": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 160
-                                          },
-                                          "description": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 2000
-                                          },
                                           "parentId": {
                                             "type": "string",
                                             "minLength": 1,
@@ -2466,18 +2430,6 @@
                                           "kind": {
                                             "type": "string",
                                             "enum": ["agent_step", "workflow_output"]
-                                          }
-                                        },
-                                        "required": ["id", "label", "state", "kind"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "id": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 128
                                           },
                                           "label": {
                                             "type": "string",
@@ -2488,6 +2440,18 @@
                                             "type": "string",
                                             "minLength": 1,
                                             "maxLength": 2000
+                                          }
+                                        },
+                                        "required": ["id", "state", "kind", "label"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
                                           },
                                           "parentId": {
                                             "type": "string",
@@ -2513,18 +2477,25 @@
                                             "minLength": 1,
                                             "maxLength": 128
                                           },
-                                          "integrationLabel": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 80
-                                          },
-                                          "eventLabel": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 160
+                                          "when": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "label": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 160
+                                                }
+                                              },
+                                              "required": ["label"],
+                                              "additionalProperties": false
+                                            },
+                                            "minItems": 1,
+                                            "maxItems": 20
                                           }
                                         },
-                                        "required": ["id", "label", "state", "kind"],
+                                        "required": ["id", "state", "kind", "when"],
                                         "additionalProperties": false
                                       },
                                       {
@@ -2534,16 +2505,6 @@
                                             "type": "string",
                                             "minLength": 1,
                                             "maxLength": 128
-                                          },
-                                          "label": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 160
-                                          },
-                                          "description": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 2000
                                           },
                                           "parentId": {
                                             "type": "string",
@@ -2569,7 +2530,7 @@
                                             "items": {
                                               "type": "object",
                                               "properties": {
-                                                "label": {
+                                                "conditionLabel": {
                                                   "type": "string",
                                                   "minLength": 1,
                                                   "maxLength": 160
@@ -2631,14 +2592,14 @@
                                                   "maxLength": 128
                                                 }
                                               },
-                                              "required": ["when"],
+                                              "required": ["conditionLabel", "when"],
                                               "additionalProperties": false
                                             },
                                             "minItems": 1,
                                             "maxItems": 20
                                           }
                                         },
-                                        "required": ["id", "label", "state", "kind", "rules"],
+                                        "required": ["id", "state", "kind", "rules"],
                                         "additionalProperties": false
                                       }
                                     ]
@@ -2933,16 +2894,6 @@
                                               "minLength": 1,
                                               "maxLength": 128
                                             },
-                                            "label": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
-                                            },
-                                            "description": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 2000
-                                            },
                                             "parentId": {
                                               "type": "string",
                                               "minLength": 1,
@@ -2961,18 +2912,6 @@
                                             "kind": {
                                               "type": "string",
                                               "enum": ["agent_step", "workflow_output"]
-                                            }
-                                          },
-                                          "required": ["id", "label", "state", "kind"],
-                                          "additionalProperties": false
-                                        },
-                                        {
-                                          "type": "object",
-                                          "properties": {
-                                            "id": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 128
                                             },
                                             "label": {
                                               "type": "string",
@@ -2983,6 +2922,18 @@
                                               "type": "string",
                                               "minLength": 1,
                                               "maxLength": 2000
+                                            }
+                                          },
+                                          "required": ["id", "state", "kind", "label"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
                                             },
                                             "parentId": {
                                               "type": "string",
@@ -3008,18 +2959,25 @@
                                               "minLength": 1,
                                               "maxLength": 128
                                             },
-                                            "integrationLabel": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 80
-                                            },
-                                            "eventLabel": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
+                                            "when": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 160
+                                                  }
+                                                },
+                                                "required": ["label"],
+                                                "additionalProperties": false
+                                              },
+                                              "minItems": 1,
+                                              "maxItems": 20
                                             }
                                           },
-                                          "required": ["id", "label", "state", "kind"],
+                                          "required": ["id", "state", "kind", "when"],
                                           "additionalProperties": false
                                         },
                                         {
@@ -3029,16 +2987,6 @@
                                               "type": "string",
                                               "minLength": 1,
                                               "maxLength": 128
-                                            },
-                                            "label": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
-                                            },
-                                            "description": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 2000
                                             },
                                             "parentId": {
                                               "type": "string",
@@ -3064,7 +3012,7 @@
                                               "items": {
                                                 "type": "object",
                                                 "properties": {
-                                                  "label": {
+                                                  "conditionLabel": {
                                                     "type": "string",
                                                     "minLength": 1,
                                                     "maxLength": 160
@@ -3126,14 +3074,14 @@
                                                     "maxLength": 128
                                                   }
                                                 },
-                                                "required": ["when"],
+                                                "required": ["conditionLabel", "when"],
                                                 "additionalProperties": false
                                               },
                                               "minItems": 1,
                                               "maxItems": 20
                                             }
                                           },
-                                          "required": ["id", "label", "state", "kind", "rules"],
+                                          "required": ["id", "state", "kind", "rules"],
                                           "additionalProperties": false
                                         }
                                       ]
@@ -3548,16 +3496,6 @@
                                               "minLength": 1,
                                               "maxLength": 128
                                             },
-                                            "label": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
-                                            },
-                                            "description": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 2000
-                                            },
                                             "parentId": {
                                               "type": "string",
                                               "minLength": 1,
@@ -3576,18 +3514,6 @@
                                             "kind": {
                                               "type": "string",
                                               "enum": ["agent_step", "workflow_output"]
-                                            }
-                                          },
-                                          "required": ["id", "label", "state", "kind"],
-                                          "additionalProperties": false
-                                        },
-                                        {
-                                          "type": "object",
-                                          "properties": {
-                                            "id": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 128
                                             },
                                             "label": {
                                               "type": "string",
@@ -3598,6 +3524,18 @@
                                               "type": "string",
                                               "minLength": 1,
                                               "maxLength": 2000
+                                            }
+                                          },
+                                          "required": ["id", "state", "kind", "label"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
                                             },
                                             "parentId": {
                                               "type": "string",
@@ -3623,18 +3561,25 @@
                                               "minLength": 1,
                                               "maxLength": 128
                                             },
-                                            "integrationLabel": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 80
-                                            },
-                                            "eventLabel": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
+                                            "when": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 160
+                                                  }
+                                                },
+                                                "required": ["label"],
+                                                "additionalProperties": false
+                                              },
+                                              "minItems": 1,
+                                              "maxItems": 20
                                             }
                                           },
-                                          "required": ["id", "label", "state", "kind"],
+                                          "required": ["id", "state", "kind", "when"],
                                           "additionalProperties": false
                                         },
                                         {
@@ -3644,16 +3589,6 @@
                                               "type": "string",
                                               "minLength": 1,
                                               "maxLength": 128
-                                            },
-                                            "label": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
-                                            },
-                                            "description": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 2000
                                             },
                                             "parentId": {
                                               "type": "string",
@@ -3679,7 +3614,7 @@
                                               "items": {
                                                 "type": "object",
                                                 "properties": {
-                                                  "label": {
+                                                  "conditionLabel": {
                                                     "type": "string",
                                                     "minLength": 1,
                                                     "maxLength": 160
@@ -3741,14 +3676,14 @@
                                                     "maxLength": 128
                                                   }
                                                 },
-                                                "required": ["when"],
+                                                "required": ["conditionLabel", "when"],
                                                 "additionalProperties": false
                                               },
                                               "minItems": 1,
                                               "maxItems": 20
                                             }
                                           },
-                                          "required": ["id", "label", "state", "kind", "rules"],
+                                          "required": ["id", "state", "kind", "rules"],
                                           "additionalProperties": false
                                         }
                                       ]
@@ -4073,16 +4008,6 @@
                                             "minLength": 1,
                                             "maxLength": 128
                                           },
-                                          "label": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 160
-                                          },
-                                          "description": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 2000
-                                          },
                                           "parentId": {
                                             "type": "string",
                                             "minLength": 1,
@@ -4101,18 +4026,6 @@
                                           "kind": {
                                             "type": "string",
                                             "enum": ["agent_step", "workflow_output"]
-                                          }
-                                        },
-                                        "required": ["id", "label", "state", "kind"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "id": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 128
                                           },
                                           "label": {
                                             "type": "string",
@@ -4123,6 +4036,18 @@
                                             "type": "string",
                                             "minLength": 1,
                                             "maxLength": 2000
+                                          }
+                                        },
+                                        "required": ["id", "state", "kind", "label"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 128
                                           },
                                           "parentId": {
                                             "type": "string",
@@ -4148,18 +4073,25 @@
                                             "minLength": 1,
                                             "maxLength": 128
                                           },
-                                          "integrationLabel": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 80
-                                          },
-                                          "eventLabel": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 160
+                                          "when": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "label": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 160
+                                                }
+                                              },
+                                              "required": ["label"],
+                                              "additionalProperties": false
+                                            },
+                                            "minItems": 1,
+                                            "maxItems": 20
                                           }
                                         },
-                                        "required": ["id", "label", "state", "kind"],
+                                        "required": ["id", "state", "kind", "when"],
                                         "additionalProperties": false
                                       },
                                       {
@@ -4169,16 +4101,6 @@
                                             "type": "string",
                                             "minLength": 1,
                                             "maxLength": 128
-                                          },
-                                          "label": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 160
-                                          },
-                                          "description": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 2000
                                           },
                                           "parentId": {
                                             "type": "string",
@@ -4204,7 +4126,7 @@
                                             "items": {
                                               "type": "object",
                                               "properties": {
-                                                "label": {
+                                                "conditionLabel": {
                                                   "type": "string",
                                                   "minLength": 1,
                                                   "maxLength": 160
@@ -4266,14 +4188,14 @@
                                                   "maxLength": 128
                                                 }
                                               },
-                                              "required": ["when"],
+                                              "required": ["conditionLabel", "when"],
                                               "additionalProperties": false
                                             },
                                             "minItems": 1,
                                             "maxItems": 20
                                           }
                                         },
-                                        "required": ["id", "label", "state", "kind", "rules"],
+                                        "required": ["id", "state", "kind", "rules"],
                                         "additionalProperties": false
                                       }
                                     ]
@@ -4568,16 +4490,6 @@
                                               "minLength": 1,
                                               "maxLength": 128
                                             },
-                                            "label": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
-                                            },
-                                            "description": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 2000
-                                            },
                                             "parentId": {
                                               "type": "string",
                                               "minLength": 1,
@@ -4596,18 +4508,6 @@
                                             "kind": {
                                               "type": "string",
                                               "enum": ["agent_step", "workflow_output"]
-                                            }
-                                          },
-                                          "required": ["id", "label", "state", "kind"],
-                                          "additionalProperties": false
-                                        },
-                                        {
-                                          "type": "object",
-                                          "properties": {
-                                            "id": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 128
                                             },
                                             "label": {
                                               "type": "string",
@@ -4618,6 +4518,18 @@
                                               "type": "string",
                                               "minLength": 1,
                                               "maxLength": 2000
+                                            }
+                                          },
+                                          "required": ["id", "state", "kind", "label"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 128
                                             },
                                             "parentId": {
                                               "type": "string",
@@ -4643,18 +4555,25 @@
                                               "minLength": 1,
                                               "maxLength": 128
                                             },
-                                            "integrationLabel": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 80
-                                            },
-                                            "eventLabel": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
+                                            "when": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1,
+                                                    "maxLength": 160
+                                                  }
+                                                },
+                                                "required": ["label"],
+                                                "additionalProperties": false
+                                              },
+                                              "minItems": 1,
+                                              "maxItems": 20
                                             }
                                           },
-                                          "required": ["id", "label", "state", "kind"],
+                                          "required": ["id", "state", "kind", "when"],
                                           "additionalProperties": false
                                         },
                                         {
@@ -4664,16 +4583,6 @@
                                               "type": "string",
                                               "minLength": 1,
                                               "maxLength": 128
-                                            },
-                                            "label": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 160
-                                            },
-                                            "description": {
-                                              "type": "string",
-                                              "minLength": 1,
-                                              "maxLength": 2000
                                             },
                                             "parentId": {
                                               "type": "string",
@@ -4699,7 +4608,7 @@
                                               "items": {
                                                 "type": "object",
                                                 "properties": {
-                                                  "label": {
+                                                  "conditionLabel": {
                                                     "type": "string",
                                                     "minLength": 1,
                                                     "maxLength": 160
@@ -4761,14 +4670,14 @@
                                                     "maxLength": 128
                                                   }
                                                 },
-                                                "required": ["when"],
+                                                "required": ["conditionLabel", "when"],
                                                 "additionalProperties": false
                                               },
                                               "minItems": 1,
                                               "maxItems": 20
                                             }
                                           },
-                                          "required": ["id", "label", "state", "kind", "rules"],
+                                          "required": ["id", "state", "kind", "rules"],
                                           "additionalProperties": false
                                         }
                                       ]
