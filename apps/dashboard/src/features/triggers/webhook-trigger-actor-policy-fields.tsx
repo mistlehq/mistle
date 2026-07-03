@@ -657,7 +657,7 @@ function SpecificActorPolicyFields(input: {
           isRefreshing={isFetching}
           label="actor"
           listState={resolveResourceListViewState({
-            error: resourceQueries.find((query) => query.isError)?.error,
+            errors: resourceQueries.filter((query) => query.isError).map((query) => query.error),
             errorMessage: "Could not load actors.",
             isError,
             isPending,
@@ -754,11 +754,12 @@ function resolveSelectedActorSetResourceValues(input: {
   });
 }
 
-function resolveResourceListViewState(input: {
+export function resolveResourceListViewState(input: {
   isPending: boolean;
   isError: boolean;
   errorMessage: string;
   error?: unknown;
+  errors?: readonly unknown[] | undefined;
 }): IntegrationResourceListViewState {
   if (input.isPending) {
     return { mode: "loading" };
@@ -768,11 +769,19 @@ function resolveResourceListViewState(input: {
     return {
       mode: "error",
       message: input.errorMessage,
-      suppressAlert: isResourceSyncRequiredError(input.error),
+      suppressAlert: shouldSuppressResourceListError(input),
     };
   }
 
   return { mode: "ready" };
+}
+
+function shouldSuppressResourceListError(input: {
+  error?: unknown;
+  errors?: readonly unknown[] | undefined;
+}): boolean {
+  const errors = input.errors ?? (input.error === undefined ? [] : [input.error]);
+  return errors.length > 0 && errors.every(isResourceSyncRequiredError);
 }
 
 function isResourceSyncRequiredError(error: unknown): boolean {
