@@ -21,7 +21,8 @@ import {
   Notice,
 } from "@mistle/ui";
 import { ArrowClockwiseIcon, InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { type FocusEvent, useId, useRef, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -39,6 +40,7 @@ import {
 import { IntegrationLogo } from "../integrations/integration-logo.js";
 import {
   isIntegrationResourceSyncRequiredError,
+  type IntegrationConnectionResources,
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
   resolveIntegrationResourceSyncFailureReasonFromCode,
@@ -366,7 +368,7 @@ function EventParameterFields(input: {
   rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
   onRuleChange: (parameterId: string, rule: WebhookTriggerEventParameterRule) => void;
   onRulesChange: (rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>) => void;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const parameters = input.eventOption.parameters ?? [];
   const parameterGroups = input.eventOption.parameterGroups ?? [];
   const renderedGroupIds = new Set<string>();
@@ -762,11 +764,50 @@ function OneOfParameterGroupField(input: {
   rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
   onRuleChange: (parameterId: string, rule: WebhookTriggerEventParameterRule) => void;
   onRulesChange: (rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>) => void;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const inputId = useId();
   const groupOptions = resolveOneOfParameterGroupOptions({
     group: input.group,
     parameters: input.parameters,
+  });
+  const groupResourceQueries = useQueries({
+    queries: groupOptions.map((option) => {
+      const resourceKind =
+        option.parameter.kind === "resource-select" ? option.parameter.resourceKind : undefined;
+      const resourceQueryKey = createTriggerParameterResourceQueryKey({
+        connectionId: input.connectionId,
+        resourceKind: resourceKind ?? "none",
+      });
+
+      return {
+        queryKey: resourceQueryKey,
+        queryFn: async ({ signal }) => {
+          if (resourceKind === undefined) {
+            throw new Error("Resource parameter is missing resource kind.");
+          }
+
+          return listIntegrationConnectionResources({
+            connectionId: input.connectionId,
+            kind: resourceKind,
+            signal,
+          });
+        },
+        enabled: resourceKind !== undefined && input.connectionId.trim().length > 0,
+        retry: false,
+      };
+    }),
+  });
+  const visibleGroupOptions = groupOptions.filter((option, index) => {
+    const resourceQuery = groupResourceQueries[index];
+    if (resourceQuery === undefined) {
+      return true;
+    }
+
+    return !shouldHideEmptyPermissionDeniedResourceParameter({
+      parameter: option.parameter,
+      resourceQuery,
+      selectedValues: resolveParameterRuleValues(input.rules[option.parameter.id]),
+    });
   });
   const [selectedParameterId, setSelectedParameterId] = useState(
     findConfiguredOneOfParameterId({
@@ -774,23 +815,24 @@ function OneOfParameterGroupField(input: {
       rules: input.rules,
     }),
   );
-  const selectedOption = groupOptions.find((option) => option.parameter.id === selectedParameterId);
-  if (selectedOption === undefined) {
-    throw new Error(
-      `Trigger event parameter group '${input.group.id}' has no selected parameter option.`,
-    );
-  }
-
-  const selectedParameter = selectedOption.parameter;
-  const selectedRule = input.rules[selectedParameter.id];
+  const selectedOption =
+    visibleGroupOptions.find((option) => option.parameter.id === selectedParameterId) ??
+    visibleGroupOptions[0];
+  const selectedParameter = selectedOption?.parameter;
+  const selectedRule =
+    selectedParameter === undefined ? undefined : input.rules[selectedParameter.id];
   const selectedValue = selectedRule?.value ?? "";
-  const selectedPrefixLabel = selectedParameter.prefix ?? selectedParameter.label;
+  const selectedPrefixLabel =
+    selectedParameter === undefined ? "" : (selectedParameter.prefix ?? selectedParameter.label);
   const selectedResources = useTriggerParameterResources({
     connectionId: input.connectionId,
     resourceKind:
-      selectedParameter.kind === "resource-select" ? selectedParameter.resourceKind : undefined,
+      selectedParameter?.kind === "resource-select" ? selectedParameter.resourceKind : undefined,
     selectedValues: resolveParameterRuleValues(selectedRule),
   });
+  if (selectedOption === undefined || selectedParameter === undefined) {
+    return null;
+  }
 
   function clearInactiveRules(parameterId: string): void {
     input.onRulesChange(
@@ -812,7 +854,7 @@ function OneOfParameterGroupField(input: {
             return;
           }
 
-          if (!groupOptions.some((option) => option.parameter.id === value)) {
+          if (!visibleGroupOptions.some((option) => option.parameter.id === value)) {
             return;
           }
 
@@ -825,7 +867,7 @@ function OneOfParameterGroupField(input: {
           <SelectValue>{selectedOption.label}</SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {groupOptions.map((option) => (
+          {visibleGroupOptions.map((option) => (
             <SelectItem
               key={`${input.group.id}:${option.parameter.id}`}
               value={option.parameter.id}
@@ -921,14 +963,6 @@ function OneOfParameterGroupField(input: {
               value={selectedValue.length === 0 ? undefined : selectedValue}
             />
           )}
-          {selectedResources.resourceErrorMessage === null ? null : (
-            <Notice variant="alert">
-              {formatResourceParameterFailureNotice(
-                selectedResources.resourceFailureReason,
-                selectedResources.resourceErrorMessage,
-              )}
-            </Notice>
-          )}
         </div>
       ) : selectedParameter.kind === "string" ? (
         <StringEqualityParameterValueField
@@ -1003,31 +1037,38 @@ function resolveResourceParameterFailureReason(input: {
   return null;
 }
 
-function formatResourceParameterFailureHeading(
-  reason: IntegrationResourceSyncFailureReason | null,
-): string | null {
-  if (reason === "permission-denied") {
-    return "Provider access needs repair.";
+function shouldHideEmptyPermissionDeniedResourceParameter(input: {
+  parameter: WebhookTriggerEventParameter;
+  resourceQuery: Pick<
+    UseQueryResult<IntegrationConnectionResources>,
+    "data" | "error" | "isError" | "isPending"
+  >;
+  selectedValues: readonly string[];
+}): boolean {
+  if (input.parameter.kind !== "resource-select") {
+    return false;
   }
 
-  if (reason === "credential-failed") {
-    return "Connection credentials need repair.";
+  if (input.selectedValues.some((selectedValue) => selectedValue.trim().length > 0)) {
+    return false;
   }
 
-  return null;
-}
-
-function formatResourceParameterFailureNotice(
-  reason: IntegrationResourceSyncFailureReason | null,
-  message: string,
-): string {
-  const heading = formatResourceParameterFailureHeading(reason);
-
-  if (heading === null) {
-    return message;
+  if (input.resourceQuery.isPending) {
+    return false;
   }
 
-  return `${heading} ${message}`;
+  if ((input.resourceQuery.data?.items.length ?? 0) > 0) {
+    return false;
+  }
+
+  return (
+    resolveResourceParameterFailureReason({
+      isError: input.resourceQuery.isError,
+      error: input.resourceQuery.error,
+      syncState: input.resourceQuery.data?.syncState,
+      lastErrorCode: input.resourceQuery.data?.lastErrorCode,
+    }) === "permission-denied"
+  );
 }
 
 function EventParameterField(input: {
@@ -1159,6 +1200,16 @@ function EventParameterField(input: {
   const resolvedSelectedResourceOption = resources.normalizedResourceOptions.find(
     (option) => option.handle === value,
   );
+  if (
+    shouldHideEmptyPermissionDeniedResourceParameter({
+      parameter: input.parameter,
+      resourceQuery: resources.resourceQuery,
+      selectedValues: input.parameter.multiValue === true ? multiValues : [value],
+    })
+  ) {
+    return null;
+  }
+
   const placeholder =
     input.connectionId.trim().length === 0
       ? `Select ${input.parameter.label}`
@@ -1229,7 +1280,7 @@ function ResourceMultiSelectParameterField(input: {
   unavailableSelectedValues: readonly string[];
   onRuleChange: (rule: WebhookTriggerEventParameterRule) => void;
   showOperator?: boolean;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const inputId = useId();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");

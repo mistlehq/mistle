@@ -621,15 +621,15 @@ export const SlackUserGroupMentionSyncingEmpty: Story = {
 };
 
 export const SlackUserGroupMentionSyncFailedEmpty: Story = {
-  name: "Slack user group mention - provider access failed empty",
+  name: "Slack user group mention - provider access denied empty hidden",
   args: createSlackUserGroupMentionArgs({
     slackUserGroupResources: StorySlackUserGroupResourcesSyncFailedEmpty,
   }),
   play: async ({ canvasElement }): Promise<void> => {
-    const body = await openSlackUserGroupMentionPicker(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
 
-    await expect(body.getByText("Provider access needs repair.")).toBeVisible();
-    await expect(body.getByText(SlackUserGroupAccessErrorMessage)).toBeVisible();
+    await expect(body.queryByText("mentioning group")).toBe(null);
+    await expect(body.queryByText(SlackUserGroupAccessErrorMessage)).toBe(null);
   },
 };
 
