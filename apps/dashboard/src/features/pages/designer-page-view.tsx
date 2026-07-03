@@ -1,15 +1,6 @@
-import {
-  DropdownMenuItem,
-  MoreActionsMenu,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@mistle/ui";
-import { ArrowRightIcon } from "@phosphor-icons/react";
-import { Link as RouterLink } from "react-router";
+import { systemScheduler } from "@mistle/time";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mistle/ui";
+import { useEffect, useState } from "react";
 
 import { ErrorNotice } from "../auth/error-notice.js";
 import { ChatComposer } from "../chat/components/chat-composer.js";
@@ -18,6 +9,29 @@ import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import { resolveSessionUpdatedLabel, SessionTitleCell } from "./sessions-page.js";
+
+const DesignerPromptTitle = "Build an agent workflow";
+const DesignerPromptPlaceholderPrefix = "Ask Mistle to build ";
+const DesignerPromptPlaceholderSuffixes: readonly [string, string, string, string, string] = [
+  "an engineering agent that...",
+  "a Chief of Staff that...",
+  "a support agent that...",
+  "an operations agent that...",
+  "a product agent that...",
+];
+const DefaultDesignerPromptPlaceholderSuffix = DesignerPromptPlaceholderSuffixes[0];
+const DefaultDesignerPromptPlaceholder = `${DesignerPromptPlaceholderPrefix}${DefaultDesignerPromptPlaceholderSuffix}`;
+const DesignerPromptPlaceholderPauseMs = 1800;
+const DesignerPromptPlaceholderDeleteMs = 28;
+const DesignerPromptPlaceholderTypeMs = 42;
+export const DesignerPageComposerContainerClassName =
+  "mx-auto grid w-full max-w-3xl gap-4 pt-8 md:pt-16";
+
+type DesignerPromptPlaceholderAnimationState = {
+  phase: "deleting" | "typing" | "waiting";
+  suffixIndex: number;
+  visibleText: string;
+};
 
 export type DesignerPageViewProps = {
   createErrorMessage: string | null;
@@ -35,31 +49,101 @@ function formatDesignerSessionTitle(session: DesignerSessionListItem): string {
 
 function ignoreDesignerComposerAction(): void {}
 
-function DesignerSessionRowActions(input: {
-  href: string;
-  sessionTitle: string;
-}): React.JSX.Element {
-  return (
-    <MoreActionsMenu
-      triggerLabel={`Designer session actions for ${input.sessionTitle}`}
-      triggerSize="icon-xs"
-    >
-      <DropdownMenuItem render={<RouterLink to={input.href} />}>
-        <ArrowRightIcon aria-hidden className="size-4" />
-        Open session
-      </DropdownMenuItem>
-    </MoreActionsMenu>
-  );
+function useDesignerPromptPlaceholder(prompt: string): string {
+  const [animationState, setAnimationState] = useState<DesignerPromptPlaceholderAnimationState>({
+    phase: "waiting",
+    suffixIndex: 0,
+    visibleText: DefaultDesignerPromptPlaceholder,
+  });
+
+  useEffect(() => {
+    if (prompt.trim().length > 0) {
+      return;
+    }
+
+    if (animationState.phase === "waiting") {
+      const timeoutId = systemScheduler.schedule(() => {
+        setAnimationState((currentState) => ({
+          ...currentState,
+          phase: "deleting",
+        }));
+      }, DesignerPromptPlaceholderPauseMs);
+
+      return () => {
+        systemScheduler.cancel(timeoutId);
+      };
+    }
+
+    if (animationState.phase === "deleting") {
+      if (animationState.visibleText.length <= DesignerPromptPlaceholderPrefix.length) {
+        setAnimationState((currentState) => ({
+          phase: "typing",
+          suffixIndex: (currentState.suffixIndex + 1) % DesignerPromptPlaceholderSuffixes.length,
+          visibleText: DesignerPromptPlaceholderPrefix,
+        }));
+        return;
+      }
+
+      const timeoutId = systemScheduler.schedule(() => {
+        setAnimationState((currentState) => ({
+          ...currentState,
+          visibleText: currentState.visibleText.slice(0, -1),
+        }));
+      }, DesignerPromptPlaceholderDeleteMs);
+
+      return () => {
+        systemScheduler.cancel(timeoutId);
+      };
+    }
+
+    const nextSuffix =
+      DesignerPromptPlaceholderSuffixes[animationState.suffixIndex] ??
+      DefaultDesignerPromptPlaceholderSuffix;
+    const targetPlaceholder = `${DesignerPromptPlaceholderPrefix}${nextSuffix}`;
+
+    if (animationState.visibleText.length >= targetPlaceholder.length) {
+      setAnimationState((currentState) => ({
+        ...currentState,
+        phase: "waiting",
+        visibleText: targetPlaceholder,
+      }));
+      return;
+    }
+
+    const timeoutId = systemScheduler.schedule(() => {
+      setAnimationState((currentState) => {
+        const currentSuffix =
+          DesignerPromptPlaceholderSuffixes[currentState.suffixIndex] ??
+          DefaultDesignerPromptPlaceholderSuffix;
+        const currentTarget = `${DesignerPromptPlaceholderPrefix}${currentSuffix}`;
+
+        return {
+          ...currentState,
+          visibleText: `${currentState.visibleText}${currentTarget.charAt(currentState.visibleText.length)}`,
+        };
+      });
+    }, DesignerPromptPlaceholderTypeMs);
+
+    return () => {
+      systemScheduler.cancel(timeoutId);
+    };
+  }, [animationState, prompt]);
+
+  return animationState.visibleText;
 }
 
 export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Element {
   const canSubmit = input.prompt.trim().length > 0 && !input.isCreating;
   const showPastSessions = input.sessions.length > 0 || input.sessionsErrorMessage !== null;
+  const placeholderText = useDesignerPromptPlaceholder(input.prompt);
 
   return (
-    <PageFrame title="Designer" width="normal">
-      <div className="grid gap-5">
-        <section className="grid gap-3">
+    <PageFrame width="normal">
+      <div className="grid gap-6">
+        <section className={DesignerPageComposerContainerClassName}>
+          <h1 className="text-center text-3xl leading-tight font-semibold tracking-normal text-foreground md:text-4xl">
+            {DesignerPromptTitle}
+          </h1>
           <ChatComposer
             canUploadAttachments={false}
             composerCapabilities={[]}
@@ -82,7 +166,7 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
             onSubmit={input.onSubmit}
             pendingAttachments={[]}
             pendingCommentSummary={null}
-            placeholderText="Build a triaging agent for incoming GitHub issues and Linear bugs."
+            placeholderText={placeholderText}
             pullRequest={null}
             reasoningEffortOptions={[]}
             selectedModel={null}
@@ -100,28 +184,19 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
 
         {showPastSessions ? (
           <section className="grid gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-base font-medium">Past sessions</h2>
-            </div>
             <ErrorNotice message={input.sessionsErrorMessage} />
             {input.sessions.length > 0 ? (
               <Table className="min-w-[36rem] table-fixed">
                 <TableHeader className="bg-muted/60">
                   <TableRow className="h-9 border-b">
-                    <TableHead className="text-foreground w-[48%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                    <TableHead className="text-foreground w-[58%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
                       Sessions
                     </TableHead>
-                    <TableHead className="text-foreground w-[18%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                    <TableHead className="text-foreground w-[21%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
                       Started by
                     </TableHead>
-                    <TableHead className="text-foreground w-[14%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
-                      Created
-                    </TableHead>
-                    <TableHead className="text-right text-foreground w-[14%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
+                    <TableHead className="text-right text-foreground w-[21%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
                       Updated
-                    </TableHead>
-                    <TableHead className="w-[6%] py-2">
-                      <span className="sr-only">Actions</span>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -143,11 +218,6 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
                         <TableCell className="align-top text-sm whitespace-normal">
                           <span className="break-words text-sm text-foreground/80">User</span>
                         </TableCell>
-                        <TableCell className="align-top whitespace-nowrap">
-                          <span className="text-muted-foreground text-sm">
-                            {formatCompactRelativeOrDate(session.createdAt)}
-                          </span>
-                        </TableCell>
                         <TableCell className="align-top text-right whitespace-nowrap">
                           <div className="flex justify-end">
                             {resolveSessionUpdatedLabel({
@@ -155,14 +225,6 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
                               updatedAt: session.updatedAt,
                               failureMessage: session.failureMessage,
                             })}
-                          </div>
-                        </TableCell>
-                        <TableCell className="align-middle text-right">
-                          <div className="flex justify-end">
-                            <DesignerSessionRowActions
-                              href={sessionHref}
-                              sessionTitle={sessionTitle}
-                            />
                           </div>
                         </TableCell>
                       </TableRow>
