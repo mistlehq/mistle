@@ -1,17 +1,13 @@
 import { z } from "zod";
 
-function normalizeTelegramApiBaseUrl(input: string): string {
+export function normalizeTelegramApiBaseUrl(input: string): string {
   const parsedUrl = new URL(input);
   const normalizedPathname =
     parsedUrl.pathname.endsWith("/") && parsedUrl.pathname !== "/"
       ? parsedUrl.pathname.slice(0, -1)
       : parsedUrl.pathname;
 
-  parsedUrl.pathname = normalizedPathname;
-  parsedUrl.search = "";
-  parsedUrl.hash = "";
-
-  return parsedUrl.toString();
+  return `${parsedUrl.origin}${normalizedPathname === "/" ? "" : normalizedPathname}`;
 }
 
 export const TelegramTargetConfigSchema = z

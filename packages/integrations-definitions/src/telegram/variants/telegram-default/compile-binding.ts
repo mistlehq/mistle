@@ -7,7 +7,7 @@ import {
 
 import { TelegramCredentialSecretTypes, TelegramCredentialSlotKeys } from "./auth.js";
 import type { TelegramBindingConfig } from "./binding-config-schema.js";
-import type { TelegramTargetConfig } from "./target-config-schema.js";
+import { normalizeTelegramApiBaseUrl, type TelegramTargetConfig } from "./target-config-schema.js";
 import { TelegramToolIds } from "./tool-ids.js";
 
 export type TelegramCompileBindingInput = CompileBindingInput<
@@ -124,7 +124,7 @@ export function compileTelegramBinding(input: TelegramCompileBindingInput): Comp
   const includesTelegramCli = input.binding.config.tools.includes(TelegramToolIds.TELEGRAM_CLI);
   const includesTelegramMcp = input.binding.config.tools.includes(TelegramToolIds.TELEGRAM_MCP);
   const includesTelegramToolArtifact = includesTelegramCli || includesTelegramMcp;
-  const upstreamBaseUrl = input.target.config.apiBaseUrl;
+  const upstreamBaseUrl = normalizeTelegramApiBaseUrl(input.target.config.apiBaseUrl);
 
   return {
     egressRoutes: [

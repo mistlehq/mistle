@@ -26,7 +26,10 @@ const SandboxPaths = {
   runtimeArtifactBinDir: "/usr/local/bin",
 };
 
-function createCompileBindingInput(tools: string[]): TelegramCompileBindingInput {
+function createCompileBindingInput(input: {
+  tools: string[];
+  apiBaseUrl?: string | undefined;
+}): TelegramCompileBindingInput {
   return {
     organizationId: "org_123",
     sandboxProfileId: "sbp_123",
@@ -37,7 +40,7 @@ function createCompileBindingInput(tools: string[]): TelegramCompileBindingInput
       variantId: "telegram-default",
       enabled: true,
       config: {
-        apiBaseUrl: "https://api.telegram.org",
+        apiBaseUrl: input.apiBaseUrl ?? "https://api.telegram.org",
       },
       secrets: {},
     },
@@ -52,7 +55,7 @@ function createCompileBindingInput(tools: string[]): TelegramCompileBindingInput
       id: "ibd_123",
       kind: "connector",
       config: {
-        tools,
+        tools: input.tools,
       },
     },
     refs: {
@@ -119,7 +122,7 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
 
 describe("compileTelegramBinding", () => {
   it("builds Telegram API egress with bot-token path segment injection", () => {
-    const compiled = compileTelegramBinding(createCompileBindingInput([]));
+    const compiled = compileTelegramBinding(createCompileBindingInput({ tools: [] }));
 
     expect(compiled.egressRoutes).toEqual([
       {
@@ -146,7 +149,9 @@ describe("compileTelegramBinding", () => {
   });
 
   it("installs the pinned Telegram CLI release when the CLI tool is selected", () => {
-    const compiled = compileTelegramBinding(createCompileBindingInput([TelegramCliToolId]));
+    const compiled = compileTelegramBinding(
+      createCompileBindingInput({ tools: [TelegramCliToolId] }),
+    );
 
     expect(compiled.artifacts).toHaveLength(1);
     const artifact = compiled.artifacts[0];
@@ -183,7 +188,9 @@ describe("compileTelegramBinding", () => {
   });
 
   it("installs the Telegram binary and starts a local MCP server when Telegram MCP is selected", () => {
-    const compiled = compileTelegramBinding(createCompileBindingInput([TelegramMcpToolId]));
+    const compiled = compileTelegramBinding(
+      createCompileBindingInput({ tools: [TelegramMcpToolId] }),
+    );
 
     expect(compiled.artifacts).toHaveLength(1);
     expect(compiled.artifacts[0]?.artifactKey).toBe("telegram-cli");
@@ -224,5 +231,19 @@ describe("compileTelegramBinding", () => {
         endpoints: [],
       },
     ]);
+  });
+
+  it("normalizes trailing slash Telegram API base URLs before exposing runtime env", () => {
+    const compiled = compileTelegramBinding(
+      createCompileBindingInput({
+        tools: [TelegramCliToolId],
+        apiBaseUrl: "https://api.telegram.org/",
+      }),
+    );
+
+    expect(compiled.egressRoutes[0]?.upstream.baseUrl).toBe("https://api.telegram.org");
+    expect(compiled.artifacts[0]?.env).toEqual({
+      TELEGRAM_BASE_URL: "https://api.telegram.org",
+    });
   });
 });
