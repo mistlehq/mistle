@@ -14,13 +14,11 @@ type TensorlakeCompileBindingInput = CompileBindingInput<
 type TensorlakeCompiledRoute = NonNullable<CompileBindingResult["egressRoutes"][number]>;
 
 const TensorlakeApiHost = "api.tensorlake.ai";
-const TensorlakeSandboxHost = "sandbox.tensorlake.ai";
 const TensorlakeApiBaseUrl = `https://${TensorlakeApiHost}`;
-const TensorlakeSandboxBaseUrl = `https://${TensorlakeSandboxHost}`;
 const TensorlakeCliArtifactKey = "tensorlake-cli";
 const TensorlakeCliArtifactName = "Tensorlake CLI";
 const TensorlakeGitHubRepository = "tensorlakeai/tensorlake";
-const TensorlakeCliReleaseTag = "cli-v0.5.47";
+const TensorlakeCliReleaseTag = "cli-v0.5.58";
 const TensorlakeCliPlaceholderApiKey = "tl_apiKey_mistle_placeholder_for_managed_egress";
 const ArtifactCommandTimeoutMs = 180_000;
 
@@ -55,20 +53,6 @@ function createTensorlakeEgressRoutes(
       },
       credentialResolver,
     },
-    {
-      match: {
-        hosts: [TensorlakeSandboxHost],
-        pathPrefixes: ["/"],
-      },
-      upstream: {
-        baseUrl: TensorlakeSandboxBaseUrl,
-      },
-      authInjection: {
-        type: "bearer",
-        target: "authorization",
-      },
-      credentialResolver,
-    },
   ];
 }
 
@@ -79,7 +63,6 @@ function createTensorlakeCliArtifact(): CompileBindingResult["artifacts"][number
     env: {
       TENSORLAKE_API_KEY: TensorlakeCliPlaceholderApiKey,
       TENSORLAKE_API_URL: TensorlakeApiBaseUrl,
-      TENSORLAKE_SANDBOX_PROXY_URL: TensorlakeSandboxBaseUrl,
     },
     lifecycle: {
       install: ({ refs }) => [
@@ -96,13 +79,13 @@ function createTensorlakeCliArtifact(): CompileBindingResult["artifacts"][number
               fileName: "tensorlake-cli-linux-x86_64.tar.gz",
               format: "tar.gz",
               extractedPath: "tensorlake",
-              sha256: "9c02b09a94d6c1e592a8e6c43b5ce90273268585593ca492890db6d8afa77a49",
+              sha256: "36ab3effbbb05535401f7d4efd71d97b721c25662840d8956f1a69a01d762358",
             },
             aarch64: {
               fileName: "tensorlake-cli-linux-aarch64.tar.gz",
               format: "tar.gz",
               extractedPath: "tensorlake",
-              sha256: "443bce4b2d831298b7d784e8c5f1f326f92506fa188d3d3332c8537ab3afddfb",
+              sha256: "dd73264282444698c47b0a134e723e54447d782821737e0191c5189b57117546",
             },
           },
           installPath: refs.artifactBinPath("tensorlake"),

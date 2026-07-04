@@ -9,7 +9,7 @@ enableGlobalVirtualStore: true
 minimumReleaseAge: 4320
 minimumReleaseAgeExclude:
   - "@opencode-ai/sdk"
-  - "tensorlake@0.5.54"
+  - "tensorlake@0.5.58"
 
 allowBuilds:
   "@parcel/watcher": false

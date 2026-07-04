@@ -125,7 +125,7 @@ describe("compileTensorlakeBinding", () => {
     expect(compiled.runtimeClients).toEqual([]);
   });
 
-  it("builds managed egress routes for Tensorlake API and sandbox proxy hosts when the CLI is selected", () => {
+  it("builds a managed egress route for the Tensorlake API host when the CLI is selected", () => {
     const compiled = compileTensorlakeForTools(["tensorlake-cli"]);
 
     expect(compiled.egressRoutes).toEqual([
@@ -136,25 +136,6 @@ describe("compileTensorlakeBinding", () => {
         },
         upstream: {
           baseUrl: "https://api.tensorlake.ai",
-        },
-        authInjection: {
-          type: "bearer",
-          target: "authorization",
-        },
-        credentialResolver: {
-          kind: "integration_connection",
-          connectionId: "icn_123",
-          secretType: "api_key",
-          slotKey: TensorlakeSandboxRuntimeCredentialSlotKeys.API_KEY,
-        },
-      },
-      {
-        match: {
-          hosts: ["sandbox.tensorlake.ai"],
-          pathPrefixes: ["/"],
-        },
-        upstream: {
-          baseUrl: "https://sandbox.tensorlake.ai",
         },
         authInjection: {
           type: "bearer",
@@ -186,7 +167,6 @@ describe("compileTensorlakeBinding", () => {
       env: {
         TENSORLAKE_API_KEY: "tl_apiKey_mistle_placeholder_for_managed_egress",
         TENSORLAKE_API_URL: "https://api.tensorlake.ai",
-        TENSORLAKE_SANDBOX_PROXY_URL: "https://sandbox.tensorlake.ai",
       },
     });
 
@@ -198,7 +178,7 @@ describe("compileTensorlakeBinding", () => {
         release: {
           kind: "tag",
           match: "exact",
-          tag: "cli-v0.5.47",
+          tag: "cli-v0.5.58",
         },
         asset: {
           kind: "by_arch",
@@ -206,13 +186,13 @@ describe("compileTensorlakeBinding", () => {
             fileName: "tensorlake-cli-linux-x86_64.tar.gz",
             format: "tar.gz",
             extractedPath: "tensorlake",
-            sha256: "9c02b09a94d6c1e592a8e6c43b5ce90273268585593ca492890db6d8afa77a49",
+            sha256: "36ab3effbbb05535401f7d4efd71d97b721c25662840d8956f1a69a01d762358",
           },
           aarch64: {
             fileName: "tensorlake-cli-linux-aarch64.tar.gz",
             format: "tar.gz",
             extractedPath: "tensorlake",
-            sha256: "443bce4b2d831298b7d784e8c5f1f326f92506fa188d3d3332c8537ab3afddfb",
+            sha256: "dd73264282444698c47b0a134e723e54447d782821737e0191c5189b57117546",
           },
         },
         installPath: "/usr/local/bin/tensorlake",
