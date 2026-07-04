@@ -50,10 +50,10 @@ function evaluateAssertion(input: {
   switch (input.assertion.kind) {
     case "blueprint-before-product-mutation":
       return evaluateBlueprintBeforeProductMutation(input.dashboardControlActions);
-    case "blueprint-core-node-count-at-most":
-      return evaluateBlueprintCoreNodeCountAtMost({
+    case "product-mutation-not-before-turn":
+      return evaluateProductMutationNotBeforeTurn({
         actions: input.dashboardControlActions,
-        maxItems: input.assertion.maxItems,
+        minTurnIndex: input.assertion.minTurnIndex,
       });
     case "blueprint-has-provider-lifecycle":
       return evaluateBlueprintHasProviderLifecycle({
@@ -67,6 +67,11 @@ function evaluateAssertion(input: {
       });
     case "required-binding-tools-present":
       return evaluateRequiredBindingToolsPresent({
+        assertion: input.assertion,
+        productStateAfter: input.productStateAfter,
+      });
+    case "required-agent-model-provider-binding":
+      return evaluateRequiredAgentModelProviderBinding({
         assertion: input.assertion,
         productStateAfter: input.productStateAfter,
       });
@@ -109,38 +114,6 @@ function evaluateAssertion(input: {
         dashboardControlActions: input.dashboardControlActions,
       });
   }
-}
-
-function evaluateBlueprintCoreNodeCountAtMost(input: {
-  actions: readonly DesignerEvalDashboardControlAction[];
-  maxItems: number;
-}): DesignerEvalCheckResult {
-  const latestBlueprint = readLatestBlueprint(input.actions);
-  if (latestBlueprint === undefined) {
-    return {
-      passed: false,
-      label: "Blueprint core node count",
-      detail: "Designer did not show a blueprint.",
-    };
-  }
-
-  const items = readBlueprintItems(latestBlueprint);
-  if (items === undefined) {
-    return {
-      passed: false,
-      label: "Blueprint core node count",
-      detail: "Latest blueprint did not contain an items array.",
-    };
-  }
-
-  return {
-    passed: items.length <= input.maxItems,
-    label: "Blueprint core node count",
-    detail:
-      items.length <= input.maxItems
-        ? `Latest blueprint contains ${String(items.length)} item(s), at or below limit ${String(input.maxItems)}.`
-        : `Latest blueprint contains ${String(items.length)} item(s), above limit ${String(input.maxItems)}.`,
-  };
 }
 
 function evaluateBlueprintHasProviderLifecycle(input: {
@@ -227,6 +200,34 @@ function evaluateRequiredBindingToolsPresent(input: {
         : missingTools.length === 0
           ? `Binding ${matchingBinding.id} includes required tools: ${input.assertion.tools.join(", ")}.`
           : `Binding ${matchingBinding.id} is missing required tools: ${missingTools.join(", ")}.`,
+  };
+}
+
+function evaluateRequiredAgentModelProviderBinding(input: {
+  assertion: Extract<DesignerEvalAssertion, { kind: "required-agent-model-provider-binding" }>;
+  productStateAfter: DesignerEvalProductState;
+}): DesignerEvalCheckResult {
+  const matchingConnection = input.productStateAfter.providerConnections.find(
+    (connection) => connection.id === input.assertion.connectionId,
+  );
+  const matchingBinding = input.productStateAfter.targetDraft.integrationBindings.find(
+    (binding) => binding.connectionId === input.assertion.connectionId && binding.kind === "agent",
+  );
+  const compatibleTarget =
+    matchingConnection !== undefined &&
+    input.assertion.compatibleTargetKeys.includes(matchingConnection.targetKey);
+
+  return {
+    passed: matchingConnection !== undefined && matchingBinding !== undefined && compatibleTarget,
+    label: `Agent model provider binding for ${input.assertion.connectionId}`,
+    detail:
+      matchingConnection === undefined
+        ? `No provider connection found for agent model provider ${input.assertion.connectionId}.`
+        : matchingBinding === undefined
+          ? `No agent binding found for connection ${input.assertion.connectionId}.`
+          : compatibleTarget
+            ? `Binding ${matchingBinding.id} uses compatible agent model provider target ${matchingConnection.targetKey}.`
+            : `Connection ${input.assertion.connectionId} uses target ${matchingConnection.targetKey}, expected one of ${input.assertion.compatibleTargetKeys.join(", ")}.`,
   };
 }
 
@@ -474,6 +475,38 @@ function evaluateBlueprintBeforeProductMutation(
     passed: false,
     label: "Blueprint before product mutation",
     detail: "Designer attempted a dashboard-mediated product mutation before showing a blueprint.",
+  };
+}
+
+function evaluateProductMutationNotBeforeTurn(input: {
+  actions: readonly DesignerEvalDashboardControlAction[];
+  minTurnIndex: number;
+}): DesignerEvalCheckResult {
+  const firstProductMutation = input.actions.find(
+    (action) => action.kind === "request_user_input" && responseHasSideEffect(action.response),
+  );
+  if (firstProductMutation === undefined) {
+    return {
+      passed: true,
+      label: "Product mutation turn boundary",
+      detail: "No dashboard-mediated product mutation was observed.",
+    };
+  }
+  if (firstProductMutation.turnIndex === undefined) {
+    return {
+      passed: false,
+      label: "Product mutation turn boundary",
+      detail: "First dashboard-mediated product mutation did not include turn metadata.",
+    };
+  }
+
+  return {
+    passed: firstProductMutation.turnIndex >= input.minTurnIndex,
+    label: "Product mutation turn boundary",
+    detail:
+      firstProductMutation.turnIndex >= input.minTurnIndex
+        ? `First dashboard-mediated product mutation occurred on turn ${String(firstProductMutation.turnIndex)}, at or after required turn ${String(input.minTurnIndex)}.`
+        : `First dashboard-mediated product mutation occurred on turn ${String(firstProductMutation.turnIndex)}, before required turn ${String(input.minTurnIndex)}.`,
   };
 }
 

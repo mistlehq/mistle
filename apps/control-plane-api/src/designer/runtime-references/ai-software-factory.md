@@ -121,6 +121,7 @@ For Linear and GitHub, identify these pieces:
 - GitHub Connected app
 - selected GitHub repository
 - GitHub CLI provider tool when the agent must branch, commit, or open pull requests
+- compatible Agent model-provider binding for the selected runtime, such as OpenAI for Codex
 - implementation profile or instructions
 - review profile or instructions when a separate review responsibility is recommended
 - trigger and publishing configuration that still needs to be completed
@@ -129,6 +130,8 @@ For Linear and GitHub, identify these pieces:
 Do not claim the factory is ready if provider setup, labels, statuses, trigger creation, publishing, or profile capability remains incomplete.
 
 If the current sandbox profile draft already has required provider tools such as `linear-mcp` or `github-cli`, do not describe those tools as missing or still needing to be bound. Distinguish configured draft capabilities from remaining configuration such as instructions, labels, statuses, publishing, and triggers.
+
+If the current sandbox profile draft already has a compatible `kind: "agent"` model-provider binding for the selected runtime, do not describe model access as missing. An empty `config.tools` value on an Agent model-provider binding such as OpenAI is valid and is not a missing provider-tool condition.
 
 When the selected approval boundary requires human approval before provider writes, describe the workflow outputs as a PR proposal and Linear update proposal until human approval is granted. Do not say the factory will create PRs or post Linear updates directly in that mode.
 

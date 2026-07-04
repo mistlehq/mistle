@@ -57,7 +57,7 @@ Score meanings:
 - `factoryProcessClarity`: issue readiness rules, workflow states, state-update behavior, and workflow operating process are clear enough for a team to run.
 - `agentRoleSeparation`: implementation and review responsibilities are separated when useful, including distinct profile/trigger/instruction recommendations when the product supports them.
 - `feedbackLoopQuality`: review findings, coding failures, noisy reviews, and recurring gaps feed back into improved instructions, workflow rules, or review gates.
-- `readinessDisclosure`: missing Linear/GitHub setup, unsupported product actions, and exact user actions are disclosed without claiming the factory is ready prematurely.
+- `readinessDisclosure`: missing Linear/GitHub setup, missing or preserved agent model-provider setup, unsupported product actions, and exact user actions are disclosed without claiming the factory is ready prematurely.
 
 Findings must cite concrete evidence from artifacts. Do not rely on vibes.
 
