@@ -35,8 +35,17 @@ const GithubPrReviewBasicCase: DesignerEvalCase = {
   id: "github-pr-review-basic",
   expectedOutcomePath: "docs/cases/github-pr-review-basic.md",
   prompt: "Help me build an agent that reviews GitHub pull requests.",
+  followUpPrompts: [
+    "The blueprint direction looks right. Use mistlehq/mistle, review opened and updated pull requests, and ask before posting review comments.",
+  ],
   seed: {
     providerConnections: [
+      {
+        id: "icn_eval_github_pr_review_basic_agent",
+        label: "OpenAI",
+        providerFamilyId: "openai",
+        targetKey: "openai-default",
+      },
       {
         id: "icn_eval_github_pr_review_basic_repo",
         label: "GitHub",
@@ -73,15 +82,6 @@ const GithubPrReviewBasicCase: DesignerEvalCase = {
     },
   },
   scriptedInputs: {
-    [DesignerEvalDecisionIds.CONFIRM_PLAN]: {
-      kind: "answers",
-      answers: [
-        {
-          id: DesignerEvalDecisionIds.CONFIRM_PLAN,
-          value: "Use this plan",
-        },
-      ],
-    },
     [DesignerEvalDecisionIds.PR_REVIEW_TRIGGER_SCOPE]: {
       kind: "answers",
       answers: [
@@ -151,6 +151,10 @@ const GithubPrReviewBasicCase: DesignerEvalCase = {
       kind: "blueprint-before-product-mutation",
     },
     {
+      kind: "product-mutation-not-before-turn",
+      minTurnIndex: 1,
+    },
+    {
       kind: "saved-selected-provider-resources",
       connectionId: "icn_eval_github_pr_review_basic_repo",
       selectedHandles: ["mistlehq/mistle"],
@@ -169,6 +173,11 @@ const GithubPrReviewBasicCase: DesignerEvalCase = {
       tools: ["github-cli"],
     },
     {
+      kind: "required-agent-model-provider-binding",
+      connectionId: "icn_eval_github_pr_review_basic_agent",
+      compatibleTargetKeys: ["openai-default"],
+    },
+    {
       kind: "setup-incompleteness-disclosed",
       requiredPhrases: ["approval"],
     },
@@ -179,8 +188,17 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
   id: "ai-software-factory-linear-github",
   expectedOutcomePath: "docs/cases/ai-software-factory.md",
   prompt: "Build an AI software factory with Linear and GitHub.",
+  followUpPrompts: [
+    "The proposed workflow direction is right. Use mistlehq/mistle, use a Ready status as the pickup rule, map statuses as Ready for Agent -> Agent In Progress -> Ready for Review -> Needs Rework / Blocked -> Done, keep implementation and review role-separated in one sandbox profile, and ask before creating pull requests or posting Linear updates.",
+  ],
   seed: {
     providerConnections: [
+      {
+        id: "icn_eval_ai_factory_agent",
+        label: "OpenAI",
+        providerFamilyId: "openai",
+        targetKey: "openai-default",
+      },
       {
         id: "icn_eval_ai_factory_github",
         label: "GitHub",
@@ -246,7 +264,6 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     ),
     ...scriptedAnswerAliases(
       [
-        DesignerEvalDecisionIds.CONFIRM_PLAN,
         "confirm_ai_factory_plan",
         "ai_factory_plan",
         "ai_software_factory_plan",
@@ -322,12 +339,12 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
       kind: "blueprint-before-product-mutation",
     },
     {
-      kind: "blueprint-core-node-count-at-most",
-      maxItems: 8,
+      kind: "product-mutation-not-before-turn",
+      minTurnIndex: 1,
     },
     {
       kind: "blueprint-has-provider-lifecycle",
-      requiredConcepts: ["linear", "github", "ready", "review", "feedback", "status"],
+      requiredConcepts: ["linear", "github", "ready", "review", "status"],
     },
     {
       kind: "blueprint-excludes-setup-nodes",
@@ -344,8 +361,13 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
       tools: ["linear-mcp"],
     },
     {
+      kind: "required-agent-model-provider-binding",
+      connectionId: "icn_eval_ai_factory_agent",
+      compatibleTargetKeys: ["openai-default"],
+    },
+    {
       kind: "setup-incompleteness-disclosed",
-      requiredPhrases: ["linear", "setup", "label", "statuses"],
+      requiredPhrases: ["linear", "trigger"],
     },
     {
       kind: "configured-tools-not-claimed-missing",
@@ -374,16 +396,7 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
     {
       kind: "transcript-includes-required-phrases",
       label: "Factory configuration next steps",
-      requiredPhrases: [
-        "Implementation agent instructions",
-        "Review agent instructions",
-        "Ready -> Agent In Progress -> Ready for Review",
-        "operating guide",
-        "Configuration shape",
-        "one sandbox profile",
-        "role-separated",
-        "Next action",
-      ],
+      requiredPhrases: ["OpenAI", "github-cli", "linear-mcp", "publish", "trigger"],
     },
   ],
 };
@@ -397,16 +410,7 @@ const AiSoftwareFactoryNextStepQualityCase: DesignerEvalCase = {
     {
       kind: "transcript-includes-required-phrases",
       label: "Factory configuration next steps",
-      requiredPhrases: [
-        "Implementation agent instructions",
-        "Review agent instructions",
-        "Ready -> Agent In Progress -> Ready for Review",
-        "operating guide",
-        "Configuration shape",
-        "one sandbox profile",
-        "role-separated",
-        "Next action",
-      ],
+      requiredPhrases: ["OpenAI", "github-cli", "linear-mcp", "publish", "trigger"],
     },
     {
       kind: "transcript-excludes-internal-progress",

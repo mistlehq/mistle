@@ -2648,6 +2648,11 @@ export type IntegrationWebhookEventParameterOptionDefinition = {
 export type IntegrationWebhookPayloadReference = {
   path: ReadonlyArray<string>;
   description: string;
+  /**
+   * Allows templates to reference descendants of this path when the reference
+   * describes an object-shaped payload field.
+   */
+  allowsDescendants?: boolean | undefined;
 };
 
 /**

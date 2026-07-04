@@ -58,11 +58,21 @@ describe("Designer managed instruction files", () => {
       "publishing",
     );
     expect(getSection(behaviorInstructions, "## Configuration Dependencies")).toContain("triggers");
+    expect(getSection(behaviorInstructions, "## Product And Canvas Rules")).toContain(
+      "Agent model provider",
+    );
+    expect(getSection(behaviorInstructions, "## Product And Canvas Rules")).toContain(
+      'agentRuntimeId: "codex"',
+    );
+    expect(getSection(behaviorInstructions, "## Integration Setup")).toContain('kind: "agent"');
     expect(getSection(behaviorInstructions, "## Decision Requests")).toContain(
       "dashboard decision request",
     );
     expect(getSection(behaviorInstructions, "## Workflow Blueprint Rules")).toContain(
       "Workflow blueprint",
+    );
+    expect(getSection(behaviorInstructions, "## Integration Setup")).not.toContain(
+      "For GitHub webhook payload fields",
     );
     expect(behaviorInstructions).not.toContain("directionally clear");
   });
@@ -95,6 +105,7 @@ describe("Designer managed instruction files", () => {
       "**Connected app**:",
       "**Mistle resource access**:",
       "**Provider tool**:",
+      "**Agent model provider**:",
       "**Agent**:",
       "**Task**:",
       "**Approval boundary**:",
@@ -122,6 +133,12 @@ describe("Designer managed instruction files", () => {
     );
     expect(getTermBlock(contextInstructions, "**Configuration change**:")).toContain(
       "Designer- or product-side",
+    );
+    expect(getTermBlock(contextInstructions, "**Agent model provider**:")).toContain(
+      'kind: "agent"',
+    );
+    expect(getTermBlock(contextInstructions, "**Agent model provider**:")).toContain(
+      'agentRuntimeId: "codex"',
     );
     expect(getTermBlock(contextInstructions, "**User action**:")).toContain(
       "outside Designer's available tools",

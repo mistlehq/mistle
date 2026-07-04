@@ -73,6 +73,14 @@ export const APP_ROUTES = createRoutesFromElements(
       <Route element={<PortAccessRedirectPage />} path="/p/ports/:slug" />
       <Route element={<AppShell />} errorElement={<RouteErrorBoundary />}>
         <Route element={<DesignerPage />} handle={ROUTE_HANDLES.home} index />
+        <Route element={<RouteOutlet />} path="designer">
+          <Route element={<Navigate replace to="/" />} index />
+          <Route
+            element={<HomeDesignerSessionRoute />}
+            handle={ROUTE_HANDLES.homeDetail}
+            path=":sessionId"
+          />
+        </Route>
         <Route
           element={<RouteOutlet />}
           handle={ROUTE_HANDLES.sandboxProfiles}
@@ -165,11 +173,6 @@ export const APP_ROUTES = createRoutesFromElements(
             path=":sandboxInstanceId"
           />
         </Route>
-        <Route
-          element={<HomeDesignerSessionRoute />}
-          handle={ROUTE_HANDLES.homeDetail}
-          path=":sessionId"
-        />
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.settings} path="settings">
           <Route element={<Navigate replace to={SETTINGS_DEFAULT_PATH} />} index />
           <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.settingsAccount} path="account">

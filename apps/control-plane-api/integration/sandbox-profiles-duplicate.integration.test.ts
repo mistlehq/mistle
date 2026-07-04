@@ -24,6 +24,7 @@ import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { DuplicateSandboxProfileResponseSchema } from "../src/sandbox-profiles/index.js";
+import { TriggerWebhooksBadRequestCodes } from "../src/trigger-webhooks/constants.js";
 import {
   sandboxProfileRow,
   sandboxProfileVersionIntegrationBindingRow,
@@ -315,6 +316,80 @@ describe.concurrent("sandbox profiles duplicate integration", () => {
     await expect(response.json()).resolves.toMatchObject({
       code: "PROFILE_VERSION_NOT_USABLE",
     });
+  });
+
+  it("rejects duplication when a copied webhook trigger template is invalid", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-duplicate-invalid-webhook-template@example.com",
+    });
+
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_duplicate_invalid_webhook_template",
+      webhookSourceId: "iws_duplicate_invalid_webhook_template",
+      profileId: "sbp_duplicate_invalid_webhook_template",
+      profileVersion: 2,
+      profileActiveVersion: 2,
+    });
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.sandboxProfileVersions)
+      .set({
+        snapshotImageProvider: "docker",
+        snapshotImageId: "sha256:duplicate-invalid-webhook-template",
+      })
+      .where(
+        and(
+          eq(
+            env.controlPlaneTables.sandboxProfileVersions.sandboxProfileId,
+            "sbp_duplicate_invalid_webhook_template",
+          ),
+          eq(env.controlPlaneTables.sandboxProfileVersions.version, 2),
+        ),
+      );
+    await seedPersistedWebhookTrigger(env, {
+      triggerId: "trg_duplicate_invalid_webhook_template",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_duplicate_invalid_webhook_template",
+      profileId: "sbp_duplicate_invalid_webhook_template",
+      profileVersion: 2,
+      targetId: "tgt_duplicate_invalid_webhook_template",
+      name: "Invalid template webhook",
+    });
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.webhookTriggers)
+      .set({
+        inputTemplate: "Handle {{payload.not_real}}",
+      })
+      .where(
+        eq(
+          env.controlPlaneTables.webhookTriggers.triggerId,
+          "trg_duplicate_invalid_webhook_template",
+        ),
+      );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_duplicate_invalid_webhook_template/duplicate",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Should not duplicate",
+          includeTriggers: true,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      code: TriggerWebhooksBadRequestCodes.INVALID_WEBHOOK_TRIGGER_TEMPLATE_REFERENCES,
+    });
+    expect(JSON.stringify(body)).toContain("inputTemplate");
+    expect(JSON.stringify(body)).toContain("{{payload.not_real}}");
   });
 
   it("allows duplicated profiles to reuse the source display name", async ({ env }) => {

@@ -18395,11 +18395,24 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_WEBHOOK_SOURCE_REFERENCE"
+                    | "INVALID_WEBHOOK_TRIGGER_REQUIREMENTS"
+                    | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
+                    | "INVALID_SANDBOX_PROFILE_REFERENCE"
+                    | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
+                    | "INVALID_PRIMARY_REPOSITORY"
+                    | "INVALID_WEBHOOK_TRIGGER_TEMPLATE_REFERENCES";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
           };
         };
         /** @description Authentication is required. */

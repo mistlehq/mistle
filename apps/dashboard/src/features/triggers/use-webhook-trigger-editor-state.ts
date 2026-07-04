@@ -70,11 +70,11 @@ const RequiredFieldSummaryMessage = "Please address the fields highlighted in re
 const RequiredTriggerSelectionMessage = "Please add an event";
 const MissingProfileVersionQueryId = 0;
 
-export function resolveNoActiveProfileVersionMessage(input: {
+export function resolveNoTriggerTargetProfileVersionMessage(input: {
   selectedProfileId: string;
   selectedProfileName?: string | undefined;
 }): string {
-  return `The sandbox profile ${input.selectedProfileName ?? input.selectedProfileId} has no active version. Publish the profile before creating triggers.`;
+  return `The sandbox profile ${input.selectedProfileName ?? input.selectedProfileId} does not have a version available for triggers.`;
 }
 
 function hasRequiredFieldErrors(fieldErrors: WebhookTriggerFormFieldErrors): boolean {
@@ -89,7 +89,7 @@ function hasRequiredFieldErrors(fieldErrors: WebhookTriggerFormFieldErrors): boo
 export function resolveSelectedProfileTriggerState(input: {
   selectedProfileId: string;
   selectedProfileName?: string | undefined;
-  hasActiveProfileVersion: boolean | null;
+  hasSelectableProfileVersion: boolean | null;
   hasBindingData: boolean;
   isBindingDataPending: boolean;
   bindingErrorMessage: string | null;
@@ -116,11 +116,11 @@ export function resolveSelectedProfileTriggerState(input: {
     };
   }
 
-  if (input.hasActiveProfileVersion === false) {
+  if (input.hasSelectableProfileVersion === false) {
     return {
       selectableConnectionIds: [],
       disabledState: {
-        reason: "Select a sandbox profile with an active version to choose events.",
+        reason: "Select a sandbox profile with a version to choose events.",
         variant: "default",
       },
     };
@@ -401,7 +401,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
   const selectedProfileId = formValues.sandboxProfileId.trim();
   const {
     effectiveSelectedProfileVersion,
-    hasActiveProfileVersion,
+    hasSelectableProfileVersion,
     isUsingPinnedSelectedProfileVersion,
     selectedProfileVersionsQuery,
     setSelectedSandboxProfileVersion,
@@ -459,7 +459,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
       resolveSelectedProfileTriggerState({
         selectedProfileId,
         selectedProfileName,
-        hasActiveProfileVersion,
+        hasSelectableProfileVersion,
         hasBindingData: hasLoadedSelectedProfileTriggerConfig,
         isBindingDataPending:
           selectedProfileId.length > 0 &&
@@ -472,7 +472,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
       }),
     [
       effectiveSelectedProfileVersion,
-      hasActiveProfileVersion,
+      hasSelectableProfileVersion,
       hasLoadedSelectedProfileTriggerConfig,
       input.directoryData,
       isUsingPinnedSelectedProfileVersion,
@@ -485,9 +485,9 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
     ],
   );
   const sandboxProfileStatusMessage =
-    hasActiveProfileVersion === false
+    hasSelectableProfileVersion === false
       ? {
-          message: resolveNoActiveProfileVersionMessage({
+          message: resolveNoTriggerTargetProfileVersionMessage({
             selectedProfileId,
             selectedProfileName,
           }),
@@ -748,8 +748,8 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
   function onSubmit(): void {
     setFormErrorTitle("Trigger could not be saved");
     const nextFieldErrors = validateWebhookTriggerFormValues(formValues, webhookEventOptions);
-    if (hasActiveProfileVersion === false) {
-      nextFieldErrors.sandboxProfileId = resolveNoActiveProfileVersionMessage({
+    if (hasSelectableProfileVersion === false) {
+      nextFieldErrors.sandboxProfileId = resolveNoTriggerTargetProfileVersionMessage({
         selectedProfileId,
         selectedProfileName,
       });

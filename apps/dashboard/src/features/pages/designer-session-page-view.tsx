@@ -22,6 +22,7 @@ import {
   NodeToolbar,
   Position,
   ReactFlow,
+  getBezierPath,
   type Edge,
   type EdgeMarker,
   type EdgeProps,
@@ -40,6 +41,11 @@ import {
   type DockviewWillShowOverlayLocationEvent,
   type IDockviewPanelProps,
 } from "dockview-react";
+import ELK, {
+  type ELK as ElkInstance,
+  type ElkExtendedEdge,
+  type ElkNode,
+} from "elkjs/lib/elk.bundled.js";
 import {
   createContext,
   useCallback,
@@ -426,6 +432,11 @@ function DesignerCanvasDockviewPanel(input: DesignerCanvasDockviewPanelProps): R
             detailTargetKey: route.targetKey,
             locationState: embeddedLocationState,
             navigate: navigateEmbeddedCanvasRoute,
+            redirectReturnContext: {
+              kind: "designer-canvas",
+              designerSessionId: params.designerSessionId,
+              canvasTabId: params.id,
+            },
             searchParams: route.searchParams,
             setSearchParams: (nextSearchParams) => {
               const nextHref = buildDesignerCanvasHref({
@@ -990,7 +1001,9 @@ const DesignerBlueprintNodeTriggerConditionTextLineHeight = 20;
 const DesignerBlueprintNodeTriggerConditionCharsPerLine = 31;
 const DesignerBlueprintInitialViewport = { x: 48, y: 32, zoom: 0.95 };
 const DesignerBlueprintInitialFocusTopPadding = 24;
-const DesignerBlueprintProcessLaneGap = 40;
+const DesignerBlueprintOutcomeGap = 48;
+const DesignerBlueprintLayoutLayerSpacing = 104;
+const DesignerBlueprintLayoutNodeSpacing = 96;
 const DesignerBlueprintProcessLaneInitialZoom = DesignerBlueprintInitialViewport.zoom;
 const DesignerBlueprintLoopbackEdgeOffset = 96;
 const DesignerBlueprintProcessLaneInitialFocusRightPadding =
@@ -1003,6 +1016,7 @@ const DesignerBlueprintEdgeMarker: EdgeMarker = {
   type: MarkerType.ArrowClosed,
   width: 16,
 };
+let designerBlueprintElk: ElkInstance | null = null;
 
 export type DesignerBlueprintRoutingSummaryRow = {
   nextStepLabel: string | undefined;
@@ -1084,9 +1098,29 @@ const DesignerBlueprintNodeTypes = {
 } satisfies NodeTypes;
 
 const DesignerBlueprintEdgeTypes = {
+  curved: DesignerBlueprintCurvedEdgeComponent,
   straight: DesignerBlueprintStraightEdgeComponent,
   loopback: DesignerBlueprintLoopbackEdgeComponent,
 } satisfies EdgeTypes;
+
+function DesignerBlueprintCurvedEdgeComponent(input: EdgeProps): React.JSX.Element {
+  const [path] = getBezierPath({
+    sourceX: input.sourceX,
+    sourceY: input.sourceY,
+    sourcePosition: input.sourcePosition,
+    targetX: input.targetX,
+    targetY: input.targetY,
+    targetPosition: input.targetPosition,
+  });
+
+  return (
+    <BaseEdge
+      path={path}
+      {...(input.markerEnd === undefined ? {} : { markerEnd: input.markerEnd })}
+      {...(input.style === undefined ? {} : { style: input.style })}
+    />
+  );
+}
 
 function DesignerBlueprintStraightEdgeComponent(input: EdgeProps): React.JSX.Element {
   const path = [`M ${input.sourceX} ${input.sourceY}`, `L ${input.targetX} ${input.targetY}`].join(
@@ -1136,6 +1170,10 @@ export function DesignerBlueprintCanvasPanel(input: {
     () => buildDesignerBlueprintIntegrationMetadataByTargetKey(integrationsQuery.data?.targets),
     [integrationsQuery.data?.targets],
   );
+  const blueprintLayoutInputKey = createDesignerBlueprintLayoutInputKey({
+    blueprint: input.blueprint,
+    integrationMetadataByTargetKey,
+  });
   const [graph, setGraph] = useState<DesignerBlueprintGraph | null>(null);
   const [layoutError, setLayoutError] = useState<string | null>(null);
   const [suppressedAddCommentItemIds, setSuppressedAddCommentItemIds] = useState<
@@ -1183,15 +1221,26 @@ export function DesignerBlueprintCanvasPanel(input: {
   useEffect(() => {
     let cancelled = false;
     setLayoutError(null);
+    setGraph(null);
 
     try {
-      const nextGraph = buildDesignerBlueprintGraph({
+      void buildDesignerBlueprintGraph({
         blueprint: input.blueprint,
         integrationMetadataByTargetKey,
-      });
-      if (!cancelled) {
-        setGraph(nextGraph);
-      }
+      })
+        .then((nextGraph) => {
+          if (!cancelled) {
+            setGraph(nextGraph);
+          }
+        })
+        .catch((error: unknown) => {
+          if (cancelled) {
+            return;
+          }
+          setLayoutError(
+            error instanceof Error ? error.message : "Designer blueprint graph layout failed.",
+          );
+        });
     } catch (error: unknown) {
       if (cancelled) {
         return;
@@ -1204,7 +1253,7 @@ export function DesignerBlueprintCanvasPanel(input: {
     return () => {
       cancelled = true;
     };
-  }, [input.blueprint, integrationMetadataByTargetKey]);
+  }, [blueprintLayoutInputKey]);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
@@ -1253,7 +1302,11 @@ export function DesignerBlueprintCanvasPanel(input: {
               rightPadding={DesignerBlueprintProcessLaneInitialFocusRightPadding}
               zoom={DesignerBlueprintProcessLaneInitialZoom}
             />
-            <DesignerBlueprintMeasuredProcessLaneLayout graph={graph} onGraphChange={setGraph} />
+            <DesignerBlueprintMeasuredGraphLayout
+              graph={graph}
+              onGraphChange={setGraph}
+              onLayoutError={setLayoutError}
+            />
             <Background gap={24} size={1} />
             <Controls showInteractive={false} />
           </ReactFlow>
@@ -1299,11 +1352,12 @@ function DesignerBlueprintInitialFocus(input: {
   return null;
 }
 
-function DesignerBlueprintMeasuredProcessLaneLayout(input: {
+function DesignerBlueprintMeasuredGraphLayout(input: {
   graph: DesignerBlueprintGraph;
   onGraphChange: (graph: DesignerBlueprintGraph) => void;
+  onLayoutError: (error: string) => void;
 }): React.JSX.Element | null {
-  const { graph, onGraphChange } = input;
+  const { graph, onGraphChange, onLayoutError } = input;
   const measuredNodeHeights = useStore(
     useCallback(
       (state) =>
@@ -1316,6 +1370,7 @@ function DesignerBlueprintMeasuredProcessLaneLayout(input: {
   );
 
   useEffect(() => {
+    let cancelled = false;
     const measuredHeightByNodeId = new Map<string, number>();
     for (const measuredNode of measuredNodeHeights) {
       if (measuredNode.height === undefined || measuredNode.height <= 0) {
@@ -1325,18 +1380,36 @@ function DesignerBlueprintMeasuredProcessLaneLayout(input: {
       measuredHeightByNodeId.set(measuredNode.id, measuredNode.height);
     }
 
-    const measuredGraph = buildDesignerBlueprintProcessLaneGraph({
+    void buildDesignerBlueprintLayoutGraph({
       edges: graph.edges,
       measuredHeightByNodeId,
       nodes: graph.nodes,
-    });
+    })
+      .then((measuredGraph) => {
+        if (cancelled) {
+          return;
+        }
 
-    if (areDesignerBlueprintGraphNodePositionsEqual(graph, measuredGraph)) {
-      return;
-    }
+        if (areDesignerBlueprintGraphNodePositionsEqual(graph, measuredGraph)) {
+          return;
+        }
 
-    onGraphChange(measuredGraph);
-  }, [graph, measuredNodeHeights, onGraphChange]);
+        onGraphChange(measuredGraph);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) {
+          return;
+        }
+
+        onLayoutError(
+          error instanceof Error ? error.message : "Designer blueprint graph layout failed.",
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [graph, measuredNodeHeights, onGraphChange, onLayoutError]);
 
   return null;
 }
@@ -1852,49 +1925,140 @@ function DesignerBlueprintNodeKindIcon(input: {
   }
 }
 
-function buildDesignerBlueprintGraph(input: {
+export async function buildDesignerBlueprintGraph(input: {
   blueprint: DesignerBlueprintDocument;
   integrationMetadataByTargetKey: ReadonlyMap<string, DesignerBlueprintIntegrationMetadata>;
-}): DesignerBlueprintGraph {
+}): Promise<DesignerBlueprintGraph> {
   const unresolvedNodes = buildDesignerBlueprintUnresolvedNodes(input);
   const displayEdges = buildDesignerBlueprintDisplayEdges(input.blueprint);
-  return buildDesignerBlueprintProcessLaneGraph({
+  return await buildDesignerBlueprintLayoutGraph({
     edges: displayEdges,
     nodes: unresolvedNodes,
   });
 }
 
-function buildDesignerBlueprintProcessLaneGraph(input: {
+async function buildDesignerBlueprintLayoutGraph(input: {
   edges: DesignerBlueprintGraphEdge[];
   measuredHeightByNodeId?: ReadonlyMap<string, number> | undefined;
   nodes: readonly DesignerBlueprintLayoutNode[];
-}): DesignerBlueprintGraph {
-  const indexByNodeId = new Map(input.nodes.map((node, index) => [node.id, index]));
-  const positionByNodeId = new Map<string, { x: number; y: number }>();
-  let nextY = 0;
+}): Promise<DesignerBlueprintGraph> {
+  const outcomeNode = input.nodes.find((node) => node.id === DesignerBlueprintOutcomeNodeId);
+  const workflowNodes = input.nodes.filter((node) => node.id !== DesignerBlueprintOutcomeNodeId);
+  const workflowNodeIds = new Set(workflowNodes.map((node) => node.id));
+  const workflowNodeIndexById = new Map(workflowNodes.map((node, index) => [node.id, index]));
+  const elkGraph: ElkNode = {
+    id: "designer-blueprint-layout",
+    children: workflowNodes.map((node) => ({
+      id: node.id,
+      width: getDesignerBlueprintPositionedNodeWidth(node),
+      height:
+        input.measuredHeightByNodeId?.get(node.id) ??
+        resolveDesignerBlueprintProcessLaneSlotHeight({
+          description: node.data.description,
+          routingSummaryRows: node.data.routingSummaryRows,
+          triggerConditionRows: node.data.triggerConditionRows,
+        }),
+    })),
+    edges: input.edges
+      .filter(
+        (edge) =>
+          workflowNodeIds.has(edge.source) &&
+          workflowNodeIds.has(edge.target) &&
+          !isDesignerBlueprintEarlierNodeReturnEdge({
+            edge,
+            indexByNodeId: workflowNodeIndexById,
+          }),
+      )
+      .map(
+        (edge): ElkExtendedEdge => ({
+          id: edge.id,
+          sources: [edge.source],
+          targets: [edge.target],
+        }),
+      ),
+  };
 
-  for (const node of input.nodes) {
-    const nodeWidth = getDesignerBlueprintPositionedNodeWidth(node);
-    positionByNodeId.set(node.id, {
-      x: (DesignerBlueprintRoutingNodeWidth - nodeWidth) / 2,
-      y: nextY,
-    });
-    const nodeHeight =
-      input.measuredHeightByNodeId?.get(node.id) ??
-      resolveDesignerBlueprintProcessLaneSlotHeight({
-        description: node.data.description,
-        routingSummaryRows: node.data.routingSummaryRows,
-        triggerConditionRows: node.data.triggerConditionRows,
-      });
-    nextY += nodeHeight + DesignerBlueprintProcessLaneGap;
+  const layoutedGraph = await getDesignerBlueprintElk().layout(elkGraph);
+  const layoutedChildren = layoutedGraph.children;
+  if (layoutedChildren === undefined && workflowNodes.length > 0) {
+    throw new Error("Designer blueprint graph layout did not return positioned nodes.");
   }
+
+  const positionByNodeId = new Map<string, { x: number; y: number }>();
+  let workflowMinX = Number.POSITIVE_INFINITY;
+  let workflowMaxX = Number.NEGATIVE_INFINITY;
+
+  for (const child of layoutedChildren ?? []) {
+    if (child.x === undefined || child.y === undefined || child.width === undefined) {
+      throw new Error(`Designer blueprint graph layout did not position node '${child.id}'.`);
+    }
+
+    workflowMinX = Math.min(workflowMinX, child.x);
+    workflowMaxX = Math.max(workflowMaxX, child.x + child.width);
+    positionByNodeId.set(child.id, {
+      x: child.x,
+      y: child.y,
+    });
+  }
+
+  const hasWorkflowNodes = Number.isFinite(workflowMinX) && Number.isFinite(workflowMaxX);
+  const workflowCenterX = hasWorkflowNodes ? workflowMinX + (workflowMaxX - workflowMinX) / 2 : 0;
+  if (hasWorkflowNodes) {
+    centerDesignerBlueprintLayers({
+      centerX: workflowCenterX,
+      nodes: workflowNodes,
+      positionByNodeId,
+    });
+  }
+
+  if (outcomeNode !== undefined) {
+    const outcomeWidth = getDesignerBlueprintPositionedNodeWidth(outcomeNode);
+    const outcomeHeight =
+      input.measuredHeightByNodeId?.get(outcomeNode.id) ??
+      resolveDesignerBlueprintProcessLaneSlotHeight({
+        description: outcomeNode.data.description,
+        routingSummaryRows: outcomeNode.data.routingSummaryRows,
+        triggerConditionRows: outcomeNode.data.triggerConditionRows,
+      });
+    positionByNodeId.set(outcomeNode.id, {
+      x: workflowCenterX - outcomeWidth / 2,
+      y: 0,
+    });
+
+    for (const [nodeId, position] of positionByNodeId) {
+      if (nodeId === outcomeNode.id) {
+        continue;
+      }
+      positionByNodeId.set(nodeId, {
+        x: position.x,
+        y: position.y + outcomeHeight + DesignerBlueprintOutcomeGap,
+      });
+    }
+  }
+
+  const positionedNodes = input.nodes.map((node) => ({
+    ...node,
+    position: positionByNodeId.get(node.id) ?? node.position,
+  }));
+
+  const positionByPositionedNodeId = new Map(
+    positionedNodes.map((node) => [node.id, node.position]),
+  );
+  const fanOutCountByNodeId = createDesignerBlueprintFanCountByNodeId({
+    edges: input.edges,
+    field: "source",
+  });
+  const fanInCountByNodeId = createDesignerBlueprintFanCountByNodeId({
+    edges: input.edges,
+    field: "target",
+  });
 
   return {
     edges: input.edges.map((edge) => {
       if (
         isDesignerBlueprintFeedbackEdge({
           edge,
-          indexByNodeId,
+          positionByNodeId: positionByPositionedNodeId,
         })
       ) {
         return {
@@ -1910,13 +2074,112 @@ function buildDesignerBlueprintProcessLaneGraph(input: {
         };
       }
 
+      if (
+        (fanOutCountByNodeId.get(edge.source) ?? 0) > 1 ||
+        (fanInCountByNodeId.get(edge.target) ?? 0) > 1
+      ) {
+        return {
+          ...edge,
+          type: "curved",
+        };
+      }
+
       return edge;
     }),
-    nodes: input.nodes.map((node) => ({
-      ...node,
-      position: positionByNodeId.get(node.id) ?? node.position,
-    })),
+    nodes: positionedNodes,
   };
+}
+
+function centerDesignerBlueprintLayers(input: {
+  centerX: number;
+  nodes: readonly DesignerBlueprintLayoutNode[];
+  positionByNodeId: Map<string, { x: number; y: number }>;
+}): void {
+  const nodeById = new Map(input.nodes.map((node) => [node.id, node]));
+  const nodeIdsByY = new Map<number, string[]>();
+  for (const node of input.nodes) {
+    const position = input.positionByNodeId.get(node.id);
+    if (position === undefined) {
+      continue;
+    }
+
+    const nodeIds = nodeIdsByY.get(position.y) ?? [];
+    nodeIds.push(node.id);
+    nodeIdsByY.set(position.y, nodeIds);
+  }
+
+  for (const nodeIds of nodeIdsByY.values()) {
+    let layerMinX = Number.POSITIVE_INFINITY;
+    let layerMaxX = Number.NEGATIVE_INFINITY;
+
+    for (const nodeId of nodeIds) {
+      const node = nodeById.get(nodeId);
+      const position = input.positionByNodeId.get(nodeId);
+      if (node === undefined || position === undefined) {
+        continue;
+      }
+
+      layerMinX = Math.min(layerMinX, position.x);
+      layerMaxX = Math.max(layerMaxX, position.x + getDesignerBlueprintPositionedNodeWidth(node));
+    }
+
+    if (!Number.isFinite(layerMinX) || !Number.isFinite(layerMaxX)) {
+      continue;
+    }
+
+    const layerCenterX = layerMinX + (layerMaxX - layerMinX) / 2;
+    const offsetX = input.centerX - layerCenterX;
+
+    for (const nodeId of nodeIds) {
+      const position = input.positionByNodeId.get(nodeId);
+      if (position === undefined) {
+        continue;
+      }
+
+      input.positionByNodeId.set(nodeId, {
+        x: position.x + offsetX,
+        y: position.y,
+      });
+    }
+  }
+}
+
+function createDesignerBlueprintFanCountByNodeId(input: {
+  edges: readonly DesignerBlueprintGraphEdge[];
+  field: "source" | "target";
+}): ReadonlyMap<string, number> {
+  const countByNodeId = new Map<string, number>();
+  for (const edge of input.edges) {
+    const nodeId = edge[input.field];
+    countByNodeId.set(nodeId, (countByNodeId.get(nodeId) ?? 0) + 1);
+  }
+
+  return countByNodeId;
+}
+
+function isDesignerBlueprintEarlierNodeReturnEdge(input: {
+  edge: DesignerBlueprintGraphEdge;
+  indexByNodeId: ReadonlyMap<string, number>;
+}): boolean {
+  const sourceIndex = input.indexByNodeId.get(input.edge.source);
+  const targetIndex = input.indexByNodeId.get(input.edge.target);
+  return sourceIndex !== undefined && targetIndex !== undefined && targetIndex < sourceIndex;
+}
+
+function getDesignerBlueprintElk(): ElkInstance {
+  if (designerBlueprintElk === null) {
+    designerBlueprintElk = new ELK({
+      defaultLayoutOptions: {
+        "elk.algorithm": "layered",
+        "elk.direction": "DOWN",
+        "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
+        "elk.layered.spacing.nodeNodeBetweenLayers": String(DesignerBlueprintLayoutLayerSpacing),
+        "elk.spacing.nodeNode": String(DesignerBlueprintLayoutNodeSpacing),
+      },
+    });
+  }
+
+  return designerBlueprintElk;
 }
 
 function areDesignerBlueprintGraphNodePositionsEqual(
@@ -1948,11 +2211,15 @@ export function resolveDesignerBlueprintProcessLaneSlotHeight(input: {
 
 function isDesignerBlueprintFeedbackEdge(input: {
   edge: DesignerBlueprintGraphEdge;
-  indexByNodeId: ReadonlyMap<string, number>;
+  positionByNodeId: ReadonlyMap<string, { x: number; y: number }>;
 }): boolean {
-  const sourceIndex = input.indexByNodeId.get(input.edge.source);
-  const targetIndex = input.indexByNodeId.get(input.edge.target);
-  return sourceIndex !== undefined && targetIndex !== undefined && targetIndex < sourceIndex;
+  const sourcePosition = input.positionByNodeId.get(input.edge.source);
+  const targetPosition = input.positionByNodeId.get(input.edge.target);
+  return (
+    sourcePosition !== undefined &&
+    targetPosition !== undefined &&
+    targetPosition.y < sourcePosition.y
+  );
 }
 
 export function resolveDesignerBlueprintInitialFocusViewport(input: {
@@ -2195,6 +2462,7 @@ function mapDesignerBlueprintGraphNodesForComments(input: {
 function buildDesignerBlueprintDisplayEdges(
   input: DesignerBlueprintDocument,
 ): DesignerBlueprintGraphEdge[] {
+  validateDesignerBlueprintRoutingLinks(input);
   return [
     ...input.links.map((link) => ({
       id: `${link.from}:${link.kind}:${link.to}`,
@@ -2205,6 +2473,51 @@ function buildDesignerBlueprintDisplayEdges(
       type: "straight",
     })),
   ];
+}
+
+function validateDesignerBlueprintRoutingLinks(input: DesignerBlueprintDocument): void {
+  const routingPolicyIds = new Set(
+    input.items.filter((item) => item.kind === "routing_policy").map((item) => item.id),
+  );
+  const routingRuleTargetKeys = new Set<string>();
+  const routeLinkKeys = new Set(
+    input.links
+      .filter((link) => link.kind === "routes_to")
+      .map((link) => `${link.from}:${link.to}`),
+  );
+
+  for (const item of input.items) {
+    if (item.kind !== "routing_policy") {
+      continue;
+    }
+
+    for (const rule of item.rules) {
+      if (rule.routeTo === undefined) {
+        continue;
+      }
+
+      const linkKey = `${item.id}:${rule.routeTo}`;
+      routingRuleTargetKeys.add(linkKey);
+      if (!routeLinkKeys.has(linkKey)) {
+        throw new Error(
+          `Designer blueprint routing rule '${item.id}' routes to '${rule.routeTo}' but the matching routes_to link is missing.`,
+        );
+      }
+    }
+  }
+
+  for (const link of input.links) {
+    if (link.kind !== "routes_to" || !routingPolicyIds.has(link.from)) {
+      continue;
+    }
+
+    const linkKey = `${link.from}:${link.to}`;
+    if (!routingRuleTargetKeys.has(linkKey)) {
+      throw new Error(
+        `Designer blueprint routes_to link '${link.from}' to '${link.to}' is missing a matching routing rule target.`,
+      );
+    }
+  }
 }
 
 function getDesignerBlueprintNodeContentHeight(input: {
@@ -2328,6 +2641,18 @@ function buildDesignerBlueprintIntegrationMetadataByTargetKey(
       },
     ]),
   );
+}
+
+function createDesignerBlueprintLayoutInputKey(input: {
+  blueprint: DesignerBlueprintDocument;
+  integrationMetadataByTargetKey: ReadonlyMap<string, DesignerBlueprintIntegrationMetadata>;
+}): string {
+  return JSON.stringify({
+    blueprint: input.blueprint,
+    integrationMetadata: [...input.integrationMetadataByTargetKey.entries()].sort(
+      ([leftTargetKey], [rightTargetKey]) => leftTargetKey.localeCompare(rightTargetKey),
+    ),
+  });
 }
 
 function createDesignerBlueprintIntegrationLogoData(input: {

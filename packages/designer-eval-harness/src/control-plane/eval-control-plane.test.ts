@@ -26,6 +26,27 @@ describe("Designer eval control plane", () => {
     expect(state.productState.targetDraft.version).toBe(evalCase.seed.targetDraft.version);
   });
 
+  it("seeds agent model-provider bindings with real provider connections", () => {
+    const evalCase = getDesignerEvalCase("ai-software-factory-linear-github");
+    const state = createDesignerEvalSessionState({
+      evalCase,
+      runKey: "ai_factory",
+    });
+    const agentBinding = state.productState.targetDraft.integrationBindings.find(
+      (binding) => binding.kind === "agent",
+    );
+    if (agentBinding === undefined) {
+      throw new Error("Expected AI factory eval to seed an agent binding.");
+    }
+
+    expect(state.productState.providerConnections).toContainEqual({
+      id: agentBinding.connectionId,
+      label: "OpenAI",
+      providerFamilyId: "openai",
+      targetKey: "openai-default",
+    });
+  });
+
   it("persists canvas tabs in run-local memory through the Designer canvas-tabs route", async () => {
     const evalCase = getDesignerEvalCase("github-pr-review-basic");
     const state = createDesignerEvalSessionState({

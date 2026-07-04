@@ -49,6 +49,7 @@ function createTelegramPayloadReferences(
     {
       path: [providerEventType],
       description: `Telegram ${providerEventType} update payload.`,
+      allowsDescendants: true,
     },
   ];
 }

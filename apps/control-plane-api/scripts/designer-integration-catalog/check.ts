@@ -1,47 +1,62 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 
 import {
-  assertDesignerIntegrationCatalogWithinBudget,
-  renderDesignerIntegrationCatalogMarkdown,
+  assertDesignerIntegrationCatalogFilesWithinBudget,
+  renderDesignerIntegrationCatalogFiles,
 } from "../../src/designer/runtime-references/designer-integration-catalog.js";
 import { isDirectEntrypoint } from "../script-entrypoint.js";
 
-const DefaultCatalogPath = fileURLToPath(
-  new URL("../../src/designer/runtime-references/integration-catalog.md", import.meta.url),
+const DefaultCatalogDirectoryPath = fileURLToPath(
+  new URL("../../src/designer/runtime-references/integrations", import.meta.url),
 );
 
-export function checkDesignerIntegrationCatalogFile(input: {
-  catalogPath?: string;
+export function checkDesignerIntegrationCatalogFiles(input: {
+  catalogDirectoryPath?: string;
   startDirectory?: string;
 }): void {
   const startDirectory = input.startDirectory ?? process.cwd();
-  const catalogPath = resolve(startDirectory, input.catalogPath ?? DefaultCatalogPath);
-  const expected = renderDesignerIntegrationCatalogMarkdown(
+  const catalogDirectoryPath = resolve(
+    startDirectory,
+    input.catalogDirectoryPath ?? DefaultCatalogDirectoryPath,
+  );
+  const expectedFiles = renderDesignerIntegrationCatalogFiles(
     createIntegrationRegistry().listDefinitions(),
   );
-  assertDesignerIntegrationCatalogWithinBudget(expected);
+  assertDesignerIntegrationCatalogFilesWithinBudget(expectedFiles);
 
-  if (!existsSync(catalogPath)) {
+  if (!existsSync(catalogDirectoryPath)) {
     throw new Error(
-      `Designer integration catalog '${catalogPath}' does not exist. Run pnpm --filter @mistle/control-plane-api designer:integration-catalog:generate.`,
+      `Designer integration catalog directory '${catalogDirectoryPath}' does not exist. Run pnpm --filter @mistle/control-plane-api designer:integration-catalog:generate.`,
     );
   }
 
-  const actual = readFileSync(catalogPath, "utf8");
-  if (actual !== expected) {
+  const expectedFileNames = expectedFiles.map((file) => file.fileName).sort();
+  const actualFileNames = readdirSync(catalogDirectoryPath)
+    .filter((fileName) => statSync(resolve(catalogDirectoryPath, fileName)).isFile())
+    .sort();
+  if (actualFileNames.join("\n") !== expectedFileNames.join("\n")) {
     throw new Error(
-      `Designer integration catalog '${catalogPath}' is out of date. Run pnpm --filter @mistle/control-plane-api designer:integration-catalog:generate.`,
+      `Designer integration catalog directory '${catalogDirectoryPath}' has stale or missing files. Run pnpm --filter @mistle/control-plane-api designer:integration-catalog:generate.`,
     );
+  }
+
+  for (const expectedFile of expectedFiles) {
+    const actual = readFileSync(resolve(catalogDirectoryPath, expectedFile.fileName), "utf8");
+    if (actual !== expectedFile.markdown) {
+      throw new Error(
+        `Designer integration catalog file '${expectedFile.fileName}' is out of date. Run pnpm --filter @mistle/control-plane-api designer:integration-catalog:generate.`,
+      );
+    }
   }
 }
 
 if (isDirectEntrypoint({ argvPath: process.argv[1], moduleUrl: import.meta.url })) {
   try {
-    checkDesignerIntegrationCatalogFile({});
+    checkDesignerIntegrationCatalogFiles({});
     console.log("Designer integration catalog is up to date.");
   } catch (error) {
     console.error(error);

@@ -5,7 +5,7 @@
 import { systemClock, systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 
-import { it } from "./system-test-context.js";
+import { it, type SystemTestFixture } from "./system-test-context.js";
 
 const TestTimeoutMs = 10 * 60_000;
 const RuntimeStateSettleTimeoutMs = 15_000;
@@ -27,7 +27,7 @@ describe("sandbox idle deadline survives gateway restart", () => {
         currentStep = "assert sandbox is idle-eligible before restart";
         const deadlineMs = systemClock.nowMs() + RuntimeStateSettleTimeoutMs;
         let runtimeStateBeforeRestart:
-          | Awaited<ReturnType<typeof fixture.readSandboxRuntimeState>>
+          | Awaited<ReturnType<SystemTestFixture["readSandboxRuntimeState"]>>
           | undefined;
         while (systemClock.nowMs() < deadlineMs) {
           const runtimeState = await fixture.readSandboxRuntimeState(sandboxInstanceId);

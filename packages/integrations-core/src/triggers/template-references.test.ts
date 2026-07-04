@@ -46,6 +46,31 @@ const PullRequestEvent: IntegrationWebhookEventDefinition = {
   ],
 };
 
+const MessageObjectEvent: IntegrationWebhookEventDefinition = {
+  eventType: "provider.message.created",
+  providerEventType: "message",
+  displayName: "Message created",
+  payloadReferences: [
+    {
+      path: ["message"],
+      description: "Message object",
+      allowsDescendants: true,
+    },
+  ],
+};
+
+const IndexedMessageEvent: IntegrationWebhookEventDefinition = {
+  eventType: "provider.message.received",
+  providerEventType: "message_received",
+  displayName: "Message received",
+  payloadReferences: [
+    {
+      path: ["messages", "0", "chat_id"],
+      description: "First message chat id",
+    },
+  ],
+};
+
 describe("webhook trigger template reference validation", () => {
   it("accepts shared fields, selected payload references, documented parents, and raw payload in user messages", () => {
     const result = validateWebhookTriggerTemplates({
@@ -72,6 +97,56 @@ describe("webhook trigger template reference validation", () => {
     expect(result.issues).toEqual([]);
   });
 
+  it("accepts descendants of documented payload object references", () => {
+    const result = validateWebhookTriggerTemplates({
+      selectedEvents: [MessageObjectEvent],
+      templates: [
+        {
+          field: "conversationKeyTemplate",
+          kind: WebhookTriggerTemplateKinds.KEY,
+          template: "{{payload.message.chat.id}}",
+        },
+      ],
+    });
+
+    expect(result.issues).toEqual([]);
+  });
+
+  it("rejects descendants of scalar payload references", () => {
+    const result = validateWebhookTriggerTemplates({
+      selectedEvents: [IssueCommentEvent],
+      templates: [
+        {
+          field: "inputTemplate",
+          kind: WebhookTriggerTemplateKinds.INPUT,
+          template: "{{payload.comment.body.text}}",
+        },
+      ],
+    });
+
+    expect(result.issues).toEqual([
+      {
+        field: "inputTemplate",
+        message: "Unsupported trigger event field reference '{{payload.comment.body.text}}'.",
+      },
+    ]);
+  });
+
+  it("accepts literal numeric array indexes in documented payload references", () => {
+    const result = validateWebhookTriggerTemplates({
+      selectedEvents: [IndexedMessageEvent],
+      templates: [
+        {
+          field: "conversationKeyTemplate",
+          kind: WebhookTriggerTemplateKinds.KEY,
+          template: "{{payload.messages[0].chat_id}}",
+        },
+      ],
+    });
+
+    expect(result.issues).toEqual([]);
+  });
+
   it("rejects unguarded user-message payload references that are not available on every selected event", () => {
     const result = validateWebhookTriggerTemplates({
       selectedEvents: [IssueCommentEvent, PullRequestEvent],
@@ -80,6 +155,62 @@ describe("webhook trigger template reference validation", () => {
           field: "inputTemplate",
           kind: WebhookTriggerTemplateKinds.INPUT,
           template: "Review {{payload.pull_request.number}}",
+        },
+      ],
+    });
+
+    expect(result.issues).toEqual([
+      {
+        field: "inputTemplate",
+        message: "Unsupported trigger event field reference '{{payload.pull_request.number}}'.",
+      },
+    ]);
+  });
+
+  it("accepts supported references used as output filter arguments", () => {
+    const result = validateWebhookTriggerTemplates({
+      selectedEvents: [IssueCommentEvent],
+      templates: [
+        {
+          field: "inputTemplate",
+          kind: WebhookTriggerTemplateKinds.INPUT,
+          template:
+            "{{payload.comment.body | default: payload.repository.full_name, allow_false: true}}",
+        },
+      ],
+    });
+
+    expect(result.issues).toEqual([]);
+  });
+
+  it("rejects unsupported references used as output filter arguments", () => {
+    const result = validateWebhookTriggerTemplates({
+      selectedEvents: [IssueCommentEvent],
+      templates: [
+        {
+          field: "inputTemplate",
+          kind: WebhookTriggerTemplateKinds.INPUT,
+          template: "{{webhookEvent.id | truncate: 0 | append: triggerRun.some_secret_field}}",
+        },
+      ],
+    });
+
+    expect(result.issues).toEqual([
+      {
+        field: "inputTemplate",
+        message: "Unsupported trigger event field reference '{{triggerRun.some_secret_field}}'.",
+      },
+    ]);
+  });
+
+  it("rejects selected-event-specific payload references used as output filter arguments outside a narrowed branch", () => {
+    const result = validateWebhookTriggerTemplates({
+      selectedEvents: [IssueCommentEvent, PullRequestEvent],
+      templates: [
+        {
+          field: "inputTemplate",
+          kind: WebhookTriggerTemplateKinds.INPUT,
+          template: "{{payload.repository.full_name | append: payload.pull_request.number}}",
         },
       ],
     });
@@ -190,6 +321,32 @@ describe("webhook trigger template reference validation", () => {
     });
 
     expect(result.issues).toEqual([]);
+  });
+
+  it("rejects elsif references under unless when the positive elsif branch reaches events missing the payload shape", () => {
+    const result = validateWebhookTriggerTemplates({
+      selectedEvents: [IssueCommentEvent, PullRequestEvent],
+      templates: [
+        {
+          field: "inputTemplate",
+          kind: WebhookTriggerTemplateKinds.INPUT,
+          template: [
+            "{% unless payload.pull_request %}",
+            "Issue {{payload.issue.number}}",
+            "{% elsif payload.pull_request %}",
+            "Issue {{payload.issue.number}}",
+            "{% endunless %}",
+          ].join(""),
+        },
+      ],
+    });
+
+    expect(result.issues).toEqual([
+      {
+        field: "inputTemplate",
+        message: "Unsupported trigger event field reference '{{payload.issue.number}}'.",
+      },
+    ]);
   });
 
   it("rejects unknown roots, unknown children, unsupported tags, and dynamic references", () => {
@@ -316,6 +473,26 @@ describe("webhook trigger template reference validation", () => {
         field: "conversationKeyTemplate",
         message:
           'Only webhookEvent.eventType equality or simple payload presence conditions are supported in key templates, for example {% if webhookEvent.eventType == "provider.event" %} or {% if payload.resource %}.',
+      },
+    ]);
+  });
+
+  it("rejects unsupported key-template condition references before narrowing branch reachability", () => {
+    const result = validateWebhookTriggerTemplates({
+      selectedEvents: [IssueCommentEvent, PullRequestEvent],
+      templates: [
+        {
+          field: "conversationKeyTemplate",
+          kind: WebhookTriggerTemplateKinds.KEY,
+          template: "{% if payload.not_real %}{{payload.pull_request.number}}{% endif %}",
+        },
+      ],
+    });
+
+    expect(result.issues).toEqual([
+      {
+        field: "conversationKeyTemplate",
+        message: "Unsupported trigger event field reference '{{payload.not_real}}'.",
       },
     ]);
   });

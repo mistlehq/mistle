@@ -950,6 +950,8 @@ async function seedOpenAiAgentBinding(input: {
     .values({
       sandboxProfileId: input.sandboxProfileId,
       version: input.sandboxProfileVersion,
+      snapshotImageProvider: "docker",
+      snapshotImageId: `snapshot_openai_agent_${input.suffix}`,
     });
   await input.env.controlPlaneDb
     .insert(input.env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)

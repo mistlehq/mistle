@@ -136,6 +136,17 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
                   ],
                   routeTo: "escalate",
                 },
+                {
+                  conditionLabel: "Normal triage",
+                  when: [
+                    {
+                      field: "severity",
+                      operator: "excludes",
+                      value: "urgent",
+                    },
+                  ],
+                  routeTo: "triage-update",
+                },
               ],
             },
             {
@@ -1049,7 +1060,11 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const WithSessions: Story = {};
+export const WithSessions: Story = {
+  render: function RenderWithSessionsStory(): React.JSX.Element {
+    return <DesignerPageStory />;
+  },
+};
 
 export const Empty: Story = {
   render: function RenderEmptyStory(): React.JSX.Element {

@@ -1,0 +1,261 @@
+# Designer Integration Reference Index
+
+Reference directory: `.mistle/designer/references/integrations/`
+
+Integration files:
+
+- AgentMail
+  - Provider family ID: `agentmail`
+  - Integration target key: `agentmail-mcp`
+  - Binding kind: `connector`
+  - Detail file: `agentmail-mcp.md`
+- Anthropic
+  - Provider family ID: `anthropic`
+  - Integration target key: `anthropic-default`
+  - Binding kind: `agent`
+  - Detail file: `anthropic-default.md`
+- Autumn
+  - Provider family ID: `autumn`
+  - Integration target key: `autumn-mcp`
+  - Binding kind: `connector`
+  - Detail file: `autumn-mcp.md`
+- AWS
+  - Provider family ID: `aws`
+  - Integration target key: `aws-cli-default`
+  - Binding kind: `connector`
+  - Detail file: `aws-cli-default.md`
+- BugSnag
+  - Provider family ID: `bugsnag`
+  - Integration target key: `bugsnag-mcp`
+  - Binding kind: `connector`
+  - Detail file: `bugsnag-mcp.md`
+- Cloudflare
+  - Provider family ID: `cloudflare`
+  - Integration target key: `cloudflare-mcp`
+  - Binding kind: `connector`
+  - Detail file: `cloudflare-mcp.md`
+- Datadog
+  - Provider family ID: `datadog`
+  - Integration target key: `datadog-default`
+  - Binding kind: `connector`
+  - Detail file: `datadog-default.md`
+- DataForSEO
+  - Provider family ID: `dataforseo`
+  - Integration target key: `dataforseo-mcp`
+  - Binding kind: `connector`
+  - Detail file: `dataforseo-mcp.md`
+- DeepSeek
+  - Provider family ID: `deepseek`
+  - Integration target key: `deepseek-default`
+  - Binding kind: `agent`
+  - Detail file: `deepseek-default.md`
+- Discord
+  - Provider family ID: `discord`
+  - Integration target key: `discord-default`
+  - Binding kind: `connector`
+  - Detail file: `discord-default.md`
+- E2B
+  - Provider family ID: `e2b`
+  - Integration target key: `e2b-default`
+  - Binding kind: `sandbox`
+  - Detail file: `e2b-default.md`
+- Expo
+  - Provider family ID: `expo`
+  - Integration target key: `expo-mcp`
+  - Binding kind: `connector`
+  - Detail file: `expo-mcp.md`
+- Fireworks AI
+  - Provider family ID: `fireworks`
+  - Integration target key: `fireworks-default`
+  - Binding kind: `agent`
+  - Detail file: `fireworks-default.md`
+- GitHub
+  - Provider family ID: `github`
+  - Integration target key: `github-cloud`
+  - Binding kind: `git`
+  - Detail file: `github-cloud.md`
+- GitHub Enterprise Server
+  - Provider family ID: `github`
+  - Integration target key: `github-enterprise-server`
+  - Binding kind: `git`
+  - Detail file: `github-enterprise-server.md`
+- Google Ads
+  - Provider family ID: `googleads`
+  - Integration target key: `googleads-default`
+  - Binding kind: `connector`
+  - Detail file: `googleads-default.md`
+- Google Analytics
+  - Provider family ID: `google-analytics`
+  - Integration target key: `google-analytics-mcp`
+  - Binding kind: `connector`
+  - Detail file: `google-analytics-mcp.md`
+- Google Business Profile
+  - Provider family ID: `google-business-profile`
+  - Integration target key: `google-business-profile-mcp`
+  - Binding kind: `connector`
+  - Detail file: `google-business-profile-mcp.md`
+- Google Cloud
+  - Provider family ID: `gcp`
+  - Integration target key: `gcp-mcp`
+  - Binding kind: `connector`
+  - Detail file: `gcp-mcp.md`
+- Google Search Console
+  - Provider family ID: `google-search-console`
+  - Integration target key: `google-search-console-mcp`
+  - Binding kind: `connector`
+  - Detail file: `google-search-console-mcp.md`
+- Google Workspace
+  - Provider family ID: `google-workspace`
+  - Integration target key: `google-workspace-mcp`
+  - Binding kind: `connector`
+  - Detail file: `google-workspace-mcp.md`
+- Inception Labs
+  - Provider family ID: `inception`
+  - Integration target key: `inception-default`
+  - Binding kind: `agent`
+  - Detail file: `inception-default.md`
+- Jira
+  - Provider family ID: `jira`
+  - Integration target key: `jira-default`
+  - Binding kind: `connector`
+  - Detail file: `jira-default.md`
+- Kimi
+  - Provider family ID: `kimi`
+  - Integration target key: `kimi-default`
+  - Binding kind: `agent`
+  - Detail file: `kimi-default.md`
+- Klaviyo
+  - Provider family ID: `klaviyo`
+  - Integration target key: `klaviyo-mcp`
+  - Binding kind: `connector`
+  - Detail file: `klaviyo-mcp.md`
+- Linear
+  - Provider family ID: `linear`
+  - Integration target key: `linear-default`
+  - Binding kind: `connector`
+  - Detail file: `linear-default.md`
+- Meta Ads
+  - Provider family ID: `metaads`
+  - Integration target key: `metaads-default`
+  - Binding kind: `connector`
+  - Detail file: `metaads-default.md`
+- MiniMax
+  - Provider family ID: `minimax`
+  - Integration target key: `minimax-default`
+  - Binding kind: `agent`
+  - Detail file: `minimax-default.md`
+- Modal
+  - Provider family ID: `modal`
+  - Integration target key: `modal-default`
+  - Binding kind: `sandbox`
+  - Detail file: `modal-default.md`
+- Notion
+  - Provider family ID: `notion`
+  - Integration target key: `notion-mcp`
+  - Binding kind: `connector`
+  - Detail file: `notion-mcp.md`
+- OpenAI
+  - Provider family ID: `openai`
+  - Integration target key: `openai-default`
+  - Binding kind: `agent`
+  - Detail file: `openai-default.md`
+- OpenCode Go
+  - Provider family ID: `opencode`
+  - Integration target key: `opencode-go`
+  - Binding kind: `agent`
+  - Detail file: `opencode-go.md`
+- OpenComputer
+  - Provider family ID: `opencomputer`
+  - Integration target key: `opencomputer-default`
+  - Binding kind: `sandbox`
+  - Detail file: `opencomputer-default.md`
+- OpenRouter
+  - Provider family ID: `openrouter`
+  - Integration target key: `openrouter-default`
+  - Binding kind: `agent`
+  - Detail file: `openrouter-default.md`
+- PlanetScale
+  - Provider family ID: `planetscale`
+  - Integration target key: `planetscale-mcp`
+  - Binding kind: `connector`
+  - Detail file: `planetscale-mcp.md`
+- PostHog
+  - Provider family ID: `posthog`
+  - Integration target key: `posthog-mcp`
+  - Binding kind: `connector`
+  - Detail file: `posthog-mcp.md`
+- Railway
+  - Provider family ID: `railway`
+  - Integration target key: `railway-mcp`
+  - Binding kind: `connector`
+  - Detail file: `railway-mcp.md`
+- Render
+  - Provider family ID: `render`
+  - Integration target key: `render-mcp`
+  - Binding kind: `connector`
+  - Detail file: `render-mcp.md`
+- Resend
+  - Provider family ID: `resend`
+  - Integration target key: `resend-mcp`
+  - Binding kind: `connector`
+  - Detail file: `resend-mcp.md`
+- Sentry
+  - Provider family ID: `sentry`
+  - Integration target key: `sentry-default`
+  - Binding kind: `connector`
+  - Detail file: `sentry-default.md`
+- Shopify
+  - Provider family ID: `shopify`
+  - Integration target key: `shopify-default`
+  - Binding kind: `connector`
+  - Detail file: `shopify-default.md`
+- SigNoz
+  - Provider family ID: `signoz`
+  - Integration target key: `signoz-mcp`
+  - Binding kind: `connector`
+  - Detail file: `signoz-mcp.md`
+- Slack
+  - Provider family ID: `slack`
+  - Integration target key: `slack-default`
+  - Binding kind: `connector`
+  - Detail file: `slack-default.md`
+- Stripe
+  - Provider family ID: `stripe`
+  - Integration target key: `stripe-mcp`
+  - Binding kind: `connector`
+  - Detail file: `stripe-mcp.md`
+- Supabase
+  - Provider family ID: `supabase`
+  - Integration target key: `supabase-mcp`
+  - Binding kind: `connector`
+  - Detail file: `supabase-mcp.md`
+- Telegram
+  - Provider family ID: `telegram`
+  - Integration target key: `telegram-default`
+  - Binding kind: `connector`
+  - Detail file: `telegram-default.md`
+- Tensorlake
+  - Provider family ID: `tensorlake`
+  - Integration target key: `tensorlake-default`
+  - Binding kind: `sandbox`
+  - Detail file: `tensorlake-default.md`
+- WasenderAPI
+  - Provider family ID: `wasenderapi`
+  - Integration target key: `wasenderapi-mcp`
+  - Binding kind: `connector`
+  - Detail file: `wasenderapi-mcp.md`
+- Whapi
+  - Provider family ID: `whapi`
+  - Integration target key: `whapi-mcp`
+  - Binding kind: `connector`
+  - Detail file: `whapi-mcp.md`
+- Xero
+  - Provider family ID: `xero`
+  - Integration target key: `xero-mcp`
+  - Binding kind: `connector`
+  - Detail file: `xero-mcp.md`
+- Z.ai
+  - Provider family ID: `zai`
+  - Integration target key: `zai-coding-plan`
+  - Binding kind: `agent`
+  - Detail file: `zai-coding-plan.md`

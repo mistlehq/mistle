@@ -3,10 +3,10 @@ import {
   ForbiddenResponseSchema,
   NotFoundResponseSchema,
   UnauthorizedResponseSchema,
-  ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
 import { TriggerWebhookParamsSchema, TriggerWebhookSchema } from "../schemas.js";
+import { DuplicateTriggerWebhookBadRequestResponseSchema } from "./schema.js";
 
 export const route = createRoute({
   method: "post",
@@ -28,7 +28,7 @@ export const route = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: ValidationErrorResponseSchema,
+          schema: DuplicateTriggerWebhookBadRequestResponseSchema,
         },
       },
     },

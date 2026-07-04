@@ -805,7 +805,7 @@ describe("sandbox PTY cgroup keepalive", () => {
       let detachedPid: string | undefined;
       let sandboxInstanceId: string | undefined;
       let detachedProcessCgroupProbe: { exitCode: number; output: string } | undefined;
-      let authenticatedSession: Awaited<ReturnType<(typeof fixture)["authSession"]>> | undefined;
+      let authenticatedSession: AuthenticatedSession | undefined;
 
       try {
         authenticatedSession = await fixture.authSession({

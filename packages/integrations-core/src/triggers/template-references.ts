@@ -1,3 +1,5 @@
+import { Liquid, Value, type Template } from "liquidjs";
+
 import type { IntegrationWebhookEventDefinition } from "../types/index.js";
 
 export type WebhookTriggerTemplateKind = "input" | "key";
@@ -42,15 +44,14 @@ const SharedAllowedReferencePaths = new Set([
   "triggerRun.triggerTargetId",
 ]);
 
-const ConditionalTemplateAllowedTagNames = new Set([
-  "if",
-  "elsif",
-  "else",
-  "endif",
-  "unless",
-  "endunless",
-]);
-const KeyTemplateAllowedTagNames = new Set(["if", "else", "endif"]);
+const LiquidTemplateEngine = new Liquid({
+  lenientIf: true,
+  strictFilters: true,
+  strictVariables: true,
+});
+
+const ConditionalTemplateAllowedTagNames = new Set(["if", "unless"]);
+const KeyTemplateAllowedTagNames = new Set(["if"]);
 const NonReferenceConditionWords = new Set([
   "and",
   "blank",
@@ -65,10 +66,13 @@ const NonReferenceConditionWords = new Set([
 ]);
 
 type SelectedEventReferencePaths = {
-  all: ReadonlySet<string>;
-  common: ReadonlySet<string>;
-  eventReferences: readonly ReadonlySet<string>[];
+  eventReferences: readonly EventReferencePaths[];
   eventTypes: readonly string[];
+};
+
+type EventReferencePaths = {
+  allowed: ReadonlySet<string>;
+  documentedPayloadReferences: ReadonlySet<string>;
 };
 
 export function validateWebhookTriggerTemplates(input: {
@@ -119,10 +123,20 @@ function validateTemplate(input: {
   selectedEventReferences: SelectedEventReferencePaths;
 }): readonly WebhookTriggerTemplateValidationIssue[] {
   const issues: WebhookTriggerTemplateValidationIssue[] = [];
-  const outputReferences: string[] = [];
-  const containsTags = collectTemplateReferencesAndTagIssues({
-    ...input,
-    outputReferences,
+  const templates = parseLiquidTemplates({
+    field: input.field,
+    template: input.template,
+    issues,
+  });
+  if (templates === null) {
+    return issues;
+  }
+
+  const containsTags = validateTemplateTags({
+    field: input.field,
+    kind: input.kind,
+    templates,
+    selectedEventReferences: input.selectedEventReferences,
     issues,
   });
 
@@ -130,7 +144,7 @@ function validateTemplate(input: {
     issues.push(
       ...validateConditionalInputTemplateReferences({
         field: input.field,
-        template: input.template,
+        templates,
         selectedEventReferences: input.selectedEventReferences,
       }),
     );
@@ -141,10 +155,19 @@ function validateTemplate(input: {
     issues.push(
       ...validateConditionalKeyTemplateReferences({
         field: input.field,
-        template: input.template,
+        templates,
         selectedEventReferences: input.selectedEventReferences,
       }),
     );
+    return issues;
+  }
+
+  const outputReferences = extractReferencePathsFromTemplates(templates);
+  if (outputReferences === null) {
+    issues.push({
+      field: input.field,
+      message: "Dynamic template references are not supported.",
+    });
     return issues;
   }
 
@@ -163,173 +186,115 @@ function validateTemplate(input: {
   return issues;
 }
 
-function forEachLiquidToken(template: string, callback: (token: string) => void): void {
-  let cursor = 0;
-  while (cursor < template.length) {
-    const outputStart = template.indexOf("{{", cursor);
-    const tagStart = template.indexOf("{%", cursor);
-    const tokenStart = earliestNonNegativeIndex(outputStart, tagStart);
-    if (tokenStart === null) {
-      return;
-    }
-
-    const endMarker = template.startsWith("{{", tokenStart) ? "}}" : "%}";
-    const tokenEnd = template.indexOf(endMarker, tokenStart + 2);
-    if (tokenEnd === -1) {
-      return;
-    }
-
-    callback(template.slice(tokenStart, tokenEnd + 2));
-    cursor = tokenEnd + 2;
-  }
-}
-
-function earliestNonNegativeIndex(left: number, right: number): number | null {
-  if (left === -1) {
-    return right === -1 ? null : right;
-  }
-
-  if (right === -1) {
-    return left;
-  }
-
-  return Math.min(left, right);
-}
-
-function validateReferencePathForSelectedEventCommon(input: {
-  field: WebhookTriggerTemplateFieldName;
-  referencePath: string;
-  selectedEventReferences: SelectedEventReferencePaths;
-  issues: WebhookTriggerTemplateValidationIssue[];
-}): void {
-  if (!input.selectedEventReferences.common.has(input.referencePath)) {
-    input.issues.push({
-      field: input.field,
-      message: `Unsupported trigger event field reference '{{${input.referencePath}}}'.`,
-    });
-  }
-}
-
-function collectTemplateReferencesAndTagIssues(input: {
+function parseLiquidTemplates(input: {
   field: WebhookTriggerTemplateFieldName;
   template: string;
+  issues: WebhookTriggerTemplateValidationIssue[];
+}): readonly Template[] | null {
+  try {
+    return LiquidTemplateEngine.parse(input.template);
+  } catch {
+    input.issues.push({
+      field: input.field,
+      message: "Dynamic template references are not supported.",
+    });
+    return null;
+  }
+}
+
+function validateTemplateTags(input: {
+  field: WebhookTriggerTemplateFieldName;
   kind: WebhookTriggerTemplateKind;
+  templates: readonly Template[];
   selectedEventReferences: SelectedEventReferencePaths;
-  outputReferences: string[];
   issues: WebhookTriggerTemplateValidationIssue[];
 }): boolean {
   let containsTags = false;
 
-  forEachLiquidToken(input.template, (token) => {
-    if (token.startsWith("{{")) {
-      collectOutputReferences({
-        field: input.field,
-        token,
-        outputReferences: input.outputReferences,
-        issues: input.issues,
-      });
-    } else {
+  for (const template of input.templates) {
+    const tagName = readLiquidTagName(template);
+    if (tagName !== null) {
       containsTags = true;
-      validateTemplateTag({
+      validateParsedTemplateTag({
         field: input.field,
-        token,
         kind: input.kind,
+        tagName,
+        template,
         selectedEventReferences: input.selectedEventReferences,
         issues: input.issues,
       });
     }
-  });
+
+    for (const branch of readConditionalBranches(template)) {
+      if (input.kind === WebhookTriggerTemplateKinds.INPUT) {
+        validateInputTemplateConditionReferences({
+          field: input.field,
+          condition: branch.condition,
+          selectedEventReferences: input.selectedEventReferences,
+          issues: input.issues,
+        });
+      }
+
+      containsTags =
+        validateTemplateTags({
+          ...input,
+          templates: branch.templates,
+        }) || containsTags;
+    }
+
+    const elseTemplates = readConditionalElseTemplates(template);
+    containsTags =
+      validateTemplateTags({
+        ...input,
+        templates: elseTemplates,
+      }) || containsTags;
+  }
 
   return containsTags;
 }
 
-function collectOutputReferences(input: {
+function validateParsedTemplateTag(input: {
   field: WebhookTriggerTemplateFieldName;
-  token: string;
-  outputReferences: string[];
-  issues: WebhookTriggerTemplateValidationIssue[];
-}): void {
-  const referencePath = extractOutputReferencePath(input.token);
-  if (referencePath === null) {
-    input.issues.push({
-      field: input.field,
-      message: "Dynamic template references are not supported.",
-    });
-    return;
-  }
-
-  input.outputReferences.push(referencePath);
-}
-
-function extractOutputReferencePath(token: string): string | null {
-  const expression = token.slice(2, -2).trim();
-  const [referenceExpression] = expression.split("|", 1);
-  if (referenceExpression === undefined) {
-    return null;
-  }
-
-  const referencePath = referenceExpression.trim();
-  return isSimpleReferencePath(referencePath) ? referencePath : null;
-}
-
-function validateTemplateTag(input: {
-  field: WebhookTriggerTemplateFieldName;
-  token: string;
   kind: WebhookTriggerTemplateKind;
+  tagName: string;
+  template: Template;
   selectedEventReferences: SelectedEventReferencePaths;
   issues: WebhookTriggerTemplateValidationIssue[];
 }): void {
-  const tagName = extractLiquidTagName(input.token);
-  if (tagName === null) {
-    input.issues.push({
-      field: input.field,
-      message: "Dynamic template tags are not supported.",
-    });
-    return;
-  }
-
   const allowedTagNames =
     input.kind === WebhookTriggerTemplateKinds.KEY
       ? KeyTemplateAllowedTagNames
       : ConditionalTemplateAllowedTagNames;
-  if (!allowedTagNames.has(tagName)) {
+  if (!allowedTagNames.has(input.tagName)) {
     input.issues.push({
       field: input.field,
       message:
         input.kind === WebhookTriggerTemplateKinds.KEY
-          ? `Liquid tag '${tagName}' is not supported in key templates.`
-          : `Liquid tag '${tagName}' is not supported in trigger user message templates.`,
+          ? `Liquid tag '${input.tagName}' is not supported in key templates.`
+          : `Liquid tag '${input.tagName}' is not supported in trigger user message templates.`,
     });
     return;
   }
 
-  if (input.kind === WebhookTriggerTemplateKinds.INPUT && isConditionalTagName(tagName)) {
-    validateInputTemplateConditionReferences({
+  if (
+    input.kind === WebhookTriggerTemplateKinds.KEY &&
+    readConditionalBranches(input.template).length > 1
+  ) {
+    input.issues.push({
       field: input.field,
-      token: input.token,
-      tagName,
-      allowedReferences: input.selectedEventReferences.all,
-      issues: input.issues,
+      message: "Liquid tag 'elsif' is not supported in key templates.",
     });
   }
 }
 
-function isConditionalTagName(tagName: string): boolean {
-  return tagName === "if" || tagName === "elsif" || tagName === "unless";
-}
-
 function validateInputTemplateConditionReferences(input: {
   field: WebhookTriggerTemplateFieldName;
-  token: string;
-  tagName: string;
-  allowedReferences: ReadonlySet<string>;
+  condition: Value;
+  selectedEventReferences: SelectedEventReferencePaths;
   issues: WebhookTriggerTemplateValidationIssue[];
 }): void {
-  const expression = extractTagExpression({
-    token: input.token,
-    tagName: input.tagName,
-  });
-  if (expression.includes("[") || expression.includes("]")) {
+  const referencePaths = extractReferencePathsFromLiquidValue(input.condition);
+  if (referencePaths === null) {
     input.issues.push({
       field: input.field,
       message: "Dynamic template references are not supported.",
@@ -337,9 +302,8 @@ function validateInputTemplateConditionReferences(input: {
     return;
   }
 
-  const referencePaths = extractConditionReferencePaths(expression);
   for (const referencePath of referencePaths) {
-    if (!input.allowedReferences.has(referencePath)) {
+    if (!isReferencePathAllowedByAnySelectedEvent(input.selectedEventReferences, referencePath)) {
       input.issues.push({
         field: input.field,
         message: `Unsupported trigger event field reference '{{${referencePath}}}'.`,
@@ -348,191 +312,126 @@ function validateInputTemplateConditionReferences(input: {
   }
 }
 
-function extractTagExpression(input: { token: string; tagName: string }): string {
-  const expressionWithTag = trimLiquidInner(input.token);
-  return expressionWithTag.slice(input.tagName.length).trim();
-}
-
-function extractConditionReferencePaths(expression: string): readonly string[] {
-  const referencePaths: string[] = [];
-  let cursor = 0;
-  while (cursor < expression.length) {
-    const char = expression[cursor];
-    if (char === undefined) {
-      return referencePaths;
-    }
-
-    if (char === '"' || char === "'") {
-      cursor = findQuotedStringEnd(expression, cursor, char);
-      continue;
-    }
-
-    if (!isReferenceStartCharacter(char)) {
-      cursor += 1;
-      continue;
-    }
-
-    const referenceStart = cursor;
-    cursor += 1;
-    while (cursor < expression.length) {
-      const nextChar = expression[cursor];
-      if (nextChar === undefined || !isReferencePathCharacter(nextChar)) {
-        break;
-      }
-
-      cursor += 1;
-    }
-
-    const referencePath = expression.slice(referenceStart, cursor);
-    if (!NonReferenceConditionWords.has(referencePath) && isSimpleReferencePath(referencePath)) {
-      referencePaths.push(referencePath);
-    }
-  }
-
-  return referencePaths;
-}
-
-function findQuotedStringEnd(expression: string, start: number, quote: string): number {
-  let cursor = start + 1;
-  while (cursor < expression.length) {
-    if (expression[cursor] === quote) {
-      return cursor + 1;
-    }
-
-    cursor += 1;
-  }
-
-  return expression.length;
-}
-
 function validateConditionalInputTemplateReferences(input: {
   field: WebhookTriggerTemplateFieldName;
-  template: string;
+  templates: readonly Template[];
   selectedEventReferences: SelectedEventReferencePaths;
 }): readonly WebhookTriggerTemplateValidationIssue[] {
   const issues: WebhookTriggerTemplateValidationIssue[] = [];
   const allEventIndexes = input.selectedEventReferences.eventReferences.map(
     (_referenceSet, index) => index,
   );
-  const stack: {
-    parentReachableEventIndexes: readonly number[];
-    consumedBranchReachableEventIndexes: readonly number[];
-    unmodeledBranchFallbackReachableEventIndexes: readonly number[] | null;
-  }[] = [];
-  let reachableEventIndexes: readonly number[] = allEventIndexes;
 
-  forEachLiquidToken(input.template, (token) => {
-    if (token.startsWith("{{")) {
-      const referencePath = extractOutputReferencePath(token);
-      if (referencePath === null) {
-        issues.push({
-          field: input.field,
-          message: "Dynamic template references are not supported.",
-        });
-      } else {
-        validateReferencePathForReachableEvents({
-          field: input.field,
-          referencePath,
-          reachableEventIndexes,
-          selectedEventReferences: input.selectedEventReferences,
-          issues,
-        });
-      }
-      return;
-    }
-
-    const tagName = extractLiquidTagName(token);
-    if (tagName === "if" || tagName === "unless") {
-      const matchingEventIndexes = filterReachableEventsByModeledInputCondition({
-        selectedEventReferences: input.selectedEventReferences,
-        reachableEventIndexes,
-        expression: extractTagExpression({ token, tagName }),
-      });
-      const branchReachableEventIndexes =
-        matchingEventIndexes === null
-          ? reachableEventIndexes
-          : tagName === "if"
-            ? matchingEventIndexes
-            : subtractEventIndexes(reachableEventIndexes, matchingEventIndexes);
-      const consumedBranchReachableEventIndexes =
-        matchingEventIndexes === null ? [] : branchReachableEventIndexes;
-      stack.push({
-        parentReachableEventIndexes: reachableEventIndexes,
-        consumedBranchReachableEventIndexes,
-        unmodeledBranchFallbackReachableEventIndexes:
-          matchingEventIndexes === null ? reachableEventIndexes : null,
-      });
-      reachableEventIndexes = branchReachableEventIndexes;
-      return;
-    }
-
-    if (tagName === "elsif") {
-      const currentFrame = stack.at(-1);
-      if (currentFrame === undefined) {
-        return;
-      }
-
-      const elseReachableEventIndexes =
-        currentFrame.unmodeledBranchFallbackReachableEventIndexes ??
-        subtractEventIndexes(
-          currentFrame.parentReachableEventIndexes,
-          currentFrame.consumedBranchReachableEventIndexes,
-        );
-      const modeledBranchReachableEventIndexes = filterReachableEventsByModeledInputCondition({
-        selectedEventReferences: input.selectedEventReferences,
-        reachableEventIndexes: elseReachableEventIndexes,
-        expression: extractTagExpression({ token, tagName }),
-      });
-      const branchReachableEventIndexes =
-        modeledBranchReachableEventIndexes ?? elseReachableEventIndexes;
-      const unmodeledBranchFallbackReachableEventIndexes =
-        currentFrame.unmodeledBranchFallbackReachableEventIndexes ??
-        (modeledBranchReachableEventIndexes === null ? elseReachableEventIndexes : null);
-      stack[stack.length - 1] = {
-        parentReachableEventIndexes: currentFrame.parentReachableEventIndexes,
-        consumedBranchReachableEventIndexes:
-          unmodeledBranchFallbackReachableEventIndexes === null
-            ? unionEventIndexes(
-                currentFrame.consumedBranchReachableEventIndexes,
-                branchReachableEventIndexes,
-              )
-            : currentFrame.consumedBranchReachableEventIndexes,
-        unmodeledBranchFallbackReachableEventIndexes,
-      };
-      reachableEventIndexes = branchReachableEventIndexes;
-      return;
-    }
-
-    if (tagName === "else") {
-      const currentFrame = stack.at(-1);
-      if (currentFrame !== undefined) {
-        reachableEventIndexes =
-          currentFrame.unmodeledBranchFallbackReachableEventIndexes ??
-          subtractEventIndexes(
-            currentFrame.parentReachableEventIndexes,
-            currentFrame.consumedBranchReachableEventIndexes,
-          );
-      }
-      return;
-    }
-
-    if (tagName === "endif" || tagName === "endunless") {
-      const currentFrame = stack.pop();
-      if (currentFrame !== undefined) {
-        reachableEventIndexes = currentFrame.parentReachableEventIndexes;
-      }
-    }
+  validateInputTemplateReferencesForReachableEvents({
+    ...input,
+    issues,
+    reachableEventIndexes: allEventIndexes,
   });
 
   return issues;
 }
 
+function validateInputTemplateReferencesForReachableEvents(input: {
+  field: WebhookTriggerTemplateFieldName;
+  templates: readonly Template[];
+  selectedEventReferences: SelectedEventReferencePaths;
+  reachableEventIndexes: readonly number[];
+  issues: WebhookTriggerTemplateValidationIssue[];
+}): void {
+  for (const template of input.templates) {
+    const tagName = readLiquidTagName(template);
+    if (tagName === null) {
+      validateTemplateReferencePathsForReachableEvents({
+        ...input,
+        templates: [template],
+      });
+      continue;
+    }
+
+    if (tagName === "if" || tagName === "unless") {
+      validateConditionalInputTagReferences({
+        ...input,
+        template,
+        tagName,
+      });
+    }
+  }
+}
+
+function validateConditionalInputTagReferences(input: {
+  field: WebhookTriggerTemplateFieldName;
+  template: Template;
+  tagName: string;
+  selectedEventReferences: SelectedEventReferencePaths;
+  reachableEventIndexes: readonly number[];
+  issues: WebhookTriggerTemplateValidationIssue[];
+}): void {
+  let consumedBranchReachableEventIndexes: readonly number[] = [];
+  let unmodeledBranchFallbackReachableEventIndexes: readonly number[] | null = null;
+
+  const branches = readConditionalBranches(input.template);
+  for (let branchIndex = 0; branchIndex < branches.length; branchIndex += 1) {
+    const branch = branches[branchIndex];
+    if (branch === undefined) {
+      throw new Error(`Missing conditional branch at index ${branchIndex}.`);
+    }
+
+    const elseReachableEventIndexes: readonly number[] =
+      unmodeledBranchFallbackReachableEventIndexes ??
+      subtractEventIndexes(input.reachableEventIndexes, consumedBranchReachableEventIndexes);
+    const matchingEventIndexes = filterReachableEventsByModeledInputCondition({
+      selectedEventReferences: input.selectedEventReferences,
+      reachableEventIndexes: elseReachableEventIndexes,
+      condition: branch.condition,
+    });
+    const isInvertedUnlessBranch = input.tagName === "unless" && branchIndex === 0;
+    const branchReachableEventIndexes =
+      matchingEventIndexes === null
+        ? elseReachableEventIndexes
+        : isInvertedUnlessBranch
+          ? subtractEventIndexes(elseReachableEventIndexes, matchingEventIndexes)
+          : matchingEventIndexes;
+
+    validateInputTemplateReferencesForReachableEvents({
+      field: input.field,
+      templates: branch.templates,
+      selectedEventReferences: input.selectedEventReferences,
+      reachableEventIndexes: branchReachableEventIndexes,
+      issues: input.issues,
+    });
+
+    if (matchingEventIndexes === null) {
+      unmodeledBranchFallbackReachableEventIndexes ??= elseReachableEventIndexes;
+    } else if (unmodeledBranchFallbackReachableEventIndexes === null) {
+      consumedBranchReachableEventIndexes = unionEventIndexes(
+        consumedBranchReachableEventIndexes,
+        branchReachableEventIndexes,
+      );
+    }
+  }
+
+  validateInputTemplateReferencesForReachableEvents({
+    field: input.field,
+    templates: readConditionalElseTemplates(input.template),
+    selectedEventReferences: input.selectedEventReferences,
+    reachableEventIndexes:
+      unmodeledBranchFallbackReachableEventIndexes ??
+      subtractEventIndexes(input.reachableEventIndexes, consumedBranchReachableEventIndexes),
+    issues: input.issues,
+  });
+}
+
 function filterReachableEventsByModeledInputCondition(input: {
   selectedEventReferences: SelectedEventReferencePaths;
   reachableEventIndexes: readonly number[];
-  expression: string;
+  condition: Value;
 }): readonly number[] | null {
-  const eventType = extractWebhookEventTypeEqualityValue(input.expression);
+  const expression = extractSimpleExpressionFromLiquidValue(input.condition);
+  if (expression === null) {
+    return null;
+  }
+
+  const eventType = extractWebhookEventTypeEqualityValue(expression);
   if (eventType !== null) {
     return filterReachableEventsByEventType({
       selectedEventReferences: input.selectedEventReferences,
@@ -541,7 +440,7 @@ function filterReachableEventsByModeledInputCondition(input: {
     });
   }
 
-  const referencePath = extractSimplePositiveConditionReferencePath(input.expression);
+  const referencePath = extractSimplePositiveConditionReferencePath(expression);
   if (referencePath === null) {
     return null;
   }
@@ -553,109 +452,99 @@ function filterReachableEventsByModeledInputCondition(input: {
   });
 }
 
-function extractSimplePositiveConditionReferencePath(expression: string): string | null {
-  const trimmedExpression = expression.trim();
-  if (!isSimpleReferencePath(trimmedExpression)) {
-    return null;
-  }
-
-  return NonReferenceConditionWords.has(trimmedExpression) ? null : trimmedExpression;
-}
-
 function validateConditionalKeyTemplateReferences(input: {
   field: WebhookTriggerTemplateFieldName;
-  template: string;
+  templates: readonly Template[];
   selectedEventReferences: SelectedEventReferencePaths;
 }): readonly WebhookTriggerTemplateValidationIssue[] {
   const issues: WebhookTriggerTemplateValidationIssue[] = [];
   const allEventIndexes = input.selectedEventReferences.eventReferences.map(
     (_referenceSet, index) => index,
   );
-  const stack: {
-    parentReachableEventIndexes: readonly number[];
-    ifBranchReachableEventIndexes: readonly number[];
-  }[] = [];
-  let reachableEventIndexes: readonly number[] = allEventIndexes;
 
-  forEachLiquidToken(input.template, (token) => {
-    if (token.startsWith("{{")) {
-      const referencePath = extractOutputReferencePath(token);
-      if (referencePath === null) {
-        issues.push({
-          field: input.field,
-          message: "Dynamic template references are not supported.",
-        });
-      } else {
-        validateReferencePathForReachableEvents({
-          field: input.field,
-          referencePath,
-          reachableEventIndexes,
-          selectedEventReferences: input.selectedEventReferences,
-          issues,
-        });
-      }
-    } else {
-      const tagName = extractLiquidTagName(token);
-      if (tagName === "if") {
-        const ifBranchReachableEventIndexes = filterReachableEventsByModeledKeyCondition({
-          field: input.field,
-          selectedEventReferences: input.selectedEventReferences,
-          reachableEventIndexes,
-          expression: extractTagExpression({ token, tagName }),
-          issues,
-        });
-        stack.push({
-          parentReachableEventIndexes: reachableEventIndexes,
-          ifBranchReachableEventIndexes,
-        });
-        reachableEventIndexes = ifBranchReachableEventIndexes;
-      } else if (tagName === "else") {
-        const currentFrame = stack.at(-1);
-        if (currentFrame !== undefined) {
-          reachableEventIndexes = currentFrame.parentReachableEventIndexes.filter(
-            (eventIndex) => !currentFrame.ifBranchReachableEventIndexes.includes(eventIndex),
-          );
-        }
-      } else if (tagName === "endif") {
-        const currentFrame = stack.pop();
-        if (currentFrame !== undefined) {
-          reachableEventIndexes = currentFrame.parentReachableEventIndexes;
-        }
-      }
-    }
+  validateKeyTemplateReferencesForReachableEvents({
+    ...input,
+    issues,
+    reachableEventIndexes: allEventIndexes,
   });
 
   return issues;
 }
 
-function extractLiquidTagName(token: string): string | null {
-  const inner = trimLiquidInner(token);
-  const firstChar = inner[0];
-  if (firstChar === undefined || !isReferenceStartCharacter(firstChar)) {
-    return null;
-  }
-
-  let cursor = 1;
-  while (cursor < inner.length) {
-    const char = inner[cursor];
-    if (char === undefined || (!isReferencePathCharacter(char) && char !== "-")) {
-      break;
+function validateKeyTemplateReferencesForReachableEvents(input: {
+  field: WebhookTriggerTemplateFieldName;
+  templates: readonly Template[];
+  selectedEventReferences: SelectedEventReferencePaths;
+  reachableEventIndexes: readonly number[];
+  issues: WebhookTriggerTemplateValidationIssue[];
+}): void {
+  for (const template of input.templates) {
+    const tagName = readLiquidTagName(template);
+    if (tagName === null) {
+      validateTemplateReferencePathsForReachableEvents({
+        ...input,
+        templates: [template],
+      });
+      continue;
     }
 
-    cursor += 1;
-  }
+    if (tagName !== "if") {
+      continue;
+    }
 
-  return inner.slice(0, cursor);
+    let consumedBranchReachableEventIndexes: readonly number[] = [];
+    for (const branch of readConditionalBranches(template)) {
+      const branchReachableEventIndexes = filterReachableEventsByModeledKeyCondition({
+        field: input.field,
+        selectedEventReferences: input.selectedEventReferences,
+        reachableEventIndexes: input.reachableEventIndexes,
+        condition: branch.condition,
+        issues: input.issues,
+      });
+      consumedBranchReachableEventIndexes = unionEventIndexes(
+        consumedBranchReachableEventIndexes,
+        branchReachableEventIndexes,
+      );
+      validateKeyTemplateReferencesForReachableEvents({
+        field: input.field,
+        templates: branch.templates,
+        selectedEventReferences: input.selectedEventReferences,
+        reachableEventIndexes: branchReachableEventIndexes,
+        issues: input.issues,
+      });
+    }
+
+    validateKeyTemplateReferencesForReachableEvents({
+      field: input.field,
+      templates: readConditionalElseTemplates(template),
+      selectedEventReferences: input.selectedEventReferences,
+      reachableEventIndexes: subtractEventIndexes(
+        input.reachableEventIndexes,
+        consumedBranchReachableEventIndexes,
+      ),
+      issues: input.issues,
+    });
+  }
 }
 
 function filterReachableEventsByModeledKeyCondition(input: {
   field: WebhookTriggerTemplateFieldName;
   selectedEventReferences: SelectedEventReferencePaths;
   reachableEventIndexes: readonly number[];
-  expression: string;
+  condition: Value;
   issues: WebhookTriggerTemplateValidationIssue[];
 }): readonly number[] {
-  const eventType = extractWebhookEventTypeEqualityValue(input.expression);
+  const expression = extractSimpleExpressionFromLiquidValue(input.condition);
+  if (expression === null) {
+    input.issues.push({
+      field: input.field,
+      message:
+        'Only webhookEvent.eventType equality or simple payload presence conditions are supported in key templates, for example {% if webhookEvent.eventType == "provider.event" %} or {% if payload.resource %}.',
+    });
+    return [];
+  }
+
+  const eventType = extractWebhookEventTypeEqualityValue(expression);
   if (eventType !== null) {
     return filterReachableEventsByEventType({
       selectedEventReferences: input.selectedEventReferences,
@@ -664,8 +553,16 @@ function filterReachableEventsByModeledKeyCondition(input: {
     });
   }
 
-  const referencePath = extractSimplePositiveConditionReferencePath(input.expression);
+  const referencePath = extractSimplePositiveConditionReferencePath(expression);
   if (referencePath !== null) {
+    if (!isReferencePathAllowedByAnySelectedEvent(input.selectedEventReferences, referencePath)) {
+      input.issues.push({
+        field: input.field,
+        message: `Unsupported trigger event field reference '{{${referencePath}}}'.`,
+      });
+      return [];
+    }
+
     return filterReachableEventsByReferencePaths({
       selectedEventReferences: input.selectedEventReferences,
       reachableEventIndexes: input.reachableEventIndexes,
@@ -679,6 +576,249 @@ function filterReachableEventsByModeledKeyCondition(input: {
       'Only webhookEvent.eventType equality or simple payload presence conditions are supported in key templates, for example {% if webhookEvent.eventType == "provider.event" %} or {% if payload.resource %}.',
   });
   return [];
+}
+
+function validateTemplateReferencePathsForReachableEvents(input: {
+  field: WebhookTriggerTemplateFieldName;
+  templates: readonly Template[];
+  selectedEventReferences: SelectedEventReferencePaths;
+  reachableEventIndexes: readonly number[];
+  issues: WebhookTriggerTemplateValidationIssue[];
+}): void {
+  const referencePaths = extractReferencePathsFromTemplates(input.templates);
+  if (referencePaths === null) {
+    input.issues.push({
+      field: input.field,
+      message: "Dynamic template references are not supported.",
+    });
+    return;
+  }
+
+  for (const referencePath of referencePaths) {
+    validateReferencePathForReachableEvents({
+      field: input.field,
+      referencePath,
+      reachableEventIndexes: input.reachableEventIndexes,
+      selectedEventReferences: input.selectedEventReferences,
+      issues: input.issues,
+    });
+  }
+}
+
+function extractReferencePathsFromTemplates(
+  templates: readonly Template[],
+): readonly string[] | null {
+  const referencePaths: string[] = [];
+  for (const segments of LiquidTemplateEngine.globalVariableSegmentsSync([...templates], {
+    partials: false,
+  })) {
+    const referencePath = readSimpleReferencePathFromSegments(segments);
+    if (referencePath === null) {
+      return null;
+    }
+
+    referencePaths.push(referencePath);
+  }
+
+  return referencePaths;
+}
+
+function extractReferencePathsFromLiquidValue(value: Value): readonly string[] | null {
+  const referencePaths: string[] = [];
+  for (const token of value.initial.postfix) {
+    if (!collectReferencePathsFromToken(token, referencePaths)) {
+      return null;
+    }
+  }
+
+  for (const filter of value.filters) {
+    for (const filterArgument of filter.args) {
+      if (!collectReferencePathsFromFilterArgument(filterArgument, referencePaths)) {
+        return null;
+      }
+    }
+  }
+
+  return referencePaths;
+}
+
+function collectReferencePathsFromFilterArgument(
+  filterArgument: unknown,
+  referencePaths: string[],
+): boolean {
+  if (Array.isArray(filterArgument)) {
+    const value = filterArgument[1];
+    return value === undefined || collectReferencePathsFromToken(value, referencePaths);
+  }
+
+  return collectReferencePathsFromToken(filterArgument, referencePaths);
+}
+
+function collectReferencePathsFromToken(token: unknown, referencePaths: string[]): boolean {
+  const propertyAccessReferencePath = readSimplePropertyAccessReferencePath(token);
+  if (propertyAccessReferencePath === DynamicReferencePath) {
+    return false;
+  }
+
+  if (propertyAccessReferencePath !== null) {
+    referencePaths.push(propertyAccessReferencePath);
+    return true;
+  }
+
+  const leftHandSide = readUnknownProperty(token, "lhs");
+  if (leftHandSide !== undefined && !collectReferencePathsFromToken(leftHandSide, referencePaths)) {
+    return false;
+  }
+
+  const rightHandSide = readUnknownProperty(token, "rhs");
+  return (
+    rightHandSide === undefined || collectReferencePathsFromToken(rightHandSide, referencePaths)
+  );
+}
+
+const DynamicReferencePath = Symbol("dynamic reference path");
+
+function readSimplePropertyAccessReferencePath(
+  token: unknown,
+): string | typeof DynamicReferencePath | null {
+  if (readConstructorName(token) !== "PropertyAccessToken") {
+    return null;
+  }
+
+  if (readUnknownProperty(token, "variable") !== undefined) {
+    return DynamicReferencePath;
+  }
+
+  const props = readUnknownProperty(token, "props");
+  if (!Array.isArray(props)) {
+    return DynamicReferencePath;
+  }
+
+  const segments: string[] = [];
+  for (const prop of props) {
+    const constructorName = readConstructorName(prop);
+    if (constructorName !== "IdentifierToken" && constructorName !== "NumberToken") {
+      return DynamicReferencePath;
+    }
+
+    const content = readUnknownProperty(prop, "content");
+    const segment = normalizeReferencePathSegment(content);
+    if (segment === null) {
+      return DynamicReferencePath;
+    }
+
+    segments.push(segment);
+  }
+
+  const referencePath = segments.join(".");
+  return isSimpleReferencePath(referencePath) ? referencePath : DynamicReferencePath;
+}
+
+function readSimpleReferencePathFromSegments(segments: readonly unknown[]): string | null {
+  const referencePathSegments: string[] = [];
+  for (const segment of segments) {
+    const normalizedSegment = normalizeReferencePathSegment(segment);
+    if (normalizedSegment === null) {
+      return null;
+    }
+
+    referencePathSegments.push(normalizedSegment);
+  }
+
+  const referencePath = referencePathSegments.join(".");
+  return isSimpleReferencePath(referencePath) ? referencePath : null;
+}
+
+type ConditionalBranch = {
+  condition: Value;
+  templates: readonly Template[];
+};
+
+function readConditionalBranches(template: Template): readonly ConditionalBranch[] {
+  const branches = readUnknownProperty(template, "branches");
+  if (!Array.isArray(branches)) {
+    return [];
+  }
+
+  const conditionalBranches: ConditionalBranch[] = [];
+  for (const branch of branches) {
+    const condition = readUnknownProperty(branch, "value");
+    const templates = readLiquidTemplateArray(readUnknownProperty(branch, "templates"));
+    if (condition instanceof Value && templates !== null) {
+      conditionalBranches.push({
+        condition,
+        templates,
+      });
+    }
+  }
+
+  return conditionalBranches;
+}
+
+function readConditionalElseTemplates(template: Template): readonly Template[] {
+  return readLiquidTemplateArray(readUnknownProperty(template, "elseTemplates")) ?? [];
+}
+
+function readLiquidTemplateArray(value: unknown): readonly Template[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const templates: Template[] = [];
+  for (const item of value) {
+    if (!isLiquidTemplate(item)) {
+      return null;
+    }
+
+    templates.push(item);
+  }
+
+  return templates;
+}
+
+function isLiquidTemplate(value: unknown): value is Template {
+  return isRecord(value) && readUnknownProperty(value, "token") !== undefined;
+}
+
+function readLiquidTagName(template: Template): string | null {
+  const name = readUnknownProperty(template.token, "name");
+  return typeof name === "string" ? name : null;
+}
+
+function extractSimpleExpressionFromLiquidValue(value: Value): string | null {
+  if (value.filters.length > 0 || value.initial.postfix.length === 0) {
+    return null;
+  }
+
+  let input: string | null = null;
+  let begin: number | null = null;
+  let end: number | null = null;
+
+  for (const token of value.initial.postfix) {
+    if (input === null) {
+      input = token.input;
+    } else if (input !== token.input) {
+      return null;
+    }
+
+    begin = begin === null ? token.begin : Math.min(begin, token.begin);
+    end = end === null ? token.end : Math.max(end, token.end);
+  }
+
+  if (input === null || begin === null || end === null) {
+    return null;
+  }
+
+  return input.slice(begin, end);
+}
+
+function extractSimplePositiveConditionReferencePath(expression: string): string | null {
+  const trimmedExpression = expression.trim();
+  if (!isSimpleReferencePath(trimmedExpression)) {
+    return null;
+  }
+
+  return NonReferenceConditionWords.has(trimmedExpression) ? null : trimmedExpression;
 }
 
 function extractWebhookEventTypeEqualityValue(expression: string): string | null {
@@ -739,7 +879,9 @@ function filterReachableEventsByReferencePaths(input: {
       throw new Error(`Missing selected event reference set for index ${eventIndex}.`);
     }
 
-    return input.referencePaths.every((referencePath) => eventReferences.has(referencePath));
+    return input.referencePaths.every((referencePath) =>
+      isReferencePathAllowedByEvent(eventReferences, referencePath),
+    );
   });
 }
 
@@ -782,7 +924,7 @@ function validateReferencePathForReachableEvents(input: {
       throw new Error(`Missing selected event reference set for index ${eventIndex}.`);
     }
 
-    if (!eventReferences.has(input.referencePath)) {
+    if (!isReferencePathAllowedByEvent(eventReferences, input.referencePath)) {
       input.issues.push({
         field: input.field,
         message: `Unsupported trigger event field reference '{{${input.referencePath}}}'.`,
@@ -790,19 +932,6 @@ function validateReferencePathForReachableEvents(input: {
       return;
     }
   }
-}
-
-function trimLiquidInner(token: string): string {
-  let inner = token.slice(2, -2).trim();
-  if (inner.startsWith("-")) {
-    inner = inner.slice(1).trimStart();
-  }
-
-  if (inner.endsWith("-")) {
-    inner = inner.slice(0, -1).trimEnd();
-  }
-
-  return inner;
 }
 
 function skipWhitespace(value: string, start: number): number {
@@ -847,6 +976,18 @@ function isReferenceChildSegment(segment: string): boolean {
   return everyCharacterMatches(segment, isReferenceChildCharacter);
 }
 
+function normalizeReferencePathSegment(segment: unknown): string | null {
+  if (typeof segment === "string") {
+    return segment;
+  }
+
+  if (typeof segment === "number" && Number.isInteger(segment) && segment >= 0) {
+    return String(segment);
+  }
+
+  return null;
+}
+
 function everyCharacterAfterFirstMatches(
   value: string,
   predicate: (char: string) => boolean,
@@ -872,10 +1013,6 @@ function everyCharacterMatches(value: string, predicate: (char: string) => boole
   return true;
 }
 
-function isReferencePathCharacter(char: string): boolean {
-  return char === "." || isReferenceChildCharacter(char);
-}
-
 function isReferenceStartCharacter(char: string): boolean {
   return isAsciiLetter(char) || char === "_";
 }
@@ -896,20 +1033,44 @@ function isWhitespace(char: string): boolean {
   return char === " " || char === "\n" || char === "\r" || char === "\t";
 }
 
+function validateReferencePathForSelectedEventCommon(input: {
+  field: WebhookTriggerTemplateFieldName;
+  referencePath: string;
+  selectedEventReferences: SelectedEventReferencePaths;
+  issues: WebhookTriggerTemplateValidationIssue[];
+}): void {
+  if (!SharedAllowedReferencePaths.has(input.referencePath)) {
+    input.issues.push({
+      field: input.field,
+      message: `Unsupported trigger event field reference '{{${input.referencePath}}}'.`,
+    });
+  }
+}
+
+function readUnknownProperty(value: unknown, key: string): unknown {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  return value[key];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return (typeof value === "object" && value !== null) || typeof value === "function";
+}
+
+function readConstructorName(value: unknown): string | null {
+  const constructor = readUnknownProperty(value, "constructor");
+  const name = readUnknownProperty(constructor, "name");
+  return typeof name === "string" ? name : null;
+}
+
 function buildSelectedEventReferencePaths(
   selectedEvents: readonly IntegrationWebhookEventDefinition[],
 ): SelectedEventReferencePaths {
   const perEventReferences = selectedEvents.map(buildEventReferencePaths);
 
   return {
-    all:
-      perEventReferences.length === 0
-        ? new Set(SharedAllowedReferencePaths)
-        : unionReferencePaths(perEventReferences),
-    common:
-      perEventReferences.length === 0
-        ? new Set(SharedAllowedReferencePaths)
-        : intersectReferencePaths(perEventReferences),
     eventReferences: perEventReferences,
     eventTypes: selectedEvents.map((eventDefinition) => eventDefinition.eventType),
   };
@@ -917,43 +1078,19 @@ function buildSelectedEventReferencePaths(
 
 function buildEventReferencePaths(
   eventDefinition: IntegrationWebhookEventDefinition,
-): ReadonlySet<string> {
-  const references = new Set(SharedAllowedReferencePaths);
+): EventReferencePaths {
+  const allowed = new Set(SharedAllowedReferencePaths);
+  const documentedPayloadReferences = new Set<string>();
 
   for (const payloadReference of eventDefinition.payloadReferences ?? []) {
-    addPayloadReferencePath(references, payloadReference.path);
-  }
-
-  return references;
-}
-
-function unionReferencePaths(referenceSets: readonly ReadonlySet<string>[]): ReadonlySet<string> {
-  const union = new Set<string>();
-  for (const referenceSet of referenceSets) {
-    for (const reference of referenceSet) {
-      union.add(reference);
+    if (payloadReference.allowsDescendants === true) {
+      documentedPayloadReferences.add(toPayloadReferencePath(payloadReference.path));
     }
+
+    addPayloadReferencePath(allowed, payloadReference.path);
   }
 
-  return union;
-}
-
-function intersectReferencePaths(
-  referenceSets: readonly ReadonlySet<string>[],
-): ReadonlySet<string> {
-  const [firstReferenceSet, ...remainingReferenceSets] = referenceSets;
-  if (firstReferenceSet === undefined) {
-    return new Set();
-  }
-
-  const intersection = new Set(firstReferenceSet);
-  for (const reference of firstReferenceSet) {
-    if (!remainingReferenceSets.every((referenceSet) => referenceSet.has(reference))) {
-      intersection.delete(reference);
-    }
-  }
-
-  return intersection;
+  return { allowed, documentedPayloadReferences };
 }
 
 function addPayloadReferencePath(
@@ -965,4 +1102,45 @@ function addPayloadReferencePath(
   for (let index = 1; index <= payloadReferencePath.length; index += 1) {
     allowedReferences.add(["payload", ...payloadReferencePath.slice(0, index)].join("."));
   }
+}
+
+function toPayloadReferencePath(payloadReferencePath: readonly string[]): string {
+  return ["payload", ...payloadReferencePath].join(".");
+}
+
+function isReferencePathAllowedByAnySelectedEvent(
+  selectedEventReferences: SelectedEventReferencePaths,
+  referencePath: string,
+): boolean {
+  if (selectedEventReferences.eventReferences.length === 0) {
+    return SharedAllowedReferencePaths.has(referencePath);
+  }
+
+  return selectedEventReferences.eventReferences.some((eventReferences) =>
+    isReferencePathAllowedByEvent(eventReferences, referencePath),
+  );
+}
+
+function isReferencePathAllowedByEvent(
+  eventReferences: EventReferencePaths,
+  referencePath: string,
+): boolean {
+  if (eventReferences.allowed.has(referencePath)) {
+    return true;
+  }
+
+  for (const documentedPayloadReference of eventReferences.documentedPayloadReferences) {
+    if (isDescendantReferencePath(referencePath, documentedPayloadReference)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isDescendantReferencePath(referencePath: string, ancestorReferencePath: string): boolean {
+  return (
+    referencePath.length > ancestorReferencePath.length &&
+    referencePath.startsWith(`${ancestorReferencePath}.`)
+  );
 }

@@ -4,16 +4,21 @@ import {
   resolveIntegrationForm,
   type AnyIntegrationDefinition,
   type IntegrationFormContext,
+  type IntegrationWebhookEventDefinition,
+  type IntegrationWebhookPayloadReference,
 } from "@mistle/integrations-core";
 
 export const DesignerIntegrationCatalogSourcePath =
-  "apps/control-plane-api/src/designer/runtime-references/integration-catalog.md";
+  "apps/control-plane-api/src/designer/runtime-references/integrations/index.md";
+export const DesignerIntegrationCatalogSourceDirectoryPath =
+  "apps/control-plane-api/src/designer/runtime-references/integrations";
 export const DesignerIntegrationCatalogRuntimePath =
-  "/root/.mistle/designer/references/integration-catalog.md";
-export const DesignerIntegrationCatalogFileId = "designer_integration_catalog";
-export const DesignerIntegrationCatalogMaxBytes = 65_536;
-
-const GeneratedHeader = `<!-- Generated from the Mistle integration registry. Do not edit by hand. Run pnpm --filter @mistle/control-plane-api designer:integration-catalog:generate. -->`;
+  "/root/.mistle/designer/references/integrations/index.md";
+export const DesignerIntegrationCatalogRuntimeDirectoryPath =
+  "/root/.mistle/designer/references/integrations";
+export const DesignerIntegrationCatalogFileId = "designer_integration_catalog_index";
+export const DesignerIntegrationCatalogIndexMaxBytes = 16_384;
+export const DesignerIntegrationCatalogDetailMaxBytes = 16_384;
 
 type BindingToolReference = {
   id: string;
@@ -21,34 +26,94 @@ type BindingToolReference = {
   selectedByDefault: boolean;
 };
 
-export function renderDesignerIntegrationCatalogMarkdown(
+export type DesignerIntegrationCatalogFile = {
+  fileName: string;
+  sourcePath: string;
+  runtimePath: string;
+  fileId: string;
+  markdown: string;
+};
+
+export function renderDesignerIntegrationCatalogFiles(
   definitions: ReadonlyArray<AnyIntegrationDefinition>,
-): string {
+): readonly DesignerIntegrationCatalogFile[] {
   const sortedDefinitions = definitions
     .filter((definition) => definition.connectionMethods.length > 0)
     .sort(compareDefinitions);
-  const lines = [
-    GeneratedHeader,
-    "",
-    "# Designer Integration Catalog",
-    "",
-    "Static integration metadata for Mistle Designer runtime lookup. Use this file to resolve user-facing provider names to provider family ids, integration target keys, setup method ids, binding tool ids, and supported resource kinds before broad integration MCP discovery.",
-    "",
+  const files: DesignerIntegrationCatalogFile[] = [
+    {
+      fileName: "index.md",
+      sourcePath: DesignerIntegrationCatalogSourcePath,
+      runtimePath: DesignerIntegrationCatalogRuntimePath,
+      fileId: DesignerIntegrationCatalogFileId,
+      markdown: renderDesignerIntegrationCatalogIndexMarkdown(sortedDefinitions),
+    },
   ];
 
   for (const definition of sortedDefinitions) {
-    lines.push(...renderDefinitionSection(definition));
+    const fileName = createDefinitionFileName(definition);
+    files.push({
+      fileName,
+      sourcePath: `${DesignerIntegrationCatalogSourceDirectoryPath}/${fileName}`,
+      runtimePath: `${DesignerIntegrationCatalogRuntimeDirectoryPath}/${fileName}`,
+      fileId: `designer_integration_catalog_${definition.variantId.replaceAll("-", "_")}`,
+      markdown: renderDesignerIntegrationDetailMarkdown(definition),
+    });
+  }
+
+  return files;
+}
+
+export function renderDesignerIntegrationCatalogIndexMarkdown(
+  definitions: ReadonlyArray<AnyIntegrationDefinition>,
+): string {
+  const lines = [
+    "# Designer Integration Reference Index",
+    "",
+    "Reference directory: `.mistle/designer/references/integrations/`",
+    "",
+    "Integration files:",
+    "",
+  ];
+
+  for (const definition of definitions) {
+    lines.push(...renderIndexDefinitionEntry(definition));
   }
 
   return `${lines.join("\n").trimEnd()}\n`;
 }
 
+export function renderDesignerIntegrationDetailMarkdown(
+  definition: AnyIntegrationDefinition,
+): string {
+  return `${renderDefinitionSection({ definition, headingLevel: 1 }).join("\n").trimEnd()}\n`;
+}
+
+export function assertDesignerIntegrationCatalogFilesWithinBudget(
+  files: readonly DesignerIntegrationCatalogFile[],
+): void {
+  for (const file of files) {
+    const sizeBytes = Buffer.byteLength(file.markdown, "utf8");
+    const maxBytes =
+      file.fileName === "index.md"
+        ? DesignerIntegrationCatalogIndexMaxBytes
+        : DesignerIntegrationCatalogDetailMaxBytes;
+    if (sizeBytes > maxBytes) {
+      throw new Error(
+        `Designer integration catalog file '${file.fileName}' is ${String(
+          sizeBytes,
+        )} bytes, exceeding the ${String(maxBytes)} byte budget.`,
+      );
+    }
+  }
+}
+
 export function assertDesignerIntegrationCatalogWithinBudget(markdown: string): void {
   const sizeBytes = Buffer.byteLength(markdown, "utf8");
-  if (sizeBytes > DesignerIntegrationCatalogMaxBytes) {
+  if (sizeBytes > DesignerIntegrationCatalogIndexMaxBytes) {
     throw new Error(
       `Designer integration catalog is ${String(sizeBytes)} bytes, exceeding the ${String(
-        DesignerIntegrationCatalogMaxBytes,
+        DesignerIntegrationCatalogIndexMaxBytes,
       )} byte budget.`,
     );
   }
@@ -71,13 +136,32 @@ function compareDefinitions(
   return left.variantId.localeCompare(right.variantId);
 }
 
-function renderDefinitionSection(definition: AnyIntegrationDefinition): string[] {
+function renderIndexDefinitionEntry(definition: AnyIntegrationDefinition): string[] {
+  const fileName = createDefinitionFileName(definition);
   const lines = [
-    `## ${definition.displayName}`,
+    `- ${definition.displayName}`,
+    `  - Provider family ID: \`${definition.familyId}\``,
+    `  - Integration target key: \`${definition.variantId}\``,
+    `  - Binding kind: \`${definition.kind}\``,
+    `  - Detail file: \`${fileName}\``,
+  ];
+
+  return lines;
+}
+
+function renderDefinitionSection(input: {
+  definition: AnyIntegrationDefinition;
+  headingLevel: 1 | 2;
+}): string[] {
+  const { definition } = input;
+  const headingMarker = "#".repeat(input.headingLevel);
+  const lines = [
+    `${headingMarker} ${definition.displayName}`,
     "",
     `Provider family ID: \`${definition.familyId}\``,
     `Integration target key: \`${definition.variantId}\``,
     `Variant ID: \`${definition.variantId}\``,
+    `Binding kind: \`${definition.kind}\``,
   ];
 
   if (definition.description !== undefined) {
@@ -118,11 +202,57 @@ function renderDefinitionSection(definition: AnyIntegrationDefinition): string[]
     lines.push("", "Trigger events:", "");
     for (const event of supportedWebhookEvents) {
       lines.push(`- \`${event.eventType}\`: ${event.displayName}`);
+      lines.push(...renderWebhookEventTemplateReferenceLines(event));
     }
   }
 
   lines.push("");
   return lines;
+}
+
+function createDefinitionFileName(definition: AnyIntegrationDefinition): string {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(definition.variantId)) {
+    throw new Error(
+      `Integration target key '${definition.variantId}' cannot be used as a Designer reference file name.`,
+    );
+  }
+
+  return `${definition.variantId}.md`;
+}
+
+function renderWebhookEventTemplateReferenceLines(
+  event: IntegrationWebhookEventDefinition,
+): string[] {
+  const lines: string[] = [];
+  const payloadReferences = event.payloadReferences ?? [];
+  if (payloadReferences.length > 0) {
+    lines.push(`  - Template fields: ${renderWebhookTemplateFields(payloadReferences)}`);
+  }
+
+  return lines;
+}
+
+function renderWebhookTemplateFields(
+  payloadReferences: readonly IntegrationWebhookPayloadReference[],
+): string {
+  const fields = new Set([
+    "{{webhookEvent.eventType}}",
+    ...payloadReferences.map(renderPayloadTemplateField),
+  ]);
+
+  return [...fields].map((field) => `\`${field}\``).join(", ");
+}
+
+function renderPayloadTemplateField(reference: IntegrationWebhookPayloadReference): string {
+  return `{{payload${reference.path.map(renderPayloadTemplatePathSegment).join("")}}}`;
+}
+
+function renderPayloadTemplatePathSegment(segment: string): string {
+  if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(segment)) {
+    return `.${segment}`;
+  }
+
+  return `[${JSON.stringify(segment)}]`;
 }
 
 function resolveBindingToolReferences(

@@ -308,6 +308,58 @@ describe.concurrent("trigger webhooks update and delete integration", () => {
     expect(JSON.stringify(body)).toContain("{{payload.not_real}}");
   });
 
+  it("rejects duplication when the source webhook trigger template is invalid", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-trigger-webhooks-duplicate-stale-invalid-template@example.com",
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_trigger_webhook_duplicate_stale_invalid_template",
+      webhookSourceId: "iws_trigger_webhook_duplicate_stale_invalid_template",
+      profileId: "sbp_trigger_webhook_duplicate_stale_invalid_template",
+      profileVersion: 4,
+    });
+    await seedPersistedWebhookTrigger(env, {
+      triggerId: "trg_trigger_webhook_duplicate_stale_invalid_template",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_trigger_webhook_duplicate_stale_invalid_template",
+      profileId: "sbp_trigger_webhook_duplicate_stale_invalid_template",
+      profileVersion: 4,
+      targetId: "tgt_trigger_webhook_duplicate_stale_invalid_template",
+      name: "Stale invalid template",
+    });
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.webhookTriggers)
+      .set({
+        conversationKeyTemplate: "{{payload.not_real}}",
+      })
+      .where(
+        eq(
+          env.controlPlaneTables.webhookTriggers.triggerId,
+          "trg_trigger_webhook_duplicate_stale_invalid_template",
+        ),
+      );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/triggers/webhooks/trg_trigger_webhook_duplicate_stale_invalid_template/duplicate",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      code: TriggerWebhooksBadRequestCodes.INVALID_WEBHOOK_TRIGGER_TEMPLATE_REFERENCES,
+    });
+    expect(JSON.stringify(body)).toContain("conversationKeyTemplate");
+    expect(JSON.stringify(body)).toContain("{{payload.not_real}}");
+  });
+
   it("deletes the webhook trigger aggregate and cascades child rows", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-trigger-webhooks-delete@example.com",

@@ -24,6 +24,7 @@ import { assertPrimaryRepositoryReferenceOrThrow as assertWebhookPrimaryReposito
 import { resolveSandboxProfileTriggerReferenceOrThrow } from "../../trigger-webhooks/services/assert-sandbox-profile-trigger-reference-or-throw.js";
 import { assertWebhookSourceReferenceOrThrow } from "../../trigger-webhooks/services/assert-webhook-source-reference-or-throw.js";
 import { assertWebhookTriggerRequirementsOrThrow } from "../../trigger-webhooks/services/assert-webhook-trigger-requirements-or-throw.js";
+import { assertWebhookTriggerTemplatesOrThrow } from "../../trigger-webhooks/services/assert-webhook-trigger-templates-or-throw.js";
 import {
   SandboxProfilesBadRequestCodes,
   SandboxProfilesConflictCodes,
@@ -624,6 +625,13 @@ async function copyWebhookTrigger(
   assertWebhookTriggerRequirementsOrThrow({
     eventTypes: webhookTrigger.eventConditions.map((condition) => condition.eventType),
     providerMetadata: resolvedWebhookSource.providerMetadata,
+    supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
+  });
+  assertWebhookTriggerTemplatesOrThrow({
+    eventTypes: webhookTrigger.eventConditions.map((condition) => condition.eventType),
+    inputTemplate: webhookTrigger.inputTemplate,
+    conversationKeyTemplate: webhookTrigger.conversationKeyTemplate,
+    idempotencyKeyTemplate: webhookTrigger.idempotencyKeyTemplate,
     supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
   });
   await resolveSandboxProfileTriggerReferenceOrThrow(
