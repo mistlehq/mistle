@@ -339,6 +339,10 @@ const AiSoftwareFactoryLinearGithubCase: DesignerEvalCase = {
       kind: "blueprint-before-product-mutation",
     },
     {
+      kind: "product-mutation-not-before-turn",
+      minTurnIndex: 1,
+    },
+    {
       kind: "blueprint-has-provider-lifecycle",
       requiredConcepts: ["linear", "github", "ready", "review", "status"],
     },

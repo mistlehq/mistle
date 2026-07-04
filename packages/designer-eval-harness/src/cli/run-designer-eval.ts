@@ -2,14 +2,6 @@ import { access, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
-import {
-  buildCodexThreadStartRequest,
-  parseCodexThreadReadResponse,
-  parseCodexThreadSessionResponse,
-} from "@mistle/integrations-definitions/agent-runtimes/codex/server";
-import { systemScheduler } from "@mistle/time";
-
-import { DashboardControlDynamicToolSpecs } from "../../../../apps/dashboard/src/features/session-agents/dashboard-control-actions.ts";
 import { createDesignerEvalArtifacts } from "../artifacts/artifacts.ts";
 import { getDesignerEvalCase } from "../cases/registry.ts";
 import {
@@ -28,14 +20,16 @@ import { startDesignerEvalContainer } from "../docker/designer-eval-container.ts
 import type { StartedDesignerEvalContainer } from "../docker/designer-eval-container.ts";
 import { evaluateDesignerEvalRun } from "../evaluator/evaluator.ts";
 import { compileEvalDesignerRuntime } from "../runtime/compile-eval-designer-runtime.ts";
-import {
-  connectDirectCodexJsonRpcClient,
-  type DirectCodexJsonRpcClient,
-} from "../runtime/direct-codex-json-rpc-client.ts";
+import { connectDirectCodexJsonRpcClient } from "../runtime/direct-codex-json-rpc-client.ts";
 import { materializeDesignerRuntimeFiles } from "../runtime/materialize-runtime-files.ts";
 import { resolveDesignerEvalCodexRuntime } from "../runtime/resolve-codex-runtime-client.ts";
 import { renderTranscriptMarkdown } from "../transcript/transcript.ts";
 import type { DesignerEvalDashboardControlAction } from "../types.ts";
+import {
+  readDesignerEvalCodexThread,
+  runDesignerEvalCodexTurns,
+  startDesignerEvalCodexThread,
+} from "./codex-thread.ts";
 import { RepositoryRootPath, resolveRepositoryPath } from "./paths.ts";
 
 async function main(): Promise<void> {
@@ -181,24 +175,17 @@ async function main(): Promise<void> {
       await rpcClient.initialize();
       const thread = await startDesignerEvalCodexThread({
         rpcClient,
-        dynamicTools: DashboardControlDynamicToolSpecs,
       });
       const turnPrompts = [evalCase.prompt, ...(evalCase.followUpPrompts ?? [])];
-      let completedTurn: { threadId: string; turnId: string } | undefined;
-      for (const [turnIndex, prompt] of turnPrompts.entries()) {
-        activeTurnIndex = turnIndex;
-        completedTurn = await Promise.race([
-          waitForDesignerTurnCompletion({
-            rpcClient,
-            threadId: thread.threadId,
-            prompt,
-          }),
-          serverRequestFailure,
-        ]);
-      }
-      if (completedTurn === undefined) {
-        throw new Error("Designer eval case did not provide a prompt.");
-      }
+      const completedTurn = await runDesignerEvalCodexTurns({
+        afterTurnStarted: (turnIndex) => {
+          activeTurnIndex = turnIndex;
+        },
+        prompts: turnPrompts,
+        rpcClient,
+        serverRequestFailure,
+        threadId: thread.threadId,
+      });
       const threadRead = await readDesignerEvalCodexThread({
         rpcClient,
         threadId: completedTurn.threadId,
@@ -397,114 +384,6 @@ function parsePositiveInteger(value: string, label: string): number {
   }
 
   return parsed;
-}
-
-async function startDesignerEvalCodexThread(input: {
-  rpcClient: DirectCodexJsonRpcClient;
-  dynamicTools: typeof DashboardControlDynamicToolSpecs;
-}): Promise<{ threadId: string; cwd: string; response: unknown }> {
-  const response = await input.rpcClient.call(
-    "thread/start",
-    buildCodexThreadStartRequest({
-      dynamicTools: input.dynamicTools,
-    }),
-  );
-  const parsed = parseCodexThreadSessionResponse({
-    method: "thread/start",
-    response,
-  });
-
-  return {
-    threadId: parsed.threadId,
-    cwd: parsed.cwd,
-    response,
-  };
-}
-
-async function readDesignerEvalCodexThread(input: {
-  rpcClient: DirectCodexJsonRpcClient;
-  threadId: string;
-}): Promise<{
-  threadId: string;
-  name: string | null;
-  preview: string | null;
-  turns: readonly { id: string; status: string | null; items: readonly unknown[] }[];
-  response: unknown;
-}> {
-  const response = await input.rpcClient.call("thread/read", {
-    threadId: input.threadId,
-    includeTurns: true,
-  });
-
-  return parseCodexThreadReadResponse(response);
-}
-
-async function waitForDesignerTurnCompletion(input: {
-  rpcClient: DirectCodexJsonRpcClient;
-  threadId: string;
-  prompt: string;
-}): Promise<{ threadId: string; turnId: string }> {
-  return await new Promise((resolve, reject) => {
-    const timeout = systemScheduler.schedule(
-      () => {
-        unsubscribe();
-        reject(new Error("Timed out waiting for Designer turn completion."));
-      },
-      10 * 60 * 1000,
-    );
-
-    const unsubscribe = input.rpcClient.onNotification((notification) => {
-      if (notification.method !== "turn/completed") {
-        return;
-      }
-      const params = notification.params;
-      if (typeof params !== "object" || params === null) {
-        return;
-      }
-      const threadId = Reflect.get(params, "threadId");
-      const turnId = readCompletedTurnId(params);
-      if (threadId !== input.threadId || typeof turnId !== "string") {
-        return;
-      }
-      systemScheduler.cancel(timeout);
-      unsubscribe();
-      resolve({
-        threadId,
-        turnId,
-      });
-    });
-
-    void input.rpcClient
-      .call("turn/start", {
-        threadId: input.threadId,
-        input: [
-          {
-            type: "text",
-            text: input.prompt,
-          },
-        ],
-      })
-      .catch((error: unknown) => {
-        systemScheduler.cancel(timeout);
-        unsubscribe();
-        reject(error instanceof Error ? error : new Error(String(error)));
-      });
-  });
-}
-
-function readCompletedTurnId(params: object): string | undefined {
-  const topLevelTurnId = Reflect.get(params, "turnId");
-  if (typeof topLevelTurnId === "string") {
-    return topLevelTurnId;
-  }
-
-  const turn = Reflect.get(params, "turn");
-  if (typeof turn !== "object" || turn === null) {
-    return undefined;
-  }
-
-  const nestedTurnId = Reflect.get(turn, "id");
-  return typeof nestedTurnId === "string" ? nestedTurnId : undefined;
 }
 
 function printHelp(): void {
