@@ -76,6 +76,13 @@ _Maps to_: Sandbox profile version integration binding `config.tools`; compiled 
 
 Use when the agent workflow needs to read or write provider data, inspect repositories, create branches or pull requests, comment on issues, or use provider APIs from inside the target sandbox profile.
 
+**Agent model provider**:
+A Connected app binding with integration catalog `Binding kind: agent` that supplies model access to the target sandbox profile's selected runtime, such as OpenAI for Codex.
+_Avoid_: Provider tool, Mistle resource access, Designer session runtime
+_Maps to_: Sandbox profile version integration binding `kind: "agent"`; provider egress route; runtime model-provider configuration
+
+Use when the configured agent runtime needs model access. A target sandbox profile with `agentRuntimeId: "codex"` still needs a compatible `kind: "agent"` binding, usually OpenAI, unless an existing compatible agent binding is already present.
+
 **Agent**:
 A configured worker that can perform one or more Tasks. In Mistle, an Agent is backed by a Sandbox profile.
 _Avoid_: Sandbox profile when not selecting or editing the product object directly, Designer runtime

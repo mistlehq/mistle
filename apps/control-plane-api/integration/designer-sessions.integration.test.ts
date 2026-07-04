@@ -24,6 +24,7 @@ import {
 } from "../src/designer/index.js";
 import {
   DesignerIntegrationCatalogFileId,
+  DesignerIntegrationCatalogRuntimeDirectoryPath,
   DesignerIntegrationCatalogRuntimePath,
 } from "../src/designer/runtime-references/designer-integration-catalog.js";
 import { SandboxInstancesConflictResponseSchema } from "../src/sandbox-instances/index.js";
@@ -431,18 +432,37 @@ describe.concurrent("designer sessions integration", () => {
       "mistle-designer-behavior",
       "mistle-designer-initial-request",
     ]);
-    const designerIntegrationCatalog = queuedWorkflowInput.runtimePlan.runtimeClients
+    const designerIntegrationCatalogIndex = queuedWorkflowInput.runtimePlan.runtimeClients
       .flatMap((client) => client.setup.files)
       .find((file) => file.fileId === DesignerIntegrationCatalogFileId);
-    expect(designerIntegrationCatalog).toMatchObject({
+    expect(designerIntegrationCatalogIndex).toMatchObject({
       path: DesignerIntegrationCatalogRuntimePath,
       mode: 420,
       writeMode: "overwrite",
     });
-    expect(designerIntegrationCatalog?.content).toContain("# Designer Integration Catalog");
-    expect(designerIntegrationCatalog?.content).toContain(
+    expect(designerIntegrationCatalogIndex?.content).toContain(
+      "# Designer Integration Reference Index",
+    );
+    expect(designerIntegrationCatalogIndex?.content).toContain(
       "Integration target key: `linear-default`",
     );
+    expect(designerIntegrationCatalogIndex?.content).toContain("Detail file: `linear-default.md`");
+    const designerLinearIntegrationCatalog = queuedWorkflowInput.runtimePlan.runtimeClients
+      .flatMap((client) => client.setup.files)
+      .find(
+        (file) =>
+          file.path === `${DesignerIntegrationCatalogRuntimeDirectoryPath}/linear-default.md`,
+      );
+    expect(designerLinearIntegrationCatalog).toMatchObject({
+      fileId: "designer_integration_catalog_linear_default",
+      mode: 420,
+      writeMode: "overwrite",
+    });
+    expect(designerLinearIntegrationCatalog?.content).toContain("# Linear");
+    expect(designerLinearIntegrationCatalog?.content).toContain(
+      "Integration target key: `linear-default`",
+    );
+    expect(designerLinearIntegrationCatalog?.content).toContain("Trigger events:");
 
     const listResponse = await env.controlPlaneApi.http.fetch("/v1/designer/sessions", {
       headers: {

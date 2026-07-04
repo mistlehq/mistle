@@ -1,15 +1,17 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { basename, extname } from "node:path";
 
 import type { RuntimeClientSetupFile } from "@mistle/integrations-core";
 
-import {
-  DesignerIntegrationCatalogFileId,
-  DesignerIntegrationCatalogRuntimePath,
-} from "../runtime-references/designer-integration-catalog.js";
+import { DesignerIntegrationCatalogRuntimeDirectoryPath } from "../runtime-references/designer-integration-catalog.js";
 
 const DesignerRuntimeReferenceFileNames = {
   AI_SOFTWARE_FACTORY: "ai-software-factory.md",
-  INTEGRATION_CATALOG: "integration-catalog.md",
+  REFERENCE_MAP: "reference-map.md",
+};
+
+const DesignerRuntimeReferenceDirectoryNames = {
+  INTEGRATIONS: "integrations",
 };
 
 type DesignerRuntimeReferenceFileName =
@@ -30,13 +32,38 @@ export function loadDesignerRuntimeReferenceContent(
 }
 
 export function createDesignerIntegrationCatalogSetupFile(): RuntimeClientSetupFile {
+  const setupFiles = createDesignerIntegrationCatalogSetupFiles();
+  const indexSetupFile = setupFiles.find((file) => file.path.endsWith("/index.md"));
+  if (indexSetupFile === undefined) {
+    throw new Error("Designer integration catalog index setup file was not created.");
+  }
+
+  return indexSetupFile;
+}
+
+export function createDesignerIntegrationCatalogSetupFiles(): readonly RuntimeClientSetupFile[] {
+  return loadDesignerRuntimeReferenceDirectoryFiles(
+    DesignerRuntimeReferenceDirectoryNames.INTEGRATIONS,
+  ).map((file) => ({
+    fileId: `designer_integration_catalog_${basename(
+      file.fileName,
+      extname(file.fileName),
+    ).replaceAll("-", "_")}`,
+    path: `${DesignerIntegrationCatalogRuntimeDirectoryPath}/${file.fileName}`,
+    mode: 420,
+    writeMode: "overwrite",
+    content: `${file.content}\n`,
+  }));
+}
+
+export function createDesignerReferenceMapSetupFile(): RuntimeClientSetupFile {
   return {
-    fileId: DesignerIntegrationCatalogFileId,
-    path: DesignerIntegrationCatalogRuntimePath,
+    fileId: "designer_reference_map",
+    path: "/root/.mistle/designer/references/reference-map.md",
     mode: 420,
     writeMode: "overwrite",
     content: `${loadDesignerRuntimeReferenceContent(
-      DesignerRuntimeReferenceFileNames.INTEGRATION_CATALOG,
+      DesignerRuntimeReferenceFileNames.REFERENCE_MAP,
     )}\n`,
   };
 }
@@ -55,7 +82,27 @@ export function createDesignerAiSoftwareFactoryReferenceSetupFile(): RuntimeClie
 
 export function createDesignerRuntimeReferenceSetupFiles(): readonly RuntimeClientSetupFile[] {
   return [
-    createDesignerIntegrationCatalogSetupFile(),
+    createDesignerReferenceMapSetupFile(),
+    ...createDesignerIntegrationCatalogSetupFiles(),
     createDesignerAiSoftwareFactoryReferenceSetupFile(),
   ];
+}
+
+function loadDesignerRuntimeReferenceDirectoryFiles(
+  directoryName: string,
+): readonly { fileName: string; content: string }[] {
+  const directoryUrl = new URL(`../runtime-references/${directoryName}/`, import.meta.url);
+  return readdirSync(directoryUrl)
+    .filter((fileName) => fileName.endsWith(".md"))
+    .sort()
+    .map((fileName) => {
+      const content = readFileSync(new URL(fileName, directoryUrl), "utf8").trim();
+      if (content.length === 0) {
+        throw new Error(
+          `Designer runtime reference file '${directoryName}/${fileName}' must not be empty.`,
+        );
+      }
+
+      return { fileName, content };
+    });
 }
