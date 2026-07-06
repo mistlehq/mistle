@@ -2177,6 +2177,137 @@ describe("DesignerCanvasWorkspace", () => {
     );
   });
 
+  it("places side-return nodes beyond existing peers in the target row", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Parallel Slack Bug Triage Workflow",
+        outcome: {
+          label: "Triage bug reports from Slack",
+        },
+        items: [
+          {
+            id: "slack_bug_intake",
+            kind: "trigger",
+            integrationTargetKey: "slack-default",
+            state: "proposed",
+            when: [{ label: "Bug report posted or app mentioned in Slack" }],
+          },
+          {
+            id: "collect_context",
+            kind: "agent_step",
+            label: "Collect report context",
+            state: "proposed",
+          },
+          {
+            id: "parallel_audit",
+            kind: "agent_step",
+            label: "Audit linked incidents",
+            state: "proposed",
+          },
+          {
+            id: "ask_for_missing_details",
+            kind: "agent_step",
+            label: "Ask for missing details",
+            state: "proposed",
+          },
+          {
+            id: "classify_bug",
+            kind: "agent_step",
+            label: "Classify and prioritize",
+            state: "proposed",
+          },
+          {
+            id: "triage_route",
+            kind: "routing_policy",
+            state: "proposed",
+            rules: [
+              {
+                conditionLabel: "Missing required details",
+                when: [
+                  {
+                    field: "report_actionability",
+                    operator: "equals",
+                    value: "needs_details",
+                  },
+                ],
+                routeTo: "ask_for_missing_details",
+              },
+              {
+                conditionLabel: "Actionable report",
+                when: [
+                  {
+                    field: "report_actionability",
+                    operator: "equals",
+                    value: "actionable",
+                  },
+                ],
+                routeTo: "post_triage_summary",
+              },
+            ],
+          },
+          {
+            id: "post_triage_summary",
+            kind: "workflow_output",
+            label: "Slack triage summary",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "slack_bug_intake",
+            to: "collect_context",
+            kind: "triggers",
+          },
+          {
+            from: "slack_bug_intake",
+            to: "parallel_audit",
+            kind: "triggers",
+          },
+          {
+            from: "collect_context",
+            to: "classify_bug",
+            kind: "requires",
+          },
+          {
+            from: "classify_bug",
+            to: "triage_route",
+            kind: "requires",
+          },
+          {
+            from: "triage_route",
+            to: "ask_for_missing_details",
+            kind: "routes_to",
+          },
+          {
+            from: "triage_route",
+            to: "post_triage_summary",
+            kind: "routes_to",
+          },
+          {
+            from: "ask_for_missing_details",
+            to: "collect_context",
+            kind: "requires",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const collectContext = getRequiredDesignerBlueprintGraphNode(graph, "collect_context");
+    const parallelAudit = getRequiredDesignerBlueprintGraphNode(graph, "parallel_audit");
+    const askForMissingDetails = getRequiredDesignerBlueprintGraphNode(
+      graph,
+      "ask_for_missing_details",
+    );
+
+    expect(parallelAudit.position.y).toBe(collectContext.position.y);
+    expect(askForMissingDetails.position.x).toBeGreaterThanOrEqual(
+      parallelAudit.position.x + resolveDesignerBlueprintGraphNodeWidth(parallelAudit),
+    );
+  });
+
   it("fails when a routing rule target is missing its routes_to link", async () => {
     await expect(
       buildDesignerBlueprintGraph({

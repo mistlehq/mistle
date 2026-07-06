@@ -2416,12 +2416,18 @@ function placeDesignerBlueprintSideReturnNodes(input: {
       });
     const sourceY =
       nextYByTargetId.get(edge.target) ?? targetPosition.y + targetHeight / 2 - sourceHeight / 2;
+    const sourceX = resolveDesignerBlueprintSideReturnNodeX({
+      nodes: input.nodes,
+      positionByNodeId: input.positionByNodeId,
+      sourceHeight,
+      sourceNode,
+      sourceY,
+      targetNode,
+      targetPosition,
+    });
 
     input.positionByNodeId.set(edge.source, {
-      x:
-        targetPosition.x +
-        getDesignerBlueprintPositionedNodeWidth(targetNode) +
-        DesignerBlueprintSideReturnNodeGap,
+      x: sourceX,
       y: sourceY,
     });
     nextYByTargetId.set(
@@ -2429,6 +2435,53 @@ function placeDesignerBlueprintSideReturnNodes(input: {
       sourceY + sourceHeight + DesignerBlueprintLayoutNodeSpacing / 2,
     );
   }
+}
+
+function resolveDesignerBlueprintSideReturnNodeX(input: {
+  nodes: readonly DesignerBlueprintLayoutNode[];
+  positionByNodeId: ReadonlyMap<string, { x: number; y: number }>;
+  sourceHeight: number;
+  sourceNode: DesignerBlueprintLayoutNode;
+  sourceY: number;
+  targetNode: DesignerBlueprintLayoutNode;
+  targetPosition: { x: number; y: number };
+}): number {
+  let sourceX =
+    input.targetPosition.x +
+    getDesignerBlueprintPositionedNodeWidth(input.targetNode) +
+    DesignerBlueprintSideReturnNodeGap;
+  const sourceBottom = input.sourceY + input.sourceHeight;
+
+  for (const node of input.nodes) {
+    if (node.id === input.sourceNode.id) {
+      continue;
+    }
+
+    const position = input.positionByNodeId.get(node.id);
+    if (position === undefined) {
+      continue;
+    }
+
+    const nodeBottom =
+      position.y +
+      resolveDesignerBlueprintProcessLaneSlotHeight({
+        description: node.data.description,
+        routingSummaryRows: node.data.routingSummaryRows,
+        triggerConditionRows: node.data.triggerConditionRows,
+      });
+    if (sourceBottom <= position.y || input.sourceY >= nodeBottom) {
+      continue;
+    }
+
+    sourceX = Math.max(
+      sourceX,
+      position.x +
+        getDesignerBlueprintPositionedNodeWidth(node) +
+        DesignerBlueprintSideReturnNodeGap,
+    );
+  }
+
+  return sourceX;
 }
 
 function centerDesignerBlueprintLayers(input: {
