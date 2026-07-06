@@ -682,7 +682,7 @@ const SupportedGitHubOrderingCases: ReadonlyArray<{
       label: "release.created release.created_at",
       value: ReleaseCreatedPayload.release.created_at,
     }),
-    expectedOrderingIdentifier: `${ReleaseCreatedPayload.release.id.toString().padStart(20, "0")}.1`,
+    expectedOrderingIdentifier: `${ReleaseCreatedPayload.release.id.toString().padStart(20, "0")}.1.delivery_release_created`,
   },
   {
     providerEventType: "release",
@@ -693,7 +693,7 @@ const SupportedGitHubOrderingCases: ReadonlyArray<{
       label: "release.published release.published_at",
       value: ReleasePublishedPayload.release.published_at,
     }),
-    expectedOrderingIdentifier: `${ReleasePublishedPayload.release.id.toString().padStart(20, "0")}.2`,
+    expectedOrderingIdentifier: `${ReleasePublishedPayload.release.id.toString().padStart(20, "0")}.2.delivery_release_published`,
   },
   {
     providerEventType: "release",
@@ -704,7 +704,7 @@ const SupportedGitHubOrderingCases: ReadonlyArray<{
       label: "release.released release.published_at",
       value: ReleaseReleasedPayload.release.published_at,
     }),
-    expectedOrderingIdentifier: `${ReleaseReleasedPayload.release.id.toString().padStart(20, "0")}.3`,
+    expectedOrderingIdentifier: `${ReleaseReleasedPayload.release.id.toString().padStart(20, "0")}.3.delivery_release_released`,
   },
   {
     providerEventType: "release",
@@ -715,7 +715,7 @@ const SupportedGitHubOrderingCases: ReadonlyArray<{
       label: "release.prereleased release.published_at",
       value: ReleasePrereleasedPayload.release.published_at,
     }),
-    expectedOrderingIdentifier: `${ReleasePrereleasedPayload.release.id.toString().padStart(20, "0")}.4`,
+    expectedOrderingIdentifier: `${ReleasePrereleasedPayload.release.id.toString().padStart(20, "0")}.4.delivery_release_prereleased`,
   },
   {
     providerEventType: "release",
@@ -726,7 +726,7 @@ const SupportedGitHubOrderingCases: ReadonlyArray<{
       label: "release.edited release.created_at",
       value: ReleaseEditedPayload.release.created_at,
     }),
-    expectedOrderingIdentifier: `${ReleaseEditedPayload.release.id.toString().padStart(20, "0")}.5`,
+    expectedOrderingIdentifier: `${ReleaseEditedPayload.release.id.toString().padStart(20, "0")}.5.delivery_release_edited`,
   },
   {
     providerEventType: "release",
@@ -737,7 +737,7 @@ const SupportedGitHubOrderingCases: ReadonlyArray<{
       label: "release.deleted release.created_at",
       value: ReleaseDeletedPayload.release.created_at,
     }),
-    expectedOrderingIdentifier: `${ReleaseDeletedPayload.release.id.toString().padStart(20, "0")}.7`,
+    expectedOrderingIdentifier: `${ReleaseDeletedPayload.release.id.toString().padStart(20, "0")}.7.delivery_release_deleted`,
   },
   {
     providerEventType: "release",
@@ -745,7 +745,7 @@ const SupportedGitHubOrderingCases: ReadonlyArray<{
     deliveryId: "delivery_release_unpublished",
     payload: ReleaseUnpublishedPayload,
     expectedOccurredAt: "2019-05-16T15:19:25Z",
-    expectedOrderingIdentifier: "00000000000017372791.6",
+    expectedOrderingIdentifier: "00000000000017372791.6.delivery_release_unpublished",
   },
 ];
 
@@ -872,6 +872,52 @@ describe("GitHubWebhookHandler", () => {
         },
       });
     }
+  });
+
+  it("keeps repeated release edit deliveries distinct in source ordering", async () => {
+    const firstResolved = await GitHubWebhookHandler.resolveWebhookRequest({
+      targetKey: "github_cloud",
+      target: createGitHubCloudTargetConfig(),
+      headers: {
+        "x-github-event": "release",
+        "x-github-delivery": "delivery_release_edit_first",
+      },
+      rawBody: encodePayload(ReleaseEditedPayload),
+    });
+    const secondResolved = await GitHubWebhookHandler.resolveWebhookRequest({
+      targetKey: "github_cloud",
+      target: createGitHubCloudTargetConfig(),
+      headers: {
+        "x-github-event": "release",
+        "x-github-delivery": "delivery_release_edit_second",
+      },
+      rawBody: encodePayload(ReleaseEditedPayload),
+    });
+
+    expect(firstResolved).toMatchObject({
+      kind: "event",
+      event: {
+        eventType: "github.release.edited",
+        sourceOrderKey: `${requireStringValue({
+          label: "release.edited release.created_at",
+          value: ReleaseEditedPayload.release.created_at,
+        })}#${ReleaseEditedPayload.release.id.toString().padStart(20, "0")}.5.delivery_release_edit_first`,
+      },
+    });
+    expect(secondResolved).toMatchObject({
+      kind: "event",
+      event: {
+        eventType: "github.release.edited",
+        sourceOrderKey: `${requireStringValue({
+          label: "release.edited release.created_at",
+          value: ReleaseEditedPayload.release.created_at,
+        })}#${ReleaseEditedPayload.release.id.toString().padStart(20, "0")}.5.delivery_release_edit_second`,
+      },
+    });
+    if (firstResolved.kind !== "event" || secondResolved.kind !== "event") {
+      throw new Error("Expected release edit webhook request resolutions to produce events.");
+    }
+    expect(firstResolved.event.sourceOrderKey).not.toBe(secondResolved.event.sourceOrderKey);
   });
 
   it("derives pull request review request source order keys for requested teams", async () => {

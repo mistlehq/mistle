@@ -450,6 +450,7 @@ function resolveReleaseTimestampFields(eventType: string): readonly string[] {
 function resolveReleaseOrdering(input: {
   payload: Record<string, unknown>;
   eventType: string;
+  deliveryId: string;
 }): GitHubEventOrdering {
   const release = requireRecordField({
     payload: input.payload,
@@ -471,7 +472,7 @@ function resolveReleaseOrdering(input: {
     occurredAt,
     sourceOrderKey: createIntegrationWebhookSourceOrderKey({
       occurredAt,
-      orderingIdentifier: `${releaseIdentifier}.${resolveReleaseActionOrderKey(input.eventType)}`,
+      orderingIdentifier: `${releaseIdentifier}.${resolveReleaseActionOrderKey(input.eventType)}.${input.deliveryId}`,
     }),
   };
 }
@@ -479,6 +480,7 @@ function resolveReleaseOrdering(input: {
 function resolveGitHubEventOrdering(input: {
   eventType: string;
   payload: Record<string, unknown>;
+  deliveryId: string;
 }): GitHubEventOrdering | undefined {
   switch (input.eventType) {
     case "github.issues.opened":
@@ -665,6 +667,7 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
     const ordering = resolveGitHubEventOrdering({
       eventType,
       payload,
+      deliveryId,
     });
 
     return {
