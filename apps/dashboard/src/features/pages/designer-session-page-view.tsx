@@ -2213,6 +2213,7 @@ function analyzeDesignerBlueprintLayoutEdges(input: {
       )
       .map((node) => [node.id, node.data.item]),
   );
+  const itemIndexById = new Map(input.nodes.map((node, index) => [node.id, index]));
   const incomingEdgesByTarget = new Map<string, DesignerBlueprintGraphEdge[]>();
 
   for (const edge of input.edges) {
@@ -2261,6 +2262,8 @@ function analyzeDesignerBlueprintLayoutEdges(input: {
   for (const edge of input.edges) {
     const sourceItem = itemById.get(edge.source);
     const targetItem = itemById.get(edge.target);
+    const sourceIndex = itemIndexById.get(edge.source);
+    const targetIndex = itemIndexById.get(edge.target);
     if (sourceItem === undefined || targetItem === undefined) {
       continue;
     }
@@ -2298,6 +2301,11 @@ function analyzeDesignerBlueprintLayoutEdges(input: {
       returnEdgeIds.add(edge.id);
       sideReturnEdgeIds.add(edge.id);
       sideReturnEdges.push(edge);
+      continue;
+    }
+
+    if (sourceIndex !== undefined && targetIndex !== undefined && sourceIndex > targetIndex) {
+      returnEdgeIds.add(edge.id);
     }
   }
 

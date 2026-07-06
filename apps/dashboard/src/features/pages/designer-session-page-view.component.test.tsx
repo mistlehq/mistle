@@ -1692,6 +1692,68 @@ describe("DesignerCanvasWorkspace", () => {
     expect(retryEdge?.type).toBe("loopback");
   });
 
+  it("keeps non-routing feedback loops out of the top-down layout rank", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Draft feedback loop",
+        outcome: {
+          label: "Revise drafts until ready",
+        },
+        items: [
+          {
+            id: "draft-response",
+            kind: "agent_step",
+            label: "Draft response",
+            state: "proposed",
+          },
+          {
+            id: "review-response",
+            kind: "agent_step",
+            label: "Review response",
+            state: "proposed",
+          },
+          {
+            id: "publish-response",
+            kind: "workflow_output",
+            label: "Publish response",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "draft-response",
+            to: "review-response",
+            kind: "requires",
+          },
+          {
+            from: "review-response",
+            to: "draft-response",
+            kind: "requires",
+          },
+          {
+            from: "review-response",
+            to: "publish-response",
+            kind: "produces",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const draftResponse = getRequiredDesignerBlueprintGraphNode(graph, "draft-response");
+    const reviewResponse = getRequiredDesignerBlueprintGraphNode(graph, "review-response");
+    const publishResponse = getRequiredDesignerBlueprintGraphNode(graph, "publish-response");
+    const feedbackEdge = graph.edges.find(
+      (edge) => edge.source === "review-response" && edge.target === "draft-response",
+    );
+
+    expect(reviewResponse.position.y).toBeGreaterThan(draftResponse.position.y);
+    expect(publishResponse.position.y).toBeGreaterThan(reviewResponse.position.y);
+    expect(feedbackEdge?.type).toBe("loopback");
+  });
+
   it("places missing-detail side loops beside the workflow step they return to", async () => {
     const graph = await buildDesignerBlueprintGraph({
       blueprint: {
