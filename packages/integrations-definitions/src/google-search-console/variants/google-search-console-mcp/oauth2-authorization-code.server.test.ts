@@ -11,6 +11,7 @@ import {
   classifyGoogleSearchConsoleRefreshFailure,
   createGoogleSearchConsoleRefreshTransportFailure,
   GoogleSearchConsoleMcpOAuth2AuthorizationCodeCapability,
+  parseGoogleSearchConsoleTokenResponse,
   resolveGoogleSearchConsoleAccessTokenExpiresAt,
   resolveGoogleSearchConsoleAuthorizationCodeOrThrow,
   resolveGoogleSearchConsoleCompleteGrantResult,
@@ -210,6 +211,17 @@ describe("Google Search Console OAuth authorization code support", () => {
       }),
     ).toThrow(
       "Google Search Console OAuth authorization did not return a refresh token. Reconnect the integration and approve offline access.",
+    );
+  });
+
+  it("rejects token responses without Google access token expiry", () => {
+    expect(() =>
+      parseGoogleSearchConsoleTokenResponse({
+        access_token: "access_123",
+        refresh_token: "refresh_123",
+      }),
+    ).toThrow(
+      "Google Search Console OAuth token response did not match the expected shape with required `expires_in`.",
     );
   });
 

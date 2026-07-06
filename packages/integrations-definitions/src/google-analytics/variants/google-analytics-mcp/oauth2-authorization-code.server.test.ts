@@ -11,6 +11,7 @@ import {
   classifyGoogleAnalyticsRefreshFailure,
   createGoogleAnalyticsRefreshTransportFailure,
   GoogleAnalyticsMcpOAuth2AuthorizationCodeCapability,
+  parseGoogleAnalyticsTokenResponse,
   resolveGoogleAnalyticsAccessTokenExpiresAt,
   resolveGoogleAnalyticsAuthorizationCodeOrThrow,
   resolveGoogleAnalyticsCompleteGrantResult,
@@ -206,6 +207,17 @@ describe("Google Analytics OAuth authorization code support", () => {
       }),
     ).toThrow(
       "Google Analytics OAuth authorization did not return a refresh token. Reconnect the integration and approve offline access.",
+    );
+  });
+
+  it("rejects token responses without Google access token expiry", () => {
+    expect(() =>
+      parseGoogleAnalyticsTokenResponse({
+        access_token: "access_123",
+        refresh_token: "refresh_123",
+      }),
+    ).toThrow(
+      "Google Analytics OAuth token response did not match the expected shape with required `expires_in`.",
     );
   });
 

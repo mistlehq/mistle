@@ -11,6 +11,7 @@ import {
   classifyGoogleBusinessProfileRefreshFailure,
   createGoogleBusinessProfileRefreshTransportFailure,
   GoogleBusinessProfileMcpOAuth2AuthorizationCodeCapability,
+  parseGoogleBusinessProfileTokenResponse,
   resolveGoogleBusinessProfileAccessTokenExpiresAt,
   resolveGoogleBusinessProfileAuthorizationCodeOrThrow,
   resolveGoogleBusinessProfileCompleteGrantResult,
@@ -209,6 +210,17 @@ describe("Google Business Profile OAuth authorization code support", () => {
       }),
     ).toThrow(
       "Google Business Profile OAuth authorization did not return a refresh token. Reconnect the integration and approve offline access.",
+    );
+  });
+
+  it("rejects token responses without Google access token expiry", () => {
+    expect(() =>
+      parseGoogleBusinessProfileTokenResponse({
+        access_token: "access_123",
+        refresh_token: "refresh_123",
+      }),
+    ).toThrow(
+      "Google Business Profile OAuth token response did not match the expected shape with required `expires_in`.",
     );
   });
 

@@ -6,6 +6,7 @@ import {
   buildGoogleWorkspaceRefreshRequestBody,
   classifyGoogleWorkspaceRefreshFailure,
   GoogleWorkspaceMcpOAuth2AuthorizationCodeCapability,
+  parseGoogleWorkspaceTokenResponse,
   resolveGoogleWorkspaceCompleteGrantResult,
   resolveGoogleWorkspaceRefreshResult,
 } from "./oauth2-authorization-code.server.js";
@@ -173,6 +174,17 @@ describe("Google Workspace OAuth authorization code helpers", () => {
       }),
     ).toThrow(
       "Google Workspace OAuth authorization did not return a refresh token. Reconnect the integration and approve offline access.",
+    );
+  });
+
+  it("rejects token responses without Google access token expiry", () => {
+    expect(() =>
+      parseGoogleWorkspaceTokenResponse({
+        access_token: "access_123",
+        refresh_token: "refresh_123",
+      }),
+    ).toThrow(
+      "Google Workspace OAuth token response did not match the expected shape with required `expires_in`.",
     );
   });
 

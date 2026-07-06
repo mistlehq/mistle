@@ -29,7 +29,7 @@ const GoogleWorkspaceTokenResponseSchema = z
   .object({
     access_token: z.string().min(1),
     refresh_token: z.string().min(1).optional(),
-    expires_in: StringOrNumberSchema.optional(),
+    expires_in: StringOrNumberSchema,
     scope: z.string().min(1).optional(),
     token_type: z.string().min(1).optional(),
   })
@@ -51,6 +51,17 @@ const GoogleWorkspaceProviderStateSchema = z
 
 type GoogleWorkspaceTokenResponse = z.output<typeof GoogleWorkspaceTokenResponseSchema>;
 type GoogleWorkspaceProviderState = z.output<typeof GoogleWorkspaceProviderStateSchema>;
+
+export function parseGoogleWorkspaceTokenResponse(input: unknown): GoogleWorkspaceTokenResponse {
+  const parsedResponse = GoogleWorkspaceTokenResponseSchema.safeParse(input);
+  if (!parsedResponse.success) {
+    throw new Error(
+      "Google Workspace OAuth token response did not match the expected shape with required `expires_in`.",
+    );
+  }
+
+  return parsedResponse.data;
+}
 
 type GoogleWorkspaceRefreshFailure = {
   classification: IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification;
@@ -196,14 +207,10 @@ export function resolveGoogleWorkspaceCompleteGrantResult(input: {
     },
     accessToken: input.response.access_token,
     refreshSchedulingResponse: input.response,
-    ...(input.response.expires_in === undefined
-      ? {}
-      : {
-          accessTokenExpiresAt: resolveGoogleWorkspaceAccessTokenExpiresAt({
-            issuedAt: input.issuedAt,
-            expiresIn: input.response.expires_in,
-          }),
-        }),
+    accessTokenExpiresAt: resolveGoogleWorkspaceAccessTokenExpiresAt({
+      issuedAt: input.issuedAt,
+      expiresIn: input.response.expires_in,
+    }),
     refreshToken: input.response.refresh_token,
     clientSecret: input.providerState.clientSecret,
     ...(credentialMetadata === undefined ? {} : { credentialMetadata }),
@@ -224,14 +231,10 @@ export function resolveGoogleWorkspaceRefreshResult(input: {
   return {
     accessToken: input.response.access_token,
     refreshSchedulingResponse: input.response,
-    ...(input.response.expires_in === undefined
-      ? {}
-      : {
-          accessTokenExpiresAt: resolveGoogleWorkspaceAccessTokenExpiresAt({
-            issuedAt: input.issuedAt,
-            expiresIn: input.response.expires_in,
-          }),
-        }),
+    accessTokenExpiresAt: resolveGoogleWorkspaceAccessTokenExpiresAt({
+      issuedAt: input.issuedAt,
+      expiresIn: input.response.expires_in,
+    }),
     ...(input.response.refresh_token === undefined
       ? {}
       : { refreshToken: input.response.refresh_token }),
@@ -321,7 +324,7 @@ async function exchangeGoogleWorkspaceToken(input: {
     );
   }
 
-  return GoogleWorkspaceTokenResponseSchema.parse(await response.json());
+  return parseGoogleWorkspaceTokenResponse(await response.json());
 }
 
 export const GoogleWorkspaceMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2AuthorizationCodeCapability<
@@ -416,7 +419,7 @@ export const GoogleWorkspaceMcpOAuth2AuthorizationCodeCapability: IntegrationOAu
     }
 
     return resolveGoogleWorkspaceRefreshResult({
-      response: GoogleWorkspaceTokenResponseSchema.parse(JSON.parse(responseText)),
+      response: parseGoogleWorkspaceTokenResponse(JSON.parse(responseText)),
       issuedAt: new Date(),
     });
   },
