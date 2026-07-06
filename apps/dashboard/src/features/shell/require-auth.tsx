@@ -1,6 +1,12 @@
 import { Button, Notice, Textarea } from "@mistle/ui";
-import { useRef } from "react";
-import { Navigate, Outlet, useLocation } from "react-router";
+import {
+  Navigate,
+  Outlet,
+  replace,
+  type LoaderFunctionArgs,
+  useLoaderData,
+  useLocation,
+} from "react-router";
 
 import { AuthenticatedAnalytics } from "../../lib/analytics/authenticated.js";
 import { AppearanceProvider, SystemAppearanceProvider } from "../appearance/appearance-provider.js";
@@ -18,6 +24,35 @@ import { requireAuthenticatedSession } from "./session-context.js";
 import { useSessionQuery } from "./session-query.js";
 
 type AuthenticatedSession = Exclude<SessionData, null>;
+
+type RequireAuthLoaderData = {
+  landingPromptStorageBlockedPrompt: string | null;
+};
+
+export function requireAuthLoader(input: LoaderFunctionArgs): RequireAuthLoaderData {
+  const url = new URL(input.request.url);
+  const result = captureDesignerLandingPromptHandoff({
+    createIdempotencyKey: () => crypto.randomUUID(),
+    nowMs: Date.now(),
+    pathname: url.pathname,
+    search: url.search,
+    storage: getBestEffortBrowserStorage("session"),
+  });
+
+  if (result.kind === "captured" || result.kind === "ignored-invalid-prompt") {
+    throw replace(createSanitizedPath({ url, search: result.sanitizedSearch }));
+  }
+
+  if (result.kind === "storage-blocked") {
+    return {
+      landingPromptStorageBlockedPrompt: result.prompt,
+    };
+  }
+
+  return {
+    landingPromptStorageBlockedPrompt: null,
+  };
+}
 
 export function useRequiredSession(): AuthenticatedSession {
   const sessionQuery = useSessionQuery();
@@ -41,44 +76,12 @@ export function useRequiredOrganizationId(): string {
 export function RequireAuth(): React.JSX.Element {
   const sessionQuery = useSessionQuery();
   const location = useLocation();
-  const landingPromptCaptureRef = useRef<{
-    locationKey: string;
-    result: ReturnType<typeof captureDesignerLandingPromptHandoff>;
-  } | null>(null);
-  const landingPromptLocationKey = `${location.pathname}\n${location.search}`;
-  if (landingPromptCaptureRef.current?.locationKey !== landingPromptLocationKey) {
-    const result = captureDesignerLandingPromptHandoff({
-      createIdempotencyKey: () => crypto.randomUUID(),
-      nowMs: Date.now(),
-      pathname: location.pathname,
-      search: location.search,
-      storage: getBestEffortBrowserStorage("session"),
-    });
-    if (
-      result.kind === "captured" ||
-      result.kind === "ignored-invalid-prompt" ||
-      result.kind === "storage-blocked"
-    ) {
-      replaceCurrentSearch(result.sanitizedSearch);
-    }
-    landingPromptCaptureRef.current = {
-      locationKey: landingPromptLocationKey,
-      result,
-    };
+  const loaderData = useLoaderData<typeof requireAuthLoader>();
+  if (loaderData.landingPromptStorageBlockedPrompt !== null) {
+    return (
+      <LandingPromptStorageBlockedNotice prompt={loaderData.landingPromptStorageBlockedPrompt} />
+    );
   }
-
-  const landingPromptCapture = landingPromptCaptureRef.current.result;
-  if (landingPromptCapture.kind === "storage-blocked") {
-    return <LandingPromptStorageBlockedNotice prompt={landingPromptCapture.prompt} />;
-  }
-  const redirectLocation =
-    landingPromptCapture.kind === "captured" ||
-    landingPromptCapture.kind === "ignored-invalid-prompt"
-      ? {
-          ...location,
-          search: landingPromptCapture.sanitizedSearch,
-        }
-      : location;
 
   if (sessionQuery.isPending) {
     return (
@@ -93,7 +96,7 @@ export function RequireAuth(): React.JSX.Element {
   }
 
   if (sessionQuery.data === null) {
-    return <Navigate replace state={{ from: redirectLocation }} to="/auth/login" />;
+    return <Navigate replace state={{ from: location }} to="/auth/login" />;
   }
 
   const appearance = readUserAppearanceFromSession(sessionQuery.data);
@@ -101,7 +104,7 @@ export function RequireAuth(): React.JSX.Element {
   if (activeOrganizationId === null) {
     return (
       <AppearanceProvider appearance={appearance}>
-        <Navigate replace state={{ from: redirectLocation }} to={AUTH_CREATE_ORGANIZATION_PATH} />
+        <Navigate replace state={{ from: location }} to={AUTH_CREATE_ORGANIZATION_PATH} />
       </AppearanceProvider>
     );
   }
@@ -117,13 +120,8 @@ export function RequireAuth(): React.JSX.Element {
   );
 }
 
-function replaceCurrentSearch(search: string): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const nextUrl = `${window.location.pathname}${search}${window.location.hash}`;
-  window.history.replaceState(window.history.state, "", nextUrl);
+function createSanitizedPath(input: { url: URL; search: string }): string {
+  return `${input.url.pathname}${input.search}${input.url.hash}`;
 }
 
 function LandingPromptStorageBlockedNotice(input: { prompt: string }): React.JSX.Element {

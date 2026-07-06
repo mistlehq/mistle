@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
 
-import type { BrowserStorage } from "../shared/browser-storage.js";
+import { afterEach, describe, expect, it } from "vitest";
+
 import {
   captureDesignerLandingPromptHandoff,
   DesignerLandingPromptHandoffStorageKey,
@@ -8,32 +9,18 @@ import {
   readPendingDesignerLandingPromptHandoff,
 } from "./designer-landing-handoff.js";
 
-function createMemoryStorage(): BrowserStorage & { entries: Map<string, string> } {
-  const entries = new Map<string, string>();
-  return {
-    entries,
-    getItem(key: string): string | null {
-      return entries.get(key) ?? null;
-    },
-    removeItem(key: string): void {
-      entries.delete(key);
-    },
-    setItem(key: string, value: string): void {
-      entries.set(key, value);
-    },
-  };
-}
-
 describe("Designer landing handoff", () => {
-  it("captures a valid root prompt with one idempotency key and a 30 minute expiry", () => {
-    const storage = createMemoryStorage();
+  afterEach(() => {
+    window.sessionStorage.removeItem(DesignerLandingPromptHandoffStorageKey);
+  });
 
+  it("captures a valid root prompt with one idempotency key and a 30 minute expiry", () => {
     const result = captureDesignerLandingPromptHandoff({
       createIdempotencyKey: () => "landing-key-001",
       nowMs: 1_000,
       pathname: "/",
       search: "?prompt=%20Build%20a%20triage%20agent%20&source=hero",
-      storage,
+      storage: window.sessionStorage,
     });
 
     expect(result).toEqual({
@@ -43,7 +30,7 @@ describe("Designer landing handoff", () => {
     expect(
       readPendingDesignerLandingPromptHandoff({
         nowMs: 1_000 + DesignerLandingPromptHandoffTtlMs - 1,
-        storage,
+        storage: window.sessionStorage,
       }),
     ).toEqual({
       expiresAtMs: 1_000 + DesignerLandingPromptHandoffTtlMs,
@@ -53,56 +40,42 @@ describe("Designer landing handoff", () => {
   });
 
   it("ignores prompts outside the root route", () => {
-    const storage = createMemoryStorage();
-
     expect(
       captureDesignerLandingPromptHandoff({
         createIdempotencyKey: () => "landing-key-002",
         nowMs: 1_000,
         pathname: "/settings",
         search: "?prompt=Build",
-        storage,
+        storage: window.sessionStorage,
       }),
     ).toEqual({ kind: "not-root-route" });
-    expect(storage.entries.has(DesignerLandingPromptHandoffStorageKey)).toBe(false);
+    expect(window.sessionStorage.getItem(DesignerLandingPromptHandoffStorageKey)).toBeNull();
   });
 
   it("removes invalid prompt query parameters without storing a handoff", () => {
-    const storage = createMemoryStorage();
-
     expect(
       captureDesignerLandingPromptHandoff({
         createIdempotencyKey: () => "landing-key-003",
         nowMs: 1_000,
         pathname: "/",
         search: "?prompt=%20%20&keep=1",
-        storage,
+        storage: window.sessionStorage,
       }),
     ).toEqual({
       kind: "ignored-invalid-prompt",
       sanitizedSearch: "?keep=1",
     });
-    expect(storage.entries.has(DesignerLandingPromptHandoffStorageKey)).toBe(false);
+    expect(window.sessionStorage.getItem(DesignerLandingPromptHandoffStorageKey)).toBeNull();
   });
 
-  it("returns storage-blocked without sanitizing the prompt source", () => {
-    const storage = {
-      getItem(): string | null {
-        return null;
-      },
-      removeItem(): void {},
-      setItem(): void {
-        throw new DOMException("Blocked", "SecurityError");
-      },
-    };
-
+  it("returns storage-blocked when browser storage is unavailable", () => {
     expect(
       captureDesignerLandingPromptHandoff({
         createIdempotencyKey: () => "landing-key-004",
         nowMs: 1_000,
         pathname: "/",
         search: "?prompt=Build&source=hero",
-        storage,
+        storage: null,
       }),
     ).toEqual({
       kind: "storage-blocked",
@@ -112,22 +85,20 @@ describe("Designer landing handoff", () => {
   });
 
   it("clears expired handoffs when reading", () => {
-    const storage = createMemoryStorage();
-
     captureDesignerLandingPromptHandoff({
       createIdempotencyKey: () => "landing-key-005",
       nowMs: 1_000,
       pathname: "/",
       search: "?prompt=Build",
-      storage,
+      storage: window.sessionStorage,
     });
 
     expect(
       readPendingDesignerLandingPromptHandoff({
         nowMs: 1_000 + DesignerLandingPromptHandoffTtlMs,
-        storage,
+        storage: window.sessionStorage,
       }),
     ).toBeNull();
-    expect(storage.entries.has(DesignerLandingPromptHandoffStorageKey)).toBe(false);
+    expect(window.sessionStorage.getItem(DesignerLandingPromptHandoffStorageKey)).toBeNull();
   });
 });

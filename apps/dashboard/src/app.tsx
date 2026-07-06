@@ -21,7 +21,7 @@ import {
 } from "./features/auth/auth-switch-organization-page.js";
 import { OAuthConsentPage } from "./features/auth/oauth-consent/oauth-consent-page.js";
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
-import { DesignerPage } from "./features/pages/designer-page.js";
+import { DesignerPage, designerPageLoader } from "./features/pages/designer-page.js";
 import { DesignerSessionPage } from "./features/pages/designer-session-page.js";
 import { IntegrationConnectionCreatePage } from "./features/pages/integration-connection-create-page.js";
 import { IntegrationConnectionEditPage } from "./features/pages/integration-connection-edit-page.js";
@@ -52,7 +52,7 @@ import { TriggerEditorPage } from "./features/pages/trigger-editor-page.js";
 import { TriggersPage } from "./features/pages/triggers-page.js";
 import { SETTINGS_DEFAULT_PATH } from "./features/settings/model.js";
 import { AppShell } from "./features/shell/app-shell.js";
-import { RequireAuth } from "./features/shell/require-auth.js";
+import { RequireAuth, requireAuthLoader } from "./features/shell/require-auth.js";
 import { RouteErrorBoundary } from "./features/shell/route-error-boundary.js";
 
 export function App(): React.JSX.Element {
@@ -68,11 +68,20 @@ export const APP_ROUTES = createRoutesFromElements(
       <Route element={<AuthSwitchOrganizationPage />} path={AUTH_SWITCH_ORGANIZATION_PATH} />
       <Route element={<InvitationAcceptPage />} path="/invitations/accept" />
     </Route>
-    <Route element={<RequireAuth />} errorElement={<RouteErrorBoundary />}>
+    <Route
+      element={<RequireAuth />}
+      errorElement={<RouteErrorBoundary />}
+      loader={requireAuthLoader}
+    >
       <Route element={<OAuthConsentPage />} path="/auth/oauth/consent/:requestId" />
       <Route element={<PortAccessRedirectPage />} path="/p/ports/:slug" />
       <Route element={<AppShell />} errorElement={<RouteErrorBoundary />}>
-        <Route element={<DesignerPage />} handle={ROUTE_HANDLES.home} index />
+        <Route
+          element={<DesignerPage />}
+          handle={ROUTE_HANDLES.home}
+          index
+          loader={designerPageLoader}
+        />
         <Route element={<RouteOutlet />} path="designer">
           <Route element={<Navigate replace to="/" />} index />
           <Route

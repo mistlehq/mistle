@@ -20,10 +20,14 @@ import {
   type DesignerLandingPromptHandoff,
 } from "../designer/designer-landing-handoff.js";
 import { isRecord } from "../shared/is-record.js";
-import { RequireAuth } from "./require-auth.js";
+import { RequireAuth, requireAuthLoader } from "./require-auth.js";
 import { SESSION_QUERY_KEY } from "./session-query-key.js";
 
-function renderRequireAuthRoute(input: { initialPath: string; sessionData: SessionData }): void {
+function renderRequireAuthRoute(input: {
+  initialPath: string;
+  sessionData: SessionData;
+  loader?: () => { landingPromptStorageBlockedPrompt: string | null };
+}): void {
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
     staleTime: Number.POSITIVE_INFINITY,
@@ -32,7 +36,7 @@ function renderRequireAuthRoute(input: { initialPath: string; sessionData: Sessi
   const router = createMemoryRouter(
     createRoutesFromElements(
       <>
-        <Route element={<RequireAuth />}>
+        <Route element={<RequireAuth />} loader={input.loader ?? requireAuthLoader}>
           <Route element={<Outlet />}>
             <Route element={<RouteProbe label="root-route" />} path="/" />
             <Route element={<RouteProbe label="settings-route" />} path="/settings" />
@@ -148,39 +152,24 @@ describe("RequireAuth landing prompt handoff", () => {
   });
 
   it("shows copy recovery when root prompt capture cannot write temporary storage", async () => {
-    const originalSessionStorage = Object.getOwnPropertyDescriptor(window, "sessionStorage");
-    Object.defineProperty(window, "sessionStorage", {
-      configurable: true,
-      get(): Storage {
-        throw new DOMException("Blocked", "SecurityError");
-      },
+    renderRequireAuthRoute({
+      initialPath: "/?prompt=Build%20a%20triage%20agent",
+      loader: () => ({ landingPromptStorageBlockedPrompt: "Build a triage agent" }),
+      sessionData: null,
     });
 
-    try {
-      renderRequireAuthRoute({
-        initialPath: "/?prompt=Build%20a%20triage%20agent",
-        sessionData: null,
-      });
-
-      expect(await screen.findByText("Temporary storage blocked")).toBeDefined();
-      expect(
-        screen.getByText(
-          "This browser blocked temporary storage, so Mistle can’t carry your prompt through login automatically. Copy the prompt below, log in, then paste it after login.",
-        ),
-      ).toBeDefined();
-      expect(screen.getByRole("button", { name: "Copy prompt" })).toBeDefined();
-      expect(screen.getByRole("textbox", { name: "Prompt to copy" })).toHaveProperty(
-        "value",
-        "Build a triage agent",
-      );
-      expect(screen.queryByText("login-route")).toBeNull();
-    } finally {
-      if (originalSessionStorage === undefined) {
-        Reflect.deleteProperty(window, "sessionStorage");
-      } else {
-        Object.defineProperty(window, "sessionStorage", originalSessionStorage);
-      }
-    }
+    expect(await screen.findByText("Temporary storage blocked")).toBeDefined();
+    expect(
+      screen.getByText(
+        "This browser blocked temporary storage, so Mistle can’t carry your prompt through login automatically. Copy the prompt below, log in, then paste it after login.",
+      ),
+    ).toBeDefined();
+    expect(screen.getByRole("button", { name: "Copy prompt" })).toBeDefined();
+    expect(screen.getByRole("textbox", { name: "Prompt to copy" })).toHaveProperty(
+      "value",
+      "Build a triage agent",
+    );
+    expect(screen.queryByText("login-route")).toBeNull();
   });
 
   it("does not capture prompt query parameters on non-root routes", async () => {
