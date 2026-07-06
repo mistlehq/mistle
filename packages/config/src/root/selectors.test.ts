@@ -531,6 +531,24 @@ describe("selectControlPlaneApiConfig", () => {
       },
     });
   });
+
+  it("projects Langfuse platform credentials without OpenAI credentials", () => {
+    const config = selectControlPlaneApiConfig(
+      createRootConfig({
+        platformCredentials: {
+          langfuse: {
+            secret_key: "platform-langfuse-secret-key",
+          },
+        },
+      }),
+    );
+
+    expect(config.platformCredentials).toEqual({
+      langfuse: {
+        secretKey: "platform-langfuse-secret-key",
+      },
+    });
+  });
 });
 
 describe("ConfigSchema", () => {
@@ -734,6 +752,24 @@ describe("selectDataPlaneGatewayConfig", () => {
     expect(config.platformCredentials).toEqual({
       openai: {
         apiKey: "platform-openai-key",
+      },
+    });
+  });
+
+  it("projects Langfuse platform credentials for gateway managed egress without OpenAI", () => {
+    const config = selectDataPlaneGatewayConfig(
+      createRootConfig({
+        platformCredentials: {
+          langfuse: {
+            secret_key: "platform-langfuse-secret-key",
+          },
+        },
+      }),
+    );
+
+    expect(config.platformCredentials).toEqual({
+      langfuse: {
+        secretKey: "platform-langfuse-secret-key",
       },
     });
   });

@@ -64,6 +64,31 @@ function selectDesignerSandboxLangfuseConfig(
   };
 }
 
+function selectPlatformCredentials(
+  platformCredentials: Config["platform_credentials"],
+): ControlPlaneApiConfig["platformCredentials"] {
+  if (platformCredentials === undefined) {
+    return undefined;
+  }
+
+  return {
+    ...(platformCredentials.openai === undefined
+      ? {}
+      : {
+          openai: {
+            apiKey: platformCredentials.openai.api_key,
+          },
+        }),
+    ...(platformCredentials.langfuse === undefined
+      ? {}
+      : {
+          langfuse: {
+            secretKey: platformCredentials.langfuse.secret_key,
+          },
+        }),
+  };
+}
+
 export function selectGlobalConfig(config: Config): GlobalConfig {
   return {
     env: config.global.env,
@@ -211,21 +236,7 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
     dataPlaneApi: {
       baseUrl: config.services.data_plane_api.internal_url,
     },
-    platformCredentials:
-      config.platform_credentials?.openai === undefined
-        ? undefined
-        : {
-            openai: {
-              apiKey: config.platform_credentials.openai.api_key,
-            },
-            ...(config.platform_credentials.langfuse === undefined
-              ? {}
-              : {
-                  langfuse: {
-                    secretKey: config.platform_credentials.langfuse.secret_key,
-                  },
-                }),
-          },
+    platformCredentials: selectPlatformCredentials(config.platform_credentials),
     internalAuth: {
       serviceToken: config.internal_auth.shared_token.token,
     },
@@ -522,21 +533,7 @@ export function selectDataPlaneGatewayConfig(config: Config): DataPlaneGatewayCo
     internalAuth: {
       serviceToken: config.internal_auth.shared_token.token,
     },
-    platformCredentials:
-      config.platform_credentials?.openai === undefined
-        ? undefined
-        : {
-            openai: {
-              apiKey: config.platform_credentials.openai.api_key,
-            },
-            ...(config.platform_credentials.langfuse === undefined
-              ? {}
-              : {
-                  langfuse: {
-                    secretKey: config.platform_credentials.langfuse.secret_key,
-                  },
-                }),
-          },
+    platformCredentials: selectPlatformCredentials(config.platform_credentials),
     sandbox: globalConfig.sandbox,
     telemetry: globalConfig.telemetry,
   };

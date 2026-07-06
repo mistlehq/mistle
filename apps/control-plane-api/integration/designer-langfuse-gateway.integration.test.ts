@@ -126,6 +126,8 @@ configuredIt(
     expect(request.path).toBe("/api/public/otel/v1/traces");
     expect(request.authorizationHeaderPresent).toBe(true);
     expect(request.authorizationHeaderUsesBasic).toBe(true);
+    expect(request.basicAuthUsername).toBe(LangfusePublicKey);
+    expect(request.basicAuthPassword).toBe(LangfuseSecretKey);
     expect(request.publicKeyHeader).toBe(LangfusePublicKey);
     expect(request.bodyBytes).toBeGreaterThan(0);
   },
@@ -135,6 +137,8 @@ configuredIt(
 type SimulatedLangfuseRequest = {
   authorizationHeaderPresent: boolean;
   authorizationHeaderUsesBasic: boolean;
+  basicAuthPassword: string | undefined;
+  basicAuthUsername: string | undefined;
   bodyBytes: number;
   method: string;
   path: string;
@@ -221,6 +225,7 @@ async function handleSimulatedLangfuseRequest(input: {
   }
   const body = Buffer.concat(chunks);
   const authorization = input.request.headers.authorization;
+  const basicAuthCredentials = parseBasicAuthCredentials(authorization);
   const publicKeyHeaderValue = input.request.headers["x-langfuse-public-key"];
   const requestUrl = new URL(input.request.url ?? "/", "http://127.0.0.1");
 
@@ -232,6 +237,8 @@ async function handleSimulatedLangfuseRequest(input: {
       authorizationHeaderPresent: authorization !== undefined,
       authorizationHeaderUsesBasic:
         typeof authorization === "string" && authorization.startsWith("Basic "),
+      basicAuthPassword: basicAuthCredentials?.password,
+      basicAuthUsername: basicAuthCredentials?.username,
       bodyBytes: body.byteLength,
       method: input.request.method,
       path: requestUrl.pathname,
@@ -241,6 +248,26 @@ async function handleSimulatedLangfuseRequest(input: {
 
   input.response.writeHead(200, { "content-type": "application/json" });
   input.response.end("{}");
+}
+
+function parseBasicAuthCredentials(
+  authorization: string | undefined,
+): { password: string; username: string } | undefined {
+  if (authorization === undefined || !authorization.startsWith("Basic ")) {
+    return undefined;
+  }
+
+  const encodedCredentials = authorization.slice("Basic ".length);
+  const decodedCredentials = Buffer.from(encodedCredentials, "base64").toString("utf8");
+  const separatorIndex = decodedCredentials.indexOf(":");
+  if (separatorIndex === -1) {
+    return undefined;
+  }
+
+  return {
+    username: decodedCredentials.slice(0, separatorIndex),
+    password: decodedCredentials.slice(separatorIndex + 1),
+  };
 }
 
 async function waitForDesignerConnectionToken(input: {

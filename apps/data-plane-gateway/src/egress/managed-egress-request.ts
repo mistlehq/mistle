@@ -25,9 +25,11 @@ type AwsSessionCredential = Extract<CachedCredential, { kind: "aws_session" }>;
 const MistleMcpTokenTtlSeconds = 300;
 
 export type GatewayPlatformCredentialConfig = {
-  openai: {
-    apiKey: string;
-  };
+  openai?:
+    | {
+        apiKey: string;
+      }
+    | undefined;
   langfuse?: { secretKey: string } | undefined;
 };
 
@@ -950,7 +952,7 @@ async function resolveCredentialWithCache(input: {
       expiresAt: mintedToken.expiresAt.toISOString(),
     };
   } else if (input.resolver.credentialResolverKind === "platform_openai_api_key") {
-    if (input.platformCredentials === undefined) {
+    if (input.platformCredentials?.openai === undefined) {
       throw new GatewayManagedEgressUnsupportedRouteError(
         "Platform OpenAI credential resolver requires gateway platform credential config.",
         "credential_resolution_failed",

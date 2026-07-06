@@ -61,7 +61,6 @@ const RuntimeClientProcessReadinessTimeoutMs = 60_000;
 const RuntimeClientProcessStopTimeoutMs = 10_000;
 const RuntimeClientProcessStopGracePeriodMs = 2_000;
 type CompileCodexRuntimeInput = CompileAgentRuntimeInput<Record<string, never>> & {
-  langfuseTracing?: CodexLangfuseTracingConfig;
   managedInstructionBlocks?: ReadonlyArray<MistleManagedInstructionBlock>;
 };
 type CodexProviderMetadata = {
@@ -435,12 +434,8 @@ export function compileCodexRuntime(input: CompileCodexRuntimeInput): CompileAge
     renderRuntimeClients: ({ egressRoutes }) =>
       buildCodexRuntimeClients({
         codexCliInstallPath,
-        ...(input.langfuseTracing === undefined ? {} : { langfuseTracing: input.langfuseTracing }),
         setupFiles: buildCodexSetupFilesFromEgressRoutes({
           egressRoutes,
-          ...(input.langfuseTracing === undefined
-            ? {}
-            : { langfuseTracing: input.langfuseTracing }),
           ...(input.managedInstructionBlocks === undefined
             ? {}
             : { managedInstructionBlocks: input.managedInstructionBlocks }),

@@ -413,6 +413,43 @@ describe("compileCodexRuntime", () => {
     expect(installed.agentRuntimes).toEqual(compiled.agentRuntimes);
   });
 
+  it("keeps Langfuse tracing scoped to the installed runtime compiler", () => {
+    const compiled = compileCodexRuntime({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      runtimeId: "codex",
+      runtimeConfig: {},
+      mcpServers: [],
+      refs: {
+        sandboxPaths: {
+          userHomeDir: "/root",
+          workspaceDir: "/root",
+          runtimeDataDir: "/var/lib/mistle",
+          runtimeArtifactDir: "/var/lib/mistle/artifacts",
+          runtimeArtifactBinDir: "/usr/local/bin",
+        },
+        artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
+      },
+    });
+
+    const runtimeClients = renderRuntimeClients({
+      compiled,
+      egressRoutes: [],
+    });
+    const runtimeClient = runtimeClients[0];
+    if (runtimeClient === undefined) {
+      throw new Error("Expected compiled Codex runtime client.");
+    }
+    expect(runtimeClient.setup.env).toEqual({});
+    expect(runtimeClient.setup.files.map((file) => file.fileId)).not.toContain(
+      "codex_langfuse_requirements",
+    );
+    expect(runtimeClient.setup.files.map((file) => file.fileId)).not.toContain(
+      "codex_home_langfuse_config",
+    );
+  });
+
   it("enables the Langfuse Codex plugin and runtime env when tracing is configured", () => {
     const installed = compileInstalledCodexRuntime({
       codexCliPath: "codex",

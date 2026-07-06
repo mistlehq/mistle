@@ -286,7 +286,8 @@ export const ControlPlaneApiPlatformCredentialsConfigSchema = z
       .object({
         apiKey: z.string().trim().min(1),
       })
-      .strict(),
+      .strict()
+      .optional(),
     langfuse: z
       .object({
         secretKey: z.string().trim().min(1),
