@@ -425,12 +425,8 @@ function resolveReleaseActionOrderKey(eventType: string): string {
       return "3";
     case "github.release.prereleased":
       return "4";
-    case "github.release.edited":
-      return "5";
-    case "github.release.unpublished":
-      return "6";
     case "github.release.deleted":
-      return "7";
+      return "5";
     default:
       throw new Error(`Unsupported GitHub release webhook event '${eventType}'.`);
   }
@@ -450,7 +446,6 @@ function resolveReleaseTimestampFields(eventType: string): readonly string[] {
 function resolveReleaseOrdering(input: {
   payload: Record<string, unknown>;
   eventType: string;
-  deliveryId: string;
 }): GitHubEventOrdering {
   const release = requireRecordField({
     payload: input.payload,
@@ -472,7 +467,7 @@ function resolveReleaseOrdering(input: {
     occurredAt,
     sourceOrderKey: createIntegrationWebhookSourceOrderKey({
       occurredAt,
-      orderingIdentifier: `${releaseIdentifier}.${resolveReleaseActionOrderKey(input.eventType)}.${input.deliveryId}`,
+      orderingIdentifier: `${releaseIdentifier}.${resolveReleaseActionOrderKey(input.eventType)}`,
     }),
   };
 }
@@ -480,7 +475,6 @@ function resolveReleaseOrdering(input: {
 function resolveGitHubEventOrdering(input: {
   eventType: string;
   payload: Record<string, unknown>;
-  deliveryId: string;
 }): GitHubEventOrdering | undefined {
   switch (input.eventType) {
     case "github.issues.opened":
@@ -605,9 +599,7 @@ function resolveGitHubEventOrdering(input: {
     case "github.release.published":
     case "github.release.released":
     case "github.release.prereleased":
-    case "github.release.edited":
     case "github.release.deleted":
-    case "github.release.unpublished":
       return resolveReleaseOrdering(input);
     default:
       return undefined;
@@ -667,7 +659,6 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
     const ordering = resolveGitHubEventOrdering({
       eventType,
       payload,
-      deliveryId,
     });
 
     return {

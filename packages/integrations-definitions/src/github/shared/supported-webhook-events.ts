@@ -792,15 +792,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     displayName: "Pre-release published",
   }),
   createGitHubReleaseEventDefinition({
-    eventType: "github.release.edited",
-    displayName: "Release edited",
-  }),
-  createGitHubReleaseEventDefinition({
     eventType: "github.release.deleted",
     displayName: "Release deleted",
-  }),
-  createGitHubReleaseEventDefinition({
-    eventType: "github.release.unpublished",
-    displayName: "Release unpublished",
   }),
 ];

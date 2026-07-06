@@ -64,9 +64,5 @@ Trigger events:
   - Template fields: `{{webhookEvent.eventType}}`, `{{payload.repository.full_name}}`, `{{payload.release.tag_name}}`, `{{payload.release.name}}`, `{{payload.release.body}}`, `{{payload.sender.login}}`
 - `github.release.prereleased`: Pre-release published
   - Template fields: `{{webhookEvent.eventType}}`, `{{payload.repository.full_name}}`, `{{payload.release.tag_name}}`, `{{payload.release.name}}`, `{{payload.release.body}}`, `{{payload.sender.login}}`
-- `github.release.edited`: Release edited
-  - Template fields: `{{webhookEvent.eventType}}`, `{{payload.repository.full_name}}`, `{{payload.release.tag_name}}`, `{{payload.release.name}}`, `{{payload.release.body}}`, `{{payload.sender.login}}`
 - `github.release.deleted`: Release deleted
-  - Template fields: `{{webhookEvent.eventType}}`, `{{payload.repository.full_name}}`, `{{payload.release.tag_name}}`, `{{payload.release.name}}`, `{{payload.release.body}}`, `{{payload.sender.login}}`
-- `github.release.unpublished`: Release unpublished
   - Template fields: `{{webhookEvent.eventType}}`, `{{payload.repository.full_name}}`, `{{payload.release.tag_name}}`, `{{payload.release.name}}`, `{{payload.release.body}}`, `{{payload.sender.login}}`
