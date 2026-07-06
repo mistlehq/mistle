@@ -88,6 +88,59 @@ describe("assertWebhookTriggerInputTemplateReferencesOrThrow", () => {
     }).not.toThrow();
   });
 
+  it("allows root webhookEvent and supported webhook event fields", () => {
+    expect(() => {
+      assertWebhookTriggerInputTemplateReferencesOrThrow({
+        inputTemplate: [
+          "Webhook {{webhookEvent}}",
+          "ID {{webhookEvent.id}}",
+          "Event {{webhookEvent.eventType}}",
+          "Provider event {{webhookEvent.providerEventType}}",
+          "External event {{webhookEvent.externalEventId}}",
+          "Delivery {{webhookEvent.externalDeliveryId}}",
+        ].join("\n"),
+        eventTypes: [MessageCreatedEvent.eventType],
+        supportedWebhookEvents: [MessageCreatedEvent],
+      });
+    }).not.toThrow();
+  });
+
+  it("rejects unknown webhook event fields with a webhook event specific error", () => {
+    expect(() => {
+      assertWebhookTriggerInputTemplateReferencesOrThrow({
+        inputTemplate: "Delivery {{webhookEvent.externalDeliveryID}}",
+        eventTypes: [MessageCreatedEvent.eventType],
+        supportedWebhookEvents: [MessageCreatedEvent],
+      });
+    }).toThrow(
+      "Invalid inputTemplate webhookEvent reference: webhookEvent.externalDeliveryID is not a supported webhook event field.",
+    );
+  });
+
+  it("rejects descendants below supported webhook event fields", () => {
+    expect(() => {
+      assertWebhookTriggerInputTemplateReferencesOrThrow({
+        inputTemplate: "Delivery {{webhookEvent.externalDeliveryId.value}}",
+        eventTypes: [MessageCreatedEvent.eventType],
+        supportedWebhookEvents: [MessageCreatedEvent],
+      });
+    }).toThrow(
+      "Invalid inputTemplate webhookEvent reference: webhookEvent.externalDeliveryId.value is not a supported webhook event field.",
+    );
+  });
+
+  it("rejects dynamic webhook event paths", () => {
+    expect(() => {
+      assertWebhookTriggerInputTemplateReferencesOrThrow({
+        inputTemplate: "Delivery {{webhookEvent[fieldName]}}",
+        eventTypes: [MessageCreatedEvent.eventType],
+        supportedWebhookEvents: [MessageCreatedEvent],
+      });
+    }).toThrow(
+      "Invalid inputTemplate webhookEvent reference: dynamic webhookEvent paths are not supported.",
+    );
+  });
+
   it("rejects malformed Liquid syntax before saving", () => {
     expect(() => {
       assertWebhookTriggerInputTemplateReferencesOrThrow({
