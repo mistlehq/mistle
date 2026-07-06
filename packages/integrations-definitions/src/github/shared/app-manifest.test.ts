@@ -64,6 +64,7 @@ describe("GitHubAppManifestTemplate", () => {
         pull_requests: "write",
       },
     });
+    expect(GitHubAppManifestTemplate.default_events).not.toContain("release");
   });
 });
 

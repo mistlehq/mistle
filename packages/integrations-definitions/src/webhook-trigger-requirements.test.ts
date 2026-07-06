@@ -116,6 +116,10 @@ describe("webhook trigger requirements", () => {
     expect(requireEvent(githubDefinition, "github.check_suite.completed").requirements).toEqual({
       anyOf: [{ event: "check_suite", permissions: [{ permission: "checks", access: "read" }] }],
     });
+
+    expect(requireEvent(githubDefinition, "github.release.published").requirements).toEqual({
+      anyOf: [{ event: "release", permissions: [{ permission: "contents", access: "read" }] }],
+    });
   });
 
   it("maps Slack trigger requirements to Events API subscriptions and bot scopes", () => {
