@@ -2384,7 +2384,7 @@ function placeDesignerBlueprintSideReturnNodes(input: {
   sideReturnEdges: readonly DesignerBlueprintGraphEdge[];
 }): void {
   const nodeById = new Map(input.nodes.map((node) => [node.id, node]));
-  const placedCountByTargetId = new Map<string, number>();
+  const nextYByTargetId = new Map<string, number>();
 
   for (const edge of input.sideReturnEdges) {
     const sourceNode = nodeById.get(edge.source);
@@ -2393,9 +2393,6 @@ function placeDesignerBlueprintSideReturnNodes(input: {
     if (sourceNode === undefined || targetNode === undefined || targetPosition === undefined) {
       continue;
     }
-
-    const placedCount = placedCountByTargetId.get(edge.target) ?? 0;
-    placedCountByTargetId.set(edge.target, placedCount + 1);
 
     const sourceHeight =
       input.measuredHeightByNodeId?.get(sourceNode.id) ??
@@ -2411,18 +2408,20 @@ function placeDesignerBlueprintSideReturnNodes(input: {
         routingSummaryRows: targetNode.data.routingSummaryRows,
         triggerConditionRows: targetNode.data.triggerConditionRows,
       });
+    const sourceY =
+      nextYByTargetId.get(edge.target) ?? targetPosition.y + targetHeight / 2 - sourceHeight / 2;
 
     input.positionByNodeId.set(edge.source, {
       x:
         targetPosition.x +
         getDesignerBlueprintPositionedNodeWidth(targetNode) +
         DesignerBlueprintSideReturnNodeGap,
-      y:
-        targetPosition.y +
-        targetHeight / 2 -
-        sourceHeight / 2 +
-        placedCount * (sourceHeight + DesignerBlueprintLayoutNodeSpacing / 2),
+      y: sourceY,
     });
+    nextYByTargetId.set(
+      edge.target,
+      sourceY + sourceHeight + DesignerBlueprintLayoutNodeSpacing / 2,
+    );
   }
 }
 

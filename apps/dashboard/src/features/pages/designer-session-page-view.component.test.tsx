@@ -554,15 +554,17 @@ function getDesignerBlueprintGraphNodeCenterX(
 function getDesignerBlueprintGraphNodeCenterY(
   node: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number],
 ): number {
-  return (
-    node.position.y +
-    resolveDesignerBlueprintProcessLaneSlotHeight({
-      description: node.data.description,
-      routingSummaryRows: node.data.routingSummaryRows,
-      triggerConditionRows: node.data.triggerConditionRows,
-    }) /
-      2
-  );
+  return node.position.y + resolveDesignerBlueprintGraphNodeHeight(node) / 2;
+}
+
+function resolveDesignerBlueprintGraphNodeHeight(
+  node: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number],
+): number {
+  return resolveDesignerBlueprintProcessLaneSlotHeight({
+    description: node.data.description,
+    routingSummaryRows: node.data.routingSummaryRows,
+    triggerConditionRows: node.data.triggerConditionRows,
+  });
 }
 
 function getDesignerBlueprintGraphNodeGroupCenterX(
@@ -1929,6 +1931,160 @@ describe("DesignerCanvasWorkspace", () => {
     expect(missingDetailsReturnEdge?.type).toBe("straight");
     expect(missingDetailsReturnEdge?.sourceHandle).toBe("left-source");
     expect(missingDetailsReturnEdge?.targetHandle).toBe("right-target");
+  });
+
+  it("stacks multiple side-return nodes without vertical overlap", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Slack Bug Triage Workflow",
+        outcome: {
+          label: "Triage bug reports from Slack",
+        },
+        items: [
+          {
+            id: "slack_bug_intake",
+            kind: "trigger",
+            integrationTargetKey: "slack-default",
+            state: "proposed",
+            when: [{ label: "Bug report posted or app mentioned in Slack" }],
+          },
+          {
+            id: "collect_context",
+            kind: "agent_step",
+            label: "Collect report context",
+            description:
+              "Read the Slack message and thread, extract product area, expected behavior, actual behavior, reproduction steps, screenshots or links, affected users, impact, and urgency.",
+            state: "proposed",
+          },
+          {
+            id: "ask_for_reproduction",
+            kind: "agent_step",
+            label: "Ask for reproduction details",
+            description:
+              "Ask for precise steps, browser and device details, affected account identifiers, screenshots, expected behavior, actual behavior, frequency, and whether the reporter can reproduce it in a clean workspace.",
+            state: "proposed",
+          },
+          {
+            id: "ask_for_impact",
+            kind: "agent_step",
+            label: "Ask for impact",
+            description: "Ask which users are blocked and whether production data is affected.",
+            state: "proposed",
+          },
+          {
+            id: "classify_bug",
+            kind: "agent_step",
+            label: "Classify and prioritize",
+            state: "proposed",
+          },
+          {
+            id: "triage_route",
+            kind: "routing_policy",
+            state: "proposed",
+            rules: [
+              {
+                conditionLabel: "Missing reproduction",
+                when: [
+                  {
+                    field: "report_actionability",
+                    operator: "equals",
+                    value: "needs_reproduction",
+                  },
+                ],
+                routeTo: "ask_for_reproduction",
+              },
+              {
+                conditionLabel: "Missing impact",
+                when: [
+                  {
+                    field: "report_actionability",
+                    operator: "equals",
+                    value: "needs_impact",
+                  },
+                ],
+                routeTo: "ask_for_impact",
+              },
+              {
+                conditionLabel: "Actionable",
+                when: [
+                  {
+                    field: "report_actionability",
+                    operator: "equals",
+                    value: "actionable",
+                  },
+                ],
+                routeTo: "post_triage_summary",
+              },
+            ],
+          },
+          {
+            id: "post_triage_summary",
+            kind: "workflow_output",
+            label: "Slack triage summary",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "slack_bug_intake",
+            to: "collect_context",
+            kind: "triggers",
+          },
+          {
+            from: "collect_context",
+            to: "classify_bug",
+            kind: "requires",
+          },
+          {
+            from: "classify_bug",
+            to: "triage_route",
+            kind: "requires",
+          },
+          {
+            from: "triage_route",
+            to: "ask_for_reproduction",
+            kind: "routes_to",
+          },
+          {
+            from: "triage_route",
+            to: "ask_for_impact",
+            kind: "routes_to",
+          },
+          {
+            from: "triage_route",
+            to: "post_triage_summary",
+            kind: "routes_to",
+          },
+          {
+            from: "ask_for_reproduction",
+            to: "collect_context",
+            kind: "requires",
+          },
+          {
+            from: "ask_for_impact",
+            to: "collect_context",
+            kind: "requires",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const collectContext = getRequiredDesignerBlueprintGraphNode(graph, "collect_context");
+    const askForReproduction = getRequiredDesignerBlueprintGraphNode(graph, "ask_for_reproduction");
+    const askForImpact = getRequiredDesignerBlueprintGraphNode(graph, "ask_for_impact");
+    const firstSideReturnNode =
+      askForReproduction.position.y <= askForImpact.position.y ? askForReproduction : askForImpact;
+    const secondSideReturnNode =
+      firstSideReturnNode.id === askForReproduction.id ? askForImpact : askForReproduction;
+
+    expect(askForReproduction.position.x).toBeGreaterThan(collectContext.position.x);
+    expect(askForImpact.position.x).toBeGreaterThan(collectContext.position.x);
+    expect(secondSideReturnNode.position.y).toBeGreaterThanOrEqual(
+      firstSideReturnNode.position.y + resolveDesignerBlueprintGraphNodeHeight(firstSideReturnNode),
+    );
   });
 
   it("fails when a routing rule target is missing its routes_to link", async () => {
