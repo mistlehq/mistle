@@ -921,8 +921,8 @@ importers:
         specifier: ^0.31.10
         version: 0.31.10(drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(kysely@0.28.17)(pg@8.20.0)(postgres@3.4.9))
       squawk-cli:
-        specifier: ^2.58.0
-        version: 2.58.0
+        specifier: ^2.59.0
+        version: 2.59.0
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -6072,28 +6072,28 @@ packages:
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
 
-  '@squawk-cli/darwin-arm64@2.58.0':
-    resolution: {integrity: sha512-NNKG0goT3xocFOYXLqWrcwCIHB/ICaxVfIYMHvjqy8emd/plbeHRpBT9LYsh8cJVMkzIJ2noVX3KHud3/1JFow==}
+  '@squawk-cli/darwin-arm64@2.59.0':
+    resolution: {integrity: sha512-nmc/6KgNLjeChGv6WlqimmbrU/pszuKsZhEnomxCozXp8OeNvk9WlMXZVpRt7p9/uI5EXunnL390KQ8ueoQFXA==}
     cpu: [arm64]
     os: [darwin]
 
-  '@squawk-cli/darwin-x64@2.58.0':
-    resolution: {integrity: sha512-eh+4p+3y8QZarrbaFn9Wwr8Mge0lCvIYkNavYsdXuC3yfiO35ObBdinsp9xlO3gbjqxY+y+J9nT6rpB7V60J2A==}
+  '@squawk-cli/darwin-x64@2.59.0':
+    resolution: {integrity: sha512-LAqi4NDW5ziB1gClxnpQCaWT7pxANhVi5YW3amSDdl5Nf9NDd9vJYafdbnhJxu0J8N9hDzhMU28SoTCljWEy1Q==}
     cpu: [x64]
     os: [darwin]
 
-  '@squawk-cli/linux-arm64@2.58.0':
-    resolution: {integrity: sha512-XA8EJH2zrkDv2Tk/ubwOFZ+Slhiwl8lYSP74HsZyvRiS+uGpmnBjdafCjTp3ypMfIB9TwXSFDDTJ0+HQ9Y02ZA==}
+  '@squawk-cli/linux-arm64@2.59.0':
+    resolution: {integrity: sha512-DZyyXK4FxJYd7yO8Niu8Jdvmu/5NP/Ipa+hL52ydk6Qj+WcN5Q23dluuhi0n/RYombyo937elncqQr2we3X/4A==}
     cpu: [arm64]
     os: [linux]
 
-  '@squawk-cli/linux-x64@2.58.0':
-    resolution: {integrity: sha512-WbFd90kKfgE29UymrH4EmUbSuRyxCnjE/jFFlzCnRwVVFj2XcHIM7S9HErYhPKfAMc7Q2o0p1tJ6aHZKQc/t5A==}
+  '@squawk-cli/linux-x64@2.59.0':
+    resolution: {integrity: sha512-09CDxHy/dtL5X28sMKlTpb/hxHRkWbVmdvS6U7vyU1cW4ECEpnfmj7Z6g+BV1WlD+vhaJ4TBb86Pkqc/pA+BFw==}
     cpu: [x64]
     os: [linux]
 
-  '@squawk-cli/win32-x64@2.58.0':
-    resolution: {integrity: sha512-Kvvb4rhjX5HyahF3Nb9vp1R9gq2oQa3zo2kCDzd++Rm46iGDJzzKcbpM8Ndfe+e0O0MIka8Zc2rZvHj48iUMPQ==}
+  '@squawk-cli/win32-x64@2.59.0':
+    resolution: {integrity: sha512-mSAscGq67sK4W9qdph7ALxuInyIBN7EeHs3WSxu/wFV5HsNNMSWlc9rfmsjAlGTtV8fJaRcAkeS38fyrRGWZSg==}
     cpu: [x64]
     os: [win32]
 
@@ -11988,8 +11988,8 @@ packages:
   sprintf-js@1.0.3:
     resolution: {integrity: sha512-D9cPgkvLlV3t3IzL0D0YLvGA9Ahk4PcvVwUbN0dSGr1aP0Nrt4AEnTUbuGvquEC0mA64Gqt1fzirlRs5ibXx8g==}
 
-  squawk-cli@2.58.0:
-    resolution: {integrity: sha512-wNrLF1Nh0tXcn1D1kfTDMvpmCopk4bjRjJkJ49Hhnn6gvXUHVylBa8MfqbsgKYb0dwcsAh2EXZAA7nkHR6mkiw==}
+  squawk-cli@2.59.0:
+    resolution: {integrity: sha512-SzUUI+tyJeXbBtDfkDGxJOn+9k6NO1cdOly4AHpOPopuv2JOEA4oTJi/HimsCLvE2MRQhxRnGKaav58OaFEUXQ==}
     hasBin: true
 
   ssh-remote-port-forward@1.0.4:
@@ -18627,19 +18627,19 @@ snapshots:
 
   '@socket.io/component-emitter@3.1.2': {}
 
-  '@squawk-cli/darwin-arm64@2.58.0':
+  '@squawk-cli/darwin-arm64@2.59.0':
     optional: true
 
-  '@squawk-cli/darwin-x64@2.58.0':
+  '@squawk-cli/darwin-x64@2.59.0':
     optional: true
 
-  '@squawk-cli/linux-arm64@2.58.0':
+  '@squawk-cli/linux-arm64@2.59.0':
     optional: true
 
-  '@squawk-cli/linux-x64@2.58.0':
+  '@squawk-cli/linux-x64@2.59.0':
     optional: true
 
-  '@squawk-cli/win32-x64@2.58.0':
+  '@squawk-cli/win32-x64@2.59.0':
     optional: true
 
   '@standard-schema/spec@1.1.0': {}
@@ -25826,13 +25826,13 @@ snapshots:
 
   sprintf-js@1.0.3: {}
 
-  squawk-cli@2.58.0:
+  squawk-cli@2.59.0:
     optionalDependencies:
-      '@squawk-cli/darwin-arm64': 2.58.0
-      '@squawk-cli/darwin-x64': 2.58.0
-      '@squawk-cli/linux-arm64': 2.58.0
-      '@squawk-cli/linux-x64': 2.58.0
-      '@squawk-cli/win32-x64': 2.58.0
+      '@squawk-cli/darwin-arm64': 2.59.0
+      '@squawk-cli/darwin-x64': 2.59.0
+      '@squawk-cli/linux-arm64': 2.59.0
+      '@squawk-cli/linux-x64': 2.59.0
+      '@squawk-cli/win32-x64': 2.59.0
 
   ssh-remote-port-forward@1.0.4:
     dependencies:
