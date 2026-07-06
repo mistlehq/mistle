@@ -29,7 +29,7 @@ const GoogleAnalyticsTokenResponseSchema = z
   .object({
     access_token: z.string().min(1),
     refresh_token: z.string().min(1).optional(),
-    expires_in: StringOrNumberSchema.optional(),
+    expires_in: StringOrNumberSchema,
     scope: z.string().min(1).optional(),
     token_type: z.string().min(1).optional(),
   })
@@ -51,6 +51,17 @@ const GoogleAnalyticsProviderStateSchema = z
 
 type GoogleAnalyticsTokenResponse = z.output<typeof GoogleAnalyticsTokenResponseSchema>;
 type GoogleAnalyticsProviderState = z.output<typeof GoogleAnalyticsProviderStateSchema>;
+
+export function parseGoogleAnalyticsTokenResponse(input: unknown): GoogleAnalyticsTokenResponse {
+  const parsedResponse = GoogleAnalyticsTokenResponseSchema.safeParse(input);
+  if (!parsedResponse.success) {
+    throw new Error(
+      "Google Analytics OAuth token response did not match the expected shape with required `expires_in`.",
+    );
+  }
+
+  return parsedResponse.data;
+}
 
 type GoogleAnalyticsRefreshFailure = {
   classification: IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification;
@@ -196,14 +207,10 @@ export function resolveGoogleAnalyticsCompleteGrantResult(input: {
     },
     accessToken: input.response.access_token,
     refreshSchedulingResponse: input.response,
-    ...(input.response.expires_in === undefined
-      ? {}
-      : {
-          accessTokenExpiresAt: resolveGoogleAnalyticsAccessTokenExpiresAt({
-            issuedAt: input.issuedAt,
-            expiresIn: input.response.expires_in,
-          }),
-        }),
+    accessTokenExpiresAt: resolveGoogleAnalyticsAccessTokenExpiresAt({
+      issuedAt: input.issuedAt,
+      expiresIn: input.response.expires_in,
+    }),
     refreshToken: input.response.refresh_token,
     clientSecret: input.providerState.clientSecret,
     ...(credentialMetadata === undefined ? {} : { credentialMetadata }),
@@ -224,14 +231,10 @@ export function resolveGoogleAnalyticsRefreshResult(input: {
   return {
     accessToken: input.response.access_token,
     refreshSchedulingResponse: input.response,
-    ...(input.response.expires_in === undefined
-      ? {}
-      : {
-          accessTokenExpiresAt: resolveGoogleAnalyticsAccessTokenExpiresAt({
-            issuedAt: input.issuedAt,
-            expiresIn: input.response.expires_in,
-          }),
-        }),
+    accessTokenExpiresAt: resolveGoogleAnalyticsAccessTokenExpiresAt({
+      issuedAt: input.issuedAt,
+      expiresIn: input.response.expires_in,
+    }),
     ...(input.response.refresh_token === undefined
       ? {}
       : { refreshToken: input.response.refresh_token }),
@@ -344,7 +347,7 @@ async function exchangeGoogleAnalyticsToken(input: {
     );
   }
 
-  return GoogleAnalyticsTokenResponseSchema.parse(await response.json());
+  return parseGoogleAnalyticsTokenResponse(await response.json());
 }
 
 export const GoogleAnalyticsMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2AuthorizationCodeCapability<
@@ -441,7 +444,7 @@ export const GoogleAnalyticsMcpOAuth2AuthorizationCodeCapability: IntegrationOAu
     }
 
     return resolveGoogleAnalyticsRefreshResult({
-      response: GoogleAnalyticsTokenResponseSchema.parse(await response.json()),
+      response: parseGoogleAnalyticsTokenResponse(await response.json()),
       issuedAt: new Date(),
     });
   },

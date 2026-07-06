@@ -29,7 +29,7 @@ const GoogleBusinessProfileTokenResponseSchema = z
   .object({
     access_token: z.string().min(1),
     refresh_token: z.string().min(1).optional(),
-    expires_in: StringOrNumberSchema.optional(),
+    expires_in: StringOrNumberSchema,
     scope: z.string().min(1).optional(),
     token_type: z.string().min(1).optional(),
   })
@@ -51,6 +51,19 @@ const GoogleBusinessProfileProviderStateSchema = z
 
 type GoogleBusinessProfileTokenResponse = z.output<typeof GoogleBusinessProfileTokenResponseSchema>;
 type GoogleBusinessProfileProviderState = z.output<typeof GoogleBusinessProfileProviderStateSchema>;
+
+export function parseGoogleBusinessProfileTokenResponse(
+  input: unknown,
+): GoogleBusinessProfileTokenResponse {
+  const parsedResponse = GoogleBusinessProfileTokenResponseSchema.safeParse(input);
+  if (!parsedResponse.success) {
+    throw new Error(
+      "Google Business Profile OAuth token response did not match the expected shape with required `expires_in`.",
+    );
+  }
+
+  return parsedResponse.data;
+}
 
 type GoogleBusinessProfileRefreshFailure = {
   classification: IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification;
@@ -198,14 +211,10 @@ export function resolveGoogleBusinessProfileCompleteGrantResult(input: {
     },
     accessToken: input.response.access_token,
     refreshSchedulingResponse: input.response,
-    ...(input.response.expires_in === undefined
-      ? {}
-      : {
-          accessTokenExpiresAt: resolveGoogleBusinessProfileAccessTokenExpiresAt({
-            issuedAt: input.issuedAt,
-            expiresIn: input.response.expires_in,
-          }),
-        }),
+    accessTokenExpiresAt: resolveGoogleBusinessProfileAccessTokenExpiresAt({
+      issuedAt: input.issuedAt,
+      expiresIn: input.response.expires_in,
+    }),
     refreshToken: input.response.refresh_token,
     clientSecret: input.providerState.clientSecret,
     ...(credentialMetadata === undefined ? {} : { credentialMetadata }),
@@ -226,14 +235,10 @@ export function resolveGoogleBusinessProfileRefreshResult(input: {
   return {
     accessToken: input.response.access_token,
     refreshSchedulingResponse: input.response,
-    ...(input.response.expires_in === undefined
-      ? {}
-      : {
-          accessTokenExpiresAt: resolveGoogleBusinessProfileAccessTokenExpiresAt({
-            issuedAt: input.issuedAt,
-            expiresIn: input.response.expires_in,
-          }),
-        }),
+    accessTokenExpiresAt: resolveGoogleBusinessProfileAccessTokenExpiresAt({
+      issuedAt: input.issuedAt,
+      expiresIn: input.response.expires_in,
+    }),
     ...(input.response.refresh_token === undefined
       ? {}
       : { refreshToken: input.response.refresh_token }),
@@ -346,7 +351,7 @@ async function exchangeGoogleBusinessProfileToken(input: {
     );
   }
 
-  return GoogleBusinessProfileTokenResponseSchema.parse(await response.json());
+  return parseGoogleBusinessProfileTokenResponse(await response.json());
 }
 
 export const GoogleBusinessProfileMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2AuthorizationCodeCapability<
@@ -443,7 +448,7 @@ export const GoogleBusinessProfileMcpOAuth2AuthorizationCodeCapability: Integrat
     }
 
     return resolveGoogleBusinessProfileRefreshResult({
-      response: GoogleBusinessProfileTokenResponseSchema.parse(await response.json()),
+      response: parseGoogleBusinessProfileTokenResponse(await response.json()),
       issuedAt: new Date(),
     });
   },

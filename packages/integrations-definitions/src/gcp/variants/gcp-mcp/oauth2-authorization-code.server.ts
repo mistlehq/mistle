@@ -29,7 +29,7 @@ const GcpTokenResponseSchema = z
   .object({
     access_token: z.string().min(1),
     refresh_token: z.string().min(1).optional(),
-    expires_in: StringOrNumberSchema.optional(),
+    expires_in: StringOrNumberSchema,
     scope: z.string().min(1).optional(),
     token_type: z.string().min(1).optional(),
   })
@@ -51,6 +51,17 @@ const GcpProviderStateSchema = z
 
 type GcpTokenResponse = z.output<typeof GcpTokenResponseSchema>;
 type GcpProviderState = z.output<typeof GcpProviderStateSchema>;
+
+export function parseGcpTokenResponse(input: unknown): GcpTokenResponse {
+  const parsedResponse = GcpTokenResponseSchema.safeParse(input);
+  if (!parsedResponse.success) {
+    throw new Error(
+      "Google OAuth token response did not match the expected shape with required `expires_in`.",
+    );
+  }
+
+  return parsedResponse.data;
+}
 
 type GcpRefreshFailure = {
   classification: IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification;
@@ -194,14 +205,10 @@ export function resolveGcpCompleteGrantResult(input: {
     },
     accessToken: input.response.access_token,
     refreshSchedulingResponse: input.response,
-    ...(input.response.expires_in === undefined
-      ? {}
-      : {
-          accessTokenExpiresAt: resolveGcpAccessTokenExpiresAt({
-            issuedAt: input.issuedAt,
-            expiresIn: input.response.expires_in,
-          }),
-        }),
+    accessTokenExpiresAt: resolveGcpAccessTokenExpiresAt({
+      issuedAt: input.issuedAt,
+      expiresIn: input.response.expires_in,
+    }),
     refreshToken: input.response.refresh_token,
     clientSecret: input.providerState.clientSecret,
     ...(credentialMetadata === undefined ? {} : { credentialMetadata }),
@@ -222,14 +229,10 @@ export function resolveGcpRefreshResult(input: {
   return {
     accessToken: input.response.access_token,
     refreshSchedulingResponse: input.response,
-    ...(input.response.expires_in === undefined
-      ? {}
-      : {
-          accessTokenExpiresAt: resolveGcpAccessTokenExpiresAt({
-            issuedAt: input.issuedAt,
-            expiresIn: input.response.expires_in,
-          }),
-        }),
+    accessTokenExpiresAt: resolveGcpAccessTokenExpiresAt({
+      issuedAt: input.issuedAt,
+      expiresIn: input.response.expires_in,
+    }),
     ...(input.response.refresh_token === undefined
       ? {}
       : { refreshToken: input.response.refresh_token }),
@@ -334,7 +337,7 @@ async function exchangeGcpToken(input: {
     );
   }
 
-  return GcpTokenResponseSchema.parse(await response.json());
+  return parseGcpTokenResponse(await response.json());
 }
 
 export const GcpMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2AuthorizationCodeCapability<
@@ -427,7 +430,7 @@ export const GcpMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Authoriza
     }
 
     return resolveGcpRefreshResult({
-      response: GcpTokenResponseSchema.parse(await response.json()),
+      response: parseGcpTokenResponse(await response.json()),
       issuedAt: new Date(),
     });
   },

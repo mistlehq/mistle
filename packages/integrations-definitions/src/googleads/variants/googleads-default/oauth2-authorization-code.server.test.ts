@@ -11,6 +11,7 @@ import {
   classifyGoogleAdsRefreshFailure,
   createGoogleAdsRefreshTransportFailure,
   GoogleAdsOAuth2AuthorizationCodeCapability,
+  parseGoogleAdsTokenResponse,
   resolveGoogleAdsAccessTokenExpiresAt,
   resolveGoogleAdsAuthorizationCodeOrThrow,
   resolveGoogleAdsCompleteGrantResult,
@@ -277,6 +278,17 @@ describe("Google Ads OAuth authorization code support", () => {
       refreshToken: "refresh_123",
       clientSecret: "google_secret_456",
     });
+  });
+
+  it("rejects token responses without Google access token expiry", () => {
+    expect(() =>
+      parseGoogleAdsTokenResponse({
+        access_token: "access_123",
+        refresh_token: "refresh_123",
+      }),
+    ).toThrow(
+      "Google Ads OAuth token response did not match the expected shape with required `expires_in`.",
+    );
   });
 
   it("rejects non-positive token expiry values", () => {

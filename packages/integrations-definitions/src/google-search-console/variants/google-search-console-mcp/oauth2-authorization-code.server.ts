@@ -29,7 +29,7 @@ const GoogleSearchConsoleTokenResponseSchema = z
   .object({
     access_token: z.string().min(1),
     refresh_token: z.string().min(1).optional(),
-    expires_in: StringOrNumberSchema.optional(),
+    expires_in: StringOrNumberSchema,
     scope: z.string().min(1).optional(),
     token_type: z.string().min(1).optional(),
   })
@@ -51,6 +51,19 @@ const GoogleSearchConsoleProviderStateSchema = z
 
 type GoogleSearchConsoleTokenResponse = z.output<typeof GoogleSearchConsoleTokenResponseSchema>;
 type GoogleSearchConsoleProviderState = z.output<typeof GoogleSearchConsoleProviderStateSchema>;
+
+export function parseGoogleSearchConsoleTokenResponse(
+  input: unknown,
+): GoogleSearchConsoleTokenResponse {
+  const parsedResponse = GoogleSearchConsoleTokenResponseSchema.safeParse(input);
+  if (!parsedResponse.success) {
+    throw new Error(
+      "Google Search Console OAuth token response did not match the expected shape with required `expires_in`.",
+    );
+  }
+
+  return parsedResponse.data;
+}
 
 type GoogleSearchConsoleRefreshFailure = {
   classification: IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification;
@@ -196,14 +209,10 @@ export function resolveGoogleSearchConsoleCompleteGrantResult(input: {
     },
     accessToken: input.response.access_token,
     refreshSchedulingResponse: input.response,
-    ...(input.response.expires_in === undefined
-      ? {}
-      : {
-          accessTokenExpiresAt: resolveGoogleSearchConsoleAccessTokenExpiresAt({
-            issuedAt: input.issuedAt,
-            expiresIn: input.response.expires_in,
-          }),
-        }),
+    accessTokenExpiresAt: resolveGoogleSearchConsoleAccessTokenExpiresAt({
+      issuedAt: input.issuedAt,
+      expiresIn: input.response.expires_in,
+    }),
     refreshToken: input.response.refresh_token,
     clientSecret: input.providerState.clientSecret,
     ...(credentialMetadata === undefined ? {} : { credentialMetadata }),
@@ -224,14 +233,10 @@ export function resolveGoogleSearchConsoleRefreshResult(input: {
   return {
     accessToken: input.response.access_token,
     refreshSchedulingResponse: input.response,
-    ...(input.response.expires_in === undefined
-      ? {}
-      : {
-          accessTokenExpiresAt: resolveGoogleSearchConsoleAccessTokenExpiresAt({
-            issuedAt: input.issuedAt,
-            expiresIn: input.response.expires_in,
-          }),
-        }),
+    accessTokenExpiresAt: resolveGoogleSearchConsoleAccessTokenExpiresAt({
+      issuedAt: input.issuedAt,
+      expiresIn: input.response.expires_in,
+    }),
     ...(input.response.refresh_token === undefined
       ? {}
       : { refreshToken: input.response.refresh_token }),
@@ -344,7 +349,7 @@ async function exchangeGoogleSearchConsoleToken(input: {
     );
   }
 
-  return GoogleSearchConsoleTokenResponseSchema.parse(await response.json());
+  return parseGoogleSearchConsoleTokenResponse(await response.json());
 }
 
 export const GoogleSearchConsoleMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2AuthorizationCodeCapability<
@@ -441,7 +446,7 @@ export const GoogleSearchConsoleMcpOAuth2AuthorizationCodeCapability: Integratio
     }
 
     return resolveGoogleSearchConsoleRefreshResult({
-      response: GoogleSearchConsoleTokenResponseSchema.parse(await response.json()),
+      response: parseGoogleSearchConsoleTokenResponse(await response.json()),
       issuedAt: new Date(),
     });
   },

@@ -9,6 +9,7 @@ import {
   classifyGcpRefreshFailure,
   GcpMcpAuthorizationRevocationCapability,
   GcpMcpOAuth2AuthorizationCodeCapability,
+  parseGcpTokenResponse,
   resolveGcpCompleteGrantResult,
   resolveGcpRefreshResult,
   revokeGcpOAuthToken,
@@ -164,6 +165,17 @@ describe("GCP OAuth authorization code helpers", () => {
       }),
     ).toThrow(
       "Google OAuth authorization did not return a refresh token. Reconnect the integration and approve offline access.",
+    );
+  });
+
+  it("rejects token responses without Google access token expiry", () => {
+    expect(() =>
+      parseGcpTokenResponse({
+        access_token: "access_123",
+        refresh_token: "refresh_123",
+      }),
+    ).toThrow(
+      "Google OAuth token response did not match the expected shape with required `expires_in`.",
     );
   });
 
