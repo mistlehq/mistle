@@ -73,6 +73,7 @@ export type WebhookTriggerConversationKeyOption = {
 export type WebhookTriggerPayloadReference = {
   path: string[];
   description: string;
+  allowsDescendants?: boolean;
 };
 
 export type WebhookTriggerEventActorResourceReference = {

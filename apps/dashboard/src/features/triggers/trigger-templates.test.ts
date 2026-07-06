@@ -46,7 +46,7 @@ describe("trigger templates", () => {
     });
     expect(template.inputTemplate).toContain("{{payload.repository.full_name}}");
     expect(template.inputTemplate).toContain("{{webhookEvent.eventType}}");
-    expect(template.inputTemplate).toContain("{% if payload.pull_request %}");
+    expect(template.inputTemplate).toContain("{% if payload.pull_request.number %}");
     expect(template.inputTemplate).toContain("Pull request opened:");
     expect(template.inputTemplate).toContain("{{payload.pull_request.number}}");
     expect(template.inputTemplate).toContain("{{payload.pull_request.base.ref}}");

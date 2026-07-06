@@ -32,6 +32,7 @@ export async function duplicateTriggerWebhook(
     instructions: sourceTrigger.instructions,
     conversationKeyTemplate: sourceTrigger.conversationKeyTemplate,
     idempotencyKeyTemplate: sourceTrigger.idempotencyKeyTemplate,
+    validateInputTemplateReferences: false,
     target: {
       sandboxProfileId: sourceTrigger.target.sandboxProfileId,
       sandboxProfileVersion: sourceTrigger.target.sandboxProfileVersion,

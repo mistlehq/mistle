@@ -4,6 +4,7 @@
 
 import { TriggerKinds, type WebhookTriggerActorPolicy } from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
+import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { TriggerWebhookSchema } from "../src/trigger-webhooks/schemas.js";
@@ -186,6 +187,59 @@ describe.concurrent("trigger webhooks create integration", () => {
     expect(body.target.sandboxProfileId).toBe("sbp_trigger_webhook_duplicate");
     expect(body.target.sandboxProfileVersion).toBe(3);
     expect(body.target.primaryRepositoryId).toBe("mistlehq/platform");
+  });
+
+  it("duplicates a historical webhook trigger with undeclared input template payload references", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-trigger-webhooks-duplicate-legacy-invalid-template@example.com",
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_trigger_webhook_duplicate_legacy_invalid_template",
+      webhookSourceId: "iws_trigger_webhook_duplicate_legacy_invalid_template",
+      profileId: "sbp_trigger_webhook_duplicate_legacy_invalid_template",
+      profileVersion: 3,
+    });
+    await seedPersistedWebhookTrigger(env, {
+      triggerId: "trg_trigger_webhook_duplicate_legacy_invalid_template",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_trigger_webhook_duplicate_legacy_invalid_template",
+      profileId: "sbp_trigger_webhook_duplicate_legacy_invalid_template",
+      profileVersion: 3,
+      targetId: "tgt_trigger_webhook_duplicate_legacy_invalid_template",
+      name: "Legacy invalid template",
+    });
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.webhookTriggers)
+      .set({
+        inputTemplate: "Handle {{payload.comment.missing_field}}",
+      })
+      .where(
+        eq(
+          env.controlPlaneTables.webhookTriggers.triggerId,
+          "trg_trigger_webhook_duplicate_legacy_invalid_template",
+        ),
+      );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/triggers/webhooks/trg_trigger_webhook_duplicate_legacy_invalid_template/duplicate",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const body = TriggerWebhookSchema.parse(await response.json());
+    expect(body.id).not.toBe("trg_trigger_webhook_duplicate_legacy_invalid_template");
+    expect(body.name).toBe("Legacy invalid template copy");
+    expect(body.enabled).toBe(false);
+    expect(body.inputTemplate).toBe("Handle {{payload.comment.missing_field}}");
   });
 
   it("uses the active sandbox profile version when the request omits a target version", async ({

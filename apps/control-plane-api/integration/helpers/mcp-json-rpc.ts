@@ -7,6 +7,16 @@ const JsonRpcToolResponseSchema = z
     id: z.union([z.string(), z.number()]),
     result: z
       .object({
+        content: z
+          .array(
+            z
+              .object({
+                type: z.string().min(1),
+                text: z.string().optional(),
+              })
+              .loose(),
+          )
+          .optional(),
         structuredContent: z.unknown().optional(),
         isError: z.boolean().optional(),
       })

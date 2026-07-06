@@ -12,6 +12,7 @@ import { resolveSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-p
 import { assertWebhookSourceReferenceOrThrow } from "./assert-webhook-source-reference-or-throw.js";
 import { assertWebhookTriggerRequirementsOrThrow } from "./assert-webhook-trigger-requirements-or-throw.js";
 import { loadWebhookTriggerAggregateOrThrow } from "./load-webhook-trigger-aggregate-or-throw.js";
+import { assertWebhookTriggerInputTemplateReferencesOrThrow } from "./validate-webhook-trigger-input-template.js";
 import {
   normalizeWebhookTriggerEventConditions,
   type NormalizedWebhookTriggerEventCondition,
@@ -33,11 +34,12 @@ export type CreateWebhookTriggerInput = {
     sandboxProfileVersion?: number | undefined;
     primaryRepositoryId?: string | null | undefined;
   };
+  validateInputTemplateReferences?: boolean | undefined;
 };
 
 type CreateWebhookTriggerPersistenceInput = Omit<
   CreateWebhookTriggerInput,
-  "eventConditions" | "target"
+  "eventConditions" | "target" | "validateInputTemplateReferences"
 > & {
   eventConditions: NormalizedWebhookTriggerEventCondition[];
   target: {
@@ -69,6 +71,13 @@ export async function createTriggerWebhook(
     providerMetadata: resolvedWebhookSource.providerMetadata,
     supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
   });
+  if (input.validateInputTemplateReferences !== false) {
+    assertWebhookTriggerInputTemplateReferencesOrThrow({
+      inputTemplate: input.inputTemplate,
+      eventTypes,
+      supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
+    });
+  }
   await assertSandboxProfileReferenceOrThrow(
     { db: ctx.db },
     {

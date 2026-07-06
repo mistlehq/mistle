@@ -108,7 +108,7 @@ export const TriggerTemplates = [
       "Event type: {{webhookEvent.eventType}}",
       "Author: {{payload.sender.login}}",
       "",
-      "{% if payload.pull_request %}",
+      "{% if payload.pull_request.number %}",
       "Pull request opened:",
       "PR #{{payload.pull_request.number}}",
       "Base branch: {{payload.pull_request.base.ref}}",

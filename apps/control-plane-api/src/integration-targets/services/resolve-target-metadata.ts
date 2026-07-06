@@ -123,6 +123,7 @@ type ResolvedWebhookEvent = {
   payloadReferences?: {
     path: string[];
     description: string;
+    allowsDescendants?: boolean | undefined;
   }[];
   conversationKeyOptions?: {
     id: string;
@@ -849,6 +850,9 @@ function cloneWebhookEvents(
           payloadReferences: eventDefinition.payloadReferences.map((payloadReference) => ({
             path: [...payloadReference.path],
             description: payloadReference.description,
+            ...(payloadReference.allowsDescendants === undefined
+              ? {}
+              : { allowsDescendants: payloadReference.allowsDescendants }),
           })),
         }),
     ...(eventDefinition.conversationKeyOptions === undefined

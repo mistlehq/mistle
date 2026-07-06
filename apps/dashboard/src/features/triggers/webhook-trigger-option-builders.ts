@@ -129,6 +129,9 @@ export function createWebhookTriggerEventOption(input: {
           payloadReferences: input.eventDefinition.payloadReferences.map((payloadReference) => ({
             path: [...payloadReference.path],
             description: payloadReference.description,
+            ...(payloadReference.allowsDescendants === undefined
+              ? {}
+              : { allowsDescendants: payloadReference.allowsDescendants }),
           })),
         }),
     ...(input.eventDefinition.conversationKeyOptions === undefined

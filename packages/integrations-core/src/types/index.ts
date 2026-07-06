@@ -2648,6 +2648,7 @@ export type IntegrationWebhookEventParameterOptionDefinition = {
 export type IntegrationWebhookPayloadReference = {
   path: ReadonlyArray<string>;
   description: string;
+  allowsDescendants?: boolean | undefined;
 };
 
 /**

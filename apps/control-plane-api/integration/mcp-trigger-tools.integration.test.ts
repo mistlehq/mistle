@@ -660,6 +660,65 @@ describe.concurrent("MCP trigger tools integration", () => {
     });
   });
 
+  it("returns a tool error when webhook trigger creation references undeclared payload fields", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-trigger-webhook-create-invalid-payload@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP webhook trigger invalid payload creator",
+      permissions: [OrganizationPermissions.TRIGGER_WEBHOOK_CREATE],
+    });
+
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_mcp_trigger_webhook_create_invalid_payload",
+      webhookSourceId: "iws_mcp_trigger_webhook_create_invalid_payload",
+      profileId: "sbp_mcp_trigger_webhook_create_invalid_payload",
+      profileVersion: 1,
+      profileActiveVersion: 1,
+    });
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "create_trigger",
+      arguments: {
+        kind: TriggerKinds.WEBHOOK,
+        name: "MCP invalid payload webhook trigger",
+        enabled: true,
+        integrationWebhookSourceId: "iws_mcp_trigger_webhook_create_invalid_payload",
+        eventConditions: [
+          {
+            eventType: GitHubIssueCommentCreatedEventType,
+          },
+        ],
+        inputTemplate: "Triage {{payload.comment.missing_field}}",
+        conversationKeyTemplate: "{{payload.issue.node_id}}",
+        target: {
+          sandboxProfileId: "sbp_mcp_trigger_webhook_create_invalid_payload",
+        },
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content?.[0]?.text).toContain(
+      "Invalid inputTemplate payload reference: payload.comment.missing_field is not declared by any selected trigger event.",
+    );
+
+    const persistedTrigger = await env.controlPlaneDb.query.triggers.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (table, { eq }) => eq(table.name, "MCP invalid payload webhook trigger"),
+    });
+    expect(persistedTrigger).toBeUndefined();
+  });
+
   it("updates shared webhook trigger fields with generic trigger update permission", async ({
     env,
   }) => {

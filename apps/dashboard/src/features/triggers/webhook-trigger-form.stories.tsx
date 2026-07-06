@@ -663,6 +663,19 @@ export const ValidationErrors: Story = {
   },
 };
 
+export const PayloadReferenceSaveError: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    formError:
+      "Invalid inputTemplate payload reference: payload.comment.missing_field is not declared by any selected trigger event.",
+    values: {
+      ...ExistingIssueCommentActorAllowlistValues,
+      inputTemplate: "Handle {{payload.comment.missing_field}}",
+    },
+  },
+};
+
 export const NoConnectedIntegrations: Story = {
   args: {
     mode: "create",

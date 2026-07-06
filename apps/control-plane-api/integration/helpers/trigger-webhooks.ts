@@ -22,17 +22,36 @@ export const OpenAiTriggerTargetKey = "openai-default-trigger-webhooks";
 
 const TestCreatedAt = "2026-02-01T00:00:00.000Z";
 export const GitHubIssueCommentCreatedEventType = "github.issue_comment.created";
-const GitHubWebhookSourceProviderMetadata = {
-  // Mirrors the GitHub App manifest metadata shape produced by production provider-app setup.
-  // See packages/integrations-definitions/src/github/shared/app-manifest.ts.
-  [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
-    events: ["issue_comment"],
-    permissions: [
-      { permission: "issues", access: "write" },
-      { permission: "issues", access: "read" },
-    ],
-  },
-};
+export const GitHubPullRequestOpenedEventType = "github.pull_request.opened";
+
+function createGitHubWebhookSourceProviderMetadata(input: {
+  providerEvents?: string[] | undefined;
+}) {
+  const providerEvents = input.providerEvents ?? ["issue_comment"];
+  const permissions = [
+    { permission: "issues", access: "write" },
+    { permission: "issues", access: "read" },
+  ];
+  if (providerEvents.includes("pull_request")) {
+    permissions.push({ permission: "pull_requests", access: "read" });
+  }
+
+  return {
+    // Mirrors the GitHub App manifest metadata shape produced by production provider-app setup.
+    // See packages/integrations-definitions/src/github/shared/app-manifest.ts.
+    [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+      events: providerEvents,
+      permissions,
+    },
+  };
+}
+
+const GitHubWebhookSourceProviderMetadata = createGitHubWebhookSourceProviderMetadata({});
+
+export const GitHubIssueAndPullRequestWebhookSourceProviderMetadata =
+  createGitHubWebhookSourceProviderMetadata({
+    providerEvents: ["issue_comment", "pull_request"],
+  });
 
 export async function seedTriggerWebhookTargets(env: IntegrationTestEnvironment): Promise<void> {
   await seedIntegrationTarget(env, {
@@ -64,6 +83,7 @@ export async function seedWebhookTriggerFixture(
     profileActiveVersion?: number | null;
     targetKey?: string;
     bindingRepositories?: string[];
+    providerMetadata?: Record<string, unknown> | undefined;
   },
 ): Promise<void> {
   const targetKey = input.targetKey ?? GitHubTriggerTargetKey;
@@ -86,7 +106,8 @@ export async function seedWebhookTriggerFixture(
     endpointKey: `ep_${input.webhookSourceId}`,
     status: IntegrationWebhookSourceStatuses.ACTIVE,
     providerMetadata:
-      targetKey === GitHubTriggerTargetKey ? GitHubWebhookSourceProviderMetadata : {},
+      input.providerMetadata ??
+      (targetKey === GitHubTriggerTargetKey ? GitHubWebhookSourceProviderMetadata : {}),
     createdAt: TestCreatedAt,
     updatedAt: TestCreatedAt,
   });

@@ -49,6 +49,13 @@ describe("IntegrationTargetSchema", () => {
           eventType: "slack.app_mention",
           providerEventType: "app_mention",
           displayName: "App mention",
+          payloadReferences: [
+            {
+              path: ["event"],
+              description: "Raw Slack event payload",
+              allowsDescendants: true,
+            },
+          ],
           actor: {
             resourceReferences: [
               {
@@ -68,6 +75,11 @@ describe("IntegrationTargetSchema", () => {
       },
     });
 
+    expect(parsed.supportedWebhookEvents?.[0]?.payloadReferences?.[0]).toEqual({
+      path: ["event"],
+      description: "Raw Slack event payload",
+      allowsDescendants: true,
+    });
     expect(parsed.supportedWebhookEvents?.[0]?.actor?.resourceReferences[0]).toEqual({
       resourceKind: "user",
       externalIdPayloadPath: ["event", "user"],

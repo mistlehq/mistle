@@ -12,6 +12,7 @@ import { resolveSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-p
 import { assertWebhookSourceReferenceOrThrow } from "./assert-webhook-source-reference-or-throw.js";
 import { assertWebhookTriggerRequirementsOrThrow } from "./assert-webhook-trigger-requirements-or-throw.js";
 import { loadWebhookTriggerAggregateOrThrow } from "./load-webhook-trigger-aggregate-or-throw.js";
+import { assertWebhookTriggerInputTemplateReferencesOrThrow } from "./validate-webhook-trigger-input-template.js";
 import {
   normalizeWebhookTriggerEventConditions,
   type NormalizedWebhookTriggerEventCondition,
@@ -89,6 +90,13 @@ export async function updateTriggerWebhook(
     providerMetadata: resolvedWebhookSource.providerMetadata,
     supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
   });
+  if (shouldValidateInputTemplateReferences(input)) {
+    assertWebhookTriggerInputTemplateReferencesOrThrow({
+      inputTemplate: input.inputTemplate ?? existingTrigger.inputTemplate,
+      eventTypes,
+      supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
+    });
+  }
   await assertSandboxProfileReferenceOrThrow(
     { db: ctx.db },
     {
@@ -140,6 +148,14 @@ export async function updateTriggerWebhook(
       },
     );
   });
+}
+
+function shouldValidateInputTemplateReferences(input: UpdateWebhookTriggerInput): boolean {
+  return (
+    input.inputTemplate !== undefined ||
+    input.eventConditions !== undefined ||
+    input.integrationWebhookSourceId !== undefined
+  );
 }
 
 async function updateTriggerBaseRow(

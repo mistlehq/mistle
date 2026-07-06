@@ -11,7 +11,9 @@ import { CreateTriggerWebhookBadRequestResponseSchema } from "../src/trigger-web
 import { UpdateTriggerWebhookBadRequestResponseSchema } from "../src/trigger-webhooks/update-trigger-webhook/index.js";
 import {
   createWebhookTriggerRequestBody,
+  GitHubIssueAndPullRequestWebhookSourceProviderMetadata,
   GitHubIssueCommentCreatedEventType,
+  GitHubPullRequestOpenedEventType,
   OpenAiTriggerTargetKey,
   seedTriggerWebhookTargets,
   seedPersistedWebhookTrigger,
@@ -223,6 +225,160 @@ describe.concurrent("trigger webhooks validation integration", () => {
     expect(body.code).toBe("VALIDATION_ERROR");
   });
 
+  it("rejects input template payload references that selected events do not declare on create", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-trigger-webhooks-invalid-template-create@example.com",
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_trigger_webhook_invalid_template_create",
+      webhookSourceId: "iws_trigger_webhook_invalid_template_create",
+      profileId: "sbp_trigger_webhook_invalid_template_create",
+      profileVersion: 1,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/triggers/webhooks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        ...createWebhookTriggerRequestBody({
+          name: "Invalid input template",
+          integrationWebhookSourceId: "iws_trigger_webhook_invalid_template_create",
+          sandboxProfileId: "sbp_trigger_webhook_invalid_template_create",
+          sandboxProfileVersion: 1,
+        }),
+        inputTemplate: "Handle {{payload.comment.missing_field}}",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const body = CreateTriggerWebhookBadRequestResponseSchema.parse(await response.json());
+    expect(body.code).toBe("VALIDATION_ERROR");
+    expect(body.message).toContain("payload.comment.missing_field");
+  });
+
+  it("allows root payload and ignores Mistle-owned webhook event references on create", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-trigger-webhooks-root-payload-template@example.com",
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_trigger_webhook_root_payload_template",
+      webhookSourceId: "iws_trigger_webhook_root_payload_template",
+      profileId: "sbp_trigger_webhook_root_payload_template",
+      profileVersion: 1,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/triggers/webhooks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        ...createWebhookTriggerRequestBody({
+          name: "Root payload template",
+          integrationWebhookSourceId: "iws_trigger_webhook_root_payload_template",
+          sandboxProfileId: "sbp_trigger_webhook_root_payload_template",
+          sandboxProfileVersion: 1,
+        }),
+        inputTemplate: "Payload {{payload}} delivery {{webhookEvent.externalDeliveryID}}",
+      }),
+    });
+
+    expect(response.status).toBe(201);
+  });
+
+  it("allows input template payload references declared by any selected event on create", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-trigger-webhooks-any-selected-template@example.com",
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_trigger_webhook_any_selected_template",
+      webhookSourceId: "iws_trigger_webhook_any_selected_template",
+      profileId: "sbp_trigger_webhook_any_selected_template",
+      profileVersion: 1,
+      providerMetadata: GitHubIssueAndPullRequestWebhookSourceProviderMetadata,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/triggers/webhooks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        ...createWebhookTriggerRequestBody({
+          name: "Any selected event input template",
+          integrationWebhookSourceId: "iws_trigger_webhook_any_selected_template",
+          sandboxProfileId: "sbp_trigger_webhook_any_selected_template",
+          sandboxProfileVersion: 1,
+        }),
+        eventConditions: [
+          {
+            eventType: GitHubIssueCommentCreatedEventType,
+          },
+          {
+            eventType: GitHubPullRequestOpenedEventType,
+          },
+        ],
+        inputTemplate:
+          "{% if payload.pull_request.number %}Pull request {{payload.pull_request.number}} from {{payload.pull_request.head.ref}} into {{payload.pull_request.base.ref}}{% endif %}\nIssue {{payload.comment.body}}",
+      }),
+    });
+
+    expect(response.status).toBe(201);
+  });
+
+  it("rejects invalid Liquid syntax in input templates on create", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-trigger-webhooks-invalid-template-syntax-create@example.com",
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_trigger_webhook_invalid_template_syntax_create",
+      webhookSourceId: "iws_trigger_webhook_invalid_template_syntax_create",
+      profileId: "sbp_trigger_webhook_invalid_template_syntax_create",
+      profileVersion: 1,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/triggers/webhooks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        ...createWebhookTriggerRequestBody({
+          name: "Invalid input template syntax",
+          integrationWebhookSourceId: "iws_trigger_webhook_invalid_template_syntax_create",
+          sandboxProfileId: "sbp_trigger_webhook_invalid_template_syntax_create",
+          sandboxProfileVersion: 1,
+        }),
+        inputTemplate: "Handle {{payload.comment.body",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const body = CreateTriggerWebhookBadRequestResponseSchema.parse(await response.json());
+    expect(body.code).toBe("VALIDATION_ERROR");
+    expect(body.message).toContain("Invalid inputTemplate Liquid syntax");
+  });
+
   it("rejects actor attribute policies on create", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-trigger-webhooks-actor-attribute-create@example.com",
@@ -321,6 +477,109 @@ describe.concurrent("trigger webhooks validation integration", () => {
     const body = UpdateTriggerWebhookBadRequestResponseSchema.parse(await response.json());
     expect(body.code).toBe("VALIDATION_ERROR");
     expect(body.message).toContain("Invalid eventConditions payloadFilter");
+  });
+
+  it("rejects input template payload references that selected events do not declare on update", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-trigger-webhooks-invalid-template-update@example.com",
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_trigger_webhook_invalid_template_update",
+      webhookSourceId: "iws_trigger_webhook_invalid_template_update",
+      profileId: "sbp_trigger_webhook_invalid_template_update",
+      profileVersion: 2,
+    });
+    await seedPersistedWebhookTrigger(env, {
+      triggerId: "atm_trigger_webhook_invalid_template_update",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_trigger_webhook_invalid_template_update",
+      profileId: "sbp_trigger_webhook_invalid_template_update",
+      profileVersion: 2,
+      targetId: "atg_trigger_webhook_invalid_template_update",
+      name: "Needs valid input template update",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/triggers/webhooks/atm_trigger_webhook_invalid_template_update",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          inputTemplate: "Handle {{payload.comment.missing_field}}",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const body = UpdateTriggerWebhookBadRequestResponseSchema.parse(await response.json());
+    expect(body.code).toBe("VALIDATION_ERROR");
+    expect(body.message).toContain("payload.comment.missing_field");
+  });
+
+  it("allows unrelated updates when an existing input template has undeclared payload references", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-trigger-webhooks-legacy-invalid-template-update@example.com",
+    });
+    await seedTriggerWebhookTargets(env);
+    await seedWebhookTriggerFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_trigger_webhook_legacy_invalid_template_update",
+      webhookSourceId: "iws_trigger_webhook_legacy_invalid_template_update",
+      profileId: "sbp_trigger_webhook_legacy_invalid_template_update",
+      profileVersion: 2,
+    });
+    await seedPersistedWebhookTrigger(env, {
+      triggerId: "atm_trigger_webhook_legacy_invalid_template_update",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_trigger_webhook_legacy_invalid_template_update",
+      profileId: "sbp_trigger_webhook_legacy_invalid_template_update",
+      profileVersion: 2,
+      targetId: "atg_trigger_webhook_legacy_invalid_template_update",
+      name: "Legacy invalid input template",
+    });
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.webhookTriggers)
+      .set({
+        inputTemplate: "Handle {{payload.comment.missing_field}}",
+      })
+      .where(
+        eq(
+          env.controlPlaneTables.webhookTriggers.triggerId,
+          "atm_trigger_webhook_legacy_invalid_template_update",
+        ),
+      );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/triggers/webhooks/atm_trigger_webhook_legacy_invalid_template_update",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          name: "Renamed legacy invalid input template",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const persistedTrigger = await env.controlPlaneDb.query.triggers.findFirst({
+      columns: {
+        name: true,
+      },
+      where: (table, { eq }) => eq(table.id, "atm_trigger_webhook_legacy_invalid_template_update"),
+    });
+    expect(persistedTrigger?.name).toBe("Renamed legacy invalid input template");
   });
 
   it("rejects ambiguous actor resource references on update", async ({ env }) => {
