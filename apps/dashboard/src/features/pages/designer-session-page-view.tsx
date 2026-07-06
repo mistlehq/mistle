@@ -2227,6 +2227,7 @@ function analyzeDesignerBlueprintLayoutEdges(input: {
   const returnEdgeIds = new Set<string>();
   const sideReturnEdgeIds = new Set<string>();
   const sideReturnEdges: DesignerBlueprintGraphEdge[] = [];
+  const sideReturnSourceIds = new Set<string>();
 
   for (const edge of input.edges) {
     const sourceItem = itemById.get(edge.source);
@@ -2235,26 +2236,62 @@ function analyzeDesignerBlueprintLayoutEdges(input: {
       continue;
     }
 
-    const targetHasExistingEntry = hasDesignerBlueprintExistingEntry({
-      edge,
-      incomingEdgesByTarget,
-    });
+    if (sourceItem.kind === "routing_policy") {
+      continue;
+    }
+
+    if (
+      hasDesignerBlueprintExistingEntry({
+        edge,
+        incomingEdgesByTarget,
+      }) &&
+      hasDesignerBlueprintPath({
+        edges: input.edges,
+        excludedEdgeId: edge.id,
+        from: edge.target,
+        to: edge.source,
+      }) &&
+      hasDesignerBlueprintIncomingRoutingPolicyEdge({
+        incomingEdgesByTarget,
+        itemById,
+        nodeId: edge.source,
+      })
+    ) {
+      sideReturnSourceIds.add(edge.source);
+    }
+  }
+
+  for (const edge of input.edges) {
+    const sourceItem = itemById.get(edge.source);
+    const targetItem = itemById.get(edge.target);
+    if (sourceItem === undefined || targetItem === undefined) {
+      continue;
+    }
+
     const targetReturnsToSource = hasDesignerBlueprintPath({
       edges: input.edges,
       excludedEdgeId: edge.id,
       from: edge.target,
       to: edge.source,
     });
-    if (!targetHasExistingEntry || !targetReturnsToSource) {
+    if (!targetReturnsToSource) {
       continue;
     }
 
     if (sourceItem.kind === "routing_policy") {
+      if (sideReturnSourceIds.has(edge.target)) {
+        continue;
+      }
+
       returnEdgeIds.add(edge.id);
       continue;
     }
 
     if (
+      hasDesignerBlueprintExistingEntry({
+        edge,
+        incomingEdgesByTarget,
+      }) &&
       hasDesignerBlueprintIncomingRoutingPolicyEdge({
         incomingEdgesByTarget,
         itemById,

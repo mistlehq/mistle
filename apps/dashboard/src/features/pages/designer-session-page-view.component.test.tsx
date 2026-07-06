@@ -1606,6 +1606,92 @@ describe("DesignerCanvasWorkspace", () => {
     expect(changesRequestedEdge?.type).toBe("loopback");
   });
 
+  it("keeps return-to-entry-node routes out of the top-down layout rank", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Retry from intake",
+        outcome: {
+          label: "Retry unresolved intake",
+        },
+        items: [
+          {
+            id: "collect-request",
+            kind: "agent_step",
+            label: "Collect request",
+            state: "proposed",
+          },
+          {
+            id: "classify-request",
+            kind: "agent_step",
+            label: "Classify request",
+            state: "proposed",
+          },
+          {
+            id: "retry-route",
+            kind: "routing_policy",
+            state: "proposed",
+            rules: [
+              {
+                conditionLabel: "Needs intake retry",
+                when: [{ field: "request_state", operator: "equals", value: "needs_retry" }],
+                routeTo: "collect-request",
+              },
+              {
+                conditionLabel: "Ready",
+                when: [{ field: "request_state", operator: "equals", value: "ready" }],
+                routeTo: "finish-request",
+              },
+            ],
+          },
+          {
+            id: "finish-request",
+            kind: "workflow_output",
+            label: "Finish request",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "collect-request",
+            to: "classify-request",
+            kind: "requires",
+          },
+          {
+            from: "classify-request",
+            to: "retry-route",
+            kind: "routes_to",
+          },
+          {
+            from: "retry-route",
+            to: "collect-request",
+            kind: "routes_to",
+          },
+          {
+            from: "retry-route",
+            to: "finish-request",
+            kind: "routes_to",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const collectRequest = getRequiredDesignerBlueprintGraphNode(graph, "collect-request");
+    const classifyRequest = getRequiredDesignerBlueprintGraphNode(graph, "classify-request");
+    const retryRoute = getRequiredDesignerBlueprintGraphNode(graph, "retry-route");
+    const finishRequest = getRequiredDesignerBlueprintGraphNode(graph, "finish-request");
+    const retryEdge = graph.edges.find(
+      (edge) => edge.source === "retry-route" && edge.target === "collect-request",
+    );
+
+    expect(classifyRequest.position.y).toBeGreaterThan(collectRequest.position.y);
+    expect(retryRoute.position.y).toBeGreaterThan(classifyRequest.position.y);
+    expect(finishRequest.position.y).toBeGreaterThan(retryRoute.position.y);
+    expect(retryEdge?.type).toBe("loopback");
+  });
+
   it("places missing-detail side loops beside the workflow step they return to", async () => {
     const graph = await buildDesignerBlueprintGraph({
       blueprint: {
