@@ -2068,9 +2068,6 @@ async function buildDesignerBlueprintLayoutGraph(input: {
   }));
 
   const positionedNodeById = new Map(positionedNodes.map((node) => [node.id, node]));
-  const positionByPositionedNodeId = new Map(
-    positionedNodes.map((node) => [node.id, node.position]),
-  );
   const fanOutCountByNodeId = createDesignerBlueprintFanCountByNodeId({
     edges: input.edges,
     field: "source",
