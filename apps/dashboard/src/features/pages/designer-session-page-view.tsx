@@ -2239,6 +2239,7 @@ function analyzeDesignerBlueprintLayoutEdges(input: {
     }
 
     if (
+      targetItem.kind !== "routing_policy" &&
       hasDesignerBlueprintExistingEntry({
         edge,
         incomingEdgesByTarget,
@@ -2283,11 +2284,16 @@ function analyzeDesignerBlueprintLayoutEdges(input: {
         continue;
       }
 
+      if (sourceIndex === undefined || targetIndex === undefined || sourceIndex <= targetIndex) {
+        continue;
+      }
+
       returnEdgeIds.add(edge.id);
       continue;
     }
 
     if (
+      targetItem.kind !== "routing_policy" &&
       hasDesignerBlueprintExistingEntry({
         edge,
         incomingEdgesByTarget,

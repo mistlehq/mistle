@@ -1756,6 +1756,96 @@ describe("DesignerCanvasWorkspace", () => {
     expect(feedbackEdge?.type).toBe("loopback");
   });
 
+  it("keeps forward routing branches in feedback cycles inside the top-down layout rank", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Retry branch",
+        outcome: {
+          label: "Route retry work",
+        },
+        items: [
+          {
+            id: "work-started",
+            kind: "trigger",
+            state: "proposed",
+            when: [{ label: "Work started" }],
+          },
+          {
+            id: "retry-route",
+            kind: "routing_policy",
+            state: "proposed",
+            rules: [
+              {
+                conditionLabel: "Retry",
+                when: [{ field: "work_state", operator: "equals", value: "retry" }],
+                routeTo: "retry-step",
+              },
+              {
+                conditionLabel: "Done",
+                when: [{ field: "work_state", operator: "equals", value: "done" }],
+                routeTo: "done-output",
+              },
+            ],
+          },
+          {
+            id: "retry-step",
+            kind: "agent_step",
+            label: "Retry work",
+            state: "proposed",
+          },
+          {
+            id: "done-output",
+            kind: "workflow_output",
+            label: "Done",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "work-started",
+            to: "retry-route",
+            kind: "triggers",
+          },
+          {
+            from: "retry-route",
+            to: "retry-step",
+            kind: "routes_to",
+          },
+          {
+            from: "retry-step",
+            to: "retry-route",
+            kind: "requires",
+          },
+          {
+            from: "retry-route",
+            to: "done-output",
+            kind: "routes_to",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const workStarted = getRequiredDesignerBlueprintGraphNode(graph, "work-started");
+    const retryRoute = getRequiredDesignerBlueprintGraphNode(graph, "retry-route");
+    const retryStep = getRequiredDesignerBlueprintGraphNode(graph, "retry-step");
+    const doneOutput = getRequiredDesignerBlueprintGraphNode(graph, "done-output");
+    const routeToRetryEdge = graph.edges.find(
+      (edge) => edge.source === "retry-route" && edge.target === "retry-step",
+    );
+    const retryToRouteEdge = graph.edges.find(
+      (edge) => edge.source === "retry-step" && edge.target === "retry-route",
+    );
+
+    expect(retryRoute.position.y).toBeGreaterThan(workStarted.position.y);
+    expect(retryStep.position.y).toBeGreaterThan(retryRoute.position.y);
+    expect(doneOutput.position.y).toBeGreaterThan(retryRoute.position.y);
+    expect(routeToRetryEdge?.type).toBe("curved");
+    expect(retryToRouteEdge?.type).toBe("loopback");
+  });
+
   it("places missing-detail side loops beside the workflow step they return to", async () => {
     const graph = await buildDesignerBlueprintGraph({
       blueprint: {
