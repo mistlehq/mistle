@@ -787,6 +787,86 @@ fn readiness_failure_flushes_captured_child_output_before_reporting() {
     );
 }
 
+#[test]
+fn runtime_client_process_readiness_checks_run_in_parallel() {
+    let first_port = reserve_test_port();
+    let second_port = reserve_test_port();
+    let process_specs = [
+        delayed_tcp_process_spec("delayed-runtime-a", first_port, 1_500),
+        delayed_tcp_process_spec("delayed-runtime-b", second_port, 1_500),
+    ];
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandbox-123",
+        std::sync::Arc::new(SystemClock),
+        BTreeSet::new(),
+    );
+
+    let started_at = Instant::now();
+    let process_manager = start_runtime_client_process_manager_with_supervisor(
+        &process_specs,
+        &SystemClock,
+        &ThreadSleeper,
+        supervisor_handle,
+    )
+    .expect("process manager should start delayed processes");
+    let elapsed = started_at.elapsed();
+
+    process_manager
+        .stop(&SystemClock, &ThreadSleeper)
+        .expect("process manager stop should succeed for delayed processes");
+
+    assert!(
+        elapsed < Duration::from_millis(2_600),
+        "parallel process readiness should complete near the slowest readiness delay, got {elapsed:?}"
+    );
+}
+
+#[test]
+fn runtime_client_process_readiness_failure_cancels_pending_checks() {
+    let slow_port = reserve_test_port();
+    let failing_port = reserve_test_port();
+    let process_specs = [
+        delayed_tcp_process_spec("slow-runtime", slow_port, 5_000),
+        exiting_before_readiness_process_spec("exiting-runtime", failing_port),
+    ];
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandbox-123",
+        std::sync::Arc::new(SystemClock),
+        BTreeSet::new(),
+    );
+
+    let started_at = Instant::now();
+    let error = start_runtime_client_process_manager_with_supervisor(
+        &process_specs,
+        &SystemClock,
+        &ThreadSleeper,
+        supervisor_handle,
+    )
+    .expect_err("process manager should fail when one process exits before readiness");
+    let elapsed = started_at.elapsed();
+
+    let ProcessManagerError::ReadinessCheck {
+        process_index,
+        process_key,
+        error,
+        ..
+    } = error
+    else {
+        panic!("expected readiness-check failure");
+    };
+
+    assert_eq!(process_index, 1);
+    assert_eq!(process_key, "exiting-runtime");
+    assert!(
+        error.contains("process exited"),
+        "expected process-exit readiness error, got: {error}"
+    );
+    assert!(
+        elapsed < Duration::from_millis(2_000),
+        "failed readiness should cancel pending readiness checks promptly, got {elapsed:?}"
+    );
+}
+
 fn codex_app_server_process_spec(port: u16, mode: &str, delay_ms: u64) -> RuntimeClientProcessSpec {
     let script = r#"
 const net = require('node:net');
@@ -1288,6 +1368,93 @@ fn claude_code_server_process_spec(
         timeout_ms: 5_000,
     };
     process_spec
+}
+
+fn delayed_tcp_process_spec(
+    process_key: &str,
+    port: u16,
+    delay_ms: u64,
+) -> RuntimeClientProcessSpec {
+    let script = r#"
+const net = require('node:net');
+const [portArg, delayArg] = process.argv.slice(1);
+const port = Number(portArg);
+const delayMs = Number(delayArg);
+const keepAlive = setInterval(() => {}, 1000);
+let server = null;
+
+function stop() {
+  if (server === null) {
+    clearInterval(keepAlive);
+    process.exit(0);
+  }
+  server.close(() => {
+    clearInterval(keepAlive);
+    process.exit(0);
+  });
+}
+
+process.on('SIGTERM', stop);
+
+setTimeout(() => {
+  server = net.createServer((socket) => {
+    socket.end();
+  });
+  server.listen(port, '127.0.0.1');
+}, delayMs);
+"#;
+
+    RuntimeClientProcessSpec {
+        process_key: process_key.to_string(),
+        command: RuntimeExecCommand {
+            args: vec![
+                "node".to_string(),
+                "-e".to_string(),
+                script.to_string(),
+                port.to_string(),
+                delay_ms.to_string(),
+            ],
+            env: Some(BTreeMap::new()),
+            cwd: None,
+            timeout_ms: None,
+        },
+        readiness: RuntimeClientProcessReadiness::Tcp {
+            host: "127.0.0.1".to_string(),
+            port,
+            timeout_ms: 5_000,
+        },
+        stop: RuntimeClientProcessStopPolicy {
+            signal: RuntimeClientProcessStopSignal::Sigterm,
+            timeout_ms: 1_000,
+            grace_period_ms: Some(250),
+        },
+    }
+}
+
+fn exiting_before_readiness_process_spec(process_key: &str, port: u16) -> RuntimeClientProcessSpec {
+    RuntimeClientProcessSpec {
+        process_key: process_key.to_string(),
+        command: RuntimeExecCommand {
+            args: vec![
+                "node".to_string(),
+                "-e".to_string(),
+                "process.exit(17);".to_string(),
+            ],
+            env: Some(BTreeMap::new()),
+            cwd: None,
+            timeout_ms: None,
+        },
+        readiness: RuntimeClientProcessReadiness::Tcp {
+            host: "127.0.0.1".to_string(),
+            port,
+            timeout_ms: 5_000,
+        },
+        stop: RuntimeClientProcessStopPolicy {
+            signal: RuntimeClientProcessStopSignal::Sigkill,
+            timeout_ms: 1_000,
+            grace_period_ms: None,
+        },
+    }
 }
 
 fn reserve_test_port() -> u16 {

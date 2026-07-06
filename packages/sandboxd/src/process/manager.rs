@@ -6,8 +6,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
-use std::thread::JoinHandle;
+use std::sync::{Arc, Mutex, mpsc};
+use std::thread::{self, JoinHandle};
 
 use std::path::{Path, PathBuf};
 
@@ -235,7 +235,7 @@ fn start_runtime_client_process_manager_with_supervisor_observer_and_platform_sc
             }
             None => start_runtime_client_process(process_spec),
         };
-        let mut process = match process_start_result {
+        let process = match process_start_result {
             Ok(process) => process,
             Err(error) => {
                 stop_process_monitor_threads(&monitor_shutdown_requested, &mut monitor_threads);
@@ -252,25 +252,37 @@ fn start_runtime_client_process_manager_with_supervisor_observer_and_platform_sc
                 });
             }
         };
+        started_processes.push(process);
+    }
 
-        if let Err(error) = wait_for_runtime_client_process_readiness(&mut process, clock, sleeper)
-        {
-            stop_process_monitor_threads(&monitor_shutdown_requested, &mut monitor_threads);
-            let _ =
-                stop_started_processes_and_platform_scopes(&mut started_processes, clock, sleeper);
-            let _ = stop_runtime_client_process_and_platform_scope(&mut process, clock, sleeper);
-            return Err(ProcessManagerError::ReadinessCheck {
-                process_index,
-                process_key: process_spec.process_key.clone(),
-                error,
-                details: Box::new(ProcessReadinessFailureDetails {
-                    readiness_type: readiness_type(process_spec).to_string(),
-                    readiness_target: readiness_target(process_spec),
-                    timeout_ms: readiness_timeout_ms(process_spec),
-                    output_tails: process.output_capture.collect_tails_after_process_exit(),
-                }),
-            });
-        }
+    if let Some(readiness_failure) =
+        wait_for_started_runtime_client_processes_readiness(&started_processes, clock, sleeper)
+    {
+        stop_process_monitor_threads(&monitor_shutdown_requested, &mut monitor_threads);
+        let process_spec = &started_processes[readiness_failure.process_index].spec;
+        let process_key = process_spec.process_key.clone();
+        let readiness_type = readiness_type(process_spec).to_string();
+        let readiness_target = readiness_target(process_spec);
+        let timeout_ms = readiness_timeout_ms(process_spec);
+        let output_capture = started_processes[readiness_failure.process_index]
+            .output_capture
+            .clone();
+        let _ = stop_started_processes_and_platform_scopes(&mut started_processes, clock, sleeper);
+        return Err(ProcessManagerError::ReadinessCheck {
+            process_index: readiness_failure.process_index,
+            process_key,
+            error: readiness_failure.error,
+            details: Box::new(ProcessReadinessFailureDetails {
+                readiness_type,
+                readiness_target,
+                timeout_ms,
+                output_tails: output_capture.collect_tails_after_process_exit(),
+            }),
+        });
+    }
+
+    for process in &started_processes {
+        let process_spec = &process.spec;
 
         if is_codex_app_server_process(process_spec)
             && supervisor_handle.tracks_component(SupervisedComponent::CodexAppServer)
@@ -376,7 +388,6 @@ fn start_runtime_client_process_manager_with_supervisor_observer_and_platform_sc
         if let Some(observer) = observer {
             observer.record_process_completed(process_spec);
         }
-        started_processes.push(process);
     }
 
     if let Some(control_handle) = codex_app_server_control_handle.clone() {
@@ -395,6 +406,70 @@ fn start_runtime_client_process_manager_with_supervisor_observer_and_platform_sc
         monitor_shutdown_requested,
         monitor_threads,
         supervisor_handle,
+    })
+}
+
+struct ProcessReadinessFailure {
+    process_index: usize,
+    error: String,
+}
+
+fn wait_for_started_runtime_client_processes_readiness(
+    started_processes: &[RunningRuntimeClientProcess],
+    clock: &dyn Clock,
+    sleeper: &dyn Sleeper,
+) -> Option<ProcessReadinessFailure> {
+    let cancellation_requested = Arc::new(AtomicBool::new(false));
+    thread::scope(|scope| {
+        let (readiness_result_sender, readiness_result_receiver) = mpsc::channel();
+        let mut readiness_threads = Vec::with_capacity(started_processes.len());
+        for (process_index, process) in started_processes.iter().enumerate() {
+            let thread_result_sender = readiness_result_sender.clone();
+            let readiness_cancellation_requested = Arc::clone(&cancellation_requested);
+            readiness_threads.push((
+                process_index,
+                scope.spawn(move || {
+                    let readiness_result =
+                        wait_for_runtime_client_process_readiness_with_child_until_cancelled(
+                            &process.spec,
+                            &process.child,
+                            clock,
+                            sleeper,
+                            || readiness_cancellation_requested.load(Ordering::SeqCst),
+                        );
+                    let _ = thread_result_sender.send((process_index, readiness_result));
+                }),
+            ));
+        }
+        drop(readiness_result_sender);
+
+        let mut first_failure = None;
+        for _ in 0..started_processes.len() {
+            let Ok((process_index, readiness_result)) = readiness_result_receiver.recv() else {
+                break;
+            };
+            if first_failure.is_none()
+                && let Err(error) = readiness_result
+            {
+                cancellation_requested.store(true, Ordering::SeqCst);
+                first_failure = Some(ProcessReadinessFailure {
+                    process_index,
+                    error,
+                });
+            }
+        }
+
+        for (process_index, readiness_thread) in readiness_threads {
+            if readiness_thread.join().is_err() && first_failure.is_none() {
+                cancellation_requested.store(true, Ordering::SeqCst);
+                first_failure = Some(ProcessReadinessFailure {
+                    process_index,
+                    error: "readiness worker panicked".to_string(),
+                });
+            }
+        }
+
+        first_failure
     })
 }
 
@@ -514,30 +589,6 @@ fn stop_started_processes_and_platform_scopes(
                 process.spec.process_key
             ));
         }
-    }
-
-    if stop_errors.is_empty() {
-        return Ok(());
-    }
-
-    Err(stop_errors.join("; "))
-}
-
-fn stop_runtime_client_process_and_platform_scope(
-    process: &mut RunningRuntimeClientProcess,
-    clock: &dyn Clock,
-    sleeper: &dyn Sleeper,
-) -> Result<(), String> {
-    let mut stop_errors = Vec::new();
-
-    if let Err(error) = stop_runtime_client_process(process, clock, sleeper) {
-        stop_errors.push(error);
-    }
-    if let Err(error) = kill_runtime_client_process_platform_scope(process) {
-        stop_errors.push(format!(
-            "platform scope processKey={}: {error}",
-            process.spec.process_key
-        ));
     }
 
     if stop_errors.is_empty() {
