@@ -116,6 +116,19 @@ describe("DesignerPageView", () => {
     );
   });
 
+  it("keeps the full-page glow layer from intercepting the shell sidebar trigger", () => {
+    const { container } = render(<ControlledDesignerPageView />);
+
+    const glowLayer = container.querySelector('[aria-hidden="true"]');
+    if (!(glowLayer instanceof HTMLElement)) {
+      throw new Error("Expected Designer page glow layer.");
+    }
+
+    expect(glowLayer.className).toContain("pointer-events-none");
+    expect(glowLayer.className).toContain("absolute");
+    expect(glowLayer.className).toContain("inset-0");
+  });
+
   it("fills the composer from a starter prompt without starting the session", () => {
     render(<ControlledDesignerPageView />);
 

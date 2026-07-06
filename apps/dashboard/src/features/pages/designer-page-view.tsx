@@ -51,7 +51,7 @@ const DesignerPageGlowAccent = "oklch(0.82 0.12 62)";
 const DesignerPageGlowMutedAccent = "oklch(0.9 0.045 62)";
 const DesignerPageGlowRootClassName = "relative overflow-hidden bg-background";
 const DesignerPageGlowClassName =
-  "pointer-events-none absolute inset-x-0 top-0 h-[24rem] bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--designer-page-glow-accent)_28%,transparent),color-mix(in_oklch,var(--designer-page-glow-muted-accent)_12%,transparent)_36%,transparent_66%)]";
+  "absolute inset-x-0 top-0 h-[24rem] bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--designer-page-glow-accent)_28%,transparent),color-mix(in_oklch,var(--designer-page-glow-muted-accent)_12%,transparent)_36%,transparent_66%)]";
 const DesignerPageGlowStyle: React.CSSProperties & {
   "--designer-page-glow-accent": string;
   "--designer-page-glow-muted-accent": string;
@@ -443,7 +443,11 @@ export function DesignerPageView(input: DesignerPageViewProps): React.JSX.Elemen
 
   return (
     <PageFrame className={DesignerPageGlowRootClassName} width="normal">
-      <div aria-hidden="true" className="absolute inset-0" style={DesignerPageGlowStyle}>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={DesignerPageGlowStyle}
+      >
         <div className={DesignerPageGlowClassName} />
       </div>
       <div className="relative z-10 grid gap-6">
