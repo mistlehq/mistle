@@ -102,14 +102,12 @@ describe.concurrent("MCP OAuth discovery", () => {
       code_challenge_methods_supported: ["S256"],
       token_endpoint_auth_methods_supported: ["none"],
       scopes_supported: [
-        "organization:read",
         "sandboxProfile:delete",
         "sandboxProfile:read",
         "sandboxProfile:update",
         "sandboxSession:connect",
         "sandboxSession:create",
         "sandboxSession:read",
-        "sandboxSession:resume",
       ],
     });
   });

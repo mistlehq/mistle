@@ -258,7 +258,7 @@ describe.concurrent("OAuth dynamic client registration", () => {
     expect(await response.json()).toMatchObject({
       registration_endpoint: `${env.controlPlaneApi.hostBaseUrl}/oauth/register`,
       token_endpoint_auth_methods_supported: ["none"],
-      scopes_supported: ["organization:read", ...McpOAuthScopes, "sandboxSession:resume"].sort(),
+      scopes_supported: [...McpOAuthScopes].sort(),
     });
   });
 });
