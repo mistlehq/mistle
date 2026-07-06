@@ -1,11 +1,8 @@
 import { OAuthGrantTypes } from "@mistle/db/control-plane";
 
-import { MistleCliOAuthClient } from "../clients.js";
 import { McpOAuthScopes } from "./protected-resource.js";
 
-export const OAuthAuthorizationServerScopesSupported = [
-  ...new Set([...MistleCliOAuthClient.scopes, ...McpOAuthScopes]),
-].sort();
+export const OAuthAuthorizationServerScopesSupported = [...McpOAuthScopes].sort();
 
 export type OAuthAuthorizationServerMetadata = {
   issuer: string;
