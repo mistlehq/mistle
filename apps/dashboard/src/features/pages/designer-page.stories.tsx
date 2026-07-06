@@ -2,7 +2,7 @@ import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 import { Button } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { MemoryRouter } from "react-router";
 
@@ -12,7 +12,6 @@ import { noopRespondToServerRequest } from "../chat/components/chat-story-suppor
 import {
   DesignerBlueprintCurrentTabHref,
   DesignerBlueprintCurrentTabId,
-  type DesignerBlueprintDocument,
 } from "../designer/designer-blueprint-schema.js";
 import type { DesignerSession, DesignerSessionListItem } from "../designer/designer-service.js";
 import type {
@@ -32,6 +31,7 @@ import {
   DesignerBlueprintPendingCommentEditor,
   DesignerCanvasWorkspace,
 } from "./designer-session-page-view.js";
+import { DesignerStoryRuntime } from "./designer-story-runtime.story-fixtures.js";
 import { createStoryConnectionMethods } from "./organization-integrations-settings-page-story-support.js";
 import {
   type PendingSessionBlueprintComment,
@@ -264,162 +264,6 @@ const StoryDesignerSessions: readonly DesignerSession[] = [
   },
 ];
 
-const AiSoftwareFactoryBlueprint = {
-  version: 1,
-  title: "AI Software Factory Draft",
-  outcome: {
-    label: "Issue-to-PR software factory",
-    description:
-      "Move well-defined software work from an issue system into implementation, pull request review, rework, and process improvement with agent assistance.",
-  },
-  items: [
-    {
-      id: "issue-ready",
-      kind: "trigger",
-      state: "proposed",
-      when: [
-        {
-          label: "Readiness signal received",
-        },
-        {
-          label: "Acceptance criteria are present",
-        },
-      ],
-    },
-    {
-      id: "readiness-check",
-      kind: "agent_step",
-      label: "Check readiness and scope",
-      description:
-        "Verify acceptance criteria, affected area, blockers, and repository target before implementation starts.",
-      state: "proposed",
-    },
-    {
-      id: "implement-change",
-      kind: "agent_step",
-      label: "Plan, edit, and test",
-      description:
-        "Create an implementation plan, change the code, and run the relevant checks before producing reviewable work.",
-      state: "proposed",
-    },
-    {
-      id: "pr-output",
-      kind: "workflow_output",
-      label: "Pull request opened or updated",
-      description:
-        "Produce a pull request with implementation notes, test evidence, and issue linkage.",
-      state: "proposed",
-    },
-    {
-      id: "review-step",
-      kind: "agent_step",
-      label: "Review change quality",
-      description:
-        "A separate review agent or human reviewer checks acceptance criteria, regressions, tests, and maintainability.",
-      state: "proposed",
-    },
-    {
-      id: "review-route",
-      kind: "routing_policy",
-      state: "proposed",
-      rules: [
-        {
-          conditionLabel: "Changes requested",
-          when: [
-            {
-              field: "review_outcome",
-              operator: "equals",
-              value: "changes_requested",
-            },
-          ],
-          routeTo: "implement-change",
-        },
-        {
-          conditionLabel: "Accepted",
-          when: [
-            {
-              field: "review_outcome",
-              operator: "equals",
-              value: "accepted",
-            },
-          ],
-          routeTo: "issue-update",
-        },
-        {
-          conditionLabel: "Blocked or unclear",
-          when: [
-            {
-              field: "review_outcome",
-              operator: "equals",
-              value: "blocked",
-            },
-          ],
-          routeTo: "issue-update",
-        },
-      ],
-    },
-    {
-      id: "issue-update",
-      kind: "agent_step",
-      label: "Update issue status",
-      description:
-        "Record PR links, review state, blockers, rework needs, or completion in the issue system.",
-      state: "proposed",
-    },
-    {
-      id: "improvement-output",
-      kind: "workflow_output",
-      label: "Factory improvement notes",
-      description:
-        "Capture repeated blockers, missing issue fields, weak tests, or recurring review feedback for later instruction and process updates.",
-      state: "proposed",
-    },
-  ],
-  links: [
-    {
-      from: "issue-ready",
-      to: "readiness-check",
-      kind: "triggers",
-    },
-    {
-      from: "readiness-check",
-      to: "implement-change",
-      kind: "hands_off_to",
-    },
-    {
-      from: "implement-change",
-      to: "pr-output",
-      kind: "produces",
-    },
-    {
-      from: "pr-output",
-      to: "review-step",
-      kind: "triggers",
-    },
-    {
-      from: "review-step",
-      to: "review-route",
-      kind: "routes_to",
-    },
-    {
-      from: "review-route",
-      to: "implement-change",
-      kind: "routes_to",
-    },
-    {
-      from: "review-route",
-      to: "issue-update",
-      kind: "routes_to",
-    },
-    {
-      from: "issue-update",
-      to: "improvement-output",
-      kind: "produces",
-    },
-  ],
-  actions: [],
-} satisfies DesignerBlueprintDocument;
-
 const StoryDesignerSessionConversationEntries = [
   {
     id: "designer-session-user-1",
@@ -497,25 +341,6 @@ function getStoryDesignerBlueprintCanvasTabs(): readonly StoryDesignerBlueprintC
   return (StoryDesignerSessions[0]?.canvasTabs ?? []).filter(isStoryDesignerBlueprintCanvasTab);
 }
 
-function DesignerCanvasStoryRuntime(input: { children: React.ReactNode }): React.JSX.Element {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            retry: false,
-          },
-        },
-      }),
-  );
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{input.children}</MemoryRouter>
-    </QueryClientProvider>
-  );
-}
-
 function DesignerPageStory(input: {
   createErrorMessage?: string | null;
   initialDraft?: string;
@@ -580,7 +405,7 @@ function DesignerSessionWithCanvasStory(input?: {
   }
 
   return (
-    <DesignerCanvasStoryRuntime>
+    <DesignerStoryRuntime>
       {renderSessionWorkbenchContentStory({
         isSecondaryPanelVisible: true,
         mainContent: (
@@ -626,37 +451,7 @@ function DesignerSessionWithCanvasStory(input?: {
         secondaryPanelMinSize: "35%",
         secondaryPanelDefaultSize: 58,
       })}
-    </DesignerCanvasStoryRuntime>
-  );
-}
-
-function AiSoftwareFactoryBlueprintStory(): React.JSX.Element {
-  return (
-    <DesignerCanvasStoryRuntime>
-      <BlueprintCanvasStoryPanel title="AI software factory blueprint">
-        <DesignerBlueprintCanvasPanel
-          blueprint={AiSoftwareFactoryBlueprint}
-          onAddComment={function onAddComment() {}}
-          onDeleteComment={function onDeleteComment() {}}
-          onUpdateComment={function onUpdateComment() {}}
-          pendingComments={[]}
-        />
-      </BlueprintCanvasStoryPanel>
-    </DesignerCanvasStoryRuntime>
-  );
-}
-
-function BlueprintCanvasStoryPanel(input: {
-  children: React.ReactNode;
-  title: string;
-}): React.JSX.Element {
-  return (
-    <section className="flex h-screen min-h-0 flex-col overflow-hidden bg-background">
-      <div className="flex h-10 flex-none items-center border-b bg-background px-3 text-sm font-medium">
-        {input.title}
-      </div>
-      <div className="min-h-0 flex-1">{input.children}</div>
-    </section>
+    </DesignerStoryRuntime>
   );
 }
 
@@ -691,7 +486,7 @@ function DesignerSessionCanvasFirstOpenStory(): React.JSX.Element {
   }
 
   return (
-    <DesignerCanvasStoryRuntime>
+    <DesignerStoryRuntime>
       <div className="h-screen min-h-0 overflow-hidden">
         <SessionWorkbenchPageView
           alert={null}
@@ -753,7 +548,7 @@ function DesignerSessionCanvasFirstOpenStory(): React.JSX.Element {
           secondaryPanelResizeKey={tabs.length === 0 ? null : "designer-canvas-open"}
         />
       </div>
-    </DesignerCanvasStoryRuntime>
+    </DesignerStoryRuntime>
   );
 }
 
@@ -818,7 +613,7 @@ function BlueprintCommentStateGalleryStory(): React.JSX.Element {
   );
 
   return (
-    <DesignerCanvasStoryRuntime>
+    <DesignerStoryRuntime>
       <div className="min-h-screen bg-muted/20 p-6 text-foreground">
         <div className="grid gap-8 lg:grid-cols-2">
           <BlueprintCommentStatePreview floating={false} title="Collapsed pending comment">
@@ -863,7 +658,7 @@ function BlueprintCommentStateGalleryStory(): React.JSX.Element {
           </BlueprintCommentStatePreview>
         </div>
       </div>
-    </DesignerCanvasStoryRuntime>
+    </DesignerStoryRuntime>
   );
 }
 
@@ -906,8 +701,9 @@ function BlueprintCommentStatePreview(input: {
 }
 
 function DesignerCanvasWorkspaceStory(input: {
-  tabs: readonly DesignerSession["canvasTabs"][number][];
   activeTabHref?: string;
+  queryClient?: QueryClient | undefined;
+  tabs: readonly DesignerSession["canvasTabs"][number][];
 }): React.JSX.Element {
   const [tabs, setTabs] = useState([...input.tabs]);
   const [activeTabHref, setActiveTabHref] = useState<string | null>(
@@ -915,7 +711,7 @@ function DesignerCanvasWorkspaceStory(input: {
   );
 
   return (
-    <DesignerCanvasStoryRuntime>
+    <DesignerStoryRuntime queryClient={input.queryClient}>
       <DesignerCanvasWorkspace
         activeTabHref={activeTabHref}
         designerSessionId="designer_session_canvas_story"
@@ -932,7 +728,7 @@ function DesignerCanvasWorkspaceStory(input: {
         pendingBlueprintComments={[]}
         tabs={tabs}
       />
-    </DesignerCanvasStoryRuntime>
+    </DesignerStoryRuntime>
   );
 }
 
@@ -1048,12 +844,11 @@ function DesignerIntegrationSetupCanvasStory(input: { activeTabHref: string }): 
   const [queryClient] = useState(createDesignerIntegrationSetupStoryQueryClient);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <DesignerCanvasWorkspaceStory
-        activeTabHref={input.activeTabHref}
-        tabs={DesignerIntegrationSetupTabs}
-      />
-    </QueryClientProvider>
+    <DesignerCanvasWorkspaceStory
+      activeTabHref={input.activeTabHref}
+      queryClient={queryClient}
+      tabs={DesignerIntegrationSetupTabs}
+    />
   );
 }
 
@@ -1063,7 +858,7 @@ function DesignerIntegrationSetupCanvasStory(input: { activeTabHref: string }): 
  * not above the composer, and that completed setup remains visible until the user closes the tab.
  */
 const meta = {
-  title: "Dashboard/Home/Page",
+  title: "Dashboard/Designer/Page",
   component: DesignerPageView,
   args: {
     createErrorMessage: null,
@@ -1167,12 +962,6 @@ export const SessionWithCanvasLongComment: Story = {
 export const BlueprintCommentStates: Story = {
   render: function RenderBlueprintCommentStatesStory(): React.JSX.Element {
     return <BlueprintCommentStateGalleryStory />;
-  },
-};
-
-export const AiSoftwareFactoryBlueprintLayout: Story = {
-  render: function RenderAiSoftwareFactoryBlueprintStory(): React.JSX.Element {
-    return <AiSoftwareFactoryBlueprintStory />;
   },
 };
 

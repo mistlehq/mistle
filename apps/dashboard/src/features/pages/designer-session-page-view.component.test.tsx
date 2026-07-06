@@ -545,10 +545,41 @@ function getRequiredDesignerBlueprintGraphNode(
   return node;
 }
 
+function getRequiredDesignerBlueprintGraphEdge(
+  graph: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>,
+  sourceId: string,
+  targetId: string,
+): Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["edges"][number] {
+  const edge = graph.edges.find(
+    (candidate) => candidate.source === sourceId && candidate.target === targetId,
+  );
+  if (edge === undefined) {
+    throw new Error(`Expected Designer blueprint graph edge '${sourceId}' to '${targetId}'.`);
+  }
+
+  return edge;
+}
+
 function getDesignerBlueprintGraphNodeCenterX(
   node: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number],
 ): number {
   return node.position.x + resolveDesignerBlueprintGraphNodeWidth(node) / 2;
+}
+
+function getDesignerBlueprintGraphNodeCenterY(
+  node: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number],
+): number {
+  return node.position.y + resolveDesignerBlueprintGraphNodeHeight(node) / 2;
+}
+
+function resolveDesignerBlueprintGraphNodeHeight(
+  node: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number],
+): number {
+  return resolveDesignerBlueprintProcessLaneSlotHeight({
+    description: node.data.description,
+    routingSummaryRows: node.data.routingSummaryRows,
+    triggerConditionRows: node.data.triggerConditionRows,
+  });
 }
 
 function getDesignerBlueprintGraphNodeGroupCenterX(
@@ -1578,8 +1609,10 @@ describe("DesignerCanvasWorkspace", () => {
     const reviewRoute = getRequiredDesignerBlueprintGraphNode(graph, "review-route");
     const issueUpdate = getRequiredDesignerBlueprintGraphNode(graph, "issue-update");
     const improvementOutput = getRequiredDesignerBlueprintGraphNode(graph, "improvement-output");
-    const changesRequestedEdge = graph.edges.find(
-      (edge) => edge.source === "review-route" && edge.target === "implement-change",
+    const changesRequestedEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "review-route",
+      "implement-change",
     );
 
     expect(readinessCheck.position.y).toBeGreaterThan(issueReady.position.y);
@@ -1589,7 +1622,720 @@ describe("DesignerCanvasWorkspace", () => {
     expect(reviewRoute.position.y).toBeGreaterThan(reviewStep.position.y);
     expect(issueUpdate.position.y).toBeGreaterThan(reviewRoute.position.y);
     expect(improvementOutput.position.y).toBeGreaterThan(issueUpdate.position.y);
-    expect(changesRequestedEdge?.type).toBe("loopback");
+    expect(changesRequestedEdge.type).toBe("loopback");
+  });
+
+  it("keeps return-to-entry-node routes out of the top-down layout rank", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Retry from intake",
+        outcome: {
+          label: "Retry unresolved intake",
+        },
+        items: [
+          {
+            id: "collect-request",
+            kind: "agent_step",
+            label: "Collect request",
+            state: "proposed",
+          },
+          {
+            id: "classify-request",
+            kind: "agent_step",
+            label: "Classify request",
+            state: "proposed",
+          },
+          {
+            id: "retry-route",
+            kind: "routing_policy",
+            state: "proposed",
+            rules: [
+              {
+                conditionLabel: "Needs intake retry",
+                when: [{ field: "request_state", operator: "equals", value: "needs_retry" }],
+                routeTo: "collect-request",
+              },
+              {
+                conditionLabel: "Ready",
+                when: [{ field: "request_state", operator: "equals", value: "ready" }],
+                routeTo: "finish-request",
+              },
+            ],
+          },
+          {
+            id: "finish-request",
+            kind: "workflow_output",
+            label: "Finish request",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "collect-request",
+            to: "classify-request",
+            kind: "requires",
+          },
+          {
+            from: "classify-request",
+            to: "retry-route",
+            kind: "routes_to",
+          },
+          {
+            from: "retry-route",
+            to: "collect-request",
+            kind: "routes_to",
+          },
+          {
+            from: "retry-route",
+            to: "finish-request",
+            kind: "routes_to",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const collectRequest = getRequiredDesignerBlueprintGraphNode(graph, "collect-request");
+    const classifyRequest = getRequiredDesignerBlueprintGraphNode(graph, "classify-request");
+    const retryRoute = getRequiredDesignerBlueprintGraphNode(graph, "retry-route");
+    const finishRequest = getRequiredDesignerBlueprintGraphNode(graph, "finish-request");
+    const retryEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "retry-route",
+      "collect-request",
+    );
+
+    expect(classifyRequest.position.y).toBeGreaterThan(collectRequest.position.y);
+    expect(retryRoute.position.y).toBeGreaterThan(classifyRequest.position.y);
+    expect(finishRequest.position.y).toBeGreaterThan(retryRoute.position.y);
+    expect(retryEdge.type).toBe("loopback");
+  });
+
+  it("keeps non-routing feedback loops out of the top-down layout rank", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Draft feedback loop",
+        outcome: {
+          label: "Revise drafts until ready",
+        },
+        items: [
+          {
+            id: "draft-response",
+            kind: "agent_step",
+            label: "Draft response",
+            state: "proposed",
+          },
+          {
+            id: "review-response",
+            kind: "agent_step",
+            label: "Review response",
+            state: "proposed",
+          },
+          {
+            id: "publish-response",
+            kind: "workflow_output",
+            label: "Publish response",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "draft-response",
+            to: "review-response",
+            kind: "requires",
+          },
+          {
+            from: "review-response",
+            to: "draft-response",
+            kind: "requires",
+          },
+          {
+            from: "review-response",
+            to: "publish-response",
+            kind: "produces",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const draftResponse = getRequiredDesignerBlueprintGraphNode(graph, "draft-response");
+    const reviewResponse = getRequiredDesignerBlueprintGraphNode(graph, "review-response");
+    const publishResponse = getRequiredDesignerBlueprintGraphNode(graph, "publish-response");
+    const feedbackEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "review-response",
+      "draft-response",
+    );
+
+    expect(reviewResponse.position.y).toBeGreaterThan(draftResponse.position.y);
+    expect(publishResponse.position.y).toBeGreaterThan(reviewResponse.position.y);
+    expect(feedbackEdge.type).toBe("loopback");
+  });
+
+  it("keeps forward routing branches in feedback cycles inside the top-down layout rank", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Retry branch",
+        outcome: {
+          label: "Route retry work",
+        },
+        items: [
+          {
+            id: "work-started",
+            kind: "trigger",
+            state: "proposed",
+            when: [{ label: "Work started" }],
+          },
+          {
+            id: "retry-route",
+            kind: "routing_policy",
+            state: "proposed",
+            rules: [
+              {
+                conditionLabel: "Retry",
+                when: [{ field: "work_state", operator: "equals", value: "retry" }],
+                routeTo: "retry-step",
+              },
+              {
+                conditionLabel: "Done",
+                when: [{ field: "work_state", operator: "equals", value: "done" }],
+                routeTo: "done-output",
+              },
+            ],
+          },
+          {
+            id: "retry-step",
+            kind: "agent_step",
+            label: "Retry work",
+            state: "proposed",
+          },
+          {
+            id: "done-output",
+            kind: "workflow_output",
+            label: "Done",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "work-started",
+            to: "retry-route",
+            kind: "triggers",
+          },
+          {
+            from: "retry-route",
+            to: "retry-step",
+            kind: "routes_to",
+          },
+          {
+            from: "retry-step",
+            to: "retry-route",
+            kind: "requires",
+          },
+          {
+            from: "retry-route",
+            to: "done-output",
+            kind: "routes_to",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const workStarted = getRequiredDesignerBlueprintGraphNode(graph, "work-started");
+    const retryRoute = getRequiredDesignerBlueprintGraphNode(graph, "retry-route");
+    const retryStep = getRequiredDesignerBlueprintGraphNode(graph, "retry-step");
+    const doneOutput = getRequiredDesignerBlueprintGraphNode(graph, "done-output");
+    const routeToRetryEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "retry-route",
+      "retry-step",
+    );
+    const retryToRouteEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "retry-step",
+      "retry-route",
+    );
+
+    expect(retryRoute.position.y).toBeGreaterThan(workStarted.position.y);
+    expect(retryStep.position.y).toBeGreaterThan(retryRoute.position.y);
+    expect(doneOutput.position.y).toBeGreaterThan(retryRoute.position.y);
+    expect(routeToRetryEdge.type).toBe("curved");
+    expect(retryToRouteEdge.type).toBe("loopback");
+  });
+
+  it("places missing-detail side loops beside the workflow step they return to", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Slack Bug Triage Workflow",
+        outcome: {
+          label: "Triage bug reports from Slack",
+          description:
+            "Turn Slack bug reports into classified, actionable triage with the right follow-up path.",
+        },
+        items: [
+          {
+            id: "slack_bug_intake",
+            kind: "trigger",
+            integrationTargetKey: "slack-default",
+            state: "proposed",
+            when: [{ label: "Bug report posted or app mentioned in Slack" }],
+          },
+          {
+            id: "collect_context",
+            kind: "agent_step",
+            label: "Collect report context",
+            description:
+              "Read the Slack message and thread, extract product area, expected behavior, actual behavior, reproduction steps, screenshots or links, affected users, impact, and urgency.",
+            state: "proposed",
+          },
+          {
+            id: "ask_for_missing_details",
+            kind: "agent_step",
+            label: "Ask for missing details",
+            description:
+              "Reply in the Slack thread with concise questions only when the report is not actionable.",
+            state: "proposed",
+          },
+          {
+            id: "classify_bug",
+            kind: "agent_step",
+            label: "Classify and prioritize",
+            description:
+              "Assign severity, affected area, likely owner or team, duplicate risk, confidence, and recommended next action.",
+            state: "proposed",
+          },
+          {
+            id: "triage_route",
+            kind: "routing_policy",
+            state: "proposed",
+            rules: [
+              {
+                conditionLabel: "Actionable report",
+                when: [
+                  {
+                    field: "report_actionability",
+                    operator: "equals",
+                    value: "actionable",
+                  },
+                ],
+                routeTo: "post_triage_summary",
+              },
+              {
+                conditionLabel: "Missing required details",
+                when: [
+                  {
+                    field: "report_actionability",
+                    operator: "equals",
+                    value: "needs_details",
+                  },
+                ],
+                routeTo: "ask_for_missing_details",
+              },
+              {
+                conditionLabel: "Critical customer or production impact",
+                when: [
+                  {
+                    field: "severity",
+                    operator: "in",
+                    value: ["sev0", "sev1"],
+                  },
+                ],
+                routeTo: "escalate_critical",
+              },
+            ],
+          },
+          {
+            id: "post_triage_summary",
+            kind: "workflow_output",
+            label: "Slack triage summary",
+            description:
+              "Post a structured Slack thread reply with severity, owner recommendation, reproduction summary, evidence, open questions, and next action.",
+            state: "proposed",
+          },
+          {
+            id: "escalate_critical",
+            kind: "workflow_output",
+            label: "Critical escalation",
+            description:
+              "Notify the selected escalation channel or user group with the evidence and recommended owner.",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "slack_bug_intake",
+            to: "collect_context",
+            kind: "triggers",
+          },
+          {
+            from: "collect_context",
+            to: "classify_bug",
+            kind: "requires",
+          },
+          {
+            from: "classify_bug",
+            to: "triage_route",
+            kind: "requires",
+          },
+          {
+            from: "triage_route",
+            to: "post_triage_summary",
+            kind: "routes_to",
+          },
+          {
+            from: "triage_route",
+            to: "ask_for_missing_details",
+            kind: "routes_to",
+          },
+          {
+            from: "triage_route",
+            to: "escalate_critical",
+            kind: "routes_to",
+          },
+          {
+            from: "ask_for_missing_details",
+            to: "collect_context",
+            kind: "requires",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const slackBugIntake = getRequiredDesignerBlueprintGraphNode(graph, "slack_bug_intake");
+    const collectContext = getRequiredDesignerBlueprintGraphNode(graph, "collect_context");
+    const askForMissingDetails = getRequiredDesignerBlueprintGraphNode(
+      graph,
+      "ask_for_missing_details",
+    );
+    const classifyBug = getRequiredDesignerBlueprintGraphNode(graph, "classify_bug");
+    const triageRoute = getRequiredDesignerBlueprintGraphNode(graph, "triage_route");
+    const routeToMissingDetailsEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "triage_route",
+      "ask_for_missing_details",
+    );
+    const routeToSummaryEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "triage_route",
+      "post_triage_summary",
+    );
+    const missingDetailsReturnEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "ask_for_missing_details",
+      "collect_context",
+    );
+
+    expect(collectContext.position.y).toBeGreaterThan(slackBugIntake.position.y);
+    expect(getDesignerBlueprintGraphNodeCenterY(askForMissingDetails)).toBe(
+      getDesignerBlueprintGraphNodeCenterY(collectContext),
+    );
+    expect(askForMissingDetails.position.x).toBeGreaterThan(collectContext.position.x);
+    expect(classifyBug.position.y).toBeGreaterThan(collectContext.position.y);
+    expect(triageRoute.position.y).toBeGreaterThan(classifyBug.position.y);
+    expect(routeToMissingDetailsEdge.type).toBe("curved");
+    expect(routeToMissingDetailsEdge.sourceHandle).toBe("right-source");
+    expect(routeToMissingDetailsEdge.targetHandle).toBe("bottom-target");
+    expect(routeToSummaryEdge.sourceHandle).toBeUndefined();
+    expect(routeToSummaryEdge.targetHandle).toBeUndefined();
+    expect(missingDetailsReturnEdge.type).toBe("straight");
+    expect(missingDetailsReturnEdge.sourceHandle).toBe("left-source");
+    expect(missingDetailsReturnEdge.targetHandle).toBe("right-target");
+  });
+
+  it("stacks multiple side-return nodes without vertical overlap", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Slack Bug Triage Workflow",
+        outcome: {
+          label: "Triage bug reports from Slack",
+        },
+        items: [
+          {
+            id: "slack_bug_intake",
+            kind: "trigger",
+            integrationTargetKey: "slack-default",
+            state: "proposed",
+            when: [{ label: "Bug report posted or app mentioned in Slack" }],
+          },
+          {
+            id: "collect_context",
+            kind: "agent_step",
+            label: "Collect report context",
+            description:
+              "Read the Slack message and thread, extract product area, expected behavior, actual behavior, reproduction steps, screenshots or links, affected users, impact, and urgency.",
+            state: "proposed",
+          },
+          {
+            id: "ask_for_reproduction",
+            kind: "agent_step",
+            label: "Ask for reproduction details",
+            description:
+              "Ask for precise steps, browser and device details, affected account identifiers, screenshots, expected behavior, actual behavior, frequency, and whether the reporter can reproduce it in a clean workspace.",
+            state: "proposed",
+          },
+          {
+            id: "ask_for_impact",
+            kind: "agent_step",
+            label: "Ask for impact",
+            description: "Ask which users are blocked and whether production data is affected.",
+            state: "proposed",
+          },
+          {
+            id: "classify_bug",
+            kind: "agent_step",
+            label: "Classify and prioritize",
+            state: "proposed",
+          },
+          {
+            id: "triage_route",
+            kind: "routing_policy",
+            state: "proposed",
+            rules: [
+              {
+                conditionLabel: "Missing reproduction",
+                when: [
+                  {
+                    field: "report_actionability",
+                    operator: "equals",
+                    value: "needs_reproduction",
+                  },
+                ],
+                routeTo: "ask_for_reproduction",
+              },
+              {
+                conditionLabel: "Missing impact",
+                when: [
+                  {
+                    field: "report_actionability",
+                    operator: "equals",
+                    value: "needs_impact",
+                  },
+                ],
+                routeTo: "ask_for_impact",
+              },
+              {
+                conditionLabel: "Actionable",
+                when: [
+                  {
+                    field: "report_actionability",
+                    operator: "equals",
+                    value: "actionable",
+                  },
+                ],
+                routeTo: "post_triage_summary",
+              },
+            ],
+          },
+          {
+            id: "post_triage_summary",
+            kind: "workflow_output",
+            label: "Slack triage summary",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "slack_bug_intake",
+            to: "collect_context",
+            kind: "triggers",
+          },
+          {
+            from: "collect_context",
+            to: "classify_bug",
+            kind: "requires",
+          },
+          {
+            from: "classify_bug",
+            to: "triage_route",
+            kind: "requires",
+          },
+          {
+            from: "triage_route",
+            to: "ask_for_reproduction",
+            kind: "routes_to",
+          },
+          {
+            from: "triage_route",
+            to: "ask_for_impact",
+            kind: "routes_to",
+          },
+          {
+            from: "triage_route",
+            to: "post_triage_summary",
+            kind: "routes_to",
+          },
+          {
+            from: "ask_for_reproduction",
+            to: "collect_context",
+            kind: "requires",
+          },
+          {
+            from: "ask_for_impact",
+            to: "collect_context",
+            kind: "requires",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const collectContext = getRequiredDesignerBlueprintGraphNode(graph, "collect_context");
+    const askForReproduction = getRequiredDesignerBlueprintGraphNode(graph, "ask_for_reproduction");
+    const askForImpact = getRequiredDesignerBlueprintGraphNode(graph, "ask_for_impact");
+    const firstSideReturnNode =
+      askForReproduction.position.y <= askForImpact.position.y ? askForReproduction : askForImpact;
+    const secondSideReturnNode =
+      firstSideReturnNode.id === askForReproduction.id ? askForImpact : askForReproduction;
+
+    expect(askForReproduction.position.x).toBeGreaterThan(collectContext.position.x);
+    expect(askForImpact.position.x).toBeGreaterThan(collectContext.position.x);
+    expect(secondSideReturnNode.position.y).toBeGreaterThanOrEqual(
+      firstSideReturnNode.position.y + resolveDesignerBlueprintGraphNodeHeight(firstSideReturnNode),
+    );
+  });
+
+  it("places side-return nodes beyond existing peers in the target row", async () => {
+    const graph = await buildDesignerBlueprintGraph({
+      blueprint: {
+        version: 1,
+        title: "Parallel Slack Bug Triage Workflow",
+        outcome: {
+          label: "Triage bug reports from Slack",
+        },
+        items: [
+          {
+            id: "slack_bug_intake",
+            kind: "trigger",
+            integrationTargetKey: "slack-default",
+            state: "proposed",
+            when: [{ label: "Bug report posted or app mentioned in Slack" }],
+          },
+          {
+            id: "collect_context",
+            kind: "agent_step",
+            label: "Collect report context",
+            state: "proposed",
+          },
+          {
+            id: "parallel_audit",
+            kind: "agent_step",
+            label: "Audit linked incidents",
+            state: "proposed",
+          },
+          {
+            id: "ask_for_missing_details",
+            kind: "agent_step",
+            label: "Ask for missing details",
+            state: "proposed",
+          },
+          {
+            id: "classify_bug",
+            kind: "agent_step",
+            label: "Classify and prioritize",
+            state: "proposed",
+          },
+          {
+            id: "triage_route",
+            kind: "routing_policy",
+            state: "proposed",
+            rules: [
+              {
+                conditionLabel: "Missing required details",
+                when: [
+                  {
+                    field: "report_actionability",
+                    operator: "equals",
+                    value: "needs_details",
+                  },
+                ],
+                routeTo: "ask_for_missing_details",
+              },
+              {
+                conditionLabel: "Actionable report",
+                when: [
+                  {
+                    field: "report_actionability",
+                    operator: "equals",
+                    value: "actionable",
+                  },
+                ],
+                routeTo: "post_triage_summary",
+              },
+            ],
+          },
+          {
+            id: "post_triage_summary",
+            kind: "workflow_output",
+            label: "Slack triage summary",
+            state: "proposed",
+          },
+        ],
+        links: [
+          {
+            from: "slack_bug_intake",
+            to: "collect_context",
+            kind: "triggers",
+          },
+          {
+            from: "slack_bug_intake",
+            to: "parallel_audit",
+            kind: "triggers",
+          },
+          {
+            from: "collect_context",
+            to: "classify_bug",
+            kind: "requires",
+          },
+          {
+            from: "classify_bug",
+            to: "triage_route",
+            kind: "requires",
+          },
+          {
+            from: "triage_route",
+            to: "ask_for_missing_details",
+            kind: "routes_to",
+          },
+          {
+            from: "triage_route",
+            to: "post_triage_summary",
+            kind: "routes_to",
+          },
+          {
+            from: "ask_for_missing_details",
+            to: "collect_context",
+            kind: "requires",
+          },
+        ],
+        actions: [],
+      } satisfies DesignerBlueprintDocument,
+      integrationMetadataByTargetKey: new Map<string, never>(),
+    });
+
+    const collectContext = getRequiredDesignerBlueprintGraphNode(graph, "collect_context");
+    const parallelAudit = getRequiredDesignerBlueprintGraphNode(graph, "parallel_audit");
+    const askForMissingDetails = getRequiredDesignerBlueprintGraphNode(
+      graph,
+      "ask_for_missing_details",
+    );
+
+    expect(parallelAudit.position.y).toBe(collectContext.position.y);
+    expect(askForMissingDetails.position.x).toBeGreaterThanOrEqual(
+      parallelAudit.position.x + resolveDesignerBlueprintGraphNodeWidth(parallelAudit),
+    );
   });
 
   it("fails when a routing rule target is missing its routes_to link", async () => {
