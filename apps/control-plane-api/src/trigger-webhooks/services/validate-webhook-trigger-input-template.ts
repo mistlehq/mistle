@@ -1,5 +1,6 @@
 import { BadRequestError } from "@mistle/http/errors.js";
 import type { IntegrationWebhookEventDefinition } from "@mistle/integrations-core";
+import { WebhookEventTemplateFields } from "@mistle/integrations-core/triggers";
 import { Liquid } from "liquidjs";
 
 const TemplateReferenceEngine = new Liquid({
@@ -8,15 +9,35 @@ const TemplateReferenceEngine = new Liquid({
 });
 
 const PayloadRootSegment = "payload";
+const WebhookEventRootSegment = "webhookEvent";
+const SupportedWebhookEventTemplateFields = new Set<string>(
+  Object.values(WebhookEventTemplateFields),
+);
 
 export function assertWebhookTriggerInputTemplateReferencesOrThrow(input: {
   inputTemplate: string;
   eventTypes: readonly string[];
   supportedWebhookEvents: readonly IntegrationWebhookEventDefinition[];
 }): void {
-  const payloadReferences = extractInputTemplatePayloadReferences(input.inputTemplate);
+  const templateReferences = extractInputTemplateReferences(input.inputTemplate);
 
-  for (const payloadReference of payloadReferences) {
+  for (const webhookEventReference of templateReferences.webhookEventReferences) {
+    if (webhookEventReference.path.length === 0) {
+      continue;
+    }
+
+    if (
+      webhookEventReference.path.length !== 1 ||
+      !isSupportedWebhookEventField(webhookEventReference.path[0])
+    ) {
+      throw new BadRequestError(
+        "VALIDATION_ERROR",
+        `Invalid inputTemplate webhookEvent reference: ${webhookEventReference.displayPath} is not a supported webhook event field.`,
+      );
+    }
+  }
+
+  for (const payloadReference of templateReferences.payloadReferences) {
     if (payloadReference.path.length === 0) {
       continue;
     }
@@ -36,11 +57,17 @@ export function assertWebhookTriggerInputTemplateReferencesOrThrow(input: {
   }
 }
 
-function extractInputTemplatePayloadReferences(inputTemplate: string): {
-  path: readonly string[];
-  displayPath: string;
-}[] {
-  let variableSegments;
+function extractInputTemplateReferences(inputTemplate: string): {
+  payloadReferences: {
+    path: readonly string[];
+    displayPath: string;
+  }[];
+  webhookEventReferences: {
+    path: readonly string[];
+    displayPath: string;
+  }[];
+} {
+  let variableSegments: ReturnType<Liquid["variableSegmentsSync"]>;
   try {
     variableSegments = TemplateReferenceEngine.variableSegmentsSync(inputTemplate);
   } catch (error) {
@@ -50,21 +77,35 @@ function extractInputTemplatePayloadReferences(inputTemplate: string): {
     );
   }
 
-  const references = new Map<string, { path: readonly string[]; displayPath: string }>();
+  const payloadReferences = new Map<string, { path: readonly string[]; displayPath: string }>();
+  const webhookEventReferences = new Map<
+    string,
+    { path: readonly string[]; displayPath: string }
+  >();
   for (const variableSegment of variableSegments) {
     const payloadReferencePath = normalizePayloadReferencePath(variableSegment);
-    if (payloadReferencePath === null) {
-      continue;
+    if (payloadReferencePath !== null) {
+      const displayPath = formatReferencePath(PayloadRootSegment, payloadReferencePath);
+      payloadReferences.set(displayPath, {
+        path: payloadReferencePath,
+        displayPath,
+      });
     }
 
-    const displayPath = formatPayloadReferencePath(payloadReferencePath);
-    references.set(displayPath, {
-      path: payloadReferencePath,
-      displayPath,
-    });
+    const webhookEventReferencePath = normalizeWebhookEventReferencePath(variableSegment);
+    if (webhookEventReferencePath !== null) {
+      const displayPath = formatReferencePath(WebhookEventRootSegment, webhookEventReferencePath);
+      webhookEventReferences.set(displayPath, {
+        path: webhookEventReferencePath,
+        displayPath,
+      });
+    }
   }
 
-  return [...references.values()];
+  return {
+    payloadReferences: [...payloadReferences.values()],
+    webhookEventReferences: [...webhookEventReferences.values()],
+  };
 }
 
 function normalizePayloadReferencePath(input: readonly unknown[]): readonly string[] | null {
@@ -90,6 +131,31 @@ function normalizePayloadReferencePath(input: readonly unknown[]): readonly stri
   }
 
   return normalizedSegments;
+}
+
+function normalizeWebhookEventReferencePath(input: readonly unknown[]): readonly string[] | null {
+  const [rootSegment, ...remainingSegments] = input;
+  if (rootSegment !== WebhookEventRootSegment) {
+    return null;
+  }
+
+  const normalizedSegments: string[] = [];
+  for (const segment of remainingSegments) {
+    if (typeof segment !== "string") {
+      throw new BadRequestError(
+        "VALIDATION_ERROR",
+        "Invalid inputTemplate webhookEvent reference: dynamic webhookEvent paths are not supported.",
+      );
+    }
+
+    normalizedSegments.push(segment);
+  }
+
+  return normalizedSegments;
+}
+
+function isSupportedWebhookEventField(input: string | undefined): boolean {
+  return input !== undefined && SupportedWebhookEventTemplateFields.has(input);
 }
 
 function isPayloadReferenceDeclaredBySelectedEvent(input: {
@@ -128,12 +194,12 @@ function pathIsAncestor(
   );
 }
 
-function formatPayloadReferencePath(path: readonly string[]): string {
+function formatReferencePath(rootSegment: string, path: readonly string[]): string {
   if (path.length === 0) {
-    return PayloadRootSegment;
+    return rootSegment;
   }
 
-  return [PayloadRootSegment, ...path].join(".");
+  return [rootSegment, ...path].join(".");
 }
 
 function getErrorMessage(error: unknown): string {

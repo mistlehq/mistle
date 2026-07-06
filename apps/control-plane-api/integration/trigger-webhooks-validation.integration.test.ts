@@ -263,18 +263,16 @@ describe.concurrent("trigger webhooks validation integration", () => {
     expect(body.message).toContain("payload.comment.missing_field");
   });
 
-  it("allows root payload and ignores Mistle-owned webhook event references on create", async ({
-    env,
-  }) => {
+  it("rejects unknown Mistle-owned webhook event references on create", async ({ env }) => {
     const session = await env.auth.createSession({
-      email: "integration-new-trigger-webhooks-root-payload-template@example.com",
+      email: "integration-new-trigger-webhooks-invalid-webhook-event-template@example.com",
     });
     await seedTriggerWebhookTargets(env);
     await seedWebhookTriggerFixture(env, {
       organizationId: session.organizationId,
-      connectionId: "icn_trigger_webhook_root_payload_template",
-      webhookSourceId: "iws_trigger_webhook_root_payload_template",
-      profileId: "sbp_trigger_webhook_root_payload_template",
+      connectionId: "icn_trigger_webhook_invalid_webhook_event_template",
+      webhookSourceId: "iws_trigger_webhook_invalid_webhook_event_template",
+      profileId: "sbp_trigger_webhook_invalid_webhook_event_template",
       profileVersion: 1,
     });
 
@@ -286,16 +284,19 @@ describe.concurrent("trigger webhooks validation integration", () => {
       },
       body: JSON.stringify({
         ...createWebhookTriggerRequestBody({
-          name: "Root payload template",
-          integrationWebhookSourceId: "iws_trigger_webhook_root_payload_template",
-          sandboxProfileId: "sbp_trigger_webhook_root_payload_template",
+          name: "Invalid webhook event template",
+          integrationWebhookSourceId: "iws_trigger_webhook_invalid_webhook_event_template",
+          sandboxProfileId: "sbp_trigger_webhook_invalid_webhook_event_template",
           sandboxProfileVersion: 1,
         }),
         inputTemplate: "Payload {{payload}} delivery {{webhookEvent.externalDeliveryID}}",
       }),
     });
 
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(400);
+    const body = CreateTriggerWebhookBadRequestResponseSchema.parse(await response.json());
+    expect(body.code).toBe("VALIDATION_ERROR");
+    expect(body.message).toContain("webhookEvent.externalDeliveryID");
   });
 
   it("allows input template payload references declared by any selected event on create", async ({

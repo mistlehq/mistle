@@ -200,3 +200,4 @@ export function parseTriggerRules(input: unknown): ReadonlyArray<TriggerRule> {
 export * from "./evaluate.js";
 export * from "./operators.js";
 export * from "./path.js";
+export * from "./webhook-event-template-context.js";

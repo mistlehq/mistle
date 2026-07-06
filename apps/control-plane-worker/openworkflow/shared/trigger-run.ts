@@ -13,6 +13,7 @@ import {
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
+import type { WebhookEventTemplateContext } from "@mistle/integrations-core/triggers";
 import {
   agentDefinitionAllowsRuntime,
   createAgentProviderKey,
@@ -764,15 +765,17 @@ export async function prepareTriggerRun(
 
   let compiledTemplates: ReturnType<typeof compileTemplates>;
   try {
+    const webhookEventTemplateContext = {
+      id: webhookEvent.id,
+      eventType: webhookEvent.eventType,
+      providerEventType: webhookEvent.providerEventType,
+      externalEventId: webhookEvent.externalEventId,
+      externalDeliveryId: webhookEvent.externalDeliveryId,
+    } satisfies WebhookEventTemplateContext["webhookEvent"];
+
     compiledTemplates = compileTemplates({
       context: {
-        webhookEvent: {
-          id: webhookEvent.id,
-          eventType: webhookEvent.eventType,
-          providerEventType: webhookEvent.providerEventType,
-          externalEventId: webhookEvent.externalEventId,
-          externalDeliveryId: webhookEvent.externalDeliveryId,
-        },
+        webhookEvent: webhookEventTemplateContext,
         triggerRun: {
           id: triggerRun.id,
           triggerId: triggerRun.triggerId,
