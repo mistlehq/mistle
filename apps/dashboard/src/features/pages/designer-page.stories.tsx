@@ -2,7 +2,7 @@ import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 import { Button } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { MemoryRouter } from "react-router";
 
@@ -31,6 +31,7 @@ import {
   DesignerBlueprintPendingCommentEditor,
   DesignerCanvasWorkspace,
 } from "./designer-session-page-view.js";
+import { DesignerStoryRuntime } from "./designer-story-runtime.js";
 import { createStoryConnectionMethods } from "./organization-integrations-settings-page-story-support.js";
 import {
   type PendingSessionBlueprintComment,
@@ -340,25 +341,6 @@ function getStoryDesignerBlueprintCanvasTabs(): readonly StoryDesignerBlueprintC
   return (StoryDesignerSessions[0]?.canvasTabs ?? []).filter(isStoryDesignerBlueprintCanvasTab);
 }
 
-function DesignerCanvasStoryRuntime(input: { children: React.ReactNode }): React.JSX.Element {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            retry: false,
-          },
-        },
-      }),
-  );
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{input.children}</MemoryRouter>
-    </QueryClientProvider>
-  );
-}
-
 function DesignerPageStory(input: {
   createErrorMessage?: string | null;
   initialDraft?: string;
@@ -423,7 +405,7 @@ function DesignerSessionWithCanvasStory(input?: {
   }
 
   return (
-    <DesignerCanvasStoryRuntime>
+    <DesignerStoryRuntime>
       {renderSessionWorkbenchContentStory({
         isSecondaryPanelVisible: true,
         mainContent: (
@@ -469,7 +451,7 @@ function DesignerSessionWithCanvasStory(input?: {
         secondaryPanelMinSize: "35%",
         secondaryPanelDefaultSize: 58,
       })}
-    </DesignerCanvasStoryRuntime>
+    </DesignerStoryRuntime>
   );
 }
 
@@ -504,7 +486,7 @@ function DesignerSessionCanvasFirstOpenStory(): React.JSX.Element {
   }
 
   return (
-    <DesignerCanvasStoryRuntime>
+    <DesignerStoryRuntime>
       <div className="h-screen min-h-0 overflow-hidden">
         <SessionWorkbenchPageView
           alert={null}
@@ -566,7 +548,7 @@ function DesignerSessionCanvasFirstOpenStory(): React.JSX.Element {
           secondaryPanelResizeKey={tabs.length === 0 ? null : "designer-canvas-open"}
         />
       </div>
-    </DesignerCanvasStoryRuntime>
+    </DesignerStoryRuntime>
   );
 }
 
@@ -631,7 +613,7 @@ function BlueprintCommentStateGalleryStory(): React.JSX.Element {
   );
 
   return (
-    <DesignerCanvasStoryRuntime>
+    <DesignerStoryRuntime>
       <div className="min-h-screen bg-muted/20 p-6 text-foreground">
         <div className="grid gap-8 lg:grid-cols-2">
           <BlueprintCommentStatePreview floating={false} title="Collapsed pending comment">
@@ -676,7 +658,7 @@ function BlueprintCommentStateGalleryStory(): React.JSX.Element {
           </BlueprintCommentStatePreview>
         </div>
       </div>
-    </DesignerCanvasStoryRuntime>
+    </DesignerStoryRuntime>
   );
 }
 
@@ -719,8 +701,9 @@ function BlueprintCommentStatePreview(input: {
 }
 
 function DesignerCanvasWorkspaceStory(input: {
-  tabs: readonly DesignerSession["canvasTabs"][number][];
   activeTabHref?: string;
+  queryClient?: QueryClient | undefined;
+  tabs: readonly DesignerSession["canvasTabs"][number][];
 }): React.JSX.Element {
   const [tabs, setTabs] = useState([...input.tabs]);
   const [activeTabHref, setActiveTabHref] = useState<string | null>(
@@ -728,7 +711,7 @@ function DesignerCanvasWorkspaceStory(input: {
   );
 
   return (
-    <DesignerCanvasStoryRuntime>
+    <DesignerStoryRuntime queryClient={input.queryClient}>
       <DesignerCanvasWorkspace
         activeTabHref={activeTabHref}
         designerSessionId="designer_session_canvas_story"
@@ -745,7 +728,7 @@ function DesignerCanvasWorkspaceStory(input: {
         pendingBlueprintComments={[]}
         tabs={tabs}
       />
-    </DesignerCanvasStoryRuntime>
+    </DesignerStoryRuntime>
   );
 }
 
@@ -861,12 +844,11 @@ function DesignerIntegrationSetupCanvasStory(input: { activeTabHref: string }): 
   const [queryClient] = useState(createDesignerIntegrationSetupStoryQueryClient);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <DesignerCanvasWorkspaceStory
-        activeTabHref={input.activeTabHref}
-        tabs={DesignerIntegrationSetupTabs}
-      />
-    </QueryClientProvider>
+    <DesignerCanvasWorkspaceStory
+      activeTabHref={input.activeTabHref}
+      queryClient={queryClient}
+      tabs={DesignerIntegrationSetupTabs}
+    />
   );
 }
 

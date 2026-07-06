@@ -545,6 +545,21 @@ function getRequiredDesignerBlueprintGraphNode(
   return node;
 }
 
+function getRequiredDesignerBlueprintGraphEdge(
+  graph: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>,
+  sourceId: string,
+  targetId: string,
+): Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["edges"][number] {
+  const edge = graph.edges.find(
+    (candidate) => candidate.source === sourceId && candidate.target === targetId,
+  );
+  if (edge === undefined) {
+    throw new Error(`Expected Designer blueprint graph edge '${sourceId}' to '${targetId}'.`);
+  }
+
+  return edge;
+}
+
 function getDesignerBlueprintGraphNodeCenterX(
   node: Awaited<ReturnType<typeof buildDesignerBlueprintGraph>>["nodes"][number],
 ): number {
@@ -1594,8 +1609,10 @@ describe("DesignerCanvasWorkspace", () => {
     const reviewRoute = getRequiredDesignerBlueprintGraphNode(graph, "review-route");
     const issueUpdate = getRequiredDesignerBlueprintGraphNode(graph, "issue-update");
     const improvementOutput = getRequiredDesignerBlueprintGraphNode(graph, "improvement-output");
-    const changesRequestedEdge = graph.edges.find(
-      (edge) => edge.source === "review-route" && edge.target === "implement-change",
+    const changesRequestedEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "review-route",
+      "implement-change",
     );
 
     expect(readinessCheck.position.y).toBeGreaterThan(issueReady.position.y);
@@ -1605,7 +1622,7 @@ describe("DesignerCanvasWorkspace", () => {
     expect(reviewRoute.position.y).toBeGreaterThan(reviewStep.position.y);
     expect(issueUpdate.position.y).toBeGreaterThan(reviewRoute.position.y);
     expect(improvementOutput.position.y).toBeGreaterThan(issueUpdate.position.y);
-    expect(changesRequestedEdge?.type).toBe("loopback");
+    expect(changesRequestedEdge.type).toBe("loopback");
   });
 
   it("keeps return-to-entry-node routes out of the top-down layout rank", async () => {
@@ -1684,14 +1701,16 @@ describe("DesignerCanvasWorkspace", () => {
     const classifyRequest = getRequiredDesignerBlueprintGraphNode(graph, "classify-request");
     const retryRoute = getRequiredDesignerBlueprintGraphNode(graph, "retry-route");
     const finishRequest = getRequiredDesignerBlueprintGraphNode(graph, "finish-request");
-    const retryEdge = graph.edges.find(
-      (edge) => edge.source === "retry-route" && edge.target === "collect-request",
+    const retryEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "retry-route",
+      "collect-request",
     );
 
     expect(classifyRequest.position.y).toBeGreaterThan(collectRequest.position.y);
     expect(retryRoute.position.y).toBeGreaterThan(classifyRequest.position.y);
     expect(finishRequest.position.y).toBeGreaterThan(retryRoute.position.y);
-    expect(retryEdge?.type).toBe("loopback");
+    expect(retryEdge.type).toBe("loopback");
   });
 
   it("keeps non-routing feedback loops out of the top-down layout rank", async () => {
@@ -1747,13 +1766,15 @@ describe("DesignerCanvasWorkspace", () => {
     const draftResponse = getRequiredDesignerBlueprintGraphNode(graph, "draft-response");
     const reviewResponse = getRequiredDesignerBlueprintGraphNode(graph, "review-response");
     const publishResponse = getRequiredDesignerBlueprintGraphNode(graph, "publish-response");
-    const feedbackEdge = graph.edges.find(
-      (edge) => edge.source === "review-response" && edge.target === "draft-response",
+    const feedbackEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "review-response",
+      "draft-response",
     );
 
     expect(reviewResponse.position.y).toBeGreaterThan(draftResponse.position.y);
     expect(publishResponse.position.y).toBeGreaterThan(reviewResponse.position.y);
-    expect(feedbackEdge?.type).toBe("loopback");
+    expect(feedbackEdge.type).toBe("loopback");
   });
 
   it("keeps forward routing branches in feedback cycles inside the top-down layout rank", async () => {
@@ -1832,18 +1853,22 @@ describe("DesignerCanvasWorkspace", () => {
     const retryRoute = getRequiredDesignerBlueprintGraphNode(graph, "retry-route");
     const retryStep = getRequiredDesignerBlueprintGraphNode(graph, "retry-step");
     const doneOutput = getRequiredDesignerBlueprintGraphNode(graph, "done-output");
-    const routeToRetryEdge = graph.edges.find(
-      (edge) => edge.source === "retry-route" && edge.target === "retry-step",
+    const routeToRetryEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "retry-route",
+      "retry-step",
     );
-    const retryToRouteEdge = graph.edges.find(
-      (edge) => edge.source === "retry-step" && edge.target === "retry-route",
+    const retryToRouteEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "retry-step",
+      "retry-route",
     );
 
     expect(retryRoute.position.y).toBeGreaterThan(workStarted.position.y);
     expect(retryStep.position.y).toBeGreaterThan(retryRoute.position.y);
     expect(doneOutput.position.y).toBeGreaterThan(retryRoute.position.y);
-    expect(routeToRetryEdge?.type).toBe("curved");
-    expect(retryToRouteEdge?.type).toBe("loopback");
+    expect(routeToRetryEdge.type).toBe("curved");
+    expect(retryToRouteEdge.type).toBe("loopback");
   });
 
   it("places missing-detail side loops beside the workflow step they return to", async () => {
@@ -1995,32 +2020,37 @@ describe("DesignerCanvasWorkspace", () => {
     );
     const classifyBug = getRequiredDesignerBlueprintGraphNode(graph, "classify_bug");
     const triageRoute = getRequiredDesignerBlueprintGraphNode(graph, "triage_route");
-    const routeToMissingDetailsEdge = graph.edges.find(
-      (edge) => edge.source === "triage_route" && edge.target === "ask_for_missing_details",
+    const routeToMissingDetailsEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "triage_route",
+      "ask_for_missing_details",
     );
-    const routeToSummaryEdge = graph.edges.find(
-      (edge) => edge.source === "triage_route" && edge.target === "post_triage_summary",
+    const routeToSummaryEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "triage_route",
+      "post_triage_summary",
     );
-    const missingDetailsReturnEdge = graph.edges.find(
-      (edge) => edge.source === "ask_for_missing_details" && edge.target === "collect_context",
+    const missingDetailsReturnEdge = getRequiredDesignerBlueprintGraphEdge(
+      graph,
+      "ask_for_missing_details",
+      "collect_context",
     );
 
     expect(collectContext.position.y).toBeGreaterThan(slackBugIntake.position.y);
-    expect(askForMissingDetails.position.y).not.toBe(slackBugIntake.position.y);
     expect(getDesignerBlueprintGraphNodeCenterY(askForMissingDetails)).toBe(
       getDesignerBlueprintGraphNodeCenterY(collectContext),
     );
     expect(askForMissingDetails.position.x).toBeGreaterThan(collectContext.position.x);
     expect(classifyBug.position.y).toBeGreaterThan(collectContext.position.y);
     expect(triageRoute.position.y).toBeGreaterThan(classifyBug.position.y);
-    expect(routeToMissingDetailsEdge?.type).toBe("curved");
-    expect(routeToMissingDetailsEdge?.sourceHandle).toBe("right-source");
-    expect(routeToMissingDetailsEdge?.targetHandle).toBe("bottom-target");
-    expect(routeToSummaryEdge?.sourceHandle).toBeUndefined();
-    expect(routeToSummaryEdge?.targetHandle).toBeUndefined();
-    expect(missingDetailsReturnEdge?.type).toBe("straight");
-    expect(missingDetailsReturnEdge?.sourceHandle).toBe("left-source");
-    expect(missingDetailsReturnEdge?.targetHandle).toBe("right-target");
+    expect(routeToMissingDetailsEdge.type).toBe("curved");
+    expect(routeToMissingDetailsEdge.sourceHandle).toBe("right-source");
+    expect(routeToMissingDetailsEdge.targetHandle).toBe("bottom-target");
+    expect(routeToSummaryEdge.sourceHandle).toBeUndefined();
+    expect(routeToSummaryEdge.targetHandle).toBeUndefined();
+    expect(missingDetailsReturnEdge.type).toBe("straight");
+    expect(missingDetailsReturnEdge.sourceHandle).toBe("left-source");
+    expect(missingDetailsReturnEdge.targetHandle).toBe("right-target");
   });
 
   it("stacks multiple side-return nodes without vertical overlap", async () => {

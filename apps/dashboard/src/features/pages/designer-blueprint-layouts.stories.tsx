@@ -1,10 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
-import { MemoryRouter } from "react-router";
 
 import type { DesignerBlueprintDocument } from "../designer/designer-blueprint-schema.js";
 import { DesignerBlueprintCanvasPanel } from "./designer-session-page-view.js";
+import { DesignerStoryRuntime } from "./designer-story-runtime.js";
 
 const AiSoftwareFactoryBlueprint = {
   version: 1,
@@ -308,7 +306,7 @@ function BlueprintLayoutStory(input: {
   title: string;
 }): React.JSX.Element {
   return (
-    <DesignerBlueprintLayoutRuntime>
+    <DesignerStoryRuntime>
       <section className="flex h-screen min-h-0 flex-col overflow-hidden bg-background">
         <div className="flex h-10 flex-none items-center border-b bg-background px-3 text-sm font-medium">
           {input.title}
@@ -323,26 +321,7 @@ function BlueprintLayoutStory(input: {
           />
         </div>
       </section>
-    </DesignerBlueprintLayoutRuntime>
-  );
-}
-
-function DesignerBlueprintLayoutRuntime(input: { children: React.ReactNode }): React.JSX.Element {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            retry: false,
-          },
-        },
-      }),
-  );
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{input.children}</MemoryRouter>
-    </QueryClientProvider>
+    </DesignerStoryRuntime>
   );
 }
 

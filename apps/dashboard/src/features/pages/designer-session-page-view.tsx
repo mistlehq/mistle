@@ -1973,13 +1973,10 @@ async function buildDesignerBlueprintLayoutGraph(input: {
     children: workflowNodes.map((node) => ({
       id: node.id,
       width: getDesignerBlueprintPositionedNodeWidth(node),
-      height:
-        input.measuredHeightByNodeId?.get(node.id) ??
-        resolveDesignerBlueprintProcessLaneSlotHeight({
-          description: node.data.description,
-          routingSummaryRows: node.data.routingSummaryRows,
-          triggerConditionRows: node.data.triggerConditionRows,
-        }),
+      height: resolveDesignerBlueprintLayoutNodeHeight({
+        measuredHeightByNodeId: input.measuredHeightByNodeId,
+        node,
+      }),
     })),
     edges: input.edges
       .filter(
@@ -2032,13 +2029,10 @@ async function buildDesignerBlueprintLayoutGraph(input: {
 
   if (outcomeNode !== undefined) {
     const outcomeWidth = getDesignerBlueprintPositionedNodeWidth(outcomeNode);
-    const outcomeHeight =
-      input.measuredHeightByNodeId?.get(outcomeNode.id) ??
-      resolveDesignerBlueprintProcessLaneSlotHeight({
-        description: outcomeNode.data.description,
-        routingSummaryRows: outcomeNode.data.routingSummaryRows,
-        triggerConditionRows: outcomeNode.data.triggerConditionRows,
-      });
+    const outcomeHeight = resolveDesignerBlueprintLayoutNodeHeight({
+      measuredHeightByNodeId: input.measuredHeightByNodeId,
+      node: outcomeNode,
+    });
     positionByNodeId.set(outcomeNode.id, {
       x: workflowCenterX - outcomeWidth / 2,
       y: 0,
@@ -2107,26 +2101,6 @@ async function buildDesignerBlueprintLayoutGraph(input: {
         };
       }
 
-      if (
-        (fanOutCountByNodeId.get(edge.source) ?? 0) > 1 ||
-        (fanInCountByNodeId.get(edge.target) ?? 0) > 1
-      ) {
-        const sourceHandle = resolveDesignerBlueprintSourceHandle({
-          edge,
-          nodeById: positionedNodeById,
-        });
-        const targetHandle = resolveDesignerBlueprintTargetHandle({
-          edge,
-          nodeById: positionedNodeById,
-        });
-        return {
-          ...edge,
-          ...(sourceHandle === undefined ? {} : { sourceHandle }),
-          ...(targetHandle === undefined ? {} : { targetHandle }),
-          type: "curved",
-        };
-      }
-
       const sourceHandle = resolveDesignerBlueprintSourceHandle({
         edge,
         nodeById: positionedNodeById,
@@ -2135,6 +2109,19 @@ async function buildDesignerBlueprintLayoutGraph(input: {
         edge,
         nodeById: positionedNodeById,
       });
+
+      if (
+        (fanOutCountByNodeId.get(edge.source) ?? 0) > 1 ||
+        (fanInCountByNodeId.get(edge.target) ?? 0) > 1
+      ) {
+        return {
+          ...edge,
+          ...(sourceHandle === undefined ? {} : { sourceHandle }),
+          ...(targetHandle === undefined ? {} : { targetHandle }),
+          type: "curved",
+        };
+      }
+
       return {
         ...edge,
         ...(sourceHandle === undefined ? {} : { sourceHandle }),
@@ -2193,6 +2180,20 @@ function resolveDesignerBlueprintTargetHandle(input: {
   return undefined;
 }
 
+function resolveDesignerBlueprintLayoutNodeHeight(input: {
+  measuredHeightByNodeId?: ReadonlyMap<string, number> | undefined;
+  node: DesignerBlueprintLayoutNode;
+}): number {
+  return (
+    input.measuredHeightByNodeId?.get(input.node.id) ??
+    resolveDesignerBlueprintProcessLaneSlotHeight({
+      description: input.node.data.description,
+      routingSummaryRows: input.node.data.routingSummaryRows,
+      triggerConditionRows: input.node.data.triggerConditionRows,
+    })
+  );
+}
+
 type DesignerBlueprintLayoutEdgeAnalysis = {
   returnEdgeIds: ReadonlySet<string>;
   sideReturnEdgeIds: ReadonlySet<string>;
@@ -2238,22 +2239,19 @@ function analyzeDesignerBlueprintLayoutEdges(input: {
       continue;
     }
 
+    const targetReturnsToSource = hasDesignerBlueprintPath({
+      edges: input.edges,
+      excludedEdgeId: edge.id,
+      from: edge.target,
+      to: edge.source,
+    });
     if (
-      targetItem.kind !== "routing_policy" &&
-      hasDesignerBlueprintExistingEntry({
+      isDesignerBlueprintSideReturnEdgeCandidate({
         edge,
-        incomingEdgesByTarget,
-      }) &&
-      hasDesignerBlueprintPath({
-        edges: input.edges,
-        excludedEdgeId: edge.id,
-        from: edge.target,
-        to: edge.source,
-      }) &&
-      hasDesignerBlueprintIncomingRoutingPolicyEdge({
-        incomingEdgesByTarget,
         itemById,
-        nodeId: edge.source,
+        incomingEdgesByTarget,
+        targetItem,
+        targetReturnsToSource,
       })
     ) {
       sideReturnSourceIds.add(edge.source);
@@ -2293,15 +2291,12 @@ function analyzeDesignerBlueprintLayoutEdges(input: {
     }
 
     if (
-      targetItem.kind !== "routing_policy" &&
-      hasDesignerBlueprintExistingEntry({
+      isDesignerBlueprintSideReturnEdgeCandidate({
         edge,
-        incomingEdgesByTarget,
-      }) &&
-      hasDesignerBlueprintIncomingRoutingPolicyEdge({
-        incomingEdgesByTarget,
         itemById,
-        nodeId: edge.source,
+        incomingEdgesByTarget,
+        targetItem,
+        targetReturnsToSource,
       })
     ) {
       returnEdgeIds.add(edge.id);
@@ -2358,6 +2353,28 @@ function hasDesignerBlueprintPath(input: {
   return false;
 }
 
+function isDesignerBlueprintSideReturnEdgeCandidate(input: {
+  edge: DesignerBlueprintGraphEdge;
+  incomingEdgesByTarget: ReadonlyMap<string, readonly DesignerBlueprintGraphEdge[]>;
+  itemById: ReadonlyMap<string, DesignerBlueprintItem>;
+  targetItem: DesignerBlueprintItem;
+  targetReturnsToSource: boolean;
+}): boolean {
+  return (
+    input.targetItem.kind !== "routing_policy" &&
+    input.targetReturnsToSource &&
+    hasDesignerBlueprintExistingEntry({
+      edge: input.edge,
+      incomingEdgesByTarget: input.incomingEdgesByTarget,
+    }) &&
+    hasDesignerBlueprintIncomingRoutingPolicyEdge({
+      incomingEdgesByTarget: input.incomingEdgesByTarget,
+      itemById: input.itemById,
+      nodeId: input.edge.source,
+    })
+  );
+}
+
 function hasDesignerBlueprintExistingEntry(input: {
   edge: DesignerBlueprintGraphEdge;
   incomingEdgesByTarget: ReadonlyMap<string, readonly DesignerBlueprintGraphEdge[]>;
@@ -2400,23 +2417,18 @@ function placeDesignerBlueprintSideReturnNodes(input: {
       continue;
     }
 
-    const sourceHeight =
-      input.measuredHeightByNodeId?.get(sourceNode.id) ??
-      resolveDesignerBlueprintProcessLaneSlotHeight({
-        description: sourceNode.data.description,
-        routingSummaryRows: sourceNode.data.routingSummaryRows,
-        triggerConditionRows: sourceNode.data.triggerConditionRows,
-      });
-    const targetHeight =
-      input.measuredHeightByNodeId?.get(targetNode.id) ??
-      resolveDesignerBlueprintProcessLaneSlotHeight({
-        description: targetNode.data.description,
-        routingSummaryRows: targetNode.data.routingSummaryRows,
-        triggerConditionRows: targetNode.data.triggerConditionRows,
-      });
+    const sourceHeight = resolveDesignerBlueprintLayoutNodeHeight({
+      measuredHeightByNodeId: input.measuredHeightByNodeId,
+      node: sourceNode,
+    });
+    const targetHeight = resolveDesignerBlueprintLayoutNodeHeight({
+      measuredHeightByNodeId: input.measuredHeightByNodeId,
+      node: targetNode,
+    });
     const sourceY =
       nextYByTargetId.get(edge.target) ?? targetPosition.y + targetHeight / 2 - sourceHeight / 2;
     const sourceX = resolveDesignerBlueprintSideReturnNodeX({
+      measuredHeightByNodeId: input.measuredHeightByNodeId,
       nodes: input.nodes,
       positionByNodeId: input.positionByNodeId,
       sourceHeight,
@@ -2438,6 +2450,7 @@ function placeDesignerBlueprintSideReturnNodes(input: {
 }
 
 function resolveDesignerBlueprintSideReturnNodeX(input: {
+  measuredHeightByNodeId?: ReadonlyMap<string, number> | undefined;
   nodes: readonly DesignerBlueprintLayoutNode[];
   positionByNodeId: ReadonlyMap<string, { x: number; y: number }>;
   sourceHeight: number;
@@ -2464,10 +2477,9 @@ function resolveDesignerBlueprintSideReturnNodeX(input: {
 
     const nodeBottom =
       position.y +
-      resolveDesignerBlueprintProcessLaneSlotHeight({
-        description: node.data.description,
-        routingSummaryRows: node.data.routingSummaryRows,
-        triggerConditionRows: node.data.triggerConditionRows,
+      resolveDesignerBlueprintLayoutNodeHeight({
+        measuredHeightByNodeId: input.measuredHeightByNodeId,
+        node,
       });
     if (sourceBottom <= position.y || input.sourceY >= nodeBottom) {
       continue;
