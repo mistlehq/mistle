@@ -21628,6 +21628,9 @@
                                       "description": {
                                         "type": "string",
                                         "minLength": 1
+                                      },
+                                      "allowsDescendants": {
+                                        "type": "boolean"
                                       }
                                     },
                                     "required": ["path", "description"],

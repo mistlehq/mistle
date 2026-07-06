@@ -222,6 +222,9 @@ importers:
       hono:
         specifier: 4.12.25
         version: 4.12.25
+      liquidjs:
+        specifier: ^10.27.1
+        version: 10.27.1
       openworkflow:
         specifier: ^0.9.0
         version: 0.9.0(postgres@3.4.9)

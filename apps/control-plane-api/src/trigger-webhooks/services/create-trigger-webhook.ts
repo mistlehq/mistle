@@ -12,6 +12,7 @@ import { resolveSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-p
 import { assertWebhookSourceReferenceOrThrow } from "./assert-webhook-source-reference-or-throw.js";
 import { assertWebhookTriggerRequirementsOrThrow } from "./assert-webhook-trigger-requirements-or-throw.js";
 import { loadWebhookTriggerAggregateOrThrow } from "./load-webhook-trigger-aggregate-or-throw.js";
+import { assertWebhookTriggerInputTemplateReferencesOrThrow } from "./validate-webhook-trigger-input-template.js";
 import {
   normalizeWebhookTriggerEventConditions,
   type NormalizedWebhookTriggerEventCondition,
@@ -67,6 +68,11 @@ export async function createTriggerWebhook(
   assertWebhookTriggerRequirementsOrThrow({
     eventTypes,
     providerMetadata: resolvedWebhookSource.providerMetadata,
+    supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
+  });
+  assertWebhookTriggerInputTemplateReferencesOrThrow({
+    inputTemplate: input.inputTemplate,
+    eventTypes,
     supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
   });
   await assertSandboxProfileReferenceOrThrow(

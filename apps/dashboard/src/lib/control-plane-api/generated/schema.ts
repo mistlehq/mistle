@@ -6602,6 +6602,7 @@ export interface paths {
                       }
                   )[];
                   payloadReferences?: {
+                    allowsDescendants?: boolean;
                     description: string;
                     path: string[];
                   }[];

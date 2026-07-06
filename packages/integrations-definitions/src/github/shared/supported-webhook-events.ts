@@ -122,6 +122,7 @@ const GitHubPayloadReferenceGroups = {
     GitHubPayloadReferences.PULL_REQUEST_NUMBER,
     GitHubPayloadReferences.PULL_REQUEST_BODY,
     GitHubPayloadReferences.PULL_REQUEST_BASE_REF,
+    GitHubPayloadReferences.PULL_REQUEST_HEAD_REF,
     GitHubPayloadReferences.SENDER_LOGIN,
   ],
 } as const satisfies Record<string, readonly IntegrationWebhookPayloadReference[]>;
@@ -402,7 +403,6 @@ function createGitHubPullRequestReviewRequestEventDefinition(input: {
     ),
     payloadReferences: [
       ...GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
-      GitHubPayloadReferences.PULL_REQUEST_HEAD_REF,
       GitHubPayloadReferences.REQUESTED_REVIEWER_LOGIN,
       GitHubPayloadReferences.REQUESTED_TEAM_SLUG,
     ],
@@ -583,10 +583,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       "pull_request",
       GitHubWebhookPermissionRequirements.PULL_REQUESTS_READ,
     ),
-    payloadReferences: [
-      ...GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
-      GitHubPayloadReferences.PULL_REQUEST_HEAD_REF,
-    ],
+    payloadReferences: GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
     conversationKeyOptions: [
       GitHubPullRequestConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
@@ -609,10 +606,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       "pull_request",
       GitHubWebhookPermissionRequirements.PULL_REQUESTS_READ,
     ),
-    payloadReferences: [
-      ...GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
-      GitHubPayloadReferences.PULL_REQUEST_HEAD_REF,
-    ],
+    payloadReferences: GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
     conversationKeyOptions: [
       GitHubPullRequestConversationKeyOption,
       GitHubRepositoryConversationKeyOption,

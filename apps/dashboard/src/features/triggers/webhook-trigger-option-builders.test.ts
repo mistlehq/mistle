@@ -14,6 +14,7 @@ import {
 const GitHubRepositoryFullNamePayloadReference: WebhookTriggerPayloadReference = {
   path: ["repository", "full_name"],
   description: "Repository owner and name",
+  allowsDescendants: true,
 };
 
 const GitHubPullRequestNumberPayloadReference: WebhookTriggerPayloadReference = {

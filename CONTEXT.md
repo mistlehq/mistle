@@ -363,7 +363,7 @@ _Avoid_: User message, trigger input, payload template
 
 **Trigger event field reference**:
 A **Trigger user message** template reference that inserts a value from the matched **Trigger event** or its normalized trigger-run context.
-_Avoid_: Resource reference, context mention, developer instruction variable
+_Avoid_: Payload moustache, payload mustache, resource reference, context mention, developer instruction variable
 
 **Trigger text resource reference**:
 A plain-text **Integration connection resource** mention inserted into **Trigger configuration** text to make the referenced provider resource unambiguous to the agent.
