@@ -97,9 +97,9 @@ const DesignerStarterPrompts: readonly {
   },
   {
     category: "Product",
-    label: "Summarize feedback",
+    label: "Triage feedback",
     prompt:
-      "Create an agent that summarizes customer feedback from Slack, Notion, and Linear into product themes.",
+      "Create an agent that reviews customer feedback, groups it into product themes, and opens follow-up issues for the team.",
   },
   {
     category: "Marketing",
