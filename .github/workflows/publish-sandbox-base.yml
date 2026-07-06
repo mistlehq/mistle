@@ -39,7 +39,8 @@ jobs:
       contents: read
       packages: write
     env:
-      IMAGE_REPOSITORY: ghcr.io/mistlehq/sandbox-base
+      SANDBOX_BASE_IMAGE_REPOSITORY: ghcr.io/mistlehq/sandbox-base
+      DESIGNER_BASE_IMAGE_REPOSITORY: ghcr.io/mistlehq/designer-base
       IMAGE_TAG: ${{ github.sha }}
       IMAGE_LATEST_TAG: latest
       IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
@@ -68,7 +69,7 @@ jobs:
       - name: Build sandbox base image
         run: |
           args=(
-            --output-image-ref "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+            --output-image-ref "${SANDBOX_BASE_IMAGE_REPOSITORY}:${IMAGE_TAG}"
             --platform linux/amd64
             --target sandbox-base
             --label "org.opencontainers.image.source=${IMAGE_SOURCE}"
@@ -80,7 +81,27 @@ jobs:
           )
 
           if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.publish_latest }}" = "true" ]; then
-            args+=(--additional-output-image-ref "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}")
+            args+=(--additional-output-image-ref "${SANDBOX_BASE_IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}")
+          fi
+
+          pnpm dev:sandbox-base:push:docker "${args[@]}"
+
+      - name: Build Designer base image
+        run: |
+          args=(
+            --output-image-ref "${DESIGNER_BASE_IMAGE_REPOSITORY}:${IMAGE_TAG}"
+            --platform linux/amd64
+            --target sandbox-designer-base
+            --label "org.opencontainers.image.source=${IMAGE_SOURCE}"
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}"
+            --label "org.opencontainers.image.title=Mistle Designer Base"
+            --label "org.opencontainers.image.description=Designer base image for Mistle coding agent runtimes"
+            --label "org.opencontainers.image.url=${IMAGE_SOURCE}"
+            --label "org.opencontainers.image.vendor=Mistle"
+          )
+
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.publish_latest }}" = "true" ]; then
+            args+=(--additional-output-image-ref "${DESIGNER_BASE_IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}")
           fi
 
           pnpm dev:sandbox-base:push:docker "${args[@]}"
@@ -88,20 +109,24 @@ jobs:
       - name: Resolve pushed digest
         id: publish
         run: |
-          digest="$(docker buildx imagetools inspect "${IMAGE_REPOSITORY}:${IMAGE_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
-          image_ref="${IMAGE_REPOSITORY}@${digest}"
-          echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
+          sandbox_base_digest="$(docker buildx imagetools inspect "${SANDBOX_BASE_IMAGE_REPOSITORY}:${IMAGE_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          designer_base_digest="$(docker buildx imagetools inspect "${DESIGNER_BASE_IMAGE_REPOSITORY}:${IMAGE_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          echo "sandbox_base_image_ref=${SANDBOX_BASE_IMAGE_REPOSITORY}@${sandbox_base_digest}" >> "${GITHUB_OUTPUT}"
+          echo "designer_base_image_ref=${DESIGNER_BASE_IMAGE_REPOSITORY}@${designer_base_digest}" >> "${GITHUB_OUTPUT}"
 
       - name: Summarize published image
         run: |
           {
-            echo "## Published image"
+            echo "## Published images"
             echo
-            echo "- Tag: \`${IMAGE_REPOSITORY}:${IMAGE_TAG}\`"
+            echo "- Sandbox base tag: \`${SANDBOX_BASE_IMAGE_REPOSITORY}:${IMAGE_TAG}\`"
+            echo "- Designer base tag: \`${DESIGNER_BASE_IMAGE_REPOSITORY}:${IMAGE_TAG}\`"
             if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.publish_latest }}" = "true" ]; then
-              echo "- Alias: \`${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}\`"
+              echo "- Sandbox base alias: \`${SANDBOX_BASE_IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}\`"
+              echo "- Designer base alias: \`${DESIGNER_BASE_IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}\`"
             fi
-            echo "- Digest: \`${{ steps.publish.outputs.image_ref }}\`"
+            echo "- Sandbox base digest: \`${{ steps.publish.outputs.sandbox_base_image_ref }}\`"
+            echo "- Designer base digest: \`${{ steps.publish.outputs.designer_base_image_ref }}\`"
           } >> "${GITHUB_STEP_SUMMARY}"
 
   publish-system-test:

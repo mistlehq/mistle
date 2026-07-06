@@ -76,6 +76,7 @@ The release workflow publishes:
 
 - service images as `ghcr.io/mistlehq/<service>:v$(cat VERSION)`
 - the sandbox base image as `ghcr.io/mistlehq/sandbox-base:v$(cat VERSION)`
+- the Designer base image as `ghcr.io/mistlehq/designer-base:v$(cat VERSION)`
 - the single-container image as `ghcr.io/mistlehq/mistle:v$(cat VERSION)`
 - a GitHub release with `dist/release-manifest.json` attached
 

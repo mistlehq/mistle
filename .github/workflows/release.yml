@@ -163,7 +163,7 @@ jobs:
           path: dist/release-manifest/${{ matrix.component }}.json
 
   publish-sandbox-base:
-    name: Publish sandbox base
+    name: Publish sandbox base images
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -171,7 +171,8 @@ jobs:
       contents: read
       packages: write
     env:
-      IMAGE_REPOSITORY: ghcr.io/mistlehq/sandbox-base
+      SANDBOX_BASE_IMAGE_REPOSITORY: ghcr.io/mistlehq/sandbox-base
+      DESIGNER_BASE_IMAGE_REPOSITORY: ghcr.io/mistlehq/designer-base
       IMAGE_SHA_TAG: ${{ github.sha }}
       IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
 
@@ -199,7 +200,7 @@ jobs:
       - name: Build sandbox base image
         run: |
           pnpm dev:sandbox-base:push:docker \
-            --output-image-ref "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}" \
+            --output-image-ref "${SANDBOX_BASE_IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}" \
             --platform linux/amd64 \
             --target sandbox-base \
             --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
@@ -210,25 +211,43 @@ jobs:
             --label "org.opencontainers.image.url=${IMAGE_SOURCE}" \
             --label "org.opencontainers.image.vendor=Mistle"
 
+      - name: Build Designer base image
+        run: |
+          pnpm dev:sandbox-base:push:docker \
+            --output-image-ref "${DESIGNER_BASE_IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}" \
+            --platform linux/amd64 \
+            --target sandbox-designer-base \
+            --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${{ needs.validate.outputs.release_version }}" \
+            --label "org.opencontainers.image.title=Mistle Designer Base" \
+            --label "org.opencontainers.image.description=Designer base image for Mistle coding agent runtimes" \
+            --label "org.opencontainers.image.url=${IMAGE_SOURCE}" \
+            --label "org.opencontainers.image.vendor=Mistle"
+
       - name: Resolve pushed digest
         id: publish
         run: |
-          digest="$(docker buildx imagetools inspect "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
-          image_ref="${IMAGE_REPOSITORY}@${digest}"
-          echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
+          sandbox_base_digest="$(docker buildx imagetools inspect "${SANDBOX_BASE_IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          designer_base_digest="$(docker buildx imagetools inspect "${DESIGNER_BASE_IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          echo "sandbox_base_image_ref=${SANDBOX_BASE_IMAGE_REPOSITORY}@${sandbox_base_digest}" >> "${GITHUB_OUTPUT}"
+          echo "designer_base_image_ref=${DESIGNER_BASE_IMAGE_REPOSITORY}@${designer_base_digest}" >> "${GITHUB_OUTPUT}"
 
       - name: Write release manifest fragment
         run: |
           mkdir -p dist/release-manifest
           cat <<EOF > dist/release-manifest/sandbox-base.json
-          {"component":"sandbox-base","image_ref":"${{ steps.publish.outputs.image_ref }}"}
+          {"component":"sandbox-base","image_ref":"${{ steps.publish.outputs.sandbox_base_image_ref }}"}
+          EOF
+          cat <<EOF > dist/release-manifest/designer-base.json
+          {"component":"designer-base","image_ref":"${{ steps.publish.outputs.designer_base_image_ref }}"}
           EOF
 
       - name: Upload release manifest fragment
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: release-image-sandbox-base
-          path: dist/release-manifest/sandbox-base.json
+          name: release-image-sandbox-base-images
+          path: dist/release-manifest/*.json
 
   publish-single-container:
     name: Publish single-container
@@ -514,6 +533,10 @@ jobs:
                   latest_tag = "latest"
               elif component == "sandbox-base":
                   repository = "ghcr.io/mistlehq/sandbox-base"
+                  release_tag = f"v{version}"
+                  latest_tag = "latest"
+              elif component == "designer-base":
+                  repository = "ghcr.io/mistlehq/designer-base"
                   release_tag = f"v{version}"
                   latest_tag = "latest"
               elif component == "mistle":

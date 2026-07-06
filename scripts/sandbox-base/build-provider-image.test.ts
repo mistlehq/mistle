@@ -54,6 +54,23 @@ describe("parseCliArguments", () => {
     );
   });
 
+  it("publishes the Designer base image in the sandbox base workflow", () => {
+    const workflow = readFileSync(".github/workflows/publish-sandbox-base.yml", "utf8");
+
+    expect(workflow).toContain("DESIGNER_BASE_IMAGE_REPOSITORY: ghcr.io/mistlehq/designer-base");
+    expect(workflow).toContain("--target sandbox-designer-base");
+    expect(workflow).toContain("${DESIGNER_BASE_IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}");
+  });
+
+  it("includes the Designer base image in release publishing and promotion", () => {
+    const workflow = readFileSync(".github/workflows/release.yml", "utf8");
+
+    expect(workflow).toContain("DESIGNER_BASE_IMAGE_REPOSITORY: ghcr.io/mistlehq/designer-base");
+    expect(workflow).toContain("--target sandbox-designer-base");
+    expect(workflow).toContain('"component":"designer-base"');
+    expect(workflow).toContain('repository = "ghcr.io/mistlehq/designer-base"');
+  });
+
   it("accepts Tensorlake image import arguments without sandboxd build inputs", () => {
     const argumentsList = parseCliArguments([
       "--provider",
