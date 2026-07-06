@@ -4,7 +4,8 @@
 //! shutdown signal policy for generic runtime processes.
 
 use std::collections::BTreeMap;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
+use std::sync::Mutex;
 
 use nix::errno::Errno;
 use nix::sys::signal::{Signal, kill as send_signal};
@@ -154,24 +155,53 @@ pub(super) fn spawn_runtime_client_child(
     Ok((child, output_capture))
 }
 
-/// Waits until one process either becomes ready, exits early, or times out.
-pub(super) fn wait_for_runtime_client_process_readiness(
-    process: &mut RunningRuntimeClientProcess,
-    clock: &dyn Clock,
-    sleeper: &dyn Sleeper,
-) -> Result<(), String> {
-    let mut child = process
-        .child
-        .lock()
-        .expect("runtime client child lock should not be poisoned");
-    wait_for_runtime_client_process_readiness_with(&process.spec, &mut child, clock, sleeper)
-}
-
 pub(super) fn wait_for_runtime_client_process_readiness_with(
     process_spec: &RuntimeClientProcessSpec,
     child: &mut Child,
     clock: &dyn Clock,
     sleeper: &dyn Sleeper,
+) -> Result<(), String> {
+    wait_for_runtime_client_process_readiness_by_polling(
+        process_spec,
+        clock,
+        sleeper,
+        || false,
+        || {
+            child
+                .try_wait()
+                .map_err(|error| format!("failed to poll process exit: {error}"))
+        },
+    )
+}
+
+pub(super) fn wait_for_runtime_client_process_readiness_with_child_until_cancelled(
+    process_spec: &RuntimeClientProcessSpec,
+    child: &Mutex<Child>,
+    clock: &dyn Clock,
+    sleeper: &dyn Sleeper,
+    should_cancel: impl Fn() -> bool,
+) -> Result<(), String> {
+    wait_for_runtime_client_process_readiness_by_polling(
+        process_spec,
+        clock,
+        sleeper,
+        should_cancel,
+        || {
+            child
+                .lock()
+                .map_err(|_| "runtime client child lock was poisoned".to_string())?
+                .try_wait()
+                .map_err(|error| format!("failed to poll process exit: {error}"))
+        },
+    )
+}
+
+fn wait_for_runtime_client_process_readiness_by_polling(
+    process_spec: &RuntimeClientProcessSpec,
+    clock: &dyn Clock,
+    sleeper: &dyn Sleeper,
+    mut should_cancel: impl FnMut() -> bool,
+    mut poll_process_exit: impl FnMut() -> Result<Option<ExitStatus>, String>,
 ) -> Result<(), String> {
     let timeout_ms = match &process_spec.readiness {
         RuntimeClientProcessReadiness::None => return Ok(()),
@@ -182,10 +212,11 @@ pub(super) fn wait_for_runtime_client_process_readiness_with(
     let deadline_ms = clock.now_ms().saturating_add(timeout_ms);
 
     loop {
-        if let Some(status) = child
-            .try_wait()
-            .map_err(|error| format!("failed to poll process exit: {error}"))?
-        {
+        if should_cancel() {
+            return Err("readiness check canceled".to_string());
+        }
+
+        if let Some(status) = poll_process_exit()? {
             return Err(describe_process_exit(status));
         }
 
