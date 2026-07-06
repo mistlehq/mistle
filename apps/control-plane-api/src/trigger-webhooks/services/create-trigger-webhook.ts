@@ -34,11 +34,12 @@ export type CreateWebhookTriggerInput = {
     sandboxProfileVersion?: number | undefined;
     primaryRepositoryId?: string | null | undefined;
   };
+  validateInputTemplateReferences?: boolean | undefined;
 };
 
 type CreateWebhookTriggerPersistenceInput = Omit<
   CreateWebhookTriggerInput,
-  "eventConditions" | "target"
+  "eventConditions" | "target" | "validateInputTemplateReferences"
 > & {
   eventConditions: NormalizedWebhookTriggerEventCondition[];
   target: {
@@ -70,11 +71,13 @@ export async function createTriggerWebhook(
     providerMetadata: resolvedWebhookSource.providerMetadata,
     supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
   });
-  assertWebhookTriggerInputTemplateReferencesOrThrow({
-    inputTemplate: input.inputTemplate,
-    eventTypes,
-    supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
-  });
+  if (input.validateInputTemplateReferences !== false) {
+    assertWebhookTriggerInputTemplateReferencesOrThrow({
+      inputTemplate: input.inputTemplate,
+      eventTypes,
+      supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
+    });
+  }
   await assertSandboxProfileReferenceOrThrow(
     { db: ctx.db },
     {
