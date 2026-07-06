@@ -75,6 +75,18 @@ const GitHubPayloadReferences = {
     path: ["pull_request", "head", "ref"],
     description: "Head branch name",
   },
+  RELEASE_TAG_NAME: {
+    path: ["release", "tag_name"],
+    description: "Release tag name",
+  },
+  RELEASE_NAME: {
+    path: ["release", "name"],
+    description: "Release name",
+  },
+  RELEASE_BODY: {
+    path: ["release", "body"],
+    description: "Release notes",
+  },
   REQUESTED_REVIEWER_LOGIN: {
     path: ["requested_reviewer", "login"],
     description: "GitHub login requested for pull request review",
@@ -297,6 +309,15 @@ const GitHubPushBranchParameter: IntegrationWebhookEventParameterDefinition = {
   placeholder: "refs/heads/main",
 };
 
+const GitHubReleaseTagParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "tag",
+  label: "tag",
+  kind: "string",
+  payloadPath: ["release", "tag_name"],
+  prefix: "for",
+  placeholder: "v1.0.0",
+};
+
 const GitHubWebhookPermissionRequirements = {
   CHECKS_READ: {
     permission: "checks",
@@ -424,6 +445,45 @@ function createGitHubPullRequestReviewRequestEventDefinition(input: {
       createGitHubActorParameterGroup(GitHubAuthorParameter),
       GitHubRequestedReviewTargetParameterGroup,
     ],
+  });
+}
+
+function createGitHubReleaseEventDefinition(input: {
+  eventType: string;
+  displayName: string;
+}): IntegrationWebhookEventDefinition {
+  return createGitHubWebhookEventDefinition({
+    eventType: input.eventType,
+    providerEventType: "release",
+    displayName: input.displayName,
+    category: "Releases",
+    requirements: createGitHubWebhookRequirements(
+      "release",
+      GitHubWebhookPermissionRequirements.CONTENTS_READ,
+    ),
+    payloadReferences: [
+      GitHubPayloadReferences.REPOSITORY_FULL_NAME,
+      GitHubPayloadReferences.RELEASE_TAG_NAME,
+      GitHubPayloadReferences.RELEASE_NAME,
+      GitHubPayloadReferences.RELEASE_BODY,
+      GitHubPayloadReferences.SENDER_LOGIN,
+    ],
+    conversationKeyOptions: [
+      GitHubRepositoryConversationKeyOption,
+      {
+        id: "release",
+        label: "Release",
+        description: "Events from the same release go to the same conversation.",
+        template: "{{payload.repository.full_name}}:release:{{payload.release.tag_name}}",
+      },
+    ],
+    parameters: [
+      GitHubRepositoryParameter,
+      GitHubAuthorParameter,
+      GitHubBotActorParameter,
+      GitHubReleaseTagParameter,
+    ],
+    parameterGroups: [createGitHubActorParameterGroup(GitHubAuthorParameter)],
   });
 }
 
@@ -714,5 +774,25 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     payloadReferences: [GitHubPayloadReferences.REPOSITORY_FULL_NAME],
     conversationKeyOptions: [GitHubRepositoryConversationKeyOption],
     parameters: [GitHubRepositoryParameter],
+  }),
+  createGitHubReleaseEventDefinition({
+    eventType: "github.release.created",
+    displayName: "Release created",
+  }),
+  createGitHubReleaseEventDefinition({
+    eventType: "github.release.published",
+    displayName: "Release published",
+  }),
+  createGitHubReleaseEventDefinition({
+    eventType: "github.release.released",
+    displayName: "Release released",
+  }),
+  createGitHubReleaseEventDefinition({
+    eventType: "github.release.prereleased",
+    displayName: "Pre-release published",
+  }),
+  createGitHubReleaseEventDefinition({
+    eventType: "github.release.deleted",
+    displayName: "Release deleted",
   }),
 ];

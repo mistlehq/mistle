@@ -244,6 +244,23 @@ function requireStringField(input: {
   );
 }
 
+function requireTimestampFieldFromCandidates(input: {
+  record: Record<string, unknown>;
+  keys: readonly string[];
+  eventType: string;
+}): string {
+  for (const key of input.keys) {
+    const timestamp = resolveTimestampField(input.record, key);
+    if (timestamp !== null) {
+      return timestamp;
+    }
+  }
+
+  throw new Error(
+    `GitHub webhook event '${input.eventType}' is missing timestamp fields '${input.keys.join(", ")}'.`,
+  );
+}
+
 function resolveOptionalRecordField(input: {
   payload: Record<string, unknown>;
   key: string;
@@ -398,6 +415,63 @@ function resolvePushOrdering(input: {
   };
 }
 
+function resolveReleaseActionOrderKey(eventType: string): string {
+  switch (eventType) {
+    case "github.release.created":
+      return "1";
+    case "github.release.published":
+      return "2";
+    case "github.release.released":
+      return "3";
+    case "github.release.prereleased":
+      return "4";
+    case "github.release.deleted":
+      return "5";
+    default:
+      throw new Error(`Unsupported GitHub release webhook event '${eventType}'.`);
+  }
+}
+
+function resolveReleaseTimestampFields(eventType: string): readonly string[] {
+  switch (eventType) {
+    case "github.release.published":
+    case "github.release.released":
+    case "github.release.prereleased":
+      return ["published_at", "created_at"];
+    default:
+      return ["created_at", "published_at"];
+  }
+}
+
+function resolveReleaseOrdering(input: {
+  payload: Record<string, unknown>;
+  eventType: string;
+}): GitHubEventOrdering {
+  const release = requireRecordField({
+    payload: input.payload,
+    key: "release",
+    eventType: input.eventType,
+  });
+  const occurredAt = requireTimestampFieldFromCandidates({
+    record: release,
+    keys: resolveReleaseTimestampFields(input.eventType),
+    eventType: input.eventType,
+  });
+  const releaseIdentifier = requireOrderingIdentifier({
+    record: release,
+    key: "id",
+    eventType: input.eventType,
+  });
+
+  return {
+    occurredAt,
+    sourceOrderKey: createIntegrationWebhookSourceOrderKey({
+      occurredAt,
+      orderingIdentifier: `${releaseIdentifier}.${resolveReleaseActionOrderKey(input.eventType)}`,
+    }),
+  };
+}
+
 function resolveGitHubEventOrdering(input: {
   eventType: string;
   payload: Record<string, unknown>;
@@ -521,6 +595,12 @@ function resolveGitHubEventOrdering(input: {
         identifierField: "id",
         eventType: input.eventType,
       });
+    case "github.release.created":
+    case "github.release.published":
+    case "github.release.released":
+    case "github.release.prereleased":
+    case "github.release.deleted":
+      return resolveReleaseOrdering(input);
     default:
       return undefined;
   }

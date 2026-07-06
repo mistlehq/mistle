@@ -9,6 +9,7 @@ import type {
   PullRequestReviewSubmittedEvent,
   PushEvent,
   PullRequestReviewCommentCreatedEvent,
+  ReleaseEvent,
   WebhookEventName,
 } from "@octokit/webhooks-types";
 import { describe, expect, it } from "vitest";
@@ -42,6 +43,7 @@ const PullRequestEventName: WebhookEventName = "pull_request";
 const PullRequestReviewEventName: WebhookEventName = "pull_request_review";
 const PushEventName: WebhookEventName = "push";
 const CheckSuiteEventName: WebhookEventName = "check_suite";
+const ReleaseEventName: WebhookEventName = "release";
 
 function encodePayload(input: unknown): Uint8Array {
   return encoder.encode(JSON.stringify(input));
@@ -262,6 +264,20 @@ function resolvePushPayload(): PushPayloadWithHeadCommit {
   return example;
 }
 
+function resolveReleasePayload(action: ReleaseEvent["action"]): ReleaseEvent & InstallationContext {
+  const definition = resolveWebhookDefinition(ReleaseEventName);
+  const example = definition.examples.find(
+    (candidate): candidate is ReleaseEvent =>
+      hasAction(candidate) && candidate.action === action && "release" in candidate,
+  );
+
+  if (example === undefined) {
+    throw new Error(`Missing GitHub webhook example for event release.${action}`);
+  }
+
+  return withInstallation(example);
+}
+
 function withoutInstallation<TPayload extends InstallationContext>(
   payload: TPayload,
 ): Omit<TPayload, "installation"> {
@@ -327,6 +343,12 @@ const PullRequestReviewSubmittedPayload: PullRequestReviewSubmittedEvent & Insta
 
 const PullRequestOpenedPayload: PullRequestOpenedEvent & InstallationContext =
   resolvePullRequestOpenedPayload();
+
+const ReleaseCreatedPayload = resolveReleasePayload("created");
+const ReleasePublishedPayload = resolveReleasePayload("published");
+const ReleaseReleasedPayload = resolveReleasePayload("released");
+const ReleasePrereleasedPayload = resolveReleasePayload("prereleased");
+const ReleaseDeletedPayload = resolveReleasePayload("deleted");
 
 const IssuesClosedPayload = createMinimalGitHubPayload({
   action: "closed",
@@ -636,6 +658,61 @@ const SupportedGitHubOrderingCases: ReadonlyArray<{
     expectedOrderingIdentifier: CheckSuiteCompletedPayload.check_suite.id
       .toString()
       .padStart(20, "0"),
+  },
+  {
+    providerEventType: "release",
+    eventType: "github.release.created",
+    deliveryId: "delivery_release_created",
+    payload: ReleaseCreatedPayload,
+    expectedOccurredAt: requireStringValue({
+      label: "release.created release.created_at",
+      value: ReleaseCreatedPayload.release.created_at,
+    }),
+    expectedOrderingIdentifier: `${ReleaseCreatedPayload.release.id.toString().padStart(20, "0")}.1`,
+  },
+  {
+    providerEventType: "release",
+    eventType: "github.release.published",
+    deliveryId: "delivery_release_published",
+    payload: ReleasePublishedPayload,
+    expectedOccurredAt: requireStringValue({
+      label: "release.published release.published_at",
+      value: ReleasePublishedPayload.release.published_at,
+    }),
+    expectedOrderingIdentifier: `${ReleasePublishedPayload.release.id.toString().padStart(20, "0")}.2`,
+  },
+  {
+    providerEventType: "release",
+    eventType: "github.release.released",
+    deliveryId: "delivery_release_released",
+    payload: ReleaseReleasedPayload,
+    expectedOccurredAt: requireStringValue({
+      label: "release.released release.published_at",
+      value: ReleaseReleasedPayload.release.published_at,
+    }),
+    expectedOrderingIdentifier: `${ReleaseReleasedPayload.release.id.toString().padStart(20, "0")}.3`,
+  },
+  {
+    providerEventType: "release",
+    eventType: "github.release.prereleased",
+    deliveryId: "delivery_release_prereleased",
+    payload: ReleasePrereleasedPayload,
+    expectedOccurredAt: requireStringValue({
+      label: "release.prereleased release.published_at",
+      value: ReleasePrereleasedPayload.release.published_at,
+    }),
+    expectedOrderingIdentifier: `${ReleasePrereleasedPayload.release.id.toString().padStart(20, "0")}.4`,
+  },
+  {
+    providerEventType: "release",
+    eventType: "github.release.deleted",
+    deliveryId: "delivery_release_deleted",
+    payload: ReleaseDeletedPayload,
+    expectedOccurredAt: requireStringValue({
+      label: "release.deleted release.created_at",
+      value: ReleaseDeletedPayload.release.created_at,
+    }),
+    expectedOrderingIdentifier: `${ReleaseDeletedPayload.release.id.toString().padStart(20, "0")}.5`,
   },
 ];
 
