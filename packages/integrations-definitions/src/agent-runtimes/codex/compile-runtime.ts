@@ -37,7 +37,12 @@ const CodexCliReleaseTag = `rust-v${CodexCliVersion}`;
 const ProxyModelProviderKey = "proxy";
 const ProxyModelProviderName = "OpenAI";
 const CodexConfigPath = "/etc/codex/config.toml";
+const CodexRequirementsPath = "/etc/codex/requirements.toml";
+const CodexHomeConfigPath = "/root/.codex/config.toml";
+const CodexHomeDir = "/root/.codex";
 const CodexGlobalAgentsPath = "/root/.codex/AGENTS.md";
+const LangfuseCodexPluginHookCommand =
+  'node "${CODEX_HOME:-$HOME/.codex}/plugins/cache/codex-observability-plugin/tracing/0.1.0/dist/index.mjs"';
 const CodexGitHubRepository = "openai/codex";
 const CodexGitHubAssets = {
   x86_64: {
@@ -56,14 +61,26 @@ const RuntimeClientProcessReadinessTimeoutMs = 60_000;
 const RuntimeClientProcessStopTimeoutMs = 10_000;
 const RuntimeClientProcessStopGracePeriodMs = 2_000;
 type CompileCodexRuntimeInput = CompileAgentRuntimeInput<Record<string, never>> & {
+  langfuseTracing?: CodexLangfuseTracingConfig;
   managedInstructionBlocks?: ReadonlyArray<MistleManagedInstructionBlock>;
 };
 type CodexProviderMetadata = {
   responsesApiBaseUrl: string;
   chatgptBaseUrl?: string;
 };
+type CodexLangfuseTracingConfig = {
+  publicKey: string;
+  secretKeyPlaceholder: string;
+  baseUrl: string;
+  environment?: string;
+  metadata?: Readonly<Record<string, string>>;
+  tags?: ReadonlyArray<string>;
+};
 
-function renderCodexConfig(input: { providerMetadata?: CodexProviderMetadata }): string {
+function renderCodexConfig(input: {
+  langfuseTracing?: CodexLangfuseTracingConfig;
+  providerMetadata?: CodexProviderMetadata;
+}): string {
   const providerConfig =
     input.providerMetadata === undefined
       ? {}
@@ -90,9 +107,19 @@ function renderCodexConfig(input: { providerMetadata?: CodexProviderMetadata }):
     features: {
       apps: false,
       goals: true,
-      plugins: false,
+      ...(input.langfuseTracing === undefined ? {} : { hooks: true }),
+      plugins: input.langfuseTracing === undefined ? false : true,
       tool_search: true,
     },
+    ...(input.langfuseTracing === undefined
+      ? {}
+      : {
+          plugins: {
+            "tracing@codex-observability-plugin": {
+              enabled: true,
+            },
+          },
+        }),
     projects: {
       "/": {
         trust_level: "trusted",
@@ -105,6 +132,43 @@ function renderCodexSetupConfigMergeFragment(): string {
   return stringifyToml({
     features: {
       tool_search: true,
+    },
+  });
+}
+
+function renderCodexHomeLangfuseConfigMergeFragment(): string {
+  return stringifyToml({
+    features: {
+      hooks: true,
+      plugins: true,
+    },
+    plugins: {
+      "tracing@codex-observability-plugin": {
+        enabled: true,
+      },
+    },
+  });
+}
+
+function renderCodexLangfuseRequirementsMergeFragment(): string {
+  return stringifyToml({
+    features: {
+      hooks: true,
+    },
+    hooks: {
+      managed_dir: "/root/.codex/plugins/cache/codex-observability-plugin/tracing/0.1.0",
+      Stop: [
+        {
+          hooks: [
+            {
+              type: "command",
+              command: LangfuseCodexPluginHookCommand,
+              timeout: 30,
+              statusMessage: "Uploading Codex trace to Langfuse",
+            },
+          ],
+        },
+      ],
     },
   });
 }
@@ -158,11 +222,38 @@ function resolveCodexProviderMetadataFromEgressRoutes(input: {
 }
 
 function buildCodexSetupFiles(input: {
+  enableInstalledLangfusePluginConfig?: boolean;
+  langfuseTracing?: CodexLangfuseTracingConfig;
   managedInstructionBlocks?: ReadonlyArray<MistleManagedInstructionBlock>;
   mergeSetupFiles?: boolean;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
   providerMetadata?: CodexProviderMetadata;
 }): ReadonlyArray<RuntimeClientSetupFile> {
+  const installedLangfusePluginConfigFiles: RuntimeClientSetupFile[] =
+    input.enableInstalledLangfusePluginConfig === true
+      ? [
+          {
+            fileId: "codex_home_langfuse_config",
+            path: CodexHomeConfigPath,
+            mode: 384,
+            writeMode: "merge",
+            content: renderCodexHomeLangfuseConfigMergeFragment(),
+          },
+        ]
+      : [];
+  const langfuseManagedHookFiles: RuntimeClientSetupFile[] =
+    input.langfuseTracing === undefined
+      ? []
+      : [
+          {
+            fileId: "codex_langfuse_requirements",
+            path: CodexRequirementsPath,
+            mode: 384,
+            writeMode: "merge",
+            content: renderCodexLangfuseRequirementsMergeFragment(),
+          },
+        ];
+
   return [
     {
       fileId: "codex_config",
@@ -172,9 +263,14 @@ function buildCodexSetupFiles(input: {
       content:
         input.mergeSetupFiles === true
           ? renderCodexSetupConfigMergeFragment()
-          : input.providerMetadata === undefined
-            ? renderCodexConfig({})
-            : renderCodexConfig({ providerMetadata: input.providerMetadata }),
+          : renderCodexConfig({
+              ...(input.langfuseTracing === undefined
+                ? {}
+                : { langfuseTracing: input.langfuseTracing }),
+              ...(input.providerMetadata === undefined
+                ? {}
+                : { providerMetadata: input.providerMetadata }),
+            }),
     },
     {
       fileId: "codex_global_agents",
@@ -196,11 +292,15 @@ function buildCodexSetupFiles(input: {
               mcpServers: input.mcpServers,
             }),
     },
+    ...langfuseManagedHookFiles,
+    ...installedLangfusePluginConfigFiles,
   ];
 }
 
 function buildCodexSetupFilesFromEgressRoutes(input: {
+  enableInstalledLangfusePluginConfig?: boolean;
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+  langfuseTracing?: CodexLangfuseTracingConfig;
   managedInstructionBlocks?: ReadonlyArray<MistleManagedInstructionBlock>;
   mergeSetupFiles?: boolean;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
@@ -210,6 +310,10 @@ function buildCodexSetupFilesFromEgressRoutes(input: {
   });
 
   return buildCodexSetupFiles({
+    ...(input.enableInstalledLangfusePluginConfig === undefined
+      ? {}
+      : { enableInstalledLangfusePluginConfig: input.enableInstalledLangfusePluginConfig }),
+    ...(input.langfuseTracing === undefined ? {} : { langfuseTracing: input.langfuseTracing }),
     ...(input.managedInstructionBlocks === undefined
       ? {}
       : { managedInstructionBlocks: input.managedInstructionBlocks }),
@@ -221,13 +325,14 @@ function buildCodexSetupFilesFromEgressRoutes(input: {
 
 function buildCodexRuntimeClients(input: {
   codexCliInstallPath: string;
+  langfuseTracing?: CodexLangfuseTracingConfig;
   setupFiles: ReadonlyArray<RuntimeClientSetupFile>;
 }): ReadonlyArray<RuntimeClient> {
   return [
     {
       clientId: "codex-cli",
       setup: {
-        env: {},
+        env: buildCodexRuntimeEnv(input),
         files: input.setupFiles,
       },
       processes: [
@@ -261,6 +366,31 @@ function buildCodexRuntimeClients(input: {
       ],
     },
   ];
+}
+
+function buildCodexRuntimeEnv(input: {
+  langfuseTracing?: CodexLangfuseTracingConfig;
+}): Record<string, string> {
+  if (input.langfuseTracing === undefined) {
+    return {};
+  }
+
+  return {
+    CODEX_HOME: CodexHomeDir,
+    TRACE_TO_LANGFUSE: "true",
+    LANGFUSE_CODEX_PUBLIC_KEY: input.langfuseTracing.publicKey,
+    LANGFUSE_CODEX_SECRET_KEY: input.langfuseTracing.secretKeyPlaceholder,
+    LANGFUSE_CODEX_BASE_URL: input.langfuseTracing.baseUrl,
+    ...(input.langfuseTracing.environment === undefined
+      ? {}
+      : { LANGFUSE_TRACING_ENVIRONMENT: input.langfuseTracing.environment }),
+    ...(input.langfuseTracing.tags === undefined
+      ? {}
+      : { LANGFUSE_CODEX_TAGS: input.langfuseTracing.tags.join(",") }),
+    ...(input.langfuseTracing.metadata === undefined
+      ? {}
+      : { LANGFUSE_CODEX_METADATA: JSON.stringify(input.langfuseTracing.metadata) }),
+  };
 }
 
 export function compileCodexRuntime(input: CompileCodexRuntimeInput): CompileAgentRuntimeResult {
@@ -305,8 +435,12 @@ export function compileCodexRuntime(input: CompileCodexRuntimeInput): CompileAge
     renderRuntimeClients: ({ egressRoutes }) =>
       buildCodexRuntimeClients({
         codexCliInstallPath,
+        ...(input.langfuseTracing === undefined ? {} : { langfuseTracing: input.langfuseTracing }),
         setupFiles: buildCodexSetupFilesFromEgressRoutes({
           egressRoutes,
+          ...(input.langfuseTracing === undefined
+            ? {}
+            : { langfuseTracing: input.langfuseTracing }),
           ...(input.managedInstructionBlocks === undefined
             ? {}
             : { managedInstructionBlocks: input.managedInstructionBlocks }),
@@ -323,6 +457,7 @@ export function compileCodexRuntime(input: CompileCodexRuntimeInput): CompileAge
 export function compileInstalledCodexRuntime(input: {
   codexCliPath: string;
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+  langfuseTracing?: CodexLangfuseTracingConfig;
   managedInstructionBlocks?: ReadonlyArray<MistleManagedInstructionBlock>;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): CompileAgentRuntimeResult {
@@ -330,8 +465,11 @@ export function compileInstalledCodexRuntime(input: {
     artifacts: [],
     runtimeClients: buildCodexRuntimeClients({
       codexCliInstallPath: input.codexCliPath,
+      ...(input.langfuseTracing === undefined ? {} : { langfuseTracing: input.langfuseTracing }),
       setupFiles: buildCodexSetupFilesFromEgressRoutes({
         egressRoutes: input.egressRoutes,
+        enableInstalledLangfusePluginConfig: input.langfuseTracing !== undefined,
+        ...(input.langfuseTracing === undefined ? {} : { langfuseTracing: input.langfuseTracing }),
         ...(input.managedInstructionBlocks === undefined
           ? {}
           : { managedInstructionBlocks: input.managedInstructionBlocks }),

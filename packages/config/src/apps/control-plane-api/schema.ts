@@ -136,6 +136,15 @@ const ControlPlaneApiDesignerSandboxConfigSchema = z
   .object({
     baseImage: z.string().trim().min(1),
     codexCliPath: z.string().trim().min(1).default("codex"),
+    langfuse: z
+      .object({
+        enabled: z.boolean(),
+        publicKey: z.string().trim().min(1).optional(),
+        baseUrl: z.url().optional(),
+        environment: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .default({ enabled: false }),
     sandboxProvider: z.string().trim().min(1),
     sandboxConnectionId: z.string().trim().min(1).nullable().default(null),
     sandboxResources: z
@@ -278,6 +287,12 @@ export const ControlPlaneApiPlatformCredentialsConfigSchema = z
         apiKey: z.string().trim().min(1),
       })
       .strict(),
+    langfuse: z
+      .object({
+        secretKey: z.string().trim().min(1),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -286,6 +301,12 @@ export const PartialControlPlaneApiPlatformCredentialsConfigSchema = z
     openai: z
       .object({
         apiKey: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+    langfuse: z
+      .object({
+        secretKey: z.string().trim().min(1).optional(),
       })
       .strict()
       .optional(),

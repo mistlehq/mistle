@@ -381,6 +381,17 @@
                           },
                           "required": ["kind"],
                           "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "platform_langfuse_secret_key"
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
                         }
                       ]
                     }
@@ -504,6 +515,17 @@
                       "kind": {
                         "type": "string",
                         "const": "platform_openai_api_key"
+                      }
+                    },
+                    "required": ["kind"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "platform_langfuse_secret_key"
                       }
                     },
                     "required": ["kind"],

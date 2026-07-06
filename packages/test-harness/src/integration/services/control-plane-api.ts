@@ -70,13 +70,16 @@ export function service(
   infra: readonly TestInfraRequirement[],
   options: IntegrationServiceOptions,
 ): TestServiceDefinition {
+  const controlPlaneApiOptions = options.controlPlaneApi;
   const requiresEnvironmentScope =
     options.sandbox !== undefined ||
-    options.controlPlaneApi?.billingStripeEnabled === true ||
-    options.controlPlaneApi?.googleAuth === "simulated" ||
-    options.controlPlaneApi?.allowSignups === false ||
-    options.controlPlaneApi?.welcomeEmail?.enabled === true ||
-    options.controlPlaneApi?.mcpTrustForwardedHeaders === false;
+    controlPlaneApiOptions?.designerLangfuse !== undefined ||
+    controlPlaneApiOptions?.platformCredentials !== undefined ||
+    controlPlaneApiOptions?.billingStripeEnabled === true ||
+    controlPlaneApiOptions?.googleAuth === "simulated" ||
+    controlPlaneApiOptions?.allowSignups === false ||
+    controlPlaneApiOptions?.welcomeEmail?.enabled === true ||
+    controlPlaneApiOptions?.mcpTrustForwardedHeaders === false;
 
   return {
     id: ServiceIds.CONTROL_PLANE_API,
@@ -90,42 +93,31 @@ export function service(
     ...(requiresEnvironmentScope ? { poolScope: "environment" } : {}),
     supportedModes: ["runtime"],
     healthCheck: async (runtime) => httpHealth(runtime, ServiceIds.CONTROL_PLANE_API),
-    start: start(
-      options?.controlPlaneApi?.googleAuth === undefined
-        ? {
-            postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.CONTROL_PLANE_API),
-            ...(options.controlPlaneApi?.allowSignups === undefined
-              ? {}
-              : { allowSignups: options.controlPlaneApi.allowSignups }),
-            ...(options.controlPlaneApi?.billingStripeEnabled === undefined
-              ? {}
-              : { billingStripeEnabled: options.controlPlaneApi.billingStripeEnabled }),
-            ...(options.controlPlaneApi?.welcomeEmail === undefined
-              ? {}
-              : { welcomeEmail: options.controlPlaneApi.welcomeEmail }),
-            ...(options.controlPlaneApi?.mcpTrustForwardedHeaders === undefined
-              ? {}
-              : { mcpTrustForwardedHeaders: options.controlPlaneApi.mcpTrustForwardedHeaders }),
-            sandbox: options.sandbox,
-          }
-        : {
-            postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.CONTROL_PLANE_API),
-            googleAuth: options.controlPlaneApi.googleAuth,
-            ...(options.controlPlaneApi.allowSignups === undefined
-              ? {}
-              : { allowSignups: options.controlPlaneApi.allowSignups }),
-            ...(options.controlPlaneApi.billingStripeEnabled === undefined
-              ? {}
-              : { billingStripeEnabled: options.controlPlaneApi.billingStripeEnabled }),
-            ...(options.controlPlaneApi.welcomeEmail === undefined
-              ? {}
-              : { welcomeEmail: options.controlPlaneApi.welcomeEmail }),
-            ...(options.controlPlaneApi.mcpTrustForwardedHeaders === undefined
-              ? {}
-              : { mcpTrustForwardedHeaders: options.controlPlaneApi.mcpTrustForwardedHeaders }),
-            sandbox: options.sandbox,
-          },
-    ),
+    start: start({
+      postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.CONTROL_PLANE_API),
+      ...(controlPlaneApiOptions?.googleAuth === undefined
+        ? {}
+        : { googleAuth: controlPlaneApiOptions.googleAuth }),
+      ...(controlPlaneApiOptions?.allowSignups === undefined
+        ? {}
+        : { allowSignups: controlPlaneApiOptions.allowSignups }),
+      ...(controlPlaneApiOptions?.billingStripeEnabled === undefined
+        ? {}
+        : { billingStripeEnabled: controlPlaneApiOptions.billingStripeEnabled }),
+      ...(controlPlaneApiOptions?.designerLangfuse === undefined
+        ? {}
+        : { designerLangfuse: controlPlaneApiOptions.designerLangfuse }),
+      ...(controlPlaneApiOptions?.platformCredentials === undefined
+        ? {}
+        : { platformCredentials: controlPlaneApiOptions.platformCredentials }),
+      ...(controlPlaneApiOptions?.welcomeEmail === undefined
+        ? {}
+        : { welcomeEmail: controlPlaneApiOptions.welcomeEmail }),
+      ...(controlPlaneApiOptions?.mcpTrustForwardedHeaders === undefined
+        ? {}
+        : { mcpTrustForwardedHeaders: controlPlaneApiOptions.mcpTrustForwardedHeaders }),
+      sandbox: options.sandbox,
+    }),
   };
 }
 
@@ -134,6 +126,10 @@ function start(input: {
   googleAuth?: "simulated";
   allowSignups?: boolean;
   billingStripeEnabled?: boolean;
+  designerLangfuse?: NonNullable<IntegrationServiceOptions["controlPlaneApi"]>["designerLangfuse"];
+  platformCredentials?: NonNullable<
+    IntegrationServiceOptions["controlPlaneApi"]
+  >["platformCredentials"];
   welcomeEmail?: IntegrationControlPlaneApiWelcomeEmailOptions;
   mcpTrustForwardedHeaders?: boolean;
   sandbox: IntegrationSandboxOptions | undefined;
@@ -150,62 +146,40 @@ function start(input: {
     const resolvedSeaweedfs = startInput.infra.get(InfraIds.SEAWEEDFS);
     const endpoint = httpEndpoint(startInput, ServiceIds.CONTROL_PLANE_API);
     const peer = peers(startInput.services, startInput.plannedEndpoints);
+    const configInput = {
+      controlPlaneBaseUrl: endpoint.hostBaseUrl,
+      controlPlanePort: endpoint.port,
+      dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
+      gatewayWsUrl: withTestEnvironmentIdQueryParam({
+        url: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
+        environmentId: startInput.environmentId,
+      }),
+      postgres: resolvedPostgres,
+      sandboxBaseImageRef: readSandboxBaseImageRef({
+        sandbox: input.sandbox,
+        sandboxBaseImage: resolvedSandboxBaseImage,
+      }),
+      sandbox: input.sandbox,
+      seaweedfs: resolvedSeaweedfs,
+      ...(input.googleAuth === undefined ? {} : { googleAuth: input.googleAuth }),
+      ...(input.billingStripeEnabled === undefined
+        ? {}
+        : { billingStripeEnabled: input.billingStripeEnabled }),
+      ...(input.designerLangfuse === undefined ? {} : { designerLangfuse: input.designerLangfuse }),
+      ...(input.platformCredentials === undefined
+        ? {}
+        : { platformCredentials: input.platformCredentials }),
+      ...(input.welcomeEmail === undefined ? {} : { welcomeEmail: input.welcomeEmail }),
+      ...(input.allowSignups === undefined ? {} : { allowSignups: input.allowSignups }),
+      ...(input.mcpTrustForwardedHeaders === undefined
+        ? {}
+        : { mcpTrustForwardedHeaders: input.mcpTrustForwardedHeaders }),
+    };
     const runtime = await createControlPlaneApiRuntime({
       global: {
         env: "development",
       },
-      app: config(
-        input.googleAuth === undefined
-          ? {
-              controlPlaneBaseUrl: endpoint.hostBaseUrl,
-              controlPlanePort: endpoint.port,
-              dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
-              gatewayWsUrl: withTestEnvironmentIdQueryParam({
-                url: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
-                environmentId: startInput.environmentId,
-              }),
-              postgres: resolvedPostgres,
-              sandboxBaseImageRef: readSandboxBaseImageRef({
-                sandbox: input.sandbox,
-                sandboxBaseImage: resolvedSandboxBaseImage,
-              }),
-              sandbox: input.sandbox,
-              seaweedfs: resolvedSeaweedfs,
-              ...(input.billingStripeEnabled === undefined
-                ? {}
-                : { billingStripeEnabled: input.billingStripeEnabled }),
-              ...(input.welcomeEmail === undefined ? {} : { welcomeEmail: input.welcomeEmail }),
-              ...(input.allowSignups === undefined ? {} : { allowSignups: input.allowSignups }),
-              ...(input.mcpTrustForwardedHeaders === undefined
-                ? {}
-                : { mcpTrustForwardedHeaders: input.mcpTrustForwardedHeaders }),
-            }
-          : {
-              controlPlaneBaseUrl: endpoint.hostBaseUrl,
-              controlPlanePort: endpoint.port,
-              dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
-              gatewayWsUrl: withTestEnvironmentIdQueryParam({
-                url: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
-                environmentId: startInput.environmentId,
-              }),
-              postgres: resolvedPostgres,
-              sandboxBaseImageRef: readSandboxBaseImageRef({
-                sandbox: input.sandbox,
-                sandboxBaseImage: resolvedSandboxBaseImage,
-              }),
-              sandbox: input.sandbox,
-              seaweedfs: resolvedSeaweedfs,
-              googleAuth: input.googleAuth,
-              ...(input.billingStripeEnabled === undefined
-                ? {}
-                : { billingStripeEnabled: input.billingStripeEnabled }),
-              ...(input.welcomeEmail === undefined ? {} : { welcomeEmail: input.welcomeEmail }),
-              ...(input.allowSignups === undefined ? {} : { allowSignups: input.allowSignups }),
-              ...(input.mcpTrustForwardedHeaders === undefined
-                ? {}
-                : { mcpTrustForwardedHeaders: input.mcpTrustForwardedHeaders }),
-            },
-      ),
+      app: config(configInput),
     });
 
     try {
@@ -247,6 +221,10 @@ function config(input: {
   googleAuth?: "simulated";
   allowSignups?: boolean;
   billingStripeEnabled?: boolean;
+  designerLangfuse?: NonNullable<IntegrationServiceOptions["controlPlaneApi"]>["designerLangfuse"];
+  platformCredentials?: NonNullable<
+    IntegrationServiceOptions["controlPlaneApi"]
+  >["platformCredentials"];
   welcomeEmail?: IntegrationControlPlaneApiWelcomeEmailOptions;
   mcpTrustForwardedHeaders?: boolean;
 }): ControlPlaneApiConfig {
@@ -300,6 +278,24 @@ function config(input: {
     internalAuth: {
       serviceToken: "integration-new-internal-service-token",
     },
+    ...(input.platformCredentials === undefined
+      ? {}
+      : {
+          platformCredentials: {
+            openai: {
+              apiKey:
+                input.platformCredentials.openai?.apiKey ??
+                "integration-new-platform-openai-api-key",
+            },
+            ...(input.platformCredentials.langfuse === undefined
+              ? {}
+              : {
+                  langfuse: {
+                    secretKey: input.platformCredentials.langfuse.secretKey,
+                  },
+                }),
+          },
+        }),
     connectionToken: {
       secret: "integration-new-connection-secret",
       issuer: "integration-new-control-plane-api",
@@ -326,6 +322,17 @@ function config(input: {
       designer: {
         baseImage: getLocalDevDockerRegistryDesignerBaseImageRef(),
         codexCliPath: "codex",
+        langfuse:
+          input.designerLangfuse === undefined
+            ? { enabled: false }
+            : {
+                enabled: true,
+                publicKey: input.designerLangfuse.publicKey,
+                baseUrl: input.designerLangfuse.baseUrl,
+                ...(input.designerLangfuse.environment === undefined
+                  ? {}
+                  : { environment: input.designerLangfuse.environment }),
+              },
         sandboxProvider: "docker",
         sandboxConnectionId: null,
         sandboxResources: null,

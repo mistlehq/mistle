@@ -19,6 +19,9 @@ const routeHandler = async (
       db: ctx.get("db"),
       dataPlaneClient: ctx.get("dataPlaneClient"),
       mcpConfig: ctx.get("config").mcp,
+      ...(ctx.get("config").platformCredentials === undefined
+        ? {}
+        : { platformCredentials: ctx.get("config").platformCredentials }),
       sandboxConfig: ctx.get("sandboxConfig"),
     },
     {

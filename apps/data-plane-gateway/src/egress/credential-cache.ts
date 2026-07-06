@@ -51,6 +51,11 @@ export type CredentialCacheKeyInput =
       testEnvironmentId?: string;
       bindingId: string;
       credentialResolverKind: "platform_openai_api_key";
+    }
+  | {
+      testEnvironmentId?: string;
+      bindingId: string;
+      credentialResolverKind: "platform_langfuse_secret_key";
     };
 
 export type CachedCredential =
@@ -181,6 +186,14 @@ function toCacheKey(input: CredentialCacheKeyInput): string {
   }
 
   if (input.credentialResolverKind === "platform_openai_api_key") {
+    return `gateway-egress-credential:${[
+      input.testEnvironmentId ?? "",
+      input.bindingId,
+      input.credentialResolverKind,
+    ].join(":")}`;
+  }
+
+  if (input.credentialResolverKind === "platform_langfuse_secret_key") {
     return `gateway-egress-credential:${[
       input.testEnvironmentId ?? "",
       input.bindingId,

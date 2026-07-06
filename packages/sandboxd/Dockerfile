@@ -161,6 +161,8 @@ FROM sandbox-base AS sandbox-designer-base
 
 ARG TARGETARCH
 ARG CODEX_CLI_VERSION=0.142.5
+ARG DESIGNER_CODEX_PLUGIN_NODE_VERSION=node@22
+ARG LANGFUSE_CODEX_PLUGIN_MARKETPLACE=langfuse/codex-observability-plugin
 
 RUN case "${TARGETARCH}" in \
       amd64) \
@@ -186,6 +188,16 @@ RUN case "${TARGETARCH}" in \
   && install -m 0755 "/tmp/${codex_binary}" /usr/local/bin/codex \
   && rm -f /tmp/codex.tar.gz "/tmp/${codex_binary}" \
   && codex --version
+
+RUN /opt/mistle/bin/mise install -y "${DESIGNER_CODEX_PLUGIN_NODE_VERSION}" \
+  && node_dir="$(/opt/mistle/bin/mise where "${DESIGNER_CODEX_PLUGIN_NODE_VERSION}")" \
+  && ln -sf "${node_dir}/bin/node" /usr/local/bin/node \
+  && ln -sf "${node_dir}/bin/npm" /usr/local/bin/npm \
+  && node --version
+
+RUN CODEX_HOME=/root/.codex codex plugin marketplace add "${LANGFUSE_CODEX_PLUGIN_MARKETPLACE}" \
+  && CODEX_HOME=/root/.codex codex plugin add tracing@codex-observability-plugin \
+  && test -f /root/.codex/plugins/cache/codex-observability-plugin/tracing/0.1.0/dist/index.mjs
 
 LABEL org.opencontainers.image.title="Mistle Designer Base"
 LABEL org.opencontainers.image.description="Sandbox base image for Mistle Designer sessions"

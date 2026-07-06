@@ -70,6 +70,11 @@ export const EgressCredentialResolverSchema = z.discriminatedUnion("kind", [
       kind: z.literal("platform_openai_api_key"),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal("platform_langfuse_secret_key"),
+    })
+    .strict(),
 ]);
 
 export const EgressCredentialRouteSchema = z
@@ -749,6 +754,12 @@ function normalizeCredentialResolver(
     };
   }
 
+  if (resolver.kind === "platform_langfuse_secret_key") {
+    return {
+      kind: "platform_langfuse_secret_key",
+    };
+  }
+
   return {
     kind: "linked_principal",
     providerFamily: resolver.providerFamily,
@@ -805,6 +816,13 @@ function compareCredentialResolvers(
   }
 
   if (left.kind === "platform_openai_api_key" && right.kind === "platform_openai_api_key") {
+    return 0;
+  }
+
+  if (
+    left.kind === "platform_langfuse_secret_key" &&
+    right.kind === "platform_langfuse_secret_key"
+  ) {
     return 0;
   }
 

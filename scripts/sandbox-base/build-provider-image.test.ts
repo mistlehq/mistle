@@ -26,6 +26,23 @@ describe("parseCliArguments", () => {
     expect(argumentsList.repositoryProvided).toBe(false);
   });
 
+  it("bakes the Langfuse Codex plugin runtime into the Designer docker target", () => {
+    const dockerfile = readFileSync("packages/sandboxd/Dockerfile", "utf8");
+
+    expect(dockerfile).toContain("FROM sandbox-base AS sandbox-designer-base");
+    expect(dockerfile).toContain("DESIGNER_CODEX_PLUGIN_NODE_VERSION=node@22");
+    expect(dockerfile).toContain(
+      "LANGFUSE_CODEX_PLUGIN_MARKETPLACE=langfuse/codex-observability-plugin",
+    );
+    expect(dockerfile).toContain(
+      'codex plugin marketplace add "${LANGFUSE_CODEX_PLUGIN_MARKETPLACE}"',
+    );
+    expect(dockerfile).toContain("codex plugin add tracing@codex-observability-plugin");
+    expect(dockerfile).toContain(
+      "/root/.codex/plugins/cache/codex-observability-plugin/tracing/0.1.0/dist/index.mjs",
+    );
+  });
+
   it("keeps an explicit repository for the Designer docker target", () => {
     const argumentsList = parseCliArguments([
       "--provider",

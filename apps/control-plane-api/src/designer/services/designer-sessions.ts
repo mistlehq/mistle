@@ -13,11 +13,13 @@ import { SandboxInstancePurposes, type SandboxInstanceStarterKind } from "@mistl
 import { and, desc, eq, sql } from "drizzle-orm";
 import { TypeID } from "typeid-js";
 
+import { logger } from "../../logger.js";
 import { SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS } from "../../sandbox-instances/constants.js";
 import { mintConnectionTokenForInstance } from "../../sandbox-instances/services/mint-connection-token-for-instance.js";
 import { resolveSandboxInstanceRuntimeContext } from "../../sandbox-instances/services/runtime-context.js";
 import { createWorkflowSandboxRuntime } from "../../sandbox-profiles/services/profile-version-runtime-config.js";
 import type {
+  ControlPlaneApiConfig,
   ControlPlaneApiConnectionTokenConfig,
   ControlPlaneApiMcpConfig,
   ControlPlaneApiSandboxRuntimeConfig,
@@ -35,7 +37,10 @@ import type {
   DesignerSessionResponse,
   PutDesignerSessionCanvasTabsBody,
 } from "../schemas.js";
-import { createDesignerRuntimePlan } from "./compile-designer-runtime-plan.js";
+import {
+  createDesignerRuntimePlan,
+  type DesignerRuntimeLangfuseConfig,
+} from "./compile-designer-runtime-plan.js";
 
 type DesignerSessionActor = {
   kind: SandboxInstanceStarterKind;
@@ -50,6 +55,7 @@ type DesignerSessionServiceContext = {
     "getSandboxInstance" | "startSandboxInstance"
   >;
   mcpConfig: ControlPlaneApiMcpConfig;
+  platformCredentials?: ControlPlaneApiConfig["platformCredentials"];
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
 };
 
@@ -100,6 +106,53 @@ function createDesignerSessionId(input: {
     .digest();
 
   return TypeID.fromUUIDBytes("dsn", digest.subarray(0, 16)).toString();
+}
+
+function resolveDesignerLangfuseRuntimeConfig(input: {
+  organizationId: string;
+  designerSessionId: string;
+  langfuse: NonNullable<ControlPlaneApiSandboxRuntimeConfig["designer"]>["langfuse"];
+  platformCredentials?: ControlPlaneApiConfig["platformCredentials"];
+}): DesignerRuntimeLangfuseConfig {
+  if (input.langfuse.enabled === false) {
+    return {
+      enabled: false,
+    };
+  }
+
+  if (
+    input.langfuse.publicKey === undefined ||
+    input.langfuse.baseUrl === undefined ||
+    input.platformCredentials?.langfuse?.secretKey === undefined
+  ) {
+    logger.warn(
+      {
+        designerSessionId: input.designerSessionId,
+        organizationId: input.organizationId,
+        hasLangfusePublicKey: input.langfuse.publicKey !== undefined,
+        hasLangfuseBaseUrl: input.langfuse.baseUrl !== undefined,
+        hasPlatformLangfuseSecretKey: input.platformCredentials?.langfuse?.secretKey !== undefined,
+      },
+      "Designer Langfuse tracing is enabled but incomplete; continuing without Codex tracing.",
+    );
+    return {
+      enabled: false,
+    };
+  }
+
+  return {
+    enabled: true,
+    publicKey: input.langfuse.publicKey,
+    baseUrl: input.langfuse.baseUrl,
+    ...(input.langfuse.environment === undefined
+      ? {}
+      : { environment: input.langfuse.environment }),
+    tags: ["mistle-designer"],
+    metadata: {
+      "mistle.organization_id": input.organizationId,
+      "mistle.designer_session_id": input.designerSessionId,
+    },
+  };
 }
 
 async function getDesignerSandboxInstance(
@@ -340,6 +393,14 @@ export async function createDesignerSession(
     designerSessionId,
     imageRef: designerSandboxConfig.baseImage,
     initialPrompt: input.body.prompt,
+    langfuse: resolveDesignerLangfuseRuntimeConfig({
+      organizationId: input.organizationId,
+      designerSessionId,
+      langfuse: designerSandboxConfig.langfuse,
+      ...(ctx.platformCredentials === undefined
+        ? {}
+        : { platformCredentials: ctx.platformCredentials }),
+    }),
     mistleMcp: {
       enabled: true,
       url: ctx.mcpConfig.url,

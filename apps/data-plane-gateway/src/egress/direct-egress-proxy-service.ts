@@ -1383,6 +1383,12 @@ function directEgressCredentialResolverLogFields(
     };
   }
 
+  if (credentialResolver.kind === "platform_langfuse_secret_key") {
+    return {
+      routeCredentialResolverKind: credentialResolver.kind,
+    };
+  }
+
   return {
     ...(credentialResolver.integrationConnectionId === undefined
       ? {}

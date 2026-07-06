@@ -127,6 +127,7 @@ function start(input: {
       }),
       gatewayRelay: input.dataPlaneGateway?.gatewayRelay,
       health: input.dataPlaneGateway?.health,
+      platformCredentials: input.dataPlaneGateway?.platformCredentials,
       portAccess: input.dataPlaneGateway?.portAccess,
       directEgressTrustedCaCertificates:
         input.dataPlaneGateway?.directEgress?.trustedCaCertificates,
@@ -221,6 +222,9 @@ function config(input: {
   gatewayWsUrl: string;
   gatewayRelay: IntegrationDataPlaneGatewayRelayOptions | undefined;
   health: NonNullable<IntegrationServiceOptions["dataPlaneGateway"]>["health"] | undefined;
+  platformCredentials:
+    | NonNullable<IntegrationServiceOptions["dataPlaneGateway"]>["platformCredentials"]
+    | undefined;
   portAccess: NonNullable<IntegrationServiceOptions["dataPlaneGateway"]>["portAccess"] | undefined;
   nats: ResolvedTestInfra | undefined;
   sandbox: IntegrationSandboxOptions | undefined;
@@ -288,8 +292,16 @@ function config(input: {
     },
     platformCredentials: {
       openai: {
-        apiKey: "integration-new-platform-openai-api-key",
+        apiKey:
+          input.platformCredentials?.openai?.apiKey ?? "integration-new-platform-openai-api-key",
       },
+      ...(input.platformCredentials?.langfuse === undefined
+        ? {}
+        : {
+            langfuse: {
+              secretKey: input.platformCredentials.langfuse.secretKey,
+            },
+          }),
     },
     sandbox: {
       defaultBaseImage: readSandboxBaseImageRef({

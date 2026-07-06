@@ -173,7 +173,11 @@ function readBooleanEnv(env: NodeJS.ProcessEnv, envVar: string): boolean | undef
     return undefined;
   }
 
-  const normalizedValue = rawValue.trim().toLowerCase();
+  return parseBooleanEnvValue(rawValue, envVar);
+}
+
+function parseBooleanEnvValue(value: string, envVar: string): boolean {
+  const normalizedValue = value.trim().toLowerCase();
   if (normalizedValue === "1" || normalizedValue === "true") {
     return true;
   }
@@ -523,6 +527,10 @@ const ControlPlaneApiEnvDescriptors = [
     envVar: "MISTLE_PLATFORM_OPENAI_API_KEY",
     path: ["platformCredentials", "openai", "apiKey"],
   },
+  {
+    envVar: "MISTLE_PLATFORM_LANGFUSE_SECRET_KEY",
+    path: ["platformCredentials", "langfuse", "secretKey"],
+  },
   { envVar: "MISTLE_INTERNAL_AUTH_SHARED_TOKEN", path: ["internalAuth", "serviceToken"] },
   {
     envVar: "MISTLE_SANDBOX_TOKENS_CONNECT_SECRET",
@@ -589,6 +597,23 @@ const ControlPlaneApiEnvDescriptors = [
   {
     envVar: "MISTLE_DESIGNER_CODEX_CLI_PATH",
     path: ["sandbox", "designer", "codexCliPath"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_LANGFUSE_ENABLED",
+    path: ["sandbox", "designer", "langfuse", "enabled"],
+    parse: parseBooleanEnvValue,
+  },
+  {
+    envVar: "MISTLE_DESIGNER_LANGFUSE_PUBLIC_KEY",
+    path: ["sandbox", "designer", "langfuse", "publicKey"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_LANGFUSE_BASE_URL",
+    path: ["sandbox", "designer", "langfuse", "baseUrl"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_LANGFUSE_ENVIRONMENT",
+    path: ["sandbox", "designer", "langfuse", "environment"],
   },
   {
     envVar: "MISTLE_DESIGNER_SANDBOX_PROVIDER",
@@ -841,6 +866,10 @@ const DataPlaneGatewayEnvDescriptors = [
   {
     envVar: "MISTLE_PLATFORM_OPENAI_API_KEY",
     path: ["platformCredentials", "openai", "apiKey"],
+  },
+  {
+    envVar: "MISTLE_PLATFORM_LANGFUSE_SECRET_KEY",
+    path: ["platformCredentials", "langfuse", "secretKey"],
   },
 ] satisfies readonly EnvDescriptor[];
 

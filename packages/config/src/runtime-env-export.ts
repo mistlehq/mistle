@@ -237,8 +237,28 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
     path: ["platformCredentials", "openai", "apiKey"],
     envVar: "MISTLE_PLATFORM_OPENAI_API_KEY",
   },
+  {
+    path: ["platformCredentials", "langfuse", "secretKey"],
+    envVar: "MISTLE_PLATFORM_LANGFUSE_SECRET_KEY",
+  },
   { path: ["sandbox", "designer", "baseImage"], envVar: "MISTLE_DESIGNER_SANDBOX_BASE_IMAGE" },
   { path: ["sandbox", "designer", "codexCliPath"], envVar: "MISTLE_DESIGNER_CODEX_CLI_PATH" },
+  {
+    path: ["sandbox", "designer", "langfuse", "enabled"],
+    envVar: "MISTLE_DESIGNER_LANGFUSE_ENABLED",
+  },
+  {
+    path: ["sandbox", "designer", "langfuse", "publicKey"],
+    envVar: "MISTLE_DESIGNER_LANGFUSE_PUBLIC_KEY",
+  },
+  {
+    path: ["sandbox", "designer", "langfuse", "baseUrl"],
+    envVar: "MISTLE_DESIGNER_LANGFUSE_BASE_URL",
+  },
+  {
+    path: ["sandbox", "designer", "langfuse", "environment"],
+    envVar: "MISTLE_DESIGNER_LANGFUSE_ENVIRONMENT",
+  },
   {
     path: ["sandbox", "designer", "sandboxProvider"],
     envVar: "MISTLE_DESIGNER_SANDBOX_PROVIDER",
@@ -413,6 +433,10 @@ const DataPlaneGatewayResourceRuntimeEnvExports: readonly RuntimeEnvExportDescri
   {
     path: ["platformCredentials", "openai", "apiKey"],
     envVar: "MISTLE_PLATFORM_OPENAI_API_KEY",
+  },
+  {
+    path: ["platformCredentials", "langfuse", "secretKey"],
+    envVar: "MISTLE_PLATFORM_LANGFUSE_SECRET_KEY",
   },
 ];
 
