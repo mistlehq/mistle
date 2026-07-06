@@ -172,6 +172,41 @@ describe("RequireAuth landing prompt handoff", () => {
     expect(screen.queryByText("login-route")).toBeNull();
   });
 
+  it("strips the prompt from the current URL when temporary storage is blocked", () => {
+    const originalSessionStorage = Object.getOwnPropertyDescriptor(window, "sessionStorage");
+    window.history.replaceState(null, "", "/?prompt=Build&source=hero#copy");
+    Object.defineProperty(window, "sessionStorage", {
+      configurable: true,
+      get(): Storage {
+        throw new DOMException("Blocked", "SecurityError");
+      },
+    });
+
+    try {
+      expect(
+        requireAuthLoader({
+          context: {},
+          params: {},
+          pattern: "/",
+          request: new Request("http://localhost/?prompt=Build&source=hero#copy"),
+          url: new URL("http://localhost/?prompt=Build&source=hero#copy"),
+        }),
+      ).toEqual({
+        landingPromptStorageBlockedPrompt: "Build",
+      });
+      expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe(
+        "/?source=hero#copy",
+      );
+    } finally {
+      if (originalSessionStorage === undefined) {
+        Reflect.deleteProperty(window, "sessionStorage");
+      } else {
+        Object.defineProperty(window, "sessionStorage", originalSessionStorage);
+      }
+      window.history.replaceState(null, "", "/");
+    }
+  });
+
   it("does not capture prompt query parameters on non-root routes", async () => {
     renderRequireAuthRoute({
       initialPath: "/settings?prompt=Build",

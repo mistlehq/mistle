@@ -44,6 +44,7 @@ export function requireAuthLoader(input: LoaderFunctionArgs): RequireAuthLoaderD
   }
 
   if (result.kind === "storage-blocked") {
+    replaceCurrentHistoryEntry(createSanitizedPath({ url, search: result.sanitizedSearch }));
     return {
       landingPromptStorageBlockedPrompt: result.prompt,
     };
@@ -122,6 +123,14 @@ export function RequireAuth(): React.JSX.Element {
 
 function createSanitizedPath(input: { url: URL; search: string }): string {
   return `${input.url.pathname}${input.search}${input.url.hash}`;
+}
+
+function replaceCurrentHistoryEntry(path: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.history.replaceState(window.history.state, "", path);
 }
 
 function LandingPromptStorageBlockedNotice(input: { prompt: string }): React.JSX.Element {

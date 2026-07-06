@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Navigate, useLoaderData, useNavigate } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 
 import {
   clearPendingDesignerLandingPromptHandoff,
@@ -39,27 +39,6 @@ export function DesignerPage(): React.JSX.Element {
     queryKey: designerSessionsQueryKey,
     queryFn: async ({ signal }) => listDesignerSessions({ signal }),
   });
-  const landingPromptSessionQuery = useQuery({
-    enabled: loaderData.landingPromptHandoff !== null,
-    queryKey:
-      loaderData.landingPromptHandoff === null
-        ? ["designer", "landing-prompt-session", "none"]
-        : ["designer", "landing-prompt-session", loaderData.landingPromptHandoff.idempotencyKey],
-    queryFn: async ({ signal }) => {
-      if (loaderData.landingPromptHandoff === null) {
-        throw new Error("Designer landing prompt handoff is unavailable.");
-      }
-
-      const session = await createDesignerSession({
-        idempotencyKey: loaderData.landingPromptHandoff.idempotencyKey,
-        prompt: loaderData.landingPromptHandoff.prompt,
-        signal,
-      });
-      clearPendingDesignerLandingPromptHandoff({ storage });
-      return session;
-    },
-    retry: false,
-  });
   const createMutation = useMutation({
     mutationFn: createDesignerSession,
     onSuccess: (session) => {
@@ -69,16 +48,10 @@ export function DesignerPage(): React.JSX.Element {
     },
   });
 
-  if (landingPromptSessionQuery.data !== undefined) {
-    return <Navigate replace to={createDesignerSessionPath(landingPromptSessionQuery.data.id)} />;
-  }
-
   return (
     <DesignerPageView
-      createErrorMessage={
-        createMutation.error?.message ?? landingPromptSessionQuery.error?.message ?? null
-      }
-      isCreating={createMutation.isPending || landingPromptSessionQuery.isFetching}
+      createErrorMessage={createMutation.error?.message ?? null}
+      isCreating={createMutation.isPending}
       onPromptChange={setPrompt}
       onSubmit={() => {
         const handoff = readPendingDesignerLandingPromptHandoff({
