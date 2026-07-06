@@ -25,8 +25,11 @@ import {
 import type { IntegrationResourceListViewState } from "../forms/integration-resource-picker-view-model.js";
 import {
   listIntegrationConnectionResources,
+  isIntegrationResourceSyncRequiredError,
+  resolveIntegrationResourceSyncFailureReasonFromError,
   type IntegrationConnection,
   type IntegrationConnectionResource,
+  type IntegrationResourceSyncFailureReason,
 } from "../integrations/integrations-service.js";
 import { FormPageSection } from "../shared/form-page.js";
 import type {
@@ -656,6 +659,7 @@ function SpecificActorPolicyFields(input: {
           isRefreshing={isFetching}
           label="actor"
           listState={resolveResourceListViewState({
+            errors: resourceQueries.filter((query) => query.isError).map((query) => query.error),
             errorMessage: "Could not load actors.",
             isError,
             isPending,
@@ -710,7 +714,6 @@ function SpecificActorPolicyFields(input: {
           visibleItems={resourceItems}
         />
       )}
-      {isError ? <Notice variant="alert">Could not load actors.</Notice> : null}
     </div>
   );
 }
@@ -753,23 +756,60 @@ function resolveSelectedActorSetResourceValues(input: {
   });
 }
 
-function resolveResourceListViewState(input: {
+export function resolveResourceListViewState(input: {
   isPending: boolean;
   isError: boolean;
   errorMessage: string;
+  errors: readonly unknown[];
 }): IntegrationResourceListViewState {
   if (input.isPending) {
     return { mode: "loading" };
   }
 
   if (input.isError) {
+    if (isResourceSyncRequiredOnlyError(input.errors)) {
+      return { mode: "ready" };
+    }
+
+    const reason = resolveResourceListFailureReason(input.errors);
     return {
       mode: "error",
+      ...(reason === null ? {} : { reason }),
       message: input.errorMessage,
     };
   }
 
   return { mode: "ready" };
+}
+
+function isResourceSyncRequiredOnlyError(errors: readonly unknown[]): boolean {
+  return errors.length > 0 && errors.every(isIntegrationResourceSyncRequiredError);
+}
+
+function resolveResourceListFailureReason(
+  errors: readonly unknown[],
+): IntegrationResourceSyncFailureReason | null {
+  const reasons = errors.flatMap((error) => {
+    if (isIntegrationResourceSyncRequiredError(error)) {
+      return [];
+    }
+
+    return [resolveIntegrationResourceSyncFailureReasonFromError(error) ?? "sync-failed"];
+  });
+
+  if (reasons.length === 0) {
+    return null;
+  }
+
+  if (reasons.includes("sync-failed")) {
+    return "sync-failed";
+  }
+
+  if (reasons.includes("credential-failed")) {
+    return "credential-failed";
+  }
+
+  return "permission-denied";
 }
 
 function toResourcePickerItems(input: {
@@ -1145,6 +1185,7 @@ function RelationshipActorPolicyFields(input: {
           isRefreshing={resourcesQuery.isFetching}
           label="group or set"
           listState={resolveResourceListViewState({
+            errors: resourcesQuery.isError ? [resourcesQuery.error] : [],
             errorMessage: "Could not load groups.",
             isError: resourcesQuery.isError,
             isPending: resourcesQuery.isPending,
@@ -1205,7 +1246,6 @@ function RelationshipActorPolicyFields(input: {
           visibleItems={resourceItems}
         />
       )}
-      {resourcesQuery.isError ? <Notice variant="alert">Could not load groups.</Notice> : null}
     </div>
   );
 }

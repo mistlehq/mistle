@@ -1,4 +1,6 @@
 import {
+  IntegrationResourceSyncFailure,
+  IntegrationResourceSyncFailureCodes,
   IntegrationConnectionMethodIds,
   type DiscoveredIntegrationResource,
   type DiscoveredIntegrationResourceRelationship,
@@ -103,6 +105,107 @@ function createGitHubOctokit(input: { apiBaseUrl: string; token: string }): Octo
       },
     },
   });
+}
+
+function readGitHubErrorStatus(error: unknown): number | null {
+  if (typeof error !== "object" || error === null || !("status" in error)) {
+    return null;
+  }
+
+  return typeof error.status === "number" ? error.status : null;
+}
+
+function readGitHubErrorMessage(error: unknown): string | null {
+  if (typeof error === "object" && error !== null && "response" in error) {
+    const response = error.response;
+    if (typeof response === "object" && response !== null && "data" in response) {
+      const data = response.data;
+      if (typeof data === "object" && data !== null && "message" in data) {
+        return typeof data.message === "string" ? data.message : null;
+      }
+    }
+  }
+
+  if (typeof error === "object" && error !== null && "message" in error) {
+    return typeof error.message === "string" ? error.message : null;
+  }
+
+  return null;
+}
+
+function readGitHubRateLimitRemainingHeader(error: unknown): string | null {
+  if (typeof error !== "object" || error === null || !("response" in error)) {
+    return null;
+  }
+
+  const response = error.response;
+  if (typeof response !== "object" || response === null || !("headers" in response)) {
+    return null;
+  }
+
+  const headers = response.headers;
+  if (typeof headers !== "object" || headers === null || !("x-ratelimit-remaining" in headers)) {
+    return null;
+  }
+
+  const value = headers["x-ratelimit-remaining"];
+  return typeof value === "string" ? value : null;
+}
+
+function isGitHubRateLimitFailure(error: unknown): boolean {
+  const remainingRequests = readGitHubRateLimitRemainingHeader(error);
+  if (remainingRequests === "0") {
+    return true;
+  }
+
+  const message = readGitHubErrorMessage(error)?.toLowerCase() ?? "";
+  return message.includes("rate limit");
+}
+
+function isGitHubPermissionFailure(error: unknown): boolean {
+  if (isGitHubRateLimitFailure(error)) {
+    return false;
+  }
+
+  const message = readGitHubErrorMessage(error);
+  return (
+    message === "Resource not accessible by integration" ||
+    message === "Resource not accessible by personal access token"
+  );
+}
+
+async function runGitHubResourceRequest<T>(input: {
+  operation: string;
+  request: () => Promise<T>;
+}): Promise<T> {
+  try {
+    return await input.request();
+  } catch (error) {
+    const status = readGitHubErrorStatus(error);
+    if (status === 403 && isGitHubPermissionFailure(error)) {
+      throw new IntegrationResourceSyncFailure(
+        {
+          code: IntegrationResourceSyncFailureCodes.PERMISSION_DENIED,
+          message: `GitHub denied access while syncing resources during ${input.operation}. Review the GitHub App permissions and repository access for this connection.`,
+          providerCode: "github_403",
+        },
+        { cause: error },
+      );
+    }
+
+    if (status === 401) {
+      throw new IntegrationResourceSyncFailure(
+        {
+          code: IntegrationResourceSyncFailureCodes.CREDENTIAL_FAILED,
+          message: `GitHub rejected the credential while syncing resources during ${input.operation}. Reconnect this GitHub integration.`,
+          providerCode: "github_401",
+        },
+        { cause: error },
+      );
+    }
+
+    throw error;
+  }
 }
 
 function toDiscoveredResource(resource: GitHubRepository): DiscoveredIntegrationResource {
@@ -278,9 +381,13 @@ async function listGitHubInstallationRepositories(input: {
   const repositories: GitHubRepository[] = [];
 
   for (let page = 1; ; page += 1) {
-    const response = await octokit.rest.apps.listReposAccessibleToInstallation({
-      per_page: GitHubPageSize,
-      page,
+    const response = await runGitHubResourceRequest({
+      operation: "installation repository listing",
+      request: () =>
+        octokit.rest.apps.listReposAccessibleToInstallation({
+          per_page: GitHubPageSize,
+          page,
+        }),
     });
     const parsedResponse = GitHubInstallationRepositoriesResponseSchema.parse(response.data);
     repositories.push(...parsedResponse.repositories);
@@ -302,11 +409,15 @@ async function listGitHubUserRepositories(input: {
   const repositories: GitHubRepository[] = [];
 
   for (let page = 1; ; page += 1) {
-    const response = await octokit.rest.repos.listForAuthenticatedUser({
-      affiliation: "owner,collaborator,organization_member",
-      sort: "full_name",
-      per_page: GitHubPageSize,
-      page,
+    const response = await runGitHubResourceRequest({
+      operation: "authenticated user repository listing",
+      request: () =>
+        octokit.rest.repos.listForAuthenticatedUser({
+          affiliation: "owner,collaborator,organization_member",
+          sort: "full_name",
+          per_page: GitHubPageSize,
+          page,
+        }),
     });
     const parsedResponse = GitHubUserRepositoriesResponseSchema.parse(response.data);
     repositories.push(...parsedResponse);
@@ -354,11 +465,15 @@ async function listGitHubRepositoryBranches(input: {
 
   const branches: GitHubBranch[] = [];
   for (let page = 1; ; page += 1) {
-    const response = await octokit.rest.repos.listBranches({
-      owner,
-      repo,
-      per_page: GitHubPageSize,
-      page,
+    const response = await runGitHubResourceRequest({
+      operation: `branch listing for ${input.repository.full_name}`,
+      request: () =>
+        octokit.rest.repos.listBranches({
+          owner,
+          repo,
+          per_page: GitHubPageSize,
+          page,
+        }),
     });
     const parsedResponse = z.array(GitHubBranchSchema).parse(response.data);
     branches.push(...parsedResponse);
@@ -385,11 +500,15 @@ async function listGitHubRepositoryCollaborators(input: {
 
   const collaborators: GitHubCollaborator[] = [];
   for (let page = 1; ; page += 1) {
-    const response = await octokit.rest.repos.listCollaborators({
-      owner,
-      repo,
-      per_page: GitHubPageSize,
-      page,
+    const response = await runGitHubResourceRequest({
+      operation: `collaborator listing for ${input.repository.full_name}`,
+      request: () =>
+        octokit.rest.repos.listCollaborators({
+          owner,
+          repo,
+          per_page: GitHubPageSize,
+          page,
+        }),
     });
 
     const parsedResponse = z.array(GitHubCollaboratorSchema).parse(response.data);
@@ -413,10 +532,14 @@ async function listGitHubOrganizationTeams(input: {
 
   const teams: GitHubTeam[] = [];
   for (let page = 1; ; page += 1) {
-    const response = await octokit.rest.teams.list({
-      org: input.organizationLogin,
-      per_page: GitHubPageSize,
-      page,
+    const response = await runGitHubResourceRequest({
+      operation: `team listing for ${input.organizationLogin}`,
+      request: () =>
+        octokit.rest.teams.list({
+          org: input.organizationLogin,
+          per_page: GitHubPageSize,
+          page,
+        }),
     });
     const parsedResponse = z.array(GitHubTeamSchema).parse(response.data);
     teams.push(...parsedResponse);
@@ -439,10 +562,14 @@ async function listGitHubOrganizationMembers(input: {
 
   const members: GitHubCollaborator[] = [];
   for (let page = 1; ; page += 1) {
-    const response = await octokit.rest.orgs.listMembers({
-      org: input.organizationLogin,
-      per_page: GitHubPageSize,
-      page,
+    const response = await runGitHubResourceRequest({
+      operation: `organization member listing for ${input.organizationLogin}`,
+      request: () =>
+        octokit.rest.orgs.listMembers({
+          org: input.organizationLogin,
+          per_page: GitHubPageSize,
+          page,
+        }),
     });
     const parsedResponse = z.array(GitHubCollaboratorSchema).parse(response.data);
     members.push(...parsedResponse);
@@ -466,11 +593,15 @@ async function listGitHubTeamMembers(input: {
 
   const members: GitHubCollaborator[] = [];
   for (let page = 1; ; page += 1) {
-    const response = await octokit.rest.teams.listMembersInOrg({
-      org: input.organizationLogin,
-      team_slug: input.teamSlug,
-      per_page: GitHubPageSize,
-      page,
+    const response = await runGitHubResourceRequest({
+      operation: `team member listing for ${input.organizationLogin}/${input.teamSlug}`,
+      request: () =>
+        octokit.rest.teams.listMembersInOrg({
+          org: input.organizationLogin,
+          team_slug: input.teamSlug,
+          per_page: GitHubPageSize,
+          page,
+        }),
     });
     const parsedResponse = z.array(GitHubCollaboratorSchema).parse(response.data);
     members.push(...parsedResponse);
@@ -493,10 +624,14 @@ async function listGitHubOrganizationInstallations(input: {
 
   const installations: GitHubOrganizationInstallation[] = [];
   for (let page = 1; ; page += 1) {
-    const response = await octokit.request("GET /orgs/{org}/installations", {
-      org: input.organizationLogin,
-      per_page: GitHubPageSize,
-      page,
+    const response = await runGitHubResourceRequest({
+      operation: `organization installation listing for ${input.organizationLogin}`,
+      request: () =>
+        octokit.request("GET /orgs/{org}/installations", {
+          org: input.organizationLogin,
+          per_page: GitHubPageSize,
+          page,
+        }),
     });
     const parsedResponse = GitHubOrganizationInstallationsResponseSchema.parse(response.data);
     installations.push(...parsedResponse.installations);

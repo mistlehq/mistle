@@ -337,6 +337,7 @@ export const StoryGitHubTeamResourcesSyncFailed: IntegrationConnectionResources 
   familyId: "github",
   kind: "team",
   syncState: "error",
+  lastErrorCode: "resource_sync_permission_denied",
   lastErrorMessage:
     "GitHub returned 403 while listing teams. Reapprove Members read permission for this installation.",
   items: [],
@@ -891,6 +892,7 @@ export const StoryWhapiEventOptions: readonly WebhookTriggerEventOption[] = [
 ];
 
 export function createWebhookTriggerStoryQueryClient(input?: {
+  githubBranchResourcesError?: Error;
   githubTeamResources?: IntegrationConnectionResources;
   slackChannelResources?: IntegrationConnectionResources;
   slackUserGroupResources?: IntegrationConnectionResources;
@@ -919,6 +921,24 @@ export function createWebhookTriggerStoryQueryClient(input?: {
     }),
     StoryGitHubBranchResources,
   );
+  if (input?.githubBranchResourcesError !== undefined) {
+    const branchQuery = queryClient.getQueryCache().find({
+      queryKey: createTriggerParameterResourceQueryKey({
+        connectionId: StoryGitHubConnectionId,
+        resourceKind: "branch",
+      }),
+    });
+    if (branchQuery === undefined) {
+      throw new Error("Expected GitHub branch resource query to be seeded.");
+    }
+
+    branchQuery.setState({
+      ...branchQuery.state,
+      data: undefined,
+      error: input.githubBranchResourcesError,
+      status: "error",
+    });
+  }
   queryClient.setQueryData(
     createTriggerParameterResourceQueryKey({
       connectionId: StoryGitHubConnectionId,

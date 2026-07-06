@@ -788,6 +788,53 @@ export class IntegrationsApiError extends Error {
   }
 }
 
+export type IntegrationResourceSyncFailureReason =
+  | "permission-denied"
+  | "credential-failed"
+  | "sync-failed";
+
+export function resolveIntegrationResourceSyncFailureReasonFromCode(
+  code: string | null | undefined,
+): IntegrationResourceSyncFailureReason {
+  if (code === "resource_sync_permission_denied") {
+    return "permission-denied";
+  }
+
+  if (code === "resource_sync_credential_failed") {
+    return "credential-failed";
+  }
+
+  return "sync-failed";
+}
+
+function readIntegrationResourceSyncLastErrorCode(error: IntegrationsApiError): string | null {
+  if (typeof error.body !== "object" || error.body === null || !("lastErrorCode" in error.body)) {
+    return null;
+  }
+
+  return typeof error.body.lastErrorCode === "string" ? error.body.lastErrorCode : null;
+}
+
+export function resolveIntegrationResourceSyncFailureReasonFromError(
+  error: unknown,
+): IntegrationResourceSyncFailureReason | null {
+  if (!(error instanceof IntegrationsApiError)) {
+    return null;
+  }
+
+  if (error.code === "RESOURCE_SYNC_FAILED") {
+    return resolveIntegrationResourceSyncFailureReasonFromCode(
+      readIntegrationResourceSyncLastErrorCode(error),
+    );
+  }
+
+  return null;
+}
+
+export function isIntegrationResourceSyncRequiredError(error: unknown): boolean {
+  return error instanceof IntegrationsApiError && error.code === "RESOURCE_SYNC_REQUIRED";
+}
+
 export async function readJsonWithSchema<T>(input: {
   response: Response;
   schema: z.ZodType<T>;

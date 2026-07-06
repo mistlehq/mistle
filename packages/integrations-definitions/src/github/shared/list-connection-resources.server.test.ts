@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { Socket } from "node:net";
 
+import { IntegrationResourceSyncFailureCodes } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { listGitHubConnectionResources } from "./list-connection-resources.server.js";
@@ -645,7 +646,77 @@ describe("listGitHubConnectionResources", () => {
             value: "github-installation-token",
           },
         }),
-      ).rejects.toThrow("Resource not accessible by integration");
+      ).rejects.toMatchObject({
+        code: IntegrationResourceSyncFailureCodes.PERMISSION_DENIED,
+      });
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("does not classify GitHub rate-limit 403 responses as permission denied", async () => {
+    const server = await startSimulatedGitHubApi({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        response.setHeader("content-type", "application/json");
+
+        // GitHub REST troubleshooting docs: primary rate limit exhaustion uses
+        // x-ratelimit-remaining: 0 and may return 403.
+        // https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api#rate-limit-errors
+        if (requestUrl.pathname === "/installation/repositories") {
+          response.writeHead(403, {
+            "x-ratelimit-remaining": "0",
+          });
+          response.end(JSON.stringify({ message: "API rate limit exceeded" }));
+          return;
+        }
+
+        response.writeHead(404);
+        response.end(JSON.stringify({ message: "not found" }));
+      },
+    });
+
+    try {
+      await expect(
+        listGitHubConnectionResources({
+          organizationId: "org_test",
+          targetKey: "github-cloud-test",
+          target: {
+            familyId: "github",
+            variantId: "github-cloud",
+            enabled: true,
+            config: {
+              apiBaseUrl: server.baseUrl,
+              webBaseUrl: "https://github.example",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "icn_github",
+            status: "active",
+            config: {
+              connection_method: "github-app-installation",
+              app_id: "123",
+              app_slug: "mistle-test",
+              client_id: "Iv1.client",
+              installation_id: "456",
+            },
+          },
+          kind: "team",
+          credential: {
+            kind: "value",
+            value: "github-installation-token",
+          },
+        }),
+      ).rejects.not.toMatchObject({
+        code: IntegrationResourceSyncFailureCodes.PERMISSION_DENIED,
+      });
     } finally {
       await server.stop();
     }
@@ -879,7 +950,9 @@ describe("listGitHubConnectionResources", () => {
             value: "github-installation-token",
           },
         }),
-      ).rejects.toThrow("Resource not accessible by integration");
+      ).rejects.toMatchObject({
+        code: IntegrationResourceSyncFailureCodes.PERMISSION_DENIED,
+      });
     } finally {
       await server.stop();
     }

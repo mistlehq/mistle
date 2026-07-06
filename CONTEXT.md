@@ -248,6 +248,18 @@ _Avoid_: Integration connection setup completion, provider app installation, web
 The point at which an **Integration connection** has refreshed the provider resources needed by resource-backed configuration controls.
 _Avoid_: Integration connection setup completion, because setup completion only means provider state and credentials are present
 
+**Resource sync permission denial**:
+A resource-kind-scoped failure where the provider denies access needed to refresh one supported resource kind for an otherwise existing **Integration connection**.
+_Avoid_: Generic sync failure, integration connection setup failure when other provider behavior may still be usable
+
+**Resource sync credential failure**:
+A resource-kind-scoped failure where the credential needed to refresh one supported resource kind is missing, invalid, expired, revoked, or the wrong credential type.
+_Avoid_: Resource sync permission denial when the provider has not accepted the credential
+
+**Generic resource sync failure**:
+A resource-kind-scoped failure where supported provider resources could not be refreshed and Mistle cannot safely classify the provider response as a permission denial or credential failure.
+_Avoid_: Provider permission issue when the provider response is ambiguous
+
 **Secret-bearing integration setup**:
 An integration setup step that requires a user-supplied credential or provider secret value.
 _Avoid_: MCP setup mutation, agent-entered secret setup

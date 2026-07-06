@@ -6,7 +6,10 @@ import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
-import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
+import {
+  IntegrationsApiError,
+  type IntegrationConnectionResources,
+} from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import type { WebhookTriggerEventPickerDisabledState } from "./webhook-trigger-event-picker-state.js";
 import {
@@ -137,6 +140,25 @@ const SlackAppMentionEventOption: WebhookTriggerEventOption = {
   ],
 };
 
+const SlackAppMentionWithUserGroupEventOption: WebhookTriggerEventOption = {
+  ...SlackAppMentionEventOption,
+  parameters: [
+    ...(SlackAppMentionEventOption.parameters ?? []),
+    {
+      id: "userGroupMention",
+      label: "user group mention",
+      kind: "resource-select",
+      resourceKind: "user_group",
+      payloadPath: ["event", "text"],
+      matchMode: "contains_token",
+      matchValuePrefix: "<!subteam^",
+      prefix: "mentioning group",
+      placeholder: "Any user group",
+      multiValue: true,
+    },
+  ],
+};
+
 const TestQueryClient = createTestQueryClient();
 
 afterEach(() => {
@@ -152,6 +174,7 @@ function renderTriggerPicker(input: {
   disabledState?: WebhookTriggerEventPickerDisabledState | null;
   eventOptions?: readonly WebhookTriggerEventOption[];
   teamResources?: IntegrationConnectionResources;
+  branchResourcesError?: IntegrationsApiError;
   useStatefulSelection?: boolean;
 }): ReturnType<typeof render> {
   TestQueryClient.setQueryData(
@@ -283,6 +306,23 @@ function renderTriggerPicker(input: {
       },
     },
   );
+  if (input.branchResourcesError !== undefined) {
+    const branchQuery = TestQueryClient.getQueryCache().find({
+      queryKey: createTriggerParameterResourceQueryKey({
+        connectionId: input.selectedConnectionId,
+        resourceKind: "branch",
+      }),
+    });
+    if (branchQuery === undefined) {
+      throw new Error("Expected branch resource query to be seeded.");
+    }
+    branchQuery.setState({
+      ...branchQuery.state,
+      data: undefined,
+      error: input.branchResourcesError,
+      status: "error",
+    });
+  }
 
   function StatefulTriggerPicker(): React.JSX.Element {
     const [selectedEventIds, setSelectedEventIds] = useState([...input.selectedEventIds]);
@@ -346,6 +386,30 @@ function createSlackChannelResources(): IntegrationConnectionResources {
   };
 }
 
+function createSlackUserGroupResources(
+  input: Partial<IntegrationConnectionResources> = {},
+): IntegrationConnectionResources {
+  return {
+    connectionId: SlackConnectionId,
+    familyId: "slack",
+    kind: "user_group",
+    syncState: "ready",
+    items: [
+      {
+        id: "icr_slack_user_group_1",
+        familyId: "slack",
+        kind: "user_group",
+        externalId: "S_ENG",
+        handle: "S_ENG",
+        displayName: "@eng-oncall",
+        status: "accessible",
+        metadata: {},
+      },
+    ],
+    ...input,
+  };
+}
+
 function renderSlackChannelTriggerPicker(): ReturnType<typeof render> {
   TestQueryClient.setQueryData(
     createTriggerParameterResourceQueryKey({
@@ -369,6 +433,49 @@ function renderSlackChannelTriggerPicker(): ReturnType<typeof render> {
         eventParameterRules={{
           [SlackAppMentionConditionId]: {
             channel: isAnyOfRule(["C12345678"]),
+          },
+        }}
+      />
+    </QueryClientProvider>,
+  );
+}
+
+function renderSlackUserGroupTriggerPicker(input: {
+  userGroupResources: IntegrationConnectionResources;
+  userGroupValues?: readonly string[];
+}): ReturnType<typeof render> {
+  TestQueryClient.setQueryData(
+    createTriggerParameterResourceQueryKey({
+      connectionId: SlackConnectionId,
+      resourceKind: "channel",
+    }),
+    createSlackChannelResources(),
+  );
+  TestQueryClient.setQueryData(
+    createTriggerParameterResourceQueryKey({
+      connectionId: SlackConnectionId,
+      resourceKind: "user_group",
+    }),
+    input.userGroupResources,
+  );
+
+  return render(
+    <QueryClientProvider client={TestQueryClient}>
+      <WebhookTriggerEventPicker
+        error={undefined}
+        eventOptions={[SlackAppMentionWithUserGroupEventOption]}
+        hasConnectedIntegrations={true}
+        onEventParameterRuleChange={() => {}}
+        onEventParameterRulesChange={() => {}}
+        onValueChange={() => {}}
+        selectedConnectionId={SlackConnectionId}
+        selectedEventIds={[SlackAppMentionConditionId]}
+        eventParameterRules={{
+          [SlackAppMentionConditionId]: {
+            channel: isAnyOfRule(["C12345678"]),
+            ...(input.userGroupValues === undefined
+              ? {}
+              : { userGroupMention: isAnyOfRule(input.userGroupValues) }),
           },
         }}
       />
@@ -669,6 +776,47 @@ describe("WebhookTriggerEventPicker", () => {
     expect(document.activeElement).toBe(refreshButton);
   });
 
+  it("hides empty Slack user group mention parameters when provider access is denied", async () => {
+    renderSlackUserGroupTriggerPicker({
+      userGroupResources: createSlackUserGroupResources({
+        syncState: "error",
+        lastErrorCode: "resource_sync_permission_denied",
+        lastErrorMessage:
+          "Slack returned missing_scope while listing user groups. Reinstall the Slack app with usergroups:read.",
+        items: [],
+      }),
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("#alerts")).toBeDefined();
+    });
+    expect(screen.queryByText("mentioning group")).toBeNull();
+    expect(screen.queryByText("No user group mentions available")).toBeNull();
+    expect(screen.queryByText(/Slack returned missing_scope/)).toBeNull();
+  });
+
+  it("keeps selected Slack user group mention values visible when provider access is denied", async () => {
+    renderSlackUserGroupTriggerPicker({
+      userGroupResources: createSlackUserGroupResources({
+        syncState: "error",
+        lastErrorCode: "resource_sync_permission_denied",
+        lastErrorMessage:
+          "Slack returned missing_scope while listing user groups. Reinstall the Slack app with usergroups:read.",
+        items: [],
+      }),
+      userGroupValues: ["S_ENG"],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("S_ENG")).toBeDefined();
+    });
+    expect(screen.getByText("mentioning group")).toBeDefined();
+    expect(
+      screen.getByText("The highlighted resources are no longer available. Please remove them."),
+    ).toBeDefined();
+    expect(screen.queryByText(/Slack returned missing_scope/)).toBeNull();
+  });
+
   it("preserves missing selected resource values as unavailable historical selections", () => {
     const triggerId = createWebhookTriggerEventId({
       webhookSourceId: GitHubWebhookSourceId,
@@ -857,6 +1005,45 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.queryByRole("button", { name: malformedBranchPlural })).toBeNull();
   });
 
+  it("does not render resource sync prerequisite errors for branch trigger parameters", async () => {
+    const triggerId = createWebhookTriggerEventId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.pull_request.opened",
+    });
+    const selectedConditionId = conditionId(triggerId);
+
+    renderTriggerPicker({
+      branchResourcesError: new IntegrationsApiError({
+        operation: "listIntegrationConnectionResources",
+        status: 409,
+        body: {
+          code: "RESOURCE_SYNC_REQUIRED",
+          message: "Resource sync is required before resources can be listed.",
+        },
+        code: "RESOURCE_SYNC_REQUIRED",
+        message: "Resource sync is required before resources can be listed.",
+      }),
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedEventIds: [selectedConditionId],
+      eventParameterRules: {
+        [selectedConditionId]: {
+          baseBranch: isRule("main"),
+        },
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText("main").length).toBeGreaterThan(0);
+    });
+
+    expect(
+      screen.queryByText("Resource sync is required before resources can be listed."),
+    ).toBeNull();
+    expect(screen.queryByText("Could not load base branches")).toBeNull();
+    expect(screen.queryByText("Sync failed.")).toBeNull();
+  });
+
   it("renders GitHub review request bot targets from synced bot resources", async () => {
     renderTriggerPicker({
       hasConnectedIntegrations: true,
@@ -895,7 +1082,7 @@ describe("WebhookTriggerEventPicker", () => {
     });
   });
 
-  it("shows GitHub team sync errors separately from an empty team list", async () => {
+  it("keeps unavailable GitHub team selections visible without showing sync error notices", async () => {
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
@@ -911,6 +1098,7 @@ describe("WebhookTriggerEventPicker", () => {
         familyId: "github",
         kind: "team",
         syncState: "error",
+        lastErrorCode: "resource_sync_permission_denied",
         lastErrorMessage:
           "GitHub returned 403 while listing teams. Reapprove Members read permission.",
         items: [],
@@ -921,11 +1109,8 @@ describe("WebhookTriggerEventPicker", () => {
     await waitFor(() => {
       expect(screen.getAllByText("platform").length).toBeGreaterThan(0);
     });
-    expect(
-      screen.getByText(
-        "GitHub returned 403 while listing teams. Reapprove Members read permission.",
-      ),
-    ).toBeDefined();
+    expect(screen.queryByText(/Provider access needs repair/)).toBeNull();
+    expect(screen.queryByText(/GitHub returned 403 while listing teams/)).toBeNull();
     expect(screen.queryByPlaceholderText("No teams available")).toBeNull();
   });
 

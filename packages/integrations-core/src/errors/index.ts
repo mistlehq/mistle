@@ -30,6 +30,35 @@ export class IntegrationDefinitionRegistryError extends IntegrationsCoreError {
   }
 }
 
+export type IntegrationResourceSyncFailureCode =
+  | "resource_sync_permission_denied"
+  | "resource_sync_credential_failed";
+
+export const IntegrationResourceSyncFailureCodes: {
+  PERMISSION_DENIED: IntegrationResourceSyncFailureCode;
+  CREDENTIAL_FAILED: IntegrationResourceSyncFailureCode;
+} = {
+  PERMISSION_DENIED: "resource_sync_permission_denied",
+  CREDENTIAL_FAILED: "resource_sync_credential_failed",
+};
+
+export class IntegrationResourceSyncFailure extends IntegrationsCoreError {
+  readonly providerCode: string | null;
+
+  constructor(
+    input: {
+      code: IntegrationResourceSyncFailureCode;
+      message: string;
+      providerCode?: string | null;
+    },
+    options?: ErrorOptions,
+  ) {
+    super(input.code, input.message, options);
+    this.name = "IntegrationResourceSyncFailure";
+    this.providerCode = input.providerCode ?? null;
+  }
+}
+
 export type TriggerRulesErrorCode = "INVALID_TRIGGER_RULES";
 
 export const TriggerRulesErrorCodes: {

@@ -4,6 +4,7 @@ export type IntegrationResourceListViewState =
     }
   | {
       mode: "error";
+      reason?: "permission-denied" | "credential-failed" | "sync-failed";
       message: string;
     }
   | {
@@ -101,9 +102,37 @@ function resolveSyncFailureState(input: {
   }
 
   if (input.hasVisibleItems) {
+    if (input.listState.reason === "permission-denied") {
+      return {
+        message: "Provider access needs repair. Only showing last synced results.",
+        detail: input.listState.message,
+      };
+    }
+
+    if (input.listState.reason === "credential-failed") {
+      return {
+        message: "Connection credentials need repair. Only showing last synced results.",
+        detail: input.listState.message,
+      };
+    }
+
     return {
       message: "Sync failed. Only showing last synced results.",
       detail: "Try again. If this keeps failing, reconnect the integration.",
+    };
+  }
+
+  if (input.listState.reason === "permission-denied") {
+    return {
+      message: "Provider access needs repair.",
+      detail: input.listState.message,
+    };
+  }
+
+  if (input.listState.reason === "credential-failed") {
+    return {
+      message: "Connection credentials need repair.",
+      detail: input.listState.message,
     };
   }
 

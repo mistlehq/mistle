@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatConnectionStatusLabel,
   formatResourceMetadata,
+  formatResourceSyncFailureLabel,
   formatSyncStateLabel,
 } from "./integration-connection-detail-formatters.js";
 
@@ -18,6 +19,22 @@ describe("integration connection detail formatters", () => {
     expect(formatSyncStateLabel("syncing")).toBe("Syncing");
     expect(formatSyncStateLabel("ready")).toBe("Ready");
     expect(formatSyncStateLabel("error")).toBe("Sync failed");
+  });
+
+  it("formats classified resource sync failure labels", () => {
+    expect(
+      formatResourceSyncFailureLabel({
+        lastErrorCode: "resource_sync_permission_denied",
+      }),
+    ).toBe("Access needs repair");
+    expect(
+      formatResourceSyncFailureLabel({
+        lastErrorCode: "resource_sync_credential_failed",
+      }),
+    ).toBe("Credentials need repair");
+    expect(formatResourceSyncFailureLabel({ lastErrorCode: "resource_sync_failed" })).toBe(
+      "Sync failed",
+    );
   });
 
   it("formats resource metadata across readiness states", () => {

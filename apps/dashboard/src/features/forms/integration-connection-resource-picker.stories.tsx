@@ -178,6 +178,20 @@ export const StateGallery: Story = {
         </StorySection>
 
         <StorySection
+          description="Resource sync prerequisites render as an empty field, not an alert."
+          title="Sync Required"
+        >
+          <IntegrationConnectionResourcePickerView
+            {...args}
+            listState={{
+              mode: "ready",
+            }}
+            searchPlaceholder="No synced repositories"
+            visibleItems={[]}
+          />
+        </StorySection>
+
+        <StorySection
           description="Refresh errors stay visible even when the picker is closed."
           title="Refresh Failed"
         >
@@ -188,13 +202,47 @@ export const StateGallery: Story = {
         </StorySection>
 
         <StorySection
-          description="Sync failures with cached results still show the error below the field."
-          title="Sync Failed"
+          description="Permission failures with cached results point users toward provider access repair."
+          title="Provider Access Failed With Snapshot"
         >
           <IntegrationConnectionResourcePickerView
             {...args}
             listState={{
               mode: "error",
+              reason: "permission-denied",
+              message: "GitHub rejected the resource sync for this connection.",
+            }}
+            refreshTooltip="Refresh repositories\nGitHub rejected the resource sync for this connection."
+            visibleItems={toIntegrationConnectionResourcePickerItems(RepositoryItems.slice(0, 3))}
+          />
+        </StorySection>
+
+        <StorySection
+          description="Credential failures with no synced resources point users toward connection repair."
+          title="Connection Credentials Failed Empty"
+        >
+          <IntegrationConnectionResourcePickerView
+            {...args}
+            listState={{
+              mode: "error",
+              reason: "credential-failed",
+              message: "Slack rejected the token while listing channels.",
+            }}
+            refreshTooltip="Refresh repositories\nSlack rejected the token while listing channels."
+            searchPlaceholder="No synced repositories"
+            visibleItems={[]}
+          />
+        </StorySection>
+
+        <StorySection
+          description="Unknown sync failures stay generic when the provider signal is not classified."
+          title="Generic Sync Failed"
+        >
+          <IntegrationConnectionResourcePickerView
+            {...args}
+            listState={{
+              mode: "error",
+              reason: "sync-failed",
               message: "GitHub rejected the resource sync for this connection.",
             }}
             refreshTooltip="Refresh repositories\nGitHub rejected the resource sync for this connection."

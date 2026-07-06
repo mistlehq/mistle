@@ -1,8 +1,10 @@
 import { buildUrlWithPath } from "@mistle/http";
-import type {
-  DiscoveredIntegrationResource,
-  ListConnectionResourcesInput,
-  ListConnectionResourcesResult,
+import {
+  IntegrationResourceSyncFailure,
+  IntegrationResourceSyncFailureCodes,
+  type DiscoveredIntegrationResource,
+  type ListConnectionResourcesInput,
+  type ListConnectionResourcesResult,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
@@ -50,6 +52,47 @@ function buildDiscordGuildChannelsListUrl(input: { apiBaseUrl: string; guildId: 
   return new URL(buildUrlWithPath(input.apiBaseUrl, `/guilds/${input.guildId}/channels`));
 }
 
+function createDiscordResourceSyncFailureForStatus(input: {
+  operation: string;
+  status: number;
+}): IntegrationResourceSyncFailure | null {
+  if (input.status === 403) {
+    return new IntegrationResourceSyncFailure({
+      code: IntegrationResourceSyncFailureCodes.PERMISSION_DENIED,
+      message: `Discord denied access while syncing resources during ${input.operation}. Review the bot permissions for this connection.`,
+      providerCode: "discord_403",
+    });
+  }
+
+  if (input.status === 401) {
+    return new IntegrationResourceSyncFailure({
+      code: IntegrationResourceSyncFailureCodes.CREDENTIAL_FAILED,
+      message: `Discord rejected the credential while syncing resources during ${input.operation}. Reconnect this Discord integration.`,
+      providerCode: "discord_401",
+    });
+  }
+
+  return null;
+}
+
+function assertDiscordHttpResponseOk(input: { operation: string; response: Response }): void {
+  if (input.response.ok) {
+    return;
+  }
+
+  const failure = createDiscordResourceSyncFailureForStatus({
+    operation: input.operation,
+    status: input.response.status,
+  });
+  if (failure !== null) {
+    throw failure;
+  }
+
+  throw new Error(
+    `Discord ${input.operation} request failed with status ${String(input.response.status)}.`,
+  );
+}
+
 function toDiscoveredGuildResource(guild: DiscordGuild): DiscoveredIntegrationResource {
   return {
     externalId: guild.id,
@@ -95,9 +138,7 @@ async function listDiscordGuilds(input: {
     },
   });
 
-  if (!response.ok) {
-    throw new Error(`Discord guild list request failed with status ${String(response.status)}.`);
-  }
+  assertDiscordHttpResponseOk({ operation: "guild listing", response });
 
   const guilds = z.array(DiscordGuildSchema).parse(await response.json());
   return guilds
@@ -132,11 +173,7 @@ async function listDiscordChannels(input: {
       },
     );
 
-    if (!response.ok) {
-      throw new Error(
-        `Discord channel list request for guild '${guildId}' failed with status ${String(response.status)}.`,
-      );
-    }
+    assertDiscordHttpResponseOk({ operation: `channel listing for guild '${guildId}'`, response });
 
     const parsedChannels = z.array(DiscordChannelSchema).parse(await response.json());
     channels.push(
