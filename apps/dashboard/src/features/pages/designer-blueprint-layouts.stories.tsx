@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import type { DesignerBlueprintDocument } from "../designer/designer-blueprint-schema.js";
 import { DesignerBlueprintCanvasPanel } from "./designer-session-page-view.js";
-import { DesignerStoryRuntime } from "./designer-story-runtime.js";
+import { DesignerStoryRuntime } from "./designer-story-runtime.story-fixtures.js";
 
 const AiSoftwareFactoryBlueprint = {
   version: 1,

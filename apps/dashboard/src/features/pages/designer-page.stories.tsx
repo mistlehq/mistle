@@ -31,7 +31,7 @@ import {
   DesignerBlueprintPendingCommentEditor,
   DesignerCanvasWorkspace,
 } from "./designer-session-page-view.js";
-import { DesignerStoryRuntime } from "./designer-story-runtime.js";
+import { DesignerStoryRuntime } from "./designer-story-runtime.story-fixtures.js";
 import { createStoryConnectionMethods } from "./organization-integrations-settings-page-story-support.js";
 import {
   type PendingSessionBlueprintComment,
