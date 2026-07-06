@@ -20,6 +20,7 @@ import type {
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
 import { createReadySessionComposerStateInput } from "../session-agents/codex/fixtures/session-fixtures.js";
+import { AppShellView } from "../shell/app-shell-view.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { DesignerPageView } from "./designer-page-view.js";
@@ -536,6 +537,32 @@ function DesignerPageStory(input: {
         sessionsErrorMessage={input.sessionsErrorMessage ?? null}
       />
     </MemoryRouter>
+  );
+}
+
+function DesignerPageCollapsedSidebarStory(): React.JSX.Element {
+  return (
+    <AppShellView
+      contentInsetOwner="child"
+      mainContent={<DesignerPageStory />}
+      renderSidebarTrigger
+      sidebarContent={
+        <div className="grid gap-2 p-2 text-sm">
+          <Button className="justify-start" variant="ghost">
+            Home
+          </Button>
+          <Button className="justify-start" variant="ghost">
+            Integrations
+          </Button>
+        </div>
+      }
+      sidebarEntryKey="/"
+      sidebarEntryState="collapsed"
+      sidebarFooterContent={null}
+      sidebarHeaderContent={null}
+      topLoadingBar={null}
+      viewportMode="document"
+    />
   );
 }
 
@@ -1069,6 +1096,12 @@ export const WithSessions: Story = {
 export const Empty: Story = {
   render: function RenderEmptyStory(): React.JSX.Element {
     return <DesignerPageStory sessions={[]} />;
+  },
+};
+
+export const CollapsedSidebar: Story = {
+  render: function RenderCollapsedSidebarStory(): React.JSX.Element {
+    return <DesignerPageCollapsedSidebarStory />;
   },
 };
 
