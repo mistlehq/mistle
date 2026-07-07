@@ -20,8 +20,8 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@codemirror/autocomplete": "6.20.2",
-    "@codemirror/commands": "6.10.3",
+    "@codemirror/autocomplete": "6.20.3",
+    "@codemirror/commands": "6.10.4",
     "@codemirror/lang-json": "6.0.2",
     "@codemirror/lang-markdown": "6.5.0",
     "@codemirror/lint": "6.9.7",
