@@ -413,6 +413,105 @@ describe("compileCodexRuntime", () => {
     expect(installed.agentRuntimes).toEqual(compiled.agentRuntimes);
   });
 
+  it("keeps Langfuse tracing scoped to the installed runtime compiler", () => {
+    const compiled = compileCodexRuntime({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      runtimeId: "codex",
+      runtimeConfig: {},
+      mcpServers: [],
+      refs: {
+        sandboxPaths: {
+          userHomeDir: "/root",
+          workspaceDir: "/root",
+          runtimeDataDir: "/var/lib/mistle",
+          runtimeArtifactDir: "/var/lib/mistle/artifacts",
+          runtimeArtifactBinDir: "/usr/local/bin",
+        },
+        artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
+      },
+    });
+
+    const runtimeClients = renderRuntimeClients({
+      compiled,
+      egressRoutes: [],
+    });
+    const runtimeClient = runtimeClients[0];
+    if (runtimeClient === undefined) {
+      throw new Error("Expected compiled Codex runtime client.");
+    }
+    expect(runtimeClient.setup.env).toEqual({});
+    expect(runtimeClient.setup.files.map((file) => file.fileId)).not.toContain(
+      "codex_langfuse_requirements",
+    );
+    expect(runtimeClient.setup.files.map((file) => file.fileId)).not.toContain(
+      "codex_home_langfuse_config",
+    );
+  });
+
+  it("enables the Langfuse Codex plugin and runtime env when tracing is configured", () => {
+    const installed = compileInstalledCodexRuntime({
+      codexCliPath: "codex",
+      egressRoutes: [],
+      langfuseTracing: {
+        publicKey: "pk-lf-public",
+        secretKeyPlaceholder: "mistle-managed-egress",
+        baseUrl: "https://us.cloud.langfuse.com",
+        environment: "development",
+        tags: ["mistle-designer"],
+        metadata: {
+          "mistle.organization_id": "org_123",
+          "mistle.designer_session_id": "dsn_123",
+        },
+      },
+      mcpServers: [],
+    });
+
+    const runtimeClient = installed.runtimeClients?.[0];
+    const configFile = runtimeClient?.setup.files.find((file) => file.fileId === "codex_config");
+    const homeConfigFile = runtimeClient?.setup.files.find(
+      (file) => file.fileId === "codex_home_langfuse_config",
+    );
+    const requirementsFile = runtimeClient?.setup.files.find(
+      (file) => file.fileId === "codex_langfuse_requirements",
+    );
+
+    expect(runtimeClient?.setup.env).toEqual({
+      CODEX_HOME: "/root/.codex",
+      TRACE_TO_LANGFUSE: "true",
+      LANGFUSE_CODEX_PUBLIC_KEY: "pk-lf-public",
+      LANGFUSE_CODEX_SECRET_KEY: "mistle-managed-egress",
+      LANGFUSE_CODEX_BASE_URL: "https://us.cloud.langfuse.com",
+      LANGFUSE_TRACING_ENVIRONMENT: "development",
+      LANGFUSE_CODEX_TAGS: "mistle-designer",
+      LANGFUSE_CODEX_METADATA: JSON.stringify({
+        "mistle.organization_id": "org_123",
+        "mistle.designer_session_id": "dsn_123",
+      }),
+    });
+    expect(configFile?.content).toContain("hooks = true");
+    expect(configFile?.content).toContain("plugins = true");
+    expect(configFile?.content).toContain('[plugins."tracing@codex-observability-plugin"]');
+    expect(configFile?.content).toContain("enabled = true");
+    expect(homeConfigFile).toMatchObject({
+      path: "/root/.codex/config.toml",
+      writeMode: "merge",
+    });
+    expect(homeConfigFile?.content).toContain("hooks = true");
+    expect(homeConfigFile?.content).toContain('[plugins."tracing@codex-observability-plugin"]');
+    expect(requirementsFile).toMatchObject({
+      path: "/etc/codex/requirements.toml",
+      writeMode: "merge",
+    });
+    expect(requirementsFile?.content).toContain("hooks = true");
+    expect(requirementsFile?.content).toContain("[hooks]");
+    expect(requirementsFile?.content).toContain("[[hooks.Stop]]");
+    expect(requirementsFile?.content).toContain(
+      'command = "node \\"${CODEX_HOME:-$HOME/.codex}/plugins/cache/codex-observability-plugin/tracing/0.1.0/dist/index.mjs\\""',
+    );
+  });
+
   it("mentions Mistle MCP tools in managed instructions when Mistle MCP is configured", () => {
     const compiled = compileCodexRuntime({
       organizationId: "org_123",

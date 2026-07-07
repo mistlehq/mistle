@@ -895,6 +895,10 @@ export interface paths {
                       | {
                           /** @enum {string} */
                           kind: "platform_openai_api_key";
+                        }
+                      | {
+                          /** @enum {string} */
+                          kind: "platform_langfuse_secret_key";
                         };
                     header: string;
                   }[];
@@ -974,6 +978,10 @@ export interface paths {
                     | {
                         /** @enum {string} */
                         kind: "platform_openai_api_key";
+                      }
+                    | {
+                        /** @enum {string} */
+                        kind: "platform_langfuse_secret_key";
                       };
                   egressRuleId: string;
                   familyId: string;
@@ -1624,6 +1632,10 @@ export interface paths {
                     | {
                         /** @enum {string} */
                         kind: "platform_openai_api_key";
+                      }
+                    | {
+                        /** @enum {string} */
+                        kind: "platform_langfuse_secret_key";
                       };
                   header: string;
                 }[];
@@ -1703,6 +1715,10 @@ export interface paths {
                   | {
                       /** @enum {string} */
                       kind: "platform_openai_api_key";
+                    }
+                  | {
+                      /** @enum {string} */
+                      kind: "platform_langfuse_secret_key";
                     };
                 egressRuleId: string;
                 familyId: string;

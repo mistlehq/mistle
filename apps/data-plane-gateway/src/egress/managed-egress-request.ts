@@ -25,9 +25,12 @@ type AwsSessionCredential = Extract<CachedCredential, { kind: "aws_session" }>;
 const MistleMcpTokenTtlSeconds = 300;
 
 export type GatewayPlatformCredentialConfig = {
-  openai: {
-    apiKey: string;
-  };
+  openai?:
+    | {
+        apiKey: string;
+      }
+    | undefined;
+  langfuse?: { secretKey: string } | undefined;
 };
 
 type MutableManagedEgressRequest = {
@@ -75,6 +78,9 @@ type CredentialResolverInput =
     }
   | {
       credentialResolverKind: "platform_openai_api_key";
+    }
+  | {
+      credentialResolverKind: "platform_langfuse_secret_key";
     };
 type CredentialResolverRef =
   | {
@@ -108,6 +114,9 @@ type CredentialResolverRef =
     }
   | {
       kind: "platform_openai_api_key";
+    }
+  | {
+      kind: "platform_langfuse_secret_key";
     };
 
 type CredentialResolutionLogFields = {
@@ -547,6 +556,12 @@ function toCredentialResolverRef(input: {
     };
   }
 
+  if (input.resolver.kind === "platform_langfuse_secret_key") {
+    return {
+      kind: "platform_langfuse_secret_key",
+    };
+  }
+
   return {
     kind: "linked_principal",
     providerFamily: input.resolver.providerFamily,
@@ -612,6 +627,12 @@ function toCredentialResolverInputFromRef(input: {
   if (input.credentialResolver.kind === "platform_openai_api_key") {
     return {
       credentialResolverKind: "platform_openai_api_key",
+    };
+  }
+
+  if (input.credentialResolver.kind === "platform_langfuse_secret_key") {
+    return {
+      credentialResolverKind: "platform_langfuse_secret_key",
     };
   }
 
@@ -783,6 +804,16 @@ function createCredentialCacheKey(input: {
     };
   }
 
+  if (input.resolver.credentialResolverKind === "platform_langfuse_secret_key") {
+    return {
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+      bindingId: input.bindingId,
+      credentialResolverKind: "platform_langfuse_secret_key",
+    };
+  }
+
   return {
     ...(input.testEnvironmentId === undefined
       ? {}
@@ -921,7 +952,7 @@ async function resolveCredentialWithCache(input: {
       expiresAt: mintedToken.expiresAt.toISOString(),
     };
   } else if (input.resolver.credentialResolverKind === "platform_openai_api_key") {
-    if (input.platformCredentials === undefined) {
+    if (input.platformCredentials?.openai === undefined) {
       throw new GatewayManagedEgressUnsupportedRouteError(
         "Platform OpenAI credential resolver requires gateway platform credential config.",
         "credential_resolution_failed",
@@ -931,6 +962,18 @@ async function resolveCredentialWithCache(input: {
     resolvedCredential = {
       kind: "value",
       value: input.platformCredentials.openai.apiKey,
+    };
+  } else if (input.resolver.credentialResolverKind === "platform_langfuse_secret_key") {
+    if (input.platformCredentials?.langfuse === undefined) {
+      throw new GatewayManagedEgressUnsupportedRouteError(
+        "Platform Langfuse credential resolver requires gateway platform Langfuse credential config.",
+        "credential_resolution_failed",
+      );
+    }
+
+    resolvedCredential = {
+      kind: "value",
+      value: input.platformCredentials.langfuse.secretKey,
     };
   } else {
     resolvedCredential =
@@ -1055,6 +1098,16 @@ function createCredentialResolutionLogFields(input: {
   }
 
   if (input.resolver.credentialResolverKind === "platform_openai_api_key") {
+    return {
+      bindingId: input.bindingId,
+      credentialResolverKind: input.resolver.credentialResolverKind,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+    };
+  }
+
+  if (input.resolver.credentialResolverKind === "platform_langfuse_secret_key") {
     return {
       bindingId: input.bindingId,
       credentialResolverKind: input.resolver.credentialResolverKind,

@@ -203,7 +203,14 @@ export const DataPlaneGatewayPlatformCredentialsConfigSchema = z
       .object({
         apiKey: z.string().trim().min(1),
       })
-      .strict(),
+      .strict()
+      .optional(),
+    langfuse: z
+      .object({
+        secretKey: z.string().trim().min(1),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -212,6 +219,12 @@ export const PartialDataPlaneGatewayPlatformCredentialsConfigSchema = z
     openai: z
       .object({
         apiKey: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+    langfuse: z
+      .object({
+        secretKey: z.string().trim().min(1).optional(),
       })
       .strict()
       .optional(),

@@ -296,6 +296,10 @@ function normalizeEgressCredentialResolver(
       return {
         kind: credentialResolver.kind,
       };
+    case "platform_langfuse_secret_key":
+      return {
+        kind: credentialResolver.kind,
+      };
   }
 }
 

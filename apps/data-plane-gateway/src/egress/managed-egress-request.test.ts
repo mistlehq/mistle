@@ -509,6 +509,76 @@ describe("buildManagedEgressRequest", () => {
     expect(result.request.headers.get("authorization")).toBe("Bearer sk-platform-openai");
   });
 
+  it("injects the gateway platform Langfuse secret key as OTLP basic auth", async () => {
+    const route: CompiledRuntimePlan["egressRoutes"][number] = {
+      egressRuleId: "egress_rule_designer_langfuse_traces",
+      bindingId: "designer-langfuse",
+      familyId: "langfuse",
+      variantId: "langfuse-otel",
+      match: {
+        hosts: ["cloud.langfuse.com"],
+        methods: ["POST"],
+        pathPrefixes: ["/api/public/otel/v1/traces"],
+      },
+      upstream: {
+        baseUrl: "https://cloud.langfuse.com",
+      },
+      authInjection: {
+        type: "basic",
+        target: "authorization",
+        username: "pk-lf-public",
+      },
+      additionalHeaders: {
+        "x-langfuse-public-key": "pk-lf-public",
+      },
+      credentialResolver: {
+        kind: "platform_langfuse_secret_key",
+      },
+    };
+
+    const result = await buildManagedEgressRequest({
+      body: undefined,
+      controlPlanePublicBaseUrl: "https://control-plane.test",
+      controlPlaneInternalClient: new ControlPlaneInternalClient({
+        baseUrl: "http://127.0.0.1:1",
+        internalAuthServiceToken: "service-token",
+      }),
+      credentialCache: new CredentialCache({
+        cache: new Cache({ adapter: new InMemoryCacheAdapter() }),
+        defaultTtlSeconds: 300,
+        refreshSkewSeconds: 0,
+        now: () => Date.parse("2026-01-01T00:00:00.000Z"),
+      }),
+      mcpTokenConfig: {
+        tokenSecret: "mcp-token-secret",
+        tokenIssuer: "data-plane-gateway",
+        tokenAudience: "mistle-mcp",
+      },
+      organizationId: "org_123",
+      platformCredentials: {
+        openai: {
+          apiKey: "sk-platform-openai",
+        },
+        langfuse: {
+          secretKey: "sk-lf-secret",
+        },
+      },
+      request: {
+        authority: "cloud.langfuse.com",
+        headers: {},
+        method: "POST",
+        path: "/api/public/otel/v1/traces",
+        scheme: "https",
+      },
+      route,
+      sandboxInstanceId: "sbi_123",
+    });
+
+    const credentials = Buffer.from("pk-lf-public:sk-lf-secret", "utf8").toString("base64");
+    expect(result.request.headers.get("authorization")).toBe(`Basic ${credentials}`);
+    expect(result.request.headers.get("x-langfuse-public-key")).toBe("pk-lf-public");
+  });
+
   it("mints Designer-scoped MCP bearer tokens for Mistle MCP egress", async () => {
     const route: CompiledRuntimePlan["egressRoutes"][number] = {
       egressRuleId: "egress_rule_mistle_mcp",

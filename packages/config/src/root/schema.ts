@@ -125,6 +125,12 @@ const PlatformCredentialsSchema = z
       })
       .strict()
       .optional(),
+    langfuse: z
+      .object({
+        secret_key: z.string().trim().min(1),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -249,10 +255,25 @@ const DesignerSandboxResourcesConfigSchema = z
   })
   .strict();
 
+const DesignerSandboxLangfuseConfigSchema = z
+  .preprocess(
+    defaultMissingEnabledToFalse,
+    z
+      .object({
+        enabled: z.boolean(),
+        public_key: z.string().trim().min(1).optional(),
+        base_url: UrlSchema.optional(),
+        environment: z.string().trim().min(1).optional(),
+      })
+      .strict(),
+  )
+  .default({ enabled: false });
+
 const DesignerSandboxConfigSchema = z
   .object({
     base_image: z.string().trim().min(1),
     codex_cli_path: z.string().trim().min(1).default("codex"),
+    langfuse: DesignerSandboxLangfuseConfigSchema,
     sandbox_provider: z.string().trim().min(1),
     sandbox_connection_id: z.string().trim().min(1).nullable().default(null),
     sandbox_resources: DesignerSandboxResourcesConfigSchema.nullable().default(null),

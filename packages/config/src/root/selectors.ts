@@ -53,6 +53,42 @@ function projectTelemetry(config: Config): GlobalTelemetryConfig {
   };
 }
 
+function selectDesignerSandboxLangfuseConfig(
+  langfuse: NonNullable<Config["sandbox"]["designer"]>["langfuse"],
+): NonNullable<ControlPlaneApiConfig["sandbox"]["designer"]>["langfuse"] {
+  return {
+    enabled: langfuse.enabled === true,
+    ...(langfuse.public_key === undefined ? {} : { publicKey: langfuse.public_key }),
+    ...(langfuse.base_url === undefined ? {} : { baseUrl: langfuse.base_url }),
+    ...(langfuse.environment === undefined ? {} : { environment: langfuse.environment }),
+  };
+}
+
+function selectPlatformCredentials(
+  platformCredentials: Config["platform_credentials"],
+): ControlPlaneApiConfig["platformCredentials"] {
+  if (platformCredentials === undefined) {
+    return undefined;
+  }
+
+  return {
+    ...(platformCredentials.openai === undefined
+      ? {}
+      : {
+          openai: {
+            apiKey: platformCredentials.openai.api_key,
+          },
+        }),
+    ...(platformCredentials.langfuse === undefined
+      ? {}
+      : {
+          langfuse: {
+            secretKey: platformCredentials.langfuse.secret_key,
+          },
+        }),
+  };
+}
+
 export function selectGlobalConfig(config: Config): GlobalConfig {
   return {
     env: config.global.env,
@@ -200,14 +236,7 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
     dataPlaneApi: {
       baseUrl: config.services.data_plane_api.internal_url,
     },
-    platformCredentials:
-      config.platform_credentials?.openai === undefined
-        ? undefined
-        : {
-            openai: {
-              apiKey: config.platform_credentials.openai.api_key,
-            },
-          },
+    platformCredentials: selectPlatformCredentials(config.platform_credentials),
     internalAuth: {
       serviceToken: config.internal_auth.shared_token.token,
     },
@@ -247,6 +276,7 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
             designer: {
               baseImage: config.sandbox.designer.base_image,
               codexCliPath: config.sandbox.designer.codex_cli_path,
+              langfuse: selectDesignerSandboxLangfuseConfig(config.sandbox.designer.langfuse),
               sandboxProvider: config.sandbox.designer.sandbox_provider,
               sandboxConnectionId: config.sandbox.designer.sandbox_connection_id,
               sandboxResources:
@@ -503,14 +533,7 @@ export function selectDataPlaneGatewayConfig(config: Config): DataPlaneGatewayCo
     internalAuth: {
       serviceToken: config.internal_auth.shared_token.token,
     },
-    platformCredentials:
-      config.platform_credentials?.openai === undefined
-        ? undefined
-        : {
-            openai: {
-              apiKey: config.platform_credentials.openai.api_key,
-            },
-          },
+    platformCredentials: selectPlatformCredentials(config.platform_credentials),
     sandbox: globalConfig.sandbox,
     telemetry: globalConfig.telemetry,
   };

@@ -180,6 +180,7 @@ pub enum CompiledEgressRouteCredentialResolver {
         designer_session_id: String,
     },
     PlatformOpenaiApiKey,
+    PlatformLangfuseSecretKey,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -1503,6 +1504,38 @@ mod tests {
         assert_eq!(
             route.credential_resolver,
             CompiledEgressRouteCredentialResolver::PlatformOpenaiApiKey
+        );
+    }
+
+    #[test]
+    fn decodes_platform_langfuse_secret_key_credential_resolver_shape() {
+        let route = serde_json::from_value::<CompiledEgressRoute>(serde_json::json!({
+          "egressRuleId": "egress_rule_designer_langfuse_traces",
+          "bindingId": "designer-langfuse",
+          "familyId": "langfuse",
+          "variantId": "langfuse-otel",
+          "match": {
+            "hosts": ["us.cloud.langfuse.com"],
+            "pathPrefixes": ["/api/public/otel/v1/traces"],
+            "methods": ["POST"]
+          },
+          "upstream": {
+            "baseUrl": "https://us.cloud.langfuse.com"
+          },
+          "authInjection": {
+            "type": "basic",
+            "target": "authorization",
+            "username": "pk-lf-public"
+          },
+          "credentialResolver": {
+            "kind": "platform_langfuse_secret_key"
+          }
+        }))
+        .expect("platform Langfuse egress route should decode");
+
+        assert_eq!(
+            route.credential_resolver,
+            CompiledEgressRouteCredentialResolver::PlatformLangfuseSecretKey
         );
     }
 }

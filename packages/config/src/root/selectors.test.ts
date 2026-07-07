@@ -479,11 +479,20 @@ describe("selectControlPlaneApiConfig", () => {
           openai: {
             api_key: "platform-openai-key",
           },
+          langfuse: {
+            secret_key: "platform-langfuse-secret-key",
+          },
         },
         sandbox: {
           designer: {
             base_image: "registry.example.com/designer:latest",
             codex_cli_path: "/usr/local/bin/codex",
+            langfuse: {
+              enabled: true,
+              public_key: "pk-lf-public",
+              base_url: "https://us.cloud.langfuse.com",
+              environment: "development",
+            },
             sandbox_provider: "docker",
             sandbox_connection_id: "sbc_designer",
             sandbox_resources: {
@@ -499,6 +508,12 @@ describe("selectControlPlaneApiConfig", () => {
     expect(config.sandbox.designer).toEqual({
       baseImage: "registry.example.com/designer:latest",
       codexCliPath: "/usr/local/bin/codex",
+      langfuse: {
+        enabled: true,
+        publicKey: "pk-lf-public",
+        baseUrl: "https://us.cloud.langfuse.com",
+        environment: "development",
+      },
       sandboxProvider: "docker",
       sandboxConnectionId: "sbc_designer",
       sandboxResources: {
@@ -510,6 +525,27 @@ describe("selectControlPlaneApiConfig", () => {
     expect(config.platformCredentials).toEqual({
       openai: {
         apiKey: "platform-openai-key",
+      },
+      langfuse: {
+        secretKey: "platform-langfuse-secret-key",
+      },
+    });
+  });
+
+  it("projects Langfuse platform credentials without OpenAI credentials", () => {
+    const config = selectControlPlaneApiConfig(
+      createRootConfig({
+        platformCredentials: {
+          langfuse: {
+            secret_key: "platform-langfuse-secret-key",
+          },
+        },
+      }),
+    );
+
+    expect(config.platformCredentials).toEqual({
+      langfuse: {
+        secretKey: "platform-langfuse-secret-key",
       },
     });
   });
@@ -523,6 +559,9 @@ describe("ConfigSchema", () => {
           designer: {
             base_image: "registry.example.com/designer:latest",
             codex_cli_path: "codex",
+            langfuse: {
+              enabled: false,
+            },
             sandbox_provider: "docker",
             sandbox_connection_id: null,
             sandbox_resources: null,
@@ -713,6 +752,24 @@ describe("selectDataPlaneGatewayConfig", () => {
     expect(config.platformCredentials).toEqual({
       openai: {
         apiKey: "platform-openai-key",
+      },
+    });
+  });
+
+  it("projects Langfuse platform credentials for gateway managed egress without OpenAI", () => {
+    const config = selectDataPlaneGatewayConfig(
+      createRootConfig({
+        platformCredentials: {
+          langfuse: {
+            secret_key: "platform-langfuse-secret-key",
+          },
+        },
+      }),
+    );
+
+    expect(config.platformCredentials).toEqual({
+      langfuse: {
+        secretKey: "platform-langfuse-secret-key",
       },
     });
   });

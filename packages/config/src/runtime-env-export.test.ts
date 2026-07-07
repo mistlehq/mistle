@@ -201,6 +201,9 @@ describe("exportServiceConfigToEnv", () => {
             designer: {
               baseImage: "registry.example.com/designer:latest",
               codexCliPath: "codex",
+              langfuse: {
+                enabled: false,
+              },
               sandboxProvider: "docker",
               sandboxConnectionId: null,
               sandboxResources: null,

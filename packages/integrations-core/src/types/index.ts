@@ -2071,13 +2071,18 @@ export type PlatformOpenAiApiKeyEgressCredentialResolverRef = {
   kind: "platform_openai_api_key";
 };
 
+export type PlatformLangfuseSecretKeyEgressCredentialResolverRef = {
+  kind: "platform_langfuse_secret_key";
+};
+
 export type EgressCredentialResolverRef =
   | IntegrationConnectionEgressCredentialResolverRef
   | LinkedPrincipalEgressCredentialResolverRef
   | MistleMcpTokenEgressCredentialResolverRef
   | MistleMcpSetupAssistantTokenEgressCredentialResolverRef
   | MistleMcpDesignerTokenEgressCredentialResolverRef
-  | PlatformOpenAiApiKeyEgressCredentialResolverRef;
+  | PlatformOpenAiApiKeyEgressCredentialResolverRef
+  | PlatformLangfuseSecretKeyEgressCredentialResolverRef;
 
 export type IntegrationEgressCredentialResolverSelectionInput = {
   organizationId: string;

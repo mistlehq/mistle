@@ -2017,6 +2017,17 @@
                                           },
                                           "required": ["kind"],
                                           "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["platform_langfuse_secret_key"]
+                                            }
+                                          },
+                                          "required": ["kind"],
+                                          "additionalProperties": false
                                         }
                                       ]
                                     }
@@ -2148,6 +2159,17 @@
                                       "kind": {
                                         "type": "string",
                                         "enum": ["platform_openai_api_key"]
+                                      }
+                                    },
+                                    "required": ["kind"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["platform_langfuse_secret_key"]
                                       }
                                     },
                                     "required": ["kind"],
@@ -4708,6 +4730,17 @@
                                     },
                                     "required": ["kind"],
                                     "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["platform_langfuse_secret_key"]
+                                      }
+                                    },
+                                    "required": ["kind"],
+                                    "additionalProperties": false
                                   }
                                 ]
                               }
@@ -4835,6 +4868,17 @@
                                 "kind": {
                                   "type": "string",
                                   "enum": ["platform_openai_api_key"]
+                                }
+                              },
+                              "required": ["kind"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["platform_langfuse_secret_key"]
                                 }
                               },
                               "required": ["kind"],

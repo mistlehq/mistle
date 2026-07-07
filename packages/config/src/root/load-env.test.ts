@@ -28,6 +28,7 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_GATEWAY_RELAY_NATS_URL: "nats://gateway-relay:4222",
       MISTLE_GATEWAY_RELAY_NATS_NAME_PREFIX: "mistle-prod",
       MISTLE_PLATFORM_OPENAI_API_KEY: "platform-openai-key",
+      MISTLE_PLATFORM_LANGFUSE_SECRET_KEY: "platform-langfuse-secret-key",
       MISTLE_OBJECT_STORE_ASSETS_BUCKET_NAME: "assets",
       MISTLE_OBJECT_STORE_ASSETS_REGION: "us-east-1",
       MISTLE_OBJECT_STORE_ASSETS_ENDPOINT: "https://assets.example",
@@ -93,6 +94,10 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: "registry.example.com/sandbox:latest",
       MISTLE_DESIGNER_SANDBOX_BASE_IMAGE: "registry.example.com/designer:latest",
       MISTLE_DESIGNER_CODEX_CLI_PATH: "/usr/local/bin/codex",
+      MISTLE_DESIGNER_LANGFUSE_ENABLED: "true",
+      MISTLE_DESIGNER_LANGFUSE_PUBLIC_KEY: "pk-lf-public",
+      MISTLE_DESIGNER_LANGFUSE_BASE_URL: "https://us.cloud.langfuse.com",
+      MISTLE_DESIGNER_LANGFUSE_ENVIRONMENT: "development",
       MISTLE_DESIGNER_SANDBOX_PROVIDER: "docker",
       MISTLE_DESIGNER_SANDBOX_CONNECTION_ID: "sbc_designer",
       MISTLE_DESIGNER_SANDBOX_VCPU_COUNT: "2",
@@ -185,6 +190,9 @@ describe("loadRootConfigFromEnv", () => {
       platform_credentials: {
         openai: {
           api_key: "platform-openai-key",
+        },
+        langfuse: {
+          secret_key: "platform-langfuse-secret-key",
         },
       },
       object_store: {
@@ -302,6 +310,12 @@ describe("loadRootConfigFromEnv", () => {
         designer: {
           base_image: "registry.example.com/designer:latest",
           codex_cli_path: "/usr/local/bin/codex",
+          langfuse: {
+            enabled: true,
+            public_key: "pk-lf-public",
+            base_url: "https://us.cloud.langfuse.com",
+            environment: "development",
+          },
           sandbox_provider: "docker",
           sandbox_connection_id: "sbc_designer",
           sandbox_resources: {

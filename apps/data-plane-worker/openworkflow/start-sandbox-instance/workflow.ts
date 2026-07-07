@@ -1427,7 +1427,8 @@ function createRuntimePlanStartupLogFields(
                     credentialMistleMcpDesignerSessionId:
                       egressRoute.credentialResolver.designerSessionId,
                   }
-                : egressRoute.credentialResolver.kind === "platform_openai_api_key"
+                : egressRoute.credentialResolver.kind === "platform_openai_api_key" ||
+                    egressRoute.credentialResolver.kind === "platform_langfuse_secret_key"
                   ? {}
                   : { credentialProviderFamily: egressRoute.credentialResolver.providerFamily }),
       };

@@ -59,6 +59,19 @@ export type DesignerRuntimeMistleMcpConfig =
       url: string;
     };
 
+export type DesignerRuntimeLangfuseConfig =
+  | {
+      enabled: false;
+    }
+  | {
+      enabled: true;
+      publicKey: string;
+      baseUrl: string;
+      environment?: string;
+      metadata: Readonly<Record<string, string>>;
+      tags?: ReadonlyArray<string>;
+    };
+
 export function createDesignerRuntimePlan(input: {
   additionalManagedInstructionBlocks?: readonly {
     blockId: string;
@@ -68,6 +81,7 @@ export function createDesignerRuntimePlan(input: {
   designerSessionId: string;
   imageRef: string;
   initialPrompt: string;
+  langfuse?: DesignerRuntimeLangfuseConfig;
   mistleMcp: DesignerRuntimeMistleMcpConfig;
   openAiProviderMode?: "platform" | "local_subscription";
 }) {
@@ -84,6 +98,9 @@ export function createDesignerRuntimePlan(input: {
           },
           url: input.mistleMcp.url,
         })
+      : []),
+    ...(input.langfuse?.enabled === true
+      ? [createDesignerLangfuseEgressRoute(input.langfuse)]
       : []),
   ];
   const mcpServers = [
@@ -107,6 +124,20 @@ export function createDesignerRuntimePlan(input: {
       }),
     ],
     mcpServers,
+    ...(input.langfuse?.enabled === true
+      ? {
+          langfuseTracing: {
+            publicKey: input.langfuse.publicKey,
+            secretKeyPlaceholder: "mistle-managed-egress",
+            baseUrl: input.langfuse.baseUrl,
+            ...(input.langfuse.environment === undefined
+              ? {}
+              : { environment: input.langfuse.environment }),
+            metadata: input.langfuse.metadata,
+            ...(input.langfuse.tags === undefined ? {} : { tags: input.langfuse.tags }),
+          },
+        }
+      : {}),
   });
   if ((codexRuntime.artifacts ?? []).length > 0) {
     throw new Error("Designer installed Codex runtime must not require runtime artifacts.");
@@ -153,6 +184,38 @@ export function createDesignerRuntimePlan(input: {
     runtimeClients: runtimeClientsWithDesignerReferences,
     agentRuntimes: codexRuntime.agentRuntimes,
   });
+}
+
+function createDesignerLangfuseEgressRoute(
+  langfuse: Extract<DesignerRuntimeLangfuseConfig, { enabled: true }>,
+): EgressCredentialRoute {
+  const baseUrl = new URL(langfuse.baseUrl);
+
+  return {
+    egressRuleId: "egress_rule_designer_langfuse_traces",
+    bindingId: "designer-langfuse",
+    familyId: "langfuse",
+    variantId: "langfuse-otel",
+    match: {
+      hosts: [baseUrl.hostname],
+      pathPrefixes: ["/api/public/otel/v1/traces"],
+      methods: ["POST"],
+    },
+    upstream: {
+      baseUrl: langfuse.baseUrl,
+    },
+    authInjection: {
+      type: "basic",
+      target: "authorization",
+      username: langfuse.publicKey,
+    },
+    additionalHeaders: {
+      "x-langfuse-public-key": langfuse.publicKey,
+    },
+    credentialResolver: {
+      kind: "platform_langfuse_secret_key",
+    },
+  };
 }
 
 function createPlatformOpenAiEgressRoute(): EgressCredentialRoute {

@@ -27,6 +27,19 @@ export type IntegrationServiceOptions = {
     allowSignups?: boolean;
     billingStripeEnabled?: boolean;
     googleAuth?: "simulated";
+    designerLangfuse?: {
+      baseUrl: string;
+      environment?: string;
+      publicKey: string;
+    };
+    platformCredentials?: {
+      openai?: {
+        apiKey: string;
+      };
+      langfuse?: {
+        secretKey: string;
+      };
+    };
     welcomeEmail?: IntegrationControlPlaneApiWelcomeEmailOptions;
     mcpTrustForwardedHeaders?: boolean;
   };
@@ -45,6 +58,14 @@ export type IntegrationServiceOptions = {
     };
     portAccess?: {
       authorizationTimeoutMs?: number;
+    };
+    platformCredentials?: {
+      openai?: {
+        apiKey: string;
+      };
+      langfuse?: {
+        secretKey: string;
+      };
     };
   };
   sandbox?: IntegrationSandboxOptions;

@@ -187,6 +187,10 @@ const RootEnvDescriptors = [
     path: ["platform_credentials", "openai", "api_key"],
   },
   {
+    envVar: "MISTLE_PLATFORM_LANGFUSE_SECRET_KEY",
+    path: ["platform_credentials", "langfuse", "secret_key"],
+  },
+  {
     envVar: "MISTLE_OBJECT_STORE_ASSETS_BUCKET_NAME",
     path: ["object_store", "assets", "bucket_name"],
   },
@@ -467,6 +471,23 @@ const RootEnvDescriptors = [
   {
     envVar: "MISTLE_DESIGNER_CODEX_CLI_PATH",
     path: ["sandbox", "designer", "codex_cli_path"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_LANGFUSE_ENABLED",
+    path: ["sandbox", "designer", "langfuse", "enabled"],
+    parse: parseBooleanEnv,
+  },
+  {
+    envVar: "MISTLE_DESIGNER_LANGFUSE_PUBLIC_KEY",
+    path: ["sandbox", "designer", "langfuse", "public_key"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_LANGFUSE_BASE_URL",
+    path: ["sandbox", "designer", "langfuse", "base_url"],
+  },
+  {
+    envVar: "MISTLE_DESIGNER_LANGFUSE_ENVIRONMENT",
+    path: ["sandbox", "designer", "langfuse", "environment"],
   },
   {
     envVar: "MISTLE_DESIGNER_SANDBOX_PROVIDER",
