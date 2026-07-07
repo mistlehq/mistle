@@ -200,6 +200,10 @@ _Avoid_: Page tab when the tab belongs to the designer workspace rather than the
 The top-level dashboard resource page for starting, listing, and resuming **Mistle Designer sessions**.
 _Avoid_: Sandbox profile page when the user is managing Designer workspaces rather than a specific profile
 
+**Landing prompt handoff**:
+A root-entry transfer from the public website into the **Designer page** that carries a visitor's prompt into the next **Mistle Designer session**.
+_Avoid_: App-wide pending prompt, cross-route prompt recovery
+
 **Agent runtime**:
 A registered agent execution environment that can be selected on a **Sandbox profile version** and run conversations inside sandbox-backed Mistle workflows.
 _Avoid_: Experimental runtime when it is not ready for sandbox profile selection and dashboard session workbench support
