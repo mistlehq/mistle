@@ -605,6 +605,14 @@ _Avoid_: Chat session when referring to runtime tools or sandbox state
 The wall-clock runtime accumulated by sandbox execution environments during a usage period.
 _Avoid_: Compute hours when the value is not weighted by configured compute resources
 
+**Sandbox usage interval**:
+A contiguous wall-clock runtime interval for one sandbox execution environment. It begins when sandbox compute is allocated or resumed and ends when that compute stops, fails, or is replaced.
+_Avoid_: Session duration when the session may span multiple runtime intervals
+
+**Terminal sandbox usage event**:
+The durable accounting observation that closes a **Sandbox usage interval** after sandbox compute stops, fails, or is replaced.
+_Avoid_: Lifecycle status when referring to usage accounting
+
 **Allocated resource-hours**:
 The sandbox runtime accumulated after weighting by configured resource allocation, such as vCPU count, memory capacity, or disk capacity.
 _Avoid_: Resource usage when referring to allocation rather than actual utilization
@@ -1170,6 +1178,9 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Sandbox session** may contain multiple **Codex threads**.
 - A **Sandbox session** may contain multiple **OpenCode sessions** when its **Agent runtime** is OpenCode.
 - A **Sandbox session** may contain **Pi conversations** when its **Agent runtime** is Pi.
+- A single **Sandbox session** may have multiple **Sandbox usage intervals** when its compute is stopped and later resumed.
+- **Sandbox hours** are derived from closed and open **Sandbox usage intervals**, not from the elapsed age of the **Sandbox session** record.
+- The component that makes a terminal sandbox compute state authoritative should also record the matching **Terminal sandbox usage event**.
 - A trigger-seeded **Sandbox session title** should identify the external work item before the **Trigger** recipe.
 - A pull-request trigger-seeded **Sandbox session title** should include the pull request number when available.
 - A pull-request trigger-seeded **Sandbox session title** should prefer the pull request title for its topic.

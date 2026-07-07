@@ -3,6 +3,7 @@ import {
   SandboxInstancePurposes,
   SandboxInstanceStatuses,
   SandboxStopReasons,
+  SandboxUsageEventTypes,
   type DataPlaneDatabase,
   type DataPlaneTables,
   type SandboxInstanceStatus,
@@ -36,7 +37,7 @@ type GetSandboxInstanceContext = {
   config: DataPlaneApiRuntimeConfig;
   controlPlaneInternalClient: AppRuntimeResources["controlPlaneInternalClient"];
   db: DataPlaneDatabase;
-  tables: Pick<DataPlaneTables, "sandboxInstances">;
+  tables: Pick<DataPlaneTables, "sandboxInstances" | "sandboxUsageEvents">;
   runtimeStateReader: AppRuntimeResources["runtimeStateReader"];
 };
 
@@ -51,6 +52,7 @@ type SandboxInstanceRuntimeSelection = {
   organizationId: string;
   runtimeProvider: SandboxInstanceProvider;
   sandboxConnectionId: string | null;
+  computeGeneration: number;
   sandboxVcpuCount: number | null;
   sandboxMemoryMb: number | null;
   sandboxDiskMb: number | null;
@@ -142,37 +144,125 @@ async function readLatestStartupOperation(input: {
 
 async function markRunningSandboxInstanceStopped(
   ctx: Pick<GetSandboxInstanceContext, "db" | "tables">,
-  input: {
+  input: SandboxInstanceRuntimeSelection & {
     sandboxInstanceId: string;
+    providerSandboxId: string;
     clearProviderSandboxId?: boolean;
   },
 ): Promise<void> {
   const { sandboxInstances } = ctx.tables;
 
-  const updatedRows = await ctx.db
-    .update(sandboxInstances)
-    .set({
-      status: SandboxInstanceStatuses.STOPPED,
-      ...(input.clearProviderSandboxId === true ? { providerSandboxId: null } : {}),
-      stoppedAt: sql`now()`,
-      stopReason: SandboxStopReasons.SYSTEM,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(sandboxInstances.id, input.sandboxInstanceId),
-        inArray(sandboxInstances.status, RuntimeInspectionStatuses),
-      ),
-    )
-    .returning({
-      status: sandboxInstances.status,
-    });
+  await ctx.db.transaction(async (tx) => {
+    const updatedRows = await tx
+      .update(sandboxInstances)
+      .set({
+        status: SandboxInstanceStatuses.STOPPED,
+        ...(input.clearProviderSandboxId === true ? { providerSandboxId: null } : {}),
+        stoppedAt: sql`now()`,
+        stopReason: SandboxStopReasons.SYSTEM,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(sandboxInstances.id, input.sandboxInstanceId),
+          inArray(sandboxInstances.status, RuntimeInspectionStatuses),
+        ),
+      )
+      .returning({
+        status: sandboxInstances.status,
+        stoppedAt: sandboxInstances.stoppedAt,
+      });
 
-  if (updatedRows[0]?.status === SandboxInstanceStatuses.STOPPED) {
-    return;
+    const updatedRow = updatedRows[0];
+    if (updatedRow?.status !== SandboxInstanceStatuses.STOPPED) {
+      throw new Error(
+        "Failed to transition sandbox instance status from runtime-active to stopped.",
+      );
+    }
+
+    await recordInspectionTerminalSandboxUsageEvent(
+      {
+        db: tx,
+        tables: ctx.tables,
+      },
+      {
+        ...input,
+        eventType: SandboxUsageEventTypes.SANDBOX_STOPPED,
+        occurredAt: requireInspectionTerminalTimestamp(
+          updatedRow.stoppedAt,
+          "Expected stopped sandbox instance transition to return stoppedAt.",
+        ),
+        outcome: "stopped",
+      },
+    );
+  });
+}
+
+function createInspectionSandboxUsageEventIdempotencyKey(input: {
+  sandboxInstanceId: string;
+  computeGeneration: number;
+  eventType:
+    | typeof SandboxUsageEventTypes.SANDBOX_STOPPED
+    | typeof SandboxUsageEventTypes.SANDBOX_FAILED;
+}): string {
+  return [
+    "usage",
+    input.sandboxInstanceId,
+    String(input.computeGeneration),
+    input.eventType,
+    "data-plane-api-inspection",
+  ].join(":");
+}
+
+async function recordInspectionTerminalSandboxUsageEvent(
+  ctx: {
+    db: Pick<DataPlaneDatabase, "insert">;
+    tables: Pick<DataPlaneTables, "sandboxUsageEvents">;
+  },
+  input: SandboxInstanceRuntimeSelection & {
+    sandboxInstanceId: string;
+    providerSandboxId: string | null;
+    eventType:
+      | typeof SandboxUsageEventTypes.SANDBOX_STOPPED
+      | typeof SandboxUsageEventTypes.SANDBOX_FAILED;
+    occurredAt: string;
+    outcome: "stopped" | "failed";
+  },
+): Promise<void> {
+  await ctx.db
+    .insert(ctx.tables.sandboxUsageEvents)
+    .values({
+      idempotencyKey: createInspectionSandboxUsageEventIdempotencyKey({
+        sandboxInstanceId: input.sandboxInstanceId,
+        computeGeneration: input.computeGeneration,
+        eventType: input.eventType,
+      }),
+      organizationId: input.organizationId,
+      sandboxInstanceId: input.sandboxInstanceId,
+      computeGeneration: input.computeGeneration,
+      eventType: input.eventType,
+      occurredAt: input.occurredAt,
+      runtimeProvider: input.runtimeProvider,
+      providerSandboxId: input.providerSandboxId,
+      vcpuCount: input.sandboxVcpuCount,
+      memoryMb: input.sandboxMemoryMb,
+      diskMb: input.sandboxDiskMb,
+      payload: {
+        operationKind: "inspection",
+        outcome: input.outcome,
+      },
+    })
+    .onConflictDoNothing({
+      target: ctx.tables.sandboxUsageEvents.idempotencyKey,
+    });
+}
+
+function requireInspectionTerminalTimestamp(value: string | null, message: string): string {
+  if (value === null) {
+    throw new Error(message);
   }
 
-  throw new Error("Failed to transition sandbox instance status from runtime-active to stopped.");
+  return value;
 }
 
 const InspectionFailureCodes = {
@@ -181,113 +271,193 @@ const InspectionFailureCodes = {
 
 async function markStartingSandboxInstanceFailed(
   ctx: Pick<GetSandboxInstanceContext, "db" | "tables">,
-  input: {
+  input: SandboxInstanceRuntimeSelection & {
     sandboxInstanceId: string;
+    providerSandboxId: string;
     failureCode: string;
     failureMessage: string;
   },
 ): Promise<void> {
   const { sandboxInstances } = ctx.tables;
 
-  const updatedRows = await ctx.db
-    .update(sandboxInstances)
-    .set({
-      status: SandboxInstanceStatuses.FAILED,
-      stopReason: SandboxStopReasons.FAILED,
-      failedAt: sql`now()`,
-      failureCode: input.failureCode,
-      failureMessage: input.failureMessage,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(sandboxInstances.id, input.sandboxInstanceId),
-        inArray(sandboxInstances.status, StartupInspectionStatuses),
-      ),
-    )
-    .returning({
-      status: sandboxInstances.status,
-    });
+  await ctx.db.transaction(async (tx) => {
+    const updatedRows = await tx
+      .update(sandboxInstances)
+      .set({
+        status: SandboxInstanceStatuses.FAILED,
+        stopReason: SandboxStopReasons.FAILED,
+        failedAt: sql`now()`,
+        failureCode: input.failureCode,
+        failureMessage: input.failureMessage,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(sandboxInstances.id, input.sandboxInstanceId),
+          inArray(sandboxInstances.status, StartupInspectionStatuses),
+        ),
+      )
+      .returning({
+        status: sandboxInstances.status,
+        failedAt: sandboxInstances.failedAt,
+      });
 
-  if (updatedRows[0]?.status === SandboxInstanceStatuses.FAILED) {
-    return;
-  }
+    const updatedRow = updatedRows[0];
+    if (updatedRow?.status !== SandboxInstanceStatuses.FAILED) {
+      throw new Error(
+        "Failed to transition sandbox instance status from startup-active to failed.",
+      );
+    }
 
-  throw new Error("Failed to transition sandbox instance status from startup-active to failed.");
+    await recordInspectionTerminalSandboxUsageEvent(
+      {
+        db: tx,
+        tables: ctx.tables,
+      },
+      {
+        ...input,
+        eventType: SandboxUsageEventTypes.SANDBOX_FAILED,
+        occurredAt: requireInspectionTerminalTimestamp(
+          updatedRow.failedAt,
+          "Expected failed sandbox instance transition to return failedAt.",
+        ),
+        outcome: "failed",
+      },
+    );
+  });
 }
 
 async function markRunningSandboxInstanceFailed(
   ctx: Pick<GetSandboxInstanceContext, "db" | "tables">,
-  input: {
+  input: SandboxInstanceRuntimeSelection & {
     sandboxInstanceId: string;
+    providerSandboxId: string;
     failureCode: string;
     failureMessage: string;
   },
 ): Promise<void> {
   const { sandboxInstances } = ctx.tables;
 
-  const updatedRows = await ctx.db
-    .update(sandboxInstances)
-    .set({
-      status: SandboxInstanceStatuses.FAILED,
-      stopReason: SandboxStopReasons.FAILED,
-      failedAt: sql`now()`,
-      failureCode: input.failureCode,
-      failureMessage: input.failureMessage,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(sandboxInstances.id, input.sandboxInstanceId),
-        inArray(sandboxInstances.status, RuntimeInspectionStatuses),
-      ),
-    )
-    .returning({
-      status: sandboxInstances.status,
-    });
+  await ctx.db.transaction(async (tx) => {
+    const updatedRows = await tx
+      .update(sandboxInstances)
+      .set({
+        status: SandboxInstanceStatuses.FAILED,
+        stopReason: SandboxStopReasons.FAILED,
+        failedAt: sql`now()`,
+        failureCode: input.failureCode,
+        failureMessage: input.failureMessage,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(sandboxInstances.id, input.sandboxInstanceId),
+          inArray(sandboxInstances.status, RuntimeInspectionStatuses),
+        ),
+      )
+      .returning({
+        status: sandboxInstances.status,
+        failedAt: sandboxInstances.failedAt,
+      });
 
-  if (updatedRows[0]?.status === SandboxInstanceStatuses.FAILED) {
-    return;
-  }
+    const updatedRow = updatedRows[0];
+    if (updatedRow?.status !== SandboxInstanceStatuses.FAILED) {
+      throw new Error(
+        "Failed to transition sandbox instance status from runtime-active to failed.",
+      );
+    }
 
-  throw new Error("Failed to transition sandbox instance status from runtime-active to failed.");
+    await recordInspectionTerminalSandboxUsageEvent(
+      {
+        db: tx,
+        tables: ctx.tables,
+      },
+      {
+        ...input,
+        eventType: SandboxUsageEventTypes.SANDBOX_FAILED,
+        occurredAt: requireInspectionTerminalTimestamp(
+          updatedRow.failedAt,
+          "Expected failed sandbox instance transition to return failedAt.",
+        ),
+        outcome: "failed",
+      },
+    );
+  });
 }
 
 async function markStoppedSandboxInstanceFailed(
   ctx: Pick<GetSandboxInstanceContext, "db" | "tables">,
-  input: {
+  input: SandboxInstanceRuntimeSelection & {
     sandboxInstanceId: string;
+    providerSandboxId: string;
     failureCode: string;
     failureMessage: string;
   },
 ): Promise<void> {
   const { sandboxInstances } = ctx.tables;
 
-  const updatedRows = await ctx.db
-    .update(sandboxInstances)
-    .set({
-      status: SandboxInstanceStatuses.FAILED,
-      stopReason: SandboxStopReasons.FAILED,
-      failedAt: sql`now()`,
-      failureCode: input.failureCode,
-      failureMessage: input.failureMessage,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(sandboxInstances.id, input.sandboxInstanceId),
-        eq(sandboxInstances.status, SandboxInstanceStatuses.STOPPED),
-      ),
-    )
-    .returning({
-      status: sandboxInstances.status,
-    });
+  await ctx.db.transaction(async (tx) => {
+    const [lockedRow] = await tx
+      .select({
+        stoppedAt: sandboxInstances.stoppedAt,
+      })
+      .from(sandboxInstances)
+      .where(
+        and(
+          eq(sandboxInstances.id, input.sandboxInstanceId),
+          eq(sandboxInstances.status, SandboxInstanceStatuses.STOPPED),
+        ),
+      )
+      .for("update");
 
-  if (updatedRows[0]?.status === SandboxInstanceStatuses.FAILED) {
-    return;
-  }
+    if (lockedRow === undefined) {
+      throw new Error("Failed to transition sandbox instance status from stopped to failed.");
+    }
 
-  throw new Error("Failed to transition sandbox instance status from stopped to failed.");
+    const stoppedAt = requireInspectionTerminalTimestamp(
+      lockedRow.stoppedAt,
+      "Expected stopped sandbox instance to have stoppedAt before inspection failure repair.",
+    );
+
+    const updatedRows = await tx
+      .update(sandboxInstances)
+      .set({
+        status: SandboxInstanceStatuses.FAILED,
+        stopReason: SandboxStopReasons.FAILED,
+        failedAt: sql`now()`,
+        failureCode: input.failureCode,
+        failureMessage: input.failureMessage,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(sandboxInstances.id, input.sandboxInstanceId),
+          eq(sandboxInstances.status, SandboxInstanceStatuses.STOPPED),
+        ),
+      )
+      .returning({
+        status: sandboxInstances.status,
+        failedAt: sandboxInstances.failedAt,
+      });
+
+    const updatedRow = updatedRows[0];
+    if (updatedRow?.status !== SandboxInstanceStatuses.FAILED) {
+      throw new Error("Failed to transition sandbox instance status from stopped to failed.");
+    }
+
+    await recordInspectionTerminalSandboxUsageEvent(
+      {
+        db: tx,
+        tables: ctx.tables,
+      },
+      {
+        ...input,
+        eventType: SandboxUsageEventTypes.SANDBOX_STOPPED,
+        occurredAt: stoppedAt,
+        outcome: "stopped",
+      },
+    );
+  });
 }
 
 async function inspectStartingSandboxInstance(
@@ -321,7 +491,9 @@ async function inspectStartingSandboxInstance(
 
   if (inspection === null) {
     await markStartingSandboxInstanceFailed(ctx, {
+      ...sandboxInstance,
       sandboxInstanceId: sandboxInstance.id,
+      providerSandboxId: sandboxInstance.providerSandboxId,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
     });
@@ -365,7 +537,9 @@ async function inspectStartingSandboxInstance(
   }
 
   await markStartingSandboxInstanceFailed(ctx, {
+    ...sandboxInstance,
     sandboxInstanceId: sandboxInstance.id,
+    providerSandboxId: sandboxInstance.providerSandboxId,
     failureCode: dispositionOutcome.failureCode,
     failureMessage: dispositionOutcome.failureMessage,
   });
@@ -418,7 +592,9 @@ async function inspectStoppedSandboxInstance(
   );
   if (inspection === null) {
     await markStoppedSandboxInstanceFailed(ctx, {
+      ...sandboxInstance,
       sandboxInstanceId: sandboxInstance.id,
+      providerSandboxId: sandboxInstance.providerSandboxId,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
     });
@@ -448,7 +624,9 @@ async function inspectStoppedSandboxInstance(
   }
 
   await markStoppedSandboxInstanceFailed(ctx, {
+    ...sandboxInstance,
     sandboxInstanceId: sandboxInstance.id,
+    providerSandboxId: sandboxInstance.providerSandboxId,
     failureCode: "provider_runtime_not_resumable",
     failureMessage: "Sandbox runtime was not resumable at the provider during inspection.",
   });
@@ -481,7 +659,9 @@ async function inspectRunningSandboxInstance(
   );
   if (inspection === null) {
     await markRunningSandboxInstanceFailed(ctx, {
+      ...sandboxInstance,
       sandboxInstanceId: sandboxInstance.id,
+      providerSandboxId: sandboxInstance.providerSandboxId,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
     });
@@ -521,7 +701,9 @@ async function inspectRunningSandboxInstance(
   }
 
   await markRunningSandboxInstanceStopped(ctx, {
+    ...sandboxInstance,
     sandboxInstanceId: sandboxInstance.id,
+    providerSandboxId: sandboxInstance.providerSandboxId,
   });
 
   return {
@@ -618,6 +800,7 @@ export async function getSandboxInstance(
       title: true,
       runtimeProvider: true,
       sandboxConnectionId: true,
+      computeGeneration: true,
       sandboxVcpuCount: true,
       sandboxMemoryMb: true,
       sandboxDiskMb: true,
