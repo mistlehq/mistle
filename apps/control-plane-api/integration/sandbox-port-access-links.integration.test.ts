@@ -396,6 +396,7 @@ describe.concurrent("sandbox Port Access links integration", () => {
       organizationId: session.organizationId,
       sandboxInstanceId,
       status: SandboxInstanceStatuses.STOPPED,
+      stoppedAt: "2026-05-13 00:00:00+00",
     });
 
     const createResponse = await env.controlPlaneApi.http.fetch(
@@ -447,6 +448,7 @@ async function insertSandboxInstance(
     sandboxInstanceId: string;
     status?: SandboxInstanceRow["status"];
     providerSandboxId?: string;
+    stoppedAt?: string;
   },
 ): Promise<void> {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
@@ -457,6 +459,7 @@ async function insertSandboxInstance(
     runtimeProvider: "docker",
     providerSandboxId: input.providerSandboxId ?? `provider-${input.sandboxInstanceId}`,
     status: input.status ?? SandboxInstanceStatuses.PENDING,
+    ...(input.stoppedAt === undefined ? {} : { stoppedAt: input.stoppedAt }),
     startedByKind: "user",
     startedById: "usr_port_access_link",
     source: SandboxInstanceSources.DASHBOARD,

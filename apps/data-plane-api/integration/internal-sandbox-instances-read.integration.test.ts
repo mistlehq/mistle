@@ -10,6 +10,7 @@ import {
   SandboxInstancePurposes,
   SandboxStopReasons,
   SandboxInstanceStatuses,
+  SandboxUsageEventTypes,
   SandboxLifecyclePhases,
   SandboxLifecycleStatuses,
   SandboxOperationEventRecordKinds,
@@ -336,6 +337,10 @@ it("marks starting sandbox instances failed when provider inspection misses the 
     failureCode: "provider_runtime_missing",
     failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
   });
+  await expectInspectionTerminalUsageEvent(env, {
+    sandboxInstanceId: "sbi_integration_new_get_missing_starting",
+    eventType: SandboxUsageEventTypes.SANDBOX_FAILED,
+  });
 });
 
 it("marks running sandbox instances failed when provider inspection misses the runtime", async ({
@@ -381,11 +386,16 @@ it("marks running sandbox instances failed when provider inspection misses the r
     failureCode: "provider_runtime_missing",
     failureMessage: "Sandbox runtime was not found at the provider during inspection.",
   });
+  await expectInspectionTerminalUsageEvent(env, {
+    sandboxInstanceId: "sbi_integration_new_get_missing_running",
+    eventType: SandboxUsageEventTypes.SANDBOX_FAILED,
+  });
 });
 
 it("marks stopped sandbox instances failed when provider inspection misses the runtime", async ({
   env,
 }) => {
+  const stoppedAt = "2026-05-13 00:00:00+00";
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
     sandboxInstanceRow({
       id: "sbi_integration_new_get_missing_stopped",
@@ -393,6 +403,7 @@ it("marks stopped sandbox instances failed when provider inspection misses the r
       sandboxProfileId: "sbp_integration_new_missing_stopped",
       status: SandboxInstanceStatuses.STOPPED,
       providerSandboxId: "integration-new-missing-stopped-runtime",
+      stoppedAt,
       title: "Missing stopped runtime",
     }),
   );
@@ -425,6 +436,11 @@ it("marks stopped sandbox instances failed when provider inspection misses the r
     stopReason: SandboxStopReasons.FAILED,
     failureCode: "provider_runtime_missing",
     failureMessage: "Sandbox runtime was not found at the provider during inspection.",
+  });
+  await expectInspectionTerminalUsageEvent(env, {
+    sandboxInstanceId: "sbi_integration_new_get_missing_stopped",
+    eventType: SandboxUsageEventTypes.SANDBOX_STOPPED,
+    occurredAt: stoppedAt,
   });
 });
 
@@ -590,6 +606,52 @@ function clientFor(env: IntegrationTestEnvironment): DataPlaneSandboxInstancesCl
 
 type SandboxInstanceRow = DataPlaneTables["sandboxInstances"]["$inferInsert"];
 type SandboxOperationEventRow = DataPlaneTables["sandboxOperationEvents"]["$inferInsert"];
+
+async function expectInspectionTerminalUsageEvent(
+  env: IntegrationTestEnvironment,
+  input: {
+    sandboxInstanceId: string;
+    eventType:
+      | typeof SandboxUsageEventTypes.SANDBOX_FAILED
+      | typeof SandboxUsageEventTypes.SANDBOX_STOPPED;
+    occurredAt?: string;
+  },
+): Promise<void> {
+  const usageEvents = await env.dataPlaneDb.query.sandboxUsageEvents.findMany({
+    columns: {
+      idempotencyKey: true,
+      sandboxInstanceId: true,
+      computeGeneration: true,
+      eventType: true,
+      occurredAt: true,
+      payload: true,
+    },
+    where: (table, { eq }) => eq(table.sandboxInstanceId, input.sandboxInstanceId),
+  });
+
+  const usageEvent = usageEvents[0];
+  expect(usageEvents).toEqual([
+    {
+      idempotencyKey: [
+        "usage",
+        input.sandboxInstanceId,
+        "1",
+        input.eventType,
+        "data-plane-api-inspection",
+      ].join(":"),
+      sandboxInstanceId: input.sandboxInstanceId,
+      computeGeneration: 1,
+      eventType: input.eventType,
+      occurredAt: usageEvent?.occurredAt,
+      payload: {
+        operationKind: "inspection",
+        outcome: input.eventType === SandboxUsageEventTypes.SANDBOX_STOPPED ? "stopped" : "failed",
+      },
+    },
+  ]);
+  expect(typeof usageEvent?.occurredAt).toBe("string");
+  expect(usageEvent?.occurredAt).toBe(input.occurredAt ?? usageEvent?.occurredAt);
+}
 
 function sandboxInstanceRow(
   input: Partial<SandboxInstanceRow> & {
