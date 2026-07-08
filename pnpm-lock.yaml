@@ -421,13 +421,13 @@ importers:
         version: 1.10.3(@types/react@19.2.17)(posthog-js@1.393.4)(react@19.2.7)
       '@rjsf/core':
         specifier: ~6.6.2
-        version: 6.6.2(@rjsf/utils@6.6.1(react@19.2.7))(react@19.2.7)
+        version: 6.6.2(@rjsf/utils@6.6.2(react@19.2.7))(react@19.2.7)
       '@rjsf/utils':
-        specifier: ~6.6.1
-        version: 6.6.1(react@19.2.7)
+        specifier: ~6.6.2
+        version: 6.6.2(react@19.2.7)
       '@rjsf/validator-ajv8':
         specifier: ~6.6.2
-        version: 6.6.2(@rjsf/utils@6.6.1(react@19.2.7))
+        version: 6.6.2(@rjsf/utils@6.6.2(react@19.2.7))
       '@streamdown/code':
         specifier: ^1.1.1
         version: 1.1.1(react@19.2.7)
@@ -5616,8 +5616,8 @@ packages:
       '@rjsf/utils': ^6.6.x
       react: '>=18'
 
-  '@rjsf/utils@6.6.1':
-    resolution: {integrity: sha512-Hwve0OB1pOed1RkbO8qggcmyPQ5nsE+nimESympq/cb2dtBou0nIVlJ+Paa4oO9vARmN5IrVXXZODinIV+ErMw==}
+  '@rjsf/utils@6.6.2':
+    resolution: {integrity: sha512-npqdWuuFmCkiXETrDLRx8a4EwDJoUdTTnGhJA/774bwDgT99u4nAEyXbJd75VuobunewcLm2FOS2cErD3e28cg==}
     engines: {node: '>=20'}
     peerDependencies:
       react: '>=18'
@@ -7120,8 +7120,8 @@ packages:
   '@webcontainer/env@1.1.1':
     resolution: {integrity: sha512-6aN99yL695Hi9SuIk1oC88l9o0gmxL1nGWWQ/kNy81HigJ0FoaoTXpytCj6ItzgyCEwA9kF1wixsTuv5cjsgng==}
 
-  '@x0k/json-schema-merge@1.0.3':
-    resolution: {integrity: sha512-lerJC4sI9CNUQWdff3PnU1YJOqazD6TjMcvxZIPXUBjn4j1cUiXE0LvzhMnGYzKKr271TkvXJtH7gEwksrtn+w==}
+  '@x0k/json-schema-merge@1.0.4':
+    resolution: {integrity: sha512-KvmMgAftbVzATq4IRnkno/SKSu+gjaR2ZUPJG5JUlY4W3twRJo03sk2914u8scmosibBZ0m7s6euZlJuqpv8Ww==}
 
   '@xterm/addon-fit@0.11.0':
     resolution: {integrity: sha512-jYcgT6xtVYhnhgxh3QgYDnnNMYTcf8ElbxxFzX0IZo+vabQqSPAjC3c1wJrKB5E19VwQei89QCiZZP86DCPF7g==}
@@ -18052,10 +18052,10 @@ snapshots:
       react: 19.2.7
       react-redux: 9.2.0(@types/react@19.2.17)(react@19.2.7)(redux@5.0.1)
 
-  '@rjsf/core@6.6.2(@rjsf/utils@6.6.1(react@19.2.7))(react@19.2.7)':
+  '@rjsf/core@6.6.2(@rjsf/utils@6.6.2(react@19.2.7))(react@19.2.7)':
     dependencies:
-      '@rjsf/utils': 6.6.1(react@19.2.7)
-      '@rjsf/validator-ajv8': 6.5.3(@rjsf/utils@6.6.1(react@19.2.7))
+      '@rjsf/utils': 6.6.2(react@19.2.7)
+      '@rjsf/validator-ajv8': 6.5.3(@rjsf/utils@6.6.2(react@19.2.7))
       lodash: 4.18.0
       lodash-es: 4.18.0
       markdown-to-jsx: 9.8.2(react@19.2.7)
@@ -18066,9 +18066,9 @@ snapshots:
       - solid-js
       - vue
 
-  '@rjsf/utils@6.6.1(react@19.2.7)':
+  '@rjsf/utils@6.6.2(react@19.2.7)':
     dependencies:
-      '@x0k/json-schema-merge': 1.0.3
+      '@x0k/json-schema-merge': 1.0.4
       fast-equals: 6.0.0
       fast-uri: 3.1.2
       jsonpointer: 5.0.1
@@ -18077,17 +18077,17 @@ snapshots:
       react: 19.2.7
       react-is: 18.3.1
 
-  '@rjsf/validator-ajv8@6.5.3(@rjsf/utils@6.6.1(react@19.2.7))':
+  '@rjsf/validator-ajv8@6.5.3(@rjsf/utils@6.6.2(react@19.2.7))':
     dependencies:
-      '@rjsf/utils': 6.6.1(react@19.2.7)
+      '@rjsf/utils': 6.6.2(react@19.2.7)
       ajv: 8.20.0
       ajv-formats: 2.1.1(ajv@8.20.0)
       lodash: 4.18.0
       lodash-es: 4.18.0
 
-  '@rjsf/validator-ajv8@6.6.2(@rjsf/utils@6.6.1(react@19.2.7))':
+  '@rjsf/validator-ajv8@6.6.2(@rjsf/utils@6.6.2(react@19.2.7))':
     dependencies:
-      '@rjsf/utils': 6.6.1(react@19.2.7)
+      '@rjsf/utils': 6.6.2(react@19.2.7)
       ajv: 8.20.0
       ajv-formats: 2.1.1(ajv@8.20.0)
       lodash: 4.18.0
@@ -19653,7 +19653,7 @@ snapshots:
 
   '@webcontainer/env@1.1.1': {}
 
-  '@x0k/json-schema-merge@1.0.3':
+  '@x0k/json-schema-merge@1.0.4':
     dependencies:
       '@types/json-schema': 7.0.15
 
