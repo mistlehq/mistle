@@ -87,6 +87,22 @@ if (typeof HTMLCanvasElement !== "undefined") {
   });
 }
 
+if (typeof ResizeObserver === "undefined") {
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    configurable: true,
+    value: class TestResizeObserver implements ResizeObserver {
+      constructor(_callback: ResizeObserverCallback) {}
+
+      disconnect(): void {}
+
+      observe(_target: Element, _options?: ResizeObserverOptions): void {}
+
+      unobserve(_target: Element): void {}
+    },
+    writable: true,
+  });
+}
+
 function createMatchMedia(query: string): MediaQueryList {
   return {
     matches: matchesMediaQuery(query),
