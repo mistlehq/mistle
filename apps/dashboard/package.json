@@ -36,7 +36,7 @@
     "@mistle/ui": "workspace:*",
     "@mistle/webhooks": "workspace:*",
     "@phosphor-icons/react": "^2.1.7",
-    "@pierre/diffs": "^1.2.5",
+    "@pierre/diffs": "^1.2.12",
     "@posthog/react": "^1.10.3",
     "@rjsf/core": "~6.6.2",
     "@rjsf/utils": "~6.6.2",
