@@ -39,7 +39,7 @@
     "@pierre/diffs": "^1.2.5",
     "@posthog/react": "^1.10.3",
     "@rjsf/core": "~6.6.2",
-    "@rjsf/utils": "~6.6.1",
+    "@rjsf/utils": "~6.6.2",
     "@rjsf/validator-ajv8": "~6.6.2",
     "@streamdown/code": "^1.1.1",
     "@streamdown/mermaid": "^1.0.2",
