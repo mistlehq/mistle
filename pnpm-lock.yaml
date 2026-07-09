@@ -1355,8 +1355,8 @@ importers:
         specifier: ^12.0.1
         version: 12.0.1
       mailpit-api:
-        specifier: ^2.0.0
-        version: 2.0.0
+        specifier: ^2.1.0
+        version: 2.1.0
       openworkflow:
         specifier: 0.9.0
         version: 0.9.0(postgres@3.4.9)
@@ -10477,8 +10477,8 @@ packages:
   magicast@0.5.3:
     resolution: {integrity: sha512-pVKE4UdSQ7DvHzivsCIFx2BJn1mHG6KsyrFcaxFx6tONdneEuThrDx0Cj3AMg58KyN4pzYT+LHOotxDQDjNvkw==}
 
-  mailpit-api@2.0.0:
-    resolution: {integrity: sha512-zK68B0CRVZaJS1PaX7omFhKUKSLp4JMMpAUTRYbCmcrgJ9nguIh4sS+RRUyFeW1nykDNH8PVlRz/WSXsq9ZqlQ==}
+  mailpit-api@2.1.0:
+    resolution: {integrity: sha512-ZZG5ShQS2E5QH9p1xeD2U2sfahKEEgRvtzIlJXsLUtLSUbYjmxPeuvciwayj0oxA+hn85xzIEt1v8FsXtwqKCA==}
     engines: {node: '>=18.0.0'}
 
   markdown-extensions@2.0.0:
@@ -23456,7 +23456,7 @@ snapshots:
       '@babel/types': 7.29.7
       source-map-js: 1.2.1
 
-  mailpit-api@2.0.0: {}
+  mailpit-api@2.1.0: {}
 
   markdown-extensions@2.0.0: {}
 
