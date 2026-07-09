@@ -49,7 +49,7 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "@xyflow/react": "^12.11.0",
-    "better-auth": "1.6.20",
+    "better-auth": "1.6.23",
     "dockview-react": "^7.0.2",
     "elkjs": "^0.11.1",
     "openapi-fetch": "^0.17.0",
