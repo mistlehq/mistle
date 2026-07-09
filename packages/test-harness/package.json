@@ -45,7 +45,7 @@
     "@mistle/time": "workspace:*",
     "@nats-io/transport-node": "^3.4.0",
     "@testcontainers/postgresql": "^12.0.1",
-    "mailpit-api": "^2.0.0",
+    "mailpit-api": "^2.1.0",
     "openworkflow": "0.9.0",
     "pg": "^8.20.0",
     "postgres": "3.4.9",
