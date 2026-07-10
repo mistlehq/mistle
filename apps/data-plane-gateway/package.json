@@ -58,7 +58,7 @@
     "@smithy/hash-node": "^4.3.5",
     "@smithy/protocol-http": "^5.5.2",
     "@smithy/signature-v4": "^5.4.6",
-    "hono": "4.12.25",
+    "hono": "4.12.27",
     "jose": "^6.2.3",
     "pg": "^8.20.0",
     "typeid-js": "^1.2.0",
