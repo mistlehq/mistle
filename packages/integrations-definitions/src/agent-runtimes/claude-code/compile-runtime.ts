@@ -33,7 +33,7 @@ const RuntimeClientProcessStopTimeoutMs = 10_000;
 const RuntimeClientProcessStopGracePeriodMs = 2_000;
 const ArtifactCommandTimeoutMs = 120_000;
 const ClaudeCodeNodeTool = "node@26.5.0";
-const ClaudeAgentSdkVersion = "0.3.206";
+const ClaudeAgentSdkVersion = "0.3.207";
 const MistleManagedApiKey = "mistle-managed-credential";
 const ClaudeCodeMcpConfigPath = "/root/.claude/mcp.json";
 
