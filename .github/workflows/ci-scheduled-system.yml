@@ -1,20 +1,18 @@
-name: CI - System (Scheduled)
+name: CI - System (Manual)
 
 on:
-  schedule:
-    - cron: "0 0,6,15 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: scheduled-system-${{ github.ref }}
+  group: manual-system-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   system-runtime:
-    name: Scheduled Runtime System
+    name: Runtime System
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     if: github.ref == 'refs/heads/main'
@@ -222,7 +220,7 @@ jobs:
                       "color": color,
                       "title": os.environ["WORKFLOW_NAME"],
                       "title_link": os.environ["RUN_URL"],
-                      "text": f"{emoji} Scheduled runtime system run finished with result: {result}.",
+                      "text": f"{emoji} Manual runtime system run finished with result: {result}.",
                       "fields": [
                           {
                               "title": "Repository",
