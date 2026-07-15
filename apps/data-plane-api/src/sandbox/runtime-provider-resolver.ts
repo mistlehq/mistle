@@ -101,6 +101,12 @@ function createRemoteSandboxProviderConfig(input: {
     });
   }
 
+  if (input.credentials.provider === SandboxProvider.FREESTYLE) {
+    return createFreestyleSandboxProviderConfig({
+      credentials: input.credentials,
+    });
+  }
+
   return assertUnreachableResolvedSandboxRuntimeCredentials(input.credentials);
 }
 
@@ -182,6 +188,18 @@ function createOpenComputerSandboxProviderConfig(input: {
       ...(input.credentials.apiBaseUrl === undefined
         ? {}
         : { apiBaseUrl: input.credentials.apiBaseUrl }),
+    },
+  };
+}
+
+function createFreestyleSandboxProviderConfig(input: {
+  credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "freestyle" }>;
+}): CreateSandboxAdapterInput {
+  return {
+    provider: SandboxProvider.FREESTYLE,
+    freestyle: {
+      apiKey: input.credentials.apiKey,
+      ...(input.credentials.baseUrl === undefined ? {} : { baseUrl: input.credentials.baseUrl }),
     },
   };
 }

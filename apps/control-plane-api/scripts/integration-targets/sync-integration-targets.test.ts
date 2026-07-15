@@ -101,6 +101,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "freestyle-default",
+        familyId: "freestyle",
+        variantId: "freestyle-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "gcp-mcp",
         familyId: "gcp",
         variantId: "gcp-mcp",

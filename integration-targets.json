@@ -71,6 +71,11 @@
       "config": {}
     },
     {
+      "targetKey": "freestyle-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "modal-default",
       "enabled": true,
       "config": {}

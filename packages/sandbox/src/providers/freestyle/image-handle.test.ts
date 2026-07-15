@@ -6,6 +6,7 @@ import {
   createFreestyleSnapshotBaseImageName,
   createFreestyleSnapshotImageHandle,
   parseFreestyleImageHandle,
+  resolveFreestyleStartImage,
 } from "./image-handle.js";
 
 describe("Freestyle image handles", () => {
@@ -35,5 +36,22 @@ describe("Freestyle image handles", () => {
         "ghcr.io/mistlehq/sandbox-base@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       ),
     ).toBe("mistle-0123456789abcdef01234567");
+  });
+
+  it("resolves GHCR image refs into Freestyle base image snapshot inputs", () => {
+    const baseImageRef =
+      "ghcr.io/mistlehq/sandbox-base@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+    expect(
+      resolveFreestyleStartImage({
+        provider: SandboxProvider.FREESTYLE,
+        imageId: baseImageRef,
+        createdAt: "2026-06-07T00:00:00.000Z",
+      }),
+    ).toEqual({
+      kind: "base_image",
+      snapshotName: "mistle-0123456789abcdef01234567",
+      sourceBaseImageRef: baseImageRef,
+    });
   });
 });

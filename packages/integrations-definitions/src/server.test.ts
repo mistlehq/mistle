@@ -80,6 +80,10 @@ describe("integrations-definitions server", () => {
       familyId: "e2b",
       variantId: "e2b-default",
     });
+    const freestyleSandboxRuntimeDefinition = registry.getDefinition({
+      familyId: "freestyle",
+      variantId: "freestyle-default",
+    });
     const modalSandboxRuntimeDefinition = registry.getDefinition({
       familyId: "modal",
       variantId: "modal-default",
@@ -314,6 +318,14 @@ describe("integrations-definitions server", () => {
       kind: "sandbox",
       sandboxRuntime: {
         providerId: "e2b",
+      },
+    });
+    expect(freestyleSandboxRuntimeDefinition).toMatchObject({
+      familyId: "freestyle",
+      variantId: "freestyle-default",
+      kind: "sandbox",
+      sandboxRuntime: {
+        providerId: "freestyle",
       },
     });
     expect(modalSandboxRuntimeDefinition).toMatchObject({
@@ -695,6 +707,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
+    expect(definitions).toHaveLength(49);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
@@ -706,6 +719,7 @@ describe("integrations-definitions server", () => {
         "deepseek::deepseek-default",
         "expo::expo-mcp",
         "fireworks::fireworks-default",
+        "freestyle::freestyle-default",
         "google-analytics::google-analytics-mcp",
         "googleads::googleads-default",
         "google-business-profile::google-business-profile-mcp",

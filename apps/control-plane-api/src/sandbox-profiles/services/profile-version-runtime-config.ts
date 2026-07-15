@@ -424,6 +424,13 @@ function validateManagedSandboxProviderAvailability(input: {
     return [];
   }
 
+  if (
+    input.providerId === SandboxProvider.FREESTYLE &&
+    input.sandboxConfig.freestyle?.enabled === true
+  ) {
+    return [];
+  }
+
   if (input.providerId === SandboxProvider.MODAL && input.sandboxConfig.modal?.enabled === true) {
     return [];
   }
@@ -450,6 +457,19 @@ function validateManagedSandboxProviderAvailability(input: {
         code: SandboxProfilePublishabilityIssueCodes.SANDBOX_MANAGED_PROVIDER_UNAVAILABLE,
         message:
           "Managed Modal sandbox provider credentials are not configured for this deployment.",
+      },
+    ];
+  }
+
+  if (
+    input.providerId === SandboxProvider.FREESTYLE &&
+    input.sandboxConfig.freestyle?.enabled !== true
+  ) {
+    return [
+      {
+        code: SandboxProfilePublishabilityIssueCodes.SANDBOX_MANAGED_PROVIDER_UNAVAILABLE,
+        message:
+          "Managed Freestyle sandbox provider credentials are not configured for this deployment.",
       },
     ];
   }
@@ -528,6 +548,10 @@ function isValidCapabilityValue(
   value: number,
   capability: SandboxRuntimeResourceCapabilities["vcpuCount"],
 ): boolean {
+  if (capability.allowedValues !== undefined) {
+    return capability.allowedValues.includes(value);
+  }
+
   return (
     Number.isInteger(value) &&
     value >= capability.min &&

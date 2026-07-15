@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createE2BSandboxProviderConfig,
+  createFreestyleSandboxProviderConfig,
   createModalSandboxProviderConfig,
   createOpenComputerSandboxProviderConfig,
   createResolveSandboxRuntimeInput,
@@ -164,6 +165,63 @@ describe("createOpenComputerSandboxProviderConfig", () => {
       provider: "opencomputer",
       opencomputer: {
         apiKey: "opencomputer-api-key",
+        sandboxd: {
+          kind: "release",
+          artifact: {
+            version: "0.32.0",
+            url: "https://github.com/mistlehq/mistle/releases/download/v0.32.0/sandboxd-x86_64-unknown-linux-gnu.tar.gz",
+            sha256: "a".repeat(64),
+          },
+        },
+      },
+    });
+  });
+});
+
+describe("createFreestyleSandboxProviderConfig", () => {
+  it("maps Freestyle credentials into provider config", () => {
+    expect(
+      createFreestyleSandboxProviderConfig({
+        credentials: {
+          provider: "freestyle",
+          source: "connection",
+          apiKey: "freestyle-api-key",
+          baseUrl: "https://api.freestyle.example.test",
+        },
+      }),
+    ).toEqual({
+      provider: "freestyle",
+      freestyle: {
+        apiKey: "freestyle-api-key",
+        baseUrl: "https://api.freestyle.example.test",
+      },
+    });
+  });
+
+  it("strips release-manifest target metadata from sandboxd artifacts", () => {
+    const artifact = {
+      version: "0.32.0",
+      target: "x86_64-unknown-linux-gnu",
+      url: "https://github.com/mistlehq/mistle/releases/download/v0.32.0/sandboxd-x86_64-unknown-linux-gnu.tar.gz",
+      sha256: "a".repeat(64),
+    };
+
+    expect(
+      createFreestyleSandboxProviderConfig({
+        credentials: {
+          provider: "freestyle",
+          source: "connection",
+          apiKey: "freestyle-api-key",
+        },
+        sandboxd: {
+          kind: "release",
+          artifact,
+        },
+      }),
+    ).toEqual({
+      provider: "freestyle",
+      freestyle: {
+        apiKey: "freestyle-api-key",
         sandboxd: {
           kind: "release",
           artifact: {

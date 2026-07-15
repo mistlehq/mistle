@@ -207,7 +207,34 @@ export function createSandboxRuntimeProviderResolver(input: {
     }
 
     if (inputRuntime.provider === SandboxProvider.FREESTYLE) {
-      throw new Error("Freestyle sandbox runtime is not wired in data-plane worker yet.");
+      const credentials = await input.controlPlaneInternalClient.resolveSandboxRuntimeCredentials({
+        organizationId: inputRuntime.organizationId,
+        provider: SandboxProvider.FREESTYLE,
+        ...(inputRuntime.connectionId === undefined
+          ? {}
+          : { connectionId: inputRuntime.connectionId }),
+      });
+      if (credentials.provider !== SandboxProvider.FREESTYLE) {
+        throw new Error("Control-plane returned non-Freestyle credentials for Freestyle runtime.");
+      }
+
+      const needsRuntimeImageArtifacts = options.includeImagePreparationArtifacts;
+      const sandboxdArtifact =
+        needsRuntimeImageArtifacts && input.sandboxdArtifactResolver !== undefined
+          ? await input.sandboxdArtifactResolver.resolve()
+          : undefined;
+
+      return createFreestyleSandboxRuntime({
+        credentials,
+        ...(sandboxdArtifact === undefined
+          ? {}
+          : {
+              sandboxd: {
+                kind: SandboxSdkImageSandboxdSourceKinds.RELEASE,
+                artifact: sandboxdArtifact,
+              },
+            }),
+      });
     }
 
     return assertUnreachableSandboxProvider(inputRuntime.provider);
@@ -296,6 +323,35 @@ function createTensorlakeSandboxRuntime(input: {
     provider: SandboxProvider.TENSORLAKE,
     sandboxAdapter: createSandboxAdapter(providerConfig),
     sandboxRuntimeControl: createSandboxRuntimeControl(providerConfig),
+  };
+}
+
+function createFreestyleSandboxRuntime(input: {
+  credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "freestyle" }>;
+  sandboxd?: SandboxSdkImageReleaseSandboxdSource;
+}): ResolvedSandboxRuntime {
+  const providerConfig = createFreestyleSandboxProviderConfig(input);
+
+  return {
+    provider: SandboxProvider.FREESTYLE,
+    sandboxAdapter: createSandboxAdapter(providerConfig),
+    sandboxRuntimeControl: createSandboxRuntimeControl(providerConfig),
+  };
+}
+
+export function createFreestyleSandboxProviderConfig(input: {
+  credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "freestyle" }>;
+  sandboxd?: SandboxSdkImageReleaseSandboxdSource;
+}): CreateSandboxAdapterInput {
+  return {
+    provider: SandboxProvider.FREESTYLE,
+    freestyle: {
+      apiKey: input.credentials.apiKey,
+      ...(input.credentials.baseUrl === undefined ? {} : { baseUrl: input.credentials.baseUrl }),
+      ...(input.sandboxd === undefined
+        ? {}
+        : { sandboxd: createSandboxProviderSource(input.sandboxd) }),
+    },
   };
 }
 

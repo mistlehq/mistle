@@ -29,6 +29,7 @@ export function createFreestyleAdapter(config: FreestyleSandboxConfig): Freestyl
     ...(validatedConfig.idleTimeoutSeconds === undefined
       ? {}
       : { idleTimeoutSeconds: validatedConfig.idleTimeoutSeconds }),
+    ...(validatedConfig.sandboxd === undefined ? {} : { sandboxd: validatedConfig.sandboxd }),
   });
 }
 

@@ -152,6 +152,31 @@ const PartialDataPlaneApiSandboxOpenComputerConfigSchema = z
   })
   .strict();
 
+export const DataPlaneApiSandboxFreestyleConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      apiKey: z.string().min(1),
+      baseUrl: z.url().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      apiKey: z.string().min(1).optional(),
+      baseUrl: z.url().optional(),
+    })
+    .strict(),
+]);
+
+const PartialDataPlaneApiSandboxFreestyleConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    apiKey: z.string().min(1).optional(),
+    baseUrl: z.url().optional(),
+  })
+  .strict();
+
 export const DataPlaneApiSandboxModalConfigSchema = z.discriminatedUnion("enabled", [
   z
     .object({
@@ -190,6 +215,7 @@ export const DataPlaneApiSandboxConfigSchema = z
   .object({
     docker: DataPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: DataPlaneApiSandboxE2BConfigSchema.optional(),
+    freestyle: DataPlaneApiSandboxFreestyleConfigSchema.optional(),
     modal: DataPlaneApiSandboxModalConfigSchema.optional(),
     opencomputer: DataPlaneApiSandboxOpenComputerConfigSchema.optional(),
     tensorlake: DataPlaneApiSandboxTensorlakeConfigSchema.optional(),
@@ -200,6 +226,7 @@ export const PartialDataPlaneApiSandboxConfigSchema = z
   .object({
     docker: PartialDataPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: PartialDataPlaneApiSandboxE2BConfigSchema.optional(),
+    freestyle: PartialDataPlaneApiSandboxFreestyleConfigSchema.optional(),
     modal: PartialDataPlaneApiSandboxModalConfigSchema.optional(),
     opencomputer: PartialDataPlaneApiSandboxOpenComputerConfigSchema.optional(),
     tensorlake: PartialDataPlaneApiSandboxTensorlakeConfigSchema.optional(),
@@ -239,7 +266,7 @@ export const PartialDataPlaneApiConfigSchema = z
 export function getDataPlaneApiSandboxProviderValidationIssue(input: {
   appSandbox: Pick<
     DataPlaneApiConfig["sandbox"],
-    "docker" | "e2b" | "modal" | "opencomputer" | "tensorlake"
+    "docker" | "e2b" | "freestyle" | "modal" | "opencomputer" | "tensorlake"
   >;
 }): {
   path: readonly ["sandbox", "docker"];

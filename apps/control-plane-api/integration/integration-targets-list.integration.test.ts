@@ -53,6 +53,13 @@ describe.concurrent("integration targets discovery integration", () => {
       },
     });
     await seedTarget(env, {
+      targetKey: "freestyle_integration_new_targets_list",
+      familyId: "freestyle",
+      variantId: "freestyle-default",
+      enabled: true,
+      config: {},
+    });
+    await seedTarget(env, {
       targetKey: "zzz_disabled_integration_new_targets_list",
       familyId: "slack",
       variantId: "slack-webhooks",
@@ -242,6 +249,36 @@ describe.concurrent("integration targets discovery integration", () => {
               description: "Open the link below and enter the code to approve access.",
             },
           },
+        },
+      ],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    });
+    expect(findTarget(allTargets, "freestyle_integration_new_targets_list")).toMatchObject({
+      targetKey: "freestyle_integration_new_targets_list",
+      familyId: "freestyle",
+      variantId: "freestyle-default",
+      kind: "sandbox",
+      enabled: true,
+      config: {},
+      displayName: "Freestyle",
+      description: "Run sandboxes on Freestyle VMs with your organization's API keys.",
+      logoKey: "freestyle",
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              placeholder: "Enter Freestyle API key",
+              inputType: "password",
+              slotKey: "freestyle.freestyle-default.api-key.api-key",
+            },
+          ],
         },
       ],
       targetHealth: {

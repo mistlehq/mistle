@@ -7,6 +7,17 @@ const FreestyleSandboxBaseImageNamePrefix = "mistle";
 const FreestyleSha256DigestPrefix = "@sha256:";
 const FreestyleBaseImageDigestLength = 24;
 
+export type FreestyleStartImage =
+  | {
+      readonly kind: "snapshot";
+      readonly snapshotId: string;
+    }
+  | {
+      readonly kind: "base_image";
+      readonly snapshotName: string;
+      readonly sourceBaseImageRef: string;
+    };
+
 export function createFreestyleSnapshotImageHandle(snapshotId: string): SandboxImageHandle {
   if (snapshotId.trim().length === 0) {
     throw new SandboxConfigurationError("Freestyle snapshot id is required.");
@@ -33,8 +44,33 @@ export function parseFreestyleImageHandle(handle: SandboxImageHandle): { snapsho
   return { snapshotId: handle.imageId };
 }
 
+export function resolveFreestyleStartImage(handle: SandboxImageHandle): FreestyleStartImage {
+  if (handle.provider !== SandboxProvider.FREESTYLE) {
+    throw new SandboxConfigurationError(
+      `Expected Freestyle image handle, received provider '${handle.provider}'.`,
+    );
+  }
+
+  if (isGhcrImageRef(handle.imageId)) {
+    return {
+      kind: "base_image",
+      snapshotName: createFreestyleSnapshotBaseImageName(handle.imageId),
+      sourceBaseImageRef: handle.imageId,
+    };
+  }
+
+  return {
+    kind: "snapshot",
+    snapshotId: requireNonEmptyFreestyleImageId(handle.imageId),
+  };
+}
+
 export function createFreestyleSnapshotBaseImageName(baseImageRef: string): string {
   return `${FreestyleSandboxBaseImageNamePrefix}-${createFreestyleBaseImageNameDigest(baseImageRef)}`;
+}
+
+function isGhcrImageRef(imageId: string): boolean {
+  return imageId.trim().startsWith("ghcr.io/");
 }
 
 function createFreestyleBaseImageNameDigest(baseImageRef: string): string {

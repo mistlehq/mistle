@@ -321,6 +321,17 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
         : config.sandbox.opencomputer?.enabled === false
           ? { opencomputer: { enabled: false } }
           : {}),
+      ...(config.sandbox.freestyle?.enabled === true
+        ? {
+            freestyle: {
+              enabled: true,
+              apiKey: config.sandbox.freestyle.api_key,
+              baseUrl: config.sandbox.freestyle.base_url,
+            },
+          }
+        : config.sandbox.freestyle?.enabled === false
+          ? { freestyle: { enabled: false } }
+          : {}),
       ...(config.sandbox.modal?.enabled === true
         ? {
             modal: {
@@ -457,6 +468,16 @@ export function selectDataPlaneApiConfig(config: Config): DataPlaneApiConfig {
               apiBaseUrl: config.sandbox.opencomputer.api_base_url,
             }
           : config.sandbox.opencomputer?.enabled === false
+            ? { enabled: false }
+            : undefined,
+      freestyle:
+        config.sandbox.freestyle?.enabled === true
+          ? {
+              enabled: true,
+              apiKey: config.sandbox.freestyle.api_key,
+              baseUrl: config.sandbox.freestyle.base_url,
+            }
+          : config.sandbox.freestyle?.enabled === false
             ? { enabled: false }
             : undefined,
       modal:
@@ -606,6 +627,16 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
               apiBaseUrl: config.sandbox.opencomputer.api_base_url,
             }
           : config.sandbox.opencomputer?.enabled === false
+            ? { enabled: false }
+            : undefined,
+      freestyle:
+        config.sandbox.freestyle?.enabled === true
+          ? {
+              enabled: true,
+              apiKey: config.sandbox.freestyle.api_key,
+              baseUrl: config.sandbox.freestyle.base_url,
+            }
+          : config.sandbox.freestyle?.enabled === false
             ? { enabled: false }
             : undefined,
       modal:

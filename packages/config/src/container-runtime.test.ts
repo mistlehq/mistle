@@ -72,6 +72,15 @@ function buildModalSandboxEnv(): NodeJS.ProcessEnv {
   };
 }
 
+function buildFreestyleSandboxEnv(): NodeJS.ProcessEnv {
+  return {
+    ...buildCommonEnv(),
+    MISTLE_SANDBOX_FREESTYLE_ENABLED: "true",
+    MISTLE_SANDBOX_FREESTYLE_API_KEY: "freestyle-key",
+    MISTLE_SANDBOX_FREESTYLE_BASE_URL: "https://api.freestyle.example.test",
+  };
+}
+
 describe("generateContainerRuntimeConfig", () => {
   it("generates a single-container config with Docker runtime settings", () => {
     const tempDir = createTempDir();
@@ -137,6 +146,25 @@ describe("generateContainerRuntimeConfig", () => {
     }
   });
 
+  it("generates a single-container config with Freestyle runtime settings", () => {
+    const tempDir = createTempDir();
+
+    try {
+      const config = generateContainerRuntimeConfig({
+        env: buildFreestyleSandboxEnv(),
+        secretsPath: join(tempDir, "secrets.env"),
+      });
+
+      expect(getValueAtPath(config, ["sandbox", "freestyle", "enabled"])).toBe(true);
+      expect(getValueAtPath(config, ["sandbox", "freestyle", "api_key"])).toBe("freestyle-key");
+      expect(getValueAtPath(config, ["sandbox", "freestyle", "base_url"])).toBe(
+        "https://api.freestyle.example.test",
+      );
+    } finally {
+      cleanupTempDir(tempDir);
+    }
+  });
+
   it("reuses generated secrets from the persisted secrets file", () => {
     const tempDir = createTempDir();
 
@@ -196,6 +224,23 @@ describe("generateContainerRuntimeConfig", () => {
           secretsPath: join(tempDir, "secrets.env"),
         }),
       ).toThrow("Missing required environment variable: MISTLE_SANDBOX_MODAL_TOKEN_SECRET");
+    } finally {
+      cleanupTempDir(tempDir);
+    }
+  });
+
+  it("fails fast when Freestyle is enabled without required credentials", () => {
+    const tempDir = createTempDir();
+    const env = buildFreestyleSandboxEnv();
+    delete env.MISTLE_SANDBOX_FREESTYLE_API_KEY;
+
+    try {
+      expect(() =>
+        generateContainerRuntimeConfig({
+          env,
+          secretsPath: join(tempDir, "secrets.env"),
+        }),
+      ).toThrow("Missing required environment variable: MISTLE_SANDBOX_FREESTYLE_API_KEY");
     } finally {
       cleanupTempDir(tempDir);
     }

@@ -161,6 +161,7 @@ describe("createFreestyleActivatePrelude", () => {
 
     expect(command).toContain("/opt/mistle/bin/sandboxd activate --stdin-bytes 4");
     expect(command).toContain("stty raw -echo");
+    expect(command).toContain("__MISTLE_FREESTYLE_ACTIVATE_READY__");
     expect(command).not.toContain("/tmp");
     expect(command).not.toContain("cat >");
   });

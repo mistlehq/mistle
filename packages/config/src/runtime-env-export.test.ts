@@ -158,6 +158,14 @@ describe("exportServiceConfigToEnv", () => {
       name: "MISTLE_SANDBOX_TENSORLAKE_API_KEY",
       value: "replace-with-tensorlake-api-key",
     });
+    expectEntry(entries, {
+      name: "MISTLE_SANDBOX_FREESTYLE_ENABLED",
+      value: true,
+    });
+    expectEntry(entries, {
+      name: "MISTLE_SANDBOX_FREESTYLE_API_KEY",
+      value: "replace-with-freestyle-api-key",
+    });
   });
 
   it("does not export control plane API KV env entries for the memory cache backend", () => {
@@ -287,6 +295,10 @@ describe("exportServiceConfigToEnv", () => {
     expectEntry(entries, {
       name: "MISTLE_SANDBOX_E2B_DOMAIN",
       value: "e2b.app",
+    });
+    expectEntry(entries, {
+      name: "MISTLE_SANDBOX_FREESTYLE_API_KEY",
+      value: "replace-with-freestyle-api-key",
     });
   });
 

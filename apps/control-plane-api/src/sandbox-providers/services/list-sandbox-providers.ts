@@ -14,6 +14,7 @@ export function listSandboxProviders(ctx: {
 }): ListSandboxProvidersResponse {
   const sandboxRuntimeDefinitions = [
     findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.E2B),
+    findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.FREESTYLE),
     findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.MODAL),
     findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.OPENCOMPUTER),
     findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.TENSORLAKE),
@@ -34,13 +35,15 @@ export function listSandboxProviders(ctx: {
         managed:
           definition.sandboxRuntime.providerId === SandboxProvider.E2B
             ? ctx.sandboxConfig.e2b?.enabled === true
-            : definition.sandboxRuntime.providerId === SandboxProvider.MODAL
-              ? ctx.sandboxConfig.modal?.enabled === true
-              : definition.sandboxRuntime.providerId === SandboxProvider.OPENCOMPUTER
-                ? ctx.sandboxConfig.opencomputer?.enabled === true
-                : definition.sandboxRuntime.providerId === SandboxProvider.TENSORLAKE
-                  ? ctx.sandboxConfig.tensorlake?.enabled === true
-                  : false,
+            : definition.sandboxRuntime.providerId === SandboxProvider.FREESTYLE
+              ? ctx.sandboxConfig.freestyle?.enabled === true
+              : definition.sandboxRuntime.providerId === SandboxProvider.MODAL
+                ? ctx.sandboxConfig.modal?.enabled === true
+                : definition.sandboxRuntime.providerId === SandboxProvider.OPENCOMPUTER
+                  ? ctx.sandboxConfig.opencomputer?.enabled === true
+                  : definition.sandboxRuntime.providerId === SandboxProvider.TENSORLAKE
+                    ? ctx.sandboxConfig.tensorlake?.enabled === true
+                    : false,
         supportsOrganizationConnection: definition.connectionMethods.length > 0,
         resourceCapabilities: createResourceCapabilitiesResponse(
           definition.sandboxRuntime.resourceCapabilities,

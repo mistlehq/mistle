@@ -660,7 +660,7 @@ function SandboxProviderResourceFields(input: {
         onChange={(value) => {
           input.onResourceFieldChange("vcpuCount", value);
         }}
-        value={input.resources.vcpuCount}
+        value={clampResourceValue(input.resources.vcpuCount, capabilities.vcpuCount)}
       />
       <ResourceSliderField
         capability={memoryCapability}
@@ -866,17 +866,50 @@ function createMemoryCapabilityForVcpu(input: {
     min,
     max,
     step: input.capability.step,
+    ...(input.capability.allowedValues === undefined
+      ? {}
+      : {
+          allowedValues: input.capability.allowedValues.filter(
+            (allowedValue) => allowedValue >= min && allowedValue <= max,
+          ),
+        }),
     default: clampResourceValue(input.capability.default, {
       min,
       max,
       step: input.capability.step,
+      ...(input.capability.allowedValues === undefined
+        ? {}
+        : {
+            allowedValues: input.capability.allowedValues.filter(
+              (allowedValue) => allowedValue >= min && allowedValue <= max,
+            ),
+          }),
       default: input.capability.default,
     }),
   };
 }
 
 function clampResourceValue(value: number, capability: ResourceCapability): number {
+  if (capability.allowedValues !== undefined) {
+    return clampAllowedResourceValue(value, capability.allowedValues);
+  }
+
   return Math.min(Math.max(value, capability.min), capability.max);
+}
+
+function clampAllowedResourceValue(value: number, allowedValues: readonly number[]): number {
+  const firstAllowedValue = allowedValues[0];
+  if (firstAllowedValue === undefined) {
+    throw new Error("Resource capability allowed values must not be empty.");
+  }
+
+  for (const allowedValue of allowedValues) {
+    if (allowedValue >= value) {
+      return allowedValue;
+    }
+  }
+
+  return allowedValues[allowedValues.length - 1] ?? firstAllowedValue;
 }
 
 function ResourceNumberField(input: {
@@ -887,6 +920,20 @@ function ResourceNumberField(input: {
   onChange: (value: number) => void;
   value: number;
 }): React.JSX.Element {
+  if (hasAllowedResourceValues(input.capability)) {
+    return (
+      <ResourceSelectField
+        capability={input.capability}
+        disabled={input.disabled}
+        formatValue={formatPlainResourceValue}
+        id={input.id}
+        label={input.label}
+        onChange={input.onChange}
+        value={input.value}
+      />
+    );
+  }
+
   return (
     <Field contentWidth="fill" orientation="horizontal">
       <FieldHeader>
@@ -924,10 +971,14 @@ function ResourceSliderField(input: {
   onChange: (value: number) => void;
   value: number;
 }): React.JSX.Element {
+  if (hasAllowedResourceValues(input.capability)) {
+    return <AllowedResourceSliderField {...input} capability={input.capability} />;
+  }
+
   return (
     <Field contentWidth="fill" orientation="horizontal">
       <FieldHeader>
-        <FieldLabel>{input.label}</FieldLabel>
+        <FieldLabel htmlFor={input.id}>{input.label}</FieldLabel>
       </FieldHeader>
       <FieldContent>
         <div className="flex items-center gap-4">
@@ -956,6 +1007,122 @@ function ResourceSliderField(input: {
       </FieldContent>
     </Field>
   );
+}
+
+function AllowedResourceSliderField(input: {
+  capability: ResourceCapability & { allowedValues: number[] };
+  disabled: boolean;
+  formatValue: (value: number) => string;
+  id: string;
+  label: string;
+  onChange: (value: number) => void;
+  value: number;
+}): React.JSX.Element {
+  const allowedValues = input.capability.allowedValues;
+  if (allowedValues.length === 0) {
+    throw new Error("Resource capability allowed values must not be empty.");
+  }
+
+  const selectedValue = clampResourceValue(input.value, input.capability);
+  const selectedIndex = allowedValues.indexOf(selectedValue);
+  const sliderIndex = selectedIndex === -1 ? 0 : selectedIndex;
+
+  return (
+    <Field contentWidth="fill" orientation="horizontal">
+      <FieldHeader>
+        <FieldLabel htmlFor={input.id}>{input.label}</FieldLabel>
+      </FieldHeader>
+      <FieldContent>
+        <div className="flex items-center gap-4">
+          <Slider
+            aria-label={input.label}
+            className="[&_[data-slot=slider-range]]:bg-primary/80 [&_[data-slot=slider-thumb]]:size-5 [&_[data-slot=slider-track]]:h-2 [&_[data-slot=slider-track]]:bg-border min-w-0 flex-1"
+            disabled={input.disabled}
+            id={input.id}
+            max={allowedValues.length - 1}
+            min={0}
+            onValueChange={(values) => {
+              const nextIndex = Array.isArray(values) ? values[0] : values;
+              if (nextIndex === undefined) {
+                return;
+              }
+
+              const nextValue = allowedValues[nextIndex];
+              if (nextValue === undefined) {
+                return;
+              }
+
+              input.onChange(nextValue);
+            }}
+            step={1}
+            value={[sliderIndex]}
+          />
+          <span className="min-w-20 shrink-0 text-right text-sm font-medium">
+            {input.formatValue(selectedValue)}
+          </span>
+        </div>
+      </FieldContent>
+    </Field>
+  );
+}
+
+function hasAllowedResourceValues(
+  capability: ResourceCapability,
+): capability is ResourceCapability & { allowedValues: number[] } {
+  return capability.allowedValues !== undefined;
+}
+
+function ResourceSelectField(input: {
+  capability: ResourceCapability & { allowedValues: number[] };
+  disabled: boolean;
+  formatValue: (value: number) => string;
+  id: string;
+  label: string;
+  onChange: (value: number) => void;
+  value: number;
+}): React.JSX.Element {
+  const selectedValue = String(clampResourceValue(input.value, input.capability));
+
+  return (
+    <Field contentWidth="fill" orientation="horizontal">
+      <FieldHeader>
+        <FieldLabel htmlFor={input.id}>{input.label}</FieldLabel>
+      </FieldHeader>
+      <FieldContent>
+        <Select
+          disabled={input.disabled}
+          onValueChange={(value) => {
+            if (value === null) {
+              return;
+            }
+
+            input.onChange(parseResourceSelectValue(value));
+          }}
+          value={selectedValue}
+        >
+          <SelectTrigger id={input.id}>
+            <SelectValue>{input.formatValue(parseResourceSelectValue(selectedValue))}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {input.capability.allowedValues.map((allowedValue) => (
+              <SelectItem key={allowedValue} value={String(allowedValue)}>
+                {input.formatValue(allowedValue)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FieldContent>
+    </Field>
+  );
+}
+
+function parseResourceSelectValue(value: string): number {
+  const parsedValue = Number(value);
+  if (!Number.isInteger(parsedValue)) {
+    throw new Error(`Invalid resource option '${value}'.`);
+  }
+
+  return parsedValue;
 }
 
 function SandboxProfileRuntimeReadOnlySummary(input: {
@@ -1816,4 +1983,8 @@ function formatCpuResourceValue(value: number): string {
 
 function formatMemoryResourceValue(value: number): string {
   return `${String(value)} MB`;
+}
+
+function formatPlainResourceValue(value: number): string {
+  return String(value);
 }

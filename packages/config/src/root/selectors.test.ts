@@ -218,6 +218,11 @@ function createRootConfig(input: {
         enabled: true,
         api_key: "tensorlake-api-key",
       },
+      freestyle: {
+        enabled: true,
+        api_key: "freestyle-api-key",
+        base_url: "https://api.freestyle.example.com",
+      },
       ...input.sandbox,
     },
   };
@@ -549,6 +554,16 @@ describe("selectControlPlaneApiConfig", () => {
       },
     });
   });
+
+  it("projects Freestyle as an enabled managed sandbox provider", () => {
+    const config = selectControlPlaneApiConfig(createRootConfig({}));
+
+    expect(config.sandbox.freestyle).toEqual({
+      enabled: true,
+      apiKey: "freestyle-api-key",
+      baseUrl: "https://api.freestyle.example.com",
+    });
+  });
 });
 
 describe("ConfigSchema", () => {
@@ -629,6 +644,11 @@ describe("selectDataPlaneApiConfig", () => {
     expect(config.sandbox.tensorlake).toEqual({
       enabled: true,
       apiKey: "tensorlake-api-key",
+    });
+    expect(config.sandbox.freestyle).toEqual({
+      enabled: true,
+      apiKey: "freestyle-api-key",
+      baseUrl: "https://api.freestyle.example.com",
     });
     expect(
       selectDataPlaneApiConfig(
@@ -789,6 +809,11 @@ describe("selectDataPlaneWorkerConfig", () => {
     expect(config.sandbox.tensorlake).toEqual({
       enabled: true,
       apiKey: "tensorlake-api-key",
+    });
+    expect(config.sandbox.freestyle).toEqual({
+      enabled: true,
+      apiKey: "freestyle-api-key",
+      baseUrl: "https://api.freestyle.example.com",
     });
     expect(
       selectDataPlaneWorkerConfig(

@@ -6,6 +6,7 @@ const SandboxRuntimeResourceFieldSchema = z
     max: z.number().int().min(0),
     step: z.number().int().min(1),
     default: z.number().int().min(0),
+    allowedValues: z.array(z.number().int().min(0)).nonempty().optional(),
   })
   .strict();
 
