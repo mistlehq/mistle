@@ -50,6 +50,6 @@
     "@opentelemetry/context-async-hooks": "^2.8.0",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.10"
   }
 }
